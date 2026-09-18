@@ -15,6 +15,7 @@ logs/
 # Private documents and generated artifacts
 *.pdf
 sent_emails.txt
+docs/pycharm-ai-prompt-library.md
 
 # Python
 __pycache__/

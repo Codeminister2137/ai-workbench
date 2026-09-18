@@ -3,8 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-from ai_provider import BackendInfo, BackendLocation, ModelCapabilities, PrivacyClass
-
 
 class TaskType(StrEnum):
     GENERAL = "general"
@@ -32,6 +30,20 @@ class QualityThreshold(StrEnum):
 class LatencyTarget(StrEnum):
     INTERACTIVE = "interactive"
     BACKGROUND = "background"
+
+
+class PrivacyClass(StrEnum):
+    """Prototype request privacy classes owned by orchestration policy."""
+
+    LOCAL_ONLY = "local_only"
+    EXTERNAL_ALLOWED = "external_allowed"
+    SENSITIVE_REVIEW_REQUIRED = "sensitive_review_required"
+    PUBLIC_OR_LOW_RISK = "public_or_low_risk"
+
+
+class BackendLocation(StrEnum):
+    LOCAL = "local"
+    EXTERNAL = "external"
 
 
 class PromptIssueSeverity(StrEnum):
@@ -71,8 +83,27 @@ class PromptJudgeResult:
 
 
 @dataclass(frozen=True, slots=True)
+class ModelCapabilities:
+    chat: bool = True
+    streaming: bool = False
+    tools: bool = False
+    structured_output: bool = False
+    multimodal_input: bool = False
+    embeddings: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class ModelBackend:
+    provider: str
+    model: str
+    location: BackendLocation
+    base_url: str | None = None
+    capabilities: ModelCapabilities = field(default_factory=ModelCapabilities)
+
+
+@dataclass(frozen=True, slots=True)
 class ModelCatalogEntry:
-    backend: BackendInfo
+    backend: ModelBackend
     quality: QualityThreshold = QualityThreshold.STANDARD
     latency: LatencyTarget = LatencyTarget.INTERACTIVE
     notes: str | None = None

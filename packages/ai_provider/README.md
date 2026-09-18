@@ -36,6 +36,18 @@ print(response.message.content)
 print(response.backend.provider, response.backend.model)
 ```
 
+## Orchestrator Composition
+
+`ai_orchestrator` returns neutral execution targets instead of depending on this
+package. When a caller chooses to execute through `ai_provider`, adapt the target
+at the boundary. See `examples/orchestrator_execution_target.py` for the minimal
+mapping from `ai_orchestrator.ExecutionTarget` to `BackendConfig`.
+
+That example also includes a caller-side `prepare_backend_config(...)` helper
+that runs `ai_orchestrator.prepare_execution(...)`, adapts only ready execution
+plans, and returns `None` for provider config when the prompt needs review or no
+model satisfies the task profile. It does not execute a provider request.
+
 ## Environment Configuration
 
 `BackendConfig.from_env()` reads these variables by default:

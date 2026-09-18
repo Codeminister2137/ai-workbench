@@ -2,14 +2,17 @@ from __future__ import annotations
 
 import pytest
 from ai_orchestrator import (
+    BackendLocation,
     LatencyTarget,
+    ModelBackend,
+    ModelCapabilities,
     ModelCatalogEntry,
+    PrivacyClass,
     QualityThreshold,
     TaskCapability,
     TaskProfile,
     recommend_model,
 )
-from ai_provider import BackendInfo, BackendLocation, ModelCapabilities, PrivacyClass
 
 
 def _candidate(
@@ -21,7 +24,7 @@ def _candidate(
     capabilities: ModelCapabilities | None = None,
 ) -> ModelCatalogEntry:
     return ModelCatalogEntry(
-        backend=BackendInfo(
+        backend=ModelBackend(
             provider=provider,
             model=model,
             location=location,
@@ -111,7 +114,7 @@ def test_recommender_filters_by_quality_threshold() -> None:
 
 def test_recommender_prefers_matching_latency_when_quality_is_equal() -> None:
     background = ModelCatalogEntry(
-        backend=BackendInfo(
+        backend=ModelBackend(
             provider="ollama",
             model="background",
             location=BackendLocation.LOCAL,

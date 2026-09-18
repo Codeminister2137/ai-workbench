@@ -4,9 +4,14 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
-from ai_provider import BackendInfo, BackendLocation, ModelCapabilities
-
-from ai_orchestrator.models import LatencyTarget, ModelCatalogEntry, QualityThreshold
+from ai_orchestrator.models import (
+    BackendLocation,
+    LatencyTarget,
+    ModelBackend,
+    ModelCapabilities,
+    ModelCatalogEntry,
+    QualityThreshold,
+)
 
 
 def load_model_catalog(path: Path) -> tuple[ModelCatalogEntry, ...]:
@@ -29,7 +34,7 @@ def _catalog_entry(item: dict[str, Any]) -> ModelCatalogEntry:
     capabilities = _capabilities(item.get("capabilities", {}))
 
     return ModelCatalogEntry(
-        backend=BackendInfo(
+        backend=ModelBackend(
             provider=provider,
             model=model,
             location=location,

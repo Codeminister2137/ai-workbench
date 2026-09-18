@@ -92,6 +92,29 @@ Implement Ollama first while shaping the provider infrastructure for future Requ
 
 Detailed ADR: `docs/decisions/ADR-015-provider-rollout-and-privacy-classes.md`
 
+## ADR-016 — Optional Package Composition And Neutral Orchestrator Contracts
+**Status:** Accepted
+**Date:** 2026-09-18
+
+Packages may be designed to work together, but should not require direct
+dependencies unless one package cannot usefully exist without the other's
+contract. `ai_orchestrator` owns neutral execution-target and model-selection
+contracts rather than depending on `ai_provider` contracts.
+
+Detailed ADR: `docs/decisions/ADR-016-optional-package-composition-and-neutral-orchestrator-contracts.md`
+
+## ADR-017 - Dependency Selection Balances Simplicity And Maintenance Cost
+**Status:** Accepted
+**Date:** 2026-09-18
+
+Prefer standard-library implementations when they are simple, but do not avoid
+dependencies when a small, mature, focused library materially reduces custom
+complexity, edge-case risk, testing burden, or future maintenance cost. `httpx`
+and `pydantic` are pre-approved when concretely justified; other focused
+dependencies are permitted when needed.
+
+Detailed ADR: `docs/decisions/ADR-017-dependency-selection-maintenance-cost.md`
+
 ## Template
 ```text
 ## ADR-NNN — Short Name

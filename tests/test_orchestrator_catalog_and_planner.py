@@ -2,10 +2,16 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-from ai_orchestrator import TaskProfile, load_model_catalog, plan_execution, recommend_model
+from ai_orchestrator import (
+    BackendLocation,
+    ModelBackend,
+    ModelCapabilities,
+    TaskProfile,
+    load_model_catalog,
+    plan_execution,
+    recommend_model,
+)
 from ai_orchestrator.models import LatencyTarget, ModelCatalogEntry, QualityThreshold
-from ai_provider import BackendInfo, BackendLocation, ModelCapabilities, ProviderError
 
 
 def test_load_model_catalog_reads_toml_entries(tmp_path: Path) -> None:
@@ -37,9 +43,9 @@ structured_output = false
     assert catalog[0].backend.base_url == "http://localhost:11434"
 
 
-def test_plan_execution_converts_recommendation_to_backend_config() -> None:
+def test_plan_execution_converts_recommendation_to_neutral_target() -> None:
     candidate = ModelCatalogEntry(
-        backend=BackendInfo(
+        backend=ModelBackend(
             provider="ollama",
             model="llama3.2",
             location=BackendLocation.LOCAL,
@@ -53,16 +59,16 @@ def test_plan_execution_converts_recommendation_to_backend_config() -> None:
 
     plan = plan_execution(TaskProfile(), recommendation, timeout_seconds=10)
 
-    assert plan.backend_config.provider.value == "ollama"
-    assert plan.backend_config.model == "llama3.2"
-    assert plan.backend_config.base_url == "http://localhost:11434"
-    assert plan.backend_config.timeout_seconds == 10
+    assert plan.target.provider == "ollama"
+    assert plan.target.model == "llama3.2"
+    assert plan.target.base_url == "http://localhost:11434"
+    assert plan.target.timeout_seconds == 10
     assert plan.reasons == recommendation.reasons
 
 
-def test_plan_execution_rejects_provider_unknown_to_provider_layer() -> None:
+def test_plan_execution_allows_targets_outside_ai_provider() -> None:
     candidate = ModelCatalogEntry(
-        backend=BackendInfo(
+        backend=ModelBackend(
             provider="custom",
             model="model",
             location=BackendLocation.LOCAL,
@@ -71,5 +77,7 @@ def test_plan_execution_rejects_provider_unknown_to_provider_layer() -> None:
     )
     recommendation = recommend_model(TaskProfile(), (candidate,))
 
-    with pytest.raises(ProviderError):
-        plan_execution(TaskProfile(), recommendation)
+    plan = plan_execution(TaskProfile(), recommendation)
+
+    assert plan.target.provider == "custom"
+    assert plan.target.model == "model"

@@ -32,7 +32,7 @@ Owns common AI contracts, provider adapters, local/cloud switching, provider API
 ### AI Orchestrator
 Location: `packages/ai_orchestrator/`
 
-Owns task classification, prompt evaluation/refinement, model selection, request configuration, routing, fallback, quota/economics awareness, and usage integration. It does not directly implement provider APIs.
+Owns task classification, prompt evaluation/refinement, model selection, request configuration, routing, fallback, quota/economics awareness, and usage integration. It owns neutral orchestration contracts and does not directly implement provider APIs or require `ai_provider` for core decision-making.
 
 ### AI Council
 Location: `apps/ai_council/`
@@ -51,6 +51,7 @@ Owns client-facing automation/integration experiments and future business applic
 If a new component does not clearly fit:
 1. define its responsibility;
 2. check whether an existing boundary is sufficient;
-3. avoid speculative abstractions;
-4. ask the user if architectural placement is materially ambiguous;
-5. update this map after the decision.
+3. prefer optional composition over unnecessary package dependencies;
+4. avoid speculative abstractions;
+5. ask the user if architectural placement is materially ambiguous;
+6. update this map after the decision.

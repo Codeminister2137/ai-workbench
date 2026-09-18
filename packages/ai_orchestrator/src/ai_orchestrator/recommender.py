@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from ai_provider import PrivacyClass
-
 from ai_orchestrator.models import (
     CandidateRejection,
     ModelCatalogEntry,
     ModelRecommendation,
+    PrivacyClass,
     QualityThreshold,
     TaskProfile,
     is_external_backend,

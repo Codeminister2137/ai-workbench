@@ -139,6 +139,23 @@ Codex should challenge assumptions, identify risks, and provide technical recomm
 
 Codex must not silently override an explicit user decision.
 
+### Challenge wrong or suboptimal premises
+
+Codex should not quietly proceed when the user appears to be factually wrong, when the requested path is likely to be materially suboptimal, or when Codex discovers that one of its own earlier assumptions was wrong.
+
+When this happens:
+
+1. investigate enough to verify the concern;
+2. state the suspected problem clearly and concretely;
+3. explain the consequence of continuing unchanged;
+4. suggest one or more better alternatives;
+5. give a technical recommendation when useful;
+6. ask for clarification or confirmation when the issue affects product behavior, architecture, privacy, data, dependencies, APIs, persistent formats, scope, or future compatibility.
+
+For small local mistakes where the correct fix is obvious and low risk, Codex may correct course without stopping, but should mention the correction in the final report.
+
+Do not treat every minor preference difference as a blocker. The goal is to prevent avoidable mistakes and poor long-term trade-offs, not to interrupt ordinary implementation.
+
 If a request conflicts with existing documentation or an accepted decision:
 
 1. identify the conflict;
@@ -309,6 +326,8 @@ Unless explicitly decided otherwise:
 * Prefer a modular monolith before microservices.
 * Keep provider-specific AI logic behind adapters/interfaces.
 * Keep application/business logic independent from individual AI providers.
+* Prefer optional composition between packages over unnecessary direct dependencies.
+* Let packages own neutral local contracts when callers may reasonably use alternate implementations.
 * Make local/cloud inference switchable through configuration.
 * Treat cloud AI gateways as external processors.
 * Prefer standard Python and small focused dependencies.
@@ -360,9 +379,30 @@ Do not spread provider-specific assumptions through application code.
 
 Do not collapse the Orchestrator and provider infrastructure into one abstraction merely for convenience.
 
+Do not force package-to-package dependencies merely because the common workflow uses
+those packages together. For example, the Orchestrator may produce a neutral
+execution target that can be adapted to `ai_provider`, direct Ollama calls, or a
+future executor.
+
 ## Investigation before implementation
 
 For non-trivial tasks, use two passes.
+
+### Token and tool-output discipline
+
+Codex should treat unnecessary token usage, noisy command output, and repeated failed commands as real costs. Quality, correctness, and safety remain higher priorities, but when choices are otherwise comparable, prefer the lower-cost path.
+
+Apply this by:
+
+* using precise searches and file reads instead of broad dumps;
+* using `rg`/targeted commands before slower or noisier fallbacks when available;
+* avoiding repeated attempts of a command pattern that already failed without changing the cause;
+* reading only the relevant parts of large files, generated files, logs, lockfiles, or extracted documents;
+* summarizing large outputs instead of pasting them back unless exact text matters;
+* parallelizing independent reads when it reduces elapsed time without producing confusing output;
+* asking concise clarification questions when guessing would create expensive rework.
+
+Do not under-investigate to save tokens when the task affects architecture, privacy, dependencies, data, public APIs, or correctness. In those cases, spend the context needed to reach a reliable conclusion.
 
 ### Required context reading
 
@@ -428,6 +468,22 @@ After the scope and material decisions are clear:
 
 For small, unambiguous tasks, the investigation and implementation passes may be combined.
 
+### Verify claimed changes
+
+Before reporting that a file, setting, behavior, test, or documentation item was changed, Codex must verify that the change actually exists.
+
+Use the most direct available evidence:
+
+* inspect `git diff` for tracked repository files;
+* inspect `git status` for tracked, untracked, ignored, and generated files when relevant;
+* re-read the changed file or configuration when it is outside Git;
+* run the relevant command or test when claiming behavior changed;
+* report any check that could not be run.
+
+If Codex discovers that a claimed or intended change did not happen, it must say so plainly, correct it when safe and in scope, or ask for direction when correction would require a material decision.
+
+Do not rely on intention, patch output, or memory alone as proof that the final state matches the report.
+
 ## Scope discipline
 
 Do not:
@@ -444,6 +500,25 @@ If unrelated technical debt is discovered, report or record it rather than silen
 
 If fixing it is necessary to complete the requested task, explain the dependency.
 
+### Avoid stacked low-value improvements
+
+Codex should actively watch for overengineering caused by layering one plausible improvement on top of another.
+
+When the current implementation is sufficient for the documented requirement, say so. Do not add abstraction, configuration, automation, generalization, persistence, evaluation harnesses, services, prompts, policies, or workflows merely because they seem useful.
+
+Before proposing or implementing an additional improvement, consider:
+
+* what concrete problem it solves now;
+* whether an existing implementation already handles the need well enough;
+* expected maintenance and cognitive cost;
+* future constraints or migration risk it may create;
+* whether it expands scope beyond the user's request;
+* whether a simpler follow-up note would preserve the idea without adding code.
+
+If the benefit is low, speculative, or not yet measurable, recommend deferring it and explain what signal would justify revisiting it later.
+
+If Codex previously recommended an improvement and later realizes the current implementation is already sufficient, it should correct itself and explain the lower-risk path.
+
 ## Dependencies
 
 Before adding a dependency, consider:
@@ -451,10 +526,32 @@ Before adding a dependency, consider:
 * whether the standard library is sufficient;
 * whether an existing dependency already solves the problem;
 * whether it materially reduces complexity;
+* whether avoiding the dependency would create complex custom code, fragile
+  edge-case handling, excessive tests, or high token/time cost for future work;
 * whether it introduces provider/framework lock-in;
 * maintenance and security implications.
 
-Significant new dependencies require user approval.
+Dependency avoidance is not a goal by itself. Prefer the standard library when it
+keeps the implementation simple. Prefer a small, mature dependency when it
+materially improves correctness, readability, testability, or maintainability.
+
+Codex tends to work more reliably with dependencies that are widely used,
+well-documented, stable, focused, typed or easy to type-check, and familiar to
+the human owner. This is a valid maintainability signal, but not a reason to add
+a dependency by itself.
+
+The owner has pre-approved `httpx` and `pydantic` when a concrete task justifies
+them:
+
+* `httpx` is appropriate when HTTP behavior grows beyond simple standard-library
+  calls, such as streaming, async, connection pooling, richer timeout behavior,
+  cleaner tests, or more maintainable provider adapters.
+* `pydantic` is appropriate when validation, parsing, configuration, or public
+  contracts become noisy or error-prone with dataclasses/manual checks.
+
+Other focused dependencies are permitted when justified by the dependency
+criteria above. Significant new dependencies still require user approval unless
+they have already been explicitly approved by an accepted decision.
 
 Do not add LangChain, LangGraph, Redis, vector databases, message brokers, Kubernetes, or similar infrastructure merely because a project uses AI.
 
@@ -580,6 +677,8 @@ When reporting work, cover:
 5. remaining risks/questions.
 
 Never claim to have run a check that was not actually run.
+
+Never claim a change was implemented unless the final state was verified. For repository files, this normally means reviewing `git diff` and `git status`; for local/global configuration, this means re-reading the changed config or using an equivalent verification command.
 
 Do not hide uncertainty.
 

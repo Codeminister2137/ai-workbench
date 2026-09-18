@@ -3,7 +3,7 @@
 ## 1. Overall direction
 The projects form a small ecosystem:
 
-`Applications → AI Orchestrator → Provider-Agnostic AI Infrastructure → Ollama / Requesty / direct providers`
+`Applications → AI Orchestrator decisions → execution adapter → Ollama / Requesty / direct providers`
 
 Applications include the AI Council, Job Search Automation, and future automation/client applications.
 
@@ -20,6 +20,20 @@ apps/
 
 Current implementation starts with an Ollama-only provider slice while keeping the provider contract extensible for Requesty and direct hosted providers.
 
+Packages should compose without unnecessary hard dependencies. A package may be
+designed to work naturally with another package, but it should own its local
+decision contracts when callers may reasonably use another implementation. For
+example, the Orchestrator returns neutral execution targets that can be adapted to
+`ai_provider`, direct Ollama calls, or future executors.
+
+The architecture prefers simple standard-library code when it remains clear, but
+does not treat dependency avoidance as an architectural goal. Small, mature,
+focused dependencies are appropriate when they reduce custom complexity,
+edge-case risk, testing burden, or future maintenance cost without blurring
+package boundaries. `httpx` and `pydantic` are pre-approved when a concrete task
+justifies them; other focused dependencies remain allowed when they satisfy the
+same criteria.
+
 ## 2. Modular monolith first
 Start as a modular monolith. Extract a separately deployable service only for a demonstrated need such as independent scaling/deployment, a different security/runtime boundary, operational isolation, or a real development bottleneck.
 
@@ -29,7 +43,7 @@ The provider layer exposes common AI request/response contracts and translates t
 It does not own application-specific task strategy or high-level model-routing policy.
 
 ## 4. AI Orchestrator
-The Orchestrator sits above providers and makes AI-request decisions:
+The Orchestrator makes AI-request decisions without requiring a specific executor:
 - task classification;
 - prompt evaluation/refinement;
 - model and request configuration;
@@ -40,6 +54,10 @@ The Orchestrator sits above providers and makes AI-request decisions:
 - cost/quota awareness;
 - usage integration;
 - eventually adaptive routing based on measured performance.
+
+It should expose neutral orchestration contracts. It may integrate with
+`ai_provider` through adapters/examples, but the core package must not require
+`ai_provider` merely to make routing decisions.
 
 Keep separate concepts:
 - **Capability:** what a model can do.
@@ -94,6 +112,11 @@ These labels are provisional until cloud routing and real external provider adap
 
 ## 10. Shared code
 Share code only when multiple projects genuinely need the same stable behavior. Good candidates are common AI contracts, provider adapters, and stable usage/configuration primitives. Avoid shared packages for experimental or application-specific logic.
+
+Prefer optional composition between packages. Do not introduce a direct package
+dependency just because two components are expected to work together in the common
+workflow. Add the dependency only when the dependent package cannot usefully exist
+without the other package's contract.
 
 ## 11. Architecture decision boundary
 Codex must ask before making material decisions involving new services, persistent storage, major dependencies, microservice extraction, public API/schema changes, provider policy, privacy/data routing, automatic external actions, autonomous AI optimization, or significant shared-interface changes.

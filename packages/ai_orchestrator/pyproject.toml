@@ -3,9 +3,7 @@ name = "ai-orchestrator"
 version = "0.1.0"
 description = "Future orchestration layer for AI routing and prompt decisions."
 requires-python = ">=3.13,<3.15"
-dependencies = [
-    "ai-provider",
-]
+dependencies = []
 
 [build-system]
 requires = ["hatchling"]
