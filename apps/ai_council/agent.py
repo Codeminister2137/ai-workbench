@@ -1,43 +1,72 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
+
+from ai_provider import (
+    AIMessage,
+    AIRequest,
+    AIStreamDelta,
+    AIStreamFinal,
+    MessageRole,
+)
+from ai_provider.config import BackendConfig, ProviderKind
+from ai_provider.factory import create_chat_client
 from domain import CouncilMember
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
-from langchain_ollama import ChatOllama
 
 
 class LocalAgent:
     def __init__(self, member: CouncilMember, ollama_base_url: str | None = None):
         self.member = member
-        self.llm = ChatOllama(
-            model=member.model,
-            base_url=ollama_base_url,
-            temperature=member.temperature,
+        self.client = create_chat_client(
+            BackendConfig(
+                provider=ProviderKind.OLLAMA,
+                base_url=ollama_base_url,
+                model=member.model,
+                timeout_seconds=120.0,
+            )
         )
 
-    def answer(self, conversation: list[BaseMessage]) -> str:
-        messages = [SystemMessage(content=self.member.system_prompt), *conversation]
-        response = self.llm.invoke(messages)
-        return str(response.content)
+    def answer(self, conversation: Iterable[AIMessage]) -> str:
+        response = self.client.complete(
+            AIRequest(
+                messages=self._messages(conversation),
+                model=self.member.model,
+                temperature=self.member.temperature,
+            )
+        )
+        return response.message.content
 
-    def stream_answer(self, conversation: list[BaseMessage]):
-        messages = [SystemMessage(content=self.member.system_prompt), *conversation]
-        for chunk in self.llm.stream(messages):
-            content = getattr(chunk, "content", "")
-            if content:
-                yield str(content)
+    def stream_answer(self, conversation: Iterable[AIMessage]):
+        for event in self.client.stream(
+            AIRequest(
+                messages=self._messages(conversation),
+                model=self.member.model,
+                temperature=self.member.temperature,
+            )
+        ):
+            if isinstance(event, AIStreamDelta):
+                yield event.content
+            elif isinstance(event, AIStreamFinal):
+                continue
+
+    def _messages(self, conversation: Iterable[AIMessage]) -> tuple[AIMessage, ...]:
+        return (
+            AIMessage(MessageRole.SYSTEM, self.member.system_prompt),
+            *tuple(conversation),
+        )
 
 
-def to_langchain_messages(rows: list[dict[str, str]]) -> list[BaseMessage]:
-    messages: list[BaseMessage] = []
+def to_provider_messages(rows: list[dict[str, str]]) -> list[AIMessage]:
+    messages: list[AIMessage] = []
     for row in rows:
         role = row["role"]
         content = row["content"]
         member_name = row.get("member_name")
 
         if role == "user":
-            messages.append(HumanMessage(content=content))
+            messages.append(AIMessage(MessageRole.USER, content))
         elif role == "assistant":
             prefix = f"{member_name}: " if member_name else ""
-            messages.append(AIMessage(content=f"{prefix}{content}"))
+            messages.append(AIMessage(MessageRole.ASSISTANT, f"{prefix}{content}"))
 
     return messages

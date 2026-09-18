@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from agent import LocalAgent, to_langchain_messages
+from agent import LocalAgent, to_provider_messages
 from config import CouncilConfig
 from storage import ConversationStore
 
@@ -15,7 +15,7 @@ class LocalCouncil:
         conversation_id = self.store.get_or_create_conversation(name)
         self.store.add_message(conversation_id, role="user", content=prompt)
 
-        history = to_langchain_messages(self.store.list_messages(conversation_id))
+        history = to_provider_messages(self.store.list_messages(conversation_id))
         answers: list[dict[str, str]] = []
 
         for member in self.config.members:
@@ -43,7 +43,7 @@ class LocalCouncil:
         conversation_id = self.store.get_or_create_conversation(name)
         self.store.add_message(conversation_id, role="user", content=prompt)
 
-        history = to_langchain_messages(self.store.list_messages(conversation_id))
+        history = to_provider_messages(self.store.list_messages(conversation_id))
 
         yield {
             "type": "council_started",
