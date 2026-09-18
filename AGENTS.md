@@ -406,22 +406,41 @@ Do not under-investigate to save tokens when the task affects architecture, priv
 
 ### Required context reading
 
-Before planning or implementing non-trivial work, Codex must read:
+Use tiered context reading. Documentation matters, but repeated broad rereads are
+a real cost. Prefer the smallest context set that can safely answer the current
+task.
 
-* local `CURRENT_CONTEXT.md`, when present;
-* `AGENTS.md`;
-* `docs/architecture.md`;
-* `docs/decisions.md`;
-* `docs/workflow.md`;
-* `docs/project-map.md`;
-* `docs/definition-of-done.md`;
+Always start with cheap state:
+
+* `git status --short`;
+* the current branch when Git workflow matters;
+* targeted file discovery/search for the affected area;
+* local `CURRENT_CONTEXT.md`, when present.
+
+Then read targeted authoritative docs for the task:
+
+* relevant sections of `AGENTS.md` and nested `AGENTS.md` files, if any;
+* relevant sections of `docs/architecture.md`, `docs/decisions.md`,
+  `docs/workflow.md`, `docs/project-map.md`, and `docs/definition-of-done.md`;
 * relevant detailed ADRs in `docs/decisions/`;
-* relevant project plans in `docs/plans/`;
-* relevant local `AGENTS.md` files, if any.
+* relevant project plans in `docs/plans/`.
 
 Use those files as active boundaries, not background decoration. If they conflict with the current request or the current code, identify the conflict and ask the user when the resolution is material.
 
 When planning non-trivial work, explicitly identify which `docs/plans/` files are relevant and take them into account before proposing implementation steps. If a plan is skipped because it is unrelated, obsolete, or superseded by code/decisions, state that briefly. If a `.docx` plan is relevant, extract/read its text rather than ignoring it because it is not Markdown.
+
+Do a fuller documentation sweep only when:
+
+* resuming after context compaction or a long gap;
+* the task changes architecture, privacy, dependencies, persistence, public APIs,
+  data contracts, or provider/application boundaries;
+* current code, docs, plans, or decisions appear to conflict;
+* the handoff is missing, stale, or insufficient;
+* a durable decision or ADR may be needed.
+
+If relevant docs were already read in the current thread and have not changed,
+prefer targeted `rg`/`Select-String` checks or the current handoff over rereading
+the full files.
 
 `CURRENT_CONTEXT.md` is the local, ignored immediate handoff file. Keep it current with the last completed work, open conflicts, validation status, and next plan of action when it exists. Do not use it as a durable ADR replacement.
 
