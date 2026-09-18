@@ -24,6 +24,13 @@ apps/
 
 Current implementation starts with an Ollama-only provider slice while keeping the provider contract extensible for Requesty and direct hosted providers.
 
+Infrastructure packages such as `ai_provider` and `ai_orchestrator` may grow a
+larger library of integration glue than individual applications. That is useful
+when the glue preserves interoperability across apps, keeps provider-specific
+details out of application workflows, and remains focused on infrastructure
+responsibilities. Applications should still own their product workflows and
+domain behavior.
+
 Packages should compose without unnecessary hard dependencies. A package may be
 designed to work naturally with another package, but it should own its local
 decision contracts when callers may reasonably use another implementation. For
@@ -119,6 +126,12 @@ These labels are provisional until cloud routing and real external provider adap
 
 ## 10. Shared code
 Share code only when multiple projects genuinely need the same stable behavior. Good candidates are common AI contracts, provider adapters, and stable usage/configuration primitives. Avoid shared packages for experimental or application-specific logic.
+
+Prefer interoperable infrastructure seams over app-specific glue. A reusable
+provider adapter, orchestration contract, config bridge, streaming contract, or
+request/response translation belongs in infrastructure when more than one app
+can plausibly use it or when keeping it in an app would leak provider assumptions
+into business logic.
 
 Prefer optional composition between packages. Do not introduce a direct package
 dependency just because two components are expected to work together in the common

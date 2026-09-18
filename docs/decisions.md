@@ -115,6 +115,16 @@ dependencies are permitted when needed.
 
 Detailed ADR: `docs/decisions/ADR-017-dependency-selection-maintenance-cost.md`
 
+## ADR-018 - Provider Streaming Before AI Council Migration
+**Status:** Accepted
+**Date:** 2026-09-18
+
+Before migrating the AI Council web execution path to `ai_provider`, add a
+provider-level streaming contract. This preserves the current Council streaming
+UI while moving provider-specific execution behind reusable infrastructure.
+
+Detailed ADR: `docs/decisions/ADR-018-provider-streaming-before-council-migration.md`
+
 ## Template
 ```text
 ## ADR-NNN — Short Name

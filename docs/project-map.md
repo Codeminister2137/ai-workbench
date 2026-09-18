@@ -13,6 +13,8 @@ Use this file to decide where a change belongs before adding new abstractions.
 - `decisions.md` — durable decisions and their history.
 - `workflow.md` — investigation, approval, implementation, validation, and Git workflow.
 - `git-workflow.md` — branch, commit, validation, and history hygiene guidance.
+- `ideas.md` — parked future product/architecture ideas that are useful but not
+  active implementation context.
 - `project-map.md` — this navigation index.
 - `definition-of-done.md` — completion checklist.
 - `plans/` — project plans that must be considered before planning non-trivial work in the related area.
@@ -50,6 +52,12 @@ Owns ingestion, normalization, matching, evidence-based analysis, CV/message sug
 
 ### Future IT Services / Automation
 Owns client-facing automation/integration experiments and future business applications. Share code only when there is a genuine stable common need.
+
+### Future Personal AI Assistant / Context
+Potential future app or module for local personal context, preferences, habits,
+skills, coding style, job-search profile, and mentor-style growth suggestions.
+This must remain local/private by default and should not be implemented until a
+separate privacy, persistence, and product-scope decision is made.
 
 ## Placement rule
 If a new component does not clearly fit:
