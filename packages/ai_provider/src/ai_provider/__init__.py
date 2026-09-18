@@ -17,6 +17,7 @@ from ai_provider.contracts import (
     UsageSource,
 )
 from ai_provider.errors import ProviderError, ProviderErrorCategory
+from ai_provider.factory import create_chat_client
 
 __all__ = [
     "AIMessage",
@@ -36,4 +37,5 @@ __all__ = [
     "ProviderKind",
     "UsageMetadata",
     "UsageSource",
+    "create_chat_client",
 ]

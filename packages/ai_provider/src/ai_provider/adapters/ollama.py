@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import socket
 import time
 from dataclasses import dataclass
 from typing import Any
@@ -66,7 +67,16 @@ class OllamaChatClient:
         raw_response = self._post_chat(payload)
         latency_ms = (time.perf_counter() - started) * 1000
 
-        content = raw_response.get("message", {}).get("content", "")
+        raw_message = raw_response.get("message")
+        if not isinstance(raw_message, dict):
+            raise ProviderError(
+                "Ollama response did not include a message object.",
+                category=ProviderErrorCategory.NON_RETRYABLE,
+                provider="ollama",
+                raw_error=raw_response,
+            )
+
+        content = raw_message.get("content", "")
         done_reason = raw_response.get("done_reason")
         return AIResponse(
             message=AIMessage(role=MessageRole.ASSISTANT, content=str(content)),
@@ -117,6 +127,14 @@ class OllamaChatClient:
                 raw_error=exc,
             ) from exc
         except URLError as exc:
+            if isinstance(exc.reason, (TimeoutError, socket.timeout)):
+                raise ProviderError(
+                    "Ollama request timed out.",
+                    category=ProviderErrorCategory.TIMEOUT,
+                    retryable=True,
+                    provider="ollama",
+                    raw_error=exc,
+                ) from exc
             raise ProviderError(
                 "Could not connect to Ollama.",
                 category=ProviderErrorCategory.RETRYABLE,

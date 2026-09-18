@@ -126,3 +126,17 @@ def test_ollama_adapter_wraps_connection_errors(monkeypatch: pytest.MonkeyPatch)
 
     assert error.value.provider == "ollama"
     assert error.value.retryable is True
+
+
+def test_ollama_adapter_rejects_unexpected_response_shape(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_urlopen(request: Any, timeout: float) -> FakeHttpResponse:
+        return FakeHttpResponse({"done_reason": "stop"})
+
+    monkeypatch.setattr("ai_provider.adapters.ollama.urlopen", fake_urlopen)
+
+    client = OllamaChatClient(BackendConfig(provider=ProviderKind.OLLAMA, model="llama3.2"))
+
+    with pytest.raises(ProviderError):
+        client.complete(AIRequest(messages=(AIMessage(MessageRole.USER, "Hello"),)))
