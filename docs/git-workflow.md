@@ -46,18 +46,29 @@ work in progress
 
 ## Validation Before Commit
 
-Run the narrow relevant checks while iterating. Before committing behavior
-changes, run the configured project checks unless the change is documentation-only
-or the user explicitly waives them:
+The repository uses `pre-commit` for repeatable local checks:
 
 ```powershell
-python -m uv run pytest
-python -m uv run ruff check .
-python -m uv run ruff format --check .
-python -m uv run pyright
-git diff --check
-git status --short
+python -m uv run pre-commit install --hook-type pre-commit --hook-type pre-push
 ```
+
+The `pre-commit` stage runs fast file-oriented checks:
+
+- `ruff check --fix`;
+- `ruff format`.
+
+The `pre-push` stage runs slower repo-wide checks:
+
+- `pyright`;
+- the normal non-live `pytest` suite.
+
+Live integration tests stay out of Git hooks. They may require Ollama, external
+services, credentials, network access, or local state, so run them explicitly
+when working on the relevant integration boundary.
+
+Run the narrow relevant checks while iterating. Before committing behavior
+changes, make sure the relevant hook stage has passed unless the user explicitly
+waives it.
 
 For documentation-only changes, at minimum inspect the diff and run
 `git diff --check`.
