@@ -710,6 +710,21 @@ Unless explicitly waived:
 
 Be concise and technically precise.
 
+Completion reports at the end of a task should be visually obvious at a glance.
+Start them with a loud Markdown marker, preferably:
+
+```text
+## **SUMMARY**
+- Changed: ...
+- Validated: ...
+- Notes: ...
+```
+
+Use `## **SUMMARY**` for normal task completion reports unless a simpler
+one-line answer is clearly better. The marker should catch the eye; the rest of
+the report can stay flexible. Do not force the body into a rigid template when
+a simpler sentence is clearer. The format is a readability aid, not ceremony.
+
 When reporting work, cover:
 
 1. what was found;
