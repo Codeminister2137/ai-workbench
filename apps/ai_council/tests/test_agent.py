@@ -92,9 +92,7 @@ def test_local_agent_streams_provider_deltas(monkeypatch) -> None:
         temperature=0.2,
     )
 
-    chunks = list(
-        LocalAgent(member).stream_answer([AIMessage(MessageRole.USER, "Question?")])
-    )
+    chunks = list(LocalAgent(member).stream_answer([AIMessage(MessageRole.USER, "Question?")]))
 
     assert chunks == ["provider ", "stream"]
     assert client.requests[0].messages[0] == AIMessage(MessageRole.SYSTEM, "Be careful.")

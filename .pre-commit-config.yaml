@@ -3,28 +3,28 @@ repos:
     hooks:
       - id: ruff-check
         name: ruff check
-        entry: python -m ruff check --fix
+        entry: .venv/Scripts/ruff.exe check --fix
         language: system
         stages: [pre-commit]
         types_or: [python, pyi]
 
       - id: ruff-format
         name: ruff format
-        entry: python -m ruff format
+        entry: .venv/Scripts/ruff.exe format
         language: system
         stages: [pre-commit]
         types_or: [python, pyi]
 
       - id: pyright
         name: pyright
-        entry: python -m pyright
+        entry: .venv/Scripts/pyright.exe
         language: system
         pass_filenames: false
         stages: [pre-push]
 
       - id: pytest
         name: pytest
-        entry: python -m pytest
+        entry: .venv/Scripts/pytest.exe
         language: system
         pass_filenames: false
         stages: [pre-push]
