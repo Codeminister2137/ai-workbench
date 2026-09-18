@@ -49,8 +49,7 @@ class LocalCouncil:
             "type": "council_started",
             "conversation": name,
             "members": [
-                {"name": member.name, "model": member.model}
-                for member in self.config.members
+                {"name": member.name, "model": member.model} for member in self.config.members
             ],
         }
 

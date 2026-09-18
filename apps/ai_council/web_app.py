@@ -3,14 +3,13 @@ from __future__ import annotations
 import argparse
 import json
 from http import HTTPStatus
-from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
 
 from config import DEFAULT_CONFIG_PATH, load_config
 from council import LocalCouncil
 from storage import DEFAULT_DB_PATH, ConversationStore
-
 
 ROOT = Path(__file__).parent
 STATIC_ROOT = ROOT / "web"
@@ -104,7 +103,7 @@ class CouncilRequestHandler(SimpleHTTPRequestHandler):
             self.close_connection = True
 
     def _write_event(self, event: dict) -> None:
-        body = f"data: {json.dumps(event)}\n\n".encode("utf-8")
+        body = f"data: {json.dumps(event)}\n\n".encode()
         self.wfile.write(body)
         self.wfile.flush()
 

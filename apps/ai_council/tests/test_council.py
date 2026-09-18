@@ -3,6 +3,7 @@ from __future__ import annotations
 from config import load_config
 from council import LocalCouncil
 from storage import ConversationStore
+
 from tests.helpers import write_config
 
 
@@ -77,6 +78,5 @@ def test_ask_events_reports_member_error_and_continues(tmp_path, monkeypatch) ->
     assert "member_error" in [event["type"] for event in events]
     assert events[-1]["type"] == "council_finished"
     assert any(
-        event["type"] == "member_finished" and event["member"] == "Skeptic"
-        for event in events
+        event["type"] == "member_finished" and event["member"] == "Skeptic" for event in events
     )

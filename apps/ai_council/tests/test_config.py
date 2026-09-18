@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 
 import pytest
-
 from config import load_config
+
 from tests.helpers import write_config
 
 

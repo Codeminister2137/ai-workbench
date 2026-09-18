@@ -1,9 +1,8 @@
 from __future__ import annotations
 
+from domain import CouncilMember
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_ollama import ChatOllama
-
-from domain import CouncilMember
 
 
 class LocalAgent:

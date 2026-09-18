@@ -7,7 +7,6 @@ from typing import Any
 
 from domain import CouncilMember
 
-
 DEFAULT_CONFIG_PATH = Path("council.json")
 EXAMPLE_CONFIG_PATH = Path("council.example.json")
 
@@ -22,7 +21,8 @@ class CouncilConfig:
 def load_config(path: Path = DEFAULT_CONFIG_PATH) -> CouncilConfig:
     if not path.exists():
         raise FileNotFoundError(
-            f"Missing {path}. Copy {EXAMPLE_CONFIG_PATH} to {DEFAULT_CONFIG_PATH} and edit it locally."
+            f"Missing {path}. Copy {EXAMPLE_CONFIG_PATH} to {DEFAULT_CONFIG_PATH} "
+            "and edit it locally."
         )
 
     raw = json.loads(path.read_text(encoding="utf-8"))

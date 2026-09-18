@@ -15,6 +15,8 @@ This package is the infrastructure layer below orchestration and applications. I
 
 Requesty and direct hosted providers are intentionally not implemented yet. The contract is shaped so those adapters can be added later without changing application-facing code.
 
+See `docs/interface.md` for the one-page interface spec and capability matrix.
+
 ## Minimal Usage
 
 ```python

@@ -7,9 +7,9 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 import pytest
+from web_app import CouncilRequestHandler
 
 from tests.helpers import write_config
-from web_app import CouncilRequestHandler
 
 
 class FakeAgent:

@@ -5,7 +5,6 @@ from pathlib import Path
 
 from config import EXAMPLE_CONFIG_PATH, load_config
 
-
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -44,7 +43,17 @@ def test_web_ui_keeps_javascript_mount_points() -> None:
 def test_task_runner_keeps_core_operations() -> None:
     tasks = (ROOT / "tasks.ps1").read_text(encoding="utf-8")
 
-    for task in ["init", "install", "pull-model", "start", "stop", "status", "cli", "list", "check"]:
+    for task in [
+        "init",
+        "install",
+        "pull-model",
+        "start",
+        "stop",
+        "status",
+        "cli",
+        "list",
+        "check",
+    ]:
         assert f'"{task}"' in tasks
 
 

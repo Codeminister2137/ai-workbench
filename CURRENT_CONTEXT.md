@@ -6,6 +6,15 @@ Keep this file short and current. It is not a historical decision record; durabl
 
 ## Last Completed Work
 
+- Removed root Ruff/Pyright exclusions for prototype apps. Prototype app lint/type cleanup is allowed before application migration when changes are mechanical and behavior-preserving.
+- Added `packages/ai_provider/docs/interface.md` with the provider interface boundary, core type summary, capability matrix, and HTTP-client decision.
+- Kept the Ollama adapter on standard-library HTTP for now; revisit `httpx` only when streaming, richer retries, or async behavior creates a concrete need.
+- Added initial `ai_orchestrator` MVP:
+  - task profile, prompt issue, prompt judge result, and model recommendation data models;
+  - deterministic prompt judge heuristics with no external AI calls;
+  - transparent model/backend recommender over a caller-provided catalog;
+  - tests for prompt judging, privacy-first filtering, capability filtering, user override, and no-match failures.
+- Ran root validation with prototype apps included in Ruff/Pyright.
 - Created initial Git commit `9964e69` for the workspace/restructure/provider baseline.
 - Read planning input for the current provider/orchestrator phase:
   - `docs/plans/01_AI_Provider_Agnostic_Infrastructure_Plan.docx`;
@@ -56,10 +65,11 @@ python -m uv run ruff format --check .
 python -m uv run pyright
 ```
 
-Last known root provider result on 2026-09-18:
+Last known validation result on 2026-09-18:
 
 ```text
-python -m uv run pytest              # 15 passed, 1 skipped
+python -m uv run pytest              # 22 passed, 1 skipped
+python -m uv run --package ai-council pytest apps\ai_council\tests # 18 passed
 python -m uv run ruff check .        # passed
 python -m uv run ruff format --check . # passed
 python -m uv run pyright             # passed
@@ -69,7 +79,7 @@ The skipped test is the optional live Ollama integration test.
 
 ## Current Boundaries
 
-- Root lint/type checks intentionally exclude prototype apps until their migration/cleanup is planned.
+- Prototype apps are included in root Ruff/Pyright checks. Mechanical lint/type cleanup is allowed before application migration, provided behavior is not changed unnecessarily.
 - `ai_provider` core must not depend on LangChain or LangGraph initially.
 - Existing AI Council direct LangChain/Ollama usage is tolerated only because the app is currently a prototype.
 - First provider milestone is Ollama only; Requesty and direct hosted providers come later.
@@ -81,24 +91,20 @@ The skipped test is the optional live Ollama integration test.
 - The old Poetry lockfiles remain in prototype apps. The workspace now uses `uv`; decide later whether to remove or preserve prototype lockfiles during app migration.
 - AI Council project docs and code are not fully aligned with the new provider boundary yet.
 - Job-search automation beyond `job-email` is still planned, not implemented.
-- AI Council app tests were not rerun after the provider hardening change because application code was not modified in that step.
+- AI Council project docs and code are still not aligned with the new provider boundary, but migration remains deferred until provider/orchestrator are more usable.
 
 ## Next Plan Of Action
 
 Before each non-trivial step, read the relevant `docs/plans/` file and report which plan informed the work.
 
-1. Finish `ai_provider` to a usable local stage:
-   - add a one-page interface/capability spec;
-   - add backend capability matrix for Ollama and planned placeholders;
-   - add a small CLI or executable test client if useful;
-   - decide whether to keep stdlib HTTP or switch to `httpx` before streaming/retries grow.
-2. Start `ai_orchestrator` MVP from `docs/plans/05_AI_Orchestrator_Project_Plan.docx`:
-   - define task profile, prompt issue, judge result, and recommendation data models;
-   - implement deterministic prompt judge heuristics without external AI calls;
-   - implement a transparent model/backend recommender over a small configured catalog;
-   - keep execution through `ai_provider`; no provider adapters inside orchestrator.
-3. Add orchestrator tests for privacy-first filtering, capability filtering, user override, and explainable rejection reasons.
-4. Only after `ai_provider` and `ai_orchestrator` are usable, plan application migration. AI Council migration is explicitly not part of the immediate next phase.
+1. Continue `ai_orchestrator` toward a usable MVP:
+   - add a minimal configured model catalog loader or fixture format;
+   - add a small execution planner that converts a recommendation into `ai_provider.BackendConfig` without executing provider calls;
+   - add tests for quality threshold, latency preference, and sensitive-review rejection.
+2. Continue `ai_provider` local usability:
+   - optionally add a tiny module entry point around `examples/minimal_chat.py`;
+   - keep stdlib HTTP unless streaming/retries/async create a concrete need for `httpx`.
+3. Keep AI Council migration out of scope until `ai_provider` and `ai_orchestrator` are usable enough to support it.
 
 ## Maintenance Rule
 
