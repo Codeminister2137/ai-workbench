@@ -48,6 +48,10 @@ that runs `ai_orchestrator.prepare_execution(...)`, adapts only ready execution
 plans, and returns `None` for provider config when the prompt needs review or no
 model satisfies the task profile. It does not execute a provider request.
 
+For the next no-network step, `prepare_provider_request(...)` also builds an
+`AIRequest` after orchestration is ready. The caller still decides whether and
+when to create a client and execute the request.
+
 ## Environment Configuration
 
 `BackendConfig.from_env()` reads these variables by default:

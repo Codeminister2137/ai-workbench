@@ -6,6 +6,10 @@ The projects form a small ecosystem:
 `Applications → AI Orchestrator decisions → execution adapter → Ollama / Requesty / direct providers`
 
 Applications include the AI Council, Job Search Automation, and future automation/client applications.
+Applications should support normal provider-backed execution paths, such as local
+Ollama, direct hosted providers, Requesty-style gateways, and orchestrator-guided
+provider selection. The choice should be configuration or orchestration policy,
+not provider-specific application branching.
 
 Repository layout:
 
@@ -92,6 +96,9 @@ The Council is an application on top of the AI infrastructure:
 `user question → council router → multiple models → raw responses → synthesis → final answer`
 
 Preserve raw responses so synthesis does not erase disagreement. Initial modes may be LOCAL, CLOUD, and HYBRID. The UI should make local vs external processing understandable.
+Its implementation should allow ordinary provider connections and
+orchestrator-guided routing without hard-coding Ollama, OpenAI, Requesty, or any
+other provider into Council-specific business logic.
 
 ## 8. Job Search Automation
 Flow:

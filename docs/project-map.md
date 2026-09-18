@@ -38,6 +38,9 @@ Owns task classification, prompt evaluation/refinement, model selection, request
 Location: `apps/ai_council/`
 
 Owns multi-model querying, raw response preservation, comparison/synthesis, and local/cloud/hybrid user-facing behavior. It is an application, not the provider layer. The current implementation is a prototype to migrate after the provider contract exists.
+It should be able to use ordinary provider connections or orchestrator-guided
+routing through the provider/orchestrator boundaries, without provider-specific
+logic leaking into Council business logic.
 
 ### Job Search Automation
 Location: `apps/job_search/`
