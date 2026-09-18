@@ -12,6 +12,7 @@ Use this file to decide where a change belongs before adding new abstractions.
 - `architecture.md` — current architecture and boundaries.
 - `decisions.md` — durable decisions and their history.
 - `workflow.md` — investigation, approval, implementation, validation, and Git workflow.
+- `git-workflow.md` — branch, commit, validation, and history hygiene guidance.
 - `project-map.md` — this navigation index.
 - `definition-of-done.md` — completion checklist.
 - `plans/` — project plans that must be considered before planning non-trivial work in the related area.

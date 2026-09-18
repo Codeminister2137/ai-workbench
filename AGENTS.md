@@ -519,6 +519,23 @@ If the benefit is low, speculative, or not yet measurable, recommend deferring i
 
 If Codex previously recommended an improvement and later realizes the current implementation is already sufficient, it should correct itself and explain the lower-risk path.
 
+## Engineering practice
+
+Use standard engineering principles as practical heuristics, not ceremony:
+
+* SOLID where it improves local design, especially single responsibility,
+  dependency inversion at provider boundaries, and interface segregation for
+  narrow contracts.
+* Clean Code where it improves readability: clear names, small cohesive
+  functions, explicit data flow, and tests that explain behavior.
+* Separation of concerns, DRY, KISS, and YAGNI as balancing constraints. Avoid
+  duplication that creates real maintenance risk, but do not add abstractions
+  before the need is concrete.
+
+Portfolio quality matters. Prefer clear boundaries, readable commits, focused
+tests, and concise documentation that a reviewer can understand without private
+context.
+
 ## Dependencies
 
 Before adding a dependency, consider:
@@ -631,6 +648,12 @@ For substantial work:
 * use a focused branch;
 * keep commits logically grouped;
 * avoid unrelated changes.
+* commit often enough that each commit describes one coherent change;
+* use clear imperative commit messages;
+* prefer several reviewable commits over one large mixed commit;
+* keep `master` stable and use feature branches for non-trivial work.
+
+See `docs/git-workflow.md` for the repository workflow.
 
 Before completion:
 
