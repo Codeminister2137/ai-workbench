@@ -3,7 +3,7 @@
 ## 1. Before starting
 For non-trivial work:
 1. Read root and relevant nested `AGENTS.md` files.
-2. Read `CURRENT_CONTEXT.md`.
+2. Read local `CURRENT_CONTEXT.md` when present.
 3. Read `docs/architecture.md`.
 4. Check `docs/decisions.md` and relevant detailed ADRs in `docs/decisions/`.
 5. Read `docs/project-map.md`, `docs/definition-of-done.md`, and relevant project plans in `docs/plans/`.
@@ -65,7 +65,7 @@ Update docs when public behavior/configuration changes, architecture changes, or
 
 When a decision changes: supersede the old ADR, add the new ADR, then update architecture/project plans as necessary.
 
-Update `CURRENT_CONTEXT.md` at the end of non-trivial work so the next session has the latest completed work, conflicts/risks, validation status, and next plan.
+Update local `CURRENT_CONTEXT.md` at the end of non-trivial work when present so the next session has the latest completed work, conflicts/risks, validation status, and next plan.
 
 ## 8. Git
 For substantial work use a focused branch/commit series. Before completion inspect:

@@ -42,7 +42,7 @@
 - [ ] Architecture docs updated if architecture changed.
 - [ ] Decisions recorded if significant.
 - [ ] Obsolete documentation updated rather than duplicated.
-- [ ] `CURRENT_CONTEXT.md` updated for non-trivial work.
+- [ ] Local `CURRENT_CONTEXT.md` updated for non-trivial work when present.
 
 ## Final review
 - [ ] `git diff` reviewed.

@@ -368,7 +368,7 @@ For non-trivial tasks, use two passes.
 
 Before planning or implementing non-trivial work, Codex must read:
 
-* `CURRENT_CONTEXT.md`;
+* local `CURRENT_CONTEXT.md`, when present;
 * `AGENTS.md`;
 * `docs/architecture.md`;
 * `docs/decisions.md`;
@@ -383,7 +383,7 @@ Use those files as active boundaries, not background decoration. If they conflic
 
 When planning non-trivial work, explicitly identify which `docs/plans/` files are relevant and take them into account before proposing implementation steps. If a plan is skipped because it is unrelated, obsolete, or superseded by code/decisions, state that briefly. If a `.docx` plan is relevant, extract/read its text rather than ignoring it because it is not Markdown.
 
-`CURRENT_CONTEXT.md` is the immediate handoff file. Keep it current with the last completed work, open conflicts, validation status, and next plan of action. Do not use it as a durable ADR replacement.
+`CURRENT_CONTEXT.md` is the local, ignored immediate handoff file. Keep it current with the last completed work, open conflicts, validation status, and next plan of action when it exists. Do not use it as a durable ADR replacement.
 
 ### Pass 1 — investigation
 

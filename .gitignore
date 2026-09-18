@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+CURRENT_CONTEXT.md
 
 # Local runtime data
 data/

@@ -177,7 +177,7 @@ See `AGENTS.md` for the detailed operating rules.
 | Document                     | Purpose                                                         |
 | ---------------------------- | --------------------------------------------------------------- |
 | `AGENTS.md`                  | Instructions for Codex and development behavior                 |
-| `CURRENT_CONTEXT.md`         | Immediate handoff: latest work, conflicts, validation, next plan |
+| `CURRENT_CONTEXT.md`         | Local ignored handoff: latest work, conflicts, validation, next plan |
 | `docs/architecture.md`       | Current architectural structure and boundaries                  |
 | `docs/decisions.md`          | Current decision index and lightweight ADR record               |
 | `docs/workflow.md`           | Investigation, decision, implementation and validation workflow |

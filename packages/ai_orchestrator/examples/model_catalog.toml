@@ -1,0 +1,31 @@
+[[models]]
+provider = "ollama"
+model = "llama3.2"
+location = "local"
+quality = "standard"
+latency = "interactive"
+notes = "Default local Ollama chat model."
+
+[models.capabilities]
+chat = true
+streaming = false
+tools = false
+structured_output = false
+multimodal_input = false
+embeddings = false
+
+[[models]]
+provider = "requesty"
+model = "future-hosted-model"
+location = "external"
+quality = "high"
+latency = "interactive"
+notes = "Placeholder for a future Requesty-backed model."
+
+[models.capabilities]
+chat = true
+streaming = false
+tools = false
+structured_output = true
+multimodal_input = false
+embeddings = false

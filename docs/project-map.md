@@ -4,7 +4,7 @@ Use this file to decide where a change belongs before adding new abstractions.
 
 ## Root
 - `AGENTS.md` — general Codex rules; especially the requirement to ask the user at material decision boundaries.
-- `CURRENT_CONTEXT.md` — immediate handoff: last completed work, open conflicts/risks, validation status, and next plan.
+- `CURRENT_CONTEXT.md` — local ignored immediate handoff, when present: last completed work, open conflicts/risks, validation status, and next plan.
 - `pyproject.toml` — uv workspace and shared validation configuration.
 - `uv.lock` — workspace dependency lockfile.
 
