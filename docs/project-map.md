@@ -1,0 +1,56 @@
+# Project Map
+
+Use this file to decide where a change belongs before adding new abstractions.
+
+## Root
+- `AGENTS.md` — general Codex rules; especially the requirement to ask the user at material decision boundaries.
+- `CURRENT_CONTEXT.md` — immediate handoff: last completed work, open conflicts/risks, validation status, and next plan.
+- `pyproject.toml` — uv workspace and shared validation configuration.
+- `uv.lock` — workspace dependency lockfile.
+
+## `docs/`
+- `architecture.md` — current architecture and boundaries.
+- `decisions.md` — durable decisions and their history.
+- `workflow.md` — investigation, approval, implementation, validation, and Git workflow.
+- `project-map.md` — this navigation index.
+- `definition-of-done.md` — completion checklist.
+- `plans/` — project plans that must be considered before planning non-trivial work in the related area.
+
+## Layout
+
+- `packages/` — reusable Python libraries.
+- `apps/` — applications and prototypes.
+- `tests/` — repository-level integration and contract tests.
+
+## Projects
+
+### Provider-Agnostic AI Infrastructure
+Location: `packages/ai_provider/`
+
+Owns common AI contracts, provider adapters, local/cloud switching, provider API handling, and usage metadata. It does not own application-specific routing strategy.
+
+### AI Orchestrator
+Location: `packages/ai_orchestrator/`
+
+Owns task classification, prompt evaluation/refinement, model selection, request configuration, routing, fallback, quota/economics awareness, and usage integration. It does not directly implement provider APIs.
+
+### AI Council
+Location: `apps/ai_council/`
+
+Owns multi-model querying, raw response preservation, comparison/synthesis, and local/cloud/hybrid user-facing behavior. It is an application, not the provider layer. The current implementation is a prototype to migrate after the provider contract exists.
+
+### Job Search Automation
+Location: `apps/job_search/`
+
+Owns ingestion, normalization, matching, evidence-based analysis, CV/message suggestions, skill-gap analysis, human review, application support, and tracking. It must never invent candidate experience. The current `job_email` tool is a pre-existing prototype to migrate later.
+
+### Future IT Services / Automation
+Owns client-facing automation/integration experiments and future business applications. Share code only when there is a genuine stable common need.
+
+## Placement rule
+If a new component does not clearly fit:
+1. define its responsibility;
+2. check whether an existing boundary is sufficient;
+3. avoid speculative abstractions;
+4. ask the user if architectural placement is materially ambiguous;
+5. update this map after the decision.

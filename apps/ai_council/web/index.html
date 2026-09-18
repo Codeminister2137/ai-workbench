@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Local AI Council</title>
+    <link rel="stylesheet" href="/app.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <h1>Local AI Council</h1>
+        <p id="subtitle">Private local councillors backed by your configured Ollama models.</p>
+      </div>
+      <div class="status-pill" id="connectionStatus">Idle</div>
+    </header>
+
+    <main>
+      <section class="composer">
+        <div class="conversation-row">
+          <label for="conversationInput">Conversation</label>
+          <input id="conversationInput" name="conversation" autocomplete="off">
+        </div>
+        <form id="promptForm">
+          <textarea id="promptInput" rows="4" placeholder="Ask the council..."></textarea>
+          <button id="askButton" type="submit">Ask</button>
+        </form>
+      </section>
+
+      <section class="council-grid" id="councilGrid" aria-live="polite"></section>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

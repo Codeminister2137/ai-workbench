@@ -1,0 +1,121 @@
+# Architecture Decisions
+
+This is the canonical lightweight record of durable architecture decisions. Do not silently rewrite history when a decision changes.
+
+## Statuses
+- Proposed
+- Accepted
+- Superseded
+- Rejected
+
+## ADR-001 — Modular Monolith First
+**Status:** Accepted
+
+Start with a modular monolith. Extract services only when a concrete operational or architectural need exists.
+
+## ADR-002 — Provider-Agnostic AI Boundary
+**Status:** Accepted
+
+Applications use a provider-agnostic AI layer so local inference, gateways, and direct providers can be exchanged without application rewrites.
+
+## ADR-003 — Requesty Is an Integration, Not the Core Architecture
+**Status:** Accepted
+
+Requesty may be used as a backend/gateway, but the project will not reproduce Requesty's gateway functionality.
+
+## ADR-004 — Local and Cloud Backends Must Be Switchable
+**Status:** Accepted
+
+AI-enabled applications should switch backend through configuration/architecture rather than application rewrites.
+
+## ADR-005 — Orchestrator Is Separate from Provider Infrastructure
+**Status:** Accepted
+
+The Orchestrator makes task/model/prompt/routing decisions. Provider infrastructure communicates with providers.
+
+## ADR-006 — Prompt Optimization Starts With Human Approval
+**Status:** Accepted
+
+Initial prompt refinement proposes a change and lets the user approve it before execution.
+
+## ADR-007 — AI Evaluation Uses Representative Real Tasks
+**Status:** Accepted
+
+Start with approximately 20–50 representative real tasks rather than a large synthetic dataset.
+
+## ADR-008 — Human Approval Before Automated Job Applications
+**Status:** Accepted
+
+Keep a human review step before sending applications or taking consequential external actions.
+
+## ADR-009 — CV Tailoring Must Not Invent Experience
+**Status:** Accepted
+
+The system may rephrase, prioritize, and reorganize genuine experience, but must not fabricate qualifications, projects, employment, achievements, or skills.
+
+## ADR-010 — Usage Tracking Is a Separate Concern
+**Status:** Accepted
+
+Usage tracking supplies data for routing/economics decisions without being tightly coupled to provider adapters.
+
+## ADR-011 — Codex Must Ask at Decision Boundaries
+**Status:** Accepted
+
+Codex must ask the user before material product, architecture, dependency, privacy, data-model, or scope decisions. When requirements do not determine the choice, Codex should stop rather than silently invent a requirement.
+
+## ADR-012 — No Speculative Infrastructure
+**Status:** Accepted
+
+Do not add Redis, message brokers, vector databases, Kubernetes, agent frameworks, microservices, or similar infrastructure without a demonstrated need.
+
+## ADR-013 — Repository Layout And Workspace
+**Status:** Accepted
+**Date:** 2026-09-18
+
+Use `packages/` for reusable libraries and `apps/` for applications. Use a root `uv` workspace. Support Python `>=3.13,<3.15`, with local development on Python 3.14.
+
+Detailed ADR: `docs/decisions/ADR-013-repository-layout-and-workspace.md`
+
+## ADR-014 — Provider Contract And Dependencies
+**Status:** Accepted
+**Date:** 2026-09-18
+
+Use a neutral chat-first provider contract designed for provider-specific child schemas/adapters. Do not put LangChain or LangGraph in the provider core initially.
+
+Detailed ADR: `docs/decisions/ADR-014-provider-contract-and-dependencies.md`
+
+## ADR-015 — Provider Rollout And Prototype Privacy Classes
+**Status:** Accepted
+**Date:** 2026-09-18
+
+Implement Ollama first while shaping the provider infrastructure for future Requesty and direct-provider adapters. Define prototype privacy classes now and treat them as provisional.
+
+Detailed ADR: `docs/decisions/ADR-015-provider-rollout-and-privacy-classes.md`
+
+## Template
+```text
+## ADR-NNN — Short Name
+**Status:** Proposed / Accepted / Superseded / Rejected
+**Date:** YYYY-MM-DD
+
+**Context**
+What problem required a decision?
+
+**Options considered**
+- Option A
+- Option B
+
+**Decision**
+What was chosen?
+
+**Reason**
+Why?
+
+**Consequences**
+What becomes easier, harder, or constrained?
+
+**Related**
+Relevant plans/issues/ADRs.
+```
+
+When an accepted decision changes, mark the old ADR **Superseded** and add a new ADR explaining the change.

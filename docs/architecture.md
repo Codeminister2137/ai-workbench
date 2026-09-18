@@ -1,0 +1,108 @@
+# Architecture
+
+## 1. Overall direction
+The projects form a small ecosystem:
+
+`Applications → AI Orchestrator → Provider-Agnostic AI Infrastructure → Ollama / Requesty / direct providers`
+
+Applications include the AI Council, Job Search Automation, and future automation/client applications.
+
+Repository layout:
+
+```text
+packages/
+  ai_provider/
+  ai_orchestrator/
+apps/
+  ai_council/
+  job_search/
+```
+
+Current implementation starts with an Ollama-only provider slice while keeping the provider contract extensible for Requesty and direct hosted providers.
+
+## 2. Modular monolith first
+Start as a modular monolith. Extract a separately deployable service only for a demonstrated need such as independent scaling/deployment, a different security/runtime boundary, operational isolation, or a real development bottleneck.
+
+## 3. Provider-agnostic AI infrastructure
+The provider layer exposes common AI request/response contracts and translates them to provider APIs. It owns provider authentication, request/response translation, provider errors, streaming, model IDs, and usage metadata.
+
+It does not own application-specific task strategy or high-level model-routing policy.
+
+## 4. AI Orchestrator
+The Orchestrator sits above providers and makes AI-request decisions:
+- task classification;
+- prompt evaluation/refinement;
+- model and request configuration;
+- routing;
+- fallback/retry;
+- privacy constraints;
+- latency/reliability considerations;
+- cost/quota awareness;
+- usage integration;
+- eventually adaptive routing based on measured performance.
+
+Keep separate concepts:
+- **Capability:** what a model can do.
+- **Performance:** how it performs on this user's workload.
+- **Economics:** cost, quotas, rate limits, and resource constraints.
+
+Evolution should be incremental: manual model choice → static rules → capability-aware selector → quota-aware selector → adaptive selector.
+
+## 5. Prompt evaluation vs optimization
+A prompt evaluator judges whether a request is adequate and identifies ambiguity/missing context. A prompt optimizer produces improved wording or variants.
+
+Initial flow:
+`User prompt → judge → suggested refinement → user approval → target model`
+
+Do not begin with autonomous optimization. Later, benchmark prompt variants automatically.
+
+## 6. Usage tracking
+Track, where available:
+- timestamp;
+- application/task;
+- provider/model;
+- input/output tokens;
+- estimated cost;
+- quota/resource consumed;
+- latency;
+- success/failure/error category.
+
+Avoid sensitive prompt content by default. Usage tracking should inform routing but remain conceptually separate from provider adapters.
+
+## 7. AI Council
+The Council is an application on top of the AI infrastructure:
+`user question → council router → multiple models → raw responses → synthesis → final answer`
+
+Preserve raw responses so synthesis does not erase disagreement. Initial modes may be LOCAL, CLOUD, and HYBRID. The UI should make local vs external processing understandable.
+
+## 8. Job Search Automation
+Flow:
+`job sources → ingestion → normalization → matching → application analysis → CV/message suggestions → human review → application → tracking`
+
+Use a normalized internal job schema. Matching should preserve evidence. CV tailoring may rephrase and prioritize genuine experience but must never invent experience or qualifications. Human approval remains the default before external applications are sent.
+
+## 9. Privacy boundary
+Local inference is the trusted privacy tier. Cloud providers and gateways are external processors. Future controls may include task-level privacy requirements, local-only routing, sensitive-data detection, optional redaction, and provider/backend audit information.
+
+Prototype privacy classes are currently:
+- `LOCAL_ONLY`;
+- `EXTERNAL_ALLOWED`;
+- `SENSITIVE_REVIEW_REQUIRED`;
+- `PUBLIC_OR_LOW_RISK`.
+
+These labels are provisional until cloud routing and real external provider adapters are implemented.
+
+## 10. Shared code
+Share code only when multiple projects genuinely need the same stable behavior. Good candidates are common AI contracts, provider adapters, and stable usage/configuration primitives. Avoid shared packages for experimental or application-specific logic.
+
+## 11. Architecture decision boundary
+Codex must ask before making material decisions involving new services, persistent storage, major dependencies, microservice extraction, public API/schema changes, provider policy, privacy/data routing, automatic external actions, autonomous AI optimization, or significant shared-interface changes.
+
+## 12. Architecture change process
+1. Describe current architecture.
+2. Describe proposed change.
+3. Explain why it is needed.
+4. Identify meaningful alternatives.
+5. Explain consequences.
+6. Ask the user when the decision is material.
+7. Record the accepted decision in `docs/decisions.md`.

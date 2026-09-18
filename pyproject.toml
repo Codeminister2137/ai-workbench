@@ -1,0 +1,54 @@
+[project]
+name = "ai-projects-workspace"
+version = "0.1.0"
+description = "Workspace for provider-agnostic AI infrastructure, orchestration, and applications."
+requires-python = ">=3.13,<3.15"
+dependencies = [
+    "ai-provider",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.0,<10.0.0",
+    "ruff>=0.14.0,<0.15.0",
+    "pyright>=1.1.400,<2.0.0",
+]
+
+[tool.uv.workspace]
+members = [
+    "packages/ai_provider",
+    "packages/ai_orchestrator",
+    "apps/ai_council",
+    "apps/job_search/job-email",
+]
+
+[tool.uv.sources]
+ai-provider = { workspace = true }
+ai-orchestrator = { workspace = true }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["packages/ai_provider/src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+exclude = [
+    "apps/ai_council",
+    "apps/job_search",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pyright]
+include = ["packages", "tests"]
+exclude = [
+    "**/__pycache__",
+    "**/.pytest_cache",
+    "apps/ai_council",
+    "apps/job_search",
+]
+pythonVersion = "3.13"
+typeCheckingMode = "standard"
+extraPaths = ["packages/ai_provider/src"]
