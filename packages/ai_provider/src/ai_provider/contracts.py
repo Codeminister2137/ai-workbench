@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any, Protocol
@@ -96,6 +97,20 @@ class AIResponse:
     raw_metadata: dict[str, Any] = field(default_factory=dict)
 
 
+@dataclass(frozen=True, slots=True)
+class AIStreamDelta:
+    content: str
+    raw_metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True, slots=True)
+class AIStreamFinal:
+    response: AIResponse
+
+
+AIStreamEvent = AIStreamDelta | AIStreamFinal
+
+
 class ChatClient(Protocol):
     @property
     def backend(self) -> BackendInfo:
@@ -104,4 +119,8 @@ class ChatClient(Protocol):
 
     def complete(self, request: AIRequest) -> AIResponse:
         """Execute a chat-style completion request."""
+        ...
+
+    def stream(self, request: AIRequest) -> Iterator[AIStreamEvent]:
+        """Execute a chat-style completion request and yield streaming events."""
         ...

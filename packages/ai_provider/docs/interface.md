@@ -55,6 +55,18 @@ One normalized provider response:
 - `latency_ms`: measured adapter latency when available;
 - `raw_metadata`: original provider metadata retained for diagnostics.
 
+### Streaming
+
+`ChatClient.stream(request)` yields `AIStreamEvent` values:
+
+- `AIStreamDelta`: one text delta with raw provider metadata;
+- `AIStreamFinal`: one final normalized `AIResponse` containing accumulated
+  assistant text, backend identity, usage metadata when available, finish reason,
+  latency, and raw final provider metadata.
+
+Streaming adapters must enforce the same privacy policy as non-streaming
+completion before sending the request.
+
 ### `BackendConfig`
 
 Configured backend selection:
@@ -71,7 +83,7 @@ Configured backend selection:
 | Capability | Ollama | Requesty placeholder | Direct-provider placeholder |
 | --- | --- | --- | --- |
 | Chat completion | Implemented | Planned | Planned |
-| Streaming | Not yet | Planned when needed | Planned when needed |
+| Streaming | Implemented | Planned when needed | Planned when needed |
 | Provider-reported usage | Partial, when Ollama reports counts | Planned | Planned |
 | External execution | No | Planned | Planned |
 | Tool calling | Not yet | Future trigger | Future trigger |

@@ -11,6 +11,7 @@ This package is the infrastructure layer below orchestration and applications. I
 - Backend identity and model capabilities.
 - Provider-reported usage metadata where available.
 - Ollama chat adapter.
+- Ollama chat streaming.
 - Provider factory for configured chat clients.
 
 Requesty and direct hosted providers are intentionally not implemented yet. The contract is shaped so those adapters can be added later without changing application-facing code.
@@ -34,6 +35,26 @@ response = client.complete(
 
 print(response.message.content)
 print(response.backend.provider, response.backend.model)
+```
+
+## Streaming
+
+```python
+from ai_provider import AIMessage, AIRequest, AIStreamDelta, AIStreamFinal, MessageRole
+from ai_provider.config import BackendConfig, ProviderKind
+from ai_provider.factory import create_chat_client
+
+client = create_chat_client(
+    BackendConfig(provider=ProviderKind.OLLAMA, model="llama3.2")
+)
+
+for event in client.stream(
+    AIRequest(messages=(AIMessage(MessageRole.USER, "Say hello in one sentence."),))
+):
+    if isinstance(event, AIStreamDelta):
+        print(event.content, end="")
+    elif isinstance(event, AIStreamFinal):
+        print(f"\nbackend={event.response.backend.provider}")
 ```
 
 ## Orchestrator Composition
@@ -86,4 +107,5 @@ $env:AI_PROVIDER_MODEL = "llama3.2"
 python -m uv run pytest tests\integration\test_ollama_live.py
 ```
 
-The test assumes Ollama is running and the configured model is available.
+The live tests include non-streaming and streaming chat. They assume Ollama is
+running and the configured model is available.

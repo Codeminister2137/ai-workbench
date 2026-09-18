@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import socket
 import time
+from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -13,6 +14,9 @@ from ai_provider.contracts import (
     AIMessage,
     AIRequest,
     AIResponse,
+    AIStreamDelta,
+    AIStreamEvent,
+    AIStreamFinal,
     BackendInfo,
     BackendLocation,
     FinishReason,
@@ -36,7 +40,7 @@ class OllamaChatClient:
             model=self.config.model,
             location=BackendLocation.LOCAL,
             base_url=self.base_url,
-            capabilities=ModelCapabilities(chat=True, streaming=False),
+            capabilities=ModelCapabilities(chat=True, streaming=True),
         )
 
     @property
@@ -47,13 +51,71 @@ class OllamaChatClient:
         enforce_privacy_policy(self.backend, request.privacy_class)
 
         model = request.model or self.config.model
+        payload = self._chat_payload(request, stream=False)
+
+        started = time.perf_counter()
+        raw_response = self._post_chat(payload)
+        latency_ms = (time.perf_counter() - started) * 1000
+
+        return self._response_from_raw(raw_response, model=model, latency_ms=latency_ms)
+
+    def stream(self, request: AIRequest) -> Iterator[AIStreamEvent]:
+        enforce_privacy_policy(self.backend, request.privacy_class)
+
+        model = request.model or self.config.model
+        payload = self._chat_payload(request, stream=True)
+        started = time.perf_counter()
+        content_parts: list[str] = []
+        final_response: AIResponse | None = None
+
+        for raw_chunk in self._stream_chat(payload):
+            raw_message = raw_chunk.get("message")
+            is_done = raw_chunk.get("done") is True
+            if raw_message is None and is_done:
+                raw_message = {}
+            if not isinstance(raw_message, dict):
+                raise ProviderError(
+                    "Ollama stream chunk did not include a message object.",
+                    category=ProviderErrorCategory.NON_RETRYABLE,
+                    provider="ollama",
+                    raw_error=raw_chunk,
+                )
+
+            content = str(raw_message.get("content", ""))
+            if content:
+                content_parts.append(content)
+                yield AIStreamDelta(content=content, raw_metadata=raw_chunk)
+
+            if is_done:
+                latency_ms = (time.perf_counter() - started) * 1000
+                final_raw = dict(raw_chunk)
+                final_raw["message"] = {
+                    **raw_message,
+                    "content": "".join(content_parts),
+                }
+                final_response = self._response_from_raw(
+                    final_raw,
+                    model=model,
+                    latency_ms=latency_ms,
+                )
+                yield AIStreamFinal(response=final_response)
+
+        if final_response is None:
+            raise ProviderError(
+                "Ollama stream ended without a final response object.",
+                category=ProviderErrorCategory.RETRYABLE,
+                retryable=True,
+                provider="ollama",
+            )
+
+    def _chat_payload(self, request: AIRequest, *, stream: bool) -> dict[str, Any]:
         payload: dict[str, Any] = {
-            "model": model,
+            "model": request.model or self.config.model,
             "messages": [
                 {"role": message.role.value, "content": message.content}
                 for message in request.messages
             ],
-            "stream": False,
+            "stream": stream,
         }
         options: dict[str, Any] = {}
         if request.temperature is not None:
@@ -62,11 +124,15 @@ class OllamaChatClient:
             options["num_predict"] = request.max_output_tokens
         if options:
             payload["options"] = options
+        return payload
 
-        started = time.perf_counter()
-        raw_response = self._post_chat(payload)
-        latency_ms = (time.perf_counter() - started) * 1000
-
+    def _response_from_raw(
+        self,
+        raw_response: dict[str, Any],
+        *,
+        model: str,
+        latency_ms: float,
+    ) -> AIResponse:
         raw_message = raw_response.get("message")
         if not isinstance(raw_message, dict):
             raise ProviderError(
@@ -85,7 +151,7 @@ class OllamaChatClient:
                 model=model,
                 location=BackendLocation.LOCAL,
                 base_url=self.base_url,
-                capabilities=ModelCapabilities(chat=True, streaming=False),
+                capabilities=ModelCapabilities(chat=True, streaming=True),
             ),
             usage=self._usage_from_response(raw_response),
             finish_reason=self._finish_reason(done_reason),
@@ -105,6 +171,67 @@ class OllamaChatClient:
         try:
             with urlopen(request, timeout=self.config.timeout_seconds) as response:
                 return json.loads(response.read().decode("utf-8"))
+        except TimeoutError as exc:
+            raise ProviderError(
+                "Ollama request timed out.",
+                category=ProviderErrorCategory.TIMEOUT,
+                retryable=True,
+                provider="ollama",
+                raw_error=exc,
+            ) from exc
+        except HTTPError as exc:
+            category = (
+                ProviderErrorCategory.RETRYABLE
+                if 500 <= exc.code < 600
+                else ProviderErrorCategory.NON_RETRYABLE
+            )
+            raise ProviderError(
+                f"Ollama returned HTTP {exc.code}.",
+                category=category,
+                retryable=category is ProviderErrorCategory.RETRYABLE,
+                provider="ollama",
+                raw_error=exc,
+            ) from exc
+        except URLError as exc:
+            if isinstance(exc.reason, (TimeoutError, socket.timeout)):
+                raise ProviderError(
+                    "Ollama request timed out.",
+                    category=ProviderErrorCategory.TIMEOUT,
+                    retryable=True,
+                    provider="ollama",
+                    raw_error=exc,
+                ) from exc
+            raise ProviderError(
+                "Could not connect to Ollama.",
+                category=ProviderErrorCategory.RETRYABLE,
+                retryable=True,
+                provider="ollama",
+                raw_error=exc,
+            ) from exc
+
+    def _stream_chat(self, payload: dict[str, Any]) -> Iterator[dict[str, Any]]:
+        body = json.dumps(payload).encode("utf-8")
+        request = Request(
+            f"{self.base_url}/api/chat",
+            data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+
+        try:
+            with urlopen(request, timeout=self.config.timeout_seconds) as response:
+                for line in response:
+                    raw_line = line.strip()
+                    if not raw_line:
+                        continue
+                    yield json.loads(raw_line.decode("utf-8"))
+        except json.JSONDecodeError as exc:
+            raise ProviderError(
+                "Ollama stream returned invalid JSON.",
+                category=ProviderErrorCategory.NON_RETRYABLE,
+                provider="ollama",
+                raw_error=exc,
+            ) from exc
         except TimeoutError as exc:
             raise ProviderError(
                 "Ollama request timed out.",
