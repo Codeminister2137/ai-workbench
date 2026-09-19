@@ -85,10 +85,24 @@ git status
 ```
 Check for unrelated edits, secrets, generated files, accidental config changes, and incomplete migrations. Never reset/delete user work without approval.
 
-## 9. Discoveries
+## 9. Session boundaries
+Use `Codex: Session Boundary Check` between work sessions, after a commit, before
+switching to a distinct task, or after compaction/context errors.
+
+Prefer a new chat when the current milestone is committed, `CURRENT_CONTEXT.md`
+is current, and the next task can resume from repository files more cheaply than
+from the accumulated transcript. Continue the current chat when work is
+mid-change, unresolved decisions exist only in the transcript, or debugging and
+validation context is still active.
+
+In the Codex IDE chat, `/status` can show context usage and rate-limit state.
+Use it as an input when context pressure matters; do not invent a fixed
+cross-surface threshold.
+
+## 10. Discoveries
 If implementation reveals a materially better architectural idea, do not silently implement it. Explain the discovery and ask whether to change direction. Small internal improvements with no meaningful architectural consequence may be implemented normally.
 
-## 10. Standard task prompt
+## 11. Standard task prompt
 ```text
 Task:
 [what I want changed]

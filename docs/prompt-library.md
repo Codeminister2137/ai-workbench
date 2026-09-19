@@ -53,6 +53,26 @@ For transition points after commits, before a new slice, or after resuming:
 1. `Codex: Prompt Library Check`
 2. Follow the smallest useful prompt sequence it recommends.
 
+For mid-day session boundaries:
+
+1. `Codex: Session Boundary Check`
+2. Continue the current chat, or update `CURRENT_CONTEXT.md` and start a new
+   chat, based on the recommendation.
+
+For end-of-day or stopping-point closeout:
+
+1. `Codex: DoD Closeout`
+2. Let it run the reusable closeout helpers it needs:
+   `Codex: Prompt Library Check`, `Codex: Capture Current Context`,
+   `Codex: ADR Gap Check`, `Codex: PyCharm Prompt Sync`, and git/validation
+   checks.
+3. Commit only when the closeout finds a coherent, validated change set ready
+   for history.
+
+The goal is that the user can say "DoD closeout" instead of separately asking
+for commits, context handoff, prompt-library review, ADR review, and final
+validation every time.
+
 For architecture-heavy work:
 
 - `Codex: ADR Gap Check` checks for missing or stale ADR coverage.
@@ -67,6 +87,8 @@ For scope control:
 
 - `Codex: Weekly Review`
 - `Codex: DoD Closeout`
+- `Codex: Closeout Helper Set`
+- `Codex: Session Boundary Check`
 - `Codex: MVP/Stop Review`
 - `Codex: Job Search Task`
 - `Codex: AI Council Task`
@@ -113,19 +135,117 @@ Give a concise review, recommended next task prompt, and any decision boundary t
 
 ```text
 Task:
-Close out this completed work against the repository definition of done.
+Close out this completed work against the repository definition of done and
+prepare a clean stopping point.
 
 Context:
 $SELECTION
 
 Instructions:
-- Check requested behavior, unchanged existing behavior, edge cases, error handling, tests, Ruff, formatting, pyright, secrets, scope, docs, ADRs, CURRENT_CONTEXT.md, git diff, and git status.
+- Treat `Codex: Closeout Helper Set` as reusable helper guidance for this
+  prompt. Run the relevant helper checks instead of waiting for the user to ask
+  for them one by one.
+- Check requested behavior, unchanged existing behavior, edge cases, error
+  handling, tests, Ruff, formatting, pyright, secrets, scope, docs, ADRs,
+  CURRENT_CONTEXT.md, git diff, and git status.
+- Read `docs/prompt-library.md` and identify whether any closeout-specific
+  prompt should be run before stopping. Use the smallest useful set; do not
+  run broad workflows just because they exist.
+- Update `CURRENT_CONTEXT.md` when the work was non-trivial or the next session
+  would otherwise lose important state.
+- Check whether a missing or stale ADR is likely. Do not create or edit an ADR
+  unless the user has approved that decision or the ADR is already part of the
+  agreed scope.
+- Check whether prompt-library changes need PyCharm manual sync notes. Do not
+  modify PyCharm settings unless the user explicitly approves it.
+- If the current diff is coherent and validated, recommend the commit grouping
+  and commit message. If the user already asked you to commit, create the
+  focused commit after validation.
+- Do not create commits for unrelated or partially validated work.
 - Do not claim checks were run unless they were actually run.
 - Separate validation performed from validation not run.
 - Identify known limitations and residual risks.
 
 Output:
-Provide a concise completion report: what changed, why, validation run, docs/decision updates, git status/diff summary, and remaining risks or follow-ups.
+Provide a concise completion report: what changed, why, validation run,
+docs/decision updates, prompt-library/helper checks used, context handoff
+status, git status/diff summary, recommended commit action, and remaining risks
+or follow-ups.
+```
+
+## `Codex: Closeout Helper Set`
+
+```text
+Task:
+Apply the reusable helper checks that support `Codex: DoD Closeout`.
+
+Context:
+$SELECTION
+
+Instructions:
+- Use this as a helper prompt, not as a standalone replacement for
+  `Codex: DoD Closeout`.
+- Prompt-library helper: read `docs/prompt-library.md`, identify only prompts
+  that are genuinely useful for the current stopping point, and explain why.
+- Context helper: update `CURRENT_CONTEXT.md` when work was non-trivial,
+  decisions changed, validation status matters, or the next action would be
+  unclear after context loss.
+- ADR helper: check for missing, stale, or contradicted ADR coverage only when
+  the work touched architecture, provider boundaries, privacy, dependencies,
+  persistence, public APIs, data contracts, or durable workflow decisions.
+- Docs helper: verify that changed public behavior, configuration,
+  architecture, or workflow guidance is reflected in the canonical docs without
+  duplicating requirements unnecessarily.
+- Git helper: inspect `git diff` and `git status`, identify unrelated changes,
+  generated files, secrets risk, incomplete migrations, and sensible commit
+  grouping.
+- Validation helper: report checks actually run and checks intentionally not
+  run; never imply a clean validation state from intent alone.
+- PyCharm sync helper: when `docs/prompt-library.md` changes, report that the
+  IDE-side prompt library may need manual sync. Use `Codex: PyCharm Prompt Sync`
+  only when the user asks for a sync check or when sync status materially
+  matters.
+- Keep the helper set small for the situation. Skip helpers that do not apply.
+
+Output:
+List the helper checks used, helper checks skipped, why they were skipped, and
+any action that should happen before stopping or committing.
+```
+
+## `Codex: Session Boundary Check`
+
+```text
+Task:
+Decide whether to continue the current Codex chat/session or move to a new one.
+
+Context:
+$SELECTION
+
+Instructions:
+- Keep this check cheap. Do not run a broad repository review just to answer it.
+- Inspect `git status --short` and `CURRENT_CONTEXT.md`.
+- Identify whether the current work is mid-task, at a committed milestone, at an
+  uncommitted but coherent stopping point, or about to switch to a distinct task.
+- If context pressure matters, ask the user to run `/status` in the Codex IDE
+  chat and share the context-usage signal. Do not guess an exact threshold.
+- Recommend starting a new chat when a milestone is committed, when
+  `CURRENT_CONTEXT.md` is current and the next task is distinct, after
+  compaction-related errors or context confusion, or when `/status` shows high
+  context usage.
+- Recommend staying in the current chat when implementation is mid-change,
+  unresolved decisions exist only in the transcript, validation/debugging context
+  is still active, `CURRENT_CONTEXT.md` is stale, or the next action is a tiny
+  follow-up.
+- Treat PyCharm/Codex IDE compaction failures as environment-specific empirical
+  signals. Do not assume the same threshold applies to every Codex surface.
+- If moving to a new chat is recommended, first ensure `CURRENT_CONTEXT.md`
+  contains the last completed work, validation status, open decisions/risks,
+  current git state, and the next recommended action.
+
+Output:
+Say either `continue current chat`, `update handoff then start new chat`, or
+`do not switch yet`. Explain the reason briefly and list any handoff update
+needed before switching.
 ```
 
 ## `Codex: MVP/Stop Review`

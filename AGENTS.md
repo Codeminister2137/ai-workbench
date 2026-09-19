@@ -449,6 +449,11 @@ repository. When the user asks to use, check, or run a named `Codex: ...`
 prompt, read that file as the actual prompt source. It also contains PyCharm
 sync guidance for the IDE-side prompt copy.
 
+For mid-work session boundaries, compaction/context errors, or suspected context
+pressure, use the lightweight `Codex: Session Boundary Check` workflow from
+`docs/prompt-library.md` and `docs/workflow.md` rather than adding broad
+meta-review.
+
 ### Pass 1 — investigation
 
 Do not modify files.
