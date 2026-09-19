@@ -18,6 +18,8 @@
 - [ ] Type checking passes when configured.
 - [ ] No unnecessary dependency added.
 - [ ] No speculative abstraction added.
+- [ ] Python docstrings/comments are useful, PEP 257-aligned where applicable,
+      and not redundant.
 
 ## Architecture
 - [ ] Provider-specific logic remains behind provider boundaries.

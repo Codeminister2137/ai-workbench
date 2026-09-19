@@ -50,6 +50,8 @@ function Invoke-Start {
     }
 
     $arguments = @(
+        "-m",
+        "uv",
         "run",
         "python",
         "web_app.py",
@@ -60,7 +62,7 @@ function Invoke-Start {
     )
 
     Start-Process `
-        -FilePath "poetry" `
+        -FilePath "python" `
         -ArgumentList $arguments `
         -WorkingDirectory $Root `
         -WindowStyle Hidden `
@@ -103,7 +105,7 @@ switch ($Task) {
         Invoke-Init
     }
     "install" {
-        poetry install
+        python -m uv sync --project $Root
     }
     "pull-model" {
         ollama pull $Model
@@ -127,14 +129,13 @@ switch ($Task) {
             $args += @("--conversation", $Conversation)
         }
         $args += $Prompt
-        poetry @args
+        python -m uv @args
     }
     "list" {
-        poetry run python main.py --list-conversations
+        python -m uv run python main.py --list-conversations
     }
     "check" {
-        poetry check
-        poetry run python -m py_compile agent.py config.py council.py domain.py main.py storage.py tools.py state.py web_app.py
-        poetry run pytest
+        python -m uv run python -m py_compile agent.py config.py council.py domain.py main.py storage.py web_app.py
+        python -m uv run pytest
     }
 }

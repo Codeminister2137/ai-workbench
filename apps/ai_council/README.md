@@ -1,13 +1,19 @@
 # Local AI Council
 
-This project runs a private local council of Ollama-backed AI agents. Each council
-member has its own persona, model, and temperature, while conversation history is
-stored locally in SQLite.
+This project runs a private local council of AI agents. Each council member has
+its own persona, model, and temperature, while conversation history is stored
+locally in SQLite.
+
+The current execution path uses the shared `ai_provider` package with the local
+Ollama adapter. The Council still owns the application workflow: loading member
+configuration, preserving raw member responses, streaming browser events, and
+storing conversation history. Provider-specific request/response handling lives
+behind `ai_provider`.
 
 ## Requirements
 
 - Python with the dependencies from `pyproject.toml`
-- Poetry
+- uv, using the repository workspace
 - Ollama running locally
 - At least one local Ollama model, for example:
 
@@ -119,7 +125,7 @@ Run project checks:
 Run only the automated tests:
 
 ```powershell
-poetry run pytest
+python -m uv run --project apps\ai_council pytest
 ```
 
 If you have `make` installed, these wrappers are also available:
@@ -170,14 +176,28 @@ List stored conversations:
 The underlying commands still work directly:
 
 ```powershell
-poetry run python web_app.py
-poetry run python main.py "Ask something"
-poetry run python main.py --list-conversations
+python -m uv run --project apps\ai_council python web_app.py
+python -m uv run --project apps\ai_council python main.py "Ask something"
+python -m uv run --project apps\ai_council python main.py --list-conversations
 ```
 
-When running `poetry run python web_app.py` directly in a terminal, close it with
-`Ctrl+C`. When running through `.\tasks.ps1 start`, close it with
-`.\tasks.ps1 stop`.
+When running `python -m uv run --project apps\ai_council python web_app.py`
+directly in a terminal, close it with `Ctrl+C`. When running through
+`.\tasks.ps1 start`, close it with `.\tasks.ps1 stop`.
+
+## Execution Boundary
+
+`LocalAgent` converts Council conversation history into neutral `ai_provider`
+chat messages, then calls `ChatClient.complete(...)` for CLI responses or
+`ChatClient.stream(...)` for browser streaming. The initial backend remains local
+Ollama, configured from each council member's `model`, `temperature`, and the
+optional `ollama_base_url`.
+
+The Council does not currently use `ai_orchestrator` for model selection or
+prompt review. That is a later integration step once the product behavior is
+clear. Earlier LangChain/LangGraph prototype modules and dependencies have been
+removed from the active app metadata; future graph or tool abstractions should be
+introduced only when a concrete Council workflow needs them.
 
 ## Change Models Or Personas
 
@@ -209,6 +229,9 @@ This app is designed for local-first use, but privacy still depends on how you r
 it:
 
 - Use local Ollama models only.
+- The active Council execution path uses `ai_provider` with local Ollama; do not
+  switch to cloud or gateway-backed providers for sensitive prompts without a
+  separate privacy and routing decision.
 - Do not configure a remote `ollama_base_url` if the prompts contain sensitive data.
 - Keep `data/council.sqlite3` private, because it contains your prompts and answers.
 - Keep `council.json` private, because it may contain personal councillor prompts,

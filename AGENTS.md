@@ -547,6 +547,13 @@ Use standard engineering principles as practical heuristics, not ceremony:
   narrow contracts.
 * Clean Code where it improves readability: clear names, small cohesive
   functions, explicit data flow, and tests that explain behavior.
+* Python comments should generally favor useful docstrings, following
+  [PEP 257](https://peps.python.org/pep-0257/) conventions. Use module, class,
+  function, and method docstrings when they clarify purpose, contracts,
+  behavior, side effects, or non-obvious constraints. Do not add redundant
+  docstrings or comments that merely restate names or obvious implementation
+  steps. Inline/block comments are still appropriate for non-obvious reasoning,
+  edge cases, security/privacy boundaries, or temporary constraints.
 * Separation of concerns, DRY, KISS, and YAGNI as balancing constraints. Avoid
   duplication that creates real maintenance risk, but do not add abstractions
   before the need is concrete.
