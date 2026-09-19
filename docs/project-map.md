@@ -15,6 +15,8 @@ Use this file to decide where a change belongs before adding new abstractions.
 - `git-workflow.md` — branch, commit, validation, and history hygiene guidance.
 - `ideas.md` — parked future product/architecture ideas that are useful but not
   active implementation context.
+- `prompt-library.md` — canonical full Codex prompt library for this repository.
+- `prompt-library-guide.md` — usage and PyCharm sync guidance for the prompt library.
 - `project-map.md` — this navigation index.
 - `definition-of-done.md` — completion checklist.
 - `api-docs.md` — generated Python API documentation workflow using `pdoc`.

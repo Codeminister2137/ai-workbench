@@ -3,6 +3,10 @@
 ## 1. Before starting
 Use tiered context reading instead of rereading every document by default.
 
+If the user asks to use, check, or run a named `Codex: ...` prompt, read
+`docs/prompt-library.md` as the canonical prompt library. Use
+`docs/prompt-library-guide.md` for usage notes and PyCharm sync guidance.
+
 For most work:
 1. Check cheap state: `git status --short`, current branch when relevant, and
    targeted file discovery/search.

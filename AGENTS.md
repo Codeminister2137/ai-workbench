@@ -444,6 +444,11 @@ the full files.
 
 `CURRENT_CONTEXT.md` is the local, ignored immediate handoff file. Keep it current with the last completed work, open conflicts, validation status, and next plan of action when it exists. Do not use it as a durable ADR replacement.
 
+`docs/prompt-library.md` is the canonical Codex prompt library for this
+repository. When the user asks to use, check, or run a named `Codex: ...`
+prompt, read that file as the actual prompt source. Use
+`docs/prompt-library-guide.md` only for usage notes and PyCharm sync guidance.
+
 ### Pass 1 — investigation
 
 Do not modify files.
