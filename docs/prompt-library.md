@@ -6,15 +6,62 @@ The prompts were migrated from the custom PyCharm AI Assistant prompt library on
 2026-09-20. This Markdown file is the source of truth for this repository. The
 PyCharm prompt library may need manual sync when this file changes.
 
+`docs/pycharm-ai-prompt-library.md` was the earlier local summary and should be
+treated as superseded by this file.
+
 ## How Codex Should Use This File
 
 When the user asks to run or check the prompt library, read this file as the
-actual prompt library. Use `docs/prompt-library-guide.md` only for usage notes.
+actual prompt library.
 
 If a prompt references `$SELECTION`, treat it as the user-selected code/text in
 PyCharm. In this Codex chat, use the user's request, current conversation, and
 relevant repository context as the equivalent selection unless the user provides
 specific selected text.
+
+When asking Codex to use a prompt, name it directly:
+
+```text
+Use Codex: Investigate First for this request.
+```
+
+## PyCharm Sync
+
+The PyCharm Prompt Library is separate IDE state. To use the same prompts there:
+
+1. Open PyCharm AI Assistant prompt/library settings.
+2. Create or update a prompt with the same `Codex: ...` name.
+3. Copy the corresponding prompt body from this file.
+4. Keep `$SELECTION` where the prompt expects selected code or text.
+
+Use `Codex: PyCharm Prompt Sync` to compare this canonical file with the
+IDE-side prompt library before manually syncing changes.
+
+## Suggested Prompt Flow
+
+For larger tasks:
+
+1. `Codex: Context Primer`
+2. `Codex: Investigate First`
+3. `Codex: Decision Brief`, if a material decision appears
+4. `Codex: Implement After Decision`
+5. `Codex: Test Plan`, if test coverage is unclear
+6. `Codex: DoD Closeout`
+
+For transition points after commits, before a new slice, or after resuming:
+
+1. `Codex: Prompt Library Check`
+2. Follow the smallest useful prompt sequence it recommends.
+
+For architecture-heavy work:
+
+- `Codex: ADR Gap Check` checks for missing or stale ADR coverage.
+- `Codex: ADR Capture` records an approved durable decision.
+
+For scope control:
+
+- `Codex: MVP/Stop Review` checks whether the current plan is becoming too broad
+  or speculative.
 
 ## Prompt Index
 
@@ -41,6 +88,7 @@ specific selected text.
 - `Codex: Implement After Decision`
 - `Codex: Investigate First`
 - `Codex: Prompt Library Check`
+- `Codex: PyCharm Prompt Sync`
 
 ## `Codex: Weekly Review`
 
@@ -507,13 +555,35 @@ $SELECTION
 
 Required workflow:
 1. Read docs/prompt-library.md as the canonical prompt library.
-2. Read docs/prompt-library-guide.md for usage guidance if needed.
-3. Check current git status and recent context.
-4. Identify whether the current situation matches any available prompt.
-5. Recommend any prompt or prompt sequence that is genuinely useful now, or say that no prompt is needed.
-6. Explain briefly why each recommended prompt is useful and what order to run them in.
-7. Prefer the smallest useful sequence. Do not suggest prompts just because they are available.
-8. Do not run a broader workflow unless it is clearly useful for the next step.
+2. Check current git status and recent context.
+3. Identify whether the current situation matches any available prompt.
+4. Recommend any prompt or prompt sequence that is genuinely useful now, or say that no prompt is needed.
+5. Explain briefly why each recommended prompt is useful and what order to run them in.
+6. Prefer the smallest useful sequence. Do not suggest prompts just because they are available.
+7. Do not run a broader workflow unless it is clearly useful for the next step.
 
 Use this especially after commits, before starting a new logical work slice, after resuming context, or before architecture/significant implementation work.
+```
+
+## `Codex: PyCharm Prompt Sync`
+
+This prompt is canonical in the repository but has not yet been synced into the
+PyCharm prompt library.
+
+```text
+Task:
+Check whether the repository prompt library and PyCharm AI Assistant prompt library are in sync.
+
+Context:
+$SELECTION
+
+Required workflow:
+1. Read docs/prompt-library.md as the canonical prompt library.
+2. If PyCharm prompt-library storage is available and access is approved, inspect the IDE-side prompt entries.
+3. Compare prompt names and prompt bodies.
+4. Identify prompts missing from PyCharm, prompts missing from the repository, and prompts whose text differs.
+5. Do not modify PyCharm settings unless I explicitly approve that follow-up.
+
+Output:
+Report sync status, differences, recommended source of truth for each difference, and exact manual sync steps.
 ```

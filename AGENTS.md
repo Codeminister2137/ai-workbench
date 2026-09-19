@@ -446,8 +446,8 @@ the full files.
 
 `docs/prompt-library.md` is the canonical Codex prompt library for this
 repository. When the user asks to use, check, or run a named `Codex: ...`
-prompt, read that file as the actual prompt source. Use
-`docs/prompt-library-guide.md` only for usage notes and PyCharm sync guidance.
+prompt, read that file as the actual prompt source. It also contains PyCharm
+sync guidance for the IDE-side prompt copy.
 
 ### Pass 1 — investigation
 
