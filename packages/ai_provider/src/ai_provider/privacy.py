@@ -1,3 +1,5 @@
+"""Privacy policy checks enforced before provider execution."""
+
 from __future__ import annotations
 
 from ai_provider.contracts import BackendInfo, BackendLocation, PrivacyClass
@@ -5,6 +7,8 @@ from ai_provider.errors import ProviderError, ProviderErrorCategory
 
 
 def enforce_privacy_policy(backend: BackendInfo, privacy_class: PrivacyClass) -> None:
+    """Reject external execution when the request privacy class forbids it."""
+
     if backend.location is BackendLocation.LOCAL:
         return
 

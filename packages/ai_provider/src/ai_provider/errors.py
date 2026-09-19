@@ -1,9 +1,13 @@
+"""Provider error types exposed to callers."""
+
 from __future__ import annotations
 
 from enum import StrEnum
 
 
 class ProviderErrorCategory(StrEnum):
+    """Stable categories callers can use for provider error handling."""
+
     CONFIGURATION = "configuration"
     AUTHENTICATION = "authentication"
     RATE_LIMIT = "rate_limit"
@@ -15,6 +19,8 @@ class ProviderErrorCategory(StrEnum):
 
 
 class ProviderError(RuntimeError):
+    """Provider-layer exception with normalized category metadata."""
+
     def __init__(
         self,
         message: str,

@@ -1,3 +1,5 @@
+"""Neutral orchestration data models and policy labels."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -5,6 +7,8 @@ from enum import StrEnum
 
 
 class TaskType(StrEnum):
+    """Broad task category used as orchestration input."""
+
     GENERAL = "general"
     CODING = "coding"
     EXTRACTION = "extraction"
@@ -14,6 +18,8 @@ class TaskType(StrEnum):
 
 
 class TaskCapability(StrEnum):
+    """Capabilities a task may require from a model/backend."""
+
     CHAT = "chat"
     TOOLS = "tools"
     STRUCTURED_OUTPUT = "structured_output"
@@ -22,12 +28,16 @@ class TaskCapability(StrEnum):
 
 
 class QualityThreshold(StrEnum):
+    """Minimum acceptable model quality tier for a task."""
+
     LOW = "low"
     STANDARD = "standard"
     HIGH = "high"
 
 
 class LatencyTarget(StrEnum):
+    """Preferred response-time profile for model selection."""
+
     INTERACTIVE = "interactive"
     BACKGROUND = "background"
 
@@ -42,11 +52,15 @@ class PrivacyClass(StrEnum):
 
 
 class BackendLocation(StrEnum):
+    """Where an orchestration backend is expected to process requests."""
+
     LOCAL = "local"
     EXTERNAL = "external"
 
 
 class PromptIssueSeverity(StrEnum):
+    """Severity levels produced by prompt judging."""
+
     INFO = "info"
     WARNING = "warning"
     BLOCKING = "blocking"
@@ -54,6 +68,8 @@ class PromptIssueSeverity(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class TaskProfile:
+    """Caller-provided constraints used for prompt review and model selection."""
+
     task_type: TaskType = TaskType.GENERAL
     privacy_class: PrivacyClass = PrivacyClass.LOCAL_ONLY
     required_capabilities: frozenset[TaskCapability] = field(
@@ -67,6 +83,8 @@ class TaskProfile:
 
 @dataclass(frozen=True, slots=True)
 class PromptIssue:
+    """Single prompt-quality issue reported by the prompt judge."""
+
     code: str
     message: str
     severity: PromptIssueSeverity
@@ -75,6 +93,8 @@ class PromptIssue:
 
 @dataclass(frozen=True, slots=True)
 class PromptJudgeResult:
+    """Result of deterministic prompt review before model selection."""
+
     original_prompt: str
     issues: tuple[PromptIssue, ...]
     should_refine: bool
@@ -84,6 +104,8 @@ class PromptJudgeResult:
 
 @dataclass(frozen=True, slots=True)
 class ModelCapabilities:
+    """Capabilities advertised by an orchestration model catalog entry."""
+
     chat: bool = True
     streaming: bool = False
     tools: bool = False
@@ -94,6 +116,8 @@ class ModelCapabilities:
 
 @dataclass(frozen=True, slots=True)
 class ModelBackend:
+    """Backend and model identity known to the orchestrator."""
+
     provider: str
     model: str
     location: BackendLocation
@@ -103,6 +127,8 @@ class ModelBackend:
 
 @dataclass(frozen=True, slots=True)
 class ModelCatalogEntry:
+    """Single selectable model entry in an orchestration catalog."""
+
     backend: ModelBackend
     quality: QualityThreshold = QualityThreshold.STANDARD
     latency: LatencyTarget = LatencyTarget.INTERACTIVE
@@ -111,12 +137,16 @@ class ModelCatalogEntry:
 
 @dataclass(frozen=True, slots=True)
 class CandidateRejection:
+    """Rejected model candidate with an explanation for observability."""
+
     candidate: ModelCatalogEntry
     reason: str
 
 
 @dataclass(frozen=True, slots=True)
 class ModelRecommendation:
+    """Selected model plus alternatives, rejections, and selection reasons."""
+
     selected: ModelCatalogEntry
     alternatives: tuple[ModelCatalogEntry, ...]
     rejected: tuple[CandidateRejection, ...]
@@ -124,6 +154,8 @@ class ModelRecommendation:
 
 
 def supports_capability(capabilities: ModelCapabilities, capability: TaskCapability) -> bool:
+    """Return whether a capability set satisfies one required task capability."""
+
     match capability:
         case TaskCapability.CHAT:
             return capabilities.chat
@@ -138,4 +170,6 @@ def supports_capability(capabilities: ModelCapabilities, capability: TaskCapabil
 
 
 def is_external_backend(entry: ModelCatalogEntry) -> bool:
+    """Return whether a catalog entry points at an external backend."""
+
     return entry.backend.location is BackendLocation.EXTERNAL

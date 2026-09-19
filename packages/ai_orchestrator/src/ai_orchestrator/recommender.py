@@ -1,3 +1,5 @@
+"""Capability, privacy, and preference based model recommendation."""
+
 from __future__ import annotations
 
 from ai_orchestrator.models import (
@@ -22,6 +24,8 @@ def recommend_model(
     profile: TaskProfile,
     catalog: tuple[ModelCatalogEntry, ...],
 ) -> ModelRecommendation:
+    """Select the best catalog candidate for a task profile."""
+
     if not catalog:
         raise ValueError("Model catalog must not be empty.")
 

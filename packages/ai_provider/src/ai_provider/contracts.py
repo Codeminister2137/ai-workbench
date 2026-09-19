@@ -1,3 +1,5 @@
+"""Provider-neutral chat request, response, and streaming contracts."""
+
 from __future__ import annotations
 
 from collections.abc import Iterator
@@ -7,6 +9,8 @@ from typing import Any, Protocol
 
 
 class MessageRole(StrEnum):
+    """Supported chat message roles shared across provider adapters."""
+
     SYSTEM = "system"
     USER = "user"
     ASSISTANT = "assistant"
@@ -26,17 +30,23 @@ class PrivacyClass(StrEnum):
 
 
 class BackendLocation(StrEnum):
+    """Where a backend processes requests from the caller's privacy perspective."""
+
     LOCAL = "local"
     EXTERNAL = "external"
 
 
 class UsageSource(StrEnum):
+    """How token usage values were obtained."""
+
     PROVIDER_REPORTED = "provider_reported"
     ESTIMATED = "estimated"
     UNAVAILABLE = "unavailable"
 
 
 class FinishReason(StrEnum):
+    """Normalized reason a provider stopped generating a response."""
+
     STOP = "stop"
     LENGTH = "length"
     ERROR = "error"
@@ -45,6 +55,8 @@ class FinishReason(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class AIMessage:
+    """Single chat message in the neutral provider contract."""
+
     role: MessageRole
     content: str
     name: str | None = None
@@ -52,6 +64,8 @@ class AIMessage:
 
 @dataclass(frozen=True, slots=True)
 class ModelCapabilities:
+    """Provider-reported capabilities used by callers and orchestration adapters."""
+
     chat: bool = True
     streaming: bool = False
     tools: bool = False
@@ -62,6 +76,8 @@ class ModelCapabilities:
 
 @dataclass(frozen=True, slots=True)
 class BackendInfo:
+    """Identity, location, and capabilities of the backend that handled a request."""
+
     provider: str
     model: str
     location: BackendLocation
@@ -71,6 +87,8 @@ class BackendInfo:
 
 @dataclass(frozen=True, slots=True)
 class UsageMetadata:
+    """Token usage metadata normalized across providers when available."""
+
     source: UsageSource = UsageSource.UNAVAILABLE
     input_tokens: int | None = None
     output_tokens: int | None = None
@@ -79,6 +97,8 @@ class UsageMetadata:
 
 @dataclass(frozen=True, slots=True)
 class AIRequest:
+    """Provider-neutral chat completion request."""
+
     messages: tuple[AIMessage, ...]
     model: str | None = None
     temperature: float | None = None
@@ -89,6 +109,8 @@ class AIRequest:
 
 @dataclass(frozen=True, slots=True)
 class AIResponse:
+    """Provider-neutral chat completion response."""
+
     message: AIMessage
     backend: BackendInfo
     usage: UsageMetadata = field(default_factory=UsageMetadata)
@@ -99,12 +121,16 @@ class AIResponse:
 
 @dataclass(frozen=True, slots=True)
 class AIStreamDelta:
+    """Incremental text emitted by a streaming provider response."""
+
     content: str
     raw_metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
 class AIStreamFinal:
+    """Final streaming event containing the normalized completed response."""
+
     response: AIResponse
 
 
@@ -112,6 +138,8 @@ AIStreamEvent = AIStreamDelta | AIStreamFinal
 
 
 class ChatClient(Protocol):
+    """Synchronous chat client interface implemented by provider adapters."""
+
     @property
     def backend(self) -> BackendInfo:
         """Return backend identity and capabilities."""

@@ -1,3 +1,5 @@
+"""Deterministic prompt review before orchestration executes a request."""
+
 from __future__ import annotations
 
 import re
@@ -23,6 +25,8 @@ _CONFLICT_HINTS = (
 
 
 def judge_prompt(prompt: str, profile: TaskProfile | None = None) -> PromptJudgeResult:
+    """Judge whether a prompt likely needs clarification before execution."""
+
     del profile
     normalized = " ".join(prompt.split())
     issues: list[PromptIssue] = []

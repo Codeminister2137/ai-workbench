@@ -1,3 +1,5 @@
+"""Backend configuration for provider chat clients."""
+
 from __future__ import annotations
 
 import os
@@ -8,6 +10,8 @@ from ai_provider.errors import ProviderError, ProviderErrorCategory
 
 
 class ProviderKind(StrEnum):
+    """Provider identifiers supported by configuration and factories."""
+
     OLLAMA = "ollama"
     REQUESTY = "requesty"
     OPENAI = "openai"
@@ -15,6 +19,8 @@ class ProviderKind(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class BackendConfig:
+    """Runtime configuration needed to construct a provider chat client."""
+
     provider: ProviderKind
     model: str
     base_url: str | None = None
@@ -36,6 +42,8 @@ class BackendConfig:
 
     @classmethod
     def from_env(cls, prefix: str = "AI_PROVIDER") -> BackendConfig:
+        """Build backend configuration from environment variables."""
+
         provider_value = os.getenv(f"{prefix}_KIND", ProviderKind.OLLAMA.value)
         try:
             provider = ProviderKind(provider_value)

@@ -125,6 +125,16 @@ UI while moving provider-specific execution behind reusable infrastructure.
 
 Detailed ADR: `docs/decisions/ADR-018-provider-streaming-before-council-migration.md`
 
+## ADR-019 - API Documentation With pdoc And Targeted Docstrings
+**Status:** Accepted
+**Date:** 2026-09-19
+
+Use `pdoc` as the initial generated Python API documentation tool and add
+targeted PEP 257-style docstrings to high-value public surfaces. Do not enable
+strict docstring linting until the public API has a clean baseline.
+
+Detailed ADR: `docs/decisions/ADR-019-api-documentation-with-pdoc-and-targeted-docstrings.md`
+
 ## Template
 ```text
 ## ADR-NNN — Short Name

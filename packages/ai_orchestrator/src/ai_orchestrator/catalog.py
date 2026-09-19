@@ -1,3 +1,5 @@
+"""Model catalog loading for orchestration decisions."""
+
 from __future__ import annotations
 
 import tomllib
@@ -15,6 +17,8 @@ from ai_orchestrator.models import (
 
 
 def load_model_catalog(path: Path) -> tuple[ModelCatalogEntry, ...]:
+    """Load model catalog entries from a TOML file."""
+
     raw = tomllib.loads(path.read_text(encoding="utf-8"))
     raw_models = raw.get("models", [])
     if not isinstance(raw_models, list):

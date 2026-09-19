@@ -1,3 +1,5 @@
+"""High-level execution preparation facade for orchestration callers."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -16,6 +18,8 @@ from ai_orchestrator.recommender import recommend_model
 
 
 class OrchestrationStatus(StrEnum):
+    """Outcome status for execution preparation."""
+
     READY = "ready"
     NEEDS_PROMPT_REVIEW = "needs_prompt_review"
     MODEL_SELECTION_FAILED = "model_selection_failed"
@@ -23,6 +27,8 @@ class OrchestrationStatus(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class OrchestrationResult:
+    """Prepared orchestration result without executing provider calls."""
+
     original_prompt: str
     profile: TaskProfile
     status: OrchestrationStatus
@@ -33,6 +39,8 @@ class OrchestrationResult:
 
     @property
     def is_ready(self) -> bool:
+        """Return whether the result contains a ready execution plan."""
+
         return self.status is OrchestrationStatus.READY
 
 
@@ -44,6 +52,8 @@ def prepare_execution(
     review_prompt: bool = True,
     timeout_seconds: float = 60.0,
 ) -> OrchestrationResult:
+    """Review a prompt, recommend a model, and prepare a neutral execution plan."""
+
     prompt_judge = judge_prompt(prompt, profile) if review_prompt else None
     if prompt_judge is not None and _needs_prompt_review(prompt_judge):
         return OrchestrationResult(

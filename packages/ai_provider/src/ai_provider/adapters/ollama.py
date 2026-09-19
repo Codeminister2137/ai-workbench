@@ -1,3 +1,5 @@
+"""Ollama implementation of the provider-neutral chat client contract."""
+
 from __future__ import annotations
 
 import json
@@ -31,10 +33,14 @@ from ai_provider.privacy import enforce_privacy_policy
 
 @dataclass(slots=True)
 class OllamaChatClient:
+    """Chat client that translates neutral requests to Ollama's local API."""
+
     config: BackendConfig
 
     @property
     def backend(self) -> BackendInfo:
+        """Return local Ollama backend identity and capabilities."""
+
         return BackendInfo(
             provider="ollama",
             model=self.config.model,
@@ -45,9 +51,13 @@ class OllamaChatClient:
 
     @property
     def base_url(self) -> str:
+        """Return the configured Ollama base URL without a trailing slash."""
+
         return (self.config.base_url or "http://localhost:11434").rstrip("/")
 
     def complete(self, request: AIRequest) -> AIResponse:
+        """Execute a non-streaming Ollama chat request."""
+
         enforce_privacy_policy(self.backend, request.privacy_class)
 
         model = request.model or self.config.model
@@ -60,6 +70,8 @@ class OllamaChatClient:
         return self._response_from_raw(raw_response, model=model, latency_ms=latency_ms)
 
     def stream(self, request: AIRequest) -> Iterator[AIStreamEvent]:
+        """Execute a streaming Ollama chat request and yield neutral events."""
+
         enforce_privacy_policy(self.backend, request.privacy_class)
 
         model = request.model or self.config.model

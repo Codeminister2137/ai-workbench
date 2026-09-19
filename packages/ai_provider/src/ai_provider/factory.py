@@ -1,3 +1,5 @@
+"""Factory helpers for creating provider chat clients."""
+
 from __future__ import annotations
 
 from ai_provider.adapters.ollama import OllamaChatClient
@@ -7,6 +9,8 @@ from ai_provider.errors import ProviderError, ProviderErrorCategory
 
 
 def create_chat_client(config: BackendConfig) -> ChatClient:
+    """Create a chat client for the configured provider."""
+
     if config.provider is ProviderKind.OLLAMA:
         return OllamaChatClient(config)
 
