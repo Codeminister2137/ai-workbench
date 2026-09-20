@@ -83,6 +83,19 @@ class OllamaPullResult:
         return max(totals) if totals else None
 
 
+@dataclass(frozen=True, slots=True)
+class OllamaPullLogStatus:
+    """Latest known background pull state from one progress log."""
+
+    model: str
+    status: str
+    log_path: Path
+    completed_bytes: int | None = None
+    total_bytes: int | None = None
+    percent: float | None = None
+    installed_model: LocalOllamaModel | None = None
+
+
 def list_local_ollama_models(
     base_url: str | None = None,
     *,
@@ -103,6 +116,23 @@ def list_local_ollama_models(
         raise _unexpected_response("Ollama model list did not include a models array.", payload)
 
     return tuple(_local_model_from_raw(item) for item in raw_models if isinstance(item, dict))
+
+
+def summarize_ollama_pull_logs(
+    log_dir: Path,
+    *,
+    installed_models: tuple[LocalOllamaModel, ...] = (),
+) -> tuple[OllamaPullLogStatus, ...]:
+    """Summarize background Ollama pull progress logs for app display."""
+
+    if not log_dir.exists():
+        return ()
+
+    installed_by_model = {model.model: model for model in installed_models}
+    return tuple(
+        _pull_status_from_log(log_path, installed_by_model=installed_by_model)
+        for log_path in sorted(log_dir.glob("*.log"))
+    )
 
 
 def show_ollama_model(
@@ -296,6 +326,65 @@ def _local_model_from_raw(raw_model: dict[str, Any]) -> LocalOllamaModel:
         ),
         details=details if isinstance(details, dict) else {},
     )
+
+
+def _pull_status_from_log(
+    log_path: Path,
+    *,
+    installed_by_model: dict[str, LocalOllamaModel],
+) -> OllamaPullLogStatus:
+    model = _model_from_log_path(log_path)
+    last_line = ""
+    with log_path.open("r", encoding="utf-8", errors="replace") as log_file:
+        for line in log_file:
+            if line.strip():
+                last_line = line.strip()
+    if not last_line:
+        return OllamaPullLogStatus(
+            model=model,
+            status="pending",
+            log_path=log_path,
+            installed_model=installed_by_model.get(model),
+        )
+
+    fields = _parse_progress_line(last_line)
+    return OllamaPullLogStatus(
+        model=model,
+        status=fields.get("status", "unknown"),
+        log_path=log_path,
+        completed_bytes=_gib_to_bytes(fields.get("completed_gb")),
+        total_bytes=_gib_to_bytes(fields.get("total_gb")),
+        percent=_to_float(fields.get("percent")),
+        installed_model=installed_by_model.get(model),
+    )
+
+
+def _parse_progress_line(line: str) -> dict[str, str]:
+    fields: dict[str, str] = {}
+    for token in line.split()[1:]:
+        key, separator, value = token.partition("=")
+        if separator:
+            fields[key] = value
+    return fields
+
+
+def _gib_to_bytes(value: str | None) -> int | None:
+    number = _to_float(value)
+    return int(number * BYTES_PER_GIB) if number is not None else None
+
+
+def _to_float(value: str | None) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except ValueError:
+        return None
+
+
+def _model_from_log_path(log_path: Path) -> str:
+    name, separator, tag = log_path.stem.rpartition("-")
+    return f"{name}:{tag}" if separator else log_path.stem
 
 
 def _pull_progress_from_raw(raw_event: dict[str, Any]) -> OllamaPullProgress:

@@ -6,12 +6,14 @@ from typing import Any
 
 import pytest
 from ai_provider import (
+    LocalOllamaModel,
     OllamaPullConstraints,
     ProviderError,
     ProviderErrorCategory,
     list_local_ollama_models,
     pull_ollama_model,
     stream_ollama_model_pull,
+    summarize_ollama_pull_logs,
 )
 
 
@@ -190,6 +192,42 @@ def test_pull_ollama_model_calls_progress_callback(
     )
 
     assert [event.status for event in events] == ["pulling layer", "success"]
+
+
+def test_summarize_ollama_pull_logs_returns_status_for_app_display(tmp_path: Path) -> None:
+    log_dir = tmp_path / "pulls"
+    log_dir.mkdir()
+    log_path = log_dir / "qwen2.5-coder-14b.log"
+    log_path.write_text(
+        "\n".join(
+            (
+                "2026-09-20T19:26:31+00:00 status=pulling abc "
+                "completed_gb=0.50 total_gb=8.00 percent=6.2",
+                "2026-09-20T19:26:32+00:00 status=pulling abc "
+                "completed_gb=1.00 total_gb=8.00 percent=12.5",
+            )
+        ),
+        encoding="utf-8",
+    )
+    installed_model = LocalOllamaModel(
+        name="qwen2.5-coder:14b",
+        model="qwen2.5-coder:14b",
+        size_bytes=9 * 1024**3,
+    )
+
+    statuses = summarize_ollama_pull_logs(log_dir, installed_models=(installed_model,))
+
+    assert len(statuses) == 1
+    assert statuses[0].model == "qwen2.5-coder:14b"
+    assert statuses[0].status == "pulling"
+    assert statuses[0].completed_bytes == 1024**3
+    assert statuses[0].total_bytes == 8 * 1024**3
+    assert statuses[0].percent == 12.5
+    assert statuses[0].installed_model == installed_model
+
+
+def test_summarize_ollama_pull_logs_returns_empty_for_missing_directory(tmp_path: Path) -> None:
+    assert summarize_ollama_pull_logs(tmp_path / "missing") == ()
 
 
 def _progress(

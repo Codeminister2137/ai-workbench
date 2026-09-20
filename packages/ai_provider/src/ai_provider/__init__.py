@@ -25,12 +25,14 @@ from ai_provider.factory import create_chat_client
 from ai_provider.ollama_models import (
     LocalOllamaModel,
     OllamaPullConstraints,
+    OllamaPullLogStatus,
     OllamaPullProgress,
     OllamaPullResult,
     list_local_ollama_models,
     pull_ollama_model,
     show_ollama_model,
     stream_ollama_model_pull,
+    summarize_ollama_pull_logs,
 )
 from ai_provider.ollama_runtime import ensure_ollama_server, is_ollama_server_available
 
@@ -51,6 +53,7 @@ __all__ = [
     "ModelCapabilities",
     "OllamaChatClient",
     "OllamaPullConstraints",
+    "OllamaPullLogStatus",
     "OllamaPullProgress",
     "OllamaPullResult",
     "OpenAICompatibleChatClient",
@@ -67,4 +70,5 @@ __all__ = [
     "pull_ollama_model",
     "show_ollama_model",
     "stream_ollama_model_pull",
+    "summarize_ollama_pull_logs",
 ]

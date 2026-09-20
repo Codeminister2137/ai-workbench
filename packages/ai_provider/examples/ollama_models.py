@@ -3,17 +3,18 @@ from __future__ import annotations
 import argparse
 import subprocess
 import sys
-from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
 from ai_provider import (
     LocalOllamaModel,
     OllamaPullConstraints,
+    OllamaPullLogStatus,
     OllamaPullProgress,
     list_local_ollama_models,
     pull_ollama_model,
     show_ollama_model,
+    summarize_ollama_pull_logs,
 )
 
 
@@ -79,11 +80,13 @@ def main() -> None:
 
     if args.pull_status:
         _print_pull_status(
-            log_dir=_default_log_dir(),
-            installed_models=list_local_ollama_models(
-                args.base_url,
-                timeout_seconds=args.timeout_seconds,
-                start_ollama=args.start_ollama,
+            summarize_ollama_pull_logs(
+                _default_log_dir(),
+                installed_models=list_local_ollama_models(
+                    args.base_url,
+                    timeout_seconds=args.timeout_seconds,
+                    start_ollama=args.start_ollama,
+                ),
             ),
         )
         return
@@ -165,19 +168,12 @@ def _default_models_path() -> Path:
     return Path("D:/AI/Ollama/models")
 
 
-def _print_pull_status(
-    *,
-    log_dir: Path,
-    installed_models: tuple[LocalOllamaModel, ...],
-) -> None:
-    installed_by_model = {model.model: model for model in installed_models}
-    log_paths = tuple(sorted(log_dir.glob("*.log"))) if log_dir.exists() else ()
-    if not log_paths:
+def _print_pull_status(statuses: tuple[OllamaPullLogStatus, ...]) -> None:
+    if not statuses:
         print("background_pulls: none")
     else:
-        for log_path in log_paths:
-            status = _pull_status_from_log(log_path)
-            installed = installed_by_model.get(status.model)
+        for status in statuses:
+            installed = status.installed_model
             installed_text = (
                 f"installed_gb={installed.size_bytes / 1024**3:.2f}"
                 if installed is not None
@@ -202,64 +198,19 @@ def _print_pull_status(
                         progress_text,
                         total_text,
                         installed_text,
-                        f"log={log_path}",
+                        f"log={status.log_path}",
                     )
                 )
             )
 
+    installed_models = tuple(
+        status.installed_model for status in statuses if status.installed_model is not None
+    )
     if installed_models:
         print("installed_models:")
         _print_model_list(installed_models)
     else:
         print("installed_models: none")
-
-
-def _pull_status_from_log(log_path: Path) -> PullLogStatus:
-    model = _model_from_log_path(log_path)
-    last_line = ""
-    with log_path.open("r", encoding="utf-8", errors="replace") as log_file:
-        for line in log_file:
-            if line.strip():
-                last_line = line.strip()
-    if not last_line:
-        return PullLogStatus(model=model, status="pending")
-
-    fields = _parse_progress_line(last_line)
-    return PullLogStatus(
-        model=model,
-        status=fields.get("status", "unknown"),
-        completed_bytes=_gib_to_bytes(fields.get("completed_gb")),
-        total_bytes=_gib_to_bytes(fields.get("total_gb")),
-        percent=_to_float(fields.get("percent")),
-    )
-
-
-def _parse_progress_line(line: str) -> dict[str, str]:
-    fields: dict[str, str] = {}
-    for token in line.split()[1:]:
-        key, separator, value = token.partition("=")
-        if separator:
-            fields[key] = value
-    return fields
-
-
-def _gib_to_bytes(value: str | None) -> int | None:
-    number = _to_float(value)
-    return int(number * 1024**3) if number is not None else None
-
-
-def _to_float(value: str | None) -> float | None:
-    if value is None:
-        return None
-    try:
-        return float(value)
-    except ValueError:
-        return None
-
-
-def _model_from_log_path(log_path: Path) -> str:
-    name, separator, tag = log_path.stem.rpartition("-")
-    return f"{name}:{tag}" if separator else log_path.stem
 
 
 def _start_background_pull(args: argparse.Namespace) -> BackgroundPullJob:
@@ -310,15 +261,6 @@ def _default_log_path(model: str) -> Path:
 
 def _default_log_dir() -> Path:
     return Path(".tmp") / "ollama-pulls"
-
-
-@dataclass(frozen=True, slots=True)
-class PullLogStatus:
-    model: str
-    status: str
-    completed_bytes: int | None = None
-    total_bytes: int | None = None
-    percent: float | None = None
 
 
 class BackgroundPullJob:
