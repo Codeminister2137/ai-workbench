@@ -141,6 +141,21 @@ python -m uv run pytest tests\integration\test_ollama_live.py
 The live tests include non-streaming and streaming chat. They assume Ollama is
 running and the configured model is available.
 
+## Local Ollama Latency Benchmark
+
+The orchestrator catalog can use local benchmark latency as a manual estimate.
+Run this only when Ollama is already running and the configured model is pulled:
+
+```powershell
+python packages\ai_provider\examples\local_ollama_latency.py `
+  --model llama3.2 --runs 3 --warmup-runs 1
+```
+
+The benchmark sends a local-only coding-style prompt, prints measured response
+latencies, and includes a TOML `[models.estimate]` snippet that can be copied
+into `packages/ai_orchestrator/examples/model_catalog.toml` after review. It
+does not persist observations or update routing policy automatically.
+
 ## Live Hosted Integration Tests
 
 Hosted integration tests are also skipped by default. They send prompts to an
