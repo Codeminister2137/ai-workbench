@@ -220,6 +220,11 @@ ollama list
 
 Background pull logs include timestamped progress lines with status, layer
 digest, completed GiB, total GiB, and percent when Ollama reports byte counts.
+The same CLI can summarize all pull logs and installed models:
+
+```powershell
+python packages\ai_provider\examples\ollama_models.py --pull-status --start-ollama
+```
 
 Model pulls remain explicit for now. Future orchestrator-driven auto-provisioning
 should call these provider primitives after a separate routing/policy decision,
