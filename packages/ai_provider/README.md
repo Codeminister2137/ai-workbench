@@ -218,6 +218,9 @@ Get-Content .tmp\ollama-pulls\qwen2.5-coder-14b.log -Tail 20
 ollama list
 ```
 
+Background pull logs include timestamped progress lines with status, layer
+digest, completed GiB, total GiB, and percent when Ollama reports byte counts.
+
 Model pulls remain explicit for now. Future orchestrator-driven auto-provisioning
 should call these provider primitives after a separate routing/policy decision,
 so disk usage and model-library changes stay bounded by user-defined constraints.

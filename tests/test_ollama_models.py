@@ -167,6 +167,31 @@ def test_pull_ollama_model_returns_result_when_constraints_pass(
     assert [event.status for event in result.events] == ["pulling layer", "success"]
 
 
+def test_pull_ollama_model_calls_progress_callback(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr("ai_provider.ollama_models.ensure_ollama_server", lambda base_url: None)
+    monkeypatch.setattr(
+        "ai_provider.ollama_models.stream_ollama_model_pull",
+        lambda model, base_url, *, timeout_seconds: iter(
+            [
+                _progress("pulling layer", total_bytes=100, completed_bytes=50),
+                _progress("success"),
+            ]
+        ),
+    )
+    events = []
+
+    pull_ollama_model(
+        "llama3.2",
+        constraints=OllamaPullConstraints(min_free_bytes=1, models_path=tmp_path),
+        progress_callback=events.append,
+    )
+
+    assert [event.status for event in events] == ["pulling layer", "success"]
+
+
 def _progress(
     status: str,
     *,

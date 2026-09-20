@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import shutil
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -129,6 +129,7 @@ def pull_ollama_model(
     base_url: str | None = None,
     *,
     constraints: OllamaPullConstraints | None = None,
+    progress_callback: Callable[[OllamaPullProgress], None] | None = None,
     timeout_seconds: float = 120.0,
     start_ollama: bool = True,
 ) -> OllamaPullResult:
@@ -145,6 +146,8 @@ def pull_ollama_model(
         base_url,
         timeout_seconds=timeout_seconds,
     ):
+        if progress_callback is not None:
+            progress_callback(event)
         _enforce_max_download_size(event, effective_constraints)
         events.append(event)
     _enforce_min_free_space(effective_constraints)

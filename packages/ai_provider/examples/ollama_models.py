@@ -3,11 +3,13 @@ from __future__ import annotations
 import argparse
 import subprocess
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
 from ai_provider import (
     LocalOllamaModel,
     OllamaPullConstraints,
+    OllamaPullProgress,
     list_local_ollama_models,
     pull_ollama_model,
     show_ollama_model,
@@ -105,6 +107,7 @@ def main() -> None:
         args.pull,
         args.base_url,
         constraints=constraints,
+        progress_callback=_print_pull_progress,
         timeout_seconds=args.timeout_seconds,
         start_ollama=args.start_ollama,
     )
@@ -126,6 +129,19 @@ def _print_pull_result(model: str, total_bytes: int | None) -> None:
     print(f"pulled: {model}")
     if total_bytes is not None:
         print(f"max_reported_total_gb: {total_bytes / 1024**3:.2f}")
+
+
+def _print_pull_progress(event: OllamaPullProgress) -> None:
+    prefix = datetime.now(UTC).isoformat(timespec="seconds")
+    parts = [prefix, f"status={event.status}"]
+    if event.digest:
+        parts.append(f"digest={event.digest}")
+    if event.completed_bytes is not None and event.total_bytes is not None:
+        percent = (event.completed_bytes / event.total_bytes) * 100 if event.total_bytes else 0
+        parts.append(f"completed_gb={event.completed_bytes / 1024**3:.2f}")
+        parts.append(f"total_gb={event.total_bytes / 1024**3:.2f}")
+        parts.append(f"percent={percent:.1f}")
+    print(" ".join(parts), flush=True)
 
 
 def _default_models_path() -> Path:
