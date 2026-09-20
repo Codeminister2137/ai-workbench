@@ -140,3 +140,28 @@ python -m uv run pytest tests\integration\test_ollama_live.py
 
 The live tests include non-streaming and streaming chat. They assume Ollama is
 running and the configured model is available.
+
+## Live Hosted Integration Tests
+
+Hosted integration tests are also skipped by default. They send prompts to an
+external provider and require explicit credentials.
+
+OpenAI:
+
+```powershell
+$env:AI_PROVIDER_RUN_HOSTED_INTEGRATION = "1"
+$env:AI_PROVIDER_KIND = "openai"
+$env:AI_PROVIDER_MODEL = "gpt-5-mini"
+$env:OPENAI_API_KEY = "..."
+python -m uv run pytest tests\integration\test_hosted_live.py
+```
+
+Requesty:
+
+```powershell
+$env:AI_PROVIDER_RUN_HOSTED_INTEGRATION = "1"
+$env:AI_PROVIDER_KIND = "requesty"
+$env:AI_PROVIDER_MODEL = "openai/gpt-5-mini"
+$env:REQUESTY_API_KEY = "..."
+python -m uv run pytest tests\integration\test_hosted_live.py
+```
