@@ -22,6 +22,16 @@ from ai_provider.contracts import (
 )
 from ai_provider.errors import ProviderError, ProviderErrorCategory
 from ai_provider.factory import create_chat_client
+from ai_provider.ollama_models import (
+    LocalOllamaModel,
+    OllamaPullConstraints,
+    OllamaPullProgress,
+    OllamaPullResult,
+    list_local_ollama_models,
+    pull_ollama_model,
+    show_ollama_model,
+    stream_ollama_model_pull,
+)
 from ai_provider.ollama_runtime import ensure_ollama_server, is_ollama_server_available
 
 __all__ = [
@@ -36,9 +46,13 @@ __all__ = [
     "BackendLocation",
     "ChatClient",
     "FinishReason",
+    "LocalOllamaModel",
     "MessageRole",
     "ModelCapabilities",
     "OllamaChatClient",
+    "OllamaPullConstraints",
+    "OllamaPullProgress",
+    "OllamaPullResult",
     "OpenAICompatibleChatClient",
     "PrivacyClass",
     "ProviderError",
@@ -49,4 +63,8 @@ __all__ = [
     "create_chat_client",
     "ensure_ollama_server",
     "is_ollama_server_available",
+    "list_local_ollama_models",
+    "pull_ollama_model",
+    "show_ollama_model",
+    "stream_ollama_model_pull",
 ]

@@ -180,6 +180,33 @@ latencies, and includes a TOML `[models.estimate]` snippet that can be copied
 into `packages/ai_orchestrator/examples/model_catalog.toml` after review. It
 does not persist observations or update routing policy automatically.
 
+## Local Ollama Model Library
+
+This package includes provider-side helpers for local Ollama model inventory and
+explicit pulls. The helpers can list installed models, show local model details,
+and pull a requested model while enforcing caller-provided disk constraints.
+
+Example list:
+
+```powershell
+python packages\ai_provider\examples\ollama_models.py --list --start-ollama
+```
+
+Example constrained pull:
+
+```powershell
+python packages\ai_provider\examples\ollama_models.py `
+  --pull llama3.2 `
+  --start-ollama `
+  --models-path D:\AI\Ollama\models `
+  --min-free-gb 40 `
+  --max-download-gb 80
+```
+
+Model pulls remain explicit for now. Future orchestrator-driven auto-provisioning
+should call these provider primitives after a separate routing/policy decision,
+so disk usage and model-library changes stay bounded by user-defined constraints.
+
 ## Live Hosted Integration Tests
 
 Hosted integration tests are also skipped by default. They send prompts to an
