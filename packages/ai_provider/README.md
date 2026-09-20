@@ -203,6 +203,21 @@ python packages\ai_provider\examples\ollama_models.py `
   --max-download-gb 80
 ```
 
+For large downloads, start the pull in the background and inspect the log later:
+
+```powershell
+python packages\ai_provider\examples\ollama_models.py `
+  --pull qwen2.5-coder:14b `
+  --background `
+  --start-ollama `
+  --models-path D:\AI\Ollama\models `
+  --min-free-gb 40 `
+  --max-download-gb 80
+
+Get-Content .tmp\ollama-pulls\qwen2.5-coder-14b.log -Tail 20
+ollama list
+```
+
 Model pulls remain explicit for now. Future orchestrator-driven auto-provisioning
 should call these provider primitives after a separate routing/policy decision,
 so disk usage and model-library changes stay bounded by user-defined constraints.
