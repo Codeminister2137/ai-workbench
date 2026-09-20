@@ -108,6 +108,23 @@ def test_run_coding_prompt_prepares_request_without_execution() -> None:
     assert result.request.metadata["task_type"] == "coding"
 
 
+def test_run_coding_prompt_can_include_system_prompt() -> None:
+    profile = coding_task_profile()
+
+    result = run_coding_prompt(
+        "Explain the failing test and suggest a minimal fix.",
+        profile,
+        (_candidate(),),
+        system_prompt="Be concise and preserve user intent.",
+    )
+
+    assert result.request is not None
+    assert result.request.messages == (
+        AIMessage(MessageRole.SYSTEM, "Be concise and preserve user intent."),
+        AIMessage(MessageRole.USER, "Explain the failing test and suggest a minimal fix."),
+    )
+
+
 def test_run_coding_prompt_executes_with_injected_client() -> None:
     client = FakeClient()
     profile = coding_task_profile()

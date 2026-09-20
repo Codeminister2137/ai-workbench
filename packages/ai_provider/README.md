@@ -92,6 +92,14 @@ python packages\ai_provider\examples\coding_assist.py `
   "Explain this failing test and suggest the smallest fix."
 ```
 
+The example also accepts an optional provider-neutral system instruction:
+
+```powershell
+python packages\ai_provider\examples\coding_assist.py `
+  "Explain this failing test and suggest the smallest fix." `
+  --system "Be concise and preserve the user's intent."
+```
+
 Example hosted execution:
 
 ```powershell

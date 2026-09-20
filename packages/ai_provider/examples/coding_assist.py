@@ -66,11 +66,20 @@ def coding_request_from_prompt(
     prompt: str,
     profile: TaskProfile,
     config: BackendConfig,
+    *,
+    system_prompt: str | None = None,
 ) -> AIRequest:
     """Build a provider-neutral request for a coding prompt."""
 
+    messages = (AIMessage(MessageRole.USER, prompt),)
+    if system_prompt:
+        messages = (
+            AIMessage(MessageRole.SYSTEM, system_prompt),
+            *messages,
+        )
+
     return AIRequest(
-        messages=(AIMessage(MessageRole.USER, prompt),),
+        messages=messages,
         model=config.model,
         privacy_class=PrivacyClass(profile.privacy_class.value),
         metadata={
@@ -89,6 +98,7 @@ def run_coding_prompt(
     review_prompt: bool = True,
     timeout_seconds: float = 60.0,
     execute: bool = False,
+    system_prompt: str | None = None,
     client_factory: Callable[[BackendConfig], ChatClient] = create_chat_client,
 ) -> CodingAssistResult:
     """Prepare and optionally execute one coding-oriented AI request."""
@@ -104,7 +114,12 @@ def run_coding_prompt(
         return CodingAssistResult(orchestration=orchestration)
 
     config = backend_config_from_execution_target(orchestration.execution_plan.target)
-    request = coding_request_from_prompt(prompt, profile, config)
+    request = coding_request_from_prompt(
+        prompt,
+        profile,
+        config,
+        system_prompt=system_prompt,
+    )
     if not execute:
         return CodingAssistResult(
             orchestration=orchestration,
@@ -171,6 +186,10 @@ def main() -> None:
         help="Hard provider override, such as ollama/openai/requesty.",
     )
     parser.add_argument("--model", help="Hard model override.")
+    parser.add_argument(
+        "--system",
+        help="Optional provider-neutral system instruction sent before the user prompt.",
+    )
     parser.add_argument("--max-latency-seconds", type=float, help="Hard latency constraint.")
     parser.add_argument("--timeout-seconds", type=float, default=60.0, help="Provider timeout.")
     parser.add_argument(
@@ -200,6 +219,7 @@ def main() -> None:
         review_prompt=not args.skip_prompt_review,
         timeout_seconds=args.timeout_seconds,
         execute=args.execute,
+        system_prompt=args.system,
     )
     _print_result(result)
 
