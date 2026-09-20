@@ -12,9 +12,15 @@ This package is the infrastructure layer below orchestration and applications. I
 - Provider-reported usage metadata where available.
 - Ollama chat adapter.
 - Ollama chat streaming.
+- OpenAI-compatible Chat Completions adapter for OpenAI and Requesty.
 - Provider factory for configured chat clients.
 
-Requesty and direct hosted providers are intentionally not implemented yet. The contract is shaped so those adapters can be added later without changing application-facing code.
+The first hosted adapter intentionally targets OpenAI-compatible Chat
+Completions because that is the shared protocol documented by Requesty and it
+maps directly to the current neutral chat contract. ADR-020 records this protocol
+choice and the rule that richer provider APIs, such as OpenAI's Responses API,
+should be preferred later when they add needed capability without hurting
+compatibility, privacy, cost, quality, or maintainability.
 
 See `docs/interface.md` for the one-page interface spec and capability matrix.
 
@@ -73,6 +79,28 @@ For the next no-network step, `prepare_provider_request(...)` also builds an
 `AIRequest` after orchestration is ready. The caller still decides whether and
 when to create a client and execute the request.
 
+For a small coding-oriented flow, see `examples/coding_assist.py`. It loads a
+model catalog, builds a coding `TaskProfile`, runs orchestration, prints the
+selected provider/model and reasons by default, and only calls a provider when
+`--execute` is passed. Hosted execution still requires an explicit external
+privacy class such as `--privacy external_allowed`.
+
+Example dry run:
+
+```powershell
+python packages\ai_provider\examples\coding_assist.py `
+  "Explain this failing test and suggest the smallest fix."
+```
+
+Example hosted execution:
+
+```powershell
+$env:OPENAI_API_KEY = "..."
+python packages\ai_provider\examples\coding_assist.py `
+  "Explain this failing test and suggest the smallest fix." `
+  --privacy external_allowed --provider openai --model gpt-5-mini --execute
+```
+
 ## Environment Configuration
 
 `BackendConfig.from_env()` reads these variables by default:
@@ -81,10 +109,13 @@ when to create a client and execute the request.
 AI_PROVIDER_KIND=ollama
 AI_PROVIDER_MODEL=llama3.2
 AI_PROVIDER_BASE_URL=http://localhost:11434
+AI_PROVIDER_API_KEY=
 AI_PROVIDER_TIMEOUT_SECONDS=60
 ```
 
-Only `ollama` is implemented in the first milestone.
+For hosted providers, `AI_PROVIDER_API_KEY` is used first. If it is unset,
+`BackendConfig.from_env()` falls back to `OPENAI_API_KEY` for `openai` and
+`REQUESTY_API_KEY` for `requesty`. Do not commit API keys.
 
 ## Privacy Classes
 
