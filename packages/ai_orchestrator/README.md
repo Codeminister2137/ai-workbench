@@ -28,6 +28,16 @@ It must not implement provider APIs directly.
 ## Model Catalog
 
 Use a TOML catalog with `[[models]]` entries. See `examples/model_catalog.toml`.
+Catalog entries may include optional source-labelled numeric estimates under
+`[models.estimate]`, such as typical latency and input/output cost per million
+tokens. Recommendations include these numbers when available, and
+`TaskProfile(max_expected_latency_seconds=...)` treats missing latency data as
+not satisfying the hard time constraint.
+
+Public pricing and model documentation are useful catalog priors, but wall-clock
+latency should be treated as unknown unless it comes from measured local or
+provider-specific benchmark data. Do not add generic latency numbers merely
+because one model is described as faster than another.
 
 ```python
 from pathlib import Path
@@ -35,8 +45,9 @@ from pathlib import Path
 from ai_orchestrator import TaskProfile, load_model_catalog, plan_execution, recommend_model
 
 catalog = load_model_catalog(Path("packages/ai_orchestrator/examples/model_catalog.toml"))
-recommendation = recommend_model(TaskProfile(), catalog)
-plan = plan_execution(TaskProfile(), recommendation)
+profile = TaskProfile(max_expected_latency_seconds=60)
+recommendation = recommend_model(profile, catalog)
+plan = plan_execution(profile, recommendation)
 ```
 
 ## Execution Preparation

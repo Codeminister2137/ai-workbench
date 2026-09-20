@@ -29,6 +29,12 @@ base_url = "http://localhost:11434"
 [models.capabilities]
 chat = true
 structured_output = false
+
+[models.estimate]
+typical_latency_seconds = 8
+input_cost_per_million_tokens = 0
+output_cost_per_million_tokens = 0
+source = "local benchmark"
 """,
         encoding="utf-8",
     )
@@ -41,6 +47,32 @@ structured_output = false
     assert catalog[0].backend.location is BackendLocation.LOCAL
     assert catalog[0].backend.capabilities.chat is True
     assert catalog[0].backend.base_url == "http://localhost:11434"
+    assert catalog[0].backend.estimate.typical_latency_seconds == 8
+    assert catalog[0].backend.estimate.source == "local benchmark"
+
+
+def test_example_model_catalog_includes_coding_mvp_backends() -> None:
+    catalog_path = (
+        Path(__file__).resolve().parents[1]
+        / "packages"
+        / "ai_orchestrator"
+        / "examples"
+        / "model_catalog.toml"
+    )
+
+    catalog = load_model_catalog(catalog_path)
+    identities = {(entry.backend.provider, entry.backend.model) for entry in catalog}
+
+    assert ("ollama", "llama3.2") in identities
+    assert ("openai", "gpt-5.1") in identities
+    assert ("openai", "gpt-5-mini") in identities
+    assert ("requesty", "openai/gpt-5.1") in identities
+    assert ("requesty", "openai/gpt-5-mini") in identities
+    assert all(
+        entry.backend.estimate.source
+        for entry in catalog
+        if entry.backend.provider in {"openai", "requesty"}
+    )
 
 
 def test_plan_execution_converts_recommendation_to_neutral_target() -> None:

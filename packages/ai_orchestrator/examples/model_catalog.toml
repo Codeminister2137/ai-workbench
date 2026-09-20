@@ -14,18 +14,96 @@ structured_output = false
 multimodal_input = false
 embeddings = false
 
+[models.estimate]
+typical_latency_seconds = 20
+input_cost_per_million_tokens = 0
+output_cost_per_million_tokens = 0
+source = "manual local placeholder; replace latency with local benchmark data"
+
 [[models]]
-provider = "requesty"
-model = "future-hosted-model"
+provider = "openai"
+model = "gpt-5.1"
 location = "external"
 quality = "high"
 latency = "interactive"
-notes = "Placeholder for a future Requesty-backed model."
+notes = "OpenAI hosted model for complex coding and agentic tasks. Uses Chat Completions in the current adapter."
 
 [models.capabilities]
 chat = true
-streaming = false
+streaming = true
 tools = false
-structured_output = true
+structured_output = false
 multimodal_input = false
 embeddings = false
+
+[models.estimate]
+input_cost_per_million_tokens = 1.25
+output_cost_per_million_tokens = 10.0
+source = "OpenAI model docs, checked 2026-09-20"
+source_url = "https://developers.openai.com/api/docs/models/gpt-5.1"
+
+[[models]]
+provider = "openai"
+model = "gpt-5-mini"
+location = "external"
+quality = "standard"
+latency = "interactive"
+notes = "Lower-cost hosted coding model for well-defined tasks. Uses Chat Completions in the current adapter."
+
+[models.capabilities]
+chat = true
+streaming = true
+tools = false
+structured_output = false
+multimodal_input = false
+embeddings = false
+
+[models.estimate]
+input_cost_per_million_tokens = 0.25
+output_cost_per_million_tokens = 2.0
+source = "OpenAI model docs, checked 2026-09-20"
+source_url = "https://developers.openai.com/api/docs/models/gpt-5-mini"
+
+[[models]]
+provider = "requesty"
+model = "openai/gpt-5.1"
+location = "external"
+quality = "high"
+latency = "interactive"
+notes = "Requesty-routed OpenAI model. Requesty reports usage cost on non-streaming responses."
+
+[models.capabilities]
+chat = true
+streaming = true
+tools = false
+structured_output = false
+multimodal_input = false
+embeddings = false
+
+[models.estimate]
+input_cost_per_million_tokens = 1.25
+output_cost_per_million_tokens = 10.0
+source = "OpenAI pricing with Requesty OpenAI-compatible routing docs, checked 2026-09-20"
+source_url = "https://docs.requesty.ai/quickstart"
+
+[[models]]
+provider = "requesty"
+model = "openai/gpt-5-mini"
+location = "external"
+quality = "standard"
+latency = "interactive"
+notes = "Lower-cost Requesty-routed OpenAI model for well-defined coding tasks."
+
+[models.capabilities]
+chat = true
+streaming = true
+tools = false
+structured_output = false
+multimodal_input = false
+embeddings = false
+
+[models.estimate]
+input_cost_per_million_tokens = 0.25
+output_cost_per_million_tokens = 2.0
+source = "OpenAI pricing with Requesty OpenAI-compatible routing docs, checked 2026-09-20"
+source_url = "https://docs.requesty.ai/quickstart"

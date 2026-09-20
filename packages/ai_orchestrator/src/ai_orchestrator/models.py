@@ -77,6 +77,7 @@ class TaskProfile:
     )
     quality_threshold: QualityThreshold = QualityThreshold.STANDARD
     latency_target: LatencyTarget = LatencyTarget.INTERACTIVE
+    max_expected_latency_seconds: float | None = None
     user_backend_override: str | None = None
     user_model_override: str | None = None
 
@@ -115,6 +116,17 @@ class ModelCapabilities:
 
 
 @dataclass(frozen=True, slots=True)
+class ModelPerformanceEstimate:
+    """Optional source-labelled model performance and cost estimates."""
+
+    typical_latency_seconds: float | None = None
+    input_cost_per_million_tokens: float | None = None
+    output_cost_per_million_tokens: float | None = None
+    source: str | None = None
+    source_url: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class ModelBackend:
     """Backend and model identity known to the orchestrator."""
 
@@ -123,6 +135,7 @@ class ModelBackend:
     location: BackendLocation
     base_url: str | None = None
     capabilities: ModelCapabilities = field(default_factory=ModelCapabilities)
+    estimate: ModelPerformanceEstimate = field(default_factory=ModelPerformanceEstimate)
 
 
 @dataclass(frozen=True, slots=True)

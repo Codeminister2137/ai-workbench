@@ -22,7 +22,10 @@ apps/
   job_search/
 ```
 
-Current implementation starts with an Ollama-only provider slice while keeping the provider contract extensible for Requesty and direct hosted providers.
+Current implementation started with an Ollama-only provider slice. The first
+useful coding MVP should support local Ollama, Requesty, and OpenAI-backed
+execution through the same provider/orchestrator boundary, with cloud execution
+remaining explicit and privacy-controlled.
 
 Infrastructure packages such as `ai_provider` and `ai_orchestrator` may grow a
 larger library of integration glue than individual applications. That is useful
@@ -114,7 +117,16 @@ Flow:
 Use a normalized internal job schema. Matching should preserve evidence. CV tailoring may rephrase and prioritize genuine experience but must never invent experience or qualifications. Human approval remains the default before external applications are sent.
 
 ## 9. Privacy boundary
-Local inference is the trusted privacy tier. Cloud providers and gateways are external processors. Future controls may include task-level privacy requirements, local-only routing, sensitive-data detection, optional redaction, and provider/backend audit information.
+Local inference is the trusted privacy tier. Cloud providers and gateways are
+external processors. Future controls may include task-level privacy requirements,
+local-only routing, sensitive-data detection, optional redaction, and
+provider/backend audit information.
+
+Application chats should be represented as provider-neutral local transcripts.
+When a model changes, the application should keep the same chat and send the
+relevant retained context to the newly selected backend. Future truncation or
+summarization must be visible when a model's context window cannot fit the full
+history.
 
 Prototype privacy classes are currently:
 - `LOCAL_ONLY`;

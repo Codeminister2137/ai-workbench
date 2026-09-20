@@ -12,6 +12,7 @@ from ai_orchestrator.models import (
     ModelBackend,
     ModelCapabilities,
     ModelCatalogEntry,
+    ModelPerformanceEstimate,
     QualityThreshold,
 )
 
@@ -36,6 +37,7 @@ def _catalog_entry(item: dict[str, Any]) -> ModelCatalogEntry:
     base_url = item.get("base_url")
     notes = item.get("notes")
     capabilities = _capabilities(item.get("capabilities", {}))
+    estimate = _estimate(item.get("estimate", {}))
 
     return ModelCatalogEntry(
         backend=ModelBackend(
@@ -44,6 +46,7 @@ def _catalog_entry(item: dict[str, Any]) -> ModelCatalogEntry:
             location=location,
             base_url=base_url if isinstance(base_url, str) else None,
             capabilities=capabilities,
+            estimate=estimate,
         ),
         quality=quality,
         latency=latency,
@@ -77,3 +80,27 @@ def _bool(raw: dict[str, Any], key: str, *, default: bool) -> bool:
     if not isinstance(value, bool):
         raise ValueError(f"Capability {key!r} must be a boolean.")
     return value
+
+
+def _estimate(raw: object) -> ModelPerformanceEstimate:
+    if not isinstance(raw, dict):
+        raise ValueError("Model estimate must be a table.")
+
+    source = raw.get("source")
+    source_url = raw.get("source_url")
+    return ModelPerformanceEstimate(
+        typical_latency_seconds=_positive_float(raw, "typical_latency_seconds"),
+        input_cost_per_million_tokens=_positive_float(raw, "input_cost_per_million_tokens"),
+        output_cost_per_million_tokens=_positive_float(raw, "output_cost_per_million_tokens"),
+        source=source if isinstance(source, str) and source.strip() else None,
+        source_url=source_url if isinstance(source_url, str) and source_url.strip() else None,
+    )
+
+
+def _positive_float(raw: dict[str, Any], key: str) -> float | None:
+    value = raw.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, int | float) or isinstance(value, bool) or value < 0:
+        raise ValueError(f"Estimate {key!r} must be a non-negative number.")
+    return float(value)

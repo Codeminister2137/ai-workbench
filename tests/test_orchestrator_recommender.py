@@ -7,6 +7,7 @@ from ai_orchestrator import (
     ModelBackend,
     ModelCapabilities,
     ModelCatalogEntry,
+    ModelPerformanceEstimate,
     PrivacyClass,
     QualityThreshold,
     TaskCapability,
@@ -22,6 +23,7 @@ def _candidate(
     *,
     quality: QualityThreshold = QualityThreshold.STANDARD,
     capabilities: ModelCapabilities | None = None,
+    estimate: ModelPerformanceEstimate | None = None,
 ) -> ModelCatalogEntry:
     return ModelCatalogEntry(
         backend=ModelBackend(
@@ -29,6 +31,7 @@ def _candidate(
             model=model,
             location=location,
             capabilities=capabilities or ModelCapabilities(),
+            estimate=estimate or ModelPerformanceEstimate(),
         ),
         quality=quality,
         latency=LatencyTarget.INTERACTIVE,
@@ -144,3 +147,54 @@ def test_recommender_rejects_sensitive_review_external_candidate() -> None:
 
     assert recommendation.selected is local
     assert "sensitive external processing" in recommendation.rejected[0].reason
+
+
+def test_recommender_includes_numeric_estimates_when_available() -> None:
+    candidate = _candidate(
+        "ollama",
+        "llama3.2",
+        BackendLocation.LOCAL,
+        estimate=ModelPerformanceEstimate(
+            typical_latency_seconds=12,
+            input_cost_per_million_tokens=0,
+            output_cost_per_million_tokens=0,
+            source="local benchmark",
+        ),
+    )
+
+    recommendation = recommend_model(TaskProfile(), (candidate,))
+
+    assert any("typical latency 12s" in reason for reason in recommendation.reasons)
+    assert any("input $0/1M tokens" in reason for reason in recommendation.reasons)
+    assert any("Source: local benchmark" in reason for reason in recommendation.reasons)
+
+
+def test_recommender_filters_by_max_expected_latency_seconds() -> None:
+    slow = _candidate(
+        "ollama",
+        "slow",
+        BackendLocation.LOCAL,
+        estimate=ModelPerformanceEstimate(typical_latency_seconds=120),
+    )
+    fast = _candidate(
+        "ollama",
+        "fast",
+        BackendLocation.LOCAL,
+        estimate=ModelPerformanceEstimate(typical_latency_seconds=20),
+    )
+
+    recommendation = recommend_model(
+        TaskProfile(max_expected_latency_seconds=60),
+        (slow, fast),
+    )
+
+    assert recommendation.selected is fast
+    assert "120s" in recommendation.rejected[0].reason
+    assert "60s" in recommendation.rejected[0].reason
+
+
+def test_recommender_rejects_missing_latency_for_hard_latency_constraint() -> None:
+    candidate = _candidate("ollama", "unknown", BackendLocation.LOCAL)
+
+    with pytest.raises(ValueError, match="no latency estimate"):
+        recommend_model(TaskProfile(max_expected_latency_seconds=60), (candidate,))

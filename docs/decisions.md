@@ -135,6 +135,16 @@ strict docstring linting until the public API has a clean baseline.
 
 Detailed ADR: `docs/decisions/ADR-019-api-documentation-with-pdoc-and-targeted-docstrings.md`
 
+## ADR-020 - Coding MVP Supports Local Requesty And OpenAI Backends
+**Status:** Accepted
+**Date:** 2026-09-20
+
+The first useful provider/orchestrator coding assistant should support local
+Ollama, Requesty, and OpenAI-backed execution, while preserving explicit privacy,
+credential, configuration, and provider-neutral transcript boundaries.
+
+Detailed ADR: `docs/decisions/ADR-020-coding-mvp-local-requesty-openai-backends.md`
+
 ## Template
 ```text
 ## ADR-NNN — Short Name
