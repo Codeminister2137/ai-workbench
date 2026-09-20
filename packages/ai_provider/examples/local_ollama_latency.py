@@ -10,6 +10,7 @@ from ai_provider import (
     ChatClient,
     MessageRole,
     PrivacyClass,
+    ensure_ollama_server,
 )
 from ai_provider.config import BackendConfig, ProviderKind
 from ai_provider.factory import create_chat_client
@@ -137,6 +138,22 @@ def main() -> None:
     parser.add_argument("--warmup-runs", type=int, default=1, help="Warmup runs to exclude.")
     parser.add_argument("--max-output-tokens", type=int, default=256, help="Response token cap.")
     parser.add_argument("--prompt", default=DEFAULT_PROMPT, help="Prompt to benchmark.")
+    parser.add_argument(
+        "--start-ollama",
+        action="store_true",
+        help="Start `ollama serve` before running the benchmark.",
+    )
+    parser.add_argument(
+        "--ollama-command",
+        default="ollama",
+        help="Ollama executable used with --start-ollama.",
+    )
+    parser.add_argument(
+        "--ollama-startup-timeout-seconds",
+        type=float,
+        default=10.0,
+        help="Seconds to wait for Ollama to become reachable after starting it.",
+    )
     args = parser.parse_args()
 
     if args.runs <= 0:
@@ -145,6 +162,13 @@ def main() -> None:
         raise SystemExit("--warmup-runs must be zero or greater.")
     if args.max_output_tokens <= 0:
         raise SystemExit("--max-output-tokens must be greater than zero.")
+
+    if args.start_ollama:
+        ensure_ollama_server(
+            args.base_url,
+            command=args.ollama_command,
+            startup_timeout_seconds=args.ollama_startup_timeout_seconds,
+        )
 
     client = create_chat_client(
         BackendConfig(

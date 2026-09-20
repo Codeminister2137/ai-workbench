@@ -22,6 +22,7 @@ from ai_provider.contracts import (
 )
 from ai_provider.errors import ProviderError, ProviderErrorCategory
 from ai_provider.factory import create_chat_client
+from ai_provider.ollama_runtime import ensure_ollama_server, is_ollama_server_available
 
 __all__ = [
     "AIMessage",
@@ -46,4 +47,6 @@ __all__ = [
     "UsageMetadata",
     "UsageSource",
     "create_chat_client",
+    "ensure_ollama_server",
+    "is_ollama_server_available",
 ]

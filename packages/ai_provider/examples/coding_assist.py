@@ -29,6 +29,7 @@ from ai_provider import (
     PrivacyClass,
     ProviderKind,
     create_chat_client,
+    ensure_ollama_server,
 )
 
 
@@ -99,6 +100,9 @@ def run_coding_prompt(
     timeout_seconds: float = 60.0,
     execute: bool = False,
     system_prompt: str | None = None,
+    start_ollama: bool = False,
+    ollama_command: str = "ollama",
+    ollama_startup_timeout_seconds: float = 10.0,
     client_factory: Callable[[BackendConfig], ChatClient] = create_chat_client,
 ) -> CodingAssistResult:
     """Prepare and optionally execute one coding-oriented AI request."""
@@ -125,6 +129,13 @@ def run_coding_prompt(
             orchestration=orchestration,
             config=config,
             request=request,
+        )
+
+    if start_ollama and config.provider is ProviderKind.OLLAMA:
+        ensure_ollama_server(
+            config.base_url,
+            command=ollama_command,
+            startup_timeout_seconds=ollama_startup_timeout_seconds,
         )
 
     client = client_factory(config)
@@ -193,6 +204,22 @@ def main() -> None:
     parser.add_argument("--max-latency-seconds", type=float, help="Hard latency constraint.")
     parser.add_argument("--timeout-seconds", type=float, default=60.0, help="Provider timeout.")
     parser.add_argument(
+        "--start-ollama",
+        action="store_true",
+        help="Start `ollama serve` before executing a local Ollama request.",
+    )
+    parser.add_argument(
+        "--ollama-command",
+        default="ollama",
+        help="Ollama executable used with --start-ollama.",
+    )
+    parser.add_argument(
+        "--ollama-startup-timeout-seconds",
+        type=float,
+        default=10.0,
+        help="Seconds to wait for Ollama to become reachable after starting it.",
+    )
+    parser.add_argument(
         "--skip-prompt-review",
         action="store_true",
         help="Bypass deterministic prompt review.",
@@ -220,6 +247,9 @@ def main() -> None:
         timeout_seconds=args.timeout_seconds,
         execute=args.execute,
         system_prompt=args.system,
+        start_ollama=args.start_ollama,
+        ollama_command=args.ollama_command,
+        ollama_startup_timeout_seconds=args.ollama_startup_timeout_seconds,
     )
     _print_result(result)
 

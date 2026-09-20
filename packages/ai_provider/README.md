@@ -100,6 +100,15 @@ python packages\ai_provider\examples\coding_assist.py `
   --system "Be concise and preserve the user's intent."
 ```
 
+When executing against local Ollama, the example can also start `ollama serve`
+first:
+
+```powershell
+python packages\ai_provider\examples\coding_assist.py `
+  "Explain this failing test and suggest the smallest fix." `
+  --execute --start-ollama
+```
+
 Example hosted execution:
 
 ```powershell
@@ -157,6 +166,13 @@ Run this only when Ollama is already running and the configured model is pulled:
 ```powershell
 python packages\ai_provider\examples\local_ollama_latency.py `
   --model llama3.2 --runs 3 --warmup-runs 1
+```
+
+If Ollama is installed but not running, the benchmark can start it first:
+
+```powershell
+python packages\ai_provider\examples\local_ollama_latency.py `
+  --model llama3.2 --runs 3 --warmup-runs 1 --start-ollama
 ```
 
 The benchmark sends a local-only coding-style prompt, prints measured response

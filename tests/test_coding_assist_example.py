@@ -4,6 +4,7 @@ import importlib.util
 import sys
 from pathlib import Path
 
+import pytest
 from ai_orchestrator import (
     BackendLocation,
     ModelBackend,
@@ -140,6 +141,36 @@ def test_run_coding_prompt_executes_with_injected_client() -> None:
     assert result.response is not None
     assert result.response.message.content == "coding answer"
     assert client.requests[0].model == "llama3.2"
+
+
+def test_run_coding_prompt_can_start_ollama_before_execution(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = FakeClient()
+    profile = coding_task_profile()
+    calls: list[tuple[str | None, str, float]] = []
+
+    monkeypatch.setattr(
+        _EXAMPLE,
+        "ensure_ollama_server",
+        lambda base_url, *, command, startup_timeout_seconds: calls.append(
+            (base_url, command, startup_timeout_seconds)
+        ),
+    )
+
+    result = run_coding_prompt(
+        "Explain the failing test and suggest a minimal fix.",
+        profile,
+        (_candidate(),),
+        execute=True,
+        start_ollama=True,
+        ollama_command="ollama-test",
+        ollama_startup_timeout_seconds=3.0,
+        client_factory=lambda config: client,
+    )
+
+    assert result.response is not None
+    assert calls == [(None, "ollama-test", 3.0)]
 
 
 def test_run_coding_prompt_keeps_local_only_profile_off_external_backend() -> None:
