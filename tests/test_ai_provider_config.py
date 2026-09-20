@@ -1,7 +1,13 @@
 from __future__ import annotations
 
 import pytest
-from ai_provider import OllamaChatClient, ProviderError, ProviderErrorCategory, ProviderKind
+from ai_provider import (
+    OllamaChatClient,
+    OpenAICompatibleChatClient,
+    ProviderError,
+    ProviderErrorCategory,
+    ProviderKind,
+)
 from ai_provider.config import BackendConfig
 from ai_provider.factory import create_chat_client
 
@@ -49,10 +55,22 @@ def test_factory_creates_ollama_client() -> None:
     assert isinstance(client, OllamaChatClient)
 
 
-def test_factory_rejects_unimplemented_providers() -> None:
-    config = BackendConfig(provider=ProviderKind.REQUESTY, model="some-model")
+def test_backend_config_loads_provider_specific_api_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AI_PROVIDER_KIND", "requesty")
+    monkeypatch.setenv("AI_PROVIDER_MODEL", "openai/gpt-5.1")
+    monkeypatch.setenv("REQUESTY_API_KEY", "requesty-key")
 
-    with pytest.raises(ProviderError) as error:
-        create_chat_client(config)
+    config = BackendConfig.from_env()
 
-    assert error.value.category is ProviderErrorCategory.CONFIGURATION
+    assert config.provider is ProviderKind.REQUESTY
+    assert config.api_key == "requesty-key"
+
+
+def test_factory_creates_openai_compatible_client() -> None:
+    client = create_chat_client(
+        BackendConfig(provider=ProviderKind.REQUESTY, model="openai/gpt-5.1")
+    )
+
+    assert isinstance(client, OpenAICompatibleChatClient)

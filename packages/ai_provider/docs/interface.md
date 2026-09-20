@@ -71,26 +71,41 @@ completion before sending the request.
 
 Configured backend selection:
 
-- `provider`: currently only `ollama` is implemented;
+- `provider`: `ollama`, `requesty`, or `openai`;
 - `model`: backend model ID;
 - `base_url`: optional backend URL override;
+- `api_key`: optional hosted-provider credential loaded from environment or
+  supplied by the caller;
 - `timeout_seconds`: bounded request timeout.
 
 `BackendConfig.from_env()` reads `AI_PROVIDER_*` variables.
 
 ## Capability Matrix
 
-| Capability | Ollama | Requesty placeholder | Direct-provider placeholder |
+| Capability | Ollama | Requesty | OpenAI |
 | --- | --- | --- | --- |
-| Chat completion | Implemented | Planned | Planned |
-| Streaming | Implemented | Planned when needed | Planned when needed |
-| Provider-reported usage | Partial, when Ollama reports counts | Planned | Planned |
-| External execution | No | Planned | Planned |
+| Chat completion | Implemented | Implemented | Implemented |
+| Streaming | Implemented | Implemented | Implemented |
+| Provider-reported usage | Partial, when Ollama reports counts | Implemented when reported | Implemented when reported |
+| External execution | No | Implemented | Implemented |
 | Tool calling | Not yet | Future trigger | Future trigger |
 | Structured output | Not yet | Future trigger | Future trigger |
 | Embeddings | Not yet | Future trigger | Future trigger |
 
 The interface should not pretend every backend supports every feature. New capabilities should be added only when a real consumer needs them.
+
+## Hosted API Shape
+
+The initial hosted adapter uses OpenAI-compatible Chat Completions for both
+Requesty and OpenAI. This is a deliberate compatibility choice, not a permanent
+statement that Chat Completions is always the best protocol. ADR-020 records that
+each hosted adapter should document whether it uses Chat Completions, Responses,
+Anthropic Messages, or another API shape, and why.
+
+Prefer the richer provider API when it does not compromise compatibility,
+privacy, cost, quality, or maintainability. OpenAI's Responses API is a likely
+future OpenAI-specific adapter when built-in tools, computer use, or richer
+agentic streaming become necessary.
 
 ## Provider Factory
 

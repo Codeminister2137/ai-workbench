@@ -1,6 +1,7 @@
 """Provider-agnostic AI infrastructure."""
 
 from ai_provider.adapters.ollama import OllamaChatClient
+from ai_provider.adapters.openai_compatible import OpenAICompatibleChatClient
 from ai_provider.config import BackendConfig, ProviderKind
 from ai_provider.contracts import (
     AIMessage,
@@ -37,6 +38,7 @@ __all__ = [
     "MessageRole",
     "ModelCapabilities",
     "OllamaChatClient",
+    "OpenAICompatibleChatClient",
     "PrivacyClass",
     "ProviderError",
     "ProviderErrorCategory",

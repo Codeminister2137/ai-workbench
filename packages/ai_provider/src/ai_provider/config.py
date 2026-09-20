@@ -24,6 +24,7 @@ class BackendConfig:
     provider: ProviderKind
     model: str
     base_url: str | None = None
+    api_key: str | None = None
     timeout_seconds: float = 60.0
 
     def __post_init__(self) -> None:
@@ -57,6 +58,7 @@ class BackendConfig:
 
         model = os.getenv(f"{prefix}_MODEL", "llama3.2").strip()
         base_url = os.getenv(f"{prefix}_BASE_URL")
+        api_key = os.getenv(f"{prefix}_API_KEY") or _provider_api_key(provider)
         timeout_value = os.getenv(f"{prefix}_TIMEOUT_SECONDS", "60")
         try:
             timeout = float(timeout_value)
@@ -71,5 +73,18 @@ class BackendConfig:
             provider=provider,
             model=model,
             base_url=base_url,
+            api_key=api_key,
             timeout_seconds=timeout,
         )
+
+
+def _provider_api_key(provider: ProviderKind) -> str | None:
+    """Return the conventional environment API key for one provider."""
+
+    match provider:
+        case ProviderKind.OPENAI:
+            return os.getenv("OPENAI_API_KEY")
+        case ProviderKind.REQUESTY:
+            return os.getenv("REQUESTY_API_KEY")
+        case ProviderKind.OLLAMA:
+            return None
