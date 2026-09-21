@@ -19,7 +19,10 @@ _EXAMPLE = importlib.util.module_from_spec(_SPEC)
 sys.modules[_SPEC.name] = _EXAMPLE
 _SPEC.loader.exec_module(_EXAMPLE)
 build_repo_prompt = _EXAMPLE.build_repo_prompt
+execute_actions = _EXAMPLE.execute_actions
+extract_actions = _EXAMPLE.extract_actions
 load_prompt_context = _EXAMPLE.load_prompt_context
+AssistantAction = _EXAMPLE.AssistantAction
 
 
 def test_load_prompt_context_loads_default_and_selected_repo_files(tmp_path: Path) -> None:
@@ -86,3 +89,79 @@ def test_build_repo_prompt_marks_context_boundaries(tmp_path: Path) -> None:
     assert "# User request\nExplain the code." in prompt
     assert "## src.py (inside-repo)" in prompt
     assert "print('hello')" in prompt
+
+
+def test_extract_actions_from_json_block() -> None:
+    actions = extract_actions(
+        """
+Use a tool:
+
+```json
+{"actions":[{"type":"read_file","path":"README.md"}]}
+```
+"""
+    )
+
+    assert actions == (AssistantAction(action_type="read_file", args={"path": "README.md"}),)
+
+
+def test_execute_actions_reads_and_writes_inside_repo(tmp_path: Path) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    source = repo_root / "source.txt"
+    source.write_text("source content", encoding="utf-8")
+
+    results = execute_actions(
+        (
+            AssistantAction(action_type="read_file", args={"path": "source.txt"}),
+            AssistantAction(
+                action_type="write_file",
+                args={"path": "generated.txt", "content": "generated content"},
+            ),
+        ),
+        repo_root,
+    )
+
+    assert [result.ok for result in results] == [True, True]
+    assert results[0].output == "source content"
+    assert (repo_root / "generated.txt").read_text(encoding="utf-8") == "generated content"
+
+
+def test_execute_actions_asks_before_outside_write(tmp_path: Path) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    outside = tmp_path / "outside.txt"
+    prompts: list[str] = []
+
+    results = execute_actions(
+        (
+            AssistantAction(
+                action_type="write_file",
+                args={"path": str(outside), "content": "outside content"},
+            ),
+        ),
+        repo_root,
+        input_func=lambda prompt: prompts.append(prompt) or "no",
+    )
+
+    assert len(prompts) == 1
+    assert results[0].ok is False
+    assert not outside.exists()
+
+
+def test_execute_actions_runs_command_in_repo(tmp_path: Path) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+
+    results = execute_actions(
+        (
+            AssistantAction(
+                action_type="run_command",
+                args={"command": "python -c \"print('hello')\""},
+            ),
+        ),
+        repo_root,
+    )
+
+    assert results[0].ok is True
+    assert "hello" in results[0].output

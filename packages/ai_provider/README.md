@@ -126,6 +126,14 @@ same provider/orchestrator path. It automatically loads root `AGENTS.md` and
 asks before reading any selected path outside the repository. It still only calls
 a provider when `--execute` is passed.
 
+It also supports a minimal Codex-like action loop. With `--apply-actions`, the
+model may request local actions through fenced JSON: `read_file`, `list_dir`,
+`write_file`, and `run_command`. Repo-internal action paths are allowed; paths or
+working directories outside the repository prompt for approval unless
+`--allow-outside-files` is passed. This is intentionally smaller than the
+PyCharm assistant surface: there is no persistent memory, dashboard UI,
+background job runner, web/search integration, or autonomous external action.
+
 Local dry run:
 
 ```powershell
@@ -141,6 +149,16 @@ python packages\ai_provider\examples\repo_coding_assistant.py `
   "Review this file for the smallest maintainable fix." `
   --file packages\ai_provider\src\ai_provider\contracts.py `
   --provider ollama --model qwen2.5-coder:14b --execute --start-ollama
+```
+
+Local Ollama execution with assistant-proposed file/command actions:
+
+```powershell
+python packages\ai_provider\examples\repo_coding_assistant.py `
+  "Inspect the selected tests and implement the smallest fix if needed." `
+  --file tests\test_repo_coding_assistant_example.py `
+  --provider ollama --model qwen2.5-coder:14b `
+  --execute --apply-actions --start-ollama
 ```
 
 Hosted execution remains explicit and requires an external privacy class:
