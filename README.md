@@ -181,6 +181,7 @@ See `AGENTS.md` for the detailed operating rules.
 | `docs/architecture.md`       | Current architectural structure and boundaries                  |
 | `docs/decisions.md`          | Current decision index and lightweight ADR record               |
 | `docs/workflow.md`           | Investigation, decision, implementation and validation workflow |
+| `docs/repo-coding-assistant.md` | How to run the repo-aware coding assistant CLI               |
 | `docs/project-map.md`        | Where different responsibilities belong                         |
 | `docs/definition-of-done.md` | Completion checklist                                            |
 | `docs/plans/`                | Detailed project plans                                          |
