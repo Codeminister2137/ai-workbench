@@ -118,6 +118,41 @@ python packages\ai_provider\examples\coding_assist.py `
   --privacy external_allowed --provider openai --model gpt-5-mini --execute
 ```
 
+## Repo-Aware Coding Assistant CLI
+
+`examples/repo_coding_assistant.py` is the smallest repo-aware wrapper around the
+same provider/orchestrator path. It automatically loads root `AGENTS.md` and
+`CURRENT_CONTEXT.md` when present, accepts selected repo files with `--file`, and
+asks before reading any selected path outside the repository. It still only calls
+a provider when `--execute` is passed.
+
+Local dry run:
+
+```powershell
+python packages\ai_provider\examples\repo_coding_assistant.py `
+  "Explain the current provider boundary and suggest the next smallest change." `
+  --file packages\ai_provider\src\ai_provider\contracts.py
+```
+
+Local Ollama execution:
+
+```powershell
+python packages\ai_provider\examples\repo_coding_assistant.py `
+  "Review this file for the smallest maintainable fix." `
+  --file packages\ai_provider\src\ai_provider\contracts.py `
+  --provider ollama --model qwen2.5-coder:14b --execute --start-ollama
+```
+
+Hosted execution remains explicit and requires an external privacy class:
+
+```powershell
+$env:REQUESTY_API_KEY = "..."
+python packages\ai_provider\examples\repo_coding_assistant.py `
+  "Review the selected files and propose the minimal implementation." `
+  --file packages\ai_provider\examples\repo_coding_assistant.py `
+  --privacy external_allowed --provider requesty --model openai/gpt-5.1 --execute
+```
+
 ## Environment Configuration
 
 `BackendConfig.from_env()` reads these variables by default:
