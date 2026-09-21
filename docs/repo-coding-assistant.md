@@ -102,6 +102,7 @@ python -m uv run python packages\ai_provider\examples\repo_coding_assistant.py `
 ## OpenAI Use
 
 OpenAI is not automatically authorized by the repository. You need an API key.
+See `docs/environment.md` for the `.env` policy and setup details.
 
 For one PowerShell session:
 
@@ -131,6 +132,7 @@ Notes:
 
 Requesty is also not automatically authorized by the repository. You need a
 Requesty API key.
+See `docs/environment.md` for the `.env` policy and setup details.
 
 For one PowerShell session:
 

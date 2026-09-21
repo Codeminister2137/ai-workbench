@@ -13,6 +13,7 @@ Use this file to decide where a change belongs before adding new abstractions.
 - `decisions.md` — durable decisions and their history.
 - `workflow.md` — investigation, approval, implementation, validation, and Git workflow.
 - `git-workflow.md` — branch, commit, validation, and history hygiene guidance.
+- `environment.md` — environment variables, `.env`, secrets, and privacy policy.
 - `codex-toolkit.md` — reusable local Codex/PyCharm environment notes, including
   approval-mode workarounds.
 - `ideas.md` — parked future product/architecture ideas that are useful but not
