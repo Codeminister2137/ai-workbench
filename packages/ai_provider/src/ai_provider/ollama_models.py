@@ -30,6 +30,19 @@ class LocalOllamaModel:
 
 
 @dataclass(frozen=True, slots=True)
+class RunningOllamaModel:
+    """One Ollama model currently loaded in memory."""
+
+    name: str
+    model: str
+    size_bytes: int
+    size_vram_bytes: int | None = None
+    digest: str | None = None
+    expires_at: str | None = None
+    details: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True, slots=True)
 class OllamaPullConstraints:
     """Local resource limits for an Ollama model pull."""
 
@@ -116,6 +129,30 @@ def list_local_ollama_models(
         raise _unexpected_response("Ollama model list did not include a models array.", payload)
 
     return tuple(_local_model_from_raw(item) for item in raw_models if isinstance(item, dict))
+
+
+def list_running_ollama_models(
+    base_url: str | None = None,
+    *,
+    timeout_seconds: float = 10.0,
+    start_ollama: bool = False,
+) -> tuple[RunningOllamaModel, ...]:
+    """Return models currently loaded by the local Ollama runtime."""
+
+    if start_ollama:
+        ensure_ollama_server(base_url)
+    payload = _request_json(
+        "GET",
+        f"{_base_url(base_url)}/api/ps",
+        timeout_seconds=timeout_seconds,
+    )
+    raw_models = payload.get("models", [])
+    if not isinstance(raw_models, list):
+        raise _unexpected_response(
+            "Ollama running model list did not include a models array.", payload
+        )
+
+    return tuple(_running_model_from_raw(item) for item in raw_models if isinstance(item, dict))
 
 
 def summarize_ollama_pull_logs(
@@ -328,18 +365,40 @@ def _local_model_from_raw(raw_model: dict[str, Any]) -> LocalOllamaModel:
     )
 
 
+def _running_model_from_raw(raw_model: dict[str, Any]) -> RunningOllamaModel:
+    name = raw_model.get("name") or raw_model.get("model")
+    model = raw_model.get("model") or name
+    size = raw_model.get("size")
+    if not isinstance(name, str) or not isinstance(model, str) or not isinstance(size, int):
+        raise _unexpected_response("Ollama running model entry had an unexpected shape.", raw_model)
+    size_vram = raw_model.get("size_vram")
+    details = raw_model.get("details", {})
+    return RunningOllamaModel(
+        name=name,
+        model=model,
+        size_bytes=size,
+        size_vram_bytes=size_vram if isinstance(size_vram, int) else None,
+        digest=raw_model.get("digest") if isinstance(raw_model.get("digest"), str) else None,
+        expires_at=raw_model.get("expires_at")
+        if isinstance(raw_model.get("expires_at"), str)
+        else None,
+        details=details if isinstance(details, dict) else {},
+    )
+
+
 def _pull_status_from_log(
     log_path: Path,
     *,
     installed_by_model: dict[str, LocalOllamaModel],
 ) -> OllamaPullLogStatus:
     model = _model_from_log_path(log_path)
-    last_line = ""
+    last_progress_fields: dict[str, str] = {}
     with log_path.open("r", encoding="utf-8", errors="replace") as log_file:
         for line in log_file:
-            if line.strip():
-                last_line = line.strip()
-    if not last_line:
+            fields = _parse_progress_line(line.strip())
+            if "status" in fields:
+                last_progress_fields = fields
+    if not last_progress_fields:
         return OllamaPullLogStatus(
             model=model,
             status="pending",
@@ -347,14 +406,13 @@ def _pull_status_from_log(
             installed_model=installed_by_model.get(model),
         )
 
-    fields = _parse_progress_line(last_line)
     return OllamaPullLogStatus(
         model=model,
-        status=fields.get("status", "unknown"),
+        status=last_progress_fields["status"],
         log_path=log_path,
-        completed_bytes=_gib_to_bytes(fields.get("completed_gb")),
-        total_bytes=_gib_to_bytes(fields.get("total_gb")),
-        percent=_to_float(fields.get("percent")),
+        completed_bytes=_gib_to_bytes(last_progress_fields.get("completed_gb")),
+        total_bytes=_gib_to_bytes(last_progress_fields.get("total_gb")),
+        percent=_to_float(last_progress_fields.get("percent")),
         installed_model=installed_by_model.get(model),
     )
 

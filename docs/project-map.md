@@ -49,6 +49,20 @@ It should be able to use ordinary provider connections or orchestrator-guided
 routing through the provider/orchestrator boundaries, without provider-specific
 logic leaking into Council business logic.
 
+### Future AI Dashboard / General Chat
+
+Potential future app that brings together provider-backed chat, model routing,
+prompt refinement, model benchmarking, AI Council discussions, and project-aware
+workflows. It is intended to cover both high-accuracy coding help and broader
+daily use cases such as research, planning, shopping decisions, workout plans,
+and general chat. It should consume `ai_provider`, `ai_orchestrator`, and
+application-specific modules rather than owning provider APIs or replacing
+package boundaries.
+
+Do not implement persistence, personal memory, background job scheduling,
+web-search integrations, or autonomous external actions for this app without a
+separate decision.
+
 ### Job Search Automation
 Location: `apps/job_search/`
 

@@ -10,7 +10,9 @@ from ai_provider import (
     OllamaPullConstraints,
     ProviderError,
     ProviderErrorCategory,
+    RunningOllamaModel,
     list_local_ollama_models,
+    list_running_ollama_models,
     pull_ollama_model,
     stream_ollama_model_pull,
     summarize_ollama_pull_logs,
@@ -78,6 +80,48 @@ def test_list_local_ollama_models_parses_tags_response(
     assert models[0].model == "llama3.2:latest"
     assert models[0].size_bytes == 2_019_393_189
     assert models[0].details["parameter_size"] == "3.2B"
+
+
+def test_list_running_ollama_models_parses_ps_response(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, Any] = {}
+
+    def fake_urlopen(request: Any, timeout: float) -> FakeHttpResponse:
+        captured["url"] = request.full_url
+        captured["timeout"] = timeout
+        return FakeHttpResponse(
+            {
+                "models": [
+                    {
+                        "name": "qwen3:14b",
+                        "model": "qwen3:14b",
+                        "size": 9_000_000_000,
+                        "size_vram": 6_000_000_000,
+                        "digest": "digest",
+                        "expires_at": "2026-01-01T00:00:00Z",
+                        "details": {"parameter_size": "14B"},
+                    }
+                ]
+            }
+        )
+
+    monkeypatch.setattr("ai_provider.ollama_models.urlopen", fake_urlopen)
+
+    models = list_running_ollama_models("http://ollama.test", timeout_seconds=3.0)
+
+    assert captured == {"url": "http://ollama.test/api/ps", "timeout": 3.0}
+    assert models == (
+        RunningOllamaModel(
+            name="qwen3:14b",
+            model="qwen3:14b",
+            size_bytes=9_000_000_000,
+            size_vram_bytes=6_000_000_000,
+            digest="digest",
+            expires_at="2026-01-01T00:00:00Z",
+            details={"parameter_size": "14B"},
+        ),
+    )
 
 
 def test_stream_ollama_model_pull_parses_progress(
@@ -224,6 +268,32 @@ def test_summarize_ollama_pull_logs_returns_status_for_app_display(tmp_path: Pat
     assert statuses[0].total_bytes == 8 * 1024**3
     assert statuses[0].percent == 12.5
     assert statuses[0].installed_model == installed_model
+
+
+def test_summarize_ollama_pull_logs_uses_last_progress_line_before_trailer(
+    tmp_path: Path,
+) -> None:
+    log_dir = tmp_path / "pulls"
+    log_dir.mkdir()
+    log_path = log_dir / "qwen3-14b.log"
+    log_path.write_text(
+        "\n".join(
+            (
+                "2026-09-20T23:09:41+00:00 status=verifying sha256 digest",
+                "2026-09-20T23:09:56+00:00 status=writing manifest",
+                "2026-09-20T23:09:56+00:00 status=success",
+                "pulled: qwen3:14b",
+                "max_reported_total_gb: 8.64",
+            )
+        ),
+        encoding="utf-8",
+    )
+
+    statuses = summarize_ollama_pull_logs(log_dir)
+
+    assert len(statuses) == 1
+    assert statuses[0].model == "qwen3:14b"
+    assert statuses[0].status == "success"
 
 
 def test_summarize_ollama_pull_logs_returns_empty_for_missing_directory(tmp_path: Path) -> None:

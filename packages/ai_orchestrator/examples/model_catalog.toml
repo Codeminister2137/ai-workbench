@@ -1,24 +1,90 @@
 [[models]]
 provider = "ollama"
-model = "llama3.2"
+model = "deepseek-coder-v2:16b"
 location = "local"
 quality = "standard"
 latency = "interactive"
-notes = "Default local Ollama chat model."
+notes = "Local coding model installed in Ollama. Latency is measured locally; quality is not yet evaluated."
 
 [models.capabilities]
 chat = true
-streaming = false
+streaming = true
 tools = false
 structured_output = false
 multimodal_input = false
 embeddings = false
 
 [models.estimate]
-typical_latency_seconds = 20
+typical_latency_seconds = 4.637
 input_cost_per_million_tokens = 0
 output_cost_per_million_tokens = 0
-source = "manual local placeholder; replace latency with local benchmark data"
+source = "local benchmark: 3 runs, 1 warmup, median latency for deepseek-coder-v2:16b"
+
+[[models]]
+provider = "ollama"
+model = "gpt-oss:20b"
+location = "local"
+quality = "standard"
+latency = "interactive"
+notes = "Local Ollama model. Latency is measured locally; quality is not yet evaluated."
+
+[models.capabilities]
+chat = true
+streaming = true
+tools = false
+structured_output = false
+multimodal_input = false
+embeddings = false
+
+[models.estimate]
+typical_latency_seconds = 5.35
+input_cost_per_million_tokens = 0
+output_cost_per_million_tokens = 0
+source = "local benchmark: 3 runs, 1 warmup, median latency for gpt-oss:20b"
+
+[[models]]
+provider = "ollama"
+model = "qwen2.5-coder:14b"
+location = "local"
+quality = "standard"
+latency = "interactive"
+notes = "Local coding model installed in Ollama. Latency is measured locally; quality is not yet evaluated."
+
+[models.capabilities]
+chat = true
+streaming = true
+tools = false
+structured_output = false
+multimodal_input = false
+embeddings = false
+
+[models.estimate]
+typical_latency_seconds = 6.049
+input_cost_per_million_tokens = 0
+output_cost_per_million_tokens = 0
+source = "local benchmark: 3 runs, 1 warmup, median latency for qwen2.5-coder:14b"
+
+[[models]]
+provider = "ollama"
+model = "qwen3:14b"
+location = "local"
+quality = "standard"
+latency = "interactive"
+notes = "Local Ollama model. Latency is measured locally; quality is not yet evaluated."
+
+[models.capabilities]
+chat = true
+streaming = true
+tools = false
+structured_output = false
+multimodal_input = false
+embeddings = false
+
+[models.estimate]
+typical_latency_seconds = 8.644
+input_cost_per_million_tokens = 0
+output_cost_per_million_tokens = 0
+source = "local benchmark: 3 runs, 1 warmup, median latency for qwen3:14b"
 
 [[models]]
 provider = "openai"

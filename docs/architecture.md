@@ -27,6 +27,24 @@ useful coding MVP should support local Ollama, Requesty, and OpenAI-backed
 execution through the same provider/orchestrator boundary, with cloud execution
 remaining explicit and privacy-controlled.
 
+Longer term, the repository is intended to support a personal AI dashboard that
+can replace a meaningful share of day-to-day ChatGPT use while remaining
+integrated with the owner's local projects and automation. Coding is the hardest
+and most correctness-sensitive target, but the same infrastructure should also
+support general chat, internet-assisted research, shopping decisions, workout
+planning, project planning, prompt refinement, model comparison, and AI Council
+style multi-model discussions. The dashboard should be able to route requests
+across local and cloud models, test model performance, expose routing reasons,
+and preserve privacy boundaries instead of hard-coding one model or provider.
+
+This is a product direction, not a license to add speculative infrastructure.
+Important parts remain open decisions: persistence, personal memory, background
+job execution, web/search integrations, dashboard UI, model-evaluation storage,
+and autonomous actions all require separate approval before implementation.
+Achievability should be validated incrementally with measured benchmarks,
+representative project tasks, and explicit comparison against the current Codex
+and ChatGPT workflows.
+
 Infrastructure packages such as `ai_provider` and `ai_orchestrator` may grow a
 larger library of integration glue than individual applications. That is useful
 when the glue preserves interoperability across apps, keeps provider-specific

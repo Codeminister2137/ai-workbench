@@ -43,6 +43,9 @@ Open product questions:
 Potential future user-facing app:
 
 - prompt editor backed by `ai_provider` and `ai_orchestrator`;
+- general chat surface intended to replace a meaningful share of day-to-day
+  ChatGPT usage, including research, shopping decisions, workout planning, and
+  project planning;
 - provider/model selector with local, Requesty, and OpenAI-backed options;
 - refinement controls next to the text prompt instead of hidden inside prose;
 - single-choice or multi-choice controls for privacy class, desired quality,
@@ -51,6 +54,10 @@ Potential future user-facing app:
 - transparency panel showing selected provider/model, routing reasons, numeric
   latency/cost estimates, context-window usage, and any omitted or summarized
   context;
+- model evaluation surfaces for latency, coding correctness, general assistant
+  quality, cost, and failure-rate comparisons;
+- background task visibility for long-running local evaluations, model
+  comparisons, and AI Council discussions;
 - future integration point for other apps such as AI Council and job-search
   automation.
 
@@ -62,6 +69,13 @@ Hard constraints to decide before implementation:
   approval;
 - local transcript ownership should remain provider-neutral so model switching
   can replay retained context into the selected backend.
+- persistence, personal memory, search/web integrations, background scheduling,
+  and autonomous external actions each need a separate decision before they are
+  implemented.
+- model replacement claims should be evidence-based. Compare local/cloud models
+  against the current Codex and ChatGPT workflows with representative coding,
+  research, planning, and general-chat tasks before treating a model as a
+  preferred default.
 
 Open product questions:
 
@@ -72,3 +86,8 @@ Open product questions:
   stops, and cancellation?
 - What telemetry should be stored locally for personalization, and what should
   remain ephemeral?
+- How should quality benchmarks combine established coding suites, project-local
+  tasks, and subjective general-assistant evaluations?
+- What model-quality threshold is good enough to replace ChatGPT/Codex for a
+  given task class, and when should the dashboard deliberately route to hosted
+  models instead of local ones?

@@ -63,7 +63,10 @@ def test_example_model_catalog_includes_coding_mvp_backends() -> None:
     catalog = load_model_catalog(catalog_path)
     identities = {(entry.backend.provider, entry.backend.model) for entry in catalog}
 
-    assert ("ollama", "llama3.2") in identities
+    assert ("ollama", "deepseek-coder-v2:16b") in identities
+    assert ("ollama", "gpt-oss:20b") in identities
+    assert ("ollama", "qwen2.5-coder:14b") in identities
+    assert ("ollama", "qwen3:14b") in identities
     assert ("openai", "gpt-5.1") in identities
     assert ("openai", "gpt-5-mini") in identities
     assert ("requesty", "openai/gpt-5.1") in identities

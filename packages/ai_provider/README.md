@@ -220,14 +220,26 @@ ollama list
 
 Background pull logs include timestamped progress lines with status, layer
 digest, completed GiB, total GiB, and percent when Ollama reports byte counts.
-The same CLI can summarize all pull logs and installed models:
+The same CLI can summarize all developer-created pull logs and installed models:
 
 ```powershell
 python packages\ai_provider\examples\ollama_models.py --pull-status --start-ollama
 ```
 
-Applications can use `summarize_ollama_pull_logs(...)` directly to display the
-same status without shelling out to the CLI.
+Pull-log summaries are intended for this explicit background-pull tooling. Normal
+runtime model inventory should ask Ollama through `list_local_ollama_models(...)`
+or the local capability snapshot instead of inspecting model-store files.
+
+## Local Capability Snapshot
+
+Applications can use `get_local_provider_capability_snapshot(...)` for a
+read-only view of local provider runtime state, including basic system info,
+best-effort GPU info, model-store disk capacity, Ollama availability, installed
+Ollama models, and running Ollama models. Installed and running model state is
+queried from Ollama's local API rather than by inspecting the model store. This
+is intended as input for future orchestrator-driven provisioning policy, not as
+an automatic model-selection or download decision by itself. GPU memory values
+include a source label because some OS APIs report approximate or capped values.
 
 Model pulls remain explicit for now. Future orchestrator-driven auto-provisioning
 should call these provider primitives after a separate routing/policy decision,
