@@ -186,6 +186,7 @@ See `AGENTS.md` for the detailed operating rules.
 | `docs/project-map.md`        | Where different responsibilities belong                         |
 | `docs/definition-of-done.md` | Completion checklist                                            |
 | `docs/plans/`                | Detailed project plans                                          |
+| `scripts/repo-assistant.ps1` | One-command launcher for the repo-aware coding assistant        |
 
 ---
 

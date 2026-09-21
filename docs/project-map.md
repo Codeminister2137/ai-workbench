@@ -7,6 +7,8 @@ Use this file to decide where a change belongs before adding new abstractions.
 - `CURRENT_CONTEXT.md` — local ignored immediate handoff, when present: last completed work, open conflicts/risks, validation status, and next plan.
 - `pyproject.toml` — uv workspace and shared validation configuration.
 - `uv.lock` — workspace dependency lockfile.
+- `scripts/repo-assistant.ps1` — one-command launcher that loads `.env` and
+  starts the repo-aware coding assistant CLI.
 
 ## `docs/`
 - `architecture.md` — current architecture and boundaries.

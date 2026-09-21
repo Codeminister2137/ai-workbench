@@ -3,7 +3,21 @@
 This is a practical guide for using the local repo-aware coding assistant CLI
 when the PyCharm AI Assistant / Codex quota is unavailable.
 
-The CLI lives at:
+The main startup command is:
+
+```powershell
+.\scripts\repo-assistant.ps1 "YOUR REQUEST" --provider ollama --model qwen2.5-coder:14b --execute --start-ollama
+```
+
+That wrapper loads `.env` for the run and starts the Python CLI.
+
+If Windows blocks direct script execution, use this form instead:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\repo-assistant.ps1 "YOUR REQUEST" --provider ollama --model qwen2.5-coder:14b --execute --start-ollama
+```
+
+The underlying Python CLI lives at:
 
 ```text
 packages/ai_provider/examples/repo_coding_assistant.py
@@ -58,6 +72,15 @@ Already implemented in this repository:
 No separate install step is currently needed beyond using the existing repo
 environment with `uv`.
 
+The normal startup script is already set up:
+
+```text
+scripts/repo-assistant.ps1
+```
+
+Use that script for day-to-day commands. It loads `.env` if present and then
+starts the Python CLI.
+
 ## Local Ollama Use
 
 This is the simplest path. It does not need an API key.
@@ -72,7 +95,7 @@ Use one of the local models already installed in Ollama, for example:
 Dry run without contacting a model:
 
 ```powershell
-python -m uv run python packages\ai_provider\examples\repo_coding_assistant.py `
+.\scripts\repo-assistant.ps1 `
   "Explain the selected file briefly." `
   --file packages\ai_provider\src\ai_provider\contracts.py `
   --provider ollama --model qwen2.5-coder:14b `
@@ -82,7 +105,7 @@ python -m uv run python packages\ai_provider\examples\repo_coding_assistant.py `
 Ask the local model for an answer:
 
 ```powershell
-python -m uv run python packages\ai_provider\examples\repo_coding_assistant.py `
+.\scripts\repo-assistant.ps1 `
   "Review this file and suggest the smallest maintainable fix." `
   --file packages\ai_provider\src\ai_provider\contracts.py `
   --provider ollama --model qwen2.5-coder:14b `
@@ -92,7 +115,7 @@ python -m uv run python packages\ai_provider\examples\repo_coding_assistant.py `
 Allow the assistant to use local repo tools:
 
 ```powershell
-python -m uv run python packages\ai_provider\examples\repo_coding_assistant.py `
+.\scripts\repo-assistant.ps1 `
   "Inspect the selected tests and implement the smallest fix if needed." `
   --file tests\test_repo_coding_assistant_example.py `
   --provider ollama --model qwen2.5-coder:14b `
@@ -104,16 +127,18 @@ python -m uv run python packages\ai_provider\examples\repo_coding_assistant.py `
 OpenAI is not automatically authorized by the repository. You need an API key.
 See `docs/environment.md` for the `.env` policy and setup details.
 
-For one PowerShell session:
+One-time local setup:
 
 ```powershell
-$env:OPENAI_API_KEY = "your-api-key-here"
+Copy-Item .env.example .env
 ```
 
-Then run:
+Then edit `.env` yourself and set `OPENAI_API_KEY=...`.
+
+Run:
 
 ```powershell
-python -m uv run python packages\ai_provider\examples\repo_coding_assistant.py `
+.\scripts\repo-assistant.ps1 `
   "Review this code and propose the smallest maintainable change." `
   --file packages\ai_provider\examples\repo_coding_assistant.py `
   --privacy external_allowed `
@@ -125,8 +150,7 @@ Notes:
 
 - `--privacy external_allowed` is required for hosted providers.
 - Do not commit API keys.
-- Setting `$env:OPENAI_API_KEY` this way only affects the current PowerShell
-  session.
+- The wrapper script loads `.env` for the run.
 
 ## Requesty Use
 
@@ -134,16 +158,18 @@ Requesty is also not automatically authorized by the repository. You need a
 Requesty API key.
 See `docs/environment.md` for the `.env` policy and setup details.
 
-For one PowerShell session:
+One-time local setup:
 
 ```powershell
-$env:REQUESTY_API_KEY = "your-api-key-here"
+Copy-Item .env.example .env
 ```
 
-Then run:
+Then edit `.env` yourself and set `REQUESTY_API_KEY=...`.
+
+Run:
 
 ```powershell
-python -m uv run python packages\ai_provider\examples\repo_coding_assistant.py `
+.\scripts\repo-assistant.ps1 `
   "Review this code and propose the smallest maintainable change." `
   --file packages\ai_provider\examples\repo_coding_assistant.py `
   --privacy external_allowed `
@@ -156,7 +182,7 @@ python -m uv run python packages\ai_provider\examples\repo_coding_assistant.py `
 Pass `--file` more than once:
 
 ```powershell
-python -m uv run python packages\ai_provider\examples\repo_coding_assistant.py `
+.\scripts\repo-assistant.ps1 `
   "Explain how these files work together." `
   --file packages\ai_provider\examples\repo_coding_assistant.py `
   --file tests\test_repo_coding_assistant_example.py `
@@ -206,7 +232,7 @@ python -m uv run pytest tests\test_repo_coding_assistant_example.py
 Local answer only:
 
 ```powershell
-python -m uv run python packages\ai_provider\examples\repo_coding_assistant.py `
+.\scripts\repo-assistant.ps1 `
   "YOUR REQUEST" `
   --file path\to\file.py `
   --provider ollama --model qwen2.5-coder:14b `
@@ -216,7 +242,7 @@ python -m uv run python packages\ai_provider\examples\repo_coding_assistant.py `
 Local with file/command actions:
 
 ```powershell
-python -m uv run python packages\ai_provider\examples\repo_coding_assistant.py `
+.\scripts\repo-assistant.ps1 `
   "YOUR REQUEST" `
   --file path\to\file.py `
   --provider ollama --model qwen2.5-coder:14b `
@@ -226,8 +252,7 @@ python -m uv run python packages\ai_provider\examples\repo_coding_assistant.py `
 OpenAI with file/command actions:
 
 ```powershell
-$env:OPENAI_API_KEY = "your-api-key-here"
-python -m uv run python packages\ai_provider\examples\repo_coding_assistant.py `
+.\scripts\repo-assistant.ps1 `
   "YOUR REQUEST" `
   --file path\to\file.py `
   --privacy external_allowed `
@@ -238,8 +263,7 @@ python -m uv run python packages\ai_provider\examples\repo_coding_assistant.py `
 Requesty with file/command actions:
 
 ```powershell
-$env:REQUESTY_API_KEY = "your-api-key-here"
-python -m uv run python packages\ai_provider\examples\repo_coding_assistant.py `
+.\scripts\repo-assistant.ps1 `
   "YOUR REQUEST" `
   --file path\to\file.py `
   --privacy external_allowed `

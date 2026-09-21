@@ -35,13 +35,36 @@ Confirm the directory:
 git status --short
 ```
 
-## Loading `.env`
+## Normal Command Path
 
-Python does not automatically read `.env` in this repository right now. That is
-intentional: loading secrets is explicit, and no new dependency such as
-`python-dotenv` is required.
+For normal CLI use, run the wrapper script:
 
-To load `.env` into the current PowerShell session:
+```powershell
+.\scripts\repo-assistant.ps1 "YOUR REQUEST" --provider ollama --model qwen2.5-coder:14b --execute --start-ollama
+```
+
+If Windows blocks direct script execution, use:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\repo-assistant.ps1 "YOUR REQUEST" --provider ollama --model qwen2.5-coder:14b --execute --start-ollama
+```
+
+The wrapper script:
+
+1. finds the repository root;
+2. loads `.env` into the script process if `.env` exists;
+3. starts `packages\ai_provider\examples\repo_coding_assistant.py`;
+4. passes the rest of your command arguments through to the Python CLI.
+
+This means you normally do not need to manually run separate `.env` loading
+commands.
+
+## Manual `.env` Loading
+
+Python does not automatically read `.env` in this repository right now. The
+PowerShell wrapper loads it for CLI runs. If you are running another Python
+entrypoint directly, you can manually load `.env` into the current PowerShell
+session:
 
 ```powershell
 Get-Content .env |
@@ -53,7 +76,7 @@ Get-Content .env |
 ```
 
 This affects only the current terminal session. Opening a new terminal requires
-loading `.env` again.
+loading `.env` again, unless you use `.\scripts\repo-assistant.ps1`.
 
 ## Current Variables
 
@@ -108,18 +131,12 @@ OpenAI:
 ```powershell
 Copy-Item .env.example .env
 # Edit .env and set OPENAI_API_KEY=...
-Get-Content .env |
-  Where-Object { $_ -and $_ -notmatch '^\s*#' } |
-  ForEach-Object {
-    $name, $value = $_ -split '=', 2
-    [Environment]::SetEnvironmentVariable($name.Trim(), $value.Trim().Trim('"'), 'Process')
-  }
 ```
 
-Then run a hosted command with:
+Then run a hosted command with the wrapper:
 
 ```powershell
---privacy external_allowed --provider openai --model gpt-5-mini
+.\scripts\repo-assistant.ps1 "YOUR REQUEST" --privacy external_allowed --provider openai --model gpt-5-mini --execute
 ```
 
 Requesty:
@@ -127,23 +144,18 @@ Requesty:
 ```powershell
 Copy-Item .env.example .env
 # Edit .env and set REQUESTY_API_KEY=...
-Get-Content .env |
-  Where-Object { $_ -and $_ -notmatch '^\s*#' } |
-  ForEach-Object {
-    $name, $value = $_ -split '=', 2
-    [Environment]::SetEnvironmentVariable($name.Trim(), $value.Trim().Trim('"'), 'Process')
-  }
 ```
 
-Then run a hosted command with:
+Then run a hosted command with the wrapper:
 
 ```powershell
---privacy external_allowed --provider requesty --model openai/gpt-5.1
+.\scripts\repo-assistant.ps1 "YOUR REQUEST" --privacy external_allowed --provider requesty --model openai/gpt-5.1 --execute
 ```
 
 ## Future Decision
 
-Automatic `.env` loading is not enabled yet. If the repo later needs that, make
-it an explicit decision because it affects credential-loading behavior and may
-justify either a small standard-library loader or a dependency such as
-`python-dotenv`.
+Automatic Python-level `.env` loading is not enabled yet. The PowerShell wrapper
+loads `.env` for CLI runs. If the Python packages later need direct automatic
+`.env` loading, make it an explicit decision because it affects
+credential-loading behavior and may justify either a small standard-library
+loader or a dependency such as `python-dotenv`.
