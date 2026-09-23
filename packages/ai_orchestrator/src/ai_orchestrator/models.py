@@ -58,6 +58,52 @@ class BackendLocation(StrEnum):
     EXTERNAL = "external"
 
 
+class AccessMethod(StrEnum):
+    """How a model/backend is reached at execution time."""
+
+    LOCAL_RUNTIME = "local_runtime"
+    PROVIDER_API = "provider_api"
+    CODEX_CLI = "codex_cli"
+
+
+class AuthMethod(StrEnum):
+    """Credential or session mechanism required for one backend route."""
+
+    NONE = "none"
+    API_KEY = "api_key"
+    CHATGPT_SIGN_IN = "chatgpt_sign_in"
+    CODEX_ACCESS_TOKEN = "codex_access_token"
+
+
+class BillingSource(StrEnum):
+    """Where usage cost, quota, or allowance is consumed."""
+
+    LOCAL_FREE = "local_free"
+    OPENAI_API_BILLING = "openai_api_billing"
+    REQUESTY_BILLING = "requesty_billing"
+    CHATGPT_SUBSCRIPTION_ALLOWANCE = "chatgpt_subscription_allowance"
+    CHATGPT_WORKSPACE_CREDITS = "chatgpt_workspace_credits"
+
+
+class CostPolicyTier(StrEnum):
+    """Maximum cost boundary a task permits for route selection."""
+
+    LOCAL_ONLY = "local_only"
+    FREE_ONLY = "free_only"
+    ALLOWANCES_ALLOWED = "allowances_allowed"
+    PREPAID_CREDITS_ALLOWED = "prepaid_credits_allowed"
+    BILLING_ALLOWED = "billing_allowed"
+
+
+_COST_POLICY_RANK = {
+    CostPolicyTier.LOCAL_ONLY: 0,
+    CostPolicyTier.FREE_ONLY: 1,
+    CostPolicyTier.ALLOWANCES_ALLOWED: 2,
+    CostPolicyTier.PREPAID_CREDITS_ALLOWED: 3,
+    CostPolicyTier.BILLING_ALLOWED: 4,
+}
+
+
 class PromptIssueSeverity(StrEnum):
     """Severity levels produced by prompt judging."""
 
@@ -78,6 +124,9 @@ class TaskProfile:
     quality_threshold: QualityThreshold = QualityThreshold.STANDARD
     latency_target: LatencyTarget = LatencyTarget.INTERACTIVE
     max_expected_latency_seconds: float | None = None
+    cost_policy_tier: CostPolicyTier = CostPolicyTier.ALLOWANCES_ALLOWED
+    user_route_id_override: str | None = None
+    user_access_method_override: AccessMethod | None = None
     user_backend_override: str | None = None
     user_model_override: str | None = None
 
@@ -127,15 +176,88 @@ class ModelPerformanceEstimate:
 
 
 @dataclass(frozen=True, slots=True)
-class ModelBackend:
-    """Backend and model identity known to the orchestrator."""
+class AccessRoute:
+    """Single official route through which a model can be reached."""
 
+    route_id: str
     provider: str
+    product: str
     model: str
     location: BackendLocation
+    access_method: AccessMethod
+    auth_method: AuthMethod
+    billing_source: BillingSource
+    cost_policy_tier: CostPolicyTier
     base_url: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ModelBackend:
+    """Model identity and route metadata known to the orchestrator."""
+
+    route: AccessRoute
     capabilities: ModelCapabilities = field(default_factory=ModelCapabilities)
     estimate: ModelPerformanceEstimate = field(default_factory=ModelPerformanceEstimate)
+
+    @property
+    def route_id(self) -> str:
+        """Return the selected route identifier."""
+
+        return self.route.route_id
+
+    @property
+    def provider(self) -> str:
+        """Return the model provider for compatibility with existing callers."""
+
+        return self.route.provider
+
+    @property
+    def product(self) -> str:
+        """Return the product or service that owns the access route."""
+
+        return self.route.product
+
+    @property
+    def model(self) -> str:
+        """Return the model identifier exposed by this route."""
+
+        return self.route.model
+
+    @property
+    def location(self) -> BackendLocation:
+        """Return where this route processes requests."""
+
+        return self.route.location
+
+    @property
+    def access_method(self) -> AccessMethod:
+        """Return how this route is executed."""
+
+        return self.route.access_method
+
+    @property
+    def auth_method(self) -> AuthMethod:
+        """Return the authentication method required by this route."""
+
+        return self.route.auth_method
+
+    @property
+    def billing_source(self) -> BillingSource:
+        """Return the allowance, credit, or billing source consumed by this route."""
+
+        return self.route.billing_source
+
+    @property
+    def cost_policy_tier(self) -> CostPolicyTier:
+        """Return the minimum task cost policy needed to use this route."""
+
+        return self.route.cost_policy_tier
+
+    @property
+    def base_url(self) -> str | None:
+        """Return the route base URL when one exists."""
+
+        return self.route.base_url
 
 
 @dataclass(frozen=True, slots=True)
@@ -186,3 +308,9 @@ def is_external_backend(entry: ModelCatalogEntry) -> bool:
     """Return whether a catalog entry points at an external backend."""
 
     return entry.backend.location is BackendLocation.EXTERNAL
+
+
+def cost_policy_allows(route_tier: CostPolicyTier, allowed_tier: CostPolicyTier) -> bool:
+    """Return whether a task cost policy permits a route's required tier."""
+
+    return _COST_POLICY_RANK[route_tier] <= _COST_POLICY_RANK[allowed_tier]

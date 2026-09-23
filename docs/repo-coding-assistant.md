@@ -143,12 +143,14 @@ Run:
   --file packages\ai_provider\examples\repo_coding_assistant.py `
   --privacy external_allowed `
   --provider openai --model gpt-5-mini `
-  --execute --apply-actions
+  --cost-policy billing_allowed --execute --apply-actions
 ```
 
 Notes:
 
 - `--privacy external_allowed` is required for hosted providers.
+- `--cost-policy billing_allowed` is required for OpenAI direct API routes in
+  the sample catalog because they can incur metered API billing.
 - Do not commit API keys.
 - The wrapper script loads `.env` for the run.
 

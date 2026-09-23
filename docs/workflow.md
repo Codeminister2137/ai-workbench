@@ -89,6 +89,12 @@ Check for unrelated edits, secrets, generated files, accidental config changes, 
 Use `Codex: Session Boundary Check` between work sessions, after a commit, before
 switching to a distinct task, or after compaction/context errors.
 
+Run `.\scripts\session-boundary.ps1` for a cheap repository-side signal before
+switching chats or when compaction symptoms appear. It checks Git state and
+`CURRENT_CONTEXT.md` freshness, but it cannot inspect private PyCharm chat
+context, so ask the user for `/status` when context pressure or rate limits
+matter.
+
 Prefer a new chat when the current milestone is committed, `CURRENT_CONTEXT.md`
 is current, and the next task can resume from repository files more cheaply than
 from the accumulated transcript. Continue the current chat when work is

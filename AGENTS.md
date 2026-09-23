@@ -742,6 +742,16 @@ one-line answer is clearly better. The marker should catch the eye; the rest of
 the report can stay flexible. Do not force the body into a rigid template when
 a simpler sentence is clearer. The format is a readability aid, not ceremony.
 
+For subsection labels inside a summary, avoid run-in bold labels that are
+followed immediately by a sentence on the same rendered line. Prefer a short
+Markdown header, a bullet label with a colon, or put the explanatory sentence on
+the next line. For example, use `**Validated:** pytest passed` or:
+
+```text
+**Validated**
+pytest passed.
+```
+
 When reporting work, cover:
 
 1. what was found;

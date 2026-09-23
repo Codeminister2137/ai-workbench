@@ -7,7 +7,12 @@ from pathlib import Path
 from typing import Any
 
 from ai_orchestrator.models import (
+    AccessMethod,
+    AccessRoute,
+    AuthMethod,
     BackendLocation,
+    BillingSource,
+    CostPolicyTier,
     LatencyTarget,
     ModelBackend,
     ModelCapabilities,
@@ -32,6 +37,44 @@ def _catalog_entry(item: dict[str, Any]) -> ModelCatalogEntry:
     provider = _required_string(item, "provider")
     model = _required_string(item, "model")
     location = BackendLocation(_required_string(item, "location"))
+    route_id = _optional_string(
+        item,
+        "route_id",
+        default=_default_route_id(provider, model),
+    )
+    access_method = AccessMethod(
+        _optional_string(
+            item,
+            "access_method",
+            default=_default_access_method(location),
+        )
+    )
+    product = _optional_string(
+        item,
+        "product",
+        default=_default_product(provider, access_method),
+    )
+    auth_method = AuthMethod(
+        _optional_string(
+            item,
+            "auth_method",
+            default=_default_auth_method(provider, access_method),
+        )
+    )
+    billing_source = BillingSource(
+        _optional_string(
+            item,
+            "billing_source",
+            default=_default_billing_source(provider, access_method),
+        )
+    )
+    cost_policy_tier = CostPolicyTier(
+        _optional_string(
+            item,
+            "cost_policy_tier",
+            default=_default_cost_policy_tier(location, billing_source),
+        )
+    )
     quality = QualityThreshold(str(item.get("quality", QualityThreshold.STANDARD.value)))
     latency = LatencyTarget(str(item.get("latency", LatencyTarget.INTERACTIVE.value)))
     base_url = item.get("base_url")
@@ -41,10 +84,18 @@ def _catalog_entry(item: dict[str, Any]) -> ModelCatalogEntry:
 
     return ModelCatalogEntry(
         backend=ModelBackend(
-            provider=provider,
-            model=model,
-            location=location,
-            base_url=base_url if isinstance(base_url, str) else None,
+            route=AccessRoute(
+                route_id=route_id,
+                provider=provider,
+                product=product,
+                model=model,
+                location=location,
+                access_method=access_method,
+                auth_method=auth_method,
+                billing_source=billing_source,
+                cost_policy_tier=cost_policy_tier,
+                base_url=base_url if isinstance(base_url, str) else None,
+            ),
             capabilities=capabilities,
             estimate=estimate,
         ),
@@ -59,6 +110,70 @@ def _required_string(item: dict[str, Any], key: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"Model catalog entry must define a non-empty {key!r}.")
     return value.strip()
+
+
+def _optional_string(item: dict[str, Any], key: str, *, default: str) -> str:
+    value = item.get(key, default)
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"Model catalog entry {key!r} must be a non-empty string.")
+    return value.strip()
+
+
+def _default_route_id(provider: str, model: str) -> str:
+    normalized_model = (
+        model.lower().replace(":", "-").replace("/", "-").replace(".", "-").replace("_", "-")
+    )
+    return f"{provider.lower()}-{normalized_model}"
+
+
+def _default_access_method(location: BackendLocation) -> str:
+    if location is BackendLocation.LOCAL:
+        return AccessMethod.LOCAL_RUNTIME.value
+    return AccessMethod.PROVIDER_API.value
+
+
+def _default_product(provider: str, access_method: AccessMethod) -> str:
+    if access_method is AccessMethod.CODEX_CLI:
+        return "codex"
+    if access_method is AccessMethod.PROVIDER_API and provider == "openai":
+        return "openai_api"
+    return provider
+
+
+def _default_auth_method(provider: str, access_method: AccessMethod) -> str:
+    if access_method is AccessMethod.LOCAL_RUNTIME:
+        return AuthMethod.NONE.value
+    if access_method is AccessMethod.CODEX_CLI:
+        return AuthMethod.CHATGPT_SIGN_IN.value
+    if provider in {"openai", "requesty"}:
+        return AuthMethod.API_KEY.value
+    return AuthMethod.API_KEY.value
+
+
+def _default_billing_source(provider: str, access_method: AccessMethod) -> str:
+    if access_method is AccessMethod.LOCAL_RUNTIME:
+        return BillingSource.LOCAL_FREE.value
+    if access_method is AccessMethod.CODEX_CLI:
+        return BillingSource.CHATGPT_SUBSCRIPTION_ALLOWANCE.value
+    if provider == "requesty":
+        return BillingSource.REQUESTY_BILLING.value
+    if provider == "openai":
+        return BillingSource.OPENAI_API_BILLING.value
+    return BillingSource.OPENAI_API_BILLING.value
+
+
+def _default_cost_policy_tier(
+    location: BackendLocation,
+    billing_source: BillingSource,
+) -> str:
+    if location is BackendLocation.LOCAL or billing_source is BillingSource.LOCAL_FREE:
+        return CostPolicyTier.LOCAL_ONLY.value
+    if billing_source in {
+        BillingSource.CHATGPT_SUBSCRIPTION_ALLOWANCE,
+        BillingSource.CHATGPT_WORKSPACE_CREDITS,
+    }:
+        return CostPolicyTier.ALLOWANCES_ALLOWED.value
+    return CostPolicyTier.BILLING_ALLOWED.value
 
 
 def _capabilities(raw: object) -> ModelCapabilities:

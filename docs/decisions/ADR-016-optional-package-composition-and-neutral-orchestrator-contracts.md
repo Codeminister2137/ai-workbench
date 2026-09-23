@@ -77,6 +77,17 @@ duplication is acceptable while the contracts are still evolving. A shared
 contracts package remains a future option if multiple packages need the same
 stable contract and the duplication becomes harmful.
 
+## Follow-up: Access, Auth, And Billing Metadata
+
+On 2026-09-21, `ModelBackend` and `ExecutionTarget` gained explicit
+`access_method`, `auth_method`, and `billing_source` metadata. This preserves the
+same optional-composition decision while making execution routes explicit.
+
+Provider API routes can still be adapted to `ai_provider.BackendConfig`. Agent or
+client surfaces such as Codex CLI are represented as different access methods and
+should use dedicated executors rather than being forced through provider API
+adapters.
+
 ## Related Decisions
 
 - `docs/decisions.md` ADR-002 - Provider-Agnostic AI Boundary

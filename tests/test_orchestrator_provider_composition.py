@@ -5,7 +5,12 @@ from pathlib import Path
 
 import pytest
 from ai_orchestrator import (
+    AccessMethod,
+    AccessRoute,
+    AuthMethod,
     BackendLocation,
+    BillingSource,
+    CostPolicyTier,
     ExecutionTarget,
     ModelBackend,
     ModelCatalogEntry,
@@ -42,20 +47,50 @@ def _candidate(
     model: str = "llama3.2",
     location: BackendLocation = BackendLocation.LOCAL,
 ) -> ModelCatalogEntry:
+    access_method = (
+        AccessMethod.LOCAL_RUNTIME
+        if location is BackendLocation.LOCAL
+        else AccessMethod.PROVIDER_API
+    )
+    auth_method = AuthMethod.NONE if location is BackendLocation.LOCAL else AuthMethod.API_KEY
+    billing_source = (
+        BillingSource.LOCAL_FREE
+        if location is BackendLocation.LOCAL
+        else BillingSource.OPENAI_API_BILLING
+    )
+    cost_policy_tier = (
+        CostPolicyTier.LOCAL_ONLY
+        if location is BackendLocation.LOCAL
+        else CostPolicyTier.BILLING_ALLOWED
+    )
     return ModelCatalogEntry(
         backend=ModelBackend(
-            provider=provider,
-            model=model,
-            location=location,
-            base_url="http://localhost:11434" if provider == "ollama" else None,
+            route=AccessRoute(
+                route_id=f"{provider}-{model}",
+                provider=provider,
+                product=provider,
+                model=model,
+                location=location,
+                access_method=access_method,
+                auth_method=auth_method,
+                billing_source=billing_source,
+                cost_policy_tier=cost_policy_tier,
+                base_url="http://localhost:11434" if provider == "ollama" else None,
+            ),
         )
     )
 
 
 def test_orchestrator_execution_target_can_be_adapted_to_provider_config() -> None:
     target = ExecutionTarget(
+        route_id="ollama-llama3.2",
         provider="ollama",
+        product="ollama",
         model="llama3.2",
+        access_method=AccessMethod.LOCAL_RUNTIME,
+        auth_method=AuthMethod.NONE,
+        billing_source=BillingSource.LOCAL_FREE,
+        cost_policy_tier=CostPolicyTier.LOCAL_ONLY,
         base_url="http://localhost:11434",
         timeout_seconds=15,
     )
@@ -69,9 +104,34 @@ def test_orchestrator_execution_target_can_be_adapted_to_provider_config() -> No
 
 
 def test_orchestrator_target_adapter_rejects_unknown_provider() -> None:
-    target = ExecutionTarget(provider="custom", model="model")
+    target = ExecutionTarget(
+        route_id="custom-model",
+        provider="custom",
+        product="custom",
+        model="model",
+        access_method=AccessMethod.LOCAL_RUNTIME,
+        auth_method=AuthMethod.NONE,
+        billing_source=BillingSource.LOCAL_FREE,
+        cost_policy_tier=CostPolicyTier.LOCAL_ONLY,
+    )
 
     with pytest.raises(ValueError, match="not supported by ai_provider"):
+        backend_config_from_execution_target(target)
+
+
+def test_orchestrator_target_adapter_rejects_codex_cli_access_method() -> None:
+    target = ExecutionTarget(
+        route_id="openai-codex-gpt-5.1",
+        provider="openai",
+        product="codex",
+        model="gpt-5.1",
+        access_method=AccessMethod.CODEX_CLI,
+        auth_method=AuthMethod.CHATGPT_SIGN_IN,
+        billing_source=BillingSource.CHATGPT_SUBSCRIPTION_ALLOWANCE,
+        cost_policy_tier=CostPolicyTier.ALLOWANCES_ALLOWED,
+    )
+
+    with pytest.raises(ValueError, match="Use a dedicated executor"):
         backend_config_from_execution_target(target)
 
 
@@ -110,7 +170,16 @@ def test_prepare_backend_config_returns_no_config_when_model_selection_fails() -
 
 
 def test_ai_request_from_prompt_uses_provider_request_contract() -> None:
-    target = ExecutionTarget(provider="ollama", model="llama3.2")
+    target = ExecutionTarget(
+        route_id="ollama-llama3.2",
+        provider="ollama",
+        product="ollama",
+        model="llama3.2",
+        access_method=AccessMethod.LOCAL_RUNTIME,
+        auth_method=AuthMethod.NONE,
+        billing_source=BillingSource.LOCAL_FREE,
+        cost_policy_tier=CostPolicyTier.LOCAL_ONLY,
+    )
     config = backend_config_from_execution_target(target)
 
     request = ai_request_from_prompt(

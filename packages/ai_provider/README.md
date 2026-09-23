@@ -83,7 +83,9 @@ For a small coding-oriented flow, see `examples/coding_assist.py`. It loads a
 model catalog, builds a coding `TaskProfile`, runs orchestration, prints the
 selected provider/model and reasons by default, and only calls a provider when
 `--execute` is passed. Hosted execution still requires an explicit external
-privacy class such as `--privacy external_allowed`.
+privacy class such as `--privacy external_allowed`. The default cost policy is
+`allowances_allowed`, which permits local/free/subscription allowance routes but
+rejects metered API billing unless `--cost-policy billing_allowed` is passed.
 
 Example dry run:
 
@@ -115,7 +117,8 @@ Example hosted execution:
 $env:OPENAI_API_KEY = "..."
 python packages\ai_provider\examples\coding_assist.py `
   "Explain this failing test and suggest the smallest fix." `
-  --privacy external_allowed --provider openai --model gpt-5-mini --execute
+  --privacy external_allowed --provider openai --model gpt-5-mini `
+  --cost-policy billing_allowed --execute
 ```
 
 ## Repo-Aware Coding Assistant CLI

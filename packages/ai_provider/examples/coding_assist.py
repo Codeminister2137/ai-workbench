@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ai_orchestrator import (
+    AccessMethod,
+    CostPolicyTier,
     ExecutionTarget,
     LatencyTarget,
     ModelCatalogEntry,
@@ -45,6 +47,15 @@ class CodingAssistResult:
 
 def backend_config_from_execution_target(target: ExecutionTarget) -> BackendConfig:
     """Adapt an orchestrator execution target to provider runtime config."""
+
+    if target.access_method not in {
+        AccessMethod.LOCAL_RUNTIME,
+        AccessMethod.PROVIDER_API,
+    }:
+        raise ValueError(
+            f"Execution target access method {target.access_method.value!r} "
+            "is not supported by ai_provider. Use a dedicated executor for this route."
+        )
 
     try:
         provider = ProviderKind(target.provider)
@@ -154,6 +165,9 @@ def coding_task_profile(
     quality_threshold: QualityThreshold = QualityThreshold.STANDARD,
     latency_target: LatencyTarget = LatencyTarget.INTERACTIVE,
     max_expected_latency_seconds: float | None = None,
+    cost_policy_tier: CostPolicyTier = CostPolicyTier.ALLOWANCES_ALLOWED,
+    route_id_override: str | None = None,
+    access_method_override: AccessMethod | None = None,
     provider_override: str | None = None,
     model_override: str | None = None,
 ) -> TaskProfile:
@@ -166,6 +180,9 @@ def coding_task_profile(
         quality_threshold=quality_threshold,
         latency_target=latency_target,
         max_expected_latency_seconds=max_expected_latency_seconds,
+        cost_policy_tier=cost_policy_tier,
+        user_route_id_override=route_id_override,
+        user_access_method_override=access_method_override,
         user_backend_override=provider_override,
         user_model_override=model_override,
     )
@@ -196,7 +213,19 @@ def main() -> None:
         "--provider",
         help="Hard provider override, such as ollama/openai/requesty.",
     )
+    parser.add_argument("--route-id", help="Hard access-route override.")
+    parser.add_argument(
+        "--access-method",
+        choices=[item.value for item in AccessMethod],
+        help="Hard access-method override, such as local_runtime/provider_api.",
+    )
     parser.add_argument("--model", help="Hard model override.")
+    parser.add_argument(
+        "--cost-policy",
+        choices=[item.value for item in CostPolicyTier],
+        default=CostPolicyTier.ALLOWANCES_ALLOWED.value,
+        help="Maximum billing boundary this task may cross.",
+    )
     parser.add_argument(
         "--system",
         help="Optional provider-neutral system instruction sent before the user prompt.",
@@ -236,6 +265,11 @@ def main() -> None:
         privacy_class=OrchestratorPrivacyClass(args.privacy),
         quality_threshold=QualityThreshold(args.quality),
         max_expected_latency_seconds=args.max_latency_seconds,
+        cost_policy_tier=CostPolicyTier(args.cost_policy),
+        route_id_override=args.route_id,
+        access_method_override=(
+            AccessMethod(args.access_method) if args.access_method is not None else None
+        ),
         provider_override=args.provider,
         model_override=args.model,
     )
@@ -272,8 +306,12 @@ def _print_result(result: CodingAssistResult) -> None:
 
     assert result.config is not None
     assert orchestration.recommendation is not None
+    assert orchestration.execution_plan is not None
+    print(f"route_id: {orchestration.execution_plan.target.route_id}")
+    print(f"product: {orchestration.execution_plan.target.product}")
     print(f"provider: {result.config.provider.value}")
     print(f"model: {result.config.model}")
+    print(f"cost_policy_tier: {orchestration.execution_plan.target.cost_policy_tier.value}")
     for reason in orchestration.recommendation.reasons:
         print(f"reason: {reason}")
 

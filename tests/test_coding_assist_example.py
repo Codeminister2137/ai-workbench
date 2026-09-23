@@ -6,7 +6,12 @@ from pathlib import Path
 
 import pytest
 from ai_orchestrator import (
+    AccessMethod,
+    AccessRoute,
+    AuthMethod,
     BackendLocation,
+    BillingSource,
+    CostPolicyTier,
     ModelBackend,
     ModelCapabilities,
     ModelCatalogEntry,
@@ -73,11 +78,34 @@ def _candidate(
     *,
     quality: QualityThreshold = QualityThreshold.STANDARD,
 ) -> ModelCatalogEntry:
+    access_method = (
+        AccessMethod.LOCAL_RUNTIME
+        if location is BackendLocation.LOCAL
+        else AccessMethod.PROVIDER_API
+    )
+    auth_method = AuthMethod.NONE if location is BackendLocation.LOCAL else AuthMethod.API_KEY
+    if location is BackendLocation.LOCAL:
+        billing_source = BillingSource.LOCAL_FREE
+        cost_policy_tier = CostPolicyTier.LOCAL_ONLY
+    elif provider == "requesty":
+        billing_source = BillingSource.REQUESTY_BILLING
+        cost_policy_tier = CostPolicyTier.ALLOWANCES_ALLOWED
+    else:
+        billing_source = BillingSource.OPENAI_API_BILLING
+        cost_policy_tier = CostPolicyTier.BILLING_ALLOWED
     return ModelCatalogEntry(
         backend=ModelBackend(
-            provider=provider,
-            model=model,
-            location=location,
+            route=AccessRoute(
+                route_id=f"{provider}-{model}",
+                provider=provider,
+                product=provider,
+                model=model,
+                location=location,
+                access_method=access_method,
+                auth_method=auth_method,
+                billing_source=billing_source,
+                cost_policy_tier=cost_policy_tier,
+            ),
             capabilities=ModelCapabilities(chat=True, streaming=True),
             estimate=ModelPerformanceEstimate(
                 typical_latency_seconds=10,

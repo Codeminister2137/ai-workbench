@@ -145,6 +145,17 @@ credential, configuration, and provider-neutral transcript boundaries.
 
 Detailed ADR: `docs/decisions/ADR-020-coding-mvp-local-requesty-openai-backends.md`
 
+## ADR-021 - Access Routes And Cost Policy Boundaries
+**Status:** Accepted
+**Date:** 2026-09-21
+
+Use access routes, not provider/model pairs alone, as the selectable execution
+unit. Enforce tiered cost-policy boundaries before fallback so the system never
+silently crosses from local/free/subscription allowance usage into prepaid
+credits or metered billing.
+
+Detailed ADR: `docs/decisions/ADR-021-access-routes-and-cost-policy.md`
+
 ## Template
 ```text
 ## ADR-NNN — Short Name

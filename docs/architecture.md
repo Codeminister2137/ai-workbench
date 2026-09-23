@@ -6,10 +6,11 @@ The projects form a small ecosystem:
 `Applications → AI Orchestrator decisions → execution adapter → Ollama / Requesty / direct providers`
 
 Applications include the AI Council, Job Search Automation, and future automation/client applications.
-Applications should support normal provider-backed execution paths, such as local
-Ollama, direct hosted providers, Requesty-style gateways, and orchestrator-guided
-provider selection. The choice should be configuration or orchestration policy,
-not provider-specific application branching.
+Applications should support official AI access routes, such as local Ollama,
+direct hosted provider APIs, Requesty-style gateways, subscription-backed
+clients such as Codex CLI, and orchestrator-guided route selection. The choice
+should be configuration or orchestration policy, not provider-specific
+application branching.
 
 Repository layout:
 
@@ -23,8 +24,8 @@ apps/
 ```
 
 Current implementation started with an Ollama-only provider slice. The first
-useful coding MVP should support local Ollama, Requesty, and OpenAI-backed
-execution through the same provider/orchestrator boundary, with cloud execution
+useful coding MVP should support local Ollama, Requesty, Codex CLI, and
+OpenAI-backed execution through explicit access routes, with cloud execution
 remaining explicit and privacy-controlled.
 
 Longer term, the repository is intended to support a personal AI dashboard that
@@ -56,7 +57,8 @@ Packages should compose without unnecessary hard dependencies. A package may be
 designed to work naturally with another package, but it should own its local
 decision contracts when callers may reasonably use another implementation. For
 example, the Orchestrator returns neutral execution targets that can be adapted to
-`ai_provider`, direct Ollama calls, or future executors.
+`ai_provider`, direct Ollama calls, Codex CLI, or future official client
+executors.
 
 The architecture prefers simple standard-library code when it remains clear, but
 does not treat dependency avoidance as an architectural goal. Small, mature,
@@ -91,10 +93,24 @@ It should expose neutral orchestration contracts. It may integrate with
 `ai_provider` through adapters/examples, but the core package must not require
 `ai_provider` merely to make routing decisions.
 
+The Orchestrator selects access routes, not provider/model pairs alone. A route
+represents one official execution path with its own provider, product/service,
+access method, authentication method, billing source, cost-policy tier,
+capabilities, availability, and model.
+
 Keep separate concepts:
 - **Capability:** what a model can do.
 - **Performance:** how it performs on this user's workload.
 - **Economics:** cost, quotas, rate limits, and resource constraints.
+- **Access route:** whether execution uses a provider API, local runtime, Codex
+  CLI, or another executor.
+- **Authentication:** whether the route uses an API key, ChatGPT sign-in, no
+  credential, or a future token/session mechanism.
+- **Billing source:** whether usage consumes API billing, Requesty billing,
+  local resources, a ChatGPT subscription allowance, or workspace credits.
+- **Cost policy:** the maximum financial boundary a task may cross. Current
+  tiers are `LOCAL_ONLY`, `FREE_ONLY`, `ALLOWANCES_ALLOWED`,
+  `PREPAID_CREDITS_ALLOWED`, and `BILLING_ALLOWED`.
 
 Evolution should be incremental: manual model choice → static rules → capability-aware selector → quota-aware selector → adaptive selector.
 

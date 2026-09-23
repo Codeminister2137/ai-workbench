@@ -136,7 +136,7 @@ Copy-Item .env.example .env
 Then run a hosted command with the wrapper:
 
 ```powershell
-.\scripts\repo-assistant.ps1 "YOUR REQUEST" --privacy external_allowed --provider openai --model gpt-5-mini --execute
+.\scripts\repo-assistant.ps1 "YOUR REQUEST" --privacy external_allowed --provider openai --model gpt-5-mini --cost-policy billing_allowed --execute
 ```
 
 Requesty:

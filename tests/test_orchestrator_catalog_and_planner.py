@@ -3,7 +3,12 @@ from __future__ import annotations
 from pathlib import Path
 
 from ai_orchestrator import (
+    AccessMethod,
+    AccessRoute,
+    AuthMethod,
     BackendLocation,
+    BillingSource,
+    CostPolicyTier,
     ModelBackend,
     ModelCapabilities,
     TaskProfile,
@@ -43,12 +48,40 @@ source = "local benchmark"
 
     assert len(catalog) == 1
     assert catalog[0].backend.provider == "ollama"
+    assert catalog[0].backend.route_id == "ollama-llama3-2"
+    assert catalog[0].backend.product == "ollama"
     assert catalog[0].backend.model == "llama3.2"
     assert catalog[0].backend.location is BackendLocation.LOCAL
+    assert catalog[0].backend.access_method is AccessMethod.LOCAL_RUNTIME
+    assert catalog[0].backend.auth_method is AuthMethod.NONE
+    assert catalog[0].backend.billing_source is BillingSource.LOCAL_FREE
+    assert catalog[0].backend.cost_policy_tier is CostPolicyTier.LOCAL_ONLY
     assert catalog[0].backend.capabilities.chat is True
     assert catalog[0].backend.base_url == "http://localhost:11434"
     assert catalog[0].backend.estimate.typical_latency_seconds == 8
     assert catalog[0].backend.estimate.source == "local benchmark"
+
+
+def test_load_model_catalog_defaults_codex_cli_access_metadata(tmp_path: Path) -> None:
+    catalog_path = tmp_path / "models.toml"
+    catalog_path.write_text(
+        """
+[[models]]
+provider = "openai"
+model = "gpt-5.1"
+location = "external"
+access_method = "codex_cli"
+""",
+        encoding="utf-8",
+    )
+
+    catalog = load_model_catalog(catalog_path)
+
+    assert catalog[0].backend.access_method is AccessMethod.CODEX_CLI
+    assert catalog[0].backend.product == "codex"
+    assert catalog[0].backend.auth_method is AuthMethod.CHATGPT_SIGN_IN
+    assert catalog[0].backend.billing_source is BillingSource.CHATGPT_SUBSCRIPTION_ALLOWANCE
+    assert catalog[0].backend.cost_policy_tier is CostPolicyTier.ALLOWANCES_ALLOWED
 
 
 def test_example_model_catalog_includes_coding_mvp_backends() -> None:
@@ -81,10 +114,18 @@ def test_example_model_catalog_includes_coding_mvp_backends() -> None:
 def test_plan_execution_converts_recommendation_to_neutral_target() -> None:
     candidate = ModelCatalogEntry(
         backend=ModelBackend(
-            provider="ollama",
-            model="llama3.2",
-            location=BackendLocation.LOCAL,
-            base_url="http://localhost:11434",
+            route=AccessRoute(
+                route_id="ollama-llama3-2",
+                provider="ollama",
+                product="ollama",
+                model="llama3.2",
+                location=BackendLocation.LOCAL,
+                access_method=AccessMethod.LOCAL_RUNTIME,
+                auth_method=AuthMethod.NONE,
+                billing_source=BillingSource.LOCAL_FREE,
+                cost_policy_tier=CostPolicyTier.LOCAL_ONLY,
+                base_url="http://localhost:11434",
+            ),
             capabilities=ModelCapabilities(),
         ),
         quality=QualityThreshold.STANDARD,
@@ -94,8 +135,14 @@ def test_plan_execution_converts_recommendation_to_neutral_target() -> None:
 
     plan = plan_execution(TaskProfile(), recommendation, timeout_seconds=10)
 
+    assert plan.target.route_id == "ollama-llama3-2"
     assert plan.target.provider == "ollama"
+    assert plan.target.product == "ollama"
     assert plan.target.model == "llama3.2"
+    assert plan.target.access_method is AccessMethod.LOCAL_RUNTIME
+    assert plan.target.auth_method is AuthMethod.NONE
+    assert plan.target.billing_source is BillingSource.LOCAL_FREE
+    assert plan.target.cost_policy_tier is CostPolicyTier.LOCAL_ONLY
     assert plan.target.base_url == "http://localhost:11434"
     assert plan.target.timeout_seconds == 10
     assert plan.reasons == recommendation.reasons
@@ -104,9 +151,17 @@ def test_plan_execution_converts_recommendation_to_neutral_target() -> None:
 def test_plan_execution_allows_targets_outside_ai_provider() -> None:
     candidate = ModelCatalogEntry(
         backend=ModelBackend(
-            provider="custom",
-            model="model",
-            location=BackendLocation.LOCAL,
+            route=AccessRoute(
+                route_id="custom-model",
+                provider="custom",
+                product="custom",
+                model="model",
+                location=BackendLocation.LOCAL,
+                access_method=AccessMethod.LOCAL_RUNTIME,
+                auth_method=AuthMethod.NONE,
+                billing_source=BillingSource.LOCAL_FREE,
+                cost_policy_tier=CostPolicyTier.LOCAL_ONLY,
+            ),
             capabilities=ModelCapabilities(),
         ),
     )

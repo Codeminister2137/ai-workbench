@@ -2,7 +2,12 @@ from __future__ import annotations
 
 import pytest
 from ai_orchestrator import (
+    AccessMethod,
+    AccessRoute,
+    AuthMethod,
     BackendLocation,
+    BillingSource,
+    CostPolicyTier,
     LatencyTarget,
     ModelBackend,
     ModelCapabilities,
@@ -25,11 +30,34 @@ def _candidate(
     capabilities: ModelCapabilities | None = None,
     estimate: ModelPerformanceEstimate | None = None,
 ) -> ModelCatalogEntry:
+    access_method = (
+        AccessMethod.LOCAL_RUNTIME
+        if location is BackendLocation.LOCAL
+        else AccessMethod.PROVIDER_API
+    )
+    auth_method = AuthMethod.NONE if location is BackendLocation.LOCAL else AuthMethod.API_KEY
+    if location is BackendLocation.LOCAL:
+        billing_source = BillingSource.LOCAL_FREE
+        cost_policy_tier = CostPolicyTier.LOCAL_ONLY
+    elif provider == "requesty":
+        billing_source = BillingSource.REQUESTY_BILLING
+        cost_policy_tier = CostPolicyTier.ALLOWANCES_ALLOWED
+    else:
+        billing_source = BillingSource.OPENAI_API_BILLING
+        cost_policy_tier = CostPolicyTier.BILLING_ALLOWED
     return ModelCatalogEntry(
         backend=ModelBackend(
-            provider=provider,
-            model=model,
-            location=location,
+            route=AccessRoute(
+                route_id=f"{provider}-{model}",
+                provider=provider,
+                product=provider,
+                model=model,
+                location=location,
+                access_method=access_method,
+                auth_method=auth_method,
+                billing_source=billing_source,
+                cost_policy_tier=cost_policy_tier,
+            ),
             capabilities=capabilities or ModelCapabilities(),
             estimate=estimate or ModelPerformanceEstimate(),
         ),
@@ -118,9 +146,17 @@ def test_recommender_filters_by_quality_threshold() -> None:
 def test_recommender_prefers_matching_latency_when_quality_is_equal() -> None:
     background = ModelCatalogEntry(
         backend=ModelBackend(
-            provider="ollama",
-            model="background",
-            location=BackendLocation.LOCAL,
+            route=AccessRoute(
+                route_id="ollama-background",
+                provider="ollama",
+                product="ollama",
+                model="background",
+                location=BackendLocation.LOCAL,
+                access_method=AccessMethod.LOCAL_RUNTIME,
+                auth_method=AuthMethod.NONE,
+                billing_source=BillingSource.LOCAL_FREE,
+                cost_policy_tier=CostPolicyTier.LOCAL_ONLY,
+            ),
             capabilities=ModelCapabilities(),
         ),
         quality=QualityThreshold.STANDARD,
@@ -198,3 +234,33 @@ def test_recommender_rejects_missing_latency_for_hard_latency_constraint() -> No
 
     with pytest.raises(ValueError, match="no latency estimate"):
         recommend_model(TaskProfile(max_expected_latency_seconds=60), (candidate,))
+
+
+def test_recommender_rejects_routes_above_task_cost_policy() -> None:
+    paid = _candidate("openai", "gpt-5.1", BackendLocation.EXTERNAL)
+    allowance = _candidate("requesty", "openai/gpt-5.1", BackendLocation.EXTERNAL)
+
+    recommendation = recommend_model(
+        TaskProfile(
+            privacy_class=PrivacyClass.EXTERNAL_ALLOWED,
+            cost_policy_tier=CostPolicyTier.ALLOWANCES_ALLOWED,
+        ),
+        (paid, allowance),
+    )
+
+    assert recommendation.selected is allowance
+    assert recommendation.rejected[0].candidate is paid
+    assert "billing_allowed" in recommendation.rejected[0].reason
+
+
+def test_recommender_applies_route_override_as_hard_constraint() -> None:
+    first = _candidate("ollama", "first", BackendLocation.LOCAL)
+    second = _candidate("ollama", "second", BackendLocation.LOCAL)
+
+    recommendation = recommend_model(
+        TaskProfile(user_route_id_override="ollama-second"),
+        (first, second),
+    )
+
+    assert recommendation.selected is second
+    assert recommendation.rejected[0].candidate is first

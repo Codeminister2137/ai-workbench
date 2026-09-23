@@ -10,6 +10,7 @@ from ai_orchestrator.models import (
     PrivacyClass,
     QualityThreshold,
     TaskProfile,
+    cost_policy_allows,
     is_external_backend,
     supports_capability,
 )
@@ -49,8 +50,12 @@ def recommend_model(
     alternatives = tuple(accepted[1:4])
 
     reasons = [
-        f"Selected {selected.backend.provider}/{selected.backend.model}.",
-        "Candidates were filtered by privacy before capability and quality.",
+        (
+            "Selected "
+            f"{selected.backend.route_id} "
+            f"({selected.backend.provider}/{selected.backend.model})."
+        ),
+        "Candidates were filtered by route, privacy, cost policy, capability, and quality.",
     ]
     estimate_reason = _estimate_reason(selected.backend.estimate)
     if estimate_reason:
@@ -68,10 +73,22 @@ def recommend_model(
 
 def _rejection_reason(profile: TaskProfile, candidate: ModelCatalogEntry) -> str | None:
     if (
+        profile.user_route_id_override
+        and candidate.backend.route_id != profile.user_route_id_override
+    ):
+        return "Rejected by user route override."
+
+    if (
         profile.user_backend_override
         and candidate.backend.provider != profile.user_backend_override
     ):
         return "Rejected by user backend override."
+
+    if (
+        profile.user_access_method_override
+        and candidate.backend.access_method is not profile.user_access_method_override
+    ):
+        return "Rejected by user access-method override."
 
     if profile.user_model_override and candidate.backend.model != profile.user_model_override:
         return "Rejected by user model override."
@@ -83,6 +100,13 @@ def _rejection_reason(profile: TaskProfile, candidate: ModelCatalogEntry) -> str
         candidate
     ):
         return "Rejected because sensitive external processing requires review."
+
+    if not cost_policy_allows(candidate.backend.cost_policy_tier, profile.cost_policy_tier):
+        return (
+            "Rejected because route requires cost policy "
+            f"{candidate.backend.cost_policy_tier.value}, but task allows "
+            f"{profile.cost_policy_tier.value}."
+        )
 
     for capability in profile.required_capabilities:
         if not supports_capability(candidate.backend.capabilities, capability):

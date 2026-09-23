@@ -2,8 +2,13 @@
 
 from ai_orchestrator.catalog import load_model_catalog
 from ai_orchestrator.models import (
+    AccessMethod,
+    AccessRoute,
+    AuthMethod,
     BackendLocation,
+    BillingSource,
     CandidateRejection,
+    CostPolicyTier,
     LatencyTarget,
     ModelBackend,
     ModelCapabilities,
@@ -29,7 +34,12 @@ from ai_orchestrator.prompt_judge import judge_prompt
 from ai_orchestrator.recommender import recommend_model
 
 __all__ = [
+    "AccessMethod",
+    "AccessRoute",
+    "AuthMethod",
+    "BillingSource",
     "CandidateRejection",
+    "CostPolicyTier",
     "ExecutionPlan",
     "ExecutionTarget",
     "LatencyTarget",

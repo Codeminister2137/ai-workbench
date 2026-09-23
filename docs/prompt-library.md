@@ -59,6 +59,14 @@ For mid-day session boundaries:
 2. Continue the current chat, or update `CURRENT_CONTEXT.md` and start a new
    chat, based on the recommendation.
 
+For PyCharm/Codex IDE compaction-risk checks:
+
+1. Run `.\scripts\session-boundary.ps1` for the repository-side signal.
+2. If the script asks for IDE status, run `/status` in the PyCharm Codex chat
+   and share the context/rate-limit signal.
+3. Use `Codex: Session Boundary Check` before switching chats so
+   `CURRENT_CONTEXT.md` is current.
+
 For end-of-day or stopping-point closeout:
 
 1. `Codex: DoD Closeout`
@@ -228,6 +236,9 @@ Instructions:
   uncommitted but coherent stopping point, or about to switch to a distinct task.
 - If context pressure matters, ask the user to run `/status` in the Codex IDE
   chat and share the context-usage signal. Do not guess an exact threshold.
+- If available, run `.\scripts\session-boundary.ps1` first and use its output as
+  repository-side evidence. The script cannot inspect PyCharm's private chat
+  state, so `/status` remains the source for IDE context/rate-limit signals.
 - Recommend starting a new chat when a milestone is committed, when
   `CURRENT_CONTEXT.md` is current and the next task is distinct, after
   compaction-related errors or context confusion, or when `/status` shows high

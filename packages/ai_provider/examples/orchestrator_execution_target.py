@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 from ai_orchestrator import (
+    AccessMethod,
+    AuthMethod,
+    BillingSource,
+    CostPolicyTier,
     ExecutionTarget,
     ModelCatalogEntry,
     OrchestrationResult,
@@ -12,6 +16,15 @@ from ai_provider import AIMessage, AIRequest, BackendConfig, MessageRole, Privac
 
 def backend_config_from_execution_target(target: ExecutionTarget) -> BackendConfig:
     """Adapt an orchestrator execution decision to the ai_provider config shape."""
+    if target.access_method not in {
+        AccessMethod.LOCAL_RUNTIME,
+        AccessMethod.PROVIDER_API,
+    }:
+        raise ValueError(
+            f"Execution target access method {target.access_method.value!r} "
+            "is not supported by ai_provider. Use a dedicated executor for this route."
+        )
+
     try:
         provider = ProviderKind(target.provider)
     except ValueError as exc:
@@ -92,8 +105,14 @@ def prepare_provider_request(
 
 def main() -> None:
     target = ExecutionTarget(
+        route_id="ollama-llama3.2",
         provider="ollama",
+        product="ollama",
         model="llama3.2",
+        access_method=AccessMethod.LOCAL_RUNTIME,
+        auth_method=AuthMethod.NONE,
+        billing_source=BillingSource.LOCAL_FREE,
+        cost_policy_tier=CostPolicyTier.LOCAL_ONLY,
         base_url="http://localhost:11434",
         timeout_seconds=30,
     )

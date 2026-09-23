@@ -11,7 +11,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from ai_orchestrator import LatencyTarget, QualityThreshold, load_model_catalog
+from ai_orchestrator import (
+    AccessMethod,
+    CostPolicyTier,
+    LatencyTarget,
+    QualityThreshold,
+    load_model_catalog,
+)
 from ai_orchestrator import PrivacyClass as OrchestratorPrivacyClass
 from coding_assist import coding_task_profile, run_coding_prompt
 
@@ -247,7 +253,19 @@ def main(argv: Sequence[str] | None = None) -> int:
         choices=["ollama", "openai", "requesty"],
         help="Hard provider override.",
     )
+    parser.add_argument("--route-id", help="Hard access-route override.")
+    parser.add_argument(
+        "--access-method",
+        choices=[item.value for item in AccessMethod],
+        help="Hard access-method override, such as local_runtime/provider_api.",
+    )
     parser.add_argument("--model", help="Hard model override.")
+    parser.add_argument(
+        "--cost-policy",
+        choices=[item.value for item in CostPolicyTier],
+        default=CostPolicyTier.ALLOWANCES_ALLOWED.value,
+        help="Maximum billing boundary this task may cross.",
+    )
     parser.add_argument(
         "--system",
         help="Additional provider-neutral system instruction appended to the tool prompt.",
@@ -312,6 +330,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         quality_threshold=QualityThreshold(args.quality),
         latency_target=LatencyTarget.INTERACTIVE,
         max_expected_latency_seconds=args.max_latency_seconds,
+        cost_policy_tier=CostPolicyTier(args.cost_policy),
+        route_id_override=args.route_id,
+        access_method_override=(
+            AccessMethod(args.access_method) if args.access_method is not None else None
+        ),
         provider_override=args.provider,
         model_override=args.model,
     )
@@ -333,8 +356,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"context: {context_file.display_path}")
     print(f"status: {result.orchestration.status.value}")
     if result.config is not None:
+        assert result.orchestration.execution_plan is not None
+        print(f"route_id: {result.orchestration.execution_plan.target.route_id}")
+        print(f"product: {result.orchestration.execution_plan.target.product}")
         print(f"provider: {result.config.provider.value}")
         print(f"model: {result.config.model}")
+        print(
+            f"cost_policy_tier: {result.orchestration.execution_plan.target.cost_policy_tier.value}"
+        )
     if result.response is not None:
         print(result.response.message.content)
         if args.apply_actions:

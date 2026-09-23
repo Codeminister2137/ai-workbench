@@ -9,6 +9,9 @@ Use this file to decide where a change belongs before adding new abstractions.
 - `uv.lock` — workspace dependency lockfile.
 - `scripts/repo-assistant.ps1` — one-command launcher that loads `.env` and
   starts the repo-aware coding assistant CLI.
+- `scripts/session-boundary.ps1` - read-only helper for deciding whether to
+  continue the current Codex/PyCharm chat or refresh the handoff and start a new
+  one.
 
 ## `docs/`
 - `architecture.md` — current architecture and boundaries.

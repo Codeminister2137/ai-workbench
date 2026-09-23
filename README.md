@@ -187,6 +187,7 @@ See `AGENTS.md` for the detailed operating rules.
 | `docs/definition-of-done.md` | Completion checklist                                            |
 | `docs/plans/`                | Detailed project plans                                          |
 | `scripts/repo-assistant.ps1` | One-command launcher for the repo-aware coding assistant        |
+| `scripts/session-boundary.ps1` | Read-only Codex/PyCharm chat boundary helper                 |
 
 ---
 
