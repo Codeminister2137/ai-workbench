@@ -113,6 +113,12 @@ important reasoning, debugging state, or decisions and reduce implementation
 quality. A new chat is a logical checkpoint recommendation unless context
 pressure, compaction, or rate limits are the actual reason.
 
+These are standing workflow principles, not per-task prompt requirements:
+preserve quality and important reasoning first; use token cost and diminishing
+returns as secondary factors; work autonomously; stay quiet between material
+phase changes; and provide a concise verified closeout. Users should not need
+to repeat them in every new-chat prompt.
+
 Whenever a new chat is recommended, or the user asks to start one, provide a
 copy-paste-ready **New chat prompt** in the same response. The prompt must name
 the repository, branch, latest checkpoint, requested next task or next action,

@@ -740,6 +740,16 @@ long-running waits, and genuine blockers or decision boundaries. Use
 `task_complete` only after the current requested task is fully implemented and
 verified; an intermediate milestone or checkpoint is not task completion.
 
+Treat quality, correctness, and preservation of important reasoning as higher
+priorities than minimizing context tokens. Token cost, noisy output, and
+diminishing returns from a long context should influence reversible workflow
+choices, but must not justify a chat reset that would discard material
+debugging state or reduce implementation quality. Continue autonomously until
+the requested scope is complete unless a real decision boundary or blocker
+requires the user's input. Provide concise phase-change updates and one
+verified final summary rather than requiring the user to restate these rules in
+each task prompt.
+
 Completion reports at the end of a task should be visually obvious at a glance.
 Start them with a loud Markdown marker, preferably:
 

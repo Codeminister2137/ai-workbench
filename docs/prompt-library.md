@@ -267,8 +267,10 @@ Instructions:
 - Whenever a new chat is recommended, or the user requests one, provide a
   copy-paste-ready `New chat prompt` in the response. It must include the
   repository, branch, latest checkpoint, next task/action, required files,
-  constraints, and first verification step. Keep the same prompt at the bottom
-  of `CURRENT_CONTEXT.md` when that handoff is used.
+  task-specific constraints, and first verification step. General quality and
+  communication principles are standing repository guidance and should not be
+  repeated in every prompt. Keep the same prompt at the bottom of
+  `CURRENT_CONTEXT.md` when that handoff is used.
 
 Output:
 Say either `continue current chat`, `update handoff then start new chat`, or
