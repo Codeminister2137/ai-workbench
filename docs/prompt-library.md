@@ -1,6 +1,9 @@
 # Prompt Library
 
-This is the canonical repository prompt library for Codex workflows.
+This is the canonical repository prompt library for Codex workflows. Its
+workflow guidance is repository-controlled and may be used by other coding
+assistants, but it cannot override the active assistant runtime's tool,
+commentary, or completion rules.
 
 The prompts were migrated from the custom PyCharm AI Assistant prompt library on
 2026-09-20. This Markdown file is the source of truth for this repository. The
@@ -24,6 +27,11 @@ When asking Codex to use a prompt, name it directly:
 ```text
 Use Codex: Investigate First for this request.
 ```
+
+For autonomous taskful execution, named prompts are not a requirement to emit
+an update after each sub-step. Keep investigation and implementation internal
+unless the user asks for an interim report; communicate only at material phase
+changes, long-running waits, blockers, or the final verified closeout.
 
 ## PyCharm Sync
 

@@ -51,6 +51,7 @@ from ai_provider import (
     MessageRole,
     PrivacyClass,
     ProviderKind,
+    ProviderError,
     create_chat_client,
     ensure_ollama_server,
     get_local_provider_capability_snapshot,
@@ -59,11 +60,7 @@ from ai_provider import (
 )
 from ai_provider import PrivacyClass as ProviderPrivacyClass
 
-_EXAMPLES_DIRECTORY = _REPO_ROOT / "packages" / "ai_provider" / "examples"
-if str(_EXAMPLES_DIRECTORY) not in sys.path:
-    sys.path.insert(0, str(_EXAMPLES_DIRECTORY))
-
-from coding_assist import coding_task_profile, run_coding_prompt  # type: ignore[reportMissingImports]
+from ai_provider.coding_assist import coding_task_profile, run_coding_prompt
 
 
 @dataclass(frozen=True, slots=True)
@@ -696,21 +693,30 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.ollama_profile is not None
         else None
     )
-    result = run_coding_prompt(
-        prompt,
-        profile,
-        catalog,
-        review_prompt=not args.skip_prompt_review,
-        prompt_for_review=args.prompt,
-        timeout_seconds=args.timeout_seconds,
-        execute=args.execute and not args.native_tools and args.mode != "plan",
-        system_prompt=build_default_system_prompt(args.system),
-        start_ollama=args.start_ollama,
-        ollama_command=args.ollama_command,
-        ollama_startup_timeout_seconds=args.ollama_startup_timeout_seconds,
-        ollama_log_path=args.ollama_log_file if args.start_ollama else None,
-        ollama_resource_profile=ollama_resource_profile,
-    )
+    try:
+        result = run_coding_prompt(
+            prompt,
+            profile,
+            catalog,
+            review_prompt=not args.skip_prompt_review,
+            prompt_for_review=args.prompt,
+            timeout_seconds=args.timeout_seconds,
+            execute=args.execute and not args.native_tools and args.mode != "plan",
+            system_prompt=build_default_system_prompt(args.system),
+            start_ollama=args.start_ollama,
+            ollama_command=args.ollama_command,
+            ollama_startup_timeout_seconds=args.ollama_startup_timeout_seconds,
+            ollama_log_path=args.ollama_log_file if args.start_ollama else None,
+            ollama_resource_profile=ollama_resource_profile,
+        )
+    except ProviderError as exc:
+        print("=== Repo Coding Assistant ===")
+        print(f"mode: {args.mode}")
+        print(f"repo_root: {repo_root}")
+        print("status: failed")
+        print(f"failure_reason: {exc}")
+        print("execution_status: failed")
+        return 1
 
     print("=== Repo Coding Assistant ===")
     print(f"mode: {args.mode}")

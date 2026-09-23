@@ -154,8 +154,15 @@ The underlying Python CLI lives at:
 packages/ai_provider/src/ai_provider/repo_coding_assistant.py
 ```
 
-The older `packages/ai_provider/examples/repo_coding_assistant.py` path remains
-available as a compatibility/example entry point during the migration.
+The coding orchestration helpers used by that CLI live in
+`packages/ai_provider/src/ai_provider/coding_assist.py`. The older
+`packages/ai_provider/examples/coding_assist.py` path remains a compatibility
+export, and the example repo-assistant path remains available during the
+migration.
+
+Provider-layer failures are reported with `status: failed` and
+`execution_status: failed`; the command returns a non-zero exit code instead
+of emitting a success-shaped response.
 
 ## CLI-First Roadmap
 

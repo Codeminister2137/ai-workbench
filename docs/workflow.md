@@ -32,6 +32,12 @@ Do not modify files. Report:
 - assumptions;
 - questions requiring the user's decision.
 
+For autonomous taskful work, this investigation is an internal phase unless the
+user explicitly asks for an investigation report first. Do not emit a progress
+message after every search, edit, or test. Keep updates silent between material
+phase changes, long-running waits, or genuine blockers/decision boundaries, and
+provide one concise completion report after the requested scope is verified.
+
 ## 3. Decision gate
 **Stop and ask the user** when a material decision is required. Examples include choosing between materially different API behavior, introducing a database/service/dependency, changing an architecture boundary, changing privacy routing, or resolving contradictory requirements.
 

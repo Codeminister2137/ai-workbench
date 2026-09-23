@@ -295,6 +295,78 @@ def test_delegate_context_requires_execution_before_provider_contact(capsys, mon
     assert "delegation: planned: requires --execute" in capsys.readouterr().out
 
 
+@pytest.mark.parametrize(
+    ("delegation_status", "expected_output"),
+    [
+        ("accepted: ollama-qwen2.5-coder:14b", "delegation: accepted: ollama-qwen2.5-coder:14b"),
+        ("rejected: unsuitable task", "delegation: rejected: unsuitable task"),
+    ],
+)
+def test_cli_reports_delegation_decision(
+    delegation_status: str,
+    expected_output: str,
+    capsys,
+    monkeypatch,
+) -> None:
+    from dataclasses import replace
+
+    from ai_provider import (
+        AIMessage,
+        AIResponse,
+        BackendInfo,
+        MessageRole,
+    )
+    from ai_provider import (
+        BackendLocation as ProviderBackendLocation,
+    )
+
+    catalog = _EXAMPLE.load_model_catalog(
+        Path("packages/ai_orchestrator/examples/model_catalog.toml")
+    )
+    prepared = _EXAMPLE.run_coding_prompt(
+        "Review the selected implementation.",
+        _EXAMPLE.coding_task_profile(model_override="qwen2.5-coder:14b"),
+        catalog,
+    )
+    prepared = replace(
+        prepared,
+        response=AIResponse(
+            message=AIMessage(MessageRole.ASSISTANT, "review complete"),
+            backend=BackendInfo(
+                provider="ollama",
+                model="qwen2.5-coder:14b",
+                location=ProviderBackendLocation.LOCAL,
+            ),
+        ),
+    )
+    monkeypatch.setattr(
+        _EXAMPLE,
+        "run_local_context_delegation",
+        lambda *args, **kwargs: ("delegated facts", delegation_status),
+    )
+    monkeypatch.setattr(_EXAMPLE, "run_coding_prompt", lambda *args, **kwargs: prepared)
+
+    assert (
+        main(
+            [
+                "--mode",
+                "review",
+                "Review the selected implementation.",
+                "--delegate-context",
+                "--provider",
+                "ollama",
+                "--model",
+                "qwen2.5-coder:14b",
+                "--execute",
+            ]
+        )
+        == 0
+    )
+    output = capsys.readouterr().out
+    assert expected_output in output
+    assert "execution_status: completed" in output
+
+
 def test_review_mode_rejects_native_tools_before_provider_contact(monkeypatch) -> None:
     def fail_if_called(*args, **kwargs):
         raise AssertionError("invalid review mode must stop before provider contact")
@@ -309,6 +381,36 @@ def test_stable_ai_assistant_entry_point_loads_cli() -> None:
     from ai_provider.cli import main as stable_main
 
     assert stable_main(["--mode", "plan", "Review code.", "--provider", "ollama"]) == 0
+
+
+def test_stable_cli_reports_provider_failures(capsys, monkeypatch) -> None:
+    from ai_provider import ProviderError
+    from ai_provider import repo_coding_assistant as stable_cli
+
+    def fail_request(*args, **kwargs):
+        raise ProviderError("provider unavailable")
+
+    monkeypatch.setattr(stable_cli, "run_coding_prompt", fail_request)
+
+    assert (
+        stable_cli.main(
+            [
+                "--mode",
+                "ask",
+                "Review code.",
+                "--provider",
+                "ollama",
+                "--model",
+                "qwen2.5-coder:14b",
+                "--execute",
+            ]
+        )
+        == 1
+    )
+    output = capsys.readouterr().out
+    assert "status: failed" in output
+    assert "failure_reason: provider unavailable" in output
+    assert "execution_status: failed" in output
 
 
 class _NativeFakeClient:

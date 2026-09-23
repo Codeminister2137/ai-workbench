@@ -727,6 +727,12 @@ Unless explicitly waived:
 
 Be concise and technically precise.
 
+For autonomous taskful work, do not report after every search, edit, test, or
+other small sub-step. Keep progress updates to material phase changes,
+long-running waits, and genuine blockers or decision boundaries. Use
+`task_complete` only after the current requested task is fully implemented and
+verified; an intermediate milestone or checkpoint is not task completion.
+
 Completion reports at the end of a task should be visually obvious at a glance.
 Start them with a loud Markdown marker, preferably:
 
