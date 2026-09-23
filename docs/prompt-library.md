@@ -255,16 +255,27 @@ Instructions:
   unresolved decisions exist only in the transcript, validation/debugging context
   is still active, `CURRENT_CONTEXT.md` is stale, or the next action is a tiny
   follow-up.
+- Balance token cost and diminishing returns against quality. Prefer continuing
+  when the active conversation contains reasoning or debugging state that would
+  be expensive or risky to reconstruct. Do not recommend a new chat solely to
+  reduce tokens when that would reduce quality.
 - Treat PyCharm/Codex IDE compaction failures as environment-specific empirical
   signals. Do not assume the same threshold applies to every Codex surface.
 - If moving to a new chat is recommended, first ensure `CURRENT_CONTEXT.md`
   contains the last completed work, validation status, open decisions/risks,
   current git state, and the next recommended action.
+- Whenever a new chat is recommended, or the user requests one, provide a
+  copy-paste-ready `New chat prompt` in the response. It must include the
+  repository, branch, latest checkpoint, next task/action, required files,
+  constraints, and first verification step. Keep the same prompt at the bottom
+  of `CURRENT_CONTEXT.md` when that handoff is used.
 
 Output:
 Say either `continue current chat`, `update handoff then start new chat`, or
 `do not switch yet`. Explain the reason briefly and list any handoff update
-needed before switching.
+needed before switching. Classify the reason as `context-pressure`,
+`logical-checkpoint`, or `quality-preserving continuation`. If starting a new
+chat, include the exact `New chat prompt` after the decision.
 ```
 
 ## `Codex: MVP/Stop Review`

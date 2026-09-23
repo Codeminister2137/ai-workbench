@@ -107,6 +107,19 @@ from the accumulated transcript. Continue the current chat when work is
 mid-change, unresolved decisions exist only in the transcript, or debugging and
 validation context is still active.
 
+Balance context cost against quality: a long context's token cost and diminishing
+returns matter, but they do not justify switching when doing so would discard
+important reasoning, debugging state, or decisions and reduce implementation
+quality. A new chat is a logical checkpoint recommendation unless context
+pressure, compaction, or rate limits are the actual reason.
+
+Whenever a new chat is recommended, or the user asks to start one, provide a
+copy-paste-ready **New chat prompt** in the same response. The prompt must name
+the repository, branch, latest checkpoint, requested next task or next action,
+required files to read, constraints, and the expected first verification step.
+If `CURRENT_CONTEXT.md` is used as the handoff, keep its bottom section
+up-to-date with the same prompt.
+
 In the Codex IDE chat, `/status` can show context usage and rate-limit state.
 Use it as an input when context pressure matters; do not invent a fixed
 cross-surface threshold.

@@ -404,6 +404,13 @@ Apply this by:
 
 Do not under-investigate to save tokens when the task affects architecture, privacy, dependencies, data, public APIs, or correctness. In those cases, spend the context needed to reach a reliable conclusion.
 
+When deciding whether to continue a chat, treat token cost and diminishing
+returns from a long context as real considerations, but subordinate them to
+quality. Continue when the active conversation contains material reasoning,
+debugging state, or decisions that would be costly or risky to reconstruct.
+Recommend a new chat when the next slice is independent and the handoff can
+preserve the needed context without reducing quality.
+
 ### Required context reading
 
 Use tiered context reading. Documentation matters, but repeated broad rereads are
