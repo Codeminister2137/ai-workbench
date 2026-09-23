@@ -68,6 +68,26 @@ def test_backend_config_loads_provider_specific_api_key(
     assert config.api_key == "requesty-key"
 
 
+def test_backend_config_loads_gemini_api_key_for_google(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AI_PROVIDER_KIND", "google")
+    monkeypatch.setenv("AI_PROVIDER_MODEL", "gemini-3.1-pro")
+    monkeypatch.setenv("GEMINI_API_KEY", "gemini-test-key")
+
+    config = BackendConfig.from_env()
+
+    assert config.provider is ProviderKind.GOOGLE
+    assert config.api_key == "gemini-test-key"
+
+
+def test_factory_creates_google_client() -> None:
+    client = create_chat_client(BackendConfig(provider=ProviderKind.GOOGLE, model="gemini-3.1-pro"))
+
+    assert isinstance(client, OpenAICompatibleChatClient)
+    assert client.base_url == "https://generativelanguage.googleapis.com/v1beta/openai"
+
+
 def test_factory_creates_openai_compatible_client() -> None:
     client = create_chat_client(
         BackendConfig(provider=ProviderKind.REQUESTY, model="openai/gpt-5.1")

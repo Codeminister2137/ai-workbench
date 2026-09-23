@@ -39,6 +39,7 @@ from ai_provider.privacy import enforce_privacy_policy
 _DEFAULT_BASE_URLS = {
     ProviderKind.OPENAI: "https://api.openai.com/v1",
     ProviderKind.REQUESTY: "https://router.requesty.ai/v1",
+    ProviderKind.GOOGLE: "https://generativelanguage.googleapis.com/v1beta/openai",
 }
 
 

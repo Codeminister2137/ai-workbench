@@ -38,6 +38,17 @@ overrides from parent tasks.
 
 Detailed ADR: `docs/decisions/ADR-022-subtask-profile-derivation-and-local-delegation.md`
 
+## ADR-023 - Google / Antigravity Access Routes And Live Multi-Model Delegation
+**Status:** Accepted
+**Date:** 2026-09-24
+
+Support Google Gemini and Antigravity access routes with strict route provenance
+in the catalog to distinguish free studio quotas, IDE subscription allowances,
+and metered routes. Provide an end-to-end multi-model delegation workflow
+connecting local Ollama context extraction with hosted primary models.
+
+Detailed ADR: `docs/decisions/ADR-023-google-antigravity-routes-and-live-delegation.md`
+
 ## Template
 ```text
 ## ADR-NNN — Short Name
@@ -58,6 +69,4 @@ What was chosen?
 Why?
 
 **Consequences**
-What becomes easier, harder, or constrained?
-
 ```

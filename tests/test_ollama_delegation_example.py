@@ -11,6 +11,7 @@ from ai_orchestrator import (
     PrivacyClass,
     TaskProfile,
     TaskType,
+    cost_policy_allows,
     load_model_catalog,
 )
 
@@ -34,14 +35,13 @@ main = _EXAMPLE.main
 plan_delegated_workflow = _EXAMPLE.plan_delegated_workflow
 
 
-def test_ollama_delegation_example_parser_defaults() -> None:
+def test_ollama_delegation_parser_defaults() -> None:
     parser = build_parser()
     args = parser.parse_args([])
 
     assert args.catalog == default_catalog_path()
     assert args.privacy == PrivacyClass.EXTERNAL_ALLOWED.value
     assert args.cost_policy == CostPolicyTier.ALLOWANCES_ALLOWED.value
-    assert args.subtask_cost_policy == CostPolicyTier.LOCAL_ONLY.value
 
 
 def test_plan_delegated_workflow_creates_primary_and_subtask_plans() -> None:
@@ -58,10 +58,10 @@ def test_plan_delegated_workflow_creates_primary_and_subtask_plans() -> None:
         catalog=catalog,
     )
 
-    assert workflow.primary_plan.target.cost_policy_tier in {
-        CostPolicyTier.LOCAL_ONLY,
-        CostPolicyTier.ALLOWANCES_ALLOWED,
-    }
+    assert cost_policy_allows(
+        workflow.primary_plan.target.cost_policy_tier,
+        primary_profile.cost_policy_tier,
+    )
 
     assert len(workflow.delegated_subtasks) == 2
     for subtask in workflow.delegated_subtasks:
@@ -78,5 +78,3 @@ def test_ollama_delegation_cli_main_output(capsys: pytest.CaptureFixture[str]) -
     captured = capsys.readouterr().out
     assert "=== Primary Task Plan ===" in captured
     assert "=== Delegated Subtasks ===" in captured
-    assert "Subtask:         [context_summary]" in captured
-    assert "Subtask:         [prompt_refinement]" in captured

@@ -64,6 +64,7 @@ class AccessMethod(StrEnum):
     LOCAL_RUNTIME = "local_runtime"
     PROVIDER_API = "provider_api"
     CODEX_CLI = "codex_cli"
+    ANTIGRAVITY_CLI = "antigravity_cli"
 
 
 class AuthMethod(StrEnum):
@@ -73,6 +74,7 @@ class AuthMethod(StrEnum):
     API_KEY = "api_key"
     CHATGPT_SIGN_IN = "chatgpt_sign_in"
     CODEX_ACCESS_TOKEN = "codex_access_token"
+    GOOGLE_ACCOUNT_SIGN_IN = "google_account_sign_in"
 
 
 class BillingSource(StrEnum):
@@ -83,6 +85,9 @@ class BillingSource(StrEnum):
     REQUESTY_BILLING = "requesty_billing"
     CHATGPT_SUBSCRIPTION_ALLOWANCE = "chatgpt_subscription_allowance"
     CHATGPT_WORKSPACE_CREDITS = "chatgpt_workspace_credits"
+    GOOGLE_AI_STUDIO_FREE = "google_ai_studio_free"
+    GOOGLE_API_BILLING = "google_api_billing"
+    ANTIGRAVITY_SUBSCRIPTION_ALLOWANCE = "antigravity_subscription_allowance"
 
 
 class CostPolicyTier(StrEnum):

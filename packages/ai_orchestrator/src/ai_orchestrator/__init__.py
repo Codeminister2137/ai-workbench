@@ -23,6 +23,7 @@ from ai_orchestrator.models import (
     TaskCapability,
     TaskProfile,
     TaskType,
+    cost_policy_allows,
 )
 from ai_orchestrator.orchestrator import (
     OrchestrationResult,
@@ -67,6 +68,7 @@ __all__ = [
     "TaskCapability",
     "TaskProfile",
     "TaskType",
+    "cost_policy_allows",
     "derive_subtask_profile",
     "judge_prompt",
     "load_model_catalog",

@@ -111,6 +111,108 @@ output_cost_per_million_tokens = 0
 source = "local benchmark: 3 runs, 1 warmup, median latency for qwen3:14b"
 
 [[models]]
+route_id = "google-ai-studio-gemini-3-1-pro"
+provider = "google"
+product = "google_ai_studio"
+model = "gemini-3.1-pro"
+location = "external"
+access_method = "provider_api"
+auth_method = "api_key"
+billing_source = "google_ai_studio_free"
+cost_policy_tier = "free_only"
+quality = "high"
+latency = "interactive"
+base_url = "https://generativelanguage.googleapis.com/v1beta/openai"
+notes = "Google AI Studio free tier for frontier reasoning and coding via OpenAI-compatible endpoint."
+
+[models.capabilities]
+chat = true
+streaming = true
+tools = false
+structured_output = false
+multimodal_input = false
+embeddings = false
+
+[models.estimate]
+input_cost_per_million_tokens = 0
+output_cost_per_million_tokens = 0
+source = "Google AI Studio free allowance docs"
+source_url = "https://ai.google.dev/pricing"
+
+[[models]]
+route_id = "google-ai-studio-gemini-3-8-flash"
+provider = "google"
+product = "google_ai_studio"
+model = "gemini-3.8-flash"
+location = "external"
+access_method = "provider_api"
+auth_method = "api_key"
+billing_source = "google_ai_studio_free"
+cost_policy_tier = "free_only"
+quality = "standard"
+latency = "interactive"
+base_url = "https://generativelanguage.googleapis.com/v1beta/openai"
+notes = "Google AI Studio free tier for fast execution via OpenAI-compatible endpoint."
+
+[models.capabilities]
+chat = true
+streaming = true
+tools = false
+structured_output = false
+multimodal_input = false
+embeddings = false
+
+[models.estimate]
+input_cost_per_million_tokens = 0
+output_cost_per_million_tokens = 0
+source = "Google AI Studio free allowance docs"
+source_url = "https://ai.google.dev/pricing"
+
+[[models]]
+route_id = "google-antigravity-gemini-3-1-pro"
+provider = "google"
+product = "antigravity"
+model = "gemini-3.1-pro"
+location = "external"
+access_method = "antigravity_cli"
+auth_method = "google_account_sign_in"
+billing_source = "antigravity_subscription_allowance"
+cost_policy_tier = "allowances_allowed"
+quality = "high"
+latency = "interactive"
+notes = "Google Antigravity IDE agent route using user Google account sign-in."
+
+[models.capabilities]
+chat = true
+streaming = true
+tools = true
+structured_output = false
+multimodal_input = false
+embeddings = false
+
+[[models]]
+route_id = "google-antigravity-gemini-3-8-flash"
+provider = "google"
+product = "antigravity"
+model = "gemini-3.8-flash"
+location = "external"
+access_method = "antigravity_cli"
+auth_method = "google_account_sign_in"
+billing_source = "antigravity_subscription_allowance"
+cost_policy_tier = "allowances_allowed"
+quality = "standard"
+latency = "interactive"
+notes = "Google Antigravity fast model route using user Google account sign-in."
+
+[models.capabilities]
+chat = true
+streaming = true
+tools = true
+structured_output = false
+multimodal_input = false
+embeddings = false
+
+[[models]]
 route_id = "openai-api-gpt-5-1"
 provider = "openai"
 product = "openai_api"

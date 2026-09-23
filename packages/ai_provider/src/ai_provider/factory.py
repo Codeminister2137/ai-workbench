@@ -14,7 +14,7 @@ def create_chat_client(config: BackendConfig) -> ChatClient:
     if config.provider is ProviderKind.OLLAMA:
         return OllamaChatClient(config)
 
-    if config.provider in {ProviderKind.OPENAI, ProviderKind.REQUESTY}:
+    if config.provider in {ProviderKind.OPENAI, ProviderKind.REQUESTY, ProviderKind.GOOGLE}:
         return OpenAICompatibleChatClient(config)
 
     msg = f"Unsupported provider kind: {config.provider.value}."
