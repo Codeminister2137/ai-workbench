@@ -8,6 +8,7 @@ from typing import Any
 import pytest
 from ai_orchestrator import (
     CostPolicyTier,
+    DelegationKind,
     TaskProfile,
     TaskType,
     load_model_catalog,
@@ -49,6 +50,7 @@ backend_config_from_target = _EXAMPLE.backend_config_from_target
 build_parser = _EXAMPLE.build_parser
 default_catalog_path = _EXAMPLE.default_catalog_path
 execute_delegated_workflow = _EXAMPLE.execute_delegated_workflow
+load_context_sources = _EXAMPLE.load_context_sources
 main = _EXAMPLE.main
 
 
@@ -163,6 +165,74 @@ def test_execute_delegated_workflow_with_mock_clients() -> None:
     assert "Primary Solution: Connection pool" in result.final_response.message.content
     assert "--- Locally Extracted Context Summary ---" in result.composed_primary_prompt
     assert "Summary: DB module" in result.composed_primary_prompt
+
+
+def test_live_runner_rejects_local_architecture_decisions() -> None:
+    catalog = load_model_catalog(default_catalog_path())
+    profile = TaskProfile(
+        task_type=TaskType.CODING,
+        privacy_class=OrchestratorPrivacyClass.LOCAL_ONLY,
+        cost_policy_tier=CostPolicyTier.LOCAL_ONLY,
+    )
+
+    with pytest.raises(ValueError, match="Delegation rejected"):
+        execute_delegated_workflow(
+            primary_prompt="Choose the next architecture",
+            raw_context="source",
+            primary_profile=profile,
+            catalog=catalog,
+            delegation_kind=DelegationKind.ARCHITECTURAL_RECOMMENDATION,
+        )
+
+
+def test_delegated_summary_without_source_citation_is_not_injected() -> None:
+    catalog = load_model_catalog(default_catalog_path())
+    primary_profile = TaskProfile(
+        task_type=TaskType.CODING,
+        privacy_class=OrchestratorPrivacyClass.EXTERNAL_ALLOWED,
+        cost_policy_tier=CostPolicyTier.FREE_ONLY,
+    )
+
+    def mock_factory(config: BackendConfig) -> ChatClient:
+        return _MockChatClient(
+            config,
+            "The repository should use clean architecture and robust error handling.",
+        )
+
+    result = execute_delegated_workflow(
+        primary_prompt="Review the implementation",
+        raw_context="=== SOURCE: src/example.py ===\n1: value = 1",
+        context_sources=("src/example.py",),
+        primary_profile=primary_profile,
+        catalog=catalog,
+        client_factory=mock_factory,
+    )
+
+    assert result.delegated_subtask_records[0].grounded_in_sources is False
+    assert "[Local delegation omitted:" in result.composed_primary_prompt
+    assert "clean architecture" not in result.composed_primary_prompt
+
+
+def test_load_context_sources_adds_line_numbers(tmp_path: Path) -> None:
+    source = tmp_path / "example.py"
+    source.write_text("first\nsecond\n", encoding="utf-8")
+
+    context, names = load_context_sources((source,))
+
+    assert names == (str(source),)
+    assert f"=== SOURCE: {source} ===" in context
+    assert "1: first" in context
+    assert "2: second" in context
+
+
+def test_load_context_sources_respects_budget(tmp_path: Path) -> None:
+    source = tmp_path / "example.py"
+    source.write_text("first line\nsecond line\nthird line\n" * 20, encoding="utf-8")
+
+    context, _ = load_context_sources((source,), max_chars=220)
+
+    assert len(context) <= 220
+    assert "source truncated" in context
 
 
 def test_live_delegation_runner_cli_dry_run_output(capsys: pytest.CaptureFixture[str]) -> None:

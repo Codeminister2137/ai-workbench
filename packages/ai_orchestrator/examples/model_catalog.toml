@@ -20,6 +20,10 @@ structured_output = false
 multimodal_input = false
 embeddings = false
 
+[models.context_limits]
+context_window_tokens = 163840
+runtime_context_tokens = 4096
+
 [models.estimate]
 typical_latency_seconds = 4.637
 input_cost_per_million_tokens = 0
@@ -47,6 +51,10 @@ tools = false
 structured_output = false
 multimodal_input = false
 embeddings = false
+
+[models.context_limits]
+context_window_tokens = 131072
+runtime_context_tokens = 4096
 
 [models.estimate]
 typical_latency_seconds = 5.35
@@ -76,6 +84,10 @@ structured_output = false
 multimodal_input = false
 embeddings = false
 
+[models.context_limits]
+context_window_tokens = 32768
+runtime_context_tokens = 4096
+
 [models.estimate]
 typical_latency_seconds = 6.049
 input_cost_per_million_tokens = 0
@@ -103,6 +115,10 @@ tools = false
 structured_output = false
 multimodal_input = false
 embeddings = false
+
+[models.context_limits]
+context_window_tokens = 40960
+runtime_context_tokens = 4096
 
 [models.estimate]
 typical_latency_seconds = 8.644

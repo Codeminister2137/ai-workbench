@@ -17,6 +17,18 @@ class TaskType(StrEnum):
     CREATIVE = "creative"
 
 
+class DelegationKind(StrEnum):
+    """Purpose of a delegated subtask and its local-model suitability."""
+
+    CONTEXT_EXTRACTION = "context_extraction"
+    FILE_SUMMARIZATION = "file_summarization"
+    SYMBOL_EXTRACTION = "symbol_extraction"
+    TEST_CASE_GENERATION = "test_case_generation"
+    PROMPT_REFINEMENT = "prompt_refinement"
+    ARCHITECTURAL_RECOMMENDATION = "architectural_recommendation"
+    IMPLEMENTATION_DECISION = "implementation_decision"
+
+
 class TaskCapability(StrEnum):
     """Capabilities a task may require from a model/backend."""
 
@@ -158,6 +170,29 @@ class PromptJudgeResult:
 
 
 @dataclass(frozen=True, slots=True)
+class PromptRefinementRequest:
+    """Inputs for a neutral prompt-refinement pass."""
+
+    prompt: str
+    profile: TaskProfile | None = None
+    prior_response: str | None = None
+    prior_critique: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class PromptRefinementResult:
+    """Deterministic refinement output suitable for an injected executor."""
+
+    original_prompt: str
+    refined_prompt: str | None
+    issues: tuple[PromptIssue, ...]
+    assumptions: tuple[str, ...] = ()
+    alternatives: tuple[str, ...] = ()
+    change_summary: str | None = None
+    requires_user_approval: bool = False
+
+
+@dataclass(frozen=True, slots=True)
 class ModelCapabilities:
     """Capabilities advertised by an orchestration model catalog entry."""
 
@@ -167,6 +202,14 @@ class ModelCapabilities:
     structured_output: bool = False
     multimodal_input: bool = False
     embeddings: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class ModelContextLimits:
+    """Model context limits and deployment defaults, when known."""
+
+    context_window_tokens: int | None = None
+    runtime_context_tokens: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -202,6 +245,7 @@ class ModelBackend:
 
     route: AccessRoute
     capabilities: ModelCapabilities = field(default_factory=ModelCapabilities)
+    context_limits: ModelContextLimits = field(default_factory=ModelContextLimits)
     estimate: ModelPerformanceEstimate = field(default_factory=ModelPerformanceEstimate)
 
     @property
@@ -273,6 +317,7 @@ class ModelCatalogEntry:
     quality: QualityThreshold = QualityThreshold.STANDARD
     latency: LatencyTarget = LatencyTarget.INTERACTIVE
     notes: str | None = None
+    metadata: dict[str, str | int | float | bool] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)

@@ -25,6 +25,7 @@ from ai_provider.contracts import (
     AIStreamDelta,
     AIStreamEvent,
     AIStreamFinal,
+    AIToolCall,
     BackendInfo,
     BackendLocation,
     FinishReason,
@@ -58,7 +59,7 @@ class OpenAICompatibleChatClient:
             model=self.config.model,
             location=BackendLocation.EXTERNAL,
             base_url=self.base_url,
-            capabilities=ModelCapabilities(chat=True, streaming=True),
+            capabilities=ModelCapabilities(chat=True, streaming=True, tools=True),
         )
 
     @property
@@ -144,16 +145,15 @@ class OpenAICompatibleChatClient:
     def _chat_payload(self, request: AIRequest, *, stream: bool) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "model": request.model or self.config.model,
-            "messages": [
-                {"role": message.role.value, "content": message.content}
-                for message in request.messages
-            ],
+            "messages": [_message_to_payload(message) for message in request.messages],
             "stream": stream,
         }
         if request.temperature is not None:
             payload["temperature"] = request.temperature
         if request.max_output_tokens is not None:
             payload["max_tokens"] = request.max_output_tokens
+        if request.tools:
+            payload["tools"] = [tool.to_json_schema() for tool in request.tools]
         return payload
 
     def _response_from_raw(
@@ -173,13 +173,17 @@ class OpenAICompatibleChatClient:
                 raw_error=raw_response,
             )
 
-        content = raw_message.get("content", "")
+        content = raw_message.get("content", "") or ""
+        tool_calls = _tool_calls_from_raw(raw_message.get("tool_calls"))
         return AIResponse(
-            message=AIMessage(role=MessageRole.ASSISTANT, content=str(content)),
+            message=AIMessage(
+                role=MessageRole.ASSISTANT, content=str(content), tool_calls=tool_calls
+            ),
             backend=self._backend_for_model(model),
             usage=self._usage_from_response(raw_response),
             finish_reason=self._finish_reason(choice.get("finish_reason")),
             latency_ms=latency_ms,
+            tool_calls=tool_calls,
             raw_metadata=raw_response,
         )
 
@@ -189,7 +193,7 @@ class OpenAICompatibleChatClient:
             model=model,
             location=BackendLocation.EXTERNAL,
             base_url=self.base_url,
-            capabilities=ModelCapabilities(chat=True, streaming=True),
+            capabilities=ModelCapabilities(chat=True, streaming=True, tools=True),
         )
 
     def _post_chat(self, payload: dict[str, Any]) -> dict[str, Any]:
@@ -340,6 +344,53 @@ class OpenAICompatibleChatClient:
         if raw_reason in {"content_filter", "tool_calls", "function_call"}:
             return FinishReason.UNKNOWN
         return FinishReason.UNKNOWN
+
+
+def _message_to_payload(message: AIMessage) -> dict[str, Any]:
+    payload: dict[str, Any] = {"role": message.role.value, "content": message.content}
+    if message.name is not None:
+        payload["name"] = message.name
+    if message.tool_call_id is not None:
+        payload["tool_call_id"] = message.tool_call_id
+    if message.tool_calls:
+        payload["tool_calls"] = [
+            {
+                "id": call.id,
+                "type": "function",
+                "function": {"name": call.name, "arguments": json.dumps(call.arguments)},
+            }
+            for call in message.tool_calls
+        ]
+    return payload
+
+
+def _tool_calls_from_raw(raw_calls: object) -> tuple[AIToolCall, ...]:
+    if not isinstance(raw_calls, list):
+        return ()
+    calls: list[AIToolCall] = []
+    for index, raw_call in enumerate(raw_calls):
+        if not isinstance(raw_call, dict):
+            continue
+        function = raw_call.get("function")
+        if not isinstance(function, dict):
+            continue
+        raw_arguments = function.get("arguments", "{}")
+        try:
+            arguments = (
+                json.loads(raw_arguments) if isinstance(raw_arguments, str) else raw_arguments
+            )
+        except json.JSONDecodeError:
+            arguments = {}
+        if not isinstance(arguments, dict):
+            arguments = {}
+        calls.append(
+            AIToolCall(
+                id=str(raw_call.get("id") or f"tool-call-{index}"),
+                name=str(function.get("name", "")),
+                arguments=arguments,
+            )
+        )
+    return tuple(calls)
 
 
 def _first_choice(raw_response: dict[str, Any], *, provider: str) -> dict[str, Any]:

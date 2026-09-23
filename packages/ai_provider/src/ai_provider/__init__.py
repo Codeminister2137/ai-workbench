@@ -10,6 +10,9 @@ from ai_provider.contracts import (
     AIStreamDelta,
     AIStreamEvent,
     AIStreamFinal,
+    AIToolCall,
+    AIToolDefinition,
+    AIToolParameter,
     BackendInfo,
     BackendLocation,
     ChatClient,
@@ -45,12 +48,22 @@ from ai_provider.ollama_models import (
     stream_ollama_model_pull,
     summarize_ollama_pull_logs,
 )
-from ai_provider.ollama_runtime import ensure_ollama_server, is_ollama_server_available
+from ai_provider.ollama_runtime import (
+    OLLAMA_RESOURCE_PROFILES,
+    OllamaResourceProfile,
+    ensure_ollama_server,
+    get_ollama_resource_profile,
+    get_ollama_version,
+    is_ollama_server_available,
+)
 
 __all__ = [
     "AIMessage",
     "AIRequest",
     "AIResponse",
+    "AIToolCall",
+    "AIToolDefinition",
+    "AIToolParameter",
     "AIStreamDelta",
     "AIStreamEvent",
     "AIStreamFinal",
@@ -82,6 +95,10 @@ __all__ = [
     "UsageSource",
     "create_chat_client",
     "ensure_ollama_server",
+    "get_ollama_resource_profile",
+    "get_ollama_version",
+    "OllamaResourceProfile",
+    "OLLAMA_RESOURCE_PROFILES",
     "get_local_provider_capability_snapshot",
     "is_ollama_server_available",
     "list_local_ollama_models",

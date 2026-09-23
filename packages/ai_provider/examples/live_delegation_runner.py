@@ -10,10 +10,12 @@ from ai_orchestrator import (
     AccessMethod,
     CostPolicyTier,
     DelegatedSubtaskPlan,
+    DelegationKind,
     ExecutionPlan,
     ModelCatalogEntry,
     TaskProfile,
     TaskType,
+    assess_delegation,
     load_model_catalog,
     plan_delegated_subtask,
     prepare_execution,
@@ -46,6 +48,7 @@ class SubtaskExecutionRecord:
     provider: str
     model: str
     response: AIResponse
+    grounded_in_sources: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -95,6 +98,8 @@ def execute_delegated_workflow(
     client_factory: ClientFactory = create_chat_client,
     dry_run: bool = False,
     subtask_cost_tier: CostPolicyTier = CostPolicyTier.LOCAL_ONLY,
+    context_sources: tuple[str, ...] = (),
+    delegation_kind: DelegationKind = DelegationKind.CONTEXT_EXTRACTION,
 ) -> LiveDelegationResult:
     """Execute a multi-stage workflow delegating context summarization locally before execution."""
     # 1. Prepare Primary Plan
@@ -109,6 +114,13 @@ def execute_delegated_workflow(
             f"Primary task planning failed: status={primary_result.status.value}, "
             f"failure_reason={primary_result.failure_reason}"
         )
+
+    delegation_decision = assess_delegation(
+        task_type=primary_profile.task_type,
+        delegation_kind=delegation_kind,
+    )
+    if not delegation_decision.allowed:
+        raise ValueError(f"Delegation rejected: {delegation_decision.reason}")
 
     # 2. Plan Local Delegated Subtask for Context Extraction/Summary
     subtask_plan: DelegatedSubtaskPlan = plan_delegated_subtask(
@@ -131,9 +143,15 @@ def execute_delegated_workflow(
     # 3. Execute Delegated Subtask Locally (e.g. Ollama)
     subtask_config = backend_config_from_target(subtask_plan.execution_plan)
     subtask_client = client_factory(subtask_config)
+    source_instruction = (
+        "Cite the supplied source locations using [source:path:line] references. "
+        "Do not make claims that are not supported by the supplied sources."
+        if context_sources
+        else "Only summarize facts explicitly present in the supplied context."
+    )
     subtask_prompt = (
         "Summarize the following code context into key architectural constraints and definitions "
-        f"needed for the task:\n\n{raw_context}"
+        f"needed for the task. {source_instruction}\n\n{raw_context}"
     )
     subtask_request = AIRequest(
         messages=(AIMessage(role=MessageRole.USER, content=subtask_prompt),),
@@ -149,10 +167,17 @@ def execute_delegated_workflow(
         provider=subtask_config.provider.value,
         model=subtask_config.model,
         response=subtask_response,
+        grounded_in_sources=not context_sources
+        or _contains_source_citation(subtask_response.message.content, context_sources),
     )
 
     # 4. Compose Primary Prompt with Locally Pre-Digested Summary
     locally_digested_summary = subtask_response.message.content.strip()
+    if context_sources and not subtask_record.grounded_in_sources:
+        locally_digested_summary = (
+            "[Local delegation omitted: the summarizer did not provide a verifiable "
+            "source citation.]\n"
+        )
     composed_prompt = (
         f"{primary_prompt}\n\n"
         "--- Locally Extracted Context Summary ---\n"
@@ -179,6 +204,59 @@ def execute_delegated_workflow(
     )
 
 
+def _contains_source_citation(summary: str, context_sources: tuple[str, ...]) -> bool:
+    """Return whether a delegated summary cites one of the supplied sources."""
+
+    normalized_summary = summary.replace("\\", "/").lower()
+    return any(
+        f"[source:{source.replace(chr(92), '/').lower()}:" in normalized_summary
+        for source in context_sources
+    )
+
+
+def load_context_sources(
+    paths: tuple[Path, ...],
+    *,
+    max_chars: int = 6_000,
+) -> tuple[str, tuple[str, ...]]:
+    """Load bounded, line-numbered source files for grounded local delegation."""
+
+    if max_chars <= 0:
+        raise ValueError("max_chars must be greater than zero.")
+    sections: list[str] = []
+    source_names: list[str] = []
+    remaining = max_chars
+    for path in paths:
+        if remaining <= 0:
+            break
+        resolved = path.resolve()
+        if not resolved.is_file():
+            raise ValueError(f"Context source is not a file: {path}")
+        source_name = str(path)
+        source_names.append(source_name)
+        lines = resolved.read_text(encoding="utf-8", errors="replace").splitlines()
+        header = f"=== SOURCE: {source_name} ===\n"
+        if len(header) >= remaining:
+            sections.append(header[:remaining])
+            remaining = 0
+            break
+        numbered_lines: list[str] = []
+        used = len(header)
+        truncation_marker = "[source truncated after line {line}]"
+        for index, line in enumerate(lines, start=1):
+            rendered = f"{index}: {line}\n"
+            marker = truncation_marker.format(line=index - 1)
+            if used + len(rendered) + len(marker) > remaining:
+                numbered_lines.append(marker)
+                used = remaining
+                break
+            numbered_lines.append(rendered.rstrip("\n"))
+            used += len(rendered)
+        sections.append(header + "\n".join(numbered_lines))
+        remaining -= used
+    return "\n\n".join(sections), tuple(source_names)
+
+
 def default_catalog_path() -> Path:
     """Return default model catalog path."""
     return (
@@ -201,6 +279,19 @@ def build_parser() -> argparse.ArgumentParser:
         "--context",
         default="class DB: def connect(self): pass\ndef execute_query(q): pass",
         help="Raw context or source code to summarize locally",
+    )
+    parser.add_argument(
+        "--context-file",
+        action="append",
+        type=Path,
+        default=[],
+        help="Source file to provide with line numbers; repeat for multiple files",
+    )
+    parser.add_argument(
+        "--context-budget-chars",
+        type=int,
+        default=6_000,
+        help="Maximum combined source-context characters sent to the local model",
     )
     parser.add_argument(
         "--catalog",
@@ -240,11 +331,20 @@ def main(argv: list[str] | None = None) -> int:
         cost_policy_tier=CostPolicyTier(args.cost_policy),
     )
 
+    context = args.context
+    context_sources: tuple[str, ...] = ()
+    if args.context_file:
+        context, context_sources = load_context_sources(
+            tuple(args.context_file),
+            max_chars=args.context_budget_chars,
+        )
+
     result = execute_delegated_workflow(
         primary_prompt=args.prompt,
-        raw_context=args.context,
+        raw_context=context,
         primary_profile=primary_profile,
         catalog=catalog,
+        context_sources=context_sources,
         dry_run=not args.execute,
     )
 

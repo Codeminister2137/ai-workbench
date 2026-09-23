@@ -28,3 +28,9 @@ def test_prompt_judge_does_not_require_refinement_for_specific_prompt() -> None:
 
     assert result.should_refine is False
     assert result.refined_prompt is None
+
+
+def test_prompt_judge_accepts_explicit_repository_reference() -> None:
+    result = judge_prompt("Examine this repo and suggest next steps.")
+
+    assert "ambiguous_reference" not in {issue.code for issue in result.issues}

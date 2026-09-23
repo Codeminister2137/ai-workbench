@@ -12,6 +12,8 @@ Current scope:
 - execution planning to neutral `ExecutionTarget` values without calling providers;
 - reusable execution preparation that combines prompt judging, model recommendation,
   and execution planning without calling providers;
+- neutral deterministic prompt refinement with optional prior-response and critique
+  provenance;
 - subtask profile derivation and local delegation planning.
 
 Current non-goals:
@@ -68,6 +70,33 @@ latency should be treated as unknown unless it comes from measured local or
 provider-specific benchmark data. Do not add generic latency numbers merely
 because one model is described as faster than another.
 
+Entries may also declare optional context metadata:
+
+```toml
+[models.context_limits]
+context_window_tokens = 32768
+runtime_context_tokens = 4096
+```
+
+`context_window_tokens` is the model's advertised maximum. `runtime_context_tokens`
+is the effective deployment default when a local runtime allocates less than the
+model maximum because of available memory or other runtime settings. These are
+metadata signals for routing and prompt budgeting, not a guarantee that every
+provider route accepts the same value.
+
+Use `[models.metadata]` for additional scalar model facts that should be
+displayed or preserved but do not yet affect orchestration:
+
+```toml
+[models.metadata]
+family = "qwen2"
+parameter_size = "14.8B"
+quantization_level = "Q4_K_M"
+```
+
+This keeps the TOML catalog easy to extend today while leaving room to migrate
+the same structured records into a database later.
+
 ```python
 from pathlib import Path
 
@@ -84,7 +113,8 @@ plan = plan_execution(profile, recommendation)
 Use `prepare_execution` when a caller wants the first orchestration pass in one
 step. It preserves the original prompt, optionally runs prompt review, recommends
 a model/backend, and returns an execution plan. It does not execute the provider
-request.
+request. Prompt-review warnings and refinement suggestions are advisory; only
+issues marked `blocking` stop execution.
 
 ```python
 from pathlib import Path
@@ -124,8 +154,35 @@ refinement) to local or low-cost compute:
 - Parent model/backend overrides do not constrain child subtasks unless
   explicitly passed.
 
+For coding tasks, local delegation is intended for bounded, source-verifiable
+work such as context extraction, file summarization, symbol extraction, and
+test-case generation. Architectural recommendations and implementation
+decisions stay with the primary model. Use `assess_delegation` with a
+`DelegationKind` before executing a delegated coding subtask.
+
 See `packages/ai_orchestrator/examples/ollama_delegation.py` for a working
 multi-phase workflow planning example.
+
+## Prompt Refinement
+
+Use `PromptRefinementRequest` and `refine_prompt` for a provider-independent
+pre-execution refinement pass. The orchestrator can also carry an optional prior
+response and critique as provenance, but it does not execute models or depend on
+the AI Council. Applications may inject their own executor for model-assisted
+variants or post-response critique.
+
+```python
+from ai_orchestrator import PromptRefinementRequest, refine_prompt
+
+refinement = refine_prompt(
+    PromptRefinementRequest(
+        prompt="Analyze this project and suggest next steps.",
+        prior_response=None,
+    )
+)
+if refinement.requires_user_approval:
+    prompt = refinement.refined_prompt
+```
 
 ```python
 from ai_orchestrator import TaskProfile, TaskType, load_model_catalog, plan_delegated_subtask

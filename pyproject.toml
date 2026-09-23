@@ -6,6 +6,7 @@ requires-python = ">=3.13,<3.15"
 dependencies = [
     "ai-provider",
     "ai-orchestrator",
+    "ai-agent",
 ]
 
 [dependency-groups]
@@ -21,6 +22,7 @@ dev = [
 members = [
     "packages/ai_provider",
     "packages/ai_orchestrator",
+    "packages/ai_agent",
     "apps/ai_council",
     "apps/job_search/job-email",
 ]
@@ -28,10 +30,15 @@ members = [
 [tool.uv.sources]
 ai-provider = { workspace = true }
 ai-orchestrator = { workspace = true }
+ai-agent = { workspace = true }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["packages/ai_provider/src", "packages/ai_orchestrator/src"]
+pythonpath = [
+    "packages/ai_provider/src",
+    "packages/ai_orchestrator/src",
+    "packages/ai_agent/src",
+]
 
 [tool.ruff]
 line-length = 100
@@ -51,6 +58,7 @@ typeCheckingMode = "standard"
 extraPaths = [
     "packages/ai_provider/src",
     "packages/ai_orchestrator/src",
+    "packages/ai_agent/src",
     "apps/ai_council",
     "apps/job_search/job-email",
 ]

@@ -22,7 +22,7 @@ from ai_orchestrator import (
     plan_execution,
     recommend_model,
 )
-from ai_orchestrator.models import LatencyTarget, ModelCatalogEntry
+from ai_orchestrator.models import LatencyTarget, ModelCatalogEntry, ModelContextLimits
 
 
 def test_load_model_catalog_reads_toml_entries(tmp_path: Path) -> None:
@@ -66,6 +66,37 @@ source = "local benchmark"
     assert catalog[0].backend.base_url == "http://localhost:11434"
     assert catalog[0].backend.estimate.typical_latency_seconds == 8
     assert catalog[0].backend.estimate.source == "local benchmark"
+
+
+def test_load_model_catalog_reads_context_limits(tmp_path: Path) -> None:
+    catalog_path = tmp_path / "models.toml"
+    catalog_path.write_text(
+        """
+[[models]]
+provider = "ollama"
+model = "qwen2.5-coder:14b"
+location = "local"
+
+[models.context_limits]
+context_window_tokens = 32768
+runtime_context_tokens = 4096
+
+[models.metadata]
+family = "qwen2"
+parameter_size = "14.8B"
+quantization_level = "Q4_K_M"
+""",
+        encoding="utf-8",
+    )
+
+    catalog = load_model_catalog(catalog_path)
+
+    assert catalog[0].backend.context_limits == ModelContextLimits(
+        context_window_tokens=32768,
+        runtime_context_tokens=4096,
+    )
+    assert catalog[0].metadata["family"] == "qwen2"
+    assert catalog[0].metadata["parameter_size"] == "14.8B"
 
 
 def test_load_model_catalog_defaults_codex_cli_access_metadata(tmp_path: Path) -> None:

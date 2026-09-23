@@ -1,11 +1,33 @@
 from __future__ import annotations
 
+import subprocess
 from typing import Any
 from urllib.error import URLError
 
 import pytest
 from ai_provider import ProviderError, ProviderErrorCategory
-from ai_provider.ollama_runtime import ensure_ollama_server, is_ollama_server_available
+from ai_provider.ollama_runtime import (
+    ensure_ollama_server,
+    get_ollama_resource_profile,
+    get_ollama_version,
+    is_ollama_server_available,
+)
+
+
+def test_get_ollama_version_reads_api_response(monkeypatch: pytest.MonkeyPatch) -> None:
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def read(self) -> bytes:
+            return b'{"version":"0.12.3"}'
+
+    monkeypatch.setattr("ai_provider.ollama_runtime.urlopen", lambda request, timeout: Response())
+
+    assert get_ollama_version("http://ollama.test") == "0.12.3"
 
 
 class FakeHttpResponse:
@@ -63,6 +85,70 @@ def test_ensure_ollama_server_starts_process_when_unreachable(
 
     assert ensure_ollama_server("http://ollama.test", command="ollama-test") is True
     assert popen_calls == [["ollama-test", "serve"]]
+
+
+def test_ensure_ollama_server_can_write_process_output_to_a_log(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    attempts = iter((False, True))
+    popen_kwargs: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        "ai_provider.ollama_runtime.is_ollama_server_available",
+        lambda base_url, *, timeout_seconds: next(attempts),
+    )
+
+    def fake_popen(command: list[str], **kwargs: object) -> object:
+        popen_kwargs.update(kwargs)
+        return object()
+
+    monkeypatch.setattr("ai_provider.ollama_runtime.subprocess.Popen", fake_popen)
+    monkeypatch.setattr("ai_provider.ollama_runtime.time.sleep", lambda seconds: None)
+
+    log_path = tmp_path / "logs" / "ollama.log"
+    assert ensure_ollama_server("http://ollama.test", log_path=log_path) is True
+    assert log_path.exists()
+    assert popen_kwargs["stdout"] is not subprocess.DEVNULL
+    assert popen_kwargs["stderr"] == subprocess.STDOUT
+
+
+def test_ollama_resource_profile_sets_server_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "ai_provider.ollama_runtime.is_ollama_server_available",
+        lambda base_url, *, timeout_seconds: False,
+    )
+    captured: dict[str, object] = {}
+
+    def fake_popen(command: list[str], **kwargs: object) -> object:
+        captured.update(kwargs)
+        return object()
+
+    monkeypatch.setattr("ai_provider.ollama_runtime.subprocess.Popen", fake_popen)
+    monkeypatch.setattr(
+        "ai_provider.ollama_runtime.time.monotonic",
+        lambda: 0.0,
+    )
+    monkeypatch.setattr(
+        "ai_provider.ollama_runtime.time.sleep",
+        lambda seconds: None,
+    )
+
+    profile = get_ollama_resource_profile("gaming")
+    attempts = iter((False, True))
+    monkeypatch.setattr(
+        "ai_provider.ollama_runtime.is_ollama_server_available",
+        lambda base_url, *, timeout_seconds: next(attempts),
+    )
+    ensure_ollama_server("http://ollama.test", resource_profile=profile)
+
+    environment = captured["env"]
+    assert isinstance(environment, dict)
+    assert environment["OLLAMA_CONTEXT_LENGTH"] == "4096"
+    assert environment["OLLAMA_NUM_PARALLEL"] == "1"
+    assert environment["OLLAMA_MAX_LOADED_MODELS"] == "1"
 
 
 def test_ensure_ollama_server_does_not_start_when_already_available(

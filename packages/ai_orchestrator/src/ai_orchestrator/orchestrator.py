@@ -50,11 +50,21 @@ def prepare_execution(
     catalog: tuple[ModelCatalogEntry, ...],
     *,
     review_prompt: bool = True,
+    prompt_for_review: str | None = None,
     timeout_seconds: float = 60.0,
 ) -> OrchestrationResult:
-    """Review a prompt, recommend a model, and prepare a neutral execution plan."""
+    """Review a prompt, recommend a model, and prepare a neutral execution plan.
 
-    prompt_judge = judge_prompt(prompt, profile) if review_prompt else None
+    ``prompt_for_review`` can contain only the user-authored portion when
+    ``prompt`` also includes repository context. The full ``prompt`` remains
+    the execution payload.
+    """
+
+    prompt_judge = (
+        judge_prompt(prompt_for_review if prompt_for_review is not None else prompt, profile)
+        if review_prompt
+        else None
+    )
     if prompt_judge is not None and _needs_prompt_review(prompt_judge):
         return OrchestrationResult(
             original_prompt=prompt,
@@ -95,6 +105,10 @@ def prepare_execution(
 
 
 def _needs_prompt_review(prompt_judge: PromptJudgeResult) -> bool:
-    return prompt_judge.should_refine or any(
-        issue.severity is PromptIssueSeverity.BLOCKING for issue in prompt_judge.issues
-    )
+    """Return whether prompt review must stop execution.
+
+    Refinement suggestions and warnings are advisory. Only an explicitly
+    blocking issue, such as an empty prompt, prevents model selection.
+    """
+
+    return any(issue.severity is PromptIssueSeverity.BLOCKING for issue in prompt_judge.issues)

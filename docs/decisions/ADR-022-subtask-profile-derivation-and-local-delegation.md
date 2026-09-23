@@ -74,3 +74,16 @@ Key rules:
 This gives applications and execution runners a clean, transparent way to
 compose multi-stage tasks across local Ollama and hosted models while strictly
 respecting privacy and cost policies.
+
+## Coding Delegation Policy
+
+Local delegation for coding is limited to bounded support work that can be
+checked against supplied sources: context extraction, file summarization,
+symbol extraction, and test-case generation. Architectural recommendations and
+implementation decisions remain with the primary model because lower-capability
+local models are not a reliable authority for those decisions.
+
+The shared `assess_delegation` policy exposes this distinction through
+`DelegationKind`. Execution runners should reject unsuitable coding subtasks
+before sending them to a local model and should require source citations before
+injecting delegated summaries into a primary prompt.

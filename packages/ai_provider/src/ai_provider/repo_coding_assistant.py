@@ -13,9 +13,9 @@ from io import TextIOBase
 from pathlib import Path
 from typing import Any
 
-# Imports below use the repository's source layout when this example is run directly.
-# ruff: noqa: E402
-_REPO_ROOT = Path(__file__).resolve().parents[3]
+# Imports below use the repository's source layout when this module is run directly.
+# ruff: noqa: E402, I001
+_REPO_ROOT = Path(__file__).resolve().parents[4]
 for _package_dir in (
     _REPO_ROOT / "packages" / "ai_provider" / "src",
     _REPO_ROOT / "packages" / "ai_orchestrator" / "src",
@@ -58,7 +58,12 @@ from ai_provider import (
     is_ollama_server_available,
 )
 from ai_provider import PrivacyClass as ProviderPrivacyClass
-from coding_assist import coding_task_profile, run_coding_prompt
+
+_EXAMPLES_DIRECTORY = _REPO_ROOT / "packages" / "ai_provider" / "examples"
+if str(_EXAMPLES_DIRECTORY) not in sys.path:
+    sys.path.insert(0, str(_EXAMPLES_DIRECTORY))
+
+from coding_assist import coding_task_profile, run_coding_prompt  # type: ignore[reportMissingImports]
 
 
 @dataclass(frozen=True, slots=True)

@@ -14,6 +14,7 @@ class MessageRole(StrEnum):
     SYSTEM = "system"
     USER = "user"
     ASSISTANT = "assistant"
+    TOOL = "tool"
 
 
 class PrivacyClass(StrEnum):
@@ -54,12 +55,66 @@ class FinishReason(StrEnum):
 
 
 @dataclass(frozen=True, slots=True)
+class AIToolParameter:
+    """JSON-schema parameter exposed to a model as part of a tool definition."""
+
+    name: str
+    type_name: str
+    description: str
+    required: bool = True
+    default: Any = None
+    enum_values: tuple[str, ...] | None = None
+
+    def to_json_schema(self) -> dict[str, Any]:
+        """Convert the parameter to a JSON-schema property."""
+        schema: dict[str, Any] = {"type": self.type_name, "description": self.description}
+        if self.enum_values:
+            schema["enum"] = list(self.enum_values)
+        if self.default is not None:
+            schema["default"] = self.default
+        return schema
+
+
+@dataclass(frozen=True, slots=True)
+class AIToolDefinition:
+    """Provider-neutral function tool definition."""
+
+    name: str
+    description: str
+    parameters: tuple[AIToolParameter, ...] = ()
+
+    def to_json_schema(self) -> dict[str, Any]:
+        """Convert the definition to an OpenAI-compatible tool schema."""
+        properties = {parameter.name: parameter.to_json_schema() for parameter in self.parameters}
+        required = [parameter.name for parameter in self.parameters if parameter.required]
+        return {
+            "type": "function",
+            "function": {
+                "name": self.name,
+                "description": self.description,
+                "parameters": {"type": "object", "properties": properties, "required": required},
+            },
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class AIToolCall:
+    """A function call requested by an assistant message."""
+
+    id: str
+    name: str
+    arguments: dict[str, Any]
+
+
+@dataclass(frozen=True, slots=True)
 class AIMessage:
     """Single chat message in the neutral provider contract."""
 
     role: MessageRole
     content: str
     name: str | None = None
+    tool_call_id: str | None = None
+    tool_calls: tuple[AIToolCall, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -104,6 +159,7 @@ class AIRequest:
     temperature: float | None = None
     max_output_tokens: int | None = None
     privacy_class: PrivacyClass = PrivacyClass.LOCAL_ONLY
+    tools: tuple[AIToolDefinition, ...] = ()
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
@@ -116,6 +172,7 @@ class AIResponse:
     usage: UsageMetadata = field(default_factory=UsageMetadata)
     finish_reason: FinishReason = FinishReason.UNKNOWN
     latency_ms: float | None = None
+    tool_calls: tuple[AIToolCall, ...] = ()
     raw_metadata: dict[str, Any] = field(default_factory=dict)
 
 

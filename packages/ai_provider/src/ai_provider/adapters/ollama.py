@@ -19,6 +19,7 @@ from ai_provider.contracts import (
     AIStreamDelta,
     AIStreamEvent,
     AIStreamFinal,
+    AIToolCall,
     BackendInfo,
     BackendLocation,
     FinishReason,
@@ -29,6 +30,34 @@ from ai_provider.contracts import (
 )
 from ai_provider.errors import ProviderError, ProviderErrorCategory
 from ai_provider.privacy import enforce_privacy_policy
+
+
+def _tool_calls_from_raw(raw_calls: object) -> tuple[AIToolCall, ...]:
+    if not isinstance(raw_calls, list):
+        return ()
+    calls: list[AIToolCall] = []
+    for index, raw_call in enumerate(raw_calls):
+        if not isinstance(raw_call, dict):
+            continue
+        function = raw_call.get("function", raw_call)
+        if not isinstance(function, dict):
+            continue
+        arguments = function.get("arguments", {})
+        if isinstance(arguments, str):
+            try:
+                arguments = json.loads(arguments)
+            except json.JSONDecodeError:
+                arguments = {}
+        if not isinstance(arguments, dict):
+            arguments = {}
+        calls.append(
+            AIToolCall(
+                id=str(raw_call.get("id") or f"tool-call-{index}"),
+                name=str(function.get("name", "")),
+                arguments=arguments,
+            )
+        )
+    return tuple(calls)
 
 
 @dataclass(slots=True)
@@ -46,7 +75,7 @@ class OllamaChatClient:
             model=self.config.model,
             location=BackendLocation.LOCAL,
             base_url=self.base_url,
-            capabilities=ModelCapabilities(chat=True, streaming=True),
+            capabilities=ModelCapabilities(chat=True, streaming=True, tools=True),
         )
 
     @property
@@ -124,7 +153,15 @@ class OllamaChatClient:
         payload: dict[str, Any] = {
             "model": request.model or self.config.model,
             "messages": [
-                {"role": message.role.value, "content": message.content}
+                {
+                    "role": message.role.value,
+                    "content": message.content,
+                    **(
+                        {"tool_name": message.name}
+                        if message.role.value == "tool" and message.name
+                        else {}
+                    ),
+                }
                 for message in request.messages
             ],
             "stream": stream,
@@ -136,6 +173,8 @@ class OllamaChatClient:
             options["num_predict"] = request.max_output_tokens
         if options:
             payload["options"] = options
+        if request.tools:
+            payload["tools"] = [tool.to_json_schema() for tool in request.tools]
         return payload
 
     def _response_from_raw(
@@ -155,19 +194,23 @@ class OllamaChatClient:
             )
 
         content = raw_message.get("content", "")
+        tool_calls = _tool_calls_from_raw(raw_message.get("tool_calls"))
         done_reason = raw_response.get("done_reason")
         return AIResponse(
-            message=AIMessage(role=MessageRole.ASSISTANT, content=str(content)),
+            message=AIMessage(
+                role=MessageRole.ASSISTANT, content=str(content), tool_calls=tool_calls
+            ),
             backend=BackendInfo(
                 provider="ollama",
                 model=model,
                 location=BackendLocation.LOCAL,
                 base_url=self.base_url,
-                capabilities=ModelCapabilities(chat=True, streaming=True),
+                capabilities=ModelCapabilities(chat=True, streaming=True, tools=True),
             ),
             usage=self._usage_from_response(raw_response),
             finish_reason=self._finish_reason(done_reason),
             latency_ms=latency_ms,
+            tool_calls=tool_calls,
             raw_metadata=raw_response,
         )
 

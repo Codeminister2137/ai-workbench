@@ -1,6 +1,7 @@
 """AI orchestration primitives."""
 
 from ai_orchestrator.catalog import load_model_catalog
+from ai_orchestrator.delegation import DelegationDecision, assess_delegation
 from ai_orchestrator.models import (
     AccessMethod,
     AccessRoute,
@@ -9,16 +10,20 @@ from ai_orchestrator.models import (
     BillingSource,
     CandidateRejection,
     CostPolicyTier,
+    DelegationKind,
     LatencyTarget,
     ModelBackend,
     ModelCapabilities,
     ModelCatalogEntry,
+    ModelContextLimits,
     ModelPerformanceEstimate,
     ModelRecommendation,
     PrivacyClass,
     PromptIssue,
     PromptIssueSeverity,
     PromptJudgeResult,
+    PromptRefinementRequest,
+    PromptRefinementResult,
     QualityThreshold,
     TaskCapability,
     TaskProfile,
@@ -39,6 +44,7 @@ from ai_orchestrator.planner import (
     plan_execution,
 )
 from ai_orchestrator.prompt_judge import judge_prompt
+from ai_orchestrator.prompt_refinement import refine_prompt
 from ai_orchestrator.recommender import recommend_model
 
 __all__ = [
@@ -48,6 +54,8 @@ __all__ = [
     "BillingSource",
     "CandidateRejection",
     "CostPolicyTier",
+    "DelegationDecision",
+    "DelegationKind",
     "DelegatedSubtaskPlan",
     "ExecutionPlan",
     "ExecutionTarget",
@@ -57,12 +65,15 @@ __all__ = [
     "ModelCatalogEntry",
     "ModelCapabilities",
     "ModelRecommendation",
+    "ModelContextLimits",
     "ModelPerformanceEstimate",
     "OrchestrationResult",
     "OrchestrationStatus",
     "PromptIssue",
     "PromptIssueSeverity",
     "PromptJudgeResult",
+    "PromptRefinementRequest",
+    "PromptRefinementResult",
     "PrivacyClass",
     "QualityThreshold",
     "TaskCapability",
@@ -70,7 +81,9 @@ __all__ = [
     "TaskType",
     "cost_policy_allows",
     "derive_subtask_profile",
+    "assess_delegation",
     "judge_prompt",
+    "refine_prompt",
     "load_model_catalog",
     "plan_delegated_subtask",
     "plan_execution",

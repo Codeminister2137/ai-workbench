@@ -34,6 +34,10 @@ def test_local_capability_snapshot_composes_ollama_state(
         lambda: True,
     )
     monkeypatch.setattr(
+        "ai_provider.local_capabilities.get_ollama_version",
+        lambda: None,
+    )
+    monkeypatch.setattr(
         "ai_provider.local_capabilities.list_local_ollama_models",
         lambda: (installed_model,),
     )
@@ -53,6 +57,7 @@ def test_local_capability_snapshot_composes_ollama_state(
     assert snapshot.models_path == model_path
     assert snapshot.models_disk is not None
     assert snapshot.ollama_available is True
+    assert snapshot.ollama_version is None
     assert snapshot.installed_ollama_models == (installed_model,)
     assert snapshot.running_ollama_models == (running_model,)
 

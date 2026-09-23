@@ -108,6 +108,19 @@ Local Ollama model location:
 OLLAMA_MODELS=D:\AI\Ollama\models
 ```
 
+The repo assistant also supports explicit local resource profiles:
+
+```text
+gaming  -> OLLAMA_CONTEXT_LENGTH=4096
+balanced -> OLLAMA_CONTEXT_LENGTH=8192
+full    -> OLLAMA_CONTEXT_LENGTH=32768
+```
+
+These profiles are applied to an Ollama server started by the assistant and
+also set `OLLAMA_NUM_PARALLEL=1` and `OLLAMA_MAX_LOADED_MODELS=1`. They are
+memory/concurrency profiles, not exact GPU-percentage limits. A running Ollama
+server must be restarted for a changed profile to take effect.
+
 `BackendConfig.from_env()` uses `AI_PROVIDER_API_KEY` first. If it is unset, it
 falls back to `OPENAI_API_KEY` for OpenAI and `REQUESTY_API_KEY` for Requesty.
 

@@ -5,6 +5,9 @@ description = "Provider-agnostic AI request contracts and adapters."
 requires-python = ">=3.13,<3.15"
 dependencies = []
 
+[project.scripts]
+ai-assistant = "ai_provider.cli:main"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

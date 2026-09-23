@@ -28,6 +28,7 @@ from ai_provider import (
     BackendConfig,
     ChatClient,
     MessageRole,
+    OllamaResourceProfile,
     PrivacyClass,
     ProviderKind,
     create_chat_client,
@@ -108,12 +109,15 @@ def run_coding_prompt(
     catalog: tuple[ModelCatalogEntry, ...],
     *,
     review_prompt: bool = True,
+    prompt_for_review: str | None = None,
     timeout_seconds: float = 60.0,
     execute: bool = False,
     system_prompt: str | None = None,
     start_ollama: bool = False,
     ollama_command: str = "ollama",
     ollama_startup_timeout_seconds: float = 10.0,
+    ollama_log_path: Path | None = None,
+    ollama_resource_profile: OllamaResourceProfile | None = None,
     client_factory: Callable[[BackendConfig], ChatClient] = create_chat_client,
 ) -> CodingAssistResult:
     """Prepare and optionally execute one coding-oriented AI request."""
@@ -123,6 +127,7 @@ def run_coding_prompt(
         profile,
         catalog,
         review_prompt=review_prompt,
+        prompt_for_review=prompt_for_review,
         timeout_seconds=timeout_seconds,
     )
     if not orchestration.is_ready or orchestration.execution_plan is None:
@@ -143,11 +148,34 @@ def run_coding_prompt(
         )
 
     if start_ollama and config.provider is ProviderKind.OLLAMA:
-        ensure_ollama_server(
-            config.base_url,
-            command=ollama_command,
-            startup_timeout_seconds=ollama_startup_timeout_seconds,
-        )
+        if ollama_log_path is None and ollama_resource_profile is None:
+            ensure_ollama_server(
+                config.base_url,
+                command=ollama_command,
+                startup_timeout_seconds=ollama_startup_timeout_seconds,
+            )
+        elif ollama_resource_profile is None:
+            ensure_ollama_server(
+                config.base_url,
+                command=ollama_command,
+                startup_timeout_seconds=ollama_startup_timeout_seconds,
+                log_path=ollama_log_path,
+            )
+        elif ollama_log_path is None:
+            ensure_ollama_server(
+                config.base_url,
+                command=ollama_command,
+                startup_timeout_seconds=ollama_startup_timeout_seconds,
+                resource_profile=ollama_resource_profile,
+            )
+        else:
+            ensure_ollama_server(
+                config.base_url,
+                command=ollama_command,
+                startup_timeout_seconds=ollama_startup_timeout_seconds,
+                log_path=ollama_log_path,
+                resource_profile=ollama_resource_profile,
+            )
 
     client = client_factory(config)
     response = client.complete(request)

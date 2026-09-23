@@ -4,11 +4,27 @@ requires-python = ">=3.13, <3.15"
 
 [manifest]
 members = [
+    "ai-agent",
     "ai-council",
     "ai-orchestrator",
     "ai-projects-workspace",
     "ai-provider",
     "job-email",
+]
+
+[[package]]
+name = "ai-agent"
+version = "0.1.0"
+source = { editable = "packages/ai_agent" }
+dependencies = [
+    { name = "ai-orchestrator" },
+    { name = "ai-provider" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "ai-orchestrator", editable = "packages/ai_orchestrator" },
+    { name = "ai-provider", editable = "packages/ai_provider" },
 ]
 
 [[package]]
@@ -40,6 +56,7 @@ name = "ai-projects-workspace"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "ai-agent" },
     { name = "ai-orchestrator" },
     { name = "ai-provider" },
 ]
@@ -55,6 +72,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "ai-agent", editable = "packages/ai_agent" },
     { name = "ai-orchestrator", editable = "packages/ai_orchestrator" },
     { name = "ai-provider", editable = "packages/ai_provider" },
 ]

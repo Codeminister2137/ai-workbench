@@ -8,11 +8,13 @@ from pathlib import Path
 from ai_orchestrator import (
     CostPolicyTier,
     DelegatedSubtaskPlan,
+    DelegationKind,
     ExecutionPlan,
     ModelCatalogEntry,
     PrivacyClass,
     TaskProfile,
     TaskType,
+    assess_delegation,
     load_model_catalog,
     plan_delegated_subtask,
     prepare_execution,
@@ -54,6 +56,13 @@ def plan_delegated_workflow(
 
     planned_subtasks: list[DelegatedSubtaskPlan] = []
     for subtask_id, description, task_type in subtasks:
+        delegation_kind = _delegation_kind_for_task_type(task_type)
+        decision = assess_delegation(
+            task_type=primary_profile.task_type,
+            delegation_kind=delegation_kind,
+        )
+        if not decision.allowed:
+            raise ValueError(f"Delegation rejected for {subtask_id!r}: {decision.reason}")
         delegated = plan_delegated_subtask(
             parent_profile=primary_profile,
             catalog=catalog,
@@ -69,6 +78,18 @@ def plan_delegated_workflow(
         primary_plan=primary_result.execution_plan,
         delegated_subtasks=tuple(planned_subtasks),
     )
+
+
+def _delegation_kind_for_task_type(task_type: TaskType) -> DelegationKind:
+    """Map a bounded planning task to the shared delegation policy."""
+
+    return {
+        TaskType.SUMMARIZATION: DelegationKind.FILE_SUMMARIZATION,
+        TaskType.EXTRACTION: DelegationKind.SYMBOL_EXTRACTION,
+        TaskType.CLASSIFICATION: DelegationKind.CONTEXT_EXTRACTION,
+        TaskType.GENERAL: DelegationKind.PROMPT_REFINEMENT,
+        TaskType.CODING: DelegationKind.TEST_CASE_GENERATION,
+    }.get(task_type, DelegationKind.CONTEXT_EXTRACTION)
 
 
 def default_catalog_path() -> Path:

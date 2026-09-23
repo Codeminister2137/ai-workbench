@@ -18,6 +18,7 @@ from ai_orchestrator.models import (
     ModelBackend,
     ModelCapabilities,
     ModelCatalogEntry,
+    ModelContextLimits,
     ModelPerformanceEstimate,
     QualityThreshold,
 )
@@ -84,7 +85,9 @@ def _parse_entry(item: object) -> ModelCatalogEntry:
     base_url = item.get("base_url")
     notes = item.get("notes")
     capabilities = _capabilities(item.get("capabilities", {}))
+    context_limits = _context_limits(item.get("context_limits", {}))
     estimate = _estimate(item.get("estimate", {}))
+    metadata = _metadata(item.get("metadata", {}))
 
     return ModelCatalogEntry(
         backend=ModelBackend(
@@ -101,11 +104,13 @@ def _parse_entry(item: object) -> ModelCatalogEntry:
                 base_url=base_url if isinstance(base_url, str) else None,
             ),
             capabilities=capabilities,
+            context_limits=context_limits,
             estimate=estimate,
         ),
         quality=quality,
         latency=latency,
         notes=notes if isinstance(notes, str) else None,
+        metadata=metadata,
     )
 
 
@@ -227,6 +232,27 @@ def _estimate(raw: object) -> ModelPerformanceEstimate:
     )
 
 
+def _context_limits(raw: object) -> ModelContextLimits:
+    if not isinstance(raw, dict):
+        raise ValueError("Model context_limits must be a table.")
+
+    return ModelContextLimits(
+        context_window_tokens=_optional_positive_int(raw, "context_window_tokens"),
+        runtime_context_tokens=_optional_positive_int(raw, "runtime_context_tokens"),
+    )
+
+
+def _metadata(raw: object) -> dict[str, str | int | float | bool]:
+    if not isinstance(raw, dict):
+        raise ValueError("Model metadata must be a table.")
+    metadata: dict[str, str | int | float | bool] = {}
+    for key, value in raw.items():
+        if not isinstance(key, str) or not isinstance(value, (str, int, float, bool)):
+            raise ValueError("Model metadata values must be scalar TOML values.")
+        metadata[key] = value
+    return metadata
+
+
 def _optional_float(raw: dict[str, Any], key: str) -> float | None:
     value = raw.get(key)
     if value is None:
@@ -234,6 +260,15 @@ def _optional_float(raw: dict[str, Any], key: str) -> float | None:
     if not isinstance(value, (int, float)):
         raise ValueError(f"Estimate {key!r} must be a number.")
     return float(value)
+
+
+def _optional_positive_int(raw: dict[str, Any], key: str) -> int | None:
+    value = raw.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+        raise ValueError(f"Context limit {key!r} must be a positive integer.")
+    return value
 
 
 def _optional_nullable_string(raw: dict[str, Any], key: str) -> str | None:

@@ -82,17 +82,37 @@ def test_prepare_execution_returns_plan_for_specific_prompt() -> None:
     assert result.execution_plan.target.timeout_seconds == 15
 
 
-def test_prepare_execution_stops_for_prompt_review_when_context_is_missing() -> None:
+def test_prepare_execution_keeps_advisory_prompt_review_findings() -> None:
     catalog = (_candidate(),)
 
     result = prepare_execution("Fix this", TaskProfile(), catalog)
 
-    assert result.status is OrchestrationStatus.NEEDS_PROMPT_REVIEW
-    assert result.is_ready is False
+    assert result.status is OrchestrationStatus.READY
+    assert result.is_ready is True
     assert result.prompt_judge is not None
     assert result.prompt_judge.should_refine is True
-    assert result.recommendation is None
-    assert result.execution_plan is None
+    assert result.recommendation is not None
+    assert result.execution_plan is not None
+
+
+def test_prepare_execution_reviews_user_prompt_separately_from_execution_context() -> None:
+    catalog = (_candidate(),)
+    full_prompt = (
+        "# User request\nExamine this repo and suggest next steps.\n\n"
+        "# Repository context\nPrefer short answers when practical; preserve long-term clarity."
+    )
+
+    result = prepare_execution(
+        full_prompt,
+        TaskProfile(),
+        catalog,
+        prompt_for_review="Examine this repo and suggest next steps.",
+    )
+
+    assert result.status is OrchestrationStatus.READY
+    assert result.prompt_judge is not None
+    assert result.prompt_judge.original_prompt == "Examine this repo and suggest next steps."
+    assert result.execution_plan is not None
 
 
 def test_prepare_execution_stops_for_prompt_review_when_prompt_is_blocking() -> None:

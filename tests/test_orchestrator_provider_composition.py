@@ -151,11 +151,11 @@ def test_prepare_backend_config_adapts_ready_orchestration_result() -> None:
     assert config.timeout_seconds == 15
 
 
-def test_prepare_backend_config_returns_no_config_when_prompt_needs_review() -> None:
+def test_prepare_backend_config_keeps_advisory_prompt_review_findings() -> None:
     result, config = prepare_backend_config("Fix this", TaskProfile(), (_candidate(),))
 
-    assert result.status is OrchestrationStatus.NEEDS_PROMPT_REVIEW
-    assert config is None
+    assert result.status is OrchestrationStatus.READY
+    assert config is not None
 
 
 def test_prepare_backend_config_returns_no_config_when_model_selection_fails() -> None:
@@ -211,9 +211,9 @@ def test_prepare_provider_request_builds_config_and_request_without_execution() 
     assert request.messages[0].content == result.original_prompt
 
 
-def test_prepare_provider_request_returns_no_request_when_not_ready() -> None:
+def test_prepare_provider_request_keeps_advisory_prompt_review_findings() -> None:
     result, config, request = prepare_provider_request("Fix this", TaskProfile(), (_candidate(),))
 
-    assert result.status is OrchestrationStatus.NEEDS_PROMPT_REVIEW
-    assert config is None
-    assert request is None
+    assert result.status is OrchestrationStatus.READY
+    assert config is not None
+    assert request is not None

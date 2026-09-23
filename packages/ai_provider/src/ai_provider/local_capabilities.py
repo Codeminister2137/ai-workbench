@@ -18,7 +18,11 @@ from ai_provider.ollama_models import (
     list_local_ollama_models,
     list_running_ollama_models,
 )
-from ai_provider.ollama_runtime import ensure_ollama_server, is_ollama_server_available
+from ai_provider.ollama_runtime import (
+    ensure_ollama_server,
+    get_ollama_version,
+    is_ollama_server_available,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -26,6 +30,7 @@ class LocalMemoryInfo:
     """Local system memory information."""
 
     total_bytes: int | None = None
+    available_bytes: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,6 +60,7 @@ class LocalSystemInfo:
     os_version: str
     machine: str
     processor: str
+    logical_cpu_count: int | None = None
     memory: LocalMemoryInfo = field(default_factory=LocalMemoryInfo)
     gpus: tuple[LocalGpuInfo, ...] = ()
 
@@ -67,6 +73,7 @@ class LocalProviderCapabilitySnapshot:
     models_path: Path
     models_disk: LocalDiskInfo | None
     ollama_available: bool
+    ollama_version: str | None
     installed_ollama_models: tuple[LocalOllamaModel, ...]
     running_ollama_models: tuple[RunningOllamaModel, ...]
 
@@ -96,6 +103,7 @@ def get_local_provider_capability_snapshot(
         models_path=effective_models_path,
         models_disk=_disk_info(effective_models_path),
         ollama_available=ollama_available,
+        ollama_version=get_ollama_version() if ollama_available else None,
         installed_ollama_models=installed_models,
         running_ollama_models=running_models,
     )
@@ -104,12 +112,17 @@ def get_local_provider_capability_snapshot(
 def local_system_info() -> LocalSystemInfo:
     """Return best-effort local OS, memory, and GPU information."""
 
+    total_memory, available_memory = _total_memory_bytes()
     return LocalSystemInfo(
         os_name=platform.system(),
         os_version=platform.version(),
         machine=platform.machine(),
         processor=platform.processor(),
-        memory=LocalMemoryInfo(total_bytes=_total_memory_bytes()),
+        logical_cpu_count=os.cpu_count(),
+        memory=LocalMemoryInfo(
+            total_bytes=total_memory,
+            available_bytes=available_memory,
+        ),
         gpus=_local_gpus(),
     )
 
@@ -134,17 +147,17 @@ def _disk_info(path: Path) -> LocalDiskInfo | None:
     )
 
 
-def _total_memory_bytes() -> int | None:
+def _total_memory_bytes() -> tuple[int | None, int | None]:
     if os.name == "nt":
         return _windows_total_memory_bytes()
     page_size = getattr(os, "sysconf", lambda name: None)("SC_PAGE_SIZE")
     page_count = getattr(os, "sysconf", lambda name: None)("SC_PHYS_PAGES")
     if isinstance(page_size, int) and isinstance(page_count, int):
-        return page_size * page_count
-    return None
+        return page_size * page_count, None
+    return None, None
 
 
-def _windows_total_memory_bytes() -> int | None:
+def _windows_total_memory_bytes() -> tuple[int | None, int | None]:
     class MemoryStatusEx(ctypes.Structure):
         _fields_ = [
             ("dwLength", ctypes.c_ulong),
@@ -161,8 +174,8 @@ def _windows_total_memory_bytes() -> int | None:
     status = MemoryStatusEx()
     status.dwLength = ctypes.sizeof(MemoryStatusEx)
     if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):  # type: ignore[attr-defined]
-        return int(status.ullTotalPhys)
-    return None
+        return int(status.ullTotalPhys), int(status.ullAvailPhys)
+    return None, None
 
 
 def _local_gpus() -> tuple[LocalGpuInfo, ...]:

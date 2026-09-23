@@ -12,6 +12,10 @@ from ai_orchestrator.models import (
 )
 
 _AMBIGUOUS_REFERENCES = re.compile(r"\b(this|that|it|thing|stuff|something)\b", re.IGNORECASE)
+_CLEAR_REPOSITORY_REFERENCES = re.compile(
+    r"\b(this|that)\s+(repo|repository|file|module|project|code|test|function|class|directory|document)\b",
+    re.IGNORECASE,
+)
 _OUTPUT_HINTS = re.compile(
     r"\b(list|table|json|bullet|bullets|explain|summary|steps|format|answer)\b",
     re.IGNORECASE,
@@ -56,7 +60,7 @@ def judge_prompt(prompt: str, profile: TaskProfile | None = None) -> PromptJudge
             )
         )
 
-    if _AMBIGUOUS_REFERENCES.search(normalized) and len(normalized) < 120:
+    if _has_ambiguous_reference(normalized) and len(normalized) < 120:
         issues.append(
             PromptIssue(
                 code="ambiguous_reference",
@@ -104,6 +108,22 @@ def judge_prompt(prompt: str, profile: TaskProfile | None = None) -> PromptJudge
         refined_prompt=refined_prompt,
         change_summary=change_summary,
     )
+
+
+def _has_ambiguous_reference(prompt: str) -> bool:
+    """Return whether the prompt contains an unqualified vague reference."""
+
+    matches = list(_AMBIGUOUS_REFERENCES.finditer(prompt))
+    if not matches:
+        return False
+
+    clear_spans = {match.span() for match in _CLEAR_REPOSITORY_REFERENCES.finditer(prompt)}
+    for match in matches:
+        if not any(
+            clear_start <= match.start() < clear_end for clear_start, clear_end in clear_spans
+        ):
+            return True
+    return False
 
 
 def _build_refined_prompt(prompt: str, issues: list[PromptIssue]) -> str:
