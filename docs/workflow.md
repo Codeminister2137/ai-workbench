@@ -126,6 +126,12 @@ required files to read, constraints, and the expected first verification step.
 If `CURRENT_CONTEXT.md` is used as the handoff, keep its bottom section
 up-to-date with the same prompt.
 
+Every handoff must also state prominently whether the current task or roadmap is
+`COMPLETE`, `INCOMPLETE`, or `BLOCKED`. For `INCOMPLETE`, it must include an
+imperative next action and completion condition. A new session must implement
+that next action rather than stopping after inspection or claiming that no
+implementation request was provided.
+
 In the Codex IDE chat, `/status` can show context usage and rate-limit state.
 Use it as an input when context pressure matters; do not invent a fixed
 cross-surface threshold.

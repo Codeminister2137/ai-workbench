@@ -271,6 +271,10 @@ Instructions:
   communication principles are standing repository guidance and should not be
   repeated in every prompt. Keep the same prompt at the bottom of
   `CURRENT_CONTEXT.md` when that handoff is used.
+- The handoff must prominently classify the task or roadmap as `COMPLETE`,
+  `INCOMPLETE`, or `BLOCKED`. For `INCOMPLETE`, include an imperative next
+  action and a concrete completion condition. Do not treat a descriptive
+  roadmap summary as permission to stop without implementing the next action.
 
 Output:
 Say either `continue current chat`, `update handoff then start new chat`, or
