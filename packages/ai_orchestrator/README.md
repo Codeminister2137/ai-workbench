@@ -11,7 +11,8 @@ Current scope:
 - TOML model-catalog loading;
 - execution planning to neutral `ExecutionTarget` values without calling providers;
 - reusable execution preparation that combines prompt judging, model recommendation,
-  and execution planning without calling providers.
+  and execution planning without calling providers;
+- subtask profile derivation and local delegation planning.
 
 Current non-goals:
 
@@ -110,6 +111,38 @@ that prompt-review overhead is unnecessary. Expected model-selection failures,
 such as an empty catalog or no candidate satisfying privacy/capability
 constraints, are returned as `MODEL_SELECTION_FAILED` results.
 
+## Subtask Profile Derivation And Delegation
+
+Use `derive_subtask_profile` and `plan_delegated_subtask` to delegate smaller,
+preparatory, or subsidiary steps (such as context summarization or prompt
+refinement) to local or low-cost compute:
+
+- Child profiles inherit their parent's `privacy_class` by default.
+- Child profiles default their `cost_policy_tier` to `LOCAL_ONLY` to route
+  smaller steps to free local models (e.g., Ollama), while accepting an
+  explicit tier if hosted subtask execution is desired.
+- Parent model/backend overrides do not constrain child subtasks unless
+  explicitly passed.
+
+See `packages/ai_orchestrator/examples/ollama_delegation.py` for a working
+multi-phase workflow planning example.
+
+```python
+from ai_orchestrator import TaskProfile, TaskType, load_model_catalog, plan_delegated_subtask
+
+catalog = load_model_catalog(Path("packages/ai_orchestrator/examples/model_catalog.toml"))
+parent_profile = TaskProfile(privacy_class=PrivacyClass.EXTERNAL_ALLOWED)
+
+subtask_plan = plan_delegated_subtask(
+    parent_profile=parent_profile,
+    catalog=catalog,
+    task_type=TaskType.SUMMARIZATION,
+    subtask_id="context_summary",
+    description="Summarize large repo context locally",
+)
+# subtask_plan.execution_plan.target will route to a local Ollama model
+```
+
 ## Codex CLI Execution Example
 
 `packages/ai_orchestrator/examples/codex_cli_executor.py` is the minimal
@@ -147,6 +180,3 @@ python packages\ai_orchestrator\examples\codex_cli_executor.py `
   --model gpt-5.1 `
   --skip-prompt-review
 ```
-
-Add `--execute` only when the prompt is ready to send to Codex CLI. If `codex`
-is not on PATH, pass `--codex-command` with the executable path.

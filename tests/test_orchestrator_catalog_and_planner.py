@@ -11,12 +11,18 @@ from ai_orchestrator import (
     CostPolicyTier,
     ModelBackend,
     ModelCapabilities,
+    PrivacyClass,
+    QualityThreshold,
+    TaskCapability,
     TaskProfile,
+    TaskType,
+    derive_subtask_profile,
     load_model_catalog,
+    plan_delegated_subtask,
     plan_execution,
     recommend_model,
 )
-from ai_orchestrator.models import LatencyTarget, ModelCatalogEntry, QualityThreshold
+from ai_orchestrator.models import LatencyTarget, ModelCatalogEntry
 
 
 def test_load_model_catalog_reads_toml_entries(tmp_path: Path) -> None:
@@ -171,3 +177,86 @@ def test_plan_execution_allows_targets_outside_ai_provider() -> None:
 
     assert plan.target.provider == "custom"
     assert plan.target.model == "model"
+
+
+def test_derive_subtask_profile_inherits_parent_privacy_and_defaults_cost_to_local_only() -> None:
+    parent = TaskProfile(
+        task_type=TaskType.CODING,
+        privacy_class=PrivacyClass.EXTERNAL_ALLOWED,
+        cost_policy_tier=CostPolicyTier.BILLING_ALLOWED,
+        quality_threshold=QualityThreshold.HIGH,
+        user_model_override="gpt-5.1",
+        user_backend_override="openai",
+    )
+
+    subtask = derive_subtask_profile(
+        parent=parent,
+        task_type=TaskType.SUMMARIZATION,
+    )
+
+    assert subtask.task_type is TaskType.SUMMARIZATION
+    assert subtask.privacy_class is PrivacyClass.EXTERNAL_ALLOWED
+    assert subtask.cost_policy_tier is CostPolicyTier.LOCAL_ONLY
+    assert subtask.quality_threshold is QualityThreshold.STANDARD
+    assert subtask.user_model_override is None
+    assert subtask.user_backend_override is None
+
+
+def test_derive_subtask_profile_accepts_explicit_overrides() -> None:
+    parent = TaskProfile(
+        task_type=TaskType.CODING,
+        privacy_class=PrivacyClass.EXTERNAL_ALLOWED,
+        cost_policy_tier=CostPolicyTier.BILLING_ALLOWED,
+    )
+
+    subtask = derive_subtask_profile(
+        parent=parent,
+        task_type=TaskType.EXTRACTION,
+        privacy_class=PrivacyClass.LOCAL_ONLY,
+        cost_policy_tier=CostPolicyTier.ALLOWANCES_ALLOWED,
+        quality_threshold=QualityThreshold.LOW,
+        required_capabilities=frozenset({TaskCapability.CHAT, TaskCapability.STRUCTURED_OUTPUT}),
+        user_model_override="custom-model",
+    )
+
+    assert subtask.task_type is TaskType.EXTRACTION
+    assert subtask.privacy_class is PrivacyClass.LOCAL_ONLY
+    assert subtask.cost_policy_tier is CostPolicyTier.ALLOWANCES_ALLOWED
+    assert subtask.quality_threshold is QualityThreshold.LOW
+    assert subtask.required_capabilities == frozenset(
+        {TaskCapability.CHAT, TaskCapability.STRUCTURED_OUTPUT}
+    )
+    assert subtask.user_model_override == "custom-model"
+
+
+def test_plan_delegated_subtask_routes_to_local_candidate() -> None:
+    catalog_path = (
+        Path(__file__).resolve().parents[1]
+        / "packages"
+        / "ai_orchestrator"
+        / "examples"
+        / "model_catalog.toml"
+    )
+    catalog = load_model_catalog(catalog_path)
+
+    parent_profile = TaskProfile(
+        task_type=TaskType.CODING,
+        privacy_class=PrivacyClass.EXTERNAL_ALLOWED,
+        cost_policy_tier=CostPolicyTier.BILLING_ALLOWED,
+    )
+
+    delegated = plan_delegated_subtask(
+        parent_profile=parent_profile,
+        catalog=catalog,
+        task_type=TaskType.SUMMARIZATION,
+        subtask_id="context-summary",
+        description="Summarize large repo context before sending prompt",
+    )
+
+    assert delegated.subtask_id == "context-summary"
+    assert delegated.description == "Summarize large repo context before sending prompt"
+    assert delegated.profile.privacy_class is PrivacyClass.EXTERNAL_ALLOWED
+    assert delegated.profile.cost_policy_tier is CostPolicyTier.LOCAL_ONLY
+    assert delegated.execution_plan.target.access_method is AccessMethod.LOCAL_RUNTIME
+    assert delegated.execution_plan.target.provider == "ollama"
+    assert delegated.execution_plan.target.cost_policy_tier is CostPolicyTier.LOCAL_ONLY

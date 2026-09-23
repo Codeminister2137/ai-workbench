@@ -29,7 +29,14 @@ from ai_orchestrator.orchestrator import (
     OrchestrationStatus,
     prepare_execution,
 )
-from ai_orchestrator.planner import ExecutionPlan, ExecutionTarget, plan_execution
+from ai_orchestrator.planner import (
+    DelegatedSubtaskPlan,
+    ExecutionPlan,
+    ExecutionTarget,
+    derive_subtask_profile,
+    plan_delegated_subtask,
+    plan_execution,
+)
 from ai_orchestrator.prompt_judge import judge_prompt
 from ai_orchestrator.recommender import recommend_model
 
@@ -40,6 +47,7 @@ __all__ = [
     "BillingSource",
     "CandidateRejection",
     "CostPolicyTier",
+    "DelegatedSubtaskPlan",
     "ExecutionPlan",
     "ExecutionTarget",
     "LatencyTarget",
@@ -59,8 +67,10 @@ __all__ = [
     "TaskCapability",
     "TaskProfile",
     "TaskType",
+    "derive_subtask_profile",
     "judge_prompt",
     "load_model_catalog",
+    "plan_delegated_subtask",
     "plan_execution",
     "prepare_execution",
     "recommend_model",
