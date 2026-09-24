@@ -49,10 +49,9 @@ function Import-DotEnv {
 
 $repoRoot = Get-RepoRoot
 $envPath = Join-Path $repoRoot ".env"
-$cliPath = Join-Path $repoRoot "packages\ai_provider\examples\repo_coding_assistant.py"
 
 Import-DotEnv -Path $envPath
 Set-Location -LiteralPath $repoRoot
 
-& python -m uv run python $cliPath @CliArgs
+& python -m uv run ai-assistant @CliArgs
 exit $LASTEXITCODE

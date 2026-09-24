@@ -234,6 +234,28 @@ def test_cli_help_lists_google_provider() -> None:
     assert result.returncode == 0
     assert "--provider {ollama,openai,requesty,google}" in result.stdout
     assert "--mode {ask,review,implement,plan,diagnose}" in result.stdout
+    assert "--scrutinize-response" in result.stdout
+
+
+def test_repo_assistant_script_uses_stable_package_entrypoint() -> None:
+    script = Path(__file__).resolve().parents[1] / "scripts" / "repo-assistant.ps1"
+    text = script.read_text(encoding="utf-8")
+
+    assert "python -m uv run ai-assistant" in text
+    assert "examples\\repo_coding_assistant.py" not in text
+
+
+def test_broad_analysis_script_keeps_canonical_manual_workflow() -> None:
+    script = Path(__file__).resolve().parents[1] / "scripts" / "repo-assistant-broad-analysis.ps1"
+    text = script.read_text(encoding="utf-8")
+
+    assert '"--mode", "ask"' in text
+    assert '"--execute"' in text
+    assert '"--start-ollama"' in text
+    assert '"--scrutinize-response"' in text
+    assert '"--log-file", $LogFile' in text
+    assert '"--ollama-log-file", $OllamaLogFile' in text
+    assert 'repo-assistant.ps1") @cliArgs' in text
 
 
 def test_cli_modes_enforce_action_boundaries(capsys) -> None:
@@ -269,6 +291,96 @@ def test_plan_mode_does_not_create_a_provider_client(capsys, monkeypatch) -> Non
     assert "status: ready" in output
     assert "delegation: disabled" in output
     assert "execution_status: planned" in output
+
+
+def test_cli_can_scrutinize_completed_response(capsys, monkeypatch) -> None:
+    from dataclasses import replace
+
+    from ai_provider import (
+        AIMessage,
+        AIResponse,
+        BackendInfo,
+        MessageRole,
+    )
+    from ai_provider import (
+        BackendLocation as ProviderBackendLocation,
+    )
+
+    catalog = _EXAMPLE.load_model_catalog(
+        Path("packages/ai_orchestrator/examples/model_catalog.toml")
+    )
+    prepared = _EXAMPLE.run_coding_prompt(
+        "Investigate the next action for this repository.",
+        _EXAMPLE.coding_task_profile(model_override="qwen2.5-coder:14b"),
+        catalog,
+    )
+    primary = replace(
+        prepared,
+        response=AIResponse(
+            message=AIMessage(MessageRole.ASSISTANT, "primary answer"),
+            backend=BackendInfo(
+                provider="ollama",
+                model="qwen2.5-coder:14b",
+                location=ProviderBackendLocation.LOCAL,
+            ),
+        ),
+    )
+    scrutiny = replace(
+        primary,
+        response=AIResponse(
+            message=AIMessage(
+                MessageRole.ASSISTANT,
+                "VERDICT: needs_revision\nSCORE: 4\nISSUES: generic answer",
+            ),
+            backend=BackendInfo(
+                provider="ollama",
+                model="qwen2.5-coder:14b",
+                location=ProviderBackendLocation.LOCAL,
+            ),
+        ),
+    )
+    calls: list[tuple[str, bool, str | None]] = []
+
+    def fake_run(prompt, profile, catalog, **kwargs):
+        calls.append((prompt, kwargs["execute"], kwargs.get("system_prompt")))
+        return primary if len(calls) == 1 else scrutiny
+
+    monkeypatch.setattr(_EXAMPLE, "run_coding_prompt", fake_run)
+
+    assert (
+        main(
+            [
+                "--mode",
+                "ask",
+                "Investigate the next action for this repository.",
+                "--provider",
+                "ollama",
+                "--model",
+                "qwen2.5-coder:14b",
+                "--execute",
+                "--scrutinize-response",
+            ]
+        )
+        == 0
+    )
+    output = capsys.readouterr().out
+    assert "=== Assistant response ===" in output
+    assert "primary answer" in output
+    assert "=== Response scrutiny ===" in output
+    assert "VERDICT: needs_revision" in output
+    assert "scrutiny_status: completed" in output
+    assert len(calls) == 2
+    assert calls[1][1] is True
+    assert "Candidate assistant response:\nprimary answer" in calls[1][0]
+    assert calls[1][2] == _EXAMPLE._RESPONSE_SCRUTINY_SYSTEM_PROMPT
+
+
+def test_scrutiny_requires_executing_ask_or_review() -> None:
+    with pytest.raises(SystemExit):
+        main(["--mode", "ask", "Review code.", "--scrutinize-response"])
+
+    with pytest.raises(SystemExit):
+        main(["--mode", "plan", "Review code.", "--execute", "--scrutinize-response"])
 
 
 def test_delegate_context_requires_execution_before_provider_contact(capsys, monkeypatch) -> None:

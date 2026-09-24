@@ -50,6 +50,7 @@ from ai_provider import (
     ChatClient,
     MessageRole,
     PrivacyClass,
+    ProviderError,
     ProviderKind,
     create_chat_client,
     ensure_ollama_server,
@@ -114,6 +115,25 @@ Supported action types:
 Prefer the smallest useful action set. Do not invent persistent state, background
 jobs, external actions, or hidden side effects.
 """.strip()
+_RESPONSE_SCRUTINY_SYSTEM_PROMPT = """
+You scrutinize a repo-aware coding assistant response for usefulness and accuracy.
+Compare the candidate response with the original request and the supplied repository
+context. Do not invent facts or claim that a recommendation is required when the
+context does not support it.
+
+Return a concise report with exactly these headings:
+VERDICT: pass | needs_revision | fail
+SCORE: 0-10
+STRENGTHS:
+ISSUES:
+RECOMMENDED_NEXT_ACTION:
+REVISED_RESPONSE:
+
+Judge whether the answer is grounded in the repository, distinguishes completed
+work from remaining work, identifies the smallest useful next action, avoids
+generic filler, and states uncertainty or decision boundaries. If the candidate
+is already good, say so rather than proposing unnecessary changes.
+""".strip()
 
 
 class _TeeOutput(TextIOBase):
@@ -162,6 +182,18 @@ def _capability_report(snapshot: Any) -> dict[str, Any]:
             "running_models": [model.model for model in snapshot.running_ollama_models],
         },
     }
+
+
+def build_response_scrutiny_prompt(original_prompt: str, response: str) -> str:
+    """Build a bounded second-pass prompt for evaluating one assistant response."""
+
+    return (
+        "Original repository-analysis request:\n"
+        f"{original_prompt}\n\n"
+        "Candidate assistant response:\n"
+        f"{response}\n\n"
+        "Scrutinize the candidate response using the required report format."
+    )
 
 
 def find_repo_root(start: Path) -> Path:
@@ -589,6 +621,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="Bypass deterministic prompt review.",
     )
     parser.add_argument(
+        "--scrutinize-response",
+        action="store_true",
+        help=(
+            "Run one additional response-quality pass after a completed ask/review "
+            "response and include its report in the transcript."
+        ),
+    )
+    parser.add_argument(
         "--execute",
         action="store_true",
         help="Execute the provider request. Without this, only print the prepared plan.",
@@ -630,6 +670,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         args.execute = False
     if args.mode in {"ask", "review"} and (args.apply_actions or args.native_tools):
         parser.error(f"--mode {args.mode} does not permit file or command actions")
+    if args.scrutinize_response and not args.execute:
+        parser.error("--scrutinize-response requires --execute")
+    if args.scrutinize_response and args.mode not in {"ask", "review"}:
+        parser.error("--scrutinize-response is available only in ask or review mode")
     if args.mode == "implement" and not args.execute:
         parser.error("--mode implement requires --execute")
     if args.mode == "implement" and not (args.apply_actions or args.native_tools):
@@ -744,6 +788,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 )
             )
     print("\n=== Assistant response ===")
+    assistant_response_text = None
     if args.native_tools and args.execute and result.config is not None:
         native_result = _run_native_agent(
             prompt,
@@ -752,14 +797,16 @@ def main(argv: Sequence[str] | None = None) -> int:
             args,
             repo_root,
         )
-        print(native_result.response.message.content)
+        assistant_response_text = native_result.response.message.content
+        print(assistant_response_text)
         execution_status = (
             "completed_with_tool_errors"
             if any(item.is_error for item in native_result.tool_results)
             else "completed"
         )
     elif result.response is not None:
-        print(result.response.message.content)
+        assistant_response_text = result.response.message.content
+        print(assistant_response_text)
         if args.apply_actions:
             actions_ok = _run_action_loop(
                 result.response.message.content,
@@ -781,6 +828,37 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f"suggested_prompt: {result.orchestration.prompt_judge.refined_prompt}")
     if result.orchestration.failure_reason:
         execution_status = "failed"
+    if args.scrutinize_response and assistant_response_text is not None:
+        print("\n=== Response scrutiny ===")
+        scrutiny_failed = False
+        try:
+            scrutiny_result = run_coding_prompt(
+                build_response_scrutiny_prompt(prompt, assistant_response_text),
+                profile,
+                catalog,
+                review_prompt=False,
+                timeout_seconds=args.timeout_seconds,
+                execute=True,
+                system_prompt=_RESPONSE_SCRUTINY_SYSTEM_PROMPT,
+                start_ollama=False,
+            )
+        except ProviderError as exc:
+            print("scrutiny_status: failed")
+            print(f"scrutiny_failure_reason: {exc}")
+            scrutiny_failed = True
+        else:
+            if scrutiny_result.response is not None:
+                print(scrutiny_result.response.message.content)
+                print("scrutiny_status: completed")
+            else:
+                print("scrutiny_status: failed")
+                scrutiny_failed = True
+                if scrutiny_result.orchestration.failure_reason:
+                    print(
+                        f"scrutiny_failure_reason: {scrutiny_result.orchestration.failure_reason}"
+                    )
+        if scrutiny_failed and execution_status == "completed":
+            execution_status = "completed_with_scrutiny_errors"
     print(f"execution_status: {execution_status}")
     return 0
 

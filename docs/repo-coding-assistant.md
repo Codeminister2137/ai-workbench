@@ -28,6 +28,15 @@ The CLI supports explicit modes:
 .\scripts\repo-assistant.ps1 --mode ask "Explain this module." --execute
 .\scripts\repo-assistant.ps1 --mode review "Find concrete issues." --execute
 
+# Run a second model pass that scrutinizes the answer quality
+.\scripts\repo-assistant.ps1 --mode ask "Investigate the next action for this repository." `
+  --provider ollama --model deepseek-coder-v2:16b --execute --start-ollama `
+  --scrutinize-response --log-file logs\repo-assistant-next-action.log `
+  --ollama-log-file logs\ollama-next-action.log
+
+# Recommended manual live acceptance check for broad repository analysis
+.\scripts\repo-assistant-broad-analysis.ps1
+
 # Permit approved native tools or legacy actions for implementation
 .\scripts\repo-assistant.ps1 --mode implement "Implement the approved fix." `
   --execute --native-tools --start-ollama
@@ -44,6 +53,34 @@ Every run prints an `execution_status` line. It distinguishes planned runs,
 completed responses, completed runs with tool/action errors, and failed
 orchestration. A response is not reported as a fully successful implementation
 when an approved tool or action returned an error.
+
+`--scrutinize-response` is an opt-in second provider call for `ask` or `review`.
+It evaluates the completed answer against the original request and repository
+context, then prints a structured verdict, score, issues, recommended next
+action, and revised response. It does not edit files or execute actions. The
+additional report is included in the same `--log-file` transcript, so this is
+the recommended broad-repository response-quality command.
+
+For repeated manual live acceptance checks, use
+`scripts\repo-assistant-broad-analysis.ps1`. This is not a unit test: it makes
+two real provider calls and the final answer remains subject to human
+evaluation. The script is the canonical, evolvable version of the command; its
+default prompt, provider/model, transcript paths, and quality flags are kept
+together.
+Pass `-Prompt`, `-Model`, `-LogFile`, or `-OllamaLogFile` when a test needs a
+different value without duplicating the workflow:
+
+```powershell
+.\scripts\repo-assistant-broad-analysis.ps1 `
+  -Prompt "Review the latest provider change and identify the smallest next milestone." `
+  -LogFile logs\provider-change-analysis.log
+```
+
+When adding a CLI feature that should be part of the standard broad-analysis
+workflow, update `scripts\repo-assistant-broad-analysis.ps1` rather than
+creating a separate one-off command. Keep the command synchronized with the
+**Canonical Manual Live Acceptance Check** section in `CURRENT_CONTEXT.md`;
+future sessions should read that section first.
 
 To use the new provider-native tool-calling loop, add `--native-tools`:
 
