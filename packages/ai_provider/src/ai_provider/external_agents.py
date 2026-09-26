@@ -25,6 +25,7 @@ class ExternalAgentConfig:
     ephemeral: bool = True
     json_output: bool = True
     resume: str | None = None
+    output_last_message_path: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -48,6 +49,7 @@ class ExternalAgentResult:
     returncode: int
     stdout: str
     stderr: str
+    last_message: str | None = None
     events: ExternalAgentEventSummary | None = None
 
 
@@ -212,6 +214,7 @@ def external_agent_config_from_orchestration(
     timeout_seconds: float,
     codex_persist_session: bool = False,
     codex_resume: str | None = None,
+    output_last_message_path: Path | None = None,
 ) -> ExternalAgentConfig:
     """Adapt a ready orchestration result to an external-agent runtime config."""
 
@@ -235,6 +238,7 @@ def external_agent_config_from_orchestration(
         timeout_seconds=timeout_seconds,
         ephemeral=not codex_persist_session and codex_resume is None,
         resume=codex_resume,
+        output_last_message_path=output_last_message_path,
     )
 
 
@@ -303,6 +307,8 @@ def build_external_agent_command(config: ExternalAgentConfig) -> tuple[str, ...]
         ]
         if config.json_output:
             command.append("--json")
+        if config.output_last_message_path is not None:
+            command.extend(["--output-last-message", str(config.output_last_message_path)])
         if config.resume == "last":
             command.append("--last")
         else:
@@ -324,6 +330,8 @@ def build_external_agent_command(config: ExternalAgentConfig) -> tuple[str, ...]
         command.append("--ephemeral")
     if config.json_output:
         command.append("--json")
+    if config.output_last_message_path is not None:
+        command.extend(["--output-last-message", str(config.output_last_message_path)])
     command.append("-")
     return tuple(command)
 
@@ -337,6 +345,8 @@ def run_external_agent(
     """Run an external coding-agent process with the prompt on stdin."""
 
     command = build_external_agent_command(config)
+    if config.output_last_message_path is not None:
+        config.output_last_message_path.parent.mkdir(parents=True, exist_ok=True)
     completed = runner(
         command,
         input=prompt,
@@ -349,11 +359,15 @@ def run_external_agent(
     )
     stdout = completed.stdout or ""
     events = parse_external_agent_jsonl(stdout) if config.json_output and stdout else None
+    last_message = None
+    if config.output_last_message_path is not None and config.output_last_message_path.exists():
+        last_message = config.output_last_message_path.read_text(encoding="utf-8", errors="replace")
     return ExternalAgentResult(
         command=command,
         returncode=completed.returncode,
         stdout=stdout,
         stderr=completed.stderr or "",
+        last_message=last_message,
         events=events,
     )
 

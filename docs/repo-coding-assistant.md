@@ -281,6 +281,10 @@ Use `--codex-persist-session` when intentionally starting a resumable Codex
 session. This omits `--ephemeral`, allowing Codex to write its normal session
 state outside the repository. Resume with `--codex-resume last` or
 `--codex-resume <session-id-or-name>`, which invokes `codex exec resume --json`.
+Use `--codex-output-last-message path\to\last-message.txt` when you also want
+Codex's `--output-last-message` artifact. The CLI creates the parent directory,
+passes the path to Codex, and uses the file as a final-answer fallback when the
+JSONL stream does not contain a final-answer event.
 
 `--mode diagnose` and `--local-capabilities` include Codex diagnostics when a
 Codex command is discoverable: command path, version, login-status text,
@@ -308,6 +312,7 @@ noninteractive command contracts and local executable paths are confirmed.
 | Shell/file coding work | Managed tools can inspect and edit the shared workspace. | `codex exec --json --sandbox workspace-write --ephemeral -` runs inside the repo root. | Implemented for Codex route. |
 | Machine-readable execution events | Tool calls are available to this runtime. | JSONL stdout is parsed for final answer, command/tool/file-change events, failures, and usage. | Implemented with tolerant parsing. |
 | Raw transcripts/event logs | Conversation and tool output exist in the managed session. | CLI transcript logs preserve invocation metadata, full prompts when requested, run metrics, and raw Codex JSONL. | Implemented as local files under `logs\`. |
+| Final-answer artifact | The managed session displays the final answer in chat. | `--codex-output-last-message` writes Codex's last assistant message to an explicit local file and uses it as a JSONL fallback. | Implemented as opt-in local file output. |
 | Approval/sandbox policy | Managed by the active ChatGPT/Codex runtime. | Uses Codex CLI sandbox flags. This installed `codex exec` supports `--json`, `--sandbox`, and `--ephemeral`; `--ask-for-approval` must not be assumed unless local help confirms it. | Partially implemented; human approval parity is a known gap. |
 | MCP tools | Available here through the current managed runtime. | Diagnostics list configured Codex MCP servers. Actually reproducing tools requires Codex MCP config/design. | Feasible, decision required before adding MCP/tool design. |
 | Plugins/apps | This session has installed app/plugin tools exposed by ChatGPT. | Diagnostics list Codex plugin marketplace/install status. Installing or authorizing plugins is outside this CLI slice. | Feasible through Codex plugins, separate auth/product decision required. |

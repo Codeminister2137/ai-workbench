@@ -194,6 +194,7 @@ class ExternalAgentConfig:
     ephemeral: bool = True
     json_output: bool = True
     resume: str | None = None
+    output_last_message_path: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -217,6 +218,7 @@ class ExternalAgentResult:
     returncode: int
     stdout: str
     stderr: str
+    last_message: str | None = None
     events: ExternalAgentEventSummary | None = None
 
 
@@ -516,6 +518,7 @@ def _external_agent_config_from_orchestration(
     timeout_seconds: float,
     codex_persist_session: bool = False,
     codex_resume: str | None = None,
+    output_last_message_path: Path | None = None,
 ) -> ExternalAgentConfig:
     """Adapt a ready orchestration result to an external-agent runtime config."""
 
@@ -539,6 +542,7 @@ def _external_agent_config_from_orchestration(
         timeout_seconds=timeout_seconds,
         ephemeral=not codex_persist_session and codex_resume is None,
         resume=codex_resume,
+        output_last_message_path=output_last_message_path,
     )
 
 
@@ -741,6 +745,8 @@ def _build_external_agent_command(config: ExternalAgentConfig) -> tuple[str, ...
         ]
         if config.json_output:
             command.append("--json")
+        if config.output_last_message_path is not None:
+            command.extend(["--output-last-message", str(config.output_last_message_path)])
         if config.resume == "last":
             command.append("--last")
         else:
@@ -762,6 +768,8 @@ def _build_external_agent_command(config: ExternalAgentConfig) -> tuple[str, ...
         command.append("--ephemeral")
     if config.json_output:
         command.append("--json")
+    if config.output_last_message_path is not None:
+        command.extend(["--output-last-message", str(config.output_last_message_path)])
     command.append("-")
     return tuple(command)
 
@@ -770,6 +778,8 @@ def _run_external_agent(prompt: str, config: ExternalAgentConfig) -> ExternalAge
     """Run an external coding-agent process with the prompt on stdin."""
 
     command = _build_external_agent_command(config)
+    if config.output_last_message_path is not None:
+        config.output_last_message_path.parent.mkdir(parents=True, exist_ok=True)
     completed = subprocess.run(
         command,
         input=prompt,
@@ -782,11 +792,15 @@ def _run_external_agent(prompt: str, config: ExternalAgentConfig) -> ExternalAge
     )
     stdout = completed.stdout or ""
     events = parse_external_agent_jsonl(stdout) if config.json_output and stdout else None
+    last_message = None
+    if config.output_last_message_path is not None and config.output_last_message_path.exists():
+        last_message = config.output_last_message_path.read_text(encoding="utf-8", errors="replace")
     return ExternalAgentResult(
         command=command,
         returncode=completed.returncode,
         stdout=stdout,
         stderr=completed.stderr or "",
+        last_message=last_message,
         events=events,
     )
 
@@ -1371,6 +1385,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
+        "--codex-output-last-message",
+        type=Path,
+        help=(
+            "For Codex CLI routes, also ask Codex to write the final assistant message "
+            "to this local file via --output-last-message."
+        ),
+    )
+    parser.add_argument(
         "--scrutinize-response",
         action="store_true",
         help=(
@@ -1511,6 +1533,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         and external_orchestration.execution_plan.target.access_method is not AccessMethod.CODEX_CLI
     ):
         parser.error("--codex-persist-session and --codex-resume require a Codex CLI route")
+    if (
+        args.codex_output_last_message is not None
+        and external_orchestration.is_ready
+        and external_orchestration.execution_plan is not None
+        and external_orchestration.execution_plan.target.access_method is not AccessMethod.CODEX_CLI
+    ):
+        parser.error("--codex-output-last-message requires a Codex CLI route")
     if (
         external_orchestration.is_ready
         and external_orchestration.execution_plan is not None
@@ -1760,12 +1789,15 @@ def _run_external_agent_cli_mode(
             timeout_seconds=args.timeout_seconds,
             codex_persist_session=args.codex_persist_session,
             codex_resume=args.codex_resume,
+            output_last_message_path=args.codex_output_last_message,
         )
         print(f"external_agent_command: {config.command}")
         print(f"external_agent_sandbox: {config.sandbox}")
         print(f"external_agent_ephemeral: {config.ephemeral}")
         if config.resume is not None:
             print(f"external_agent_resume: {config.resume}")
+        if config.output_last_message_path is not None:
+            print(f"external_agent_output_last_message: {config.output_last_message_path}")
         print("\n=== Assistant response ===")
         if args.execute and args.mode != "plan":
             primary_started = time.perf_counter()
@@ -1777,6 +1809,10 @@ def _run_external_agent_cli_mode(
                 _write_external_agent_raw_jsonl(external_result.stdout)
                 if external_result.events.final_answer:
                     print(external_result.events.final_answer)
+                elif external_result.last_message:
+                    print(external_result.last_message, end="")
+                    if not external_result.last_message.endswith("\n"):
+                        print()
                 else:
                     print("external_agent_final_answer: unavailable")
             elif external_result.stdout:

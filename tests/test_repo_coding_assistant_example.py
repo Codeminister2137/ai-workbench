@@ -719,6 +719,54 @@ def test_cli_preserves_raw_codex_jsonl_in_transcript_only(
     assert raw_jsonl.strip() in transcript
 
 
+def test_cli_can_use_codex_output_last_message_file(
+    tmp_path: Path,
+    capsys,
+    monkeypatch,
+) -> None:
+    def fake_run(*args, **kwargs):
+        output_index = args[0].index("--output-last-message") + 1
+        Path(args[0][output_index]).write_text("last-message answer", encoding="utf-8")
+        return _EXAMPLE.subprocess.CompletedProcess(
+            args[0],
+            0,
+            '{"type":"turn.completed"}\n',
+            "",
+        )
+
+    monkeypatch.setenv("CODEX_COMMAND", "codex-test")
+    monkeypatch.setattr(_EXAMPLE.subprocess, "run", fake_run)
+    output_file = tmp_path / "codex" / "last.txt"
+
+    assert (
+        main(
+            [
+                "--mode",
+                "ask",
+                "Review this repository.",
+                "--privacy",
+                "external_allowed",
+                "--route-id",
+                "openai-codex-gpt-5-5",
+                "--provider",
+                "openai",
+                "--model",
+                "gpt-5.5",
+                "--execute",
+                "--skip-prompt-review",
+                "--codex-output-last-message",
+                str(output_file),
+            ]
+        )
+        == 0
+    )
+
+    output = capsys.readouterr().out
+    assert "external_agent_output_last_message:" in output
+    assert "last-message answer" in output
+    assert output_file.read_text(encoding="utf-8") == "last-message answer"
+
+
 def test_codex_capability_status_reports_expected_diagnostics(monkeypatch) -> None:
     def fake_run(command, *args, **kwargs):
         joined = tuple(command)

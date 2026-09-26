@@ -38,6 +38,7 @@ class CodexCliConfig:
     ephemeral: bool = True
     json_output: bool = False
     resume: str | None = None
+    output_last_message_path: Path | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,6 +49,7 @@ class CodexCliResult:
     returncode: int
     stdout: str
     stderr: str
+    last_message: str | None = None
     events: CodexJsonlSummary | None = None
 
     @property
@@ -112,6 +114,7 @@ def codex_cli_config_from_execution_target(
     timeout_seconds: float | None = None,
     ephemeral: bool = True,
     resume: str | None = None,
+    output_last_message_path: Path | None = None,
 ) -> CodexCliConfig:
     """Adapt an orchestrator target to Codex CLI runtime config."""
 
@@ -140,6 +143,7 @@ def codex_cli_config_from_execution_target(
         timeout_seconds=timeout_seconds or target.timeout_seconds,
         ephemeral=ephemeral,
         resume=resume,
+        output_last_message_path=output_last_message_path,
     )
 
 
@@ -156,6 +160,8 @@ def build_codex_exec_command(config: CodexCliConfig) -> tuple[str, ...]:
         ]
         if config.json_output:
             command.append("--json")
+        if config.output_last_message_path is not None:
+            command.extend(["--output-last-message", str(config.output_last_message_path)])
         if config.resume == "last":
             command.append("--last")
         else:
@@ -177,6 +183,8 @@ def build_codex_exec_command(config: CodexCliConfig) -> tuple[str, ...]:
         command.append("--ephemeral")
     if config.json_output:
         command.append("--json")
+    if config.output_last_message_path is not None:
+        command.extend(["--output-last-message", str(config.output_last_message_path)])
     command.append("-")
     return tuple(command)
 
@@ -340,6 +348,8 @@ def run_codex_exec(
     """Run `codex exec` with the prompt on stdin."""
 
     command = build_codex_exec_command(config)
+    if config.output_last_message_path is not None:
+        config.output_last_message_path.parent.mkdir(parents=True, exist_ok=True)
     completed = runner(
         command,
         input=prompt,
@@ -351,11 +361,15 @@ def run_codex_exec(
         cwd=config.cwd,
     )
     stdout = completed.stdout or ""
+    last_message = None
+    if config.output_last_message_path is not None and config.output_last_message_path.exists():
+        last_message = config.output_last_message_path.read_text(encoding="utf-8", errors="replace")
     return CodexCliResult(
         command=command,
         returncode=completed.returncode,
         stdout=stdout,
         stderr=completed.stderr or "",
+        last_message=last_message,
         events=parse_codex_jsonl_events(stdout) if config.json_output and stdout else None,
     )
 
@@ -371,6 +385,7 @@ def prepare_codex_cli_execution(
     timeout_seconds: float = 600.0,
     codex_persist_session: bool = False,
     codex_resume: str | None = None,
+    codex_output_last_message: Path | None = None,
     execute: bool = False,
     runner: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
 ) -> CodexCliExecutionResult:
@@ -397,6 +412,7 @@ def prepare_codex_cli_execution(
         timeout_seconds=timeout_seconds,
         ephemeral=not codex_persist_session and codex_resume is None,
         resume=codex_resume,
+        output_last_message_path=codex_output_last_message,
     )
     if not execute:
         return CodexCliExecutionResult(orchestration=orchestration, config=config)
@@ -439,6 +455,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--skip-prompt-review", action="store_true")
     parser.add_argument("--codex-persist-session", action="store_true")
     parser.add_argument("--codex-resume")
+    parser.add_argument("--codex-output-last-message", type=Path)
     parser.add_argument("--execute", action="store_true")
     args = parser.parse_args(argv)
 
@@ -462,6 +479,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         timeout_seconds=args.timeout_seconds,
         codex_persist_session=args.codex_persist_session,
         codex_resume=args.codex_resume,
+        codex_output_last_message=args.codex_output_last_message,
         execute=args.execute,
     )
 

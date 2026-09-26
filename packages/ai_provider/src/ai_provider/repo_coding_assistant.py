@@ -422,6 +422,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
+        "--codex-output-last-message",
+        type=Path,
+        help=(
+            "For Codex CLI routes, also ask Codex to write the final assistant message "
+            "to this local file via --output-last-message."
+        ),
+    )
+    parser.add_argument(
         "--scrutinize-response",
         action="store_true",
         help=(
@@ -562,6 +570,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         and external_orchestration.execution_plan.target.access_method is not AccessMethod.CODEX_CLI
     ):
         parser.error("--codex-persist-session and --codex-resume require a Codex CLI route")
+    if (
+        args.codex_output_last_message is not None
+        and external_orchestration.is_ready
+        and external_orchestration.execution_plan is not None
+        and external_orchestration.execution_plan.target.access_method is not AccessMethod.CODEX_CLI
+    ):
+        parser.error("--codex-output-last-message requires a Codex CLI route")
     if (
         external_orchestration.is_ready
         and external_orchestration.execution_plan is not None
@@ -811,12 +826,15 @@ def _run_external_agent_cli_mode(
             timeout_seconds=args.timeout_seconds,
             codex_persist_session=args.codex_persist_session,
             codex_resume=args.codex_resume,
+            output_last_message_path=args.codex_output_last_message,
         )
         print(f"external_agent_command: {config.command}")
         print(f"external_agent_sandbox: {config.sandbox}")
         print(f"external_agent_ephemeral: {config.ephemeral}")
         if config.resume is not None:
             print(f"external_agent_resume: {config.resume}")
+        if config.output_last_message_path is not None:
+            print(f"external_agent_output_last_message: {config.output_last_message_path}")
         print("\n=== Assistant response ===")
         if args.execute and args.mode != "plan":
             primary_started = time.perf_counter()
@@ -828,6 +846,10 @@ def _run_external_agent_cli_mode(
                 _write_external_agent_raw_jsonl(external_result.stdout)
                 if external_result.events.final_answer:
                     print(external_result.events.final_answer)
+                elif external_result.last_message:
+                    print(external_result.last_message, end="")
+                    if not external_result.last_message.endswith("\n"):
+                        print()
                 else:
                     print("external_agent_final_answer: unavailable")
             elif external_result.stdout:

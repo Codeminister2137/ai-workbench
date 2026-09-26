@@ -242,3 +242,6 @@ By default the example uses ephemeral Codex sessions. Pass
 `--codex-persist-session` to start a resumable session, or
 `--codex-resume last` / `--codex-resume <session-id-or-name>` to resume through
 `codex exec resume`.
+Pass `--codex-output-last-message path\to\last-message.txt` to also request
+Codex's `--output-last-message` artifact for deterministic final-message
+capture.

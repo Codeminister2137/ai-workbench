@@ -112,6 +112,22 @@ def test_build_codex_exec_command_can_request_jsonl_events(tmp_path: Path) -> No
     assert command[-1] == "-"
 
 
+def test_build_codex_exec_command_can_write_last_message(tmp_path: Path) -> None:
+    output_path = tmp_path / "last-message.txt"
+    config = CodexCliConfig(
+        command="codex",
+        model="gpt-5.5",
+        cwd=tmp_path,
+        output_last_message_path=output_path,
+    )
+
+    command = build_codex_exec_command(config)
+
+    assert "--output-last-message" in command
+    assert str(output_path) in command
+    assert command[-1] == "-"
+
+
 def test_build_codex_exec_command_can_start_persistent_session(tmp_path: Path) -> None:
     config = CodexCliConfig(
         command="codex",
@@ -243,6 +259,26 @@ def test_run_codex_exec_parses_jsonl_when_enabled(tmp_path: Path) -> None:
     assert result.ok is True
     assert result.events is not None
     assert result.events.final_answer == "structured done"
+
+
+def test_run_codex_exec_reads_output_last_message(tmp_path: Path) -> None:
+    output_path = tmp_path / "nested" / "last-message.txt"
+
+    def fake_runner(*args: Any, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        output_path.write_text("last file answer", encoding="utf-8")
+        return subprocess.CompletedProcess(args[0], 0, stdout="", stderr="")
+
+    config = CodexCliConfig(
+        command="codex",
+        model="gpt-5.5",
+        cwd=tmp_path,
+        output_last_message_path=output_path,
+    )
+
+    result = run_codex_exec("Do the task.", config, runner=fake_runner)
+
+    assert result.last_message == "last file answer"
+    assert output_path.exists()
 
 
 def test_prepare_codex_cli_execution_rejects_local_only_privacy(tmp_path: Path) -> None:
