@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import importlib.util
 import sys
+from io import StringIO
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -30,6 +32,26 @@ execute_actions = _EXAMPLE.execute_actions
 extract_actions = _EXAMPLE.extract_actions
 load_prompt_context = _EXAMPLE.load_prompt_context
 AssistantAction = _EXAMPLE.AssistantAction
+parse_response_scrutiny_report = _EXAMPLE.parse_response_scrutiny_report
+
+
+class _AsciiTerminal(StringIO):
+    encoding = "ascii"
+
+    def write(self, text: str) -> int:
+        text.encode(self.encoding)
+        return super().write(text)
+
+
+def test_tee_output_preserves_utf8_transcript_when_terminal_replaces_unicode() -> None:
+    terminal = _AsciiTerminal()
+    transcript = StringIO()
+    tee = _TeeOutput(terminal, transcript)
+
+    assert tee.write("Understand ↓ Inspect") == len("Understand ↓ Inspect")
+
+    assert transcript.getvalue() == "Understand ↓ Inspect"
+    assert terminal.getvalue() == "Understand ? Inspect"
 
 
 def test_load_prompt_context_loads_default_and_selected_repo_files(tmp_path: Path) -> None:
@@ -243,6 +265,8 @@ def test_repo_assistant_script_uses_stable_package_entrypoint() -> None:
 
     assert "python -m uv run ai-assistant" in text
     assert "examples\\repo_coding_assistant.py" not in text
+    assert "Add-DefaultLogFile" in text
+    assert "repo-assistant-$timestamp.log" in text
 
 
 def test_broad_analysis_script_keeps_canonical_manual_workflow() -> None:
@@ -253,6 +277,9 @@ def test_broad_analysis_script_keeps_canonical_manual_workflow() -> None:
     assert '"--execute"' in text
     assert '"--start-ollama"' in text
     assert '"--scrutinize-response"' in text
+    assert '"--log-full-prompt"' in text
+    assert "repo-assistant-broad-analysis-$timestamp.log" in text
+    assert "ollama-broad-analysis-$timestamp.log" in text
     assert '"--log-file", $LogFile' in text
     assert '"--ollama-log-file", $OllamaLogFile' in text
     assert 'repo-assistant.ps1") @cliArgs' in text
@@ -260,7 +287,9 @@ def test_broad_analysis_script_keeps_canonical_manual_workflow() -> None:
 
 def test_cli_modes_enforce_action_boundaries(capsys) -> None:
     assert main(["--mode", "diagnose"]) == 0
-    assert '"system"' in capsys.readouterr().out
+    diagnose_output = capsys.readouterr().out
+    assert '"system"' in diagnose_output
+    assert '"external_agents"' in diagnose_output
 
     with pytest.raises(SystemExit):
         main(["--mode", "implement", "make a change"])
@@ -291,6 +320,173 @@ def test_plan_mode_does_not_create_a_provider_client(capsys, monkeypatch) -> Non
     assert "status: ready" in output
     assert "delegation: disabled" in output
     assert "execution_status: planned" in output
+
+
+def test_cli_log_file_captures_invocation_and_transcript(
+    tmp_path: Path,
+    capsys,
+    monkeypatch,
+) -> None:
+    def fail_if_called(*args, **kwargs):
+        raise AssertionError("plan mode must not contact a provider")
+
+    monkeypatch.setattr(_EXAMPLE, "create_chat_client", fail_if_called)
+    log_file = tmp_path / "repo-assistant.log"
+
+    assert (
+        main(
+            [
+                "--mode",
+                "plan",
+                "Review CLI logging.",
+                "--provider",
+                "ollama",
+                "--model",
+                "qwen2.5-coder:14b",
+                "--log-file",
+                str(log_file),
+            ]
+        )
+        == 0
+    )
+    output = capsys.readouterr().out
+    text = log_file.read_text(encoding="utf-8")
+
+    assert "=== CLI invocation ===" in text
+    assert "timestamp_utc:" in text
+    assert "cwd:" in text
+    assert "Review CLI logging." in text
+    assert '"--mode", "plan"' in text
+    assert '"--log-file"' in text
+    assert "=== Repo Coding Assistant ===" in text
+    assert "execution_status: planned" in text
+    assert "=== Run metrics ===" in text
+    assert "total_wall_seconds:" in text
+    assert "process_cpu_seconds:" in text
+    assert "python_memory_peak_bytes:" in text
+    assert "primary_elapsed_seconds:" in text
+    assert "primary_usage_source: unavailable" in text
+    assert "scrutiny_usage_source: unavailable" in text
+    assert "=== Primary model input ===" not in text
+    assert output == text
+
+
+def test_cli_log_full_prompt_captures_assembled_model_input(
+    tmp_path: Path,
+    capsys,
+    monkeypatch,
+) -> None:
+    def fail_if_called(*args, **kwargs):
+        raise AssertionError("plan mode must not contact a provider")
+
+    monkeypatch.setattr(_EXAMPLE, "create_chat_client", fail_if_called)
+    log_file = tmp_path / "repo-assistant.log"
+
+    assert (
+        main(
+            [
+                "--mode",
+                "plan",
+                "Review CLI full-prompt logging.",
+                "--provider",
+                "ollama",
+                "--model",
+                "qwen2.5-coder:14b",
+                "--log-file",
+                str(log_file),
+                "--log-full-prompt",
+            ]
+        )
+        == 0
+    )
+    text = log_file.read_text(encoding="utf-8")
+
+    assert "=== Primary model input ===" in text
+    assert "system_prompt:" in text
+    assert "user_prompt:" in text
+    assert "# User request" in text
+    assert "Review CLI full-prompt logging." in text
+    assert "# Repository context" in text
+    assert "AGENTS.md" in text
+    assert capsys.readouterr().out == text
+
+
+def test_log_full_prompt_requires_log_file() -> None:
+    with pytest.raises(SystemExit):
+        main(["--mode", "plan", "Review logging.", "--log-full-prompt"])
+
+
+def test_cli_plans_codex_external_agent_route(capsys, monkeypatch) -> None:
+    monkeypatch.setenv("CODEX_COMMAND", "codex-test")
+
+    assert (
+        main(
+            [
+                "--mode",
+                "plan",
+                "Review this repository.",
+                "--privacy",
+                "external_allowed",
+                "--route-id",
+                "openai-codex-gpt-5-1",
+                "--provider",
+                "openai",
+                "--model",
+                "gpt-5.1",
+                "--skip-prompt-review",
+            ]
+        )
+        == 0
+    )
+    output = capsys.readouterr().out
+    assert "route_id: openai-codex-gpt-5-1" in output
+    assert "access_method: codex_cli" in output
+    assert "external_agent_command: codex-test" in output
+    assert "external_agent_command_line_json:" in output
+    assert "execution_status: planned" in output
+
+
+def test_cli_executes_codex_external_agent_route(capsys, monkeypatch) -> None:
+    calls: list[dict[str, Any]] = []
+
+    def fake_run(*args, **kwargs):
+        calls.append({"args": args, "kwargs": kwargs})
+        return _EXAMPLE.subprocess.CompletedProcess(args[0], 0, "codex done\n", "")
+
+    monkeypatch.setenv("CODEX_COMMAND", "codex-test")
+    monkeypatch.setattr(_EXAMPLE.subprocess, "run", fake_run)
+
+    assert (
+        main(
+            [
+                "--mode",
+                "ask",
+                "Review this repository.",
+                "--privacy",
+                "external_allowed",
+                "--route-id",
+                "openai-codex-gpt-5-1",
+                "--provider",
+                "openai",
+                "--model",
+                "gpt-5.1",
+                "--execute",
+                "--skip-prompt-review",
+            ]
+        )
+        == 0
+    )
+    output = capsys.readouterr().out
+    assert "external_agent_returncode: 0" in output
+    assert "codex done" in output
+    assert "execution_status: completed" in output
+    command = calls[0]["args"][0]
+    assert command[:2] == ("codex-test", "exec")
+    assert "--ask-for-approval" not in command
+    assert "--sandbox" in command
+    assert "workspace-write" in command
+    assert calls[0]["kwargs"]["input"].startswith("# User request")
+    assert "# Repository context" in calls[0]["kwargs"]["input"]
 
 
 def test_cli_can_scrutinize_completed_response(capsys, monkeypatch) -> None:
@@ -330,7 +526,17 @@ def test_cli_can_scrutinize_completed_response(capsys, monkeypatch) -> None:
         response=AIResponse(
             message=AIMessage(
                 MessageRole.ASSISTANT,
-                "VERDICT: needs_revision\nSCORE: 4\nISSUES: generic answer",
+                "\n".join(
+                    [
+                        "VERDICT: needs_revision",
+                        "SCORE: 4",
+                        "STRENGTHS: names the relevant command",
+                        "ISSUES: generic answer",
+                        "RECOMMENDED_NEXT_ACTION: revise the answer",
+                        "REVISED_RESPONSE:",
+                        "Use the canonical command and inspect its logs.",
+                    ]
+                ),
             ),
             backend=BackendInfo(
                 provider="ollama",
@@ -368,11 +574,173 @@ def test_cli_can_scrutinize_completed_response(capsys, monkeypatch) -> None:
     assert "primary answer" in output
     assert "=== Response scrutiny ===" in output
     assert "VERDICT: needs_revision" in output
+    assert "scrutiny_verdict: needs_revision" in output
+    assert "scrutiny_score: 4" in output
     assert "scrutiny_status: completed" in output
+    assert "execution_status: completed_with_scrutiny_findings" in output
     assert len(calls) == 2
     assert calls[1][1] is True
     assert "Candidate assistant response:\nprimary answer" in calls[1][0]
     assert calls[1][2] == _EXAMPLE._RESPONSE_SCRUTINY_SYSTEM_PROMPT
+
+
+def test_parse_response_scrutiny_report_validates_required_shape() -> None:
+    report = parse_response_scrutiny_report(
+        "\n".join(
+            [
+                "### **Verdict:** PASS",
+                "### **SCORE:** 8",
+                "### **STRENGTHS:**",
+                "Grounded.",
+                "### **ISSUES:**",
+                "None.",
+                "### **RECOMMENDED NEXT ACTION:** Keep answer.",
+                "### **REVISED RESPONSE:**",
+                "Original answer is acceptable.",
+            ]
+        )
+    )
+
+    assert report.verdict == "pass"
+    assert report.score == 8
+    assert report.strengths == "Grounded."
+    assert report.issues == "None."
+    assert report.revised_response == "Original answer is acceptable."
+
+
+def test_parse_response_scrutiny_report_accepts_fenced_json_object() -> None:
+    report = parse_response_scrutiny_report(
+        """```json
+{
+  "VERDICT": "pass",
+  "SCORE": 9,
+  "STRENGTHS": ["names concrete files"],
+  "ISSUES": ["needs one more validation step"],
+  "RECOMMENDED_NEXT_ACTION": [{"type": "run_command", "command": "pytest"}],
+  "REVISED_RESPONSE": null
+}
+```"""
+    )
+
+    assert report.verdict == "pass"
+    assert report.score == 9
+    assert "names concrete files" in report.strengths
+    assert "run_command" in report.recommended_next_action
+    assert report.revised_response == ""
+
+
+@pytest.mark.parametrize(
+    ("content", "message"),
+    [
+        ("VERDICT: pass\nSCORE: 5", "missing scrutiny heading"),
+        (
+            "\n".join(
+                [
+                    "VERDICT: maybe",
+                    "SCORE: 5",
+                    "STRENGTHS:",
+                    "ISSUES:",
+                    "RECOMMENDED_NEXT_ACTION:",
+                    "REVISED_RESPONSE:",
+                ]
+            ),
+            "invalid scrutiny verdict",
+        ),
+        (
+            "\n".join(
+                [
+                    "VERDICT: pass",
+                    "SCORE: 11",
+                    "STRENGTHS:",
+                    "ISSUES:",
+                    "RECOMMENDED_NEXT_ACTION:",
+                    "REVISED_RESPONSE:",
+                ]
+            ),
+            "scrutiny score out of range",
+        ),
+    ],
+)
+def test_parse_response_scrutiny_report_rejects_invalid_reports(
+    content: str,
+    message: str,
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        parse_response_scrutiny_report(content)
+
+
+def test_cli_marks_malformed_scrutiny_as_scrutiny_error(capsys, monkeypatch) -> None:
+    from dataclasses import replace
+
+    from ai_provider import (
+        AIMessage,
+        AIResponse,
+        BackendInfo,
+        MessageRole,
+    )
+    from ai_provider import (
+        BackendLocation as ProviderBackendLocation,
+    )
+
+    catalog = _EXAMPLE.load_model_catalog(
+        Path("packages/ai_orchestrator/examples/model_catalog.toml")
+    )
+    prepared = _EXAMPLE.run_coding_prompt(
+        "Investigate the next action for this repository.",
+        _EXAMPLE.coding_task_profile(model_override="qwen2.5-coder:14b"),
+        catalog,
+    )
+    primary = replace(
+        prepared,
+        response=AIResponse(
+            message=AIMessage(MessageRole.ASSISTANT, "primary answer"),
+            backend=BackendInfo(
+                provider="ollama",
+                model="qwen2.5-coder:14b",
+                location=ProviderBackendLocation.LOCAL,
+            ),
+        ),
+    )
+    scrutiny = replace(
+        primary,
+        response=AIResponse(
+            message=AIMessage(MessageRole.ASSISTANT, "VERDICT: pass\nSCORE: 8"),
+            backend=BackendInfo(
+                provider="ollama",
+                model="qwen2.5-coder:14b",
+                location=ProviderBackendLocation.LOCAL,
+            ),
+        ),
+    )
+    calls = 0
+
+    def fake_run(prompt, profile, catalog, **kwargs):
+        nonlocal calls
+        calls += 1
+        return primary if calls == 1 else scrutiny
+
+    monkeypatch.setattr(_EXAMPLE, "run_coding_prompt", fake_run)
+
+    assert (
+        main(
+            [
+                "--mode",
+                "ask",
+                "Investigate the next action for this repository.",
+                "--provider",
+                "ollama",
+                "--model",
+                "qwen2.5-coder:14b",
+                "--execute",
+                "--scrutinize-response",
+            ]
+        )
+        == 0
+    )
+    output = capsys.readouterr().out
+    assert "scrutiny_status: invalid" in output
+    assert "scrutiny_failure_reason: missing scrutiny heading" in output
+    assert "execution_status: completed_with_scrutiny_errors" in output
 
 
 def test_scrutiny_requires_executing_ask_or_review() -> None:

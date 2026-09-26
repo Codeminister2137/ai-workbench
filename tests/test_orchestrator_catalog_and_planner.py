@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from ai_orchestrator import (
     AccessMethod,
     AccessRoute,
@@ -121,6 +122,50 @@ access_method = "codex_cli"
     assert catalog[0].backend.cost_policy_tier is CostPolicyTier.ALLOWANCES_ALLOWED
 
 
+@pytest.mark.parametrize(
+    ("access_method", "product", "auth_method", "billing_source"),
+    [
+        (
+            "copilot_cli",
+            "github_copilot",
+            AuthMethod.GITHUB_ACCOUNT_SIGN_IN,
+            BillingSource.GITHUB_COPILOT_SUBSCRIPTION_ALLOWANCE,
+        ),
+        (
+            "kiro_cli",
+            "kiro",
+            AuthMethod.KIRO_SIGN_IN,
+            BillingSource.KIRO_SUBSCRIPTION_ALLOWANCE,
+        ),
+    ],
+)
+def test_load_model_catalog_defaults_external_agent_access_metadata(
+    tmp_path: Path,
+    access_method: str,
+    product: str,
+    auth_method: AuthMethod,
+    billing_source: BillingSource,
+) -> None:
+    catalog_path = tmp_path / "models.toml"
+    catalog_path.write_text(
+        f"""
+[[models]]
+provider = "{product}"
+model = "default"
+location = "external"
+access_method = "{access_method}"
+""",
+        encoding="utf-8",
+    )
+
+    catalog = load_model_catalog(catalog_path)
+
+    assert catalog[0].backend.product == product
+    assert catalog[0].backend.auth_method is auth_method
+    assert catalog[0].backend.billing_source is billing_source
+    assert catalog[0].backend.cost_policy_tier is CostPolicyTier.ALLOWANCES_ALLOWED
+
+
 def test_example_model_catalog_includes_coding_mvp_backends() -> None:
     catalog_path = (
         Path(__file__).resolve().parents[1]
@@ -141,6 +186,12 @@ def test_example_model_catalog_includes_coding_mvp_backends() -> None:
     assert ("openai", "gpt-5-mini") in identities
     assert ("requesty", "openai/gpt-5.1") in identities
     assert ("requesty", "openai/gpt-5-mini") in identities
+    assert ("openai", "gpt-5.1") in identities
+    route_ids = {entry.backend.route_id for entry in catalog}
+    assert "openai-codex-gpt-5-1" in route_ids
+    assert "google-antigravity-gemini-3-1-pro" in route_ids
+    assert "github-copilot-cli-default" in route_ids
+    assert "kiro-cli-default" in route_ids
     assert all(
         entry.backend.estimate.source
         for entry in catalog

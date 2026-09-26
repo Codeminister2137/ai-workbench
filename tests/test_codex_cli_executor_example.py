@@ -95,8 +95,6 @@ def test_build_codex_exec_command_reads_prompt_from_stdin(tmp_path: Path) -> Non
         str(tmp_path),
         "--model",
         "gpt-5.1",
-        "--ask-for-approval",
-        "never",
         "--sandbox",
         "workspace-write",
         "--ephemeral",

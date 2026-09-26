@@ -77,6 +77,8 @@ class AccessMethod(StrEnum):
     PROVIDER_API = "provider_api"
     CODEX_CLI = "codex_cli"
     ANTIGRAVITY_CLI = "antigravity_cli"
+    COPILOT_CLI = "copilot_cli"
+    KIRO_CLI = "kiro_cli"
 
 
 class AuthMethod(StrEnum):
@@ -87,6 +89,8 @@ class AuthMethod(StrEnum):
     CHATGPT_SIGN_IN = "chatgpt_sign_in"
     CODEX_ACCESS_TOKEN = "codex_access_token"
     GOOGLE_ACCOUNT_SIGN_IN = "google_account_sign_in"
+    GITHUB_ACCOUNT_SIGN_IN = "github_account_sign_in"
+    KIRO_SIGN_IN = "kiro_sign_in"
 
 
 class BillingSource(StrEnum):
@@ -100,6 +104,8 @@ class BillingSource(StrEnum):
     GOOGLE_AI_STUDIO_FREE = "google_ai_studio_free"
     GOOGLE_API_BILLING = "google_api_billing"
     ANTIGRAVITY_SUBSCRIPTION_ALLOWANCE = "antigravity_subscription_allowance"
+    GITHUB_COPILOT_SUBSCRIPTION_ALLOWANCE = "github_copilot_subscription_allowance"
+    KIRO_SUBSCRIPTION_ALLOWANCE = "kiro_subscription_allowance"
 
 
 class CostPolicyTier(StrEnum):

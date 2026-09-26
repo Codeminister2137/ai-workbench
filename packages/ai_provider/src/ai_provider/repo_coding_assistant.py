@@ -5,10 +5,14 @@ import atexit
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
+import time
+import tracemalloc
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from io import TextIOBase
 from pathlib import Path
 from typing import Any
@@ -36,16 +40,19 @@ from ai_orchestrator import (
     CostPolicyTier,
     DelegationKind,
     LatencyTarget,
+    OrchestrationResult,
     QualityThreshold,
     TaskType,
     assess_delegation,
     load_model_catalog,
     plan_delegated_subtask,
+    prepare_execution,
 )
 from ai_orchestrator import PrivacyClass as OrchestratorPrivacyClass
 from ai_provider import (
     AIMessage,
     AIRequest,
+    AIResponse,
     BackendConfig,
     ChatClient,
     MessageRole,
@@ -135,6 +142,66 @@ work from remaining work, identifies the smallest useful next action, avoids
 generic filler, and states uncertainty or decision boundaries. If the candidate
 is already good, say so rather than proposing unnecessary changes.
 """.strip()
+_RESPONSE_SCRUTINY_HEADINGS = (
+    "VERDICT",
+    "SCORE",
+    "STRENGTHS",
+    "ISSUES",
+    "RECOMMENDED_NEXT_ACTION",
+    "REVISED_RESPONSE",
+)
+_RESPONSE_SCRUTINY_VERDICTS = {"pass", "needs_revision", "fail"}
+_RESPONSE_SCRUTINY_HEADING_PATTERN = (
+    r"(?mi)^[ \t]*(?:#{1,6}[ \t]+)?(?:\*\*)?"
+    r"(VERDICT|SCORE|STRENGTHS|ISSUES|RECOMMENDED[ _]NEXT[ _]ACTION|REVISED[ _]RESPONSE)"
+    r"(?:\*\*)?:(?:\*\*)?[ \t]*(.*)$"
+)
+_FENCED_JSON_PATTERN = re.compile(r"```(?:json)?\s*(\{.*?\})\s*```", re.DOTALL)
+
+
+@dataclass(frozen=True)
+class ResponseScrutinyReport:
+    """Parsed second-pass response-quality report."""
+
+    verdict: str
+    score: int
+    strengths: str
+    issues: str
+    recommended_next_action: str
+    revised_response: str
+    raw_text: str
+
+
+@dataclass(frozen=True)
+class RunMetrics:
+    """Local process metrics captured for one CLI run."""
+
+    started_wall_seconds: float
+    started_cpu_seconds: float
+    tracemalloc_started: bool
+
+
+@dataclass(frozen=True)
+class ExternalAgentConfig:
+    """Runtime configuration for an external coding-agent CLI."""
+
+    access_method: AccessMethod
+    command: str
+    model: str
+    cwd: Path
+    timeout_seconds: float
+    sandbox: str = "workspace-write"
+    ephemeral: bool = True
+
+
+@dataclass(frozen=True)
+class ExternalAgentResult:
+    """Completed external coding-agent process result."""
+
+    command: tuple[str, ...]
+    returncode: int
+    stdout: str
+    stderr: str
 
 
 class _TeeOutput(TextIOBase):
@@ -145,13 +212,256 @@ class _TeeOutput(TextIOBase):
         self._transcript = transcript
 
     def write(self, text: str) -> int:
-        self._terminal.write(text)
         self._transcript.write(text)
+        try:
+            self._terminal.write(text)
+        except UnicodeEncodeError:
+            encoding = getattr(self._terminal, "encoding", None) or "utf-8"
+            safe_text = text.encode(encoding, errors="replace").decode(encoding)
+            self._terminal.write(safe_text)
         return len(text)
 
     def flush(self) -> None:
         self._terminal.flush()
-        self._transcript.flush()
+        if not self._transcript.closed:
+            self._transcript.flush()
+
+
+def _print_transcript_header(args: argparse.Namespace, argv: Sequence[str] | None) -> None:
+    """Print reproducible CLI invocation metadata for transcript logs."""
+
+    effective_argv = list(argv) if argv is not None else sys.argv[1:]
+    print("=== CLI invocation ===")
+    print(f"timestamp_utc: {datetime.now(UTC).isoformat()}")
+    print(f"cwd: {Path.cwd()}")
+    print("argv_json: " + json.dumps(effective_argv, ensure_ascii=False))
+    print("request:")
+    assert args.prompt is not None
+    print(args.prompt)
+    print()
+
+
+def _print_model_input(label: str, *, system_prompt: str, prompt: str) -> None:
+    """Print the exact model input for evaluation transcripts."""
+
+    print(f"\n=== {label} model input ===")
+    print("system_prompt:")
+    print("```text")
+    print(system_prompt.rstrip())
+    print("```")
+    print("user_prompt:")
+    print("```text")
+    print(prompt.rstrip())
+    print("```")
+
+
+def _print_external_agent_input(label: str, *, prompt: str) -> None:
+    """Print the exact stdin prompt sent to an external agent CLI."""
+
+    print(f"\n=== {label} external-agent input ===")
+    print("stdin_prompt:")
+    print("```text")
+    print(prompt.rstrip())
+    print("```")
+
+
+def _start_run_metrics() -> RunMetrics:
+    """Start local process metrics for transcript observability."""
+
+    tracemalloc_started = False
+    if not tracemalloc.is_tracing():
+        tracemalloc.start()
+        tracemalloc_started = True
+    return RunMetrics(
+        started_wall_seconds=time.perf_counter(),
+        started_cpu_seconds=time.process_time(),
+        tracemalloc_started=tracemalloc_started,
+    )
+
+
+def _print_response_usage(prefix: str, response: AIResponse | None) -> None:
+    """Print token and provider latency metrics for one response."""
+
+    if response is None:
+        print(f"{prefix}_usage_source: unavailable")
+        return
+    print(f"{prefix}_usage_source: {response.usage.source.value}")
+    print(f"{prefix}_input_tokens: {response.usage.input_tokens}")
+    print(f"{prefix}_output_tokens: {response.usage.output_tokens}")
+    print(f"{prefix}_total_tokens: {response.usage.total_tokens}")
+    print(f"{prefix}_provider_latency_ms: {response.latency_ms}")
+
+
+def _print_run_metrics(
+    metrics: RunMetrics,
+    *,
+    primary_elapsed_seconds: float | None,
+    primary_response: AIResponse | None,
+    scrutiny_elapsed_seconds: float | None,
+    scrutiny_response: AIResponse | None,
+) -> None:
+    """Print local process and provider-reported metrics for transcript analysis."""
+
+    current_bytes, peak_bytes = tracemalloc.get_traced_memory()
+    total_wall_seconds = time.perf_counter() - metrics.started_wall_seconds
+    total_cpu_seconds = time.process_time() - metrics.started_cpu_seconds
+    print("\n=== Run metrics ===")
+    print(f"total_wall_seconds: {total_wall_seconds:.3f}")
+    print(f"process_cpu_seconds: {total_cpu_seconds:.3f}")
+    print(f"python_memory_current_bytes: {current_bytes}")
+    print(f"python_memory_peak_bytes: {peak_bytes}")
+    print(f"primary_elapsed_seconds: {_format_optional_seconds(primary_elapsed_seconds)}")
+    _print_response_usage("primary", primary_response)
+    print(f"scrutiny_elapsed_seconds: {_format_optional_seconds(scrutiny_elapsed_seconds)}")
+    _print_response_usage("scrutiny", scrutiny_response)
+    if metrics.tracemalloc_started:
+        tracemalloc.stop()
+
+
+def _format_optional_seconds(value: float | None) -> str:
+    """Format an optional elapsed-time value for stable transcript output."""
+
+    if value is None:
+        return "None"
+    return f"{value:.3f}"
+
+
+def _is_external_agent_access_method(access_method: AccessMethod) -> bool:
+    """Return whether an access method uses an external coding-agent client."""
+
+    return access_method in {
+        AccessMethod.CODEX_CLI,
+        AccessMethod.ANTIGRAVITY_CLI,
+        AccessMethod.COPILOT_CLI,
+        AccessMethod.KIRO_CLI,
+    }
+
+
+def _default_codex_command() -> str | None:
+    """Return Codex CLI from env, PATH, or the PyCharm bundled install."""
+
+    configured = os.environ.get("CODEX_COMMAND")
+    if configured:
+        return configured
+
+    command = shutil.which("codex")
+    if command:
+        return command
+
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    if not local_app_data:
+        return None
+
+    bundled = (
+        Path(local_app_data)
+        / "JetBrains"
+        / "PyCharm2025.3"
+        / "aia"
+        / "codex"
+        / "bin"
+        / "codex-x86_64-pc-windows-msvc.exe"
+    )
+    return str(bundled) if bundled.exists() else None
+
+
+def _external_agent_command(access_method: AccessMethod) -> str | None:
+    """Return the configured command for a supported external coding-agent route."""
+
+    if access_method is AccessMethod.CODEX_CLI:
+        return _default_codex_command()
+    if access_method is AccessMethod.ANTIGRAVITY_CLI:
+        return os.environ.get("ANTIGRAVITY_COMMAND") or shutil.which("antigravity")
+    if access_method is AccessMethod.COPILOT_CLI:
+        return os.environ.get("GITHUB_COPILOT_COMMAND") or shutil.which("copilot")
+    if access_method is AccessMethod.KIRO_CLI:
+        return os.environ.get("KIRO_COMMAND") or shutil.which("kiro")
+    return None
+
+
+def _external_agent_status() -> dict[str, str | bool | None]:
+    """Return local discovery status for configured external coding-agent clients."""
+
+    return {
+        "codex_available": _external_agent_command(AccessMethod.CODEX_CLI) is not None,
+        "codex_command": _external_agent_command(AccessMethod.CODEX_CLI),
+        "antigravity_available": _external_agent_command(AccessMethod.ANTIGRAVITY_CLI) is not None,
+        "antigravity_command": _external_agent_command(AccessMethod.ANTIGRAVITY_CLI),
+        "copilot_available": _external_agent_command(AccessMethod.COPILOT_CLI) is not None,
+        "copilot_command": _external_agent_command(AccessMethod.COPILOT_CLI),
+        "kiro_available": _external_agent_command(AccessMethod.KIRO_CLI) is not None,
+        "kiro_command": _external_agent_command(AccessMethod.KIRO_CLI),
+    }
+
+
+def _external_agent_config_from_orchestration(
+    orchestration: OrchestrationResult,
+    *,
+    repo_root: Path,
+    timeout_seconds: float,
+) -> ExternalAgentConfig:
+    """Adapt a ready orchestration result to an external-agent runtime config."""
+
+    assert orchestration.execution_plan is not None
+    target = orchestration.execution_plan.target
+    if target.access_method is not AccessMethod.CODEX_CLI:
+        raise NotImplementedError(
+            f"{target.access_method.value} execution is not implemented yet. "
+            "Configure the official command first, then add an executor adapter."
+        )
+    command = _external_agent_command(target.access_method)
+    if command is None:
+        raise FileNotFoundError(
+            "Could not find Codex CLI. Set CODEX_COMMAND or install/configure Codex CLI."
+        )
+    return ExternalAgentConfig(
+        access_method=target.access_method,
+        command=command,
+        model=target.model,
+        cwd=repo_root,
+        timeout_seconds=timeout_seconds,
+    )
+
+
+def _build_external_agent_command(config: ExternalAgentConfig) -> tuple[str, ...]:
+    """Build the noninteractive command for an external coding-agent client."""
+
+    if config.access_method is not AccessMethod.CODEX_CLI:
+        raise NotImplementedError(f"{config.access_method.value} execution is not implemented.")
+
+    command = [
+        config.command,
+        "exec",
+        "--cd",
+        str(config.cwd),
+        "--model",
+        config.model,
+        "--sandbox",
+        config.sandbox,
+    ]
+    if config.ephemeral:
+        command.append("--ephemeral")
+    command.append("-")
+    return tuple(command)
+
+
+def _run_external_agent(prompt: str, config: ExternalAgentConfig) -> ExternalAgentResult:
+    """Run an external coding-agent process with the prompt on stdin."""
+
+    command = _build_external_agent_command(config)
+    completed = subprocess.run(
+        command,
+        input=prompt,
+        text=True,
+        capture_output=True,
+        timeout=config.timeout_seconds,
+        cwd=config.cwd,
+    )
+    return ExternalAgentResult(
+        command=command,
+        returncode=completed.returncode,
+        stdout=completed.stdout or "",
+        stderr=completed.stderr or "",
+    )
 
 
 def _capability_report(snapshot: Any) -> dict[str, Any]:
@@ -182,6 +492,7 @@ def _capability_report(snapshot: Any) -> dict[str, Any]:
             "installed_models": [model.model for model in snapshot.installed_ollama_models],
             "running_models": [model.model for model in snapshot.running_ollama_models],
         },
+        "external_agents": _external_agent_status(),
     }
 
 
@@ -195,6 +506,94 @@ def build_response_scrutiny_prompt(original_prompt: str, response: str) -> str:
         f"{response}\n\n"
         "Scrutinize the candidate response using the required report format."
     )
+
+
+def parse_response_scrutiny_report(text: str) -> ResponseScrutinyReport:
+    """Parse and validate the structured response-scrutiny report."""
+
+    sections = _parse_response_scrutiny_heading_sections(text)
+    if sections is None:
+        sections = _parse_response_scrutiny_json_sections(text)
+
+    missing = [heading for heading in _RESPONSE_SCRUTINY_HEADINGS if heading not in sections]
+    if missing:
+        raise ValueError("missing scrutiny heading(s): " + ", ".join(missing))
+
+    verdict = sections["VERDICT"].strip().lower()
+    if verdict not in _RESPONSE_SCRUTINY_VERDICTS:
+        raise ValueError(f"invalid scrutiny verdict: {sections['VERDICT']!r}")
+
+    try:
+        score = int(sections["SCORE"].strip())
+    except ValueError as exc:
+        raise ValueError(f"invalid scrutiny score: {sections['SCORE']!r}") from exc
+    if not 0 <= score <= 10:
+        raise ValueError(f"scrutiny score out of range: {score}")
+
+    return ResponseScrutinyReport(
+        verdict=verdict,
+        score=score,
+        strengths=sections["STRENGTHS"],
+        issues=sections["ISSUES"],
+        recommended_next_action=sections["RECOMMENDED_NEXT_ACTION"],
+        revised_response=sections["REVISED_RESPONSE"],
+        raw_text=text,
+    )
+
+
+def _parse_response_scrutiny_heading_sections(text: str) -> dict[str, str] | None:
+    """Parse report sections from canonical heading lines."""
+
+    matches = list(
+        re.finditer(
+            _RESPONSE_SCRUTINY_HEADING_PATTERN,
+            text,
+        )
+    )
+    if not matches:
+        return None
+
+    sections: dict[str, str] = {}
+    for index, match in enumerate(matches):
+        heading = match.group(1).upper().replace(" ", "_")
+        if heading in sections:
+            raise ValueError(f"duplicate scrutiny heading: {heading}")
+        section_end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
+        first_line = match.group(2).strip()
+        continuation = text[match.end() : section_end].strip()
+        sections[heading] = f"{first_line}\n{continuation}".strip() if continuation else first_line
+
+    return sections
+
+
+def _parse_response_scrutiny_json_sections(text: str) -> dict[str, str]:
+    """Parse report sections from a JSON object with canonical keys."""
+
+    candidate = text.strip()
+    match = _FENCED_JSON_PATTERN.search(candidate)
+    if match:
+        candidate = match.group(1)
+    try:
+        parsed = json.loads(candidate)
+    except json.JSONDecodeError:
+        return {}
+    if not isinstance(parsed, dict):
+        return {}
+    return {
+        heading: _stringify_scrutiny_section(parsed[heading])
+        for heading in _RESPONSE_SCRUTINY_HEADINGS
+        if heading in parsed
+    }
+
+
+def _stringify_scrutiny_section(value: Any) -> str:
+    """Convert JSON scrutiny values to stable transcript text."""
+
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value.strip()
+    return json.dumps(value, ensure_ascii=False, indent=2)
 
 
 def find_repo_root(start: Path) -> Path:
@@ -617,6 +1016,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="Also save the complete CLI transcript to this local file.",
     )
     parser.add_argument(
+        "--log-full-prompt",
+        action="store_true",
+        help=(
+            "Include exact system and user prompts in --log-file transcripts. "
+            "This can contain repository context and sensitive text."
+        ),
+    )
+    parser.add_argument(
         "--skip-prompt-review",
         action="store_true",
         help="Bypass deterministic prompt review.",
@@ -679,8 +1086,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         parser.error("--mode implement requires --execute")
     if args.mode == "implement" and not (args.apply_actions or args.native_tools):
         parser.error("--mode implement requires --apply-actions or --native-tools")
+    if args.log_full_prompt and args.log_file is None:
+        parser.error("--log-full-prompt requires --log-file")
 
     transcript = None
+    close_transcript_func: Callable[[], None] | None = None
     if args.log_file is not None:
         args.log_file.parent.mkdir(parents=True, exist_ok=True)
         transcript = args.log_file.open("w", encoding="utf-8")
@@ -688,12 +1098,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         sys.stdout = _TeeOutput(terminal, transcript)
 
         def close_transcript() -> None:
+            if transcript.closed:
+                return
             sys.stdout = terminal
             transcript.close()
 
         atexit.register(close_transcript)
+        close_transcript_func = close_transcript
         print(f"transcript_log_file: {args.log_file}")
+        _print_transcript_header(args, argv)
 
+    metrics = _start_run_metrics()
     repo_root = (args.repo_root or find_repo_root(Path.cwd())).resolve()
     context_budget_chars = None if args.context_budget_chars == 0 else args.context_budget_chars
     context_files = load_prompt_context(
@@ -731,12 +1146,44 @@ def main(argv: Sequence[str] | None = None) -> int:
             prompt = f"{prompt}\n\n## Verified local context extraction\n{delegated_summary}"
     elif args.delegate_context:
         delegation_status = "planned: requires --execute"
+    primary_system_prompt = build_default_system_prompt(args.system)
     ollama_resource_profile = (
         get_ollama_resource_profile(args.ollama_profile)
         if args.ollama_profile is not None
         else None
     )
+    external_orchestration = prepare_execution(
+        prompt,
+        profile,
+        catalog,
+        review_prompt=not args.skip_prompt_review,
+        prompt_for_review=args.prompt,
+        timeout_seconds=args.timeout_seconds,
+    )
+    if (
+        external_orchestration.is_ready
+        and external_orchestration.execution_plan is not None
+        and _is_external_agent_access_method(
+            external_orchestration.execution_plan.target.access_method
+        )
+    ):
+        return _run_external_agent_cli_mode(
+            prompt=prompt,
+            args=args,
+            repo_root=repo_root,
+            context_files=context_files,
+            context_budget_chars=context_budget_chars,
+            orchestration=external_orchestration,
+            delegation_status=delegation_status,
+            metrics=metrics,
+            close_transcript=close_transcript_func,
+        )
+
+    if args.log_full_prompt:
+        _print_model_input("Primary", system_prompt=primary_system_prompt, prompt=prompt)
+    primary_elapsed_seconds = None
     try:
+        primary_started = time.perf_counter()
         result = run_coding_prompt(
             prompt,
             profile,
@@ -745,13 +1192,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             prompt_for_review=args.prompt,
             timeout_seconds=args.timeout_seconds,
             execute=args.execute and not args.native_tools and args.mode != "plan",
-            system_prompt=build_default_system_prompt(args.system),
+            system_prompt=primary_system_prompt,
             start_ollama=args.start_ollama,
             ollama_command=args.ollama_command,
             ollama_startup_timeout_seconds=args.ollama_startup_timeout_seconds,
             ollama_log_path=args.ollama_log_file if args.start_ollama else None,
             ollama_resource_profile=ollama_resource_profile,
         )
+        primary_elapsed_seconds = time.perf_counter() - primary_started
     except ProviderError as exc:
         print("=== Repo Coding Assistant ===")
         print(f"mode: {args.mode}")
@@ -759,6 +1207,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("status: failed")
         print(f"failure_reason: {exc}")
         print("execution_status: failed")
+        _print_run_metrics(
+            metrics,
+            primary_elapsed_seconds=primary_elapsed_seconds,
+            primary_response=None,
+            scrutiny_elapsed_seconds=None,
+            scrutiny_response=None,
+        )
+        if close_transcript_func is not None:
+            close_transcript_func()
         return 1
 
     print("=== Repo Coding Assistant ===")
@@ -838,12 +1295,22 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f"suggested_prompt: {result.orchestration.prompt_judge.refined_prompt}")
     if result.orchestration.failure_reason:
         execution_status = "failed"
+    scrutiny_result = None
+    scrutiny_elapsed_seconds = None
     if args.scrutinize_response and assistant_response_text is not None:
         print("\n=== Response scrutiny ===")
         scrutiny_failed = False
         try:
+            scrutiny_started = time.perf_counter()
+            scrutiny_prompt = build_response_scrutiny_prompt(prompt, assistant_response_text)
+            if args.log_full_prompt:
+                _print_model_input(
+                    "Scrutiny",
+                    system_prompt=_RESPONSE_SCRUTINY_SYSTEM_PROMPT,
+                    prompt=scrutiny_prompt,
+                )
             scrutiny_result = run_coding_prompt(
-                build_response_scrutiny_prompt(prompt, assistant_response_text),
+                scrutiny_prompt,
                 profile,
                 catalog,
                 review_prompt=False,
@@ -852,14 +1319,27 @@ def main(argv: Sequence[str] | None = None) -> int:
                 system_prompt=_RESPONSE_SCRUTINY_SYSTEM_PROMPT,
                 start_ollama=False,
             )
+            scrutiny_elapsed_seconds = time.perf_counter() - scrutiny_started
         except ProviderError as exc:
             print("scrutiny_status: failed")
             print(f"scrutiny_failure_reason: {exc}")
             scrutiny_failed = True
         else:
             if scrutiny_result.response is not None:
-                print(scrutiny_result.response.message.content)
-                print("scrutiny_status: completed")
+                scrutiny_text = scrutiny_result.response.message.content
+                print(scrutiny_text)
+                try:
+                    scrutiny_report = parse_response_scrutiny_report(scrutiny_text)
+                except ValueError as exc:
+                    print("scrutiny_status: invalid")
+                    print(f"scrutiny_failure_reason: {exc}")
+                    scrutiny_failed = True
+                else:
+                    print(f"scrutiny_verdict: {scrutiny_report.verdict}")
+                    print(f"scrutiny_score: {scrutiny_report.score}")
+                    print("scrutiny_status: completed")
+                    if scrutiny_report.verdict != "pass" and execution_status == "completed":
+                        execution_status = "completed_with_scrutiny_findings"
             else:
                 print("scrutiny_status: failed")
                 scrutiny_failed = True
@@ -870,7 +1350,104 @@ def main(argv: Sequence[str] | None = None) -> int:
         if scrutiny_failed and execution_status == "completed":
             execution_status = "completed_with_scrutiny_errors"
     print(f"execution_status: {execution_status}")
+    _print_run_metrics(
+        metrics,
+        primary_elapsed_seconds=primary_elapsed_seconds,
+        primary_response=result.response,
+        scrutiny_elapsed_seconds=scrutiny_elapsed_seconds,
+        scrutiny_response=scrutiny_result.response if scrutiny_result is not None else None,
+    )
+    if close_transcript_func is not None:
+        close_transcript_func()
     return 0
+
+
+def _run_external_agent_cli_mode(
+    *,
+    prompt: str,
+    args: argparse.Namespace,
+    repo_root: Path,
+    context_files: Sequence[RepoContextFile],
+    context_budget_chars: int | None,
+    orchestration: OrchestrationResult,
+    delegation_status: str,
+    metrics: RunMetrics,
+    close_transcript: Callable[[], None] | None,
+) -> int:
+    """Run or plan a coding request through an external coding-agent CLI route."""
+
+    assert orchestration.execution_plan is not None
+    target = orchestration.execution_plan.target
+    print("=== Repo Coding Assistant ===")
+    print(f"mode: {args.mode}")
+    print(f"repo_root: {repo_root}")
+    print(
+        f"context_chars: {sum(len(item.content) for item in context_files)}"
+        + (f"/{args.context_budget_chars}" if context_budget_chars is not None else "/unlimited")
+    )
+    for context_file in context_files:
+        print(f"context: {context_file.display_path}")
+    print(f"status: {orchestration.status.value}")
+    print(f"delegation: {delegation_status}")
+    print(f"route_id: {target.route_id}")
+    print(f"product: {target.product}")
+    print(f"provider: {target.provider}")
+    print(f"model: {target.model}")
+    print(f"access_method: {target.access_method.value}")
+    print(f"cost_policy_tier: {target.cost_policy_tier.value}")
+    if args.log_full_prompt:
+        _print_external_agent_input("Primary", prompt=prompt)
+
+    primary_elapsed_seconds = None
+    external_result = None
+    execution_status = "planned"
+    exit_code = 0
+    try:
+        config = _external_agent_config_from_orchestration(
+            orchestration,
+            repo_root=repo_root,
+            timeout_seconds=args.timeout_seconds,
+        )
+        print(f"external_agent_command: {config.command}")
+        print(f"external_agent_sandbox: {config.sandbox}")
+        print("\n=== Assistant response ===")
+        if args.execute and args.mode != "plan":
+            primary_started = time.perf_counter()
+            external_result = _run_external_agent(prompt, config)
+            primary_elapsed_seconds = time.perf_counter() - primary_started
+            print(f"external_agent_returncode: {external_result.returncode}")
+            if external_result.stdout:
+                print(external_result.stdout, end="")
+                if not external_result.stdout.endswith("\n"):
+                    print()
+            if external_result.stderr:
+                print("\n=== External agent stderr ===")
+                print(external_result.stderr, end="")
+                if not external_result.stderr.endswith("\n"):
+                    print()
+            execution_status = "completed" if external_result.returncode == 0 else "failed"
+            exit_code = external_result.returncode
+        else:
+            command = _build_external_agent_command(config)
+            print("execution: skipped")
+            print("external_agent_command_line_json: " + json.dumps(list(command)))
+    except (FileNotFoundError, NotImplementedError, subprocess.TimeoutExpired) as exc:
+        print("\n=== Assistant response ===")
+        print(f"failure_reason: {exc}")
+        execution_status = "failed"
+        exit_code = 1
+
+    print(f"execution_status: {execution_status}")
+    _print_run_metrics(
+        metrics,
+        primary_elapsed_seconds=primary_elapsed_seconds,
+        primary_response=None,
+        scrutiny_elapsed_seconds=None,
+        scrutiny_response=None,
+    )
+    if close_transcript is not None:
+        close_transcript()
+    return exit_code
 
 
 def _run_native_agent(

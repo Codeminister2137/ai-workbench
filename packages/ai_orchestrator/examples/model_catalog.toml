@@ -127,6 +127,31 @@ output_cost_per_million_tokens = 0
 source = "local benchmark: 3 runs, 1 warmup, median latency for qwen3:14b"
 
 [[models]]
+route_id = "openai-codex-gpt-5-1"
+provider = "openai"
+product = "codex"
+model = "gpt-5.1"
+location = "external"
+access_method = "codex_cli"
+auth_method = "chatgpt_sign_in"
+billing_source = "chatgpt_subscription_allowance"
+cost_policy_tier = "allowances_allowed"
+quality = "high"
+latency = "interactive"
+notes = "Codex CLI route using ChatGPT sign-in and subscription allowance. Executed via `codex exec` when the CLI command is available."
+
+[models.capabilities]
+chat = true
+streaming = false
+tools = true
+structured_output = false
+multimodal_input = false
+embeddings = false
+
+[models.estimate]
+source = "Codex CLI subscription allowance; live usage telemetry is captured from CLI transcripts when available."
+
+[[models]]
 route_id = "google-ai-studio-gemini-3-1-pro"
 provider = "google"
 product = "google_ai_studio"
@@ -223,6 +248,50 @@ notes = "Google Antigravity fast model route using user Google account sign-in."
 [models.capabilities]
 chat = true
 streaming = true
+tools = true
+structured_output = false
+multimodal_input = false
+embeddings = false
+
+[[models]]
+route_id = "github-copilot-cli-default"
+provider = "github"
+product = "github_copilot"
+model = "copilot"
+location = "external"
+access_method = "copilot_cli"
+auth_method = "github_account_sign_in"
+billing_source = "github_copilot_subscription_allowance"
+cost_policy_tier = "allowances_allowed"
+quality = "standard"
+latency = "interactive"
+notes = "GitHub Copilot CLI/editor-agent route placeholder. Execution is disabled until the official noninteractive command contract is confirmed."
+
+[models.capabilities]
+chat = true
+streaming = false
+tools = true
+structured_output = false
+multimodal_input = false
+embeddings = false
+
+[[models]]
+route_id = "kiro-cli-default"
+provider = "kiro"
+product = "kiro"
+model = "kiro"
+location = "external"
+access_method = "kiro_cli"
+auth_method = "kiro_sign_in"
+billing_source = "kiro_subscription_allowance"
+cost_policy_tier = "allowances_allowed"
+quality = "standard"
+latency = "interactive"
+notes = "Kiro CLI candidate route placeholder. Execution is disabled until the installed client path and noninteractive command contract are confirmed."
+
+[models.capabilities]
+chat = true
+streaming = false
 tools = true
 structured_output = false
 multimodal_input = false

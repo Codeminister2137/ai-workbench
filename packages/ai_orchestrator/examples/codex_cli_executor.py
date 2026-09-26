@@ -32,7 +32,6 @@ class CodexCliConfig:
     model: str
     cwd: Path
     sandbox: str = "workspace-write"
-    approval_policy: str = "never"
     timeout_seconds: float = 600.0
     ephemeral: bool = True
     json_output: bool = False
@@ -133,8 +132,6 @@ def build_codex_exec_command(config: CodexCliConfig) -> tuple[str, ...]:
         str(config.cwd),
         "--model",
         config.model,
-        "--ask-for-approval",
-        config.approval_policy,
         "--sandbox",
         config.sandbox,
     ]

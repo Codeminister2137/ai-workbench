@@ -47,11 +47,33 @@ function Import-DotEnv {
     }
 }
 
+function Add-DefaultLogFile {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]] $Args,
+        [Parameter(Mandatory = $true)]
+        [string] $RepoRoot
+    )
+
+    if ($Args -contains "--log-file" -or $Args -contains "--local-capabilities") {
+        return $Args
+    }
+
+    $logsDirectory = Join-Path $RepoRoot "logs"
+    New-Item -ItemType Directory -Path $logsDirectory -Force | Out-Null
+    $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
+    $logFile = Join-Path $logsDirectory "repo-assistant-$timestamp.log"
+
+    return @($Args + @("--log-file", $logFile))
+}
+
 $repoRoot = Get-RepoRoot
 $envPath = Join-Path $repoRoot ".env"
 
 Import-DotEnv -Path $envPath
 Set-Location -LiteralPath $repoRoot
 
-& python -m uv run ai-assistant @CliArgs
+$effectiveCliArgs = Add-DefaultLogFile -Args $CliArgs -RepoRoot $repoRoot
+
+& python -m uv run ai-assistant @effectiveCliArgs
 exit $LASTEXITCODE

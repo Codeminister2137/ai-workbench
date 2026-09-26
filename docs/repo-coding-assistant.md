@@ -16,7 +16,8 @@ python -m uv run ai-assistant --mode plan "Review this module."
 ```
 
 On Windows, `scripts\repo-assistant.ps1` remains the convenient wrapper because
-it loads `.env` and starts the command from the repository root.
+it loads `.env`, starts the command from the repository root, and adds a
+timestamped transcript log under `logs\` when `--log-file` is not supplied.
 
 The CLI supports explicit modes:
 
@@ -58,15 +59,23 @@ when an approved tool or action returned an error.
 It evaluates the completed answer against the original request and repository
 context, then prints a structured verdict, score, issues, recommended next
 action, and revised response. It does not edit files or execute actions. The
-additional report is included in the same `--log-file` transcript, so this is
-the recommended broad-repository response-quality command.
+CLI parses and validates Markdown-compatible report headings with the required
+labels, including case and underscore/space variants for known labels, or a JSON
+object with the same required keys, before marking scrutiny as completed. It
+emits normalized `scrutiny_verdict` and `scrutiny_score` lines for log
+inspection. A malformed scrutiny report is reported as
+`scrutiny_status: invalid`; a non-pass verdict leaves the primary answer intact
+but marks the run as
+`execution_status: completed_with_scrutiny_findings`. The additional report is
+included in the same `--log-file` transcript, so this is the recommended
+broad-repository response-quality command.
 
 For repeated manual live acceptance checks, use
 `scripts\repo-assistant-broad-analysis.ps1`. This is not a unit test: it makes
 two real provider calls and the final answer remains subject to human
 evaluation. The script is the canonical, evolvable version of the command; its
-default prompt, provider/model, transcript paths, and quality flags are kept
-together.
+default prompt, provider/model, timestamped transcript/runtime logs, full-prompt
+evaluation capture, and quality flags are kept together.
 Pass `-Prompt`, `-Model`, `-LogFile`, or `-OllamaLogFile` when a test needs a
 different value without duplicating the workflow:
 
@@ -107,6 +116,41 @@ so keep them local:
   --execute --start-ollama `
   --log-file logs\repo-assistant-latest.log
 ```
+
+Logged transcripts start with a `=== CLI invocation ===` section containing the
+UTC timestamp, current working directory, argv as JSON, and the original request
+text. The rest of the file mirrors the CLI output, including route metadata,
+assistant response, action-loop output, scrutiny output, normalized scrutiny
+status, and final `execution_status`.
+
+By default, transcript logs do not include the complete assembled model prompt.
+Use `--log-full-prompt` with `--log-file` when building evaluation data that
+needs exact instructions and repository context. For provider API routes, this
+records the exact system prompt and user prompt. For external-agent routes such
+as Codex CLI, this records the exact stdin prompt passed to the agent. These
+sections may contain `AGENTS.md`, `CURRENT_CONTEXT.md`, selected source files,
+and the original request, so keep them local unless reviewed.
+
+Every run also ends with `=== Run metrics ===`. These fields are intended for
+comparing CLI changes, model behavior, and local settings over time:
+
+- `total_wall_seconds` and `process_cpu_seconds`;
+- `python_memory_current_bytes` and `python_memory_peak_bytes`;
+- `primary_elapsed_seconds` and `scrutiny_elapsed_seconds`;
+- provider-reported primary and scrutiny token usage when available:
+  `*_usage_source`, `*_input_tokens`, `*_output_tokens`, `*_total_tokens`;
+- provider-reported latency when available: `*_provider_latency_ms`.
+
+Token and provider-latency fields are `None` or `unavailable` when the backend
+does not report them. The memory metrics are Python-process memory observed by
+the CLI, not total GPU, Ollama server, IDE, or external-provider resource use.
+
+When using `scripts\repo-assistant.ps1`, transcript logging is on by default.
+Each run without an explicit `--log-file` writes to
+`logs\repo-assistant-YYYYMMDD-HHMMSS.log`. The canonical broad-analysis script
+uses timestamped `logs\repo-assistant-broad-analysis-YYYYMMDD-HHMMSS.log` and
+`logs\ollama-broad-analysis-YYYYMMDD-HHMMSS.log` paths by default. Pass
+`--log-file` or `-LogFile` when you intentionally want a fixed path.
 
 When `--start-ollama` is used, Ollama server output is written to
 `logs\ollama-serve.log` by default. Change it with `--ollama-log-file`.
@@ -200,6 +244,39 @@ migration.
 Provider-layer failures are reported with `status: failed` and
 `execution_status: failed`; the command returns a non-zero exit code instead
 of emitting a success-shaped response.
+
+## External Coding Agent Routes
+
+The catalog includes subscription/client-backed coding-agent routes alongside
+provider API routes:
+
+- Codex CLI: `openai-codex-gpt-5-1`, access method `codex_cli`;
+- Google Antigravity: `google-antigravity-gemini-3-1-pro` and
+  `google-antigravity-gemini-3-8-flash`, access method `antigravity_cli`;
+- GitHub Copilot placeholder: `github-copilot-cli-default`, access method
+  `copilot_cli`;
+- Kiro placeholder: `kiro-cli-default`, access method `kiro_cli`.
+
+Codex execution is wired first. The CLI discovers the Codex command from
+`CODEX_COMMAND`, then PATH, then the PyCharm bundled Codex binary. Example:
+
+```powershell
+.\scripts\repo-assistant.ps1 `
+  "Review this repository and identify the smallest safe next change." `
+  --privacy external_allowed `
+  --route-id openai-codex-gpt-5-1 `
+  --provider openai --model gpt-5.1 `
+  --execute --skip-prompt-review
+```
+
+Codex is invoked as `codex exec` with repository cwd, stdin prompt, workspace
+sandbox, and ephemeral session state. This is
+not full parity with the Codex IDE/ChatGPT environment: app/plugin tools,
+document-control tools, IDE-private state, and this chat's managed approval
+surface are not automatically available through `codex exec`. Antigravity,
+Copilot, and Kiro are represented for route planning and diagnostics, but their
+execution adapters remain disabled until their official noninteractive command
+contracts and local executable paths are confirmed.
 
 ## CLI-First Roadmap
 

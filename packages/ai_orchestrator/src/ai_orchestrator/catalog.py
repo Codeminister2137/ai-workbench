@@ -146,6 +146,10 @@ def _default_product(provider: str, access_method: AccessMethod) -> str:
         return "codex"
     if access_method is AccessMethod.ANTIGRAVITY_CLI:
         return "antigravity"
+    if access_method is AccessMethod.COPILOT_CLI:
+        return "github_copilot"
+    if access_method is AccessMethod.KIRO_CLI:
+        return "kiro"
     if access_method is AccessMethod.PROVIDER_API and provider == "openai":
         return "openai_api"
     if access_method is AccessMethod.PROVIDER_API and provider in {"google", "gemini"}:
@@ -160,6 +164,10 @@ def _default_auth_method(provider: str, access_method: AccessMethod) -> str:
         return AuthMethod.CHATGPT_SIGN_IN.value
     if access_method is AccessMethod.ANTIGRAVITY_CLI:
         return AuthMethod.GOOGLE_ACCOUNT_SIGN_IN.value
+    if access_method is AccessMethod.COPILOT_CLI:
+        return AuthMethod.GITHUB_ACCOUNT_SIGN_IN.value
+    if access_method is AccessMethod.KIRO_CLI:
+        return AuthMethod.KIRO_SIGN_IN.value
     return AuthMethod.API_KEY.value
 
 
@@ -170,6 +178,10 @@ def _default_billing_source(provider: str, access_method: AccessMethod) -> str:
         return BillingSource.CHATGPT_SUBSCRIPTION_ALLOWANCE.value
     if access_method is AccessMethod.ANTIGRAVITY_CLI:
         return BillingSource.ANTIGRAVITY_SUBSCRIPTION_ALLOWANCE.value
+    if access_method is AccessMethod.COPILOT_CLI:
+        return BillingSource.GITHUB_COPILOT_SUBSCRIPTION_ALLOWANCE.value
+    if access_method is AccessMethod.KIRO_CLI:
+        return BillingSource.KIRO_SUBSCRIPTION_ALLOWANCE.value
     if provider == "requesty":
         return BillingSource.REQUESTY_BILLING.value
     if provider in {"google", "gemini"}:
@@ -191,6 +203,8 @@ def _default_cost_policy_tier(
         BillingSource.CHATGPT_SUBSCRIPTION_ALLOWANCE,
         BillingSource.CHATGPT_WORKSPACE_CREDITS,
         BillingSource.ANTIGRAVITY_SUBSCRIPTION_ALLOWANCE,
+        BillingSource.GITHUB_COPILOT_SUBSCRIPTION_ALLOWANCE,
+        BillingSource.KIRO_SUBSCRIPTION_ALLOWANCE,
     }:
         return CostPolicyTier.ALLOWANCES_ALLOWED.value
     if billing_source is BillingSource.REQUESTY_BILLING:
