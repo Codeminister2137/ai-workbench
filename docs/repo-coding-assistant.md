@@ -250,7 +250,8 @@ of emitting a success-shaped response.
 The catalog includes subscription/client-backed coding-agent routes alongside
 provider API routes:
 
-- Codex CLI: `openai-codex-gpt-5-1`, access method `codex_cli`;
+- Codex CLI: `openai-codex-gpt-5-5` and `openai-codex-gpt-5-1`, access method
+  `codex_cli`;
 - Google Antigravity: `google-antigravity-gemini-3-1-pro` and
   `google-antigravity-gemini-3-8-flash`, access method `antigravity_cli`;
 - GitHub Copilot placeholder: `github-copilot-cli-default`, access method
@@ -264,19 +265,51 @@ Codex execution is wired first. The CLI discovers the Codex command from
 .\scripts\repo-assistant.ps1 `
   "Review this repository and identify the smallest safe next change." `
   --privacy external_allowed `
-  --route-id openai-codex-gpt-5-1 `
-  --provider openai --model gpt-5.1 `
+  --route-id openai-codex-gpt-5-5 `
+  --provider openai --model gpt-5.5 `
   --execute --skip-prompt-review
 ```
 
-Codex is invoked as `codex exec` with repository cwd, stdin prompt, workspace
-sandbox, and ephemeral session state. This is
-not full parity with the Codex IDE/ChatGPT environment: app/plugin tools,
-document-control tools, IDE-private state, and this chat's managed approval
-surface are not automatically available through `codex exec`. Antigravity,
-Copilot, and Kiro are represented for route planning and diagnostics, but their
-execution adapters remain disabled until their official noninteractive command
-contracts and local executable paths are confirmed.
+Codex is invoked as `codex exec --json` with repository cwd, stdin prompt,
+workspace sandbox, and ephemeral session state. The CLI parses the JSONL event
+stream enough to report the final answer, command/tool/file-change event counts,
+failure status, and usage payloads when Codex emits them. Raw JSONL is preserved
+in transcript logs under `=== External agent raw JSONL ===` for debugging and
+evaluation without dumping the full event stream to the terminal.
+
+`--mode diagnose` and `--local-capabilities` include Codex diagnostics when a
+Codex command is discoverable: command path, version, login-status text,
+`exec --json` support, MCP list output, plugin list output, and the relevant
+config path. The report does not read or print auth files, config contents, or
+tokens.
+
+The PyCharm-bundled Codex CLI verified in this repository is `codex-cli
+0.137.0`. On 2026-09-26, `gpt-5.5` completed a low-risk JSONL execution through
+ChatGPT sign-in, while `gpt-5.1` returned an upstream invalid-request error for
+this account. Keep both facts in mind when selecting routes.
+
+This is not full parity with the Codex IDE/ChatGPT environment: app/plugin
+tools, document-control tools, IDE-private state, and this chat's managed
+approval surface are not automatically available through `codex exec`.
+Antigravity, Copilot, and Kiro are represented for route planning and
+diagnostics, but their execution adapters remain disabled until their official
+noninteractive command contracts and local executable paths are confirmed.
+
+### Codex Capability Matrix
+
+| Capability | This ChatGPT/Codex session | Repository CLI via Codex CLI | Current status |
+| --- | --- | --- | --- |
+| Repository instructions | Root `AGENTS.md` and runtime instructions are loaded by this session. | The repo assistant includes bounded `AGENTS.md`/`CURRENT_CONTEXT.md` context in the stdin prompt; Codex CLI also has its own `AGENTS.md`/config behavior. | Implemented, with bounded prompt context. |
+| Shell/file coding work | Managed tools can inspect and edit the shared workspace. | `codex exec --json --sandbox workspace-write --ephemeral -` runs inside the repo root. | Implemented for Codex route. |
+| Machine-readable execution events | Tool calls are available to this runtime. | JSONL stdout is parsed for final answer, command/tool/file-change events, failures, and usage. | Implemented with tolerant parsing. |
+| Raw transcripts/event logs | Conversation and tool output exist in the managed session. | CLI transcript logs preserve invocation metadata, full prompts when requested, run metrics, and raw Codex JSONL. | Implemented as local files under `logs\`. |
+| Approval/sandbox policy | Managed by the active ChatGPT/Codex runtime. | Uses Codex CLI sandbox flags. This installed `codex exec` supports `--json`, `--sandbox`, and `--ephemeral`; `--ask-for-approval` must not be assumed unless local help confirms it. | Partially implemented; human approval parity is a known gap. |
+| MCP tools | Available here through the current managed runtime. | Diagnostics list configured Codex MCP servers. Actually reproducing tools requires Codex MCP config/design. | Feasible, decision required before adding MCP/tool design. |
+| Plugins/apps | This session has installed app/plugin tools exposed by ChatGPT. | Diagnostics list Codex plugin marketplace/install status. Installing or authorizing plugins is outside this CLI slice. | Feasible through Codex plugins, separate auth/product decision required. |
+| Document/app-control tools | Available here when connected document sessions expose tools. | Not inherited automatically by `codex exec`. Would require MCP/plugin equivalents and authorization. | Gap; decision required before design. |
+| Web/search | This runtime may have managed browsing tools. | Codex CLI exposes a search flag, but this repo CLI does not enable broad web/search by default. | Gap by policy; ask before changing external network behavior. |
+| Images/multimodal input | This runtime can receive images when tools/context allow it. | Codex CLI help exposes image attachment flags, but the repo assistant route currently sends text prompts only. | Feasible later through CLI-layer input design. |
+| Multi-turn resume | This chat preserves conversation state. | Codex CLI supports resume, while the repo assistant currently uses ephemeral one-shot execution for reviewable transcripts. | Known gap; persistence/resume policy needs a separate decision. |
 
 ## CLI-First Roadmap
 

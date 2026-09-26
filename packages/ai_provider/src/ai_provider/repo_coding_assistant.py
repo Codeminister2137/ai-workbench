@@ -192,6 +192,20 @@ class ExternalAgentConfig:
     timeout_seconds: float
     sandbox: str = "workspace-write"
     ephemeral: bool = True
+    json_output: bool = True
+
+
+@dataclass(frozen=True)
+class ExternalAgentEventSummary:
+    """Structured summary parsed from an external agent JSONL event stream."""
+
+    final_answer: str | None
+    command_events: tuple[dict[str, Any], ...]
+    tool_events: tuple[dict[str, Any], ...]
+    file_change_events: tuple[dict[str, Any], ...]
+    usage: dict[str, Any] | None
+    failure_reason: str | None
+    parse_errors: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -202,6 +216,7 @@ class ExternalAgentResult:
     returncode: int
     stdout: str
     stderr: str
+    events: ExternalAgentEventSummary | None = None
 
 
 class _TeeOutput(TextIOBase):
@@ -220,6 +235,11 @@ class _TeeOutput(TextIOBase):
             safe_text = text.encode(encoding, errors="replace").decode(encoding)
             self._terminal.write(safe_text)
         return len(text)
+
+    def write_transcript_only(self, text: str) -> int:
+        """Write text only to the transcript file, not the terminal."""
+
+        return self._transcript.write(text)
 
     def flush(self) -> None:
         self._terminal.flush()
@@ -263,6 +283,14 @@ def _print_external_agent_input(label: str, *, prompt: str) -> None:
     print("```text")
     print(prompt.rstrip())
     print("```")
+
+
+def _write_transcript_only(text: str) -> None:
+    """Write content to the transcript side of stdout when tee logging is active."""
+
+    writer = getattr(sys.stdout, "write_transcript_only", None)
+    if callable(writer):
+        writer(text)
 
 
 def _start_run_metrics() -> RunMetrics:
@@ -378,18 +406,105 @@ def _external_agent_command(access_method: AccessMethod) -> str | None:
     return None
 
 
-def _external_agent_status() -> dict[str, str | bool | None]:
+def _external_agent_status() -> dict[str, Any]:
     """Return local discovery status for configured external coding-agent clients."""
 
+    codex_command = _external_agent_command(AccessMethod.CODEX_CLI)
     return {
-        "codex_available": _external_agent_command(AccessMethod.CODEX_CLI) is not None,
-        "codex_command": _external_agent_command(AccessMethod.CODEX_CLI),
+        "codex_available": codex_command is not None,
+        "codex_command": codex_command,
+        "codex": _codex_capability_status(codex_command),
         "antigravity_available": _external_agent_command(AccessMethod.ANTIGRAVITY_CLI) is not None,
         "antigravity_command": _external_agent_command(AccessMethod.ANTIGRAVITY_CLI),
         "copilot_available": _external_agent_command(AccessMethod.COPILOT_CLI) is not None,
         "copilot_command": _external_agent_command(AccessMethod.COPILOT_CLI),
         "kiro_available": _external_agent_command(AccessMethod.KIRO_CLI) is not None,
         "kiro_command": _external_agent_command(AccessMethod.KIRO_CLI),
+    }
+
+
+def _run_diagnostic_command(
+    command: str,
+    *args: str,
+    timeout_seconds: float = 5.0,
+) -> dict[str, Any]:
+    """Run a read-only local diagnostic command and return redacted process metadata."""
+
+    try:
+        completed = subprocess.run(
+            (command, *args),
+            text=True,
+            capture_output=True,
+            timeout=timeout_seconds,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return {
+            "ok": False,
+            "returncode": None,
+            "stdout": "",
+            "stderr": str(exc),
+        }
+    return {
+        "ok": completed.returncode == 0,
+        "returncode": completed.returncode,
+        "stdout": completed.stdout.strip(),
+        "stderr": completed.stderr.strip(),
+    }
+
+
+def _codex_config_path(command: str | None = None) -> str:
+    """Return the Codex config path without reading config contents."""
+
+    codex_home = os.environ.get("CODEX_HOME")
+    if codex_home:
+        return str(Path(codex_home) / "config.toml")
+    if command:
+        command_path = Path(command)
+        if command_path.parent.name == "bin":
+            return str(command_path.parent.parent / "config.toml")
+    return str(Path.home() / ".codex" / "config.toml")
+
+
+def _codex_capability_status(command: str | None) -> dict[str, Any]:
+    """Return best-effort Codex CLI diagnostics without exposing secrets."""
+
+    if command is None:
+        return {
+            "available": False,
+            "command": None,
+            "version": None,
+            "login_status": "unavailable",
+            "exec_json_supported": False,
+            "config_path": _codex_config_path(command),
+            "mcp_list": None,
+            "plugin_list": None,
+        }
+
+    version = _run_diagnostic_command(command, "--version")
+    login = _run_diagnostic_command(command, "login", "status")
+    exec_help = _run_diagnostic_command(command, "exec", "--help")
+    mcp_list = _run_diagnostic_command(command, "mcp", "list")
+    plugin_list = _run_diagnostic_command(command, "plugin", "list")
+    return {
+        "available": True,
+        "command": command,
+        "version": version["stdout"] or version["stderr"] or None,
+        "login_status": login["stdout"] or login["stderr"] or None,
+        "exec_json_supported": "--json" in str(exec_help["stdout"]),
+        "config_path": _codex_config_path(command),
+        "mcp_list": _diagnostic_text_result(mcp_list),
+        "plugin_list": _diagnostic_text_result(plugin_list),
+    }
+
+
+def _diagnostic_text_result(result: dict[str, Any]) -> dict[str, Any]:
+    """Normalize a diagnostic command result for JSON reporting."""
+
+    return {
+        "ok": result["ok"],
+        "returncode": result["returncode"],
+        "stdout": result["stdout"],
+        "stderr": result["stderr"],
     }
 
 
@@ -422,6 +537,189 @@ def _external_agent_config_from_orchestration(
     )
 
 
+def parse_external_agent_jsonl(text: str) -> ExternalAgentEventSummary:
+    """Parse Codex-style JSONL events into the stable fields this CLI reports."""
+
+    final_answer = None
+    command_events: list[dict[str, Any]] = []
+    tool_events: list[dict[str, Any]] = []
+    file_change_events: list[dict[str, Any]] = []
+    usage = None
+    failure_reason = None
+    parse_errors: list[str] = []
+    for line_number, line in enumerate(text.splitlines(), start=1):
+        stripped = line.strip()
+        if not stripped:
+            continue
+        try:
+            event = json.loads(stripped)
+        except json.JSONDecodeError as exc:
+            parse_errors.append(f"line {line_number}: {exc.msg}")
+            continue
+        if not isinstance(event, dict):
+            parse_errors.append(f"line {line_number}: expected JSON object")
+            continue
+        event_type = _event_type(event)
+        if _is_command_event(event, event_type):
+            command_events.append(event)
+        if _is_tool_event(event, event_type):
+            tool_events.append(event)
+        if _is_file_change_event(event, event_type):
+            file_change_events.append(event)
+        event_usage = _find_usage(event)
+        if event_usage is not None:
+            usage = event_usage
+        event_failure = _find_failure_reason(event, event_type)
+        if event_failure is not None and (failure_reason is None or event_failure != event_type):
+            failure_reason = event_failure
+        event_answer = _find_final_answer(event, event_type)
+        if event_answer:
+            final_answer = event_answer
+    return ExternalAgentEventSummary(
+        final_answer=final_answer,
+        command_events=tuple(command_events),
+        tool_events=tuple(tool_events),
+        file_change_events=tuple(file_change_events),
+        usage=usage,
+        failure_reason=failure_reason,
+        parse_errors=tuple(parse_errors),
+    )
+
+
+def _event_type(event: dict[str, Any]) -> str:
+    """Return the best-effort type label for a JSONL event."""
+
+    for key in ("type", "event", "kind", "name"):
+        value = event.get(key)
+        if isinstance(value, str):
+            return value.lower()
+    nested = event.get("item")
+    if isinstance(nested, dict):
+        return _event_type(nested)
+    return ""
+
+
+def _is_command_event(event: dict[str, Any], event_type: str) -> bool:
+    """Return whether an event appears to describe shell command activity."""
+
+    haystack = _event_haystack(event, event_type)
+    return any(token in haystack for token in ("command", "shell", "exec", "terminal"))
+
+
+def _is_tool_event(event: dict[str, Any], event_type: str) -> bool:
+    """Return whether an event appears to describe a tool call."""
+
+    haystack = _event_haystack(event, event_type)
+    return "tool" in haystack or "function_call" in haystack
+
+
+def _is_file_change_event(event: dict[str, Any], event_type: str) -> bool:
+    """Return whether an event appears to describe a file modification."""
+
+    haystack = _event_haystack(event, event_type)
+    return any(token in haystack for token in ("file_change", "patch", "diff", "edit", "write"))
+
+
+def _event_haystack(event: dict[str, Any], event_type: str) -> str:
+    """Build a shallow searchable label string for classifying event families."""
+
+    labels = [event_type]
+    for key in ("type", "event", "kind", "name", "subtype", "status"):
+        value = event.get(key)
+        if isinstance(value, str):
+            labels.append(value.lower())
+    nested = event.get("item")
+    if isinstance(nested, dict):
+        labels.append(_event_haystack(nested, _event_type(nested)))
+    return " ".join(labels)
+
+
+def _find_usage(value: Any) -> dict[str, Any] | None:
+    """Find the first nested usage/token payload in an event."""
+
+    if isinstance(value, dict):
+        for key, nested in value.items():
+            key_lower = key.lower()
+            if key_lower == "usage" and isinstance(nested, dict):
+                return nested
+            if "token" in key_lower and isinstance(nested, dict):
+                return nested
+            found = _find_usage(nested)
+            if found is not None:
+                return found
+    elif isinstance(value, list):
+        for item in value:
+            found = _find_usage(item)
+            if found is not None:
+                return found
+    return None
+
+
+def _find_failure_reason(event: dict[str, Any], event_type: str) -> str | None:
+    """Find a failure or error reason in an event."""
+
+    haystack = _event_haystack(event, event_type)
+    if not any(token in haystack for token in ("error", "failed", "failure")):
+        return None
+    for key in ("error", "failure", "details"):
+        value = event.get(key)
+        if isinstance(value, dict):
+            for nested_key in ("message", "error", "failure_reason", "reason", "detail"):
+                nested_value = value.get(nested_key)
+                if isinstance(nested_value, str) and nested_value.strip():
+                    return nested_value.strip()
+            nested = _find_failure_reason(value, _event_type(value) or key)
+            if nested is not None:
+                return nested
+    for key in ("message", "error", "failure_reason", "reason", "detail"):
+        value = event.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return event_type or "external agent reported failure"
+
+
+def _find_final_answer(event: dict[str, Any], event_type: str) -> str | None:
+    """Find a final assistant answer in a Codex JSONL event."""
+
+    explicit = event.get("final_answer")
+    if isinstance(explicit, str) and explicit.strip():
+        return explicit.strip()
+    if "final" in event_type or event.get("role") == "assistant":
+        text = _find_text_payload(event)
+        if text:
+            return text
+    if event_type in {"assistant_message", "agent_message", "message", "response"}:
+        text = _find_text_payload(event)
+        if text:
+            return text
+    nested = event.get("item")
+    if isinstance(nested, dict):
+        return _find_final_answer(nested, _event_type(nested))
+    return None
+
+
+def _find_text_payload(value: Any) -> str | None:
+    """Find a human-readable text payload inside common event shapes."""
+
+    if isinstance(value, str):
+        return value.strip() or None
+    if isinstance(value, dict):
+        for key in ("text", "content", "message", "answer", "output"):
+            nested = value.get(key)
+            if isinstance(nested, str) and nested.strip():
+                return nested.strip()
+        for key in ("content", "message", "delta", "item"):
+            nested = value.get(key)
+            found = _find_text_payload(nested)
+            if found:
+                return found
+    if isinstance(value, list):
+        parts = [_find_text_payload(item) for item in value]
+        text = "\n".join(part for part in parts if part)
+        return text or None
+    return None
+
+
 def _build_external_agent_command(config: ExternalAgentConfig) -> tuple[str, ...]:
     """Build the noninteractive command for an external coding-agent client."""
 
@@ -440,6 +738,8 @@ def _build_external_agent_command(config: ExternalAgentConfig) -> tuple[str, ...
     ]
     if config.ephemeral:
         command.append("--ephemeral")
+    if config.json_output:
+        command.append("--json")
     command.append("-")
     return tuple(command)
 
@@ -452,15 +752,20 @@ def _run_external_agent(prompt: str, config: ExternalAgentConfig) -> ExternalAge
         command,
         input=prompt,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         capture_output=True,
         timeout=config.timeout_seconds,
         cwd=config.cwd,
     )
+    stdout = completed.stdout or ""
+    events = parse_external_agent_jsonl(stdout) if config.json_output and stdout else None
     return ExternalAgentResult(
         command=command,
         returncode=completed.returncode,
-        stdout=completed.stdout or "",
+        stdout=stdout,
         stderr=completed.stderr or "",
+        events=events,
     )
 
 
@@ -1416,17 +1721,34 @@ def _run_external_agent_cli_mode(
             external_result = _run_external_agent(prompt, config)
             primary_elapsed_seconds = time.perf_counter() - primary_started
             print(f"external_agent_returncode: {external_result.returncode}")
-            if external_result.stdout:
+            if external_result.events is not None:
+                _print_external_agent_event_summary(external_result.events)
+                _write_external_agent_raw_jsonl(external_result.stdout)
+                if external_result.events.final_answer:
+                    print(external_result.events.final_answer)
+                else:
+                    print("external_agent_final_answer: unavailable")
+            elif external_result.stdout:
                 print(external_result.stdout, end="")
                 if not external_result.stdout.endswith("\n"):
                     print()
             if external_result.stderr:
                 print("\n=== External agent stderr ===")
-                print(external_result.stderr, end="")
-                if not external_result.stderr.endswith("\n"):
+                stderr_text = _format_external_agent_stderr(external_result.stderr)
+                print(stderr_text, end="")
+                if not stderr_text.endswith("\n"):
                     print()
-            execution_status = "completed" if external_result.returncode == 0 else "failed"
-            exit_code = external_result.returncode
+            parsed_failure = (
+                external_result.events.failure_reason
+                if external_result.events is not None
+                else None
+            )
+            execution_status = (
+                "completed"
+                if external_result.returncode == 0 and parsed_failure is None
+                else "failed"
+            )
+            exit_code = 0 if execution_status == "completed" else external_result.returncode or 1
         else:
             command = _build_external_agent_command(config)
             print("execution: skipped")
@@ -1448,6 +1770,44 @@ def _run_external_agent_cli_mode(
     if close_transcript is not None:
         close_transcript()
     return exit_code
+
+
+def _print_external_agent_event_summary(events: ExternalAgentEventSummary) -> None:
+    """Print structured external-agent execution metadata."""
+
+    print("external_agent_jsonl_events: parsed")
+    print(f"external_agent_command_event_count: {len(events.command_events)}")
+    print(f"external_agent_tool_event_count: {len(events.tool_events)}")
+    print(f"external_agent_file_change_event_count: {len(events.file_change_events)}")
+    if events.usage is not None:
+        print("external_agent_usage_json: " + json.dumps(events.usage, sort_keys=True))
+    if events.failure_reason is not None:
+        print(f"external_agent_failure_reason: {events.failure_reason}")
+    if events.parse_errors:
+        print("external_agent_jsonl_parse_errors_json: " + json.dumps(list(events.parse_errors)))
+
+
+def _write_external_agent_raw_jsonl(raw_jsonl: str) -> None:
+    """Preserve raw external-agent JSONL in transcript logs without console noise."""
+
+    if not raw_jsonl:
+        return
+    _write_transcript_only("\n=== External agent raw JSONL ===\n")
+    _write_transcript_only(raw_jsonl)
+    if not raw_jsonl.endswith("\n"):
+        _write_transcript_only("\n")
+
+
+def _format_external_agent_stderr(stderr: str, *, limit: int = 2000) -> str:
+    """Bound noisy external-agent stderr while preserving the actionable prefix."""
+
+    if len(stderr) <= limit:
+        return stderr
+    omitted = len(stderr) - limit
+    return (
+        stderr[:limit].rstrip()
+        + f"\n[external agent stderr truncated: {omitted} characters omitted]\n"
+    )
 
 
 def _run_native_agent(

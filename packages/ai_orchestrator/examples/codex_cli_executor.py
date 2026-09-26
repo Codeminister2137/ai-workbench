@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import shutil
 import subprocess
@@ -8,6 +9,7 @@ import sys
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from ai_orchestrator import (
     AccessMethod,
@@ -45,12 +47,26 @@ class CodexCliResult:
     returncode: int
     stdout: str
     stderr: str
+    events: CodexJsonlSummary | None = None
 
     @property
     def ok(self) -> bool:
         """Return whether the Codex CLI process exited successfully."""
 
-        return self.returncode == 0
+        return self.returncode == 0 and (self.events is None or self.events.failure_reason is None)
+
+
+@dataclass(frozen=True, slots=True)
+class CodexJsonlSummary:
+    """Structured summary parsed from `codex exec --json` JSONL events."""
+
+    final_answer: str | None
+    command_events: tuple[dict[str, Any], ...]
+    tool_events: tuple[dict[str, Any], ...]
+    file_change_events: tuple[dict[str, Any], ...]
+    usage: dict[str, Any] | None
+    failure_reason: str | None
+    parse_errors: tuple[str, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -143,6 +159,156 @@ def build_codex_exec_command(config: CodexCliConfig) -> tuple[str, ...]:
     return tuple(command)
 
 
+def parse_codex_jsonl_events(text: str) -> CodexJsonlSummary:
+    """Parse Codex JSONL events into stable fields used by this repository."""
+
+    final_answer = None
+    command_events: list[dict[str, Any]] = []
+    tool_events: list[dict[str, Any]] = []
+    file_change_events: list[dict[str, Any]] = []
+    usage = None
+    failure_reason = None
+    parse_errors: list[str] = []
+    for line_number, line in enumerate(text.splitlines(), start=1):
+        stripped = line.strip()
+        if not stripped:
+            continue
+        try:
+            event = json.loads(stripped)
+        except json.JSONDecodeError as exc:
+            parse_errors.append(f"line {line_number}: {exc.msg}")
+            continue
+        if not isinstance(event, dict):
+            parse_errors.append(f"line {line_number}: expected JSON object")
+            continue
+        event_type = _event_type(event)
+        haystack = _event_haystack(event, event_type)
+        if any(token in haystack for token in ("command", "shell", "exec", "terminal")):
+            command_events.append(event)
+        if "tool" in haystack or "function_call" in haystack:
+            tool_events.append(event)
+        if any(token in haystack for token in ("file_change", "patch", "diff", "edit", "write")):
+            file_change_events.append(event)
+        event_usage = _find_usage(event)
+        if event_usage is not None:
+            usage = event_usage
+        event_failure = _find_failure_reason(event, event_type)
+        if event_failure is not None and (failure_reason is None or event_failure != event_type):
+            failure_reason = event_failure
+        event_answer = _find_final_answer(event, event_type)
+        if event_answer:
+            final_answer = event_answer
+    return CodexJsonlSummary(
+        final_answer=final_answer,
+        command_events=tuple(command_events),
+        tool_events=tuple(tool_events),
+        file_change_events=tuple(file_change_events),
+        usage=usage,
+        failure_reason=failure_reason,
+        parse_errors=tuple(parse_errors),
+    )
+
+
+def _event_type(event: dict[str, Any]) -> str:
+    for key in ("type", "event", "kind", "name"):
+        value = event.get(key)
+        if isinstance(value, str):
+            return value.lower()
+    nested = event.get("item")
+    if isinstance(nested, dict):
+        return _event_type(nested)
+    return ""
+
+
+def _event_haystack(event: dict[str, Any], event_type: str) -> str:
+    labels = [event_type]
+    for key in ("type", "event", "kind", "name", "subtype", "status"):
+        value = event.get(key)
+        if isinstance(value, str):
+            labels.append(value.lower())
+    nested = event.get("item")
+    if isinstance(nested, dict):
+        labels.append(_event_haystack(nested, _event_type(nested)))
+    return " ".join(labels)
+
+
+def _find_usage(value: Any) -> dict[str, Any] | None:
+    if isinstance(value, dict):
+        for key, nested in value.items():
+            key_lower = key.lower()
+            if key_lower == "usage" and isinstance(nested, dict):
+                return nested
+            if "token" in key_lower and isinstance(nested, dict):
+                return nested
+            found = _find_usage(nested)
+            if found is not None:
+                return found
+    elif isinstance(value, list):
+        for item in value:
+            found = _find_usage(item)
+            if found is not None:
+                return found
+    return None
+
+
+def _find_failure_reason(event: dict[str, Any], event_type: str) -> str | None:
+    haystack = _event_haystack(event, event_type)
+    if not any(token in haystack for token in ("error", "failed", "failure")):
+        return None
+    for key in ("error", "failure", "details"):
+        value = event.get(key)
+        if isinstance(value, dict):
+            for nested_key in ("message", "error", "failure_reason", "reason", "detail"):
+                nested_value = value.get(nested_key)
+                if isinstance(nested_value, str) and nested_value.strip():
+                    return nested_value.strip()
+            nested = _find_failure_reason(value, _event_type(value) or key)
+            if nested is not None:
+                return nested
+    for key in ("message", "error", "failure_reason", "reason", "detail"):
+        value = event.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return event_type or "codex reported failure"
+
+
+def _find_final_answer(event: dict[str, Any], event_type: str) -> str | None:
+    explicit = event.get("final_answer")
+    if isinstance(explicit, str) and explicit.strip():
+        return explicit.strip()
+    if "final" in event_type or event.get("role") == "assistant":
+        text = _find_text_payload(event)
+        if text:
+            return text
+    if event_type in {"assistant_message", "agent_message", "message", "response"}:
+        text = _find_text_payload(event)
+        if text:
+            return text
+    nested = event.get("item")
+    if isinstance(nested, dict):
+        return _find_final_answer(nested, _event_type(nested))
+    return None
+
+
+def _find_text_payload(value: Any) -> str | None:
+    if isinstance(value, str):
+        return value.strip() or None
+    if isinstance(value, dict):
+        for key in ("text", "content", "message", "answer", "output"):
+            nested = value.get(key)
+            if isinstance(nested, str) and nested.strip():
+                return nested.strip()
+        for key in ("content", "message", "delta", "item"):
+            found = _find_text_payload(value.get(key))
+            if found:
+                return found
+    if isinstance(value, list):
+        parts = [_find_text_payload(item) for item in value]
+        text = "\n".join(part for part in parts if part)
+        return text or None
+    return None
+
+
 def run_codex_exec(
     prompt: str,
     config: CodexCliConfig,
@@ -156,15 +322,19 @@ def run_codex_exec(
         command,
         input=prompt,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         capture_output=True,
         timeout=config.timeout_seconds,
         cwd=config.cwd,
     )
+    stdout = completed.stdout or ""
     return CodexCliResult(
         command=command,
         returncode=completed.returncode,
-        stdout=completed.stdout or "",
+        stdout=stdout,
         stderr=completed.stderr or "",
+        events=parse_codex_jsonl_events(stdout) if config.json_output and stdout else None,
     )
 
 

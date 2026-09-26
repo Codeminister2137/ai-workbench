@@ -34,6 +34,7 @@ _SPEC.loader.exec_module(_EXAMPLE)
 CodexCliConfig = _EXAMPLE.CodexCliConfig
 build_codex_exec_command = _EXAMPLE.build_codex_exec_command
 codex_cli_config_from_execution_target = _EXAMPLE.codex_cli_config_from_execution_target
+parse_codex_jsonl_events = _EXAMPLE.parse_codex_jsonl_events
 prepare_codex_cli_execution = _EXAMPLE.prepare_codex_cli_execution
 run_codex_exec = _EXAMPLE.run_codex_exec
 
@@ -102,6 +103,51 @@ def test_build_codex_exec_command_reads_prompt_from_stdin(tmp_path: Path) -> Non
     )
 
 
+def test_build_codex_exec_command_can_request_jsonl_events(tmp_path: Path) -> None:
+    config = CodexCliConfig(command="codex", model="gpt-5.1", cwd=tmp_path, json_output=True)
+
+    command = build_codex_exec_command(config)
+
+    assert "--json" in command
+    assert command[-1] == "-"
+
+
+def test_parse_codex_jsonl_events_extracts_structured_summary() -> None:
+    summary = parse_codex_jsonl_events(
+        "\n".join(
+            [
+                '{"type":"command.started","command":"pytest"}',
+                '{"type":"tool.completed","name":"read_file"}',
+                '{"type":"file_change","path":"pkg/module.py"}',
+                '{"type":"turn.completed","usage":{"input_tokens":10,"output_tokens":5}}',
+                '{"type":"final_answer","content":"Done."}',
+            ]
+        )
+    )
+
+    assert summary.final_answer == "Done."
+    assert len(summary.command_events) == 1
+    assert len(summary.tool_events) == 1
+    assert len(summary.file_change_events) == 1
+    assert summary.usage == {"input_tokens": 10, "output_tokens": 5}
+    assert summary.failure_reason is None
+    assert summary.parse_errors == ()
+
+
+def test_parse_codex_jsonl_events_reports_failures_and_parse_errors() -> None:
+    summary = parse_codex_jsonl_events(
+        "\n".join(
+            [
+                '{"type":"turn.failed","error":{"message":"model error"}}',
+                "not json",
+            ]
+        )
+    )
+
+    assert summary.failure_reason == "model error"
+    assert summary.parse_errors
+
+
 def test_run_codex_exec_uses_injected_runner(tmp_path: Path) -> None:
     calls: list[dict[str, Any]] = []
 
@@ -116,7 +162,27 @@ def test_run_codex_exec_uses_injected_runner(tmp_path: Path) -> None:
     assert result.ok is True
     assert result.stdout == "done"
     assert calls[0]["kwargs"]["input"] == "Do the task."
+    assert calls[0]["kwargs"]["encoding"] == "utf-8"
+    assert calls[0]["kwargs"]["errors"] == "replace"
     assert calls[0]["kwargs"]["cwd"] == tmp_path
+
+
+def test_run_codex_exec_parses_jsonl_when_enabled(tmp_path: Path) -> None:
+    def fake_runner(*args: Any, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(
+            args[0],
+            0,
+            stdout='{"type":"final_answer","content":"structured done"}\n',
+            stderr="",
+        )
+
+    config = CodexCliConfig(command="codex", model="gpt-5.1", cwd=tmp_path, json_output=True)
+
+    result = run_codex_exec("Do the task.", config, runner=fake_runner)
+
+    assert result.ok is True
+    assert result.events is not None
+    assert result.events.final_answer == "structured done"
 
 
 def test_prepare_codex_cli_execution_rejects_local_only_privacy(tmp_path: Path) -> None:

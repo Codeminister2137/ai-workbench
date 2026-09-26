@@ -189,6 +189,7 @@ def test_example_model_catalog_includes_coding_mvp_backends() -> None:
     assert ("openai", "gpt-5.1") in identities
     route_ids = {entry.backend.route_id for entry in catalog}
     assert "openai-codex-gpt-5-1" in route_ids
+    assert "openai-codex-gpt-5-5" in route_ids
     assert "google-antigravity-gemini-3-1-pro" in route_ids
     assert "github-copilot-cli-default" in route_ids
     assert "kiro-cli-default" in route_ids

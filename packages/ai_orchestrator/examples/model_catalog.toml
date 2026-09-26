@@ -152,6 +152,31 @@ embeddings = false
 source = "Codex CLI subscription allowance; live usage telemetry is captured from CLI transcripts when available."
 
 [[models]]
+route_id = "openai-codex-gpt-5-5"
+provider = "openai"
+product = "codex"
+model = "gpt-5.5"
+location = "external"
+access_method = "codex_cli"
+auth_method = "chatgpt_sign_in"
+billing_source = "chatgpt_subscription_allowance"
+cost_policy_tier = "allowances_allowed"
+quality = "high"
+latency = "interactive"
+notes = "Codex CLI route verified locally with ChatGPT sign-in on 2026-09-26 using `codex exec --json`. Use this route when `gpt-5.1` is rejected by the installed Codex CLI."
+
+[models.capabilities]
+chat = true
+streaming = false
+tools = true
+structured_output = false
+multimodal_input = false
+embeddings = false
+
+[models.estimate]
+source = "Codex CLI subscription allowance; live usage telemetry is captured from CLI JSONL events when available."
+
+[[models]]
 route_id = "google-ai-studio-gemini-3-1-pro"
 provider = "google"
 product = "google_ai_studio"

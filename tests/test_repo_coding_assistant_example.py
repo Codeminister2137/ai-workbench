@@ -32,6 +32,7 @@ execute_actions = _EXAMPLE.execute_actions
 extract_actions = _EXAMPLE.extract_actions
 load_prompt_context = _EXAMPLE.load_prompt_context
 AssistantAction = _EXAMPLE.AssistantAction
+parse_external_agent_jsonl = _EXAMPLE.parse_external_agent_jsonl
 parse_response_scrutiny_report = _EXAMPLE.parse_response_scrutiny_report
 
 
@@ -451,7 +452,21 @@ def test_cli_executes_codex_external_agent_route(capsys, monkeypatch) -> None:
 
     def fake_run(*args, **kwargs):
         calls.append({"args": args, "kwargs": kwargs})
-        return _EXAMPLE.subprocess.CompletedProcess(args[0], 0, "codex done\n", "")
+        return _EXAMPLE.subprocess.CompletedProcess(
+            args[0],
+            0,
+            "\n".join(
+                [
+                    '{"type":"command.started","command":"git status --short"}',
+                    '{"type":"tool.completed","name":"read_file"}',
+                    '{"type":"file_change","path":"example.py"}',
+                    '{"type":"turn.completed","usage":{"input_tokens":12,"output_tokens":3}}',
+                    '{"type":"final_answer","content":"codex done"}',
+                ]
+            )
+            + "\n",
+            "",
+        )
 
     monkeypatch.setenv("CODEX_COMMAND", "codex-test")
     monkeypatch.setattr(_EXAMPLE.subprocess, "run", fake_run)
@@ -478,15 +493,167 @@ def test_cli_executes_codex_external_agent_route(capsys, monkeypatch) -> None:
     )
     output = capsys.readouterr().out
     assert "external_agent_returncode: 0" in output
+    assert "external_agent_jsonl_events: parsed" in output
+    assert "external_agent_command_event_count: 1" in output
+    assert "external_agent_tool_event_count: 1" in output
+    assert "external_agent_file_change_event_count: 1" in output
+    assert "external_agent_usage_json:" in output
     assert "codex done" in output
     assert "execution_status: completed" in output
     command = calls[0]["args"][0]
     assert command[:2] == ("codex-test", "exec")
+    assert "--json" in command
     assert "--ask-for-approval" not in command
     assert "--sandbox" in command
     assert "workspace-write" in command
     assert calls[0]["kwargs"]["input"].startswith("# User request")
+    assert calls[0]["kwargs"]["encoding"] == "utf-8"
+    assert calls[0]["kwargs"]["errors"] == "replace"
     assert "# Repository context" in calls[0]["kwargs"]["input"]
+
+
+def test_external_agent_jsonl_parser_extracts_failure_and_final_answer() -> None:
+    events = parse_external_agent_jsonl(
+        "\n".join(
+            [
+                '{"type":"agent_message","role":"assistant","content":"intermediate"}',
+                '{"type":"turn.failed","error":{"message":"sandbox denied"}}',
+                '{"type":"final_answer","content":"last answer"}',
+                "not-json",
+            ]
+        )
+    )
+
+    assert events.final_answer == "last answer"
+    assert events.failure_reason == "sandbox denied"
+    assert events.parse_errors
+
+
+def test_cli_does_not_print_raw_jsonl_when_codex_fails(capsys, monkeypatch) -> None:
+    raw_jsonl = '{"type":"turn.failed","error":{"message":"unsupported model"}}\n'
+
+    def fake_run(*args, **kwargs):
+        return _EXAMPLE.subprocess.CompletedProcess(args[0], 1, raw_jsonl, "")
+
+    monkeypatch.setenv("CODEX_COMMAND", "codex-test")
+    monkeypatch.setattr(_EXAMPLE.subprocess, "run", fake_run)
+
+    assert (
+        main(
+            [
+                "--mode",
+                "ask",
+                "Review this repository.",
+                "--privacy",
+                "external_allowed",
+                "--route-id",
+                "openai-codex-gpt-5-1",
+                "--provider",
+                "openai",
+                "--model",
+                "gpt-5.1",
+                "--execute",
+                "--skip-prompt-review",
+            ]
+        )
+        == 1
+    )
+
+    output = capsys.readouterr().out
+    assert "external_agent_failure_reason: unsupported model" in output
+    assert "external_agent_final_answer: unavailable" in output
+    assert raw_jsonl.strip() not in output
+
+
+def test_external_agent_stderr_is_bounded() -> None:
+    stderr = _EXAMPLE._format_external_agent_stderr("x" * 2500, limit=100)
+
+    assert stderr.startswith("x" * 100)
+    assert "external agent stderr truncated: 2400 characters omitted" in stderr
+    assert len(stderr) < 200
+
+
+def test_cli_preserves_raw_codex_jsonl_in_transcript_only(
+    tmp_path: Path,
+    capsys,
+    monkeypatch,
+) -> None:
+    raw_jsonl = '{"type":"final_answer","content":"transcript answer"}\n'
+
+    def fake_run(*args, **kwargs):
+        return _EXAMPLE.subprocess.CompletedProcess(args[0], 0, raw_jsonl, "")
+
+    monkeypatch.setenv("CODEX_COMMAND", "codex-test")
+    monkeypatch.setattr(_EXAMPLE.subprocess, "run", fake_run)
+    log_file = tmp_path / "codex.log"
+
+    assert (
+        main(
+            [
+                "--mode",
+                "ask",
+                "Review this repository.",
+                "--privacy",
+                "external_allowed",
+                "--route-id",
+                "openai-codex-gpt-5-1",
+                "--provider",
+                "openai",
+                "--model",
+                "gpt-5.1",
+                "--execute",
+                "--skip-prompt-review",
+                "--log-file",
+                str(log_file),
+            ]
+        )
+        == 0
+    )
+
+    output = capsys.readouterr().out
+    transcript = log_file.read_text(encoding="utf-8")
+    assert "transcript answer" in output
+    assert "=== External agent raw JSONL ===" not in output
+    assert "=== External agent raw JSONL ===" in transcript
+    assert raw_jsonl.strip() in transcript
+
+
+def test_codex_capability_status_reports_expected_diagnostics(monkeypatch) -> None:
+    def fake_run(command, *args, **kwargs):
+        joined = tuple(command)
+        if joined[1:] == ("--version",):
+            return _EXAMPLE.subprocess.CompletedProcess(joined, 0, "codex-cli 0.137.0\n", "")
+        if joined[1:] == ("login", "status"):
+            return _EXAMPLE.subprocess.CompletedProcess(joined, 0, "Logged in using ChatGPT\n", "")
+        if joined[1:] == ("exec", "--help"):
+            return _EXAMPLE.subprocess.CompletedProcess(joined, 0, "--json\n", "")
+        if joined[1:] == ("mcp", "list"):
+            return _EXAMPLE.subprocess.CompletedProcess(
+                joined,
+                0,
+                "No MCP servers configured yet.\n",
+                "",
+            )
+        if joined[1:] == ("plugin", "list"):
+            return _EXAMPLE.subprocess.CompletedProcess(
+                joined,
+                0,
+                "PLUGIN STATUS\nlinear@openai-curated not installed\n",
+                "",
+            )
+        raise AssertionError(joined)
+
+    monkeypatch.setattr(_EXAMPLE.subprocess, "run", fake_run)
+    monkeypatch.delenv("CODEX_HOME", raising=False)
+
+    status = _EXAMPLE._codex_capability_status("C:/codex/bin/codex.exe")
+
+    assert status["version"] == "codex-cli 0.137.0"
+    assert status["login_status"] == "Logged in using ChatGPT"
+    assert status["exec_json_supported"] is True
+    assert status["mcp_list"]["stdout"] == "No MCP servers configured yet."
+    assert "linear@openai-curated" in status["plugin_list"]["stdout"]
+    assert status["config_path"] == "C:\\codex\\config.toml"
 
 
 def test_cli_can_scrutinize_completed_response(capsys, monkeypatch) -> None:
