@@ -61,10 +61,10 @@ def test_codex_cli_config_requires_codex_cli_access_method(tmp_path: Path) -> No
 
 def test_codex_cli_config_accepts_chatgpt_signed_in_target(tmp_path: Path) -> None:
     target = ExecutionTarget(
-        route_id="openai-codex-gpt-5.1",
+        route_id="openai-codex-gpt-5.5",
         provider="openai",
         product="codex",
-        model="gpt-5.1",
+        model="gpt-5.5",
         access_method=AccessMethod.CODEX_CLI,
         auth_method=AuthMethod.CHATGPT_SIGN_IN,
         billing_source=BillingSource.CHATGPT_SUBSCRIPTION_ALLOWANCE,
@@ -79,13 +79,13 @@ def test_codex_cli_config_accepts_chatgpt_signed_in_target(tmp_path: Path) -> No
     )
 
     assert config.command == "codex"
-    assert config.model == "gpt-5.1"
+    assert config.model == "gpt-5.5"
     assert config.cwd == tmp_path
     assert config.timeout_seconds == 30
 
 
 def test_build_codex_exec_command_reads_prompt_from_stdin(tmp_path: Path) -> None:
-    config = CodexCliConfig(command="codex", model="gpt-5.1", cwd=tmp_path)
+    config = CodexCliConfig(command="codex", model="gpt-5.5", cwd=tmp_path)
 
     command = build_codex_exec_command(config)
 
@@ -95,7 +95,7 @@ def test_build_codex_exec_command_reads_prompt_from_stdin(tmp_path: Path) -> Non
         "--cd",
         str(tmp_path),
         "--model",
-        "gpt-5.1",
+        "gpt-5.5",
         "--sandbox",
         "workspace-write",
         "--ephemeral",
@@ -104,12 +104,72 @@ def test_build_codex_exec_command_reads_prompt_from_stdin(tmp_path: Path) -> Non
 
 
 def test_build_codex_exec_command_can_request_jsonl_events(tmp_path: Path) -> None:
-    config = CodexCliConfig(command="codex", model="gpt-5.1", cwd=tmp_path, json_output=True)
+    config = CodexCliConfig(command="codex", model="gpt-5.5", cwd=tmp_path, json_output=True)
 
     command = build_codex_exec_command(config)
 
     assert "--json" in command
     assert command[-1] == "-"
+
+
+def test_build_codex_exec_command_can_start_persistent_session(tmp_path: Path) -> None:
+    config = CodexCliConfig(
+        command="codex",
+        model="gpt-5.5",
+        cwd=tmp_path,
+        ephemeral=False,
+        json_output=True,
+    )
+
+    command = build_codex_exec_command(config)
+
+    assert command[:2] == ("codex", "exec")
+    assert "--ephemeral" not in command
+    assert "--json" in command
+
+
+def test_build_codex_exec_command_can_resume_last_session(tmp_path: Path) -> None:
+    config = CodexCliConfig(
+        command="codex",
+        model="gpt-5.5",
+        cwd=tmp_path,
+        json_output=True,
+        resume="last",
+    )
+
+    command = build_codex_exec_command(config)
+
+    assert command == (
+        "codex",
+        "exec",
+        "resume",
+        "--model",
+        "gpt-5.5",
+        "--json",
+        "--last",
+        "-",
+    )
+
+
+def test_build_codex_exec_command_can_resume_named_session(tmp_path: Path) -> None:
+    config = CodexCliConfig(
+        command="codex",
+        model="gpt-5.5",
+        cwd=tmp_path,
+        resume="01abc",
+    )
+
+    command = build_codex_exec_command(config)
+
+    assert command == (
+        "codex",
+        "exec",
+        "resume",
+        "--model",
+        "gpt-5.5",
+        "01abc",
+        "-",
+    )
 
 
 def test_parse_codex_jsonl_events_extracts_structured_summary() -> None:
@@ -155,7 +215,7 @@ def test_run_codex_exec_uses_injected_runner(tmp_path: Path) -> None:
         calls.append({"args": args, "kwargs": kwargs})
         return subprocess.CompletedProcess(args[0], 0, stdout="done", stderr="")
 
-    config = CodexCliConfig(command="codex", model="gpt-5.1", cwd=tmp_path)
+    config = CodexCliConfig(command="codex", model="gpt-5.5", cwd=tmp_path)
 
     result = run_codex_exec("Do the task.", config, runner=fake_runner)
 
@@ -176,7 +236,7 @@ def test_run_codex_exec_parses_jsonl_when_enabled(tmp_path: Path) -> None:
             stderr="",
         )
 
-    config = CodexCliConfig(command="codex", model="gpt-5.1", cwd=tmp_path, json_output=True)
+    config = CodexCliConfig(command="codex", model="gpt-5.5", cwd=tmp_path, json_output=True)
 
     result = run_codex_exec("Do the task.", config, runner=fake_runner)
 
@@ -205,7 +265,7 @@ def test_prepare_codex_cli_execution_dry_run_uses_catalog_target(tmp_path: Path)
         """
 [[models]]
 provider = "openai"
-model = "gpt-5.1"
+model = "gpt-5.5"
 location = "external"
 access_method = "codex_cli"
 quality = "standard"
@@ -219,7 +279,7 @@ latency = "interactive"
         TaskProfile(
             privacy_class=PrivacyClass.EXTERNAL_ALLOWED,
             user_backend_override="openai",
-            user_model_override="gpt-5.1",
+            user_model_override="gpt-5.5",
         ),
         catalog_path,
         cwd=tmp_path,
@@ -231,4 +291,4 @@ latency = "interactive"
     assert result.config is not None
     assert result.result is None
     assert result.config.command == "codex"
-    assert result.config.model == "gpt-5.1"
+    assert result.config.model == "gpt-5.5"

@@ -250,8 +250,7 @@ of emitting a success-shaped response.
 The catalog includes subscription/client-backed coding-agent routes alongside
 provider API routes:
 
-- Codex CLI: `openai-codex-gpt-5-5` and `openai-codex-gpt-5-1`, access method
-  `codex_cli`;
+- Codex CLI: `openai-codex-gpt-5-5`, access method `codex_cli`;
 - Google Antigravity: `google-antigravity-gemini-3-1-pro` and
   `google-antigravity-gemini-3-8-flash`, access method `antigravity_cli`;
 - GitHub Copilot placeholder: `github-copilot-cli-default`, access method
@@ -271,11 +270,17 @@ Codex execution is wired first. The CLI discovers the Codex command from
 ```
 
 Codex is invoked as `codex exec --json` with repository cwd, stdin prompt,
-workspace sandbox, and ephemeral session state. The CLI parses the JSONL event
-stream enough to report the final answer, command/tool/file-change event counts,
-failure status, and usage payloads when Codex emits them. Raw JSONL is preserved
-in transcript logs under `=== External agent raw JSONL ===` for debugging and
-evaluation without dumping the full event stream to the terminal.
+workspace sandbox, and ephemeral session state by default. The CLI parses the
+JSONL event stream enough to report the final answer, command/tool/file-change
+event counts, failure status, and usage payloads when Codex emits them. Raw
+JSONL is preserved in transcript logs under `=== External agent raw JSONL ===`
+for debugging and evaluation without dumping the full event stream to the
+terminal.
+
+Use `--codex-persist-session` when intentionally starting a resumable Codex
+session. This omits `--ephemeral`, allowing Codex to write its normal session
+state outside the repository. Resume with `--codex-resume last` or
+`--codex-resume <session-id-or-name>`, which invokes `codex exec resume --json`.
 
 `--mode diagnose` and `--local-capabilities` include Codex diagnostics when a
 Codex command is discoverable: command path, version, login-status text,
@@ -309,7 +314,7 @@ noninteractive command contracts and local executable paths are confirmed.
 | Document/app-control tools | Available here when connected document sessions expose tools. | Not inherited automatically by `codex exec`. Would require MCP/plugin equivalents and authorization. | Gap; decision required before design. |
 | Web/search | This runtime may have managed browsing tools. | Codex CLI exposes a search flag, but this repo CLI does not enable broad web/search by default. | Gap by policy; ask before changing external network behavior. |
 | Images/multimodal input | This runtime can receive images when tools/context allow it. | Codex CLI help exposes image attachment flags, but the repo assistant route currently sends text prompts only. | Feasible later through CLI-layer input design. |
-| Multi-turn resume | This chat preserves conversation state. | Codex CLI supports resume, while the repo assistant currently uses ephemeral one-shot execution for reviewable transcripts. | Known gap; persistence/resume policy needs a separate decision. |
+| Multi-turn resume | This chat preserves conversation state. | Default runs remain ephemeral. `--codex-persist-session` starts a resumable session, and `--codex-resume last|<session-id>` resumes one through Codex CLI. | Implemented as explicit opt-in Codex persistence. |
 
 ## CLI-First Roadmap
 

@@ -215,10 +215,10 @@ Use a small catalog containing the intended Codex CLI target, for example:
 
 ```toml
 [[models]]
-route_id = "openai-codex-gpt-5-1"
+route_id = "openai-codex-gpt-5-5"
 provider = "openai"
 product = "codex"
-model = "gpt-5.1"
+model = "gpt-5.5"
 location = "external"
 access_method = "codex_cli"
 auth_method = "chatgpt_sign_in"
@@ -234,6 +234,11 @@ Then run a dry preparation pass before execution:
 python packages\ai_orchestrator\examples\codex_cli_executor.py `
   "Explain the repo test command." `
   --catalog path\to\codex-cli-catalog.toml `
-  --model gpt-5.1 `
+  --model gpt-5.5 `
   --skip-prompt-review
 ```
+
+By default the example uses ephemeral Codex sessions. Pass
+`--codex-persist-session` to start a resumable session, or
+`--codex-resume last` / `--codex-resume <session-id-or-name>` to resume through
+`codex exec resume`.

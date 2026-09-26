@@ -193,6 +193,7 @@ class ExternalAgentConfig:
     sandbox: str = "workspace-write"
     ephemeral: bool = True
     json_output: bool = True
+    resume: str | None = None
 
 
 @dataclass(frozen=True)
@@ -513,6 +514,8 @@ def _external_agent_config_from_orchestration(
     *,
     repo_root: Path,
     timeout_seconds: float,
+    codex_persist_session: bool = False,
+    codex_resume: str | None = None,
 ) -> ExternalAgentConfig:
     """Adapt a ready orchestration result to an external-agent runtime config."""
 
@@ -534,6 +537,8 @@ def _external_agent_config_from_orchestration(
         model=target.model,
         cwd=repo_root,
         timeout_seconds=timeout_seconds,
+        ephemeral=not codex_persist_session and codex_resume is None,
+        resume=codex_resume,
     )
 
 
@@ -725,6 +730,23 @@ def _build_external_agent_command(config: ExternalAgentConfig) -> tuple[str, ...
 
     if config.access_method is not AccessMethod.CODEX_CLI:
         raise NotImplementedError(f"{config.access_method.value} execution is not implemented.")
+
+    if config.resume is not None:
+        command = [
+            config.command,
+            "exec",
+            "resume",
+            "--model",
+            config.model,
+        ]
+        if config.json_output:
+            command.append("--json")
+        if config.resume == "last":
+            command.append("--last")
+        else:
+            command.append(config.resume)
+        command.append("-")
+        return tuple(command)
 
     command = [
         config.command,
@@ -1334,6 +1356,21 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="Bypass deterministic prompt review.",
     )
     parser.add_argument(
+        "--codex-persist-session",
+        action="store_true",
+        help=(
+            "For Codex CLI routes, omit --ephemeral so Codex can save a resumable session. "
+            "This is opt-in because it writes Codex session state outside this repo."
+        ),
+    )
+    parser.add_argument(
+        "--codex-resume",
+        help=(
+            "For Codex CLI routes, resume a previous Codex exec session by id/name, "
+            "or pass 'last' for the most recent session."
+        ),
+    )
+    parser.add_argument(
         "--scrutinize-response",
         action="store_true",
         help=(
@@ -1393,6 +1430,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         parser.error("--mode implement requires --apply-actions or --native-tools")
     if args.log_full_prompt and args.log_file is None:
         parser.error("--log-full-prompt requires --log-file")
+    if args.codex_persist_session and args.codex_resume:
+        parser.error("--codex-persist-session cannot be combined with --codex-resume")
 
     transcript = None
     close_transcript_func: Callable[[], None] | None = None
@@ -1465,6 +1504,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         prompt_for_review=args.prompt,
         timeout_seconds=args.timeout_seconds,
     )
+    if (
+        (args.codex_persist_session or args.codex_resume)
+        and external_orchestration.is_ready
+        and external_orchestration.execution_plan is not None
+        and external_orchestration.execution_plan.target.access_method is not AccessMethod.CODEX_CLI
+    ):
+        parser.error("--codex-persist-session and --codex-resume require a Codex CLI route")
     if (
         external_orchestration.is_ready
         and external_orchestration.execution_plan is not None
@@ -1712,9 +1758,14 @@ def _run_external_agent_cli_mode(
             orchestration,
             repo_root=repo_root,
             timeout_seconds=args.timeout_seconds,
+            codex_persist_session=args.codex_persist_session,
+            codex_resume=args.codex_resume,
         )
         print(f"external_agent_command: {config.command}")
         print(f"external_agent_sandbox: {config.sandbox}")
+        print(f"external_agent_ephemeral: {config.ephemeral}")
+        if config.resume is not None:
+            print(f"external_agent_resume: {config.resume}")
         print("\n=== Assistant response ===")
         if args.execute and args.mode != "plan":
             primary_started = time.perf_counter()

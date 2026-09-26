@@ -121,10 +121,10 @@ def test_orchestrator_target_adapter_rejects_unknown_provider() -> None:
 
 def test_orchestrator_target_adapter_rejects_codex_cli_access_method() -> None:
     target = ExecutionTarget(
-        route_id="openai-codex-gpt-5.1",
+        route_id="openai-codex-gpt-5.5",
         provider="openai",
         product="codex",
-        model="gpt-5.1",
+        model="gpt-5.5",
         access_method=AccessMethod.CODEX_CLI,
         auth_method=AuthMethod.CHATGPT_SIGN_IN,
         billing_source=BillingSource.CHATGPT_SUBSCRIPTION_ALLOWANCE,

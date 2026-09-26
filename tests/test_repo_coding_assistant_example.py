@@ -429,18 +429,18 @@ def test_cli_plans_codex_external_agent_route(capsys, monkeypatch) -> None:
                 "--privacy",
                 "external_allowed",
                 "--route-id",
-                "openai-codex-gpt-5-1",
+                "openai-codex-gpt-5-5",
                 "--provider",
                 "openai",
                 "--model",
-                "gpt-5.1",
+                "gpt-5.5",
                 "--skip-prompt-review",
             ]
         )
         == 0
     )
     output = capsys.readouterr().out
-    assert "route_id: openai-codex-gpt-5-1" in output
+    assert "route_id: openai-codex-gpt-5-5" in output
     assert "access_method: codex_cli" in output
     assert "external_agent_command: codex-test" in output
     assert "external_agent_command_line_json:" in output
@@ -480,11 +480,11 @@ def test_cli_executes_codex_external_agent_route(capsys, monkeypatch) -> None:
                 "--privacy",
                 "external_allowed",
                 "--route-id",
-                "openai-codex-gpt-5-1",
+                "openai-codex-gpt-5-5",
                 "--provider",
                 "openai",
                 "--model",
-                "gpt-5.1",
+                "gpt-5.5",
                 "--execute",
                 "--skip-prompt-review",
             ]
@@ -510,6 +510,107 @@ def test_cli_executes_codex_external_agent_route(capsys, monkeypatch) -> None:
     assert calls[0]["kwargs"]["encoding"] == "utf-8"
     assert calls[0]["kwargs"]["errors"] == "replace"
     assert "# Repository context" in calls[0]["kwargs"]["input"]
+
+
+def test_cli_can_plan_persistent_codex_session(capsys, monkeypatch) -> None:
+    monkeypatch.setenv("CODEX_COMMAND", "codex-test")
+
+    assert (
+        main(
+            [
+                "--mode",
+                "plan",
+                "Start a persistent Codex session.",
+                "--privacy",
+                "external_allowed",
+                "--route-id",
+                "openai-codex-gpt-5-5",
+                "--provider",
+                "openai",
+                "--model",
+                "gpt-5.5",
+                "--skip-prompt-review",
+                "--codex-persist-session",
+            ]
+        )
+        == 0
+    )
+
+    output = capsys.readouterr().out
+    assert "external_agent_ephemeral: False" in output
+    assert "--ephemeral" not in output
+    assert "external_agent_command_line_json:" in output
+
+
+def test_cli_can_plan_codex_resume_last(capsys, monkeypatch) -> None:
+    monkeypatch.setenv("CODEX_COMMAND", "codex-test")
+
+    assert (
+        main(
+            [
+                "--mode",
+                "plan",
+                "Resume Codex.",
+                "--privacy",
+                "external_allowed",
+                "--route-id",
+                "openai-codex-gpt-5-5",
+                "--provider",
+                "openai",
+                "--model",
+                "gpt-5.5",
+                "--skip-prompt-review",
+                "--codex-resume",
+                "last",
+            ]
+        )
+        == 0
+    )
+
+    output = capsys.readouterr().out
+    assert "external_agent_resume: last" in output
+    assert '"resume", "--model", "gpt-5.5", "--json", "--last", "-"' in output
+    assert "--ephemeral" not in output
+
+
+def test_codex_persist_and_resume_are_mutually_exclusive() -> None:
+    with pytest.raises(SystemExit):
+        main(
+            [
+                "--mode",
+                "plan",
+                "Invalid flags.",
+                "--privacy",
+                "external_allowed",
+                "--route-id",
+                "openai-codex-gpt-5-5",
+                "--provider",
+                "openai",
+                "--model",
+                "gpt-5.5",
+                "--skip-prompt-review",
+                "--codex-persist-session",
+                "--codex-resume",
+                "last",
+            ]
+        )
+
+
+def test_codex_session_flags_require_codex_route() -> None:
+    with pytest.raises(SystemExit):
+        main(
+            [
+                "--mode",
+                "plan",
+                "Invalid route.",
+                "--provider",
+                "ollama",
+                "--model",
+                "qwen2.5-coder:14b",
+                "--codex-resume",
+                "last",
+            ]
+        )
 
 
 def test_external_agent_jsonl_parser_extracts_failure_and_final_answer() -> None:
@@ -547,11 +648,11 @@ def test_cli_does_not_print_raw_jsonl_when_codex_fails(capsys, monkeypatch) -> N
                 "--privacy",
                 "external_allowed",
                 "--route-id",
-                "openai-codex-gpt-5-1",
+                "openai-codex-gpt-5-5",
                 "--provider",
                 "openai",
                 "--model",
-                "gpt-5.1",
+                "gpt-5.5",
                 "--execute",
                 "--skip-prompt-review",
             ]
@@ -596,11 +697,11 @@ def test_cli_preserves_raw_codex_jsonl_in_transcript_only(
                 "--privacy",
                 "external_allowed",
                 "--route-id",
-                "openai-codex-gpt-5-1",
+                "openai-codex-gpt-5-5",
                 "--provider",
                 "openai",
                 "--model",
-                "gpt-5.1",
+                "gpt-5.5",
                 "--execute",
                 "--skip-prompt-review",
                 "--log-file",

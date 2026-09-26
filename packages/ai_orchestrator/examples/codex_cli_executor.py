@@ -37,6 +37,7 @@ class CodexCliConfig:
     timeout_seconds: float = 600.0
     ephemeral: bool = True
     json_output: bool = False
+    resume: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -109,6 +110,8 @@ def codex_cli_config_from_execution_target(
     cwd: Path,
     command: str | None = None,
     timeout_seconds: float | None = None,
+    ephemeral: bool = True,
+    resume: str | None = None,
 ) -> CodexCliConfig:
     """Adapt an orchestrator target to Codex CLI runtime config."""
 
@@ -135,11 +138,30 @@ def codex_cli_config_from_execution_target(
         model=target.model,
         cwd=cwd,
         timeout_seconds=timeout_seconds or target.timeout_seconds,
+        ephemeral=ephemeral,
+        resume=resume,
     )
 
 
 def build_codex_exec_command(config: CodexCliConfig) -> tuple[str, ...]:
     """Build a non-interactive `codex exec` command that reads the prompt from stdin."""
+
+    if config.resume is not None:
+        command = [
+            config.command,
+            "exec",
+            "resume",
+            "--model",
+            config.model,
+        ]
+        if config.json_output:
+            command.append("--json")
+        if config.resume == "last":
+            command.append("--last")
+        else:
+            command.append(config.resume)
+        command.append("-")
+        return tuple(command)
 
     command = [
         config.command,
@@ -347,6 +369,8 @@ def prepare_codex_cli_execution(
     review_prompt: bool = True,
     codex_command: str | None = None,
     timeout_seconds: float = 600.0,
+    codex_persist_session: bool = False,
+    codex_resume: str | None = None,
     execute: bool = False,
     runner: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
 ) -> CodexCliExecutionResult:
@@ -371,6 +395,8 @@ def prepare_codex_cli_execution(
         cwd=cwd,
         command=codex_command,
         timeout_seconds=timeout_seconds,
+        ephemeral=not codex_persist_session and codex_resume is None,
+        resume=codex_resume,
     )
     if not execute:
         return CodexCliExecutionResult(orchestration=orchestration, config=config)
@@ -411,8 +437,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     parser.add_argument("--timeout-seconds", type=float, default=600.0)
     parser.add_argument("--skip-prompt-review", action="store_true")
+    parser.add_argument("--codex-persist-session", action="store_true")
+    parser.add_argument("--codex-resume")
     parser.add_argument("--execute", action="store_true")
     args = parser.parse_args(argv)
+
+    if args.codex_persist_session and args.codex_resume:
+        parser.error("--codex-persist-session cannot be combined with --codex-resume")
 
     profile = TaskProfile(
         privacy_class=PrivacyClass(args.privacy),
@@ -429,6 +460,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         review_prompt=not args.skip_prompt_review,
         codex_command=args.codex_command,
         timeout_seconds=args.timeout_seconds,
+        codex_persist_session=args.codex_persist_session,
+        codex_resume=args.codex_resume,
         execute=args.execute,
     )
 
