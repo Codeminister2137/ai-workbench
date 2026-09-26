@@ -128,6 +128,22 @@ def test_build_codex_exec_command_can_write_last_message(tmp_path: Path) -> None
     assert command[-1] == "-"
 
 
+def test_build_codex_exec_command_can_use_output_schema(tmp_path: Path) -> None:
+    schema_path = tmp_path / "answer.schema.json"
+    config = CodexCliConfig(
+        command="codex",
+        model="gpt-5.5",
+        cwd=tmp_path,
+        output_schema_path=schema_path,
+    )
+
+    command = build_codex_exec_command(config)
+
+    assert "--output-schema" in command
+    assert str(schema_path) in command
+    assert command[-1] == "-"
+
+
 def test_build_codex_exec_command_can_start_persistent_session(tmp_path: Path) -> None:
     config = CodexCliConfig(
         command="codex",

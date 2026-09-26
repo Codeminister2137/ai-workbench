@@ -285,6 +285,8 @@ Use `--codex-output-last-message path\to\last-message.txt` when you also want
 Codex's `--output-last-message` artifact. The CLI creates the parent directory,
 passes the path to Codex, and uses the file as a final-answer fallback when the
 JSONL stream does not contain a final-answer event.
+Use `--codex-output-schema path\to\schema.json` to pass Codex an explicit JSON
+Schema via `--output-schema` for structured final responses.
 
 `--mode diagnose` and `--local-capabilities` include Codex diagnostics when a
 Codex command is discoverable: command path, version, login-status text,
@@ -313,6 +315,7 @@ noninteractive command contracts and local executable paths are confirmed.
 | Machine-readable execution events | Tool calls are available to this runtime. | JSONL stdout is parsed for final answer, command/tool/file-change events, failures, and usage. | Implemented with tolerant parsing. |
 | Raw transcripts/event logs | Conversation and tool output exist in the managed session. | CLI transcript logs preserve invocation metadata, full prompts when requested, run metrics, and raw Codex JSONL. | Implemented as local files under `logs\`. |
 | Final-answer artifact | The managed session displays the final answer in chat. | `--codex-output-last-message` writes Codex's last assistant message to an explicit local file and uses it as a JSONL fallback. | Implemented as opt-in local file output. |
+| Structured final response | This runtime can constrain some outputs through tool/runtime mechanisms. | `--codex-output-schema` passes an explicit JSON Schema file to `codex exec`. | Implemented as opt-in schema file input. |
 | Approval/sandbox policy | Managed by the active ChatGPT/Codex runtime. | Uses Codex CLI sandbox flags. This installed `codex exec` supports `--json`, `--sandbox`, and `--ephemeral`; `--ask-for-approval` must not be assumed unless local help confirms it. | Partially implemented; human approval parity is a known gap. |
 | MCP tools | Available here through the current managed runtime. | Diagnostics list configured Codex MCP servers. Actually reproducing tools requires Codex MCP config/design. | Feasible, decision required before adding MCP/tool design. |
 | Plugins/apps | This session has installed app/plugin tools exposed by ChatGPT. | Diagnostics list Codex plugin marketplace/install status. Installing or authorizing plugins is outside this CLI slice. | Feasible through Codex plugins, separate auth/product decision required. |

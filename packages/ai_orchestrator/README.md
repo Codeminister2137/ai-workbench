@@ -245,3 +245,5 @@ By default the example uses ephemeral Codex sessions. Pass
 Pass `--codex-output-last-message path\to\last-message.txt` to also request
 Codex's `--output-last-message` artifact for deterministic final-message
 capture.
+Pass `--codex-output-schema path\to\schema.json` to forward a JSON Schema file
+to Codex's `--output-schema` flag for structured final responses.

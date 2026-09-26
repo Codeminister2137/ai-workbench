@@ -39,6 +39,7 @@ class CodexCliConfig:
     json_output: bool = False
     resume: str | None = None
     output_last_message_path: Path | None = None
+    output_schema_path: Path | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -115,6 +116,7 @@ def codex_cli_config_from_execution_target(
     ephemeral: bool = True,
     resume: str | None = None,
     output_last_message_path: Path | None = None,
+    output_schema_path: Path | None = None,
 ) -> CodexCliConfig:
     """Adapt an orchestrator target to Codex CLI runtime config."""
 
@@ -144,6 +146,7 @@ def codex_cli_config_from_execution_target(
         ephemeral=ephemeral,
         resume=resume,
         output_last_message_path=output_last_message_path,
+        output_schema_path=output_schema_path,
     )
 
 
@@ -162,6 +165,8 @@ def build_codex_exec_command(config: CodexCliConfig) -> tuple[str, ...]:
             command.append("--json")
         if config.output_last_message_path is not None:
             command.extend(["--output-last-message", str(config.output_last_message_path)])
+        if config.output_schema_path is not None:
+            command.extend(["--output-schema", str(config.output_schema_path)])
         if config.resume == "last":
             command.append("--last")
         else:
@@ -185,6 +190,8 @@ def build_codex_exec_command(config: CodexCliConfig) -> tuple[str, ...]:
         command.append("--json")
     if config.output_last_message_path is not None:
         command.extend(["--output-last-message", str(config.output_last_message_path)])
+    if config.output_schema_path is not None:
+        command.extend(["--output-schema", str(config.output_schema_path)])
     command.append("-")
     return tuple(command)
 
@@ -386,6 +393,7 @@ def prepare_codex_cli_execution(
     codex_persist_session: bool = False,
     codex_resume: str | None = None,
     codex_output_last_message: Path | None = None,
+    codex_output_schema: Path | None = None,
     execute: bool = False,
     runner: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
 ) -> CodexCliExecutionResult:
@@ -413,6 +421,7 @@ def prepare_codex_cli_execution(
         ephemeral=not codex_persist_session and codex_resume is None,
         resume=codex_resume,
         output_last_message_path=codex_output_last_message,
+        output_schema_path=codex_output_schema,
     )
     if not execute:
         return CodexCliExecutionResult(orchestration=orchestration, config=config)
@@ -456,6 +465,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--codex-persist-session", action="store_true")
     parser.add_argument("--codex-resume")
     parser.add_argument("--codex-output-last-message", type=Path)
+    parser.add_argument("--codex-output-schema", type=Path)
     parser.add_argument("--execute", action="store_true")
     args = parser.parse_args(argv)
 
@@ -480,6 +490,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         codex_persist_session=args.codex_persist_session,
         codex_resume=args.codex_resume,
         codex_output_last_message=args.codex_output_last_message,
+        codex_output_schema=args.codex_output_schema,
         execute=args.execute,
     )
 

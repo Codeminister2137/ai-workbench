@@ -26,6 +26,7 @@ class ExternalAgentConfig:
     json_output: bool = True
     resume: str | None = None
     output_last_message_path: Path | None = None
+    output_schema_path: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -215,6 +216,7 @@ def external_agent_config_from_orchestration(
     codex_persist_session: bool = False,
     codex_resume: str | None = None,
     output_last_message_path: Path | None = None,
+    output_schema_path: Path | None = None,
 ) -> ExternalAgentConfig:
     """Adapt a ready orchestration result to an external-agent runtime config."""
 
@@ -239,6 +241,7 @@ def external_agent_config_from_orchestration(
         ephemeral=not codex_persist_session and codex_resume is None,
         resume=codex_resume,
         output_last_message_path=output_last_message_path,
+        output_schema_path=output_schema_path,
     )
 
 
@@ -309,6 +312,8 @@ def build_external_agent_command(config: ExternalAgentConfig) -> tuple[str, ...]
             command.append("--json")
         if config.output_last_message_path is not None:
             command.extend(["--output-last-message", str(config.output_last_message_path)])
+        if config.output_schema_path is not None:
+            command.extend(["--output-schema", str(config.output_schema_path)])
         if config.resume == "last":
             command.append("--last")
         else:
@@ -332,6 +337,8 @@ def build_external_agent_command(config: ExternalAgentConfig) -> tuple[str, ...]
         command.append("--json")
     if config.output_last_message_path is not None:
         command.extend(["--output-last-message", str(config.output_last_message_path)])
+    if config.output_schema_path is not None:
+        command.extend(["--output-schema", str(config.output_schema_path)])
     command.append("-")
     return tuple(command)
 

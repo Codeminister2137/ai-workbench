@@ -767,6 +767,59 @@ def test_cli_can_use_codex_output_last_message_file(
     assert output_file.read_text(encoding="utf-8") == "last-message answer"
 
 
+def test_cli_can_plan_codex_output_schema(capsys, monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("CODEX_COMMAND", "codex-test")
+    schema_file = tmp_path / "answer.schema.json"
+    schema_file.write_text('{"type":"object"}', encoding="utf-8")
+
+    assert (
+        main(
+            [
+                "--mode",
+                "plan",
+                "Return structured output.",
+                "--privacy",
+                "external_allowed",
+                "--route-id",
+                "openai-codex-gpt-5-5",
+                "--provider",
+                "openai",
+                "--model",
+                "gpt-5.5",
+                "--skip-prompt-review",
+                "--codex-output-schema",
+                str(schema_file),
+            ]
+        )
+        == 0
+    )
+
+    output = capsys.readouterr().out
+    assert "external_agent_output_schema:" in output
+    assert "--output-schema" in output
+    assert str(schema_file) in output
+
+
+def test_codex_output_schema_requires_codex_route(tmp_path: Path) -> None:
+    schema_file = tmp_path / "answer.schema.json"
+    schema_file.write_text('{"type":"object"}', encoding="utf-8")
+
+    with pytest.raises(SystemExit):
+        main(
+            [
+                "--mode",
+                "plan",
+                "Invalid route.",
+                "--provider",
+                "ollama",
+                "--model",
+                "qwen2.5-coder:14b",
+                "--codex-output-schema",
+                str(schema_file),
+            ]
+        )
+
+
 def test_codex_capability_status_reports_expected_diagnostics(monkeypatch) -> None:
     def fake_run(command, *args, **kwargs):
         joined = tuple(command)

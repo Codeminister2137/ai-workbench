@@ -430,6 +430,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
+        "--codex-output-schema",
+        type=Path,
+        help=(
+            "For Codex CLI routes, pass a JSON Schema file to Codex via --output-schema "
+            "to constrain the final assistant message."
+        ),
+    )
+    parser.add_argument(
         "--scrutinize-response",
         action="store_true",
         help=(
@@ -577,6 +585,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         and external_orchestration.execution_plan.target.access_method is not AccessMethod.CODEX_CLI
     ):
         parser.error("--codex-output-last-message requires a Codex CLI route")
+    if (
+        args.codex_output_schema is not None
+        and external_orchestration.is_ready
+        and external_orchestration.execution_plan is not None
+        and external_orchestration.execution_plan.target.access_method is not AccessMethod.CODEX_CLI
+    ):
+        parser.error("--codex-output-schema requires a Codex CLI route")
     if (
         external_orchestration.is_ready
         and external_orchestration.execution_plan is not None
@@ -827,6 +842,7 @@ def _run_external_agent_cli_mode(
             codex_persist_session=args.codex_persist_session,
             codex_resume=args.codex_resume,
             output_last_message_path=args.codex_output_last_message,
+            output_schema_path=args.codex_output_schema,
         )
         print(f"external_agent_command: {config.command}")
         print(f"external_agent_sandbox: {config.sandbox}")
@@ -835,6 +851,8 @@ def _run_external_agent_cli_mode(
             print(f"external_agent_resume: {config.resume}")
         if config.output_last_message_path is not None:
             print(f"external_agent_output_last_message: {config.output_last_message_path}")
+        if config.output_schema_path is not None:
+            print(f"external_agent_output_schema: {config.output_schema_path}")
         print("\n=== Assistant response ===")
         if args.execute and args.mode != "plan":
             primary_started = time.perf_counter()
