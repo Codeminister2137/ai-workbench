@@ -144,6 +144,21 @@ def test_build_codex_exec_command_can_use_output_schema(tmp_path: Path) -> None:
     assert command[-1] == "-"
 
 
+def test_build_codex_exec_command_can_enable_top_level_search(tmp_path: Path) -> None:
+    config = CodexCliConfig(
+        command="codex",
+        model="gpt-5.5",
+        cwd=tmp_path,
+        web_search=True,
+    )
+
+    command = build_codex_exec_command(config)
+
+    assert command[:3] == ("codex", "--search", "exec")
+    assert "exec" in command
+    assert command[-1] == "-"
+
+
 def test_build_codex_exec_command_can_start_persistent_session(tmp_path: Path) -> None:
     config = CodexCliConfig(
         command="codex",
@@ -183,6 +198,31 @@ def test_build_codex_exec_command_can_resume_last_session(tmp_path: Path) -> Non
     )
 
 
+def test_build_codex_exec_command_can_resume_with_top_level_search(tmp_path: Path) -> None:
+    config = CodexCliConfig(
+        command="codex",
+        model="gpt-5.5",
+        cwd=tmp_path,
+        json_output=True,
+        resume="last",
+        web_search=True,
+    )
+
+    command = build_codex_exec_command(config)
+
+    assert command == (
+        "codex",
+        "--search",
+        "exec",
+        "resume",
+        "--model",
+        "gpt-5.5",
+        "--json",
+        "--last",
+        "-",
+    )
+
+
 def test_build_codex_exec_command_can_resume_named_session(tmp_path: Path) -> None:
     config = CodexCliConfig(
         command="codex",
@@ -210,6 +250,7 @@ def test_parse_codex_jsonl_events_extracts_structured_summary() -> None:
             [
                 '{"type":"command.started","command":"pytest"}',
                 '{"type":"tool.completed","name":"read_file"}',
+                '{"type":"item.completed","item":{"type":"web_search","query":"OpenAI"}}',
                 '{"type":"file_change","path":"pkg/module.py"}',
                 '{"type":"turn.completed","usage":{"input_tokens":10,"output_tokens":5}}',
                 '{"type":"final_answer","content":"Done."}',
@@ -220,6 +261,7 @@ def test_parse_codex_jsonl_events_extracts_structured_summary() -> None:
     assert summary.final_answer == "Done."
     assert len(summary.command_events) == 1
     assert len(summary.tool_events) == 1
+    assert len(summary.web_search_events) == 1
     assert len(summary.file_change_events) == 1
     assert summary.usage == {"input_tokens": 10, "output_tokens": 5}
     assert summary.failure_reason is None

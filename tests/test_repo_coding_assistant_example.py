@@ -258,6 +258,7 @@ def test_cli_help_lists_google_provider() -> None:
     assert "--provider {ollama,openai,requesty,google}" in result.stdout
     assert "--mode {ask,review,implement,plan,diagnose}" in result.stdout
     assert "--scrutinize-response" in result.stdout
+    assert "--codex-search" in result.stdout
 
 
 def test_repo_assistant_script_uses_stable_package_entrypoint() -> None:
@@ -459,6 +460,7 @@ def test_cli_executes_codex_external_agent_route(capsys, monkeypatch) -> None:
                 [
                     '{"type":"command.started","command":"git status --short"}',
                     '{"type":"tool.completed","name":"read_file"}',
+                    '{"type":"item.completed","item":{"type":"web_search","query":"OpenAI"}}',
                     '{"type":"file_change","path":"example.py"}',
                     '{"type":"turn.completed","usage":{"input_tokens":12,"output_tokens":3}}',
                     '{"type":"final_answer","content":"codex done"}',
@@ -496,6 +498,7 @@ def test_cli_executes_codex_external_agent_route(capsys, monkeypatch) -> None:
     assert "external_agent_jsonl_events: parsed" in output
     assert "external_agent_command_event_count: 1" in output
     assert "external_agent_tool_event_count: 1" in output
+    assert "external_agent_web_search_event_count: 1" in output
     assert "external_agent_file_change_event_count: 1" in output
     assert "external_agent_usage_json:" in output
     assert "codex done" in output
@@ -618,6 +621,7 @@ def test_external_agent_jsonl_parser_extracts_failure_and_final_answer() -> None
         "\n".join(
             [
                 '{"type":"agent_message","role":"assistant","content":"intermediate"}',
+                '{"type":"item.completed","item":{"type":"web_search","query":"OpenAI"}}',
                 '{"type":"turn.failed","error":{"message":"sandbox denied"}}',
                 '{"type":"final_answer","content":"last answer"}',
                 "not-json",
@@ -627,6 +631,7 @@ def test_external_agent_jsonl_parser_extracts_failure_and_final_answer() -> None
 
     assert events.final_answer == "last answer"
     assert events.failure_reason == "sandbox denied"
+    assert len(events.web_search_events) == 1
     assert events.parse_errors
 
 
@@ -800,6 +805,36 @@ def test_cli_can_plan_codex_output_schema(capsys, monkeypatch, tmp_path: Path) -
     assert str(schema_file) in output
 
 
+def test_cli_can_plan_codex_search(capsys, monkeypatch) -> None:
+    monkeypatch.setenv("CODEX_COMMAND", "codex-test")
+
+    assert (
+        main(
+            [
+                "--mode",
+                "plan",
+                "Search for current documentation.",
+                "--privacy",
+                "external_allowed",
+                "--route-id",
+                "openai-codex-gpt-5-5",
+                "--provider",
+                "openai",
+                "--model",
+                "gpt-5.5",
+                "--skip-prompt-review",
+                "--codex-search",
+            ]
+        )
+        == 0
+    )
+
+    output = capsys.readouterr().out
+    assert "external_agent_web_search: True" in output
+    assert '"codex-test", "--search", "exec"' in output
+    assert '"exec", "--search"' not in output
+
+
 def test_codex_output_schema_requires_codex_route(tmp_path: Path) -> None:
     schema_file = tmp_path / "answer.schema.json"
     schema_file.write_text('{"type":"object"}', encoding="utf-8")
@@ -816,6 +851,22 @@ def test_codex_output_schema_requires_codex_route(tmp_path: Path) -> None:
                 "qwen2.5-coder:14b",
                 "--codex-output-schema",
                 str(schema_file),
+            ]
+        )
+
+
+def test_codex_search_requires_codex_route() -> None:
+    with pytest.raises(SystemExit):
+        main(
+            [
+                "--mode",
+                "plan",
+                "Invalid route.",
+                "--provider",
+                "ollama",
+                "--model",
+                "qwen2.5-coder:14b",
+                "--codex-search",
             ]
         )
 

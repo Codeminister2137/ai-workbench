@@ -40,6 +40,7 @@ class CodexCliConfig:
     resume: str | None = None
     output_last_message_path: Path | None = None
     output_schema_path: Path | None = None
+    web_search: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,6 +68,7 @@ class CodexJsonlSummary:
     final_answer: str | None
     command_events: tuple[dict[str, Any], ...]
     tool_events: tuple[dict[str, Any], ...]
+    web_search_events: tuple[dict[str, Any], ...]
     file_change_events: tuple[dict[str, Any], ...]
     usage: dict[str, Any] | None
     failure_reason: str | None
@@ -117,6 +119,7 @@ def codex_cli_config_from_execution_target(
     resume: str | None = None,
     output_last_message_path: Path | None = None,
     output_schema_path: Path | None = None,
+    web_search: bool = False,
 ) -> CodexCliConfig:
     """Adapt an orchestrator target to Codex CLI runtime config."""
 
@@ -147,20 +150,19 @@ def codex_cli_config_from_execution_target(
         resume=resume,
         output_last_message_path=output_last_message_path,
         output_schema_path=output_schema_path,
+        web_search=web_search,
     )
 
 
 def build_codex_exec_command(config: CodexCliConfig) -> tuple[str, ...]:
     """Build a non-interactive `codex exec` command that reads the prompt from stdin."""
 
+    command = [config.command]
+    if config.web_search:
+        command.append("--search")
+
     if config.resume is not None:
-        command = [
-            config.command,
-            "exec",
-            "resume",
-            "--model",
-            config.model,
-        ]
+        command.extend(["exec", "resume", "--model", config.model])
         if config.json_output:
             command.append("--json")
         if config.output_last_message_path is not None:
@@ -174,16 +176,17 @@ def build_codex_exec_command(config: CodexCliConfig) -> tuple[str, ...]:
         command.append("-")
         return tuple(command)
 
-    command = [
-        config.command,
-        "exec",
-        "--cd",
-        str(config.cwd),
-        "--model",
-        config.model,
-        "--sandbox",
-        config.sandbox,
-    ]
+    command.extend(
+        [
+            "exec",
+            "--cd",
+            str(config.cwd),
+            "--model",
+            config.model,
+            "--sandbox",
+            config.sandbox,
+        ]
+    )
     if config.ephemeral:
         command.append("--ephemeral")
     if config.json_output:
@@ -202,6 +205,7 @@ def parse_codex_jsonl_events(text: str) -> CodexJsonlSummary:
     final_answer = None
     command_events: list[dict[str, Any]] = []
     tool_events: list[dict[str, Any]] = []
+    web_search_events: list[dict[str, Any]] = []
     file_change_events: list[dict[str, Any]] = []
     usage = None
     failure_reason = None
@@ -224,6 +228,8 @@ def parse_codex_jsonl_events(text: str) -> CodexJsonlSummary:
             command_events.append(event)
         if "tool" in haystack or "function_call" in haystack:
             tool_events.append(event)
+        if "web_search" in haystack:
+            web_search_events.append(event)
         if any(token in haystack for token in ("file_change", "patch", "diff", "edit", "write")):
             file_change_events.append(event)
         event_usage = _find_usage(event)
@@ -239,6 +245,7 @@ def parse_codex_jsonl_events(text: str) -> CodexJsonlSummary:
         final_answer=final_answer,
         command_events=tuple(command_events),
         tool_events=tuple(tool_events),
+        web_search_events=tuple(web_search_events),
         file_change_events=tuple(file_change_events),
         usage=usage,
         failure_reason=failure_reason,
@@ -394,6 +401,7 @@ def prepare_codex_cli_execution(
     codex_resume: str | None = None,
     codex_output_last_message: Path | None = None,
     codex_output_schema: Path | None = None,
+    codex_search: bool = False,
     execute: bool = False,
     runner: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
 ) -> CodexCliExecutionResult:
@@ -422,6 +430,7 @@ def prepare_codex_cli_execution(
         resume=codex_resume,
         output_last_message_path=codex_output_last_message,
         output_schema_path=codex_output_schema,
+        web_search=codex_search,
     )
     if not execute:
         return CodexCliExecutionResult(orchestration=orchestration, config=config)
@@ -466,6 +475,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--codex-resume")
     parser.add_argument("--codex-output-last-message", type=Path)
     parser.add_argument("--codex-output-schema", type=Path)
+    parser.add_argument(
+        "--codex-search",
+        action="store_true",
+        help=(
+            "Enable Codex web search for this run. "
+            "This is opt-in because it allows external web/search activity."
+        ),
+    )
     parser.add_argument("--execute", action="store_true")
     args = parser.parse_args(argv)
 
@@ -491,6 +508,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         codex_resume=args.codex_resume,
         codex_output_last_message=args.codex_output_last_message,
         codex_output_schema=args.codex_output_schema,
+        codex_search=args.codex_search,
         execute=args.execute,
     )
 
@@ -508,6 +526,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"product: {result.orchestration.execution_plan.target.product}")
         print(f"codex_command: {result.config.command}")
         print(f"model: {result.config.model}")
+        print(f"web_search: {result.config.web_search}")
         print(
             f"cost_policy_tier: {result.orchestration.execution_plan.target.cost_policy_tier.value}"
         )

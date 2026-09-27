@@ -438,6 +438,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
+        "--codex-search",
+        action="store_true",
+        help=(
+            "For Codex CLI routes, enable Codex web search for this run. "
+            "This is opt-in because it allows external web/search activity."
+        ),
+    )
+    parser.add_argument(
         "--scrutinize-response",
         action="store_true",
         help=(
@@ -592,6 +600,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         and external_orchestration.execution_plan.target.access_method is not AccessMethod.CODEX_CLI
     ):
         parser.error("--codex-output-schema requires a Codex CLI route")
+    if (
+        args.codex_search
+        and external_orchestration.is_ready
+        and external_orchestration.execution_plan is not None
+        and external_orchestration.execution_plan.target.access_method is not AccessMethod.CODEX_CLI
+    ):
+        parser.error("--codex-search requires a Codex CLI route")
     if (
         external_orchestration.is_ready
         and external_orchestration.execution_plan is not None
@@ -843,6 +858,7 @@ def _run_external_agent_cli_mode(
             codex_resume=args.codex_resume,
             output_last_message_path=args.codex_output_last_message,
             output_schema_path=args.codex_output_schema,
+            web_search=args.codex_search,
         )
         print(f"external_agent_command: {config.command}")
         print(f"external_agent_sandbox: {config.sandbox}")
@@ -853,6 +869,7 @@ def _run_external_agent_cli_mode(
             print(f"external_agent_output_last_message: {config.output_last_message_path}")
         if config.output_schema_path is not None:
             print(f"external_agent_output_schema: {config.output_schema_path}")
+        print(f"external_agent_web_search: {config.web_search}")
         print("\n=== Assistant response ===")
         if args.execute and args.mode != "plan":
             primary_started = time.perf_counter()
@@ -920,6 +937,7 @@ def _print_external_agent_event_summary(events: ExternalAgentEventSummary) -> No
     print("external_agent_jsonl_events: parsed")
     print(f"external_agent_command_event_count: {len(events.command_events)}")
     print(f"external_agent_tool_event_count: {len(events.tool_events)}")
+    print(f"external_agent_web_search_event_count: {len(events.web_search_events)}")
     print(f"external_agent_file_change_event_count: {len(events.file_change_events)}")
     if events.usage is not None:
         print("external_agent_usage_json: " + json.dumps(events.usage, sort_keys=True))

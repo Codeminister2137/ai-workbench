@@ -272,10 +272,10 @@ Codex execution is wired first. The CLI discovers the Codex command from
 Codex is invoked as `codex exec --json` with repository cwd, stdin prompt,
 workspace sandbox, and ephemeral session state by default. The CLI parses the
 JSONL event stream enough to report the final answer, command/tool/file-change
-event counts, failure status, and usage payloads when Codex emits them. Raw
-JSONL is preserved in transcript logs under `=== External agent raw JSONL ===`
-for debugging and evaluation without dumping the full event stream to the
-terminal.
+event counts, web-search event counts, failure status, and usage payloads when
+Codex emits them. Raw JSONL is preserved in transcript logs under
+`=== External agent raw JSONL ===` for debugging and evaluation without dumping
+the full event stream to the terminal.
 
 Use `--codex-persist-session` when intentionally starting a resumable Codex
 session. This omits `--ephemeral`, allowing Codex to write its normal session
@@ -287,6 +287,11 @@ passes the path to Codex, and uses the file as a final-answer fallback when the
 JSONL stream does not contain a final-answer event.
 Use `--codex-output-schema path\to\schema.json` to pass Codex an explicit JSON
 Schema via `--output-schema` for structured final responses.
+Use `--codex-search` to enable Codex web search for one run. This is deliberately
+off by default because it allows external web/search activity in addition to
+sending the selected repository context to Codex. The verified local Codex CLI
+expects search as a top-level flag, so the repository CLI invokes
+`codex --search exec ...` rather than the unsupported `codex exec --search ...`.
 
 `--mode diagnose` and `--local-capabilities` include Codex diagnostics when a
 Codex command is discoverable: command path, version, login-status text,
@@ -320,7 +325,7 @@ noninteractive command contracts and local executable paths are confirmed.
 | MCP tools | Available here through the current managed runtime. | Diagnostics list configured Codex MCP servers. Actually reproducing tools requires Codex MCP config/design. | Feasible, decision required before adding MCP/tool design. |
 | Plugins/apps | This session has installed app/plugin tools exposed by ChatGPT. | Diagnostics list Codex plugin marketplace/install status. Installing or authorizing plugins is outside this CLI slice. | Feasible through Codex plugins, separate auth/product decision required. |
 | Document/app-control tools | Available here when connected document sessions expose tools. | Not inherited automatically by `codex exec`. Would require MCP/plugin equivalents and authorization. | Gap; decision required before design. |
-| Web/search | This runtime may have managed browsing tools. | Codex CLI exposes a search flag, but this repo CLI does not enable broad web/search by default. | Gap by policy; ask before changing external network behavior. |
+| Web/search | This runtime may have managed browsing tools. | `--codex-search` invokes `codex --search exec ...` for one explicit Codex CLI run. Default runs omit search. | Implemented as explicit opt-in only. |
 | Images/multimodal input | This runtime can receive images when tools/context allow it. | Codex CLI help exposes image attachment flags, but the repo assistant route currently sends text prompts only. | Feasible later through CLI-layer input design. |
 | Multi-turn resume | This chat preserves conversation state. | Default runs remain ephemeral. `--codex-persist-session` starts a resumable session, and `--codex-resume last|<session-id>` resumes one through Codex CLI. | Implemented as explicit opt-in Codex persistence. |
 

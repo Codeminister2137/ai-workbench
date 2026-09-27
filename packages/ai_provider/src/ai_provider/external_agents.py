@@ -27,6 +27,7 @@ class ExternalAgentConfig:
     resume: str | None = None
     output_last_message_path: Path | None = None
     output_schema_path: Path | None = None
+    web_search: bool = False
 
 
 @dataclass(frozen=True)
@@ -36,6 +37,7 @@ class ExternalAgentEventSummary:
     final_answer: str | None
     command_events: tuple[dict[str, Any], ...]
     tool_events: tuple[dict[str, Any], ...]
+    web_search_events: tuple[dict[str, Any], ...]
     file_change_events: tuple[dict[str, Any], ...]
     usage: dict[str, Any] | None
     failure_reason: str | None
@@ -217,6 +219,7 @@ def external_agent_config_from_orchestration(
     codex_resume: str | None = None,
     output_last_message_path: Path | None = None,
     output_schema_path: Path | None = None,
+    web_search: bool = False,
 ) -> ExternalAgentConfig:
     """Adapt a ready orchestration result to an external-agent runtime config."""
 
@@ -242,6 +245,7 @@ def external_agent_config_from_orchestration(
         resume=codex_resume,
         output_last_message_path=output_last_message_path,
         output_schema_path=output_schema_path,
+        web_search=web_search,
     )
 
 
@@ -251,6 +255,7 @@ def parse_external_agent_jsonl(text: str) -> ExternalAgentEventSummary:
     final_answer = None
     command_events: list[dict[str, Any]] = []
     tool_events: list[dict[str, Any]] = []
+    web_search_events: list[dict[str, Any]] = []
     file_change_events: list[dict[str, Any]] = []
     usage = None
     failure_reason = None
@@ -272,6 +277,8 @@ def parse_external_agent_jsonl(text: str) -> ExternalAgentEventSummary:
             command_events.append(event)
         if _is_tool_event(event, event_type):
             tool_events.append(event)
+        if _is_web_search_event(event, event_type):
+            web_search_events.append(event)
         if _is_file_change_event(event, event_type):
             file_change_events.append(event)
         event_usage = _find_usage(event)
@@ -287,6 +294,7 @@ def parse_external_agent_jsonl(text: str) -> ExternalAgentEventSummary:
         final_answer=final_answer,
         command_events=tuple(command_events),
         tool_events=tuple(tool_events),
+        web_search_events=tuple(web_search_events),
         file_change_events=tuple(file_change_events),
         usage=usage,
         failure_reason=failure_reason,
@@ -300,14 +308,12 @@ def build_external_agent_command(config: ExternalAgentConfig) -> tuple[str, ...]
     if config.access_method is not AccessMethod.CODEX_CLI:
         raise NotImplementedError(f"{config.access_method.value} execution is not implemented.")
 
+    command = [config.command]
+    if config.web_search:
+        command.append("--search")
+
     if config.resume is not None:
-        command = [
-            config.command,
-            "exec",
-            "resume",
-            "--model",
-            config.model,
-        ]
+        command.extend(["exec", "resume", "--model", config.model])
         if config.json_output:
             command.append("--json")
         if config.output_last_message_path is not None:
@@ -321,16 +327,17 @@ def build_external_agent_command(config: ExternalAgentConfig) -> tuple[str, ...]
         command.append("-")
         return tuple(command)
 
-    command = [
-        config.command,
-        "exec",
-        "--cd",
-        str(config.cwd),
-        "--model",
-        config.model,
-        "--sandbox",
-        config.sandbox,
-    ]
+    command.extend(
+        [
+            "exec",
+            "--cd",
+            str(config.cwd),
+            "--model",
+            config.model,
+            "--sandbox",
+            config.sandbox,
+        ]
+    )
     if config.ephemeral:
         command.append("--ephemeral")
     if config.json_output:
@@ -404,6 +411,13 @@ def _is_tool_event(event: dict[str, Any], event_type: str) -> bool:
 
     haystack = _event_haystack(event, event_type)
     return "tool" in haystack or "function_call" in haystack
+
+
+def _is_web_search_event(event: dict[str, Any], event_type: str) -> bool:
+    """Return whether an event appears to describe Codex web search activity."""
+
+    haystack = _event_haystack(event, event_type)
+    return "web_search" in haystack
 
 
 def _is_file_change_event(event: dict[str, Any], event_type: str) -> bool:

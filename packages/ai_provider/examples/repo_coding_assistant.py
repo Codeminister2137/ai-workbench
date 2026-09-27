@@ -196,6 +196,7 @@ class ExternalAgentConfig:
     resume: str | None = None
     output_last_message_path: Path | None = None
     output_schema_path: Path | None = None
+    web_search: bool = False
 
 
 @dataclass(frozen=True)
@@ -205,6 +206,7 @@ class ExternalAgentEventSummary:
     final_answer: str | None
     command_events: tuple[dict[str, Any], ...]
     tool_events: tuple[dict[str, Any], ...]
+    web_search_events: tuple[dict[str, Any], ...]
     file_change_events: tuple[dict[str, Any], ...]
     usage: dict[str, Any] | None
     failure_reason: str | None
@@ -521,6 +523,7 @@ def _external_agent_config_from_orchestration(
     codex_resume: str | None = None,
     output_last_message_path: Path | None = None,
     output_schema_path: Path | None = None,
+    web_search: bool = False,
 ) -> ExternalAgentConfig:
     """Adapt a ready orchestration result to an external-agent runtime config."""
 
@@ -546,6 +549,7 @@ def _external_agent_config_from_orchestration(
         resume=codex_resume,
         output_last_message_path=output_last_message_path,
         output_schema_path=output_schema_path,
+        web_search=web_search,
     )
 
 
@@ -555,6 +559,7 @@ def parse_external_agent_jsonl(text: str) -> ExternalAgentEventSummary:
     final_answer = None
     command_events: list[dict[str, Any]] = []
     tool_events: list[dict[str, Any]] = []
+    web_search_events: list[dict[str, Any]] = []
     file_change_events: list[dict[str, Any]] = []
     usage = None
     failure_reason = None
@@ -576,6 +581,8 @@ def parse_external_agent_jsonl(text: str) -> ExternalAgentEventSummary:
             command_events.append(event)
         if _is_tool_event(event, event_type):
             tool_events.append(event)
+        if _is_web_search_event(event, event_type):
+            web_search_events.append(event)
         if _is_file_change_event(event, event_type):
             file_change_events.append(event)
         event_usage = _find_usage(event)
@@ -591,6 +598,7 @@ def parse_external_agent_jsonl(text: str) -> ExternalAgentEventSummary:
         final_answer=final_answer,
         command_events=tuple(command_events),
         tool_events=tuple(tool_events),
+        web_search_events=tuple(web_search_events),
         file_change_events=tuple(file_change_events),
         usage=usage,
         failure_reason=failure_reason,
@@ -623,6 +631,13 @@ def _is_tool_event(event: dict[str, Any], event_type: str) -> bool:
 
     haystack = _event_haystack(event, event_type)
     return "tool" in haystack or "function_call" in haystack
+
+
+def _is_web_search_event(event: dict[str, Any], event_type: str) -> bool:
+    """Return whether an event appears to describe Codex web search activity."""
+
+    haystack = _event_haystack(event, event_type)
+    return "web_search" in haystack
 
 
 def _is_file_change_event(event: dict[str, Any], event_type: str) -> bool:
@@ -738,14 +753,12 @@ def _build_external_agent_command(config: ExternalAgentConfig) -> tuple[str, ...
     if config.access_method is not AccessMethod.CODEX_CLI:
         raise NotImplementedError(f"{config.access_method.value} execution is not implemented.")
 
+    command = [config.command]
+    if config.web_search:
+        command.append("--search")
+
     if config.resume is not None:
-        command = [
-            config.command,
-            "exec",
-            "resume",
-            "--model",
-            config.model,
-        ]
+        command.extend(["exec", "resume", "--model", config.model])
         if config.json_output:
             command.append("--json")
         if config.output_last_message_path is not None:
@@ -759,16 +772,17 @@ def _build_external_agent_command(config: ExternalAgentConfig) -> tuple[str, ...
         command.append("-")
         return tuple(command)
 
-    command = [
-        config.command,
-        "exec",
-        "--cd",
-        str(config.cwd),
-        "--model",
-        config.model,
-        "--sandbox",
-        config.sandbox,
-    ]
+    command.extend(
+        [
+            "exec",
+            "--cd",
+            str(config.cwd),
+            "--model",
+            config.model,
+            "--sandbox",
+            config.sandbox,
+        ]
+    )
     if config.ephemeral:
         command.append("--ephemeral")
     if config.json_output:
@@ -1408,6 +1422,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
+        "--codex-search",
+        action="store_true",
+        help=(
+            "For Codex CLI routes, enable Codex web search for this run. "
+            "This is opt-in because it allows external web/search activity."
+        ),
+    )
+    parser.add_argument(
         "--scrutinize-response",
         action="store_true",
         help=(
@@ -1562,6 +1584,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         and external_orchestration.execution_plan.target.access_method is not AccessMethod.CODEX_CLI
     ):
         parser.error("--codex-output-schema requires a Codex CLI route")
+    if (
+        args.codex_search
+        and external_orchestration.is_ready
+        and external_orchestration.execution_plan is not None
+        and external_orchestration.execution_plan.target.access_method is not AccessMethod.CODEX_CLI
+    ):
+        parser.error("--codex-search requires a Codex CLI route")
     if (
         external_orchestration.is_ready
         and external_orchestration.execution_plan is not None
@@ -1813,6 +1842,7 @@ def _run_external_agent_cli_mode(
             codex_resume=args.codex_resume,
             output_last_message_path=args.codex_output_last_message,
             output_schema_path=args.codex_output_schema,
+            web_search=args.codex_search,
         )
         print(f"external_agent_command: {config.command}")
         print(f"external_agent_sandbox: {config.sandbox}")
@@ -1823,6 +1853,7 @@ def _run_external_agent_cli_mode(
             print(f"external_agent_output_last_message: {config.output_last_message_path}")
         if config.output_schema_path is not None:
             print(f"external_agent_output_schema: {config.output_schema_path}")
+        print(f"external_agent_web_search: {config.web_search}")
         print("\n=== Assistant response ===")
         if args.execute and args.mode != "plan":
             primary_started = time.perf_counter()
@@ -1890,6 +1921,7 @@ def _print_external_agent_event_summary(events: ExternalAgentEventSummary) -> No
     print("external_agent_jsonl_events: parsed")
     print(f"external_agent_command_event_count: {len(events.command_events)}")
     print(f"external_agent_tool_event_count: {len(events.tool_events)}")
+    print(f"external_agent_web_search_event_count: {len(events.web_search_events)}")
     print(f"external_agent_file_change_event_count: {len(events.file_change_events)}")
     if events.usage is not None:
         print("external_agent_usage_json: " + json.dumps(events.usage, sort_keys=True))
