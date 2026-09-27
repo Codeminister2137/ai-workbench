@@ -244,6 +244,26 @@ def test_execute_actions_runs_command_in_repo(tmp_path: Path) -> None:
     assert "hello" in results[0].output
 
 
+def test_execute_actions_can_be_blocked_by_approval_policy(tmp_path: Path) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+
+    results = execute_actions(
+        (
+            AssistantAction(
+                action_type="write_file",
+                args={"path": "generated.txt", "content": "generated content"},
+            ),
+        ),
+        repo_root,
+        authorize_action=lambda action: action.action_type != "write_file",
+    )
+
+    assert results[0].ok is False
+    assert results[0].summary == "Skipped by approval policy: write_file"
+    assert not (repo_root / "generated.txt").exists()
+
+
 def test_cli_help_lists_google_provider() -> None:
     result = __import__("subprocess").run(
         [
@@ -260,6 +280,7 @@ def test_cli_help_lists_google_provider() -> None:
     assert "--provider {ollama,openai,requesty,google}" in result.stdout
     assert "--mode {ask,review,implement,plan,diagnose}" in result.stdout
     assert "--scrutinize-response" in result.stdout
+    assert "--approval-policy" in result.stdout
     assert "--codex-search" in result.stdout
     assert "--codex-image" in result.stdout
     assert "--codex-mcp-setup" in result.stdout
@@ -510,6 +531,36 @@ def test_cli_plans_codex_external_agent_route(capsys, monkeypatch) -> None:
     assert "external_agent_command: codex-test" in output
     assert "external_agent_command_line_json:" in output
     assert "execution_status: planned" in output
+
+
+def test_cli_approval_policy_read_only_maps_to_codex_sandbox(capsys, monkeypatch) -> None:
+    monkeypatch.setenv("CODEX_COMMAND", "codex-test")
+
+    assert (
+        main(
+            [
+                "--mode",
+                "plan",
+                "Inspect this repository.",
+                "--privacy",
+                "external_allowed",
+                "--route-id",
+                "openai-codex-gpt-5-5",
+                "--provider",
+                "openai",
+                "--model",
+                "gpt-5.5",
+                "--skip-prompt-review",
+                "--approval-policy",
+                "read_only",
+            ]
+        )
+        == 0
+    )
+    output = capsys.readouterr().out
+    assert "approval_policy: read_only" in output
+    assert "external_agent_sandbox: read-only" in output
+    assert '"--sandbox", "read-only"' in output
 
 
 def test_cli_executes_codex_external_agent_route(capsys, monkeypatch) -> None:

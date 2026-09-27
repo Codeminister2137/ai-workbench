@@ -11,7 +11,7 @@ from ai_agent.contracts import (
     ToolResult,
 )
 from ai_agent.loop import AgentLoop, AgentResult
-from ai_agent.permissions import PermissionManager, PermissionPolicy
+from ai_agent.permissions import ApprovalPolicyPreset, PermissionManager, PermissionPolicy
 from ai_agent.tools import (
     BaseTool,
     CreateFileTool,
@@ -29,6 +29,7 @@ from ai_agent.tools import (
 __all__ = [
     "AgentLoop",
     "AgentResult",
+    "ApprovalPolicyPreset",
     "BaseTool",
     "CreateFileTool",
     "EditFileTool",

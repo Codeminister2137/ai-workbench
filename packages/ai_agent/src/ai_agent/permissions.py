@@ -4,11 +4,21 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from enum import StrEnum
 
 from ai_agent.contracts import PermissionAction, ToolCall, ToolCategory
 from ai_agent.tools.base import BaseTool
 
 ApprovalCallback = Callable[[ToolCall, ToolCategory], bool]
+
+
+class ApprovalPolicyPreset(StrEnum):
+    """Named approval modes shared across model and executor implementations."""
+
+    READ_ONLY = "read_only"
+    INTERACTIVE = "interactive"
+    WORKSPACE_WRITE = "workspace_write"
+    TRUSTED_LOCAL = "trusted_local"
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,6 +54,17 @@ class PermissionPolicy:
         )
 
     @classmethod
+    def workspace_write(cls) -> PermissionPolicy:
+        """Allow workspace reads/searches/writes, but ask before shell/custom tools."""
+        return cls(
+            read_action=PermissionAction.ALLOW,
+            search_action=PermissionAction.ALLOW,
+            write_action=PermissionAction.ALLOW,
+            shell_action=PermissionAction.ASK_USER,
+            custom_action=PermissionAction.ASK_USER,
+        )
+
+    @classmethod
     def interactive(cls) -> PermissionPolicy:
         """Allow reads and searches, ask for writes and shell commands."""
         return cls(
@@ -67,6 +88,20 @@ class PermissionPolicy:
                 return self.shell_action
             case ToolCategory.CUSTOM:
                 return self.custom_action
+
+    @classmethod
+    def from_approval_preset(cls, preset: ApprovalPolicyPreset | str) -> PermissionPolicy:
+        """Return the permission policy for a named approval preset."""
+        normalized = ApprovalPolicyPreset(preset)
+        match normalized:
+            case ApprovalPolicyPreset.READ_ONLY:
+                return cls.read_only()
+            case ApprovalPolicyPreset.INTERACTIVE:
+                return cls.interactive()
+            case ApprovalPolicyPreset.WORKSPACE_WRITE:
+                return cls.workspace_write()
+            case ApprovalPolicyPreset.TRUSTED_LOCAL:
+                return cls.permissive()
 
 
 @dataclass(slots=True)

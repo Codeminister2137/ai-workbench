@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from ai_agent import (
+    ApprovalPolicyPreset,
     CreateFileTool,
     PermissionAction,
     PermissionManager,
@@ -27,6 +28,32 @@ def test_permission_policy_presets() -> None:
     assert interactive.action_for_category(ToolCategory.READ) is PermissionAction.ALLOW
     assert interactive.action_for_category(ToolCategory.WRITE) is PermissionAction.ASK_USER
     assert interactive.action_for_category(ToolCategory.SHELL) is PermissionAction.ASK_USER
+
+    workspace_write = PermissionPolicy.workspace_write()
+    assert workspace_write.action_for_category(ToolCategory.READ) is PermissionAction.ALLOW
+    assert workspace_write.action_for_category(ToolCategory.WRITE) is PermissionAction.ALLOW
+    assert workspace_write.action_for_category(ToolCategory.SHELL) is PermissionAction.ASK_USER
+
+
+def test_permission_policy_from_approval_preset() -> None:
+    assert (
+        PermissionPolicy.from_approval_preset(ApprovalPolicyPreset.READ_ONLY).action_for_category(
+            ToolCategory.WRITE
+        )
+        is PermissionAction.DENY
+    )
+    assert (
+        PermissionPolicy.from_approval_preset("workspace_write").action_for_category(
+            ToolCategory.WRITE
+        )
+        is PermissionAction.ALLOW
+    )
+    assert (
+        PermissionPolicy.from_approval_preset(
+            ApprovalPolicyPreset.TRUSTED_LOCAL
+        ).action_for_category(ToolCategory.SHELL)
+        is PermissionAction.ALLOW
+    )
 
 
 def test_permission_manager_interactive_callback() -> None:

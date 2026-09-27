@@ -63,6 +63,7 @@ def execute_actions(
     actions: Sequence[AssistantAction],
     repo_root: Path,
     *,
+    authorize_action: Callable[[AssistantAction], bool] | None = None,
     input_func: Callable[[str], str] = input,
     allow_outside_files: bool = False,
     command_timeout_seconds: float = 60.0,
@@ -73,6 +74,7 @@ def execute_actions(
         _execute_action(
             action,
             repo_root,
+            authorize_action=authorize_action,
             input_func=input_func,
             allow_outside_files=allow_outside_files,
             command_timeout_seconds=command_timeout_seconds,
@@ -139,10 +141,17 @@ def _execute_action(
     action: AssistantAction,
     repo_root: Path,
     *,
+    authorize_action: Callable[[AssistantAction], bool] | None,
     input_func: Callable[[str], str],
     allow_outside_files: bool,
     command_timeout_seconds: float,
 ) -> AssistantActionResult:
+    if authorize_action is not None and not authorize_action(action):
+        return AssistantActionResult(
+            action.action_type,
+            False,
+            f"Skipped by approval policy: {action.action_type}",
+        )
     if action.action_type == "read_file":
         return _read_file_action(action, repo_root, input_func, allow_outside_files)
     if action.action_type == "list_dir":

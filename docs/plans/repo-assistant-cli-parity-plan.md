@@ -17,6 +17,9 @@ for code and development work.
 
 ### 1. Model-neutral approval policy presets
 
+Status: implemented for the repo assistant CLI's Codex sandbox mapping,
+provider-native tools, and legacy fenced-JSON local actions.
+
 Define project-owned approval modes that can work across Codex, local Ollama,
 hosted provider APIs, and future executors.
 

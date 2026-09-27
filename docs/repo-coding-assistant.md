@@ -98,8 +98,21 @@ To use the new provider-native tool-calling loop, add `--native-tools`:
 ```
 
 Native mode uses the shared `ai_provider` tool-call contract and `ai_agent.AgentLoop`.
-Reads are allowed automatically; file writes and shell commands ask for interactive
-approval. `--apply-actions` remains available as the legacy fenced-JSON action protocol.
+Use `--approval-policy read_only|interactive|workspace_write|trusted_local` to
+choose the model-neutral local action policy. The default is `interactive`.
+
+- `read_only`: allow read/search tools, deny local writes and shell commands.
+- `interactive`: allow read/search tools, ask before local writes and shell
+  commands.
+- `workspace_write`: allow workspace file writes, but deny legacy shell actions
+  and continue asking before provider-native shell/custom tools.
+- `trusted_local`: allow local read/write/shell tool actions without asking.
+
+For Codex CLI routes, the current local CLI exposes sandbox modes rather than
+the full policy shape: `read_only` maps to Codex `--sandbox read-only`, while
+the other presets map to `--sandbox workspace-write`. `--apply-actions` remains
+available as the legacy fenced-JSON action protocol and now uses the same
+approval policy presets.
 
 That wrapper loads `.env` for the run and starts the Python CLI.
 
@@ -399,7 +412,7 @@ same policy.
 | Raw transcripts/event logs | Conversation and tool output exist in the managed session. | CLI transcript logs preserve invocation metadata, full prompts when requested, run metrics, and raw Codex JSONL. | Implemented as local files under `logs\`. |
 | Final-answer artifact | The managed session displays the final answer in chat. | `--codex-output-last-message` writes Codex's last assistant message to an explicit local file and uses it as a JSONL fallback. | Implemented as opt-in local file output. |
 | Structured final response | This runtime can constrain some outputs through tool/runtime mechanisms. | `--codex-output-schema` passes an explicit JSON Schema file to `codex exec`. | Implemented as opt-in schema file input. |
-| Approval/sandbox policy | Managed by the active ChatGPT/Codex runtime. | Uses Codex CLI sandbox flags today. Planned direction is repo-owned, model-neutral approval policy presets that can map to Codex and future executors. | Partially implemented; policy presets planned in ADR-024. |
+| Approval/sandbox policy | Managed by the active ChatGPT/Codex runtime. | `--approval-policy` selects model-neutral presets for native tools and legacy actions. Codex routes map `read_only` to `--sandbox read-only` and other presets to `--sandbox workspace-write`. | Implemented first preset slice; Codex CLI still lacks exact managed approval UI parity. |
 | MCP tools | Available here through the current managed runtime. | `--codex-mcp-setup` configures a local `repo_assistant_tools` MCP server for read/search repository tools. | Implemented for selected local read/search tools. |
 | Plugins/apps | This session has installed app/plugin tools exposed by ChatGPT. | Diagnostics list Codex plugin marketplace/install status and structured plugin counts. Explicit install/remove is available through repeated `--codex-plugin-install` / `--codex-plugin-remove` with `--execute`. | Initial approved plugin install set implemented; future connectors one at a time behind reusable authorization. |
 | Document/app-control tools | Available here when connected document sessions expose tools. | Not inherited automatically by `codex exec`. Development-relevant bridges may be added as needed, with read/write capability designed together and writes gated by policy. | Accepted direction in ADR-024; implementation deferred until a concrete development workflow needs it. |

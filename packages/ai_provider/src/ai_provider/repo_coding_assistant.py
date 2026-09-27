@@ -23,8 +23,10 @@ for _package_dir in (
 
 from ai_agent import (
     AgentLoop,
+    ApprovalPolicyPreset,
     PermissionManager,
     PermissionPolicy,
+    ToolCategory,
     ToolContext,
     default_coding_tools,
 )
@@ -114,6 +116,7 @@ from ai_provider.transcripts import (
 
 DEFAULT_DELEGATION_CONTEXT_BUDGET_CHARS = 6_000
 CLI_MODES = ("ask", "review", "implement", "plan", "diagnose")
+APPROVAL_POLICY_PRESETS = tuple(item.value for item in ApprovalPolicyPreset)
 
 
 def _capability_report(snapshot: Any) -> dict[str, Any]:
@@ -375,6 +378,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--system",
         help="Additional provider-neutral system instruction appended to the tool prompt.",
+    )
+    parser.add_argument(
+        "--approval-policy",
+        choices=APPROVAL_POLICY_PRESETS,
+        default=ApprovalPolicyPreset.INTERACTIVE.value,
+        help=(
+            "Model-neutral action approval preset. read_only denies writes/shell, "
+            "interactive asks for writes/shell, workspace_write allows file writes "
+            "but denies legacy shell actions, and trusted_local allows local writes/shell."
+        ),
     )
     parser.add_argument("--max-latency-seconds", type=float, help="Hard latency constraint.")
     parser.add_argument("--timeout-seconds", type=float, default=60.0, help="Provider timeout.")
@@ -1042,6 +1055,7 @@ def _run_external_agent_cli_mode(
             orchestration,
             repo_root=repo_root,
             timeout_seconds=args.timeout_seconds,
+            sandbox=_codex_sandbox_for_approval_policy(args.approval_policy),
             codex_persist_session=args.codex_persist_session,
             codex_resume=args.codex_resume,
             output_last_message_path=args.codex_output_last_message,
@@ -1050,6 +1064,7 @@ def _run_external_agent_cli_mode(
             image_paths=tuple(args.codex_image),
         )
         print(f"external_agent_command: {config.command}")
+        print(f"approval_policy: {args.approval_policy}")
         print(f"external_agent_sandbox: {config.sandbox}")
         print(f"external_agent_ephemeral: {config.ephemeral}")
         if config.resume is not None:
@@ -1189,14 +1204,26 @@ def _run_native_agent(
         answer = input(f"Allow {category.value} tool '{call.name}'? [y/N]: ")
         return answer.strip().lower() in {"y", "yes"}
 
+    approval_policy = ApprovalPolicyPreset(
+        getattr(args, "approval_policy", ApprovalPolicyPreset.INTERACTIVE.value)
+    )
+    permission_policy = PermissionPolicy.from_approval_preset(approval_policy)
+    approval_callback = (
+        approve
+        if any(
+            permission_policy.action_for_category(category).value == "ask_user"
+            for category in ToolCategory
+        )
+        else None
+    )
     client = create_chat_client(config)
     agent = AgentLoop(
         client,
         default_coding_tools(),
         ToolContext(workspace_root=repo_root),
         permissions=PermissionManager(
-            policy=PermissionPolicy.interactive(),
-            approval_callback=approve,
+            policy=permission_policy,
+            approval_callback=approval_callback,
         ),
         max_iterations=args.max_action_rounds,
     )
@@ -1227,6 +1254,9 @@ def _run_action_loop(
         results = execute_actions(
             actions,
             repo_root,
+            authorize_action=_legacy_action_authorizer(
+                getattr(args, "approval_policy", ApprovalPolicyPreset.INTERACTIVE.value)
+            ),
             allow_outside_files=args.allow_outside_files,
             command_timeout_seconds=args.command_timeout_seconds,
         )
@@ -1259,6 +1289,49 @@ def _run_action_loop(
         current_response = result.response.message.content
         print(current_response)
     return all_actions_ok
+
+
+def _codex_sandbox_for_approval_policy(approval_policy: str) -> str:
+    """Map model-neutral approval presets to supported Codex CLI sandbox modes."""
+
+    if ApprovalPolicyPreset(approval_policy) is ApprovalPolicyPreset.READ_ONLY:
+        return "read-only"
+    return "workspace-write"
+
+
+def _legacy_action_authorizer(approval_policy: str) -> Callable[[AssistantAction], bool]:
+    """Return an authorizer for legacy fenced-JSON local actions."""
+
+    preset = ApprovalPolicyPreset(approval_policy)
+
+    def authorize(action: AssistantAction) -> bool:
+        if action.action_type in {"read_file", "list_dir"}:
+            return True
+        if action.action_type == "write_file":
+            if preset is ApprovalPolicyPreset.READ_ONLY:
+                return False
+            if preset is ApprovalPolicyPreset.INTERACTIVE:
+                return _confirm_legacy_action(action, "write")
+            return True
+        if action.action_type == "run_command":
+            if preset in {
+                ApprovalPolicyPreset.READ_ONLY,
+                ApprovalPolicyPreset.WORKSPACE_WRITE,
+            }:
+                return False
+            if preset is ApprovalPolicyPreset.INTERACTIVE:
+                return _confirm_legacy_action(action, "shell")
+            return True
+        return preset is ApprovalPolicyPreset.TRUSTED_LOCAL
+
+    return authorize
+
+
+def _confirm_legacy_action(action: AssistantAction, category: str) -> bool:
+    """Ask the user before running an interactive legacy local action."""
+
+    answer = input(f"Allow {category} action '{action.action_type}'? [y/N]: ")
+    return answer.strip().lower() in {"y", "yes"}
 
 
 if __name__ == "__main__":
