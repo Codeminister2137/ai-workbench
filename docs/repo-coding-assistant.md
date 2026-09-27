@@ -316,6 +316,14 @@ Codex command is discoverable: command path, version, login-status text,
 summary, and the relevant config path. The report does not read or print auth
 files, config contents, or tokens.
 
+The same diagnostics also include an `authorization` registry summary. For the
+Codex CLI bridge, this maps local command discovery, login status, plugin
+summary, and MCP status into the shared `ai_agent.authorization` contracts.
+Read scopes cover secret-free local diagnostics. Write scopes are modeled for
+Codex workspace execution, resumable session state, plugin install/remove, and
+MCP registration, but those actions still require their existing explicit CLI
+flags and approval-policy gates.
+
 Use `--codex-plugin-install PLUGIN@MARKETPLACE --execute` to explicitly install
 one or more Codex plugins through `codex plugin add`. The flag may be repeated:
 

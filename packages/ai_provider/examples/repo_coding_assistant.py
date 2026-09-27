@@ -35,6 +35,7 @@ from ai_agent import (
     PermissionPolicy,
     ToolCategory,
     ToolContext,
+    codex_authorization_registry,
     default_coding_tools,
 )
 from ai_orchestrator import (
@@ -912,6 +913,7 @@ def _run_external_agent(prompt: str, config: ExternalAgentConfig) -> ExternalAge
 def _capability_report(snapshot: Any) -> dict[str, Any]:
     """Convert the local capability snapshot into stable JSON-friendly data."""
 
+    external_agents = _external_agent_status()
     return {
         "system": {
             "os": snapshot.system.os_name,
@@ -937,7 +939,8 @@ def _capability_report(snapshot: Any) -> dict[str, Any]:
             "installed_models": [model.model for model in snapshot.installed_ollama_models],
             "running_models": [model.model for model in snapshot.running_ollama_models],
         },
-        "external_agents": _external_agent_status(),
+        "external_agents": external_agents,
+        "authorization": codex_authorization_registry(external_agents["codex"]).to_dict(),
     }
 
 

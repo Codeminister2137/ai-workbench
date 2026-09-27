@@ -10,6 +10,11 @@ from ai_agent.authorization import (
     CredentialLocation,
     ServiceAuthorization,
 )
+from ai_agent.codex_authorization import (
+    CODEX_SERVICE_ID,
+    codex_authorization_from_status,
+    codex_authorization_registry,
+)
 from ai_agent.contracts import (
     PermissionAction,
     ToolCall,
@@ -42,6 +47,7 @@ __all__ = [
     "AuthorizationRegistry",
     "AuthorizationState",
     "BaseTool",
+    "CODEX_SERVICE_ID",
     "CapabilityGrant",
     "CreateFileTool",
     "CredentialLocation",
@@ -63,4 +69,6 @@ __all__ = [
     "ToolRegistry",
     "ToolResult",
     "default_coding_tools",
+    "codex_authorization_from_status",
+    "codex_authorization_registry",
 ]

@@ -60,6 +60,11 @@ implementing their own auth handling.
 
 ### 3. Development-relevant app/tool bridges
 
+Status: first local Codex capability bridge implemented. The repo assistant
+diagnostics now map existing Codex CLI command/login/plugin/MCP status into the
+shared secret-free `ai_agent.authorization` registry. This bridge does not add a
+new external service, OAuth flow, token read, connector sign-in, or write action.
+
 Add app/control integrations only when they support current coding and
 development workflows. Examples that may become relevant:
 

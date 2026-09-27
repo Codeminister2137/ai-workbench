@@ -1093,6 +1093,61 @@ def test_codex_capability_status_reports_expected_diagnostics(monkeypatch) -> No
     assert status["config_path"] == "C:\\codex\\config.toml"
 
 
+def test_capability_report_includes_codex_authorization(monkeypatch) -> None:
+    monkeypatch.setattr(
+        _EXAMPLE,
+        "_external_agent_status",
+        lambda: {
+            "codex_available": True,
+            "codex_command": "codex",
+            "codex": {
+                "available": True,
+                "command": "codex",
+                "login_status": "Logged in using ChatGPT",
+                "exec_json_supported": True,
+                "plugin_summary": {
+                    "marketplaces": ["openai-curated"],
+                    "available_count": 65,
+                    "installed_count": 5,
+                    "plugins": [],
+                },
+                "mcp_list": {"ok": True, "stdout": "repo_assistant_tools", "stderr": ""},
+            },
+            "antigravity_available": False,
+            "antigravity_command": None,
+            "copilot_available": False,
+            "copilot_command": None,
+            "kiro_available": False,
+            "kiro_command": None,
+        },
+    )
+    snapshot = SimpleNamespace(
+        system=SimpleNamespace(
+            os_name="Windows",
+            os_version="11",
+            machine="AMD64",
+            processor="x64",
+            logical_cpu_count=16,
+            memory=SimpleNamespace(total_bytes=32, available_bytes=16),
+            gpus=[],
+        ),
+        ollama_available=False,
+        ollama_version=None,
+        models_path=None,
+        installed_ollama_models=[],
+        running_ollama_models=[],
+    )
+
+    report = _EXAMPLE._capability_report(snapshot)
+
+    assert report["authorization"]["service_count"] == 1
+    service = report["authorization"]["services"][0]
+    assert service["service_id"] == "codex"
+    assert service["state"] == "authorized"
+    assert service["capability"]["write"] is True
+    assert "write:codex.mcp_registration" in service["capability"]["scopes"]
+
+
 def test_cli_can_install_codex_plugins_when_explicitly_executed(
     capsys,
     monkeypatch,
