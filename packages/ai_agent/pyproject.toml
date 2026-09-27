@@ -9,6 +9,9 @@ dependencies = [
     "ai-orchestrator",
 ]
 
+[project.scripts]
+ai-agent-mcp = "ai_agent.mcp_server:main"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from ai_provider.codex_mcp import CodexMcpSetupResult
 
 _EXAMPLE_PATH = (
     Path(__file__).resolve().parents[1]
@@ -259,6 +260,8 @@ def test_cli_help_lists_google_provider() -> None:
     assert "--mode {ask,review,implement,plan,diagnose}" in result.stdout
     assert "--scrutinize-response" in result.stdout
     assert "--codex-search" in result.stdout
+    assert "--codex-mcp-setup" in result.stdout
+    assert "--codex-mcp-register-global" in result.stdout
 
 
 def test_repo_assistant_script_uses_stable_package_entrypoint() -> None:
@@ -295,6 +298,65 @@ def test_cli_modes_enforce_action_boundaries(capsys) -> None:
 
     with pytest.raises(SystemExit):
         main(["--mode", "implement", "make a change"])
+
+
+def test_cli_can_setup_project_codex_mcp_without_prompt(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    (repo_root / ".git").mkdir()
+
+    assert main(["--repo-root", str(repo_root), "--codex-mcp-setup"]) == 0
+
+    output = capsys.readouterr().out
+    config_file = repo_root / ".codex" / "config.toml"
+    text = config_file.read_text(encoding="utf-8")
+    assert "=== Codex MCP setup ===" in output
+    assert f"repo_root: {repo_root.resolve()}" in output
+    assert f"codex_mcp_config: {config_file}" in output
+    assert "codex_mcp_server: repo_assistant_tools" in output
+    assert "codex_mcp_enabled_tools_json:" in output
+    assert "codex_mcp_global_registered: False" in output
+    assert "[mcp_servers.repo_assistant_tools]" in text
+    assert "ai-agent-mcp" in text
+    assert "run_command" not in text
+
+
+def test_cli_can_setup_and_register_codex_mcp_when_explicitly_requested(
+    tmp_path: Path,
+    capsys,
+    monkeypatch,
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    (repo_root / ".git").mkdir()
+
+    def fake_setup_project_codex_mcp(repo_root_arg: Path, *, register_global: bool):
+        assert repo_root_arg == repo_root.resolve()
+        assert register_global is True
+        return CodexMcpSetupResult(
+            config_path=repo_root / ".codex" / "config.toml",
+            server_name="repo_assistant_tools",
+            command="python",
+            args=("-m", "uv", "run", "ai-agent-mcp"),
+            enabled_tools=("read_file", "list_dir", "find_files", "grep_search"),
+            created=True,
+            global_registered=True,
+            global_add_stdout="Added global MCP server.",
+        )
+
+    monkeypatch.setattr(_EXAMPLE, "setup_project_codex_mcp", fake_setup_project_codex_mcp)
+
+    assert (
+        main(["--repo-root", str(repo_root), "--codex-mcp-setup", "--codex-mcp-register-global"])
+        == 0
+    )
+
+    output = capsys.readouterr().out
+    assert "codex_mcp_global_registered: True" in output
+    assert "codex_mcp_add_stdout: Added global MCP server." in output
 
 
 def test_plan_mode_does_not_create_a_provider_client(capsys, monkeypatch) -> None:

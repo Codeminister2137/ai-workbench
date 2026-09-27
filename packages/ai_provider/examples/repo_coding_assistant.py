@@ -66,6 +66,7 @@ from ai_provider import (
     is_ollama_server_available,
 )
 from ai_provider import PrivacyClass as ProviderPrivacyClass
+from ai_provider.codex_mcp import setup_project_codex_mcp
 
 from coding_assist import coding_task_profile, run_coding_prompt
 
@@ -1250,6 +1251,22 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="Print a local machine/provider capability report and exit.",
     )
     parser.add_argument(
+        "--codex-mcp-setup",
+        action="store_true",
+        help=(
+            "Create or update project-scoped .codex/config.toml so Codex can use "
+            "this repository's read/search MCP tools."
+        ),
+    )
+    parser.add_argument(
+        "--codex-mcp-register-global",
+        action="store_true",
+        help=(
+            "With --codex-mcp-setup, also run `codex mcp add` to persistently "
+            "register the server in the user-level Codex MCP configuration."
+        ),
+    )
+    parser.add_argument(
         "--repo-root",
         type=Path,
         help="Repository root. Defaults to the nearest parent containing .git.",
@@ -1469,6 +1486,34 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
+    repo_root = (args.repo_root or find_repo_root(Path.cwd())).resolve()
+    if args.codex_mcp_setup:
+        try:
+            result = setup_project_codex_mcp(
+                repo_root,
+                register_global=args.codex_mcp_register_global,
+            )
+        except (FileNotFoundError, RuntimeError, subprocess.TimeoutExpired) as exc:
+            print("=== Codex MCP setup ===")
+            print(f"repo_root: {repo_root}")
+            print("codex_mcp_status: failed")
+            print(f"failure_reason: {exc}")
+            return 1
+        print("=== Codex MCP setup ===")
+        print(f"repo_root: {repo_root}")
+        print(f"codex_mcp_config: {result.config_path}")
+        print(f"codex_mcp_server: {result.server_name}")
+        print(f"codex_mcp_command: {result.command}")
+        print("codex_mcp_args_json: " + json.dumps(list(result.args)))
+        print("codex_mcp_enabled_tools_json: " + json.dumps(list(result.enabled_tools)))
+        print(f"codex_mcp_config_created: {result.created}")
+        print("codex_mcp_scope: project")
+        print(f"codex_mcp_global_registered: {result.global_registered}")
+        if result.global_add_stdout:
+            print(f"codex_mcp_add_stdout: {result.global_add_stdout}")
+        if result.global_add_stderr:
+            print(f"codex_mcp_add_stderr: {result.global_add_stderr}")
+        return 0
     if args.mode == "diagnose" or args.local_capabilities:
         snapshot = get_local_provider_capability_snapshot()
         print(json.dumps(_capability_report(snapshot), indent=2, default=str))
@@ -1512,7 +1557,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         _print_transcript_header(args, argv)
 
     metrics = _start_run_metrics()
-    repo_root = (args.repo_root or find_repo_root(Path.cwd())).resolve()
     context_budget_chars = None if args.context_budget_chars == 0 else args.context_budget_chars
     context_files = load_prompt_context(
         repo_root,

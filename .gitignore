@@ -39,6 +39,7 @@ env/
 
 # Tooling
 .uv-cache/
+.codex/
 
 # IDE and OS files
 .idea/

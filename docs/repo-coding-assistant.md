@@ -299,6 +299,33 @@ Codex command is discoverable: command path, version, login-status text,
 config path. The report does not read or print auth files, config contents, or
 tokens.
 
+Use `--codex-mcp-setup` to expose this repository's selected local read/search
+tools to Codex through MCP:
+
+```powershell
+python -m uv run ai-assistant --codex-mcp-setup
+```
+
+The setup command writes local `.codex\config.toml` for project-scoped Codex
+config. The file contains this checkout's absolute workspace path and is ignored
+by Git; rerun the setup command for each local checkout. It does not change
+user-level Codex MCP configuration by default.
+
+To also register the server persistently with the official Codex MCP CLI, pass
+the explicit global-registration flag:
+
+```powershell
+python -m uv run ai-assistant --codex-mcp-setup --codex-mcp-register-global
+```
+
+That command runs `codex mcp add repo_assistant_tools -- ...`, so
+`codex mcp list` can see the server outside this project-scoped config. Use it
+only when you intentionally want to update the broader Codex environment.
+
+The first exposed MCP server is intentionally limited to read/search tools:
+`read_file`, `list_dir`, `find_files`, and `grep_search`. It does not expose
+write or shell tools. Tool calls are bounded to the configured workspace root.
+
 The PyCharm-bundled Codex CLI verified in this repository is `codex-cli
 0.137.0`. On 2026-09-26, `gpt-5.5` completed a low-risk JSONL execution through
 ChatGPT sign-in, while `gpt-5.1` returned an upstream invalid-request error for
@@ -322,7 +349,7 @@ noninteractive command contracts and local executable paths are confirmed.
 | Final-answer artifact | The managed session displays the final answer in chat. | `--codex-output-last-message` writes Codex's last assistant message to an explicit local file and uses it as a JSONL fallback. | Implemented as opt-in local file output. |
 | Structured final response | This runtime can constrain some outputs through tool/runtime mechanisms. | `--codex-output-schema` passes an explicit JSON Schema file to `codex exec`. | Implemented as opt-in schema file input. |
 | Approval/sandbox policy | Managed by the active ChatGPT/Codex runtime. | Uses Codex CLI sandbox flags. This installed `codex exec` supports `--json`, `--sandbox`, and `--ephemeral`; `--ask-for-approval` must not be assumed unless local help confirms it. | Partially implemented; human approval parity is a known gap. |
-| MCP tools | Available here through the current managed runtime. | Diagnostics list configured Codex MCP servers. Actually reproducing tools requires Codex MCP config/design. | Feasible, decision required before adding MCP/tool design. |
+| MCP tools | Available here through the current managed runtime. | `--codex-mcp-setup` configures a local `repo_assistant_tools` MCP server for read/search repository tools. | Implemented for selected local read/search tools. |
 | Plugins/apps | This session has installed app/plugin tools exposed by ChatGPT. | Diagnostics list Codex plugin marketplace/install status. Installing or authorizing plugins is outside this CLI slice. | Feasible through Codex plugins, separate auth/product decision required. |
 | Document/app-control tools | Available here when connected document sessions expose tools. | Not inherited automatically by `codex exec`. Would require MCP/plugin equivalents and authorization. | Gap; decision required before design. |
 | Web/search | This runtime may have managed browsing tools. | `--codex-search` invokes `codex --search exec ...` for one explicit Codex CLI run. Default runs omit search. | Implemented as explicit opt-in only. |
