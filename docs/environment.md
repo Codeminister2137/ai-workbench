@@ -100,13 +100,33 @@ Provider-specific API keys:
 ```text
 OPENAI_API_KEY=
 REQUESTY_API_KEY=
+GEMINI_API_KEY=
+GOOGLE_API_KEY=
 ```
+
+For Google/Gemini routes, either `GEMINI_API_KEY` or `GOOGLE_API_KEY` is enough.
+Prefer `GEMINI_API_KEY` when using Google AI Studio style Gemini credentials.
 
 Local Ollama model location:
 
 ```text
 OLLAMA_MODELS=D:\AI\Ollama\models
 ```
+
+Optional external-agent command overrides:
+
+```text
+CODEX_COMMAND=
+ANTIGRAVITY_COMMAND=
+GITHUB_COPILOT_COMMAND=
+KIRO_COMMAND=
+CODEX_HOME=
+```
+
+Leave these blank unless auto-discovery cannot find the executable or Codex
+config root you want. `CODEX_COMMAND` can point to the Codex CLI executable;
+`CODEX_HOME` changes where Codex looks for its config. The repo assistant never
+needs real passwords in these fields.
 
 The repo assistant also supports explicit local resource profiles:
 
@@ -122,7 +142,8 @@ memory/concurrency profiles, not exact GPU-percentage limits. A running Ollama
 server must be restarted for a changed profile to take effect.
 
 `BackendConfig.from_env()` uses `AI_PROVIDER_API_KEY` first. If it is unset, it
-falls back to `OPENAI_API_KEY` for OpenAI and `REQUESTY_API_KEY` for Requesty.
+falls back to `OPENAI_API_KEY` for OpenAI, `REQUESTY_API_KEY` for Requesty, and
+`GEMINI_API_KEY` or `GOOGLE_API_KEY` for Google.
 
 ## Privacy Rules
 
