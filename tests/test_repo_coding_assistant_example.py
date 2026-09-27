@@ -285,6 +285,8 @@ def test_cli_help_lists_google_provider() -> None:
     assert "--codex-image" in result.stdout
     assert "--codex-mcp-setup" in result.stdout
     assert "--codex-mcp-register-global" in result.stdout
+    assert "--codex-login" in result.stdout
+    assert "--codex-login-device" in result.stdout
 
 
 def test_repo_assistant_script_uses_stable_package_entrypoint() -> None:
@@ -295,6 +297,8 @@ def test_repo_assistant_script_uses_stable_package_entrypoint() -> None:
     assert "examples\\repo_coding_assistant.py" not in text
     assert "Add-DefaultLogFile" in text
     assert "repo-assistant-$timestamp.log" in text
+    assert '--codex-login"' in text
+    assert '--codex-login-device"' in text
 
 
 def test_broad_analysis_script_keeps_canonical_manual_workflow() -> None:
@@ -380,6 +384,68 @@ def test_cli_can_setup_and_register_codex_mcp_when_explicitly_requested(
     output = capsys.readouterr().out
     assert "codex_mcp_global_registered: True" in output
     assert "codex_mcp_add_stdout: Added global MCP server." in output
+
+
+def test_cli_can_refresh_codex_login(capsys, monkeypatch, tmp_path: Path) -> None:
+    calls: list[tuple[str, ...]] = []
+
+    def fake_run(command, *args, **kwargs):
+        joined = tuple(command)
+        calls.append(joined)
+        if joined[1:] == ("login",):
+            return _EXAMPLE.subprocess.CompletedProcess(joined, 0, "", "")
+        if joined[1:] == ("login", "status"):
+            return _EXAMPLE.subprocess.CompletedProcess(joined, 0, "Logged in using ChatGPT\n", "")
+        raise AssertionError(joined)
+
+    monkeypatch.setenv("CODEX_COMMAND", "codex")
+    monkeypatch.setattr(_EXAMPLE.subprocess, "run", fake_run)
+
+    assert main(["--repo-root", str(tmp_path), "--codex-login"]) == 0
+
+    output = capsys.readouterr().out
+    assert ("codex", "login") in calls
+    assert ("codex", "login", "status") in calls
+    assert "codex_login_auth_boundary: local Codex auth refresh only" in output
+    assert 'codex_login_command_line_json: ["codex", "login"]' in output
+    assert "codex_login_status_stdout: Logged in using ChatGPT" in output
+    assert "execution_status: completed" in output
+
+
+def test_cli_can_refresh_codex_login_with_device_auth(
+    capsys,
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    calls: list[tuple[str, ...]] = []
+
+    def fake_run(command, *args, **kwargs):
+        joined = tuple(command)
+        calls.append(joined)
+        if joined[1:] == ("login", "--device-auth"):
+            return _EXAMPLE.subprocess.CompletedProcess(joined, 0, "", "")
+        if joined[1:] == ("login", "status"):
+            return _EXAMPLE.subprocess.CompletedProcess(joined, 0, "Logged in using ChatGPT\n", "")
+        raise AssertionError(joined)
+
+    monkeypatch.setenv("CODEX_COMMAND", "codex")
+    monkeypatch.setattr(_EXAMPLE.subprocess, "run", fake_run)
+
+    assert main(["--repo-root", str(tmp_path), "--codex-login-device"]) == 0
+
+    output = capsys.readouterr().out
+    assert ("codex", "login", "--device-auth") in calls
+    assert 'codex_login_command_line_json: ["codex", "login", "--device-auth"]' in output
+
+
+def test_codex_login_rejects_prompt_request(tmp_path: Path) -> None:
+    with pytest.raises(SystemExit):
+        main(["--repo-root", str(tmp_path), "--codex-login", "Do work."])
+
+
+def test_codex_login_modes_are_mutually_exclusive(tmp_path: Path) -> None:
+    with pytest.raises(SystemExit):
+        main(["--repo-root", str(tmp_path), "--codex-login", "--codex-login-device"])
 
 
 def test_plan_mode_does_not_create_a_provider_client(capsys, monkeypatch) -> None:

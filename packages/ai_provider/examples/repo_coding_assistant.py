@@ -1354,6 +1354,22 @@ def main(argv: Sequence[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
+        "--codex-login",
+        action="store_true",
+        help=(
+            "Run `codex login` so Codex can refresh its local ChatGPT/OAuth session. "
+            "This mutates local Codex auth state and cannot be combined with a prompt."
+        ),
+    )
+    parser.add_argument(
+        "--codex-login-device",
+        action="store_true",
+        help=(
+            "Run `codex login --device-auth` for device-code authentication. "
+            "This mutates local Codex auth state and cannot be combined with a prompt."
+        ),
+    )
+    parser.add_argument(
         "--repo-root",
         type=Path,
         help="Repository root. Defaults to the nearest parent containing .git.",
@@ -1615,6 +1631,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     repo_root = (args.repo_root or find_repo_root(Path.cwd())).resolve()
+    if args.codex_login or args.codex_login_device:
+        return _run_codex_login(args=args, repo_root=repo_root, parser=parser)
     if args.codex_plugin_install or args.codex_plugin_remove:
         return _run_codex_plugin_management(args=args, repo_root=repo_root, parser=parser)
     if args.codex_mcp_setup:
@@ -2070,6 +2088,58 @@ def _run_codex_plugin_management(
     )
     print(f"execution_status: {'completed' if all_ok else 'failed'}")
     return 0 if all_ok else 1
+
+
+def _run_codex_login(
+    *,
+    args: argparse.Namespace,
+    repo_root: Path,
+    parser: argparse.ArgumentParser,
+) -> int:
+    """Run explicit Codex CLI login refresh."""
+
+    if args.codex_login and args.codex_login_device:
+        parser.error("--codex-login and --codex-login-device are mutually exclusive")
+    if args.prompt:
+        parser.error("Codex login cannot be combined with a prompt request")
+    command = _external_agent_command(AccessMethod.CODEX_CLI)
+    if command is None:
+        print("=== Codex login ===")
+        print(f"repo_root: {repo_root}")
+        print("codex_login_status: failed")
+        print("failure_reason: Could not find Codex CLI. Set CODEX_COMMAND or install Codex CLI.")
+        return 1
+
+    login_command = [command, "login"]
+    if args.codex_login_device:
+        login_command.append("--device-auth")
+
+    print("=== Codex login ===")
+    print(f"repo_root: {repo_root}")
+    print(f"codex_command: {command}")
+    print(
+        "codex_login_auth_boundary: local Codex auth refresh only; "
+        "no token values are read or printed"
+    )
+    print("codex_login_command_line_json: " + json.dumps(login_command))
+    try:
+        result = subprocess.run(tuple(login_command), text=True)
+    except OSError as exc:
+        print("codex_login_status: failed")
+        print(f"failure_reason: {exc}")
+        print("execution_status: failed")
+        return 1
+
+    status = _run_diagnostic_command(command, "login", "status", timeout_seconds=10.0)
+    print(f"codex_login_returncode: {result.returncode}")
+    print(f"codex_login_status_ok: {status['ok']}")
+    if status["stdout"]:
+        print(f"codex_login_status_stdout: {status['stdout']}")
+    if status["stderr"]:
+        print(f"codex_login_status_stderr: {status['stderr']}")
+    execution_status = "completed" if result.returncode == 0 and status["ok"] else "failed"
+    print(f"execution_status: {execution_status}")
+    return 0 if execution_status == "completed" else result.returncode or 1
 
 
 def _run_external_agent_cli_mode(

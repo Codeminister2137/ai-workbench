@@ -467,6 +467,23 @@ Codex login through the CLI or PyCharm/Codex, or set `CODEX_COMMAND` to a
 separately authenticated Codex CLI. Until that is fixed, use local Ollama or a
 direct hosted provider route with the relevant API key.
 
+To refresh Codex authentication through the repository CLI, run:
+
+```powershell
+.\scripts\repo-assistant.ps1 --codex-login
+```
+
+For device-code authentication, run:
+
+```powershell
+.\scripts\repo-assistant.ps1 --codex-login-device
+```
+
+These commands call the official Codex CLI login flow and may open a browser or
+print a device-code link. They mutate local Codex auth state, cannot be
+combined with a prompt, and do not read or print token values. The PowerShell
+wrapper does not create a transcript log for these auth-refresh commands.
+
 This is not full parity with the Codex IDE/ChatGPT environment: app/plugin
 tools, document-control tools, IDE-private state, and this chat's managed
 approval surface are not automatically available through `codex exec`.

@@ -55,7 +55,12 @@ function Add-DefaultLogFile {
         [string] $RepoRoot
     )
 
-    if ($Args -contains "--log-file" -or $Args -contains "--local-capabilities") {
+    if (
+        $Args -contains "--log-file" -or
+        $Args -contains "--local-capabilities" -or
+        $Args -contains "--codex-login" -or
+        $Args -contains "--codex-login-device"
+    ) {
         return $Args
     }
 
