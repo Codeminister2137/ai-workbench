@@ -2,6 +2,14 @@
 
 from __future__ import annotations
 
+from ai_agent.authorization import (
+    AuthorizationMethod,
+    AuthorizationRegistry,
+    AuthorizationState,
+    CapabilityGrant,
+    CredentialLocation,
+    ServiceAuthorization,
+)
 from ai_agent.contracts import (
     PermissionAction,
     ToolCall,
@@ -30,8 +38,13 @@ __all__ = [
     "AgentLoop",
     "AgentResult",
     "ApprovalPolicyPreset",
+    "AuthorizationMethod",
+    "AuthorizationRegistry",
+    "AuthorizationState",
     "BaseTool",
+    "CapabilityGrant",
     "CreateFileTool",
+    "CredentialLocation",
     "EditFileTool",
     "FindFilesTool",
     "GrepSearchTool",
@@ -41,6 +54,7 @@ __all__ = [
     "PermissionPolicy",
     "ReadFileTool",
     "RunCommandTool",
+    "ServiceAuthorization",
     "ToolCall",
     "ToolCategory",
     "ToolContext",

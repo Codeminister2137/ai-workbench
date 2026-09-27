@@ -38,6 +38,12 @@ than Codex-specific UI behavior.
 
 ### 2. Reusable authorization boundary
 
+Status: foundational secret-free contracts are implemented in `ai_agent` for
+service authorization state, credential location, read/write capability grants,
+and registry diagnostics. Real service authorization, OAuth, token/session
+discovery, and connector-specific checks remain deferred until a connector is
+approved.
+
 Create one shared authorization boundary before adding serious connector
 support. It should cover:
 
