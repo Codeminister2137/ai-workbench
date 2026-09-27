@@ -120,7 +120,9 @@ when an approved tool or action returned an error.
 `--scrutinize-response` is an opt-in second provider call for `ask` or `review`.
 It evaluates the completed answer against the original request and repository
 context, then prints a structured verdict, score, issues, recommended next
-action, and revised response. It does not edit files or execute actions. The
+action, and revised response. It uses a derived local-only child task profile by
+default, so scrutiny does not silently reuse an expensive or allowance-backed
+primary route. It does not edit files or execute actions. The
 CLI parses and validates Markdown-compatible report headings with the required
 labels, including case and underscore/space variants for known labels, or a JSON
 object with the same required keys, before marking scrutiny as completed. It
@@ -131,6 +133,13 @@ but marks the run as
 `execution_status: completed_with_scrutiny_findings`. The additional report is
 included in the same `--log-file` transcript, so this is the recommended
 broad-repository response-quality command.
+
+The same policy applies to future auxiliary calls: context extraction,
+summarization, prompt refinement, test-case generation, and response critique
+should prefer local or cheaper models unless the task is important enough to
+justify an explicit stronger route. Primary model routing remains governed by
+the task profile, privacy class, quality threshold, selected route, and
+cost-policy tier.
 
 For repeated manual live acceptance checks, use
 `scripts\repo-assistant-broad-analysis.ps1`. This is not a unit test: it makes
@@ -171,10 +180,15 @@ choose the model-neutral local action policy. The default is `interactive`.
 - `trusted_local`: allow local read/write/shell tool actions without asking.
 
 For Codex CLI routes, the current local CLI exposes sandbox modes rather than
-the full policy shape: `read_only` maps to Codex `--sandbox read-only`, while
-the other presets map to `--sandbox workspace-write`. `--apply-actions` remains
-available as the legacy fenced-JSON action protocol and now uses the same
-approval policy presets.
+the full policy shape: `read_only` maps to Codex `--sandbox read-only`,
+`interactive` and `workspace_write` map to `--sandbox workspace-write`, and
+`trusted_local` maps to Codex `--sandbox danger-full-access`. Git metadata
+writes such as `git add` and `git commit` require `trusted_local`; the CLI
+rejects commit-like Codex requests under weaker presets before contacting the
+model. The wrapper also forwards Codex `--ask-for-approval`: `interactive` uses
+`on-request`, while non-interactive presets use `never`. `--apply-actions`
+remains available as the legacy fenced-JSON action protocol and now uses the
+same approval policy presets.
 
 That wrapper loads `.env` for the run and starts the Python CLI.
 
@@ -197,6 +211,13 @@ UTC timestamp, current working directory, argv as JSON, and the original request
 text. The rest of the file mirrors the CLI output, including route metadata,
 assistant response, action-loop output, scrutiny output, normalized scrutiny
 status, and final `execution_status`.
+
+For external-agent routes such as Codex CLI, `--timeout-seconds` is treated as
+an inactivity timeout. Model output resets the timer, and the CLI prints bounded
+`external_agent_activity` or `external_agent_status` lines during long runs so
+the transcript shows that work is still active. If a timeout or process error
+occurs after partial output, the CLI summarizes parsed JSONL events and keeps
+raw JSONL in the transcript-only section rather than dumping it to the console.
 
 By default, transcript logs do not include the complete assembled model prompt.
 Use `--log-full-prompt` with `--log-file` when building evaluation data that
@@ -508,7 +529,7 @@ same policy.
 | Raw transcripts/event logs | Conversation and tool output exist in the managed session. | CLI transcript logs preserve invocation metadata, full prompts when requested, run metrics, and raw Codex JSONL. | Implemented as local files under `logs\`. |
 | Final-answer artifact | The managed session displays the final answer in chat. | `--codex-output-last-message` writes Codex's last assistant message to an explicit local file and uses it as a JSONL fallback. | Implemented as opt-in local file output. |
 | Structured final response | This runtime can constrain some outputs through tool/runtime mechanisms. | `--codex-output-schema` passes an explicit JSON Schema file to `codex exec`. | Implemented as opt-in schema file input. |
-| Approval/sandbox policy | Managed by the active ChatGPT/Codex runtime. | `--approval-policy` selects model-neutral presets for native tools and legacy actions. Codex routes map `read_only` to `--sandbox read-only` and other presets to `--sandbox workspace-write`. | Implemented first preset slice; Codex CLI still lacks exact managed approval UI parity. |
+| Approval/sandbox policy | Managed by the active ChatGPT/Codex runtime. | `--approval-policy` selects model-neutral presets for native tools and legacy actions. Codex routes map `read_only` to `--sandbox read-only`, `interactive`/`workspace_write` to `--sandbox workspace-write`, and `trusted_local` to `--sandbox danger-full-access` for commit-capable local runs. | Implemented first preset slice; Codex CLI still lacks exact managed approval UI parity. |
 | MCP tools | Available here through the current managed runtime. | `--codex-mcp-setup` configures a local `repo_assistant_tools` MCP server for read/search repository tools. | Implemented for selected local read/search tools. |
 | Plugins/apps | This session has installed app/plugin tools exposed by ChatGPT. | Diagnostics list Codex plugin marketplace/install status and structured plugin counts. Explicit install/remove is available through repeated `--codex-plugin-install` / `--codex-plugin-remove` with `--execute`. | Initial approved plugin install set implemented; future connectors one at a time behind reusable authorization. |
 | Document/app-control tools | Available here when connected document sessions expose tools. | Not inherited automatically by `codex exec`. Development-relevant bridges may be added as needed, with read/write capability designed together and writes gated by policy. | Accepted direction in ADR-024; implementation deferred until a concrete development workflow needs it. |

@@ -112,6 +112,13 @@ Keep separate concepts:
   tiers are `LOCAL_ONLY`, `FREE_ONLY`, `ALLOWANCES_ALLOWED`,
   `PREPAID_CREDITS_ALLOWED`, and `BILLING_ALLOWED`.
 
+Auxiliary AI work should be routed separately from the primary task. Response
+scrutiny, context extraction, summarization, prompt refinement, and similar
+support passes should derive child task profiles that prefer local or cheaper
+routes by default. A support pass must not silently reuse an expensive,
+allowance-backed, prepaid-credit, or metered primary route unless the task
+explicitly needs that escalation and the route/cost boundary is reported.
+
 Evolution should be incremental: manual model choice → static rules → capability-aware selector → quota-aware selector → adaptive selector.
 
 ## 4.1 Authorization and approval policy

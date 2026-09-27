@@ -40,6 +40,7 @@ from ai_orchestrator import (
     QualityThreshold,
     TaskType,
     assess_delegation,
+    derive_subtask_profile,
     load_model_catalog,
     plan_delegated_subtask,
     prepare_execution,
@@ -409,7 +410,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         ),
     )
     parser.add_argument("--max-latency-seconds", type=float, help="Hard latency constraint.")
-    parser.add_argument("--timeout-seconds", type=float, default=60.0, help="Provider timeout.")
+    parser.add_argument(
+        "--timeout-seconds",
+        type=float,
+        default=180.0,
+        help=(
+            "Provider timeout. For external-agent routes, this is an inactivity "
+            "timeout and model output resets the timer."
+        ),
+    )
     parser.add_argument(
         "--start-ollama",
         action="store_true",
@@ -738,6 +747,16 @@ def main(argv: Sequence[str] | None = None) -> int:
             external_orchestration.execution_plan.target.access_method
         )
     ):
+        if (
+            external_orchestration.execution_plan.target.access_method is AccessMethod.CODEX_CLI
+            and _prompt_requests_git_metadata_write(args.prompt)
+            and ApprovalPolicyPreset(args.approval_policy) is not ApprovalPolicyPreset.TRUSTED_LOCAL
+        ):
+            parser.error(
+                "Codex CLI requests that write Git metadata, such as git add or git commit, "
+                "require --approval-policy trusted_local so the run can use Codex "
+                "danger-full-access."
+            )
         return _run_external_agent_cli_mode(
             prompt=prompt,
             args=args,
@@ -874,6 +893,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         try:
             scrutiny_started = time.perf_counter()
             scrutiny_prompt = build_response_scrutiny_prompt(prompt, assistant_response_text)
+            scrutiny_profile = derive_subtask_profile(
+                parent=profile,
+                task_type=TaskType.CLASSIFICATION,
+                quality_threshold=QualityThreshold.STANDARD,
+                latency_target=LatencyTarget.BACKGROUND,
+                cost_policy_tier=CostPolicyTier.LOCAL_ONLY,
+                privacy_class=OrchestratorPrivacyClass.LOCAL_ONLY,
+            )
             if args.log_full_prompt:
                 _print_model_input(
                     "Scrutiny",
@@ -882,7 +909,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 )
             scrutiny_result = run_coding_prompt(
                 scrutiny_prompt,
-                profile,
+                scrutiny_profile,
                 catalog,
                 review_prompt=False,
                 timeout_seconds=args.timeout_seconds,
@@ -1123,12 +1150,14 @@ def _run_external_agent_cli_mode(
     external_result = None
     execution_status = "planned"
     exit_code = 0
+    response_header_printed = False
     try:
         config = _external_agent_config_from_orchestration(
             orchestration,
             repo_root=repo_root,
             timeout_seconds=args.timeout_seconds,
             sandbox=_codex_sandbox_for_approval_policy(args.approval_policy),
+            approval_policy=_codex_approval_for_approval_policy(args.approval_policy),
             codex_persist_session=args.codex_persist_session,
             codex_resume=args.codex_resume,
             output_last_message_path=args.codex_output_last_message,
@@ -1138,6 +1167,7 @@ def _run_external_agent_cli_mode(
         )
         print(f"external_agent_command: {config.command}")
         print(f"approval_policy: {args.approval_policy}")
+        print(f"external_agent_approval_policy: {config.approval_policy}")
         print(f"external_agent_sandbox: {config.sandbox}")
         print(f"external_agent_ephemeral: {config.ephemeral}")
         if config.resume is not None:
@@ -1147,15 +1177,22 @@ def _run_external_agent_cli_mode(
         if config.output_schema_path is not None:
             print(f"external_agent_output_schema: {config.output_schema_path}")
         print(f"external_agent_web_search: {config.web_search}")
+        print("external_agent_timeout_mode: inactivity")
+        print(f"external_agent_inactivity_timeout_seconds: {config.timeout_seconds:g}")
         if config.image_paths:
             print(
                 "external_agent_images_json: "
                 + json.dumps([str(path) for path in config.image_paths])
             )
         print("\n=== Assistant response ===")
+        response_header_printed = True
         if args.execute and args.mode != "plan":
             primary_started = time.perf_counter()
-            external_result = _run_external_agent(prompt, config)
+            external_result = _run_external_agent(
+                prompt,
+                config,
+                progress_callback=print,
+            )
             primary_elapsed_seconds = time.perf_counter() - primary_started
             print(f"external_agent_returncode: {external_result.returncode}")
             if external_result.events is not None:
@@ -1195,8 +1232,14 @@ def _run_external_agent_cli_mode(
             print("execution: skipped")
             print("external_agent_command_line_json: " + json.dumps(list(command)))
     except (FileNotFoundError, NotImplementedError, subprocess.TimeoutExpired) as exc:
-        print("\n=== Assistant response ===")
+        if not response_header_printed:
+            print("\n=== Assistant response ===")
         print(f"failure_reason: {exc}")
+        if isinstance(exc, subprocess.TimeoutExpired):
+            _print_external_agent_timeout_output(exc)
+        hint = _external_agent_exception_hint(exc)
+        if hint is not None:
+            print(f"failure_hint: {hint}")
         execution_status = "failed"
         exit_code = 1
 
@@ -1230,6 +1273,49 @@ def _print_external_agent_event_summary(events: ExternalAgentEventSummary) -> No
             print(f"external_agent_failure_hint: {hint}")
     if events.parse_errors:
         print("external_agent_jsonl_parse_errors_json: " + json.dumps(list(events.parse_errors)))
+
+
+def _external_agent_exception_hint(exc: Exception) -> str | None:
+    """Return an actionable hint for known external-agent process failures."""
+
+    if isinstance(exc, subprocess.TimeoutExpired):
+        command_text = " ".join(str(part) for part in exc.cmd) if exc.cmd else ""
+        if "codex" in command_text.lower():
+            return (
+                "Codex CLI did not finish before the repo assistant timeout. If an auth box "
+                "or device-code link was expected, run `.\\scripts\\repo-assistant.ps1 "
+                "--codex-login-device` first. If Codex is simply slow, rerun with a larger "
+                "`--timeout-seconds` value."
+            )
+        return "The external process timed out. Rerun with a larger `--timeout-seconds` value."
+    return None
+
+
+def _print_external_agent_timeout_output(exc: subprocess.TimeoutExpired) -> None:
+    """Print bounded partial output captured before an external-agent timeout."""
+
+    stdout = _timeout_output_to_text(exc.output)
+    stderr = _timeout_output_to_text(exc.stderr)
+    if stdout:
+        events = parse_external_agent_jsonl(stdout)
+        _print_external_agent_event_summary(events)
+        _write_external_agent_raw_jsonl(stdout)
+    if stderr:
+        print("\n=== External agent stderr ===")
+        stderr_text = _format_external_agent_stderr(stderr)
+        print(stderr_text, end="")
+        if not stderr_text.endswith("\n"):
+            print()
+
+
+def _timeout_output_to_text(value: str | bytes | None) -> str:
+    """Normalize subprocess timeout output to text for transcripts."""
+
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return value
 
 
 def _external_agent_failure_hint(failure_reason: str) -> str | None:
@@ -1389,9 +1475,42 @@ def _run_action_loop(
 def _codex_sandbox_for_approval_policy(approval_policy: str) -> str:
     """Map model-neutral approval presets to supported Codex CLI sandbox modes."""
 
-    if ApprovalPolicyPreset(approval_policy) is ApprovalPolicyPreset.READ_ONLY:
+    preset = ApprovalPolicyPreset(approval_policy)
+    if preset is ApprovalPolicyPreset.READ_ONLY:
         return "read-only"
+    if preset is ApprovalPolicyPreset.TRUSTED_LOCAL:
+        return "danger-full-access"
     return "workspace-write"
+
+
+def _codex_approval_for_approval_policy(approval_policy: str) -> str:
+    """Map model-neutral approval presets to Codex CLI approval modes."""
+
+    preset = ApprovalPolicyPreset(approval_policy)
+    if preset is ApprovalPolicyPreset.INTERACTIVE:
+        return "on-request"
+    if preset is ApprovalPolicyPreset.READ_ONLY:
+        return "never"
+    return "never"
+
+
+def _prompt_requests_git_metadata_write(prompt: str) -> bool:
+    """Return whether a prompt appears to require writing Git metadata."""
+
+    normalized = prompt.lower()
+    return any(
+        phrase in normalized
+        for phrase in (
+            "git commit",
+            "git add",
+            "commit that",
+            "commit this",
+            "commit the",
+            "make a commit",
+            "create a commit",
+            "stage and commit",
+        )
+    )
 
 
 def _legacy_action_authorizer(approval_policy: str) -> Callable[[AssistantAction], bool]:

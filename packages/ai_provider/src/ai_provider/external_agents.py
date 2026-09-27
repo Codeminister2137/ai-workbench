@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import json
 import os
+import queue
 import shutil
 import subprocess
+import threading
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -22,6 +25,7 @@ class ExternalAgentConfig:
     cwd: Path
     timeout_seconds: float
     sandbox: str = "workspace-write"
+    approval_policy: str = "never"
     ephemeral: bool = True
     json_output: bool = True
     resume: str | None = None
@@ -429,6 +433,7 @@ def external_agent_config_from_orchestration(
     repo_root: Path,
     timeout_seconds: float,
     sandbox: str = "workspace-write",
+    approval_policy: str = "never",
     codex_persist_session: bool = False,
     codex_resume: str | None = None,
     output_last_message_path: Path | None = None,
@@ -457,6 +462,7 @@ def external_agent_config_from_orchestration(
         cwd=repo_root,
         timeout_seconds=timeout_seconds,
         sandbox=sandbox,
+        approval_policy=approval_policy,
         ephemeral=not codex_persist_session and codex_resume is None,
         resume=codex_resume,
         output_last_message_path=output_last_message_path,
@@ -528,6 +534,7 @@ def build_external_agent_command(config: ExternalAgentConfig) -> tuple[str, ...]
     command = [config.command]
     if config.web_search:
         command.append("--search")
+    command.extend(["--ask-for-approval", config.approval_policy])
 
     if config.resume is not None:
         command.extend(["exec", "resume", "--model", config.model])
@@ -576,22 +583,127 @@ def run_external_agent(
     config: ExternalAgentConfig,
     *,
     runner: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
+    popen_factory: Callable[..., subprocess.Popen[str]] = subprocess.Popen,
+    progress_callback: Callable[[str], None] | None = None,
+    progress_interval_seconds: float = 15.0,
 ) -> ExternalAgentResult:
     """Run an external coding-agent process with the prompt on stdin."""
 
     command = build_external_agent_command(config)
     if config.output_last_message_path is not None:
         config.output_last_message_path.parent.mkdir(parents=True, exist_ok=True)
-    completed = runner(
+    if runner is not subprocess.run:
+        completed = runner(
+            command,
+            input=prompt,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            capture_output=True,
+            timeout=config.timeout_seconds,
+            cwd=config.cwd,
+        )
+        return _external_agent_result_from_completed_process(command, config, completed)
+
+    process = popen_factory(
         command,
-        input=prompt,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
         text=True,
         encoding="utf-8",
         errors="replace",
-        capture_output=True,
-        timeout=config.timeout_seconds,
         cwd=config.cwd,
+        bufsize=1,
     )
+    output_queue: queue.Queue[tuple[str, str]] = queue.Queue()
+    stdout_lines: list[str] = []
+    stderr_lines: list[str] = []
+    readers: list[threading.Thread] = []
+    for label, stream in (("stdout", process.stdout), ("stderr", process.stderr)):
+        if stream is None:
+            continue
+        reader = threading.Thread(
+            target=_read_process_stream,
+            args=(label, stream, output_queue),
+            daemon=True,
+        )
+        reader.start()
+        readers.append(reader)
+
+    try:
+        if process.stdin is not None:
+            process.stdin.write(prompt)
+            process.stdin.close()
+    except (BrokenPipeError, OSError):
+        pass
+
+    started = time.monotonic()
+    last_activity = started
+    last_progress = started
+    while process.poll() is None or not output_queue.empty():
+        now = time.monotonic()
+        try:
+            label, line = output_queue.get(timeout=0.2)
+        except queue.Empty:
+            if (
+                progress_callback is not None
+                and progress_interval_seconds > 0
+                and now - last_progress >= progress_interval_seconds
+            ):
+                progress_callback(
+                    "external_agent_status: running "
+                    f"elapsed_seconds={now - started:.1f} "
+                    f"last_output_age_seconds={now - last_activity:.1f}"
+                )
+                last_progress = now
+            if config.timeout_seconds > 0 and now - last_activity > config.timeout_seconds:
+                process.kill()
+                _drain_process_output(output_queue, stdout_lines, stderr_lines)
+                for reader in readers:
+                    reader.join(timeout=1.0)
+                raise subprocess.TimeoutExpired(
+                    command,
+                    timeout=config.timeout_seconds,
+                    output="".join(stdout_lines),
+                    stderr="".join(stderr_lines),
+                ) from None
+            continue
+
+        last_activity = now
+        if label == "stdout":
+            stdout_lines.append(line)
+            if progress_callback is not None:
+                progress = _external_agent_progress_line(line)
+                if progress is not None:
+                    progress_callback(progress)
+                    last_progress = now
+        else:
+            stderr_lines.append(line)
+            if progress_callback is not None:
+                progress_callback("external_agent_activity: stderr")
+                last_progress = now
+
+    for reader in readers:
+        reader.join(timeout=1.0)
+    _drain_process_output(output_queue, stdout_lines, stderr_lines)
+    returncode = process.returncode if process.returncode is not None else 1
+    completed = subprocess.CompletedProcess(
+        command,
+        returncode,
+        stdout="".join(stdout_lines),
+        stderr="".join(stderr_lines),
+    )
+    return _external_agent_result_from_completed_process(command, config, completed)
+
+
+def _external_agent_result_from_completed_process(
+    command: tuple[str, ...],
+    config: ExternalAgentConfig,
+    completed: subprocess.CompletedProcess[str],
+) -> ExternalAgentResult:
+    """Build a stable external-agent result from captured process output."""
+
     stdout = completed.stdout or ""
     events = parse_external_agent_jsonl(stdout) if config.json_output and stdout else None
     last_message = None
@@ -605,6 +717,62 @@ def run_external_agent(
         last_message=last_message,
         events=events,
     )
+
+
+def _read_process_stream(
+    label: str,
+    stream: Any,
+    output_queue: queue.Queue[tuple[str, str]],
+) -> None:
+    """Read one process stream into a queue line by line."""
+
+    try:
+        for line in iter(stream.readline, ""):
+            if not line:
+                break
+            output_queue.put((label, line))
+    finally:
+        stream.close()
+
+
+def _drain_process_output(
+    output_queue: queue.Queue[tuple[str, str]],
+    stdout_lines: list[str],
+    stderr_lines: list[str],
+) -> None:
+    """Drain queued process output into captured stdout and stderr buffers."""
+
+    while True:
+        try:
+            label, line = output_queue.get_nowait()
+        except queue.Empty:
+            return
+        if label == "stdout":
+            stdout_lines.append(line)
+        else:
+            stderr_lines.append(line)
+
+
+def _external_agent_progress_line(line: str) -> str | None:
+    """Return a bounded progress line for one external-agent output event."""
+
+    stripped = line.strip()
+    if not stripped:
+        return None
+    try:
+        event = json.loads(stripped)
+    except json.JSONDecodeError:
+        return "external_agent_activity: stdout"
+    if not isinstance(event, dict):
+        return "external_agent_activity: stdout"
+    event_type = _event_type(event) or "json_event"
+    if _find_final_answer(event, event_type):
+        return "external_agent_activity: final_answer"
+    if _find_failure_reason(event, event_type):
+        return "external_agent_activity: failure"
+    if _find_usage(event) is not None:
+        return "external_agent_activity: usage"
+    return f"external_agent_activity: {event_type}"
 
 
 def _event_type(event: dict[str, Any]) -> str:

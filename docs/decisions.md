@@ -61,6 +61,18 @@ reusable boundary.
 
 Detailed ADR: `docs/decisions/ADR-024-codex-cli-parity-authorization-and-dev-tool-policy.md`
 
+## ADR-025 - Local-First Auxiliary AI Work
+**Status:** Accepted
+**Date:** 2026-09-27
+
+Auxiliary AI work such as response scrutiny, context extraction, summarization,
+prompt refinement, and other support passes should derive their own child task
+profiles and prefer local or cheaper routes by default. Escalating auxiliary
+passes to Codex, hosted APIs, prepaid credits, or metered billing requires an
+explicit task need and visible route/cost reporting.
+
+Detailed ADR: `docs/decisions/ADR-025-local-first-auxiliary-ai-work.md`
+
 ## Template
 ```text
 ## ADR-NNN — Short Name

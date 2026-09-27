@@ -625,8 +625,71 @@ def test_cli_approval_policy_read_only_maps_to_codex_sandbox(capsys, monkeypatch
     )
     output = capsys.readouterr().out
     assert "approval_policy: read_only" in output
+    assert "external_agent_approval_policy: never" in output
     assert "external_agent_sandbox: read-only" in output
+    assert '"--ask-for-approval", "never"' in output
     assert '"--sandbox", "read-only"' in output
+
+
+def test_cli_approval_policy_trusted_local_maps_to_commit_capable_codex_sandbox(
+    capsys,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("CODEX_COMMAND", "codex-test")
+
+    assert (
+        main(
+            [
+                "--mode",
+                "plan",
+                "Implement the change.",
+                "--privacy",
+                "external_allowed",
+                "--route-id",
+                "openai-codex-gpt-5-5",
+                "--provider",
+                "openai",
+                "--model",
+                "gpt-5.5",
+                "--skip-prompt-review",
+                "--approval-policy",
+                "trusted_local",
+            ]
+        )
+        == 0
+    )
+    output = capsys.readouterr().out
+    assert "approval_policy: trusted_local" in output
+    assert "external_agent_approval_policy: never" in output
+    assert "external_agent_sandbox: danger-full-access" in output
+    assert '"--ask-for-approval", "never"' in output
+    assert '"--sandbox", "danger-full-access"' in output
+
+
+def test_cli_rejects_codex_commit_request_without_trusted_local(monkeypatch) -> None:
+    monkeypatch.setenv("CODEX_COMMAND", "codex-test")
+
+    with pytest.raises(SystemExit):
+        main(
+            [
+                "--mode",
+                "implement",
+                "Commit that slice.",
+                "--privacy",
+                "external_allowed",
+                "--route-id",
+                "openai-codex-gpt-5-5",
+                "--provider",
+                "openai",
+                "--model",
+                "gpt-5.5",
+                "--execute",
+                "--native-tools",
+                "--approval-policy",
+                "workspace_write",
+                "--skip-prompt-review",
+            ]
+        )
 
 
 def test_cli_executes_codex_external_agent_route(capsys, monkeypatch) -> None:
@@ -685,9 +748,8 @@ def test_cli_executes_codex_external_agent_route(capsys, monkeypatch) -> None:
     assert "codex done" in output
     assert "execution_status: completed" in output
     command = calls[0]["args"][0]
-    assert command[:2] == ("codex-test", "exec")
+    assert command[:4] == ("codex-test", "--ask-for-approval", "on-request", "exec")
     assert "--json" in command
-    assert "--ask-for-approval" not in command
     assert "--sandbox" in command
     assert "workspace-write" in command
     assert calls[0]["kwargs"]["input"].startswith("# User request")
@@ -850,6 +912,43 @@ def test_cli_does_not_print_raw_jsonl_when_codex_fails(capsys, monkeypatch) -> N
     assert "external_agent_failure_reason: unsupported model" in output
     assert "external_agent_final_answer: unavailable" in output
     assert raw_jsonl.strip() not in output
+
+
+def test_cli_explains_codex_timeout_without_duplicate_response_header(
+    capsys,
+    monkeypatch,
+) -> None:
+    def fake_run(*args, **kwargs):
+        raise _EXAMPLE.subprocess.TimeoutExpired(args[0], timeout=60.0)
+
+    monkeypatch.setenv("CODEX_COMMAND", "codex-test")
+    monkeypatch.setattr(_EXAMPLE.subprocess, "run", fake_run)
+
+    assert (
+        main(
+            [
+                "--mode",
+                "ask",
+                "Review this repository.",
+                "--privacy",
+                "external_allowed",
+                "--route-id",
+                "openai-codex-gpt-5-5",
+                "--provider",
+                "openai",
+                "--model",
+                "gpt-5.5",
+                "--execute",
+                "--skip-prompt-review",
+            ]
+        )
+        == 1
+    )
+
+    output = capsys.readouterr().out
+    assert output.count("=== Assistant response ===") == 1
+    assert "failure_hint: Codex CLI did not finish before the repo assistant timeout" in output
+    assert "--codex-login-device" in output
 
 
 def test_external_agent_stderr_is_bounded() -> None:
@@ -1023,7 +1122,7 @@ def test_cli_can_plan_codex_search(capsys, monkeypatch) -> None:
 
     output = capsys.readouterr().out
     assert "external_agent_web_search: True" in output
-    assert '"codex-test", "--search", "exec"' in output
+    assert '"codex-test", "--search", "--ask-for-approval", "on-request", "exec"' in output
     assert '"exec", "--search"' not in output
 
 
@@ -1520,10 +1619,12 @@ def test_cli_marks_malformed_scrutiny_as_scrutiny_error(capsys, monkeypatch) -> 
         ),
     )
     calls = 0
+    profiles = []
 
     def fake_run(prompt, profile, catalog, **kwargs):
         nonlocal calls
         calls += 1
+        profiles.append(profile)
         return primary if calls == 1 else scrutiny
 
     monkeypatch.setattr(_EXAMPLE, "run_coding_prompt", fake_run)
@@ -1548,6 +1649,10 @@ def test_cli_marks_malformed_scrutiny_as_scrutiny_error(capsys, monkeypatch) -> 
     assert "scrutiny_status: invalid" in output
     assert "scrutiny_failure_reason: missing scrutiny heading" in output
     assert "execution_status: completed_with_scrutiny_errors" in output
+    assert profiles[1].privacy_class is _EXAMPLE.OrchestratorPrivacyClass.LOCAL_ONLY
+    assert profiles[1].cost_policy_tier is _EXAMPLE.CostPolicyTier.LOCAL_ONLY
+    assert profiles[1].user_backend_override is None
+    assert profiles[1].user_model_override is None
 
 
 def test_scrutiny_requires_executing_ask_or_review() -> None:
