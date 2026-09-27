@@ -30,6 +30,13 @@ Applications should not need to know provider-specific API details.
 
 **Status:** First Ollama-backed vertical slice in progress under `packages/ai_provider/`.
 
+The repository also has a working CLI-first coding assistant surface:
+`scripts/repo-assistant.ps1` / `python -m uv run ai-assistant`. It supports
+local Ollama, hosted provider routes, Codex CLI execution, bounded repository
+context, transcript logs, explicit implementation modes, approval-policy
+presets, Codex plugin/MCP diagnostics, and selected Codex CLI parity features.
+See `docs/repo-coding-assistant.md` for the day-to-day usage guide.
+
 ---
 
 ### AI Orchestrator

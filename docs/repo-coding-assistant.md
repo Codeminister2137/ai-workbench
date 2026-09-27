@@ -9,6 +9,68 @@ The main startup command is:
 .\scripts\repo-assistant.ps1 "YOUR REQUEST" --provider ollama --model qwen2.5-coder:14b --execute --start-ollama
 ```
 
+## Moving Work From PyCharm Chat To The CLI
+
+For this repository's current local-only workflow, the CLI is ready to take over
+routine coding-assistant work. It is strongest for bounded repository tasks:
+planning, asking, reviewing, implementation with explicit local tools, Codex CLI
+runs, diagnostics, transcript capture, and validation loops.
+
+Use this default flow when starting a task:
+
+```powershell
+# 1. Inspect routing/context without contacting a model
+.\scripts\repo-assistant.ps1 --mode plan "YOUR TASK" --file path\to\relevant.py
+
+# 2. Ask for analysis or review without actions
+.\scripts\repo-assistant.ps1 --mode review "YOUR TASK" `
+  --file path\to\relevant.py `
+  --provider ollama --model qwen2.5-coder:14b `
+  --execute --start-ollama
+
+# 3. Implement only after the intended change is clear
+.\scripts\repo-assistant.ps1 --mode implement "Implement the approved change." `
+  --file path\to\relevant.py `
+  --provider ollama --model qwen2.5-coder:14b `
+  --execute --native-tools --approval-policy interactive --start-ollama
+
+# 4. Verify from the terminal
+git diff
+git status --short
+python -m uv run pytest
+python -m uv run ruff check .
+python -m uv run ruff format --check .
+python -m uv run pyright
+```
+
+Use the Codex route when you want behavior closest to this chat's coding model:
+
+```powershell
+.\scripts\repo-assistant.ps1 `
+  "Review this repository and identify the smallest safe next change." `
+  --privacy external_allowed `
+  --route-id openai-codex-gpt-5-5 `
+  --provider openai --model gpt-5.5 `
+  --execute --skip-prompt-review
+```
+
+Use `--codex-search`, `--codex-image`, `--codex-output-schema`, or
+`--codex-persist-session` only when the specific task needs them. They are
+opt-in because they change network behavior, attach local files, constrain
+output, or write Codex session state outside the repository.
+
+Keep PyCharm AI Assistant chat for now when the work depends on IDE-only
+context, this chat's managed app/document-control tools, or a material product
+or architecture decision that needs discussion before implementation.
+
+Current parity status:
+
+- Ready for local repo coding workflows: yes.
+- Ready for Codex CLI-backed coding workflows: mostly, with explicit opt-ins.
+- Ready for GitHub, deployment, document-control, or broad connected-app work:
+  intentionally no, because this repository is still local-only and those
+  connectors require separate authorization decisions.
+
 The workspace also exposes a stable command entry point:
 
 ```powershell
