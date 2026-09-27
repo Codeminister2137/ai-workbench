@@ -28,6 +28,7 @@ class ExternalAgentConfig:
     output_last_message_path: Path | None = None
     output_schema_path: Path | None = None
     web_search: bool = False
+    image_paths: tuple[Path, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -432,6 +433,7 @@ def external_agent_config_from_orchestration(
     output_last_message_path: Path | None = None,
     output_schema_path: Path | None = None,
     web_search: bool = False,
+    image_paths: tuple[Path, ...] = (),
 ) -> ExternalAgentConfig:
     """Adapt a ready orchestration result to an external-agent runtime config."""
 
@@ -458,6 +460,7 @@ def external_agent_config_from_orchestration(
         output_last_message_path=output_last_message_path,
         output_schema_path=output_schema_path,
         web_search=web_search,
+        image_paths=image_paths,
     )
 
 
@@ -532,6 +535,8 @@ def build_external_agent_command(config: ExternalAgentConfig) -> tuple[str, ...]
             command.extend(["--output-last-message", str(config.output_last_message_path)])
         if config.output_schema_path is not None:
             command.extend(["--output-schema", str(config.output_schema_path)])
+        for image_path in config.image_paths:
+            command.extend(["--image", str(image_path)])
         if config.resume == "last":
             command.append("--last")
         else:
@@ -558,6 +563,8 @@ def build_external_agent_command(config: ExternalAgentConfig) -> tuple[str, ...]
         command.extend(["--output-last-message", str(config.output_last_message_path)])
     if config.output_schema_path is not None:
         command.extend(["--output-schema", str(config.output_schema_path)])
+    for image_path in config.image_paths:
+        command.extend(["--image", str(image_path)])
     command.append("-")
     return tuple(command)
 

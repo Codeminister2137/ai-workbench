@@ -261,6 +261,7 @@ def test_cli_help_lists_google_provider() -> None:
     assert "--mode {ask,review,implement,plan,diagnose}" in result.stdout
     assert "--scrutinize-response" in result.stdout
     assert "--codex-search" in result.stdout
+    assert "--codex-image" in result.stdout
     assert "--codex-mcp-setup" in result.stdout
     assert "--codex-mcp-register-global" in result.stdout
 
@@ -898,6 +899,42 @@ def test_cli_can_plan_codex_search(capsys, monkeypatch) -> None:
     assert '"exec", "--search"' not in output
 
 
+def test_cli_can_plan_codex_images(capsys, monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("CODEX_COMMAND", "codex-test")
+    before_image = tmp_path / "before.png"
+    after_image = tmp_path / "after.jpg"
+
+    assert (
+        main(
+            [
+                "--mode",
+                "plan",
+                "Compare the UI screenshots.",
+                "--privacy",
+                "external_allowed",
+                "--route-id",
+                "openai-codex-gpt-5-5",
+                "--provider",
+                "openai",
+                "--model",
+                "gpt-5.5",
+                "--skip-prompt-review",
+                "--codex-image",
+                str(before_image),
+                "--codex-image",
+                str(after_image),
+            ]
+        )
+        == 0
+    )
+
+    output = capsys.readouterr().out
+    assert "external_agent_images_json:" in output
+    assert "--image" in output
+    assert before_image.name in output
+    assert after_image.name in output
+
+
 def test_codex_output_schema_requires_codex_route(tmp_path: Path) -> None:
     schema_file = tmp_path / "answer.schema.json"
     schema_file.write_text('{"type":"object"}', encoding="utf-8")
@@ -930,6 +967,25 @@ def test_codex_search_requires_codex_route() -> None:
                 "--model",
                 "qwen2.5-coder:14b",
                 "--codex-search",
+            ]
+        )
+
+
+def test_codex_image_requires_codex_route(tmp_path: Path) -> None:
+    image_file = tmp_path / "screenshot.png"
+
+    with pytest.raises(SystemExit):
+        main(
+            [
+                "--mode",
+                "plan",
+                "Invalid route.",
+                "--provider",
+                "ollama",
+                "--model",
+                "qwen2.5-coder:14b",
+                "--codex-image",
+                str(image_file),
             ]
         )
 

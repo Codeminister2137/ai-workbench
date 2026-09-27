@@ -204,6 +204,7 @@ class ExternalAgentConfig:
     output_last_message_path: Path | None = None
     output_schema_path: Path | None = None
     web_search: bool = False
+    image_paths: tuple[Path, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -595,6 +596,7 @@ def _external_agent_config_from_orchestration(
     output_last_message_path: Path | None = None,
     output_schema_path: Path | None = None,
     web_search: bool = False,
+    image_paths: tuple[Path, ...] = (),
 ) -> ExternalAgentConfig:
     """Adapt a ready orchestration result to an external-agent runtime config."""
 
@@ -621,6 +623,7 @@ def _external_agent_config_from_orchestration(
         output_last_message_path=output_last_message_path,
         output_schema_path=output_schema_path,
         web_search=web_search,
+        image_paths=image_paths,
     )
 
 
@@ -836,6 +839,8 @@ def _build_external_agent_command(config: ExternalAgentConfig) -> tuple[str, ...
             command.extend(["--output-last-message", str(config.output_last_message_path)])
         if config.output_schema_path is not None:
             command.extend(["--output-schema", str(config.output_schema_path)])
+        for image_path in config.image_paths:
+            command.extend(["--image", str(image_path)])
         if config.resume == "last":
             command.append("--last")
         else:
@@ -862,6 +867,8 @@ def _build_external_agent_command(config: ExternalAgentConfig) -> tuple[str, ...
         command.extend(["--output-last-message", str(config.output_last_message_path)])
     if config.output_schema_path is not None:
         command.extend(["--output-schema", str(config.output_schema_path)])
+    for image_path in config.image_paths:
+        command.extend(["--image", str(image_path)])
     command.append("-")
     return tuple(command)
 
@@ -1517,6 +1524,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
+        "--codex-image",
+        action="append",
+        default=[],
+        type=Path,
+        metavar="PATH",
+        help=(
+            "For Codex CLI routes, attach one local image to the initial prompt via "
+            "--image. May be repeated."
+        ),
+    )
+    parser.add_argument(
         "--codex-plugin-install",
         action="append",
         default=[],
@@ -1727,6 +1745,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         and external_orchestration.execution_plan.target.access_method is not AccessMethod.CODEX_CLI
     ):
         parser.error("--codex-search requires a Codex CLI route")
+    if (
+        args.codex_image
+        and external_orchestration.is_ready
+        and external_orchestration.execution_plan is not None
+        and external_orchestration.execution_plan.target.access_method is not AccessMethod.CODEX_CLI
+    ):
+        parser.error("--codex-image requires a Codex CLI route")
     if (
         external_orchestration.is_ready
         and external_orchestration.execution_plan is not None
@@ -2077,6 +2102,7 @@ def _run_external_agent_cli_mode(
             output_last_message_path=args.codex_output_last_message,
             output_schema_path=args.codex_output_schema,
             web_search=args.codex_search,
+            image_paths=tuple(args.codex_image),
         )
         print(f"external_agent_command: {config.command}")
         print(f"external_agent_sandbox: {config.sandbox}")
@@ -2088,6 +2114,11 @@ def _run_external_agent_cli_mode(
         if config.output_schema_path is not None:
             print(f"external_agent_output_schema: {config.output_schema_path}")
         print(f"external_agent_web_search: {config.web_search}")
+        if config.image_paths:
+            print(
+                "external_agent_images_json: "
+                + json.dumps([str(path) for path in config.image_paths])
+            )
         print("\n=== Assistant response ===")
         if args.execute and args.mode != "plan":
             primary_started = time.perf_counter()

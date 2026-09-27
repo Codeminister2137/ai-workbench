@@ -44,6 +44,26 @@ def test_build_external_agent_command_omits_codex_search_by_default(tmp_path: Pa
     assert command[:2] == ("codex", "exec")
 
 
+def test_build_external_agent_command_can_attach_codex_images(tmp_path: Path) -> None:
+    first_image = tmp_path / "before.png"
+    second_image = tmp_path / "after.jpg"
+    config = ExternalAgentConfig(
+        access_method=AccessMethod.CODEX_CLI,
+        command="codex",
+        model="gpt-5.5",
+        cwd=tmp_path,
+        timeout_seconds=60.0,
+        image_paths=(first_image, second_image),
+    )
+
+    command = build_external_agent_command(config)
+
+    assert command.count("--image") == 2
+    assert str(first_image) in command
+    assert str(second_image) in command
+    assert command[-1] == "-"
+
+
 def test_parse_external_agent_jsonl_counts_web_search_events() -> None:
     events = parse_external_agent_jsonl(
         "\n".join(

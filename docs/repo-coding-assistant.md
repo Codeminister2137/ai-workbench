@@ -292,6 +292,10 @@ off by default because it allows external web/search activity in addition to
 sending the selected repository context to Codex. The verified local Codex CLI
 expects search as a top-level flag, so the repository CLI invokes
 `codex --search exec ...` rather than the unsupported `codex exec --search ...`.
+Use repeated `--codex-image path\to\screenshot.png` flags to attach local image
+files to the initial Codex prompt. This is useful for screenshots, diagrams, or
+visual regressions; the prompt should still state what Codex should inspect and
+what output you want.
 
 `--mode diagnose` and `--local-capabilities` include Codex diagnostics when a
 Codex command is discoverable: command path, version, login-status text,
@@ -393,7 +397,7 @@ noninteractive command contracts and local executable paths are confirmed.
 | Plugins/apps | This session has installed app/plugin tools exposed by ChatGPT. | Diagnostics list Codex plugin marketplace/install status and structured plugin counts. Explicit install/remove is available through repeated `--codex-plugin-install` / `--codex-plugin-remove` with `--execute`. | Initial approved plugin install set implemented; external-service auth and permissions remain separate decisions. |
 | Document/app-control tools | Available here when connected document sessions expose tools. | Not inherited automatically by `codex exec`. Would require MCP/plugin equivalents and authorization. | Gap; decision required before design. |
 | Web/search | This runtime may have managed browsing tools. | `--codex-search` invokes `codex --search exec ...` for one explicit Codex CLI run. Default runs omit search. | Implemented as explicit opt-in only. |
-| Images/multimodal input | This runtime can receive images when tools/context allow it. | Codex CLI help exposes image attachment flags, but the repo assistant route currently sends text prompts only. | Feasible later through CLI-layer input design. |
+| Images/multimodal input | This runtime can receive images when tools/context allow it. | Repeated `--codex-image PATH` flags forward local images to `codex exec --image PATH`. | Implemented as explicit opt-in image attachments for Codex CLI routes. |
 | Multi-turn resume | This chat preserves conversation state. | Default runs remain ephemeral. `--codex-persist-session` starts a resumable session, and `--codex-resume last|<session-id>` resumes one through Codex CLI. | Implemented as explicit opt-in Codex persistence. |
 
 ## CLI-First Roadmap
