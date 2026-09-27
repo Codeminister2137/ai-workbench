@@ -49,6 +49,18 @@ connecting local Ollama context extraction with hosted primary models.
 
 Detailed ADR: `docs/decisions/ADR-023-google-antigravity-routes-and-live-delegation.md`
 
+## ADR-024 - Codex CLI Parity, Authorization, And Development Tool Policy
+**Status:** Accepted
+**Date:** 2026-09-27
+
+Use model-neutral approval policy presets for CLI parity, add only
+development-relevant app/tool bridges as concrete needs appear, design read and
+write capabilities together even when writes are disabled by default, expand
+external connectors one at a time, and keep user authorization behind one
+reusable boundary.
+
+Detailed ADR: `docs/decisions/ADR-024-codex-cli-parity-authorization-and-dev-tool-policy.md`
+
 ## Template
 ```text
 ## ADR-NNN — Short Name

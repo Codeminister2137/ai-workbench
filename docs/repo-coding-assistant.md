@@ -382,6 +382,13 @@ Antigravity, Copilot, and Kiro are represented for route planning and
 diagnostics, but their execution adapters remain disabled until their official
 noninteractive command contracts and local executable paths are confirmed.
 
+The accepted parity direction is recorded in
+`docs/decisions/ADR-024-codex-cli-parity-authorization-and-dev-tool-policy.md`
+and `docs/plans/repo-assistant-cli-parity-plan.md`. Codex remains the baseline
+capability target, but approval policy, tool authorization, and development
+tool contracts should stay model-neutral so alternate executors can use the
+same policy.
+
 ### Codex Capability Matrix
 
 | Capability | This ChatGPT/Codex session | Repository CLI via Codex CLI | Current status |
@@ -392,10 +399,10 @@ noninteractive command contracts and local executable paths are confirmed.
 | Raw transcripts/event logs | Conversation and tool output exist in the managed session. | CLI transcript logs preserve invocation metadata, full prompts when requested, run metrics, and raw Codex JSONL. | Implemented as local files under `logs\`. |
 | Final-answer artifact | The managed session displays the final answer in chat. | `--codex-output-last-message` writes Codex's last assistant message to an explicit local file and uses it as a JSONL fallback. | Implemented as opt-in local file output. |
 | Structured final response | This runtime can constrain some outputs through tool/runtime mechanisms. | `--codex-output-schema` passes an explicit JSON Schema file to `codex exec`. | Implemented as opt-in schema file input. |
-| Approval/sandbox policy | Managed by the active ChatGPT/Codex runtime. | Uses Codex CLI sandbox flags. This installed `codex exec` supports `--json`, `--sandbox`, and `--ephemeral`; `--ask-for-approval` must not be assumed unless local help confirms it. | Partially implemented; human approval parity is a known gap. |
+| Approval/sandbox policy | Managed by the active ChatGPT/Codex runtime. | Uses Codex CLI sandbox flags today. Planned direction is repo-owned, model-neutral approval policy presets that can map to Codex and future executors. | Partially implemented; policy presets planned in ADR-024. |
 | MCP tools | Available here through the current managed runtime. | `--codex-mcp-setup` configures a local `repo_assistant_tools` MCP server for read/search repository tools. | Implemented for selected local read/search tools. |
-| Plugins/apps | This session has installed app/plugin tools exposed by ChatGPT. | Diagnostics list Codex plugin marketplace/install status and structured plugin counts. Explicit install/remove is available through repeated `--codex-plugin-install` / `--codex-plugin-remove` with `--execute`. | Initial approved plugin install set implemented; external-service auth and permissions remain separate decisions. |
-| Document/app-control tools | Available here when connected document sessions expose tools. | Not inherited automatically by `codex exec`. Would require MCP/plugin equivalents and authorization. | Gap; decision required before design. |
+| Plugins/apps | This session has installed app/plugin tools exposed by ChatGPT. | Diagnostics list Codex plugin marketplace/install status and structured plugin counts. Explicit install/remove is available through repeated `--codex-plugin-install` / `--codex-plugin-remove` with `--execute`. | Initial approved plugin install set implemented; future connectors one at a time behind reusable authorization. |
+| Document/app-control tools | Available here when connected document sessions expose tools. | Not inherited automatically by `codex exec`. Development-relevant bridges may be added as needed, with read/write capability designed together and writes gated by policy. | Accepted direction in ADR-024; implementation deferred until a concrete development workflow needs it. |
 | Web/search | This runtime may have managed browsing tools. | `--codex-search` invokes `codex --search exec ...` for one explicit Codex CLI run. Default runs omit search. | Implemented as explicit opt-in only. |
 | Images/multimodal input | This runtime can receive images when tools/context allow it. | Repeated `--codex-image PATH` flags forward local images to `codex exec --image PATH`. | Implemented as explicit opt-in image attachments for Codex CLI routes. |
 | Multi-turn resume | This chat preserves conversation state. | Default runs remain ephemeral. `--codex-persist-session` starts a resumable session, and `--codex-resume last|<session-id>` resumes one through Codex CLI. | Implemented as explicit opt-in Codex persistence. |
@@ -414,6 +421,16 @@ are intentionally CLI-first:
    retaining this PowerShell launcher;
 5. build interactive chat as a thin multi-turn interface over that stable
    execution service.
+
+The next parity-specific roadmap is:
+
+1. define model-neutral approval policy presets;
+2. introduce a reusable authorization boundary for Codex/GitHub/app connectors;
+3. add development-relevant tool bridges only as concrete workflows require
+   them;
+4. design read and write capability contracts together, even when writes remain
+   disabled by default;
+5. approve external connectors one at a time.
 
 Chat is deliberately deferred until the CLI has a predictable execution and
 approval contract. Persistent memory, background jobs, web/search integrations,

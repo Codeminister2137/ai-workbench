@@ -114,6 +114,25 @@ Keep separate concepts:
 
 Evolution should be incremental: manual model choice → static rules → capability-aware selector → quota-aware selector → adaptive selector.
 
+## 4.1 Authorization and approval policy
+External user authorization is a shared infrastructure concern, not a per-tool
+implementation detail. GitHub, Codex plugins/apps, cloud deployment targets,
+document/control tools, issue trackers, and similar services should use one
+reusable authorization boundary for sign-in/token discovery, permission
+summaries, diagnostics, and revocation guidance.
+
+Individual tools and adapters should consume that boundary rather than reading
+credentials or managing OAuth/session state independently. Adding a new
+authorized service must explicitly identify what data can be read, what actions
+can be written, what credentials or sessions are used, and what approval policy
+applies.
+
+Approval modes should be model-neutral. Codex is the baseline execution
+experience, but the project-owned policy should also work for Ollama, hosted
+providers, direct provider APIs, and future executors. Tool contracts should
+model read and write capabilities together when writes are foreseeable, even
+when write actions are disabled by default or require a stricter approval mode.
+
 ## 5. Prompt evaluation vs optimization
 A prompt evaluator judges whether a request is adequate and identifies ambiguity/missing context. A prompt optimizer produces improved wording or variants.
 
