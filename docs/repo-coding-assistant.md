@@ -295,9 +295,9 @@ expects search as a top-level flag, so the repository CLI invokes
 
 `--mode diagnose` and `--local-capabilities` include Codex diagnostics when a
 Codex command is discoverable: command path, version, login-status text,
-`exec --json` support, MCP list output, plugin list output, and the relevant
-config path. The report does not read or print auth files, config contents, or
-tokens.
+`exec --json` support, MCP list output, plugin list output, a structured plugin
+summary, and the relevant config path. The report does not read or print auth
+files, config contents, or tokens.
 
 Use `--codex-mcp-setup` to expose this repository's selected local read/search
 tools to Codex through MCP:
@@ -350,7 +350,7 @@ noninteractive command contracts and local executable paths are confirmed.
 | Structured final response | This runtime can constrain some outputs through tool/runtime mechanisms. | `--codex-output-schema` passes an explicit JSON Schema file to `codex exec`. | Implemented as opt-in schema file input. |
 | Approval/sandbox policy | Managed by the active ChatGPT/Codex runtime. | Uses Codex CLI sandbox flags. This installed `codex exec` supports `--json`, `--sandbox`, and `--ephemeral`; `--ask-for-approval` must not be assumed unless local help confirms it. | Partially implemented; human approval parity is a known gap. |
 | MCP tools | Available here through the current managed runtime. | `--codex-mcp-setup` configures a local `repo_assistant_tools` MCP server for read/search repository tools. | Implemented for selected local read/search tools. |
-| Plugins/apps | This session has installed app/plugin tools exposed by ChatGPT. | Diagnostics list Codex plugin marketplace/install status. Installing or authorizing plugins is outside this CLI slice. | Feasible through Codex plugins, separate auth/product decision required. |
+| Plugins/apps | This session has installed app/plugin tools exposed by ChatGPT. | Diagnostics list Codex plugin marketplace/install status and structured plugin counts. Installing or authorizing plugins is outside this CLI slice. | Diagnostics implemented; install/auth remains a separate decision. |
 | Document/app-control tools | Available here when connected document sessions expose tools. | Not inherited automatically by `codex exec`. Would require MCP/plugin equivalents and authorization. | Gap; decision required before design. |
 | Web/search | This runtime may have managed browsing tools. | `--codex-search` invokes `codex --search exec ...` for one explicit Codex CLI run. Default runs omit search. | Implemented as explicit opt-in only. |
 | Images/multimodal input | This runtime can receive images when tools/context allow it. | Codex CLI help exposes image attachment flags, but the repo assistant route currently sends text prompts only. | Feasible later through CLI-layer input design. |

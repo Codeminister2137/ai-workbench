@@ -953,7 +953,15 @@ def test_codex_capability_status_reports_expected_diagnostics(monkeypatch) -> No
             return _EXAMPLE.subprocess.CompletedProcess(
                 joined,
                 0,
-                "PLUGIN STATUS\nlinear@openai-curated not installed\n",
+                "\n".join(
+                    [
+                        "Marketplace `openai-curated`",
+                        "C:\\codex\\marketplace.json",
+                        "PLUGIN                 STATUS         VERSION  PATH",
+                        "linear@openai-curated  not installed           C:\\codex\\plugins\\linear",
+                        "github@openai-curated  installed      1.2.3    C:\\codex\\plugins\\github",
+                    ]
+                ),
                 "",
             )
         raise AssertionError(joined)
@@ -968,6 +976,10 @@ def test_codex_capability_status_reports_expected_diagnostics(monkeypatch) -> No
     assert status["exec_json_supported"] is True
     assert status["mcp_list"]["stdout"] == "No MCP servers configured yet."
     assert "linear@openai-curated" in status["plugin_list"]["stdout"]
+    assert status["plugin_summary"]["marketplaces"] == ["openai-curated"]
+    assert status["plugin_summary"]["available_count"] == 2
+    assert status["plugin_summary"]["installed_count"] == 1
+    assert status["plugin_summary"]["plugins"][0]["status"] == "not installed"
     assert status["config_path"] == "C:\\codex\\config.toml"
 
 

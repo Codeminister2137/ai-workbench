@@ -56,6 +56,54 @@ class ExternalAgentResult:
     events: ExternalAgentEventSummary | None = None
 
 
+@dataclass(frozen=True)
+class CodexPluginInfo:
+    """One plugin listed by the Codex plugin marketplace command."""
+
+    name: str
+    status: str
+    version: str | None
+    path: str | None
+
+
+@dataclass(frozen=True)
+class CodexPluginListSummary:
+    """Structured summary of `codex plugin list` output."""
+
+    marketplaces: tuple[str, ...]
+    plugins: tuple[CodexPluginInfo, ...]
+
+    @property
+    def installed_count(self) -> int:
+        """Return how many listed plugins are currently installed."""
+
+        return sum(1 for plugin in self.plugins if plugin.status == "installed")
+
+    @property
+    def available_count(self) -> int:
+        """Return how many plugins were listed in configured marketplaces."""
+
+        return len(self.plugins)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return a JSON-friendly representation."""
+
+        return {
+            "marketplaces": list(self.marketplaces),
+            "available_count": self.available_count,
+            "installed_count": self.installed_count,
+            "plugins": [
+                {
+                    "name": plugin.name,
+                    "status": plugin.status,
+                    "version": plugin.version,
+                    "path": plugin.path,
+                }
+                for plugin in self.plugins
+            ],
+        }
+
+
 def is_external_agent_access_method(access_method: AccessMethod) -> bool:
     """Return whether an access method uses an external coding-agent client."""
 
@@ -180,6 +228,7 @@ def codex_capability_status(command: str | None) -> dict[str, Any]:
             "config_path": codex_config_path(command),
             "mcp_list": None,
             "plugin_list": None,
+            "plugin_summary": None,
         }
 
     version = run_diagnostic_command(command, "--version")
@@ -196,6 +245,9 @@ def codex_capability_status(command: str | None) -> dict[str, Any]:
         "config_path": codex_config_path(command),
         "mcp_list": diagnostic_text_result(mcp_list),
         "plugin_list": diagnostic_text_result(plugin_list),
+        "plugin_summary": parse_codex_plugin_list(plugin_list["stdout"]).to_dict()
+        if plugin_list["ok"]
+        else None,
     }
 
 
@@ -208,6 +260,49 @@ def diagnostic_text_result(result: dict[str, Any]) -> dict[str, Any]:
         "stdout": result["stdout"],
         "stderr": result["stderr"],
     }
+
+
+def parse_codex_plugin_list(text: str) -> CodexPluginListSummary:
+    """Parse the table-like output from `codex plugin list`."""
+
+    marketplaces: list[str] = []
+    plugins: list[CodexPluginInfo] = []
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        if line.startswith("Marketplace `") and line.endswith("`"):
+            marketplaces.append(line.removeprefix("Marketplace `").removesuffix("`"))
+            continue
+        if (
+            line.startswith("PLUGIN ")
+            or line.startswith("PATH")
+            or line.endswith("marketplace.json")
+        ):
+            continue
+        if "@" not in line:
+            continue
+        plugin = _parse_codex_plugin_row(line)
+        if plugin is not None:
+            plugins.append(plugin)
+    return CodexPluginListSummary(marketplaces=tuple(marketplaces), plugins=tuple(plugins))
+
+
+def _parse_codex_plugin_row(line: str) -> CodexPluginInfo | None:
+    parts = line.split()
+    if len(parts) < 3 or "@" not in parts[0]:
+        return None
+    name = parts[0]
+    if parts[1] == "not" and len(parts) >= 4 and parts[2] == "installed":
+        status = "not installed"
+        version = None
+        path = " ".join(parts[3:]) or None
+        return CodexPluginInfo(name=name, status=status, version=version, path=path)
+
+    status = parts[1]
+    version = parts[2] if len(parts) >= 3 and parts[2] != "-" else None
+    path = " ".join(parts[3:]) if len(parts) > 3 else None
+    return CodexPluginInfo(name=name, status=status, version=version, path=path)
 
 
 def external_agent_config_from_orchestration(

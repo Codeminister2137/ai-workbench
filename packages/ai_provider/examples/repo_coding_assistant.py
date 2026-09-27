@@ -485,6 +485,7 @@ def _codex_capability_status(command: str | None) -> dict[str, Any]:
             "config_path": _codex_config_path(command),
             "mcp_list": None,
             "plugin_list": None,
+            "plugin_summary": None,
         }
 
     version = _run_diagnostic_command(command, "--version")
@@ -501,6 +502,9 @@ def _codex_capability_status(command: str | None) -> dict[str, Any]:
         "config_path": _codex_config_path(command),
         "mcp_list": _diagnostic_text_result(mcp_list),
         "plugin_list": _diagnostic_text_result(plugin_list),
+        "plugin_summary": _parse_codex_plugin_list(plugin_list["stdout"])
+        if plugin_list["ok"]
+        else None,
     }
 
 
@@ -512,6 +516,57 @@ def _diagnostic_text_result(result: dict[str, Any]) -> dict[str, Any]:
         "returncode": result["returncode"],
         "stdout": result["stdout"],
         "stderr": result["stderr"],
+    }
+
+
+def _parse_codex_plugin_list(text: str) -> dict[str, Any]:
+    """Parse the table-like output from `codex plugin list`."""
+
+    marketplaces: list[str] = []
+    plugins: list[dict[str, str | None]] = []
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        if line.startswith("Marketplace `") and line.endswith("`"):
+            marketplaces.append(line.removeprefix("Marketplace `").removesuffix("`"))
+            continue
+        if (
+            line.startswith("PLUGIN ")
+            or line.startswith("PATH")
+            or line.endswith("marketplace.json")
+        ):
+            continue
+        if "@" not in line:
+            continue
+        plugin = _parse_codex_plugin_row(line)
+        if plugin is not None:
+            plugins.append(plugin)
+    return {
+        "marketplaces": marketplaces,
+        "available_count": len(plugins),
+        "installed_count": sum(1 for plugin in plugins if plugin["status"] == "installed"),
+        "plugins": plugins,
+    }
+
+
+def _parse_codex_plugin_row(line: str) -> dict[str, str | None] | None:
+    parts = line.split()
+    if len(parts) < 3 or "@" not in parts[0]:
+        return None
+    name = parts[0]
+    if parts[1] == "not" and len(parts) >= 4 and parts[2] == "installed":
+        return {
+            "name": name,
+            "status": "not installed",
+            "version": None,
+            "path": " ".join(parts[3:]) or None,
+        }
+    return {
+        "name": name,
+        "status": parts[1],
+        "version": parts[2] if parts[2] != "-" else None,
+        "path": " ".join(parts[3:]) if len(parts) > 3 else None,
     }
 
 

@@ -4,6 +4,7 @@ from ai_orchestrator import AccessMethod
 from ai_provider.external_agents import (
     ExternalAgentConfig,
     build_external_agent_command,
+    parse_codex_plugin_list,
     parse_external_agent_jsonl,
 )
 
@@ -53,3 +54,28 @@ def test_parse_external_agent_jsonl_counts_web_search_events() -> None:
 
     assert len(events.web_search_events) == 2
     assert events.final_answer == "done"
+
+
+def test_parse_codex_plugin_list_summarizes_marketplace_rows() -> None:
+    summary = parse_codex_plugin_list(
+        "\n".join(
+            [
+                "Marketplace `openai-curated`",
+                "C:\\codex\\.tmp\\plugins\\.agents\\plugins\\marketplace.json",
+                "",
+                "PLUGIN                 STATUS         VERSION  PATH",
+                "linear@openai-curated  not installed           C:\\codex\\plugins\\linear",
+                "github@openai-curated  installed      1.2.3    C:\\codex\\plugins\\github",
+            ]
+        )
+    )
+
+    assert summary.marketplaces == ("openai-curated",)
+    assert summary.available_count == 2
+    assert summary.installed_count == 1
+    assert summary.plugins[0].name == "linear@openai-curated"
+    assert summary.plugins[0].status == "not installed"
+    assert summary.plugins[0].version is None
+    assert summary.plugins[1].name == "github@openai-curated"
+    assert summary.plugins[1].status == "installed"
+    assert summary.plugins[1].version == "1.2.3"
