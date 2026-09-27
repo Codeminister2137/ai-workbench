@@ -794,6 +794,17 @@ def test_external_agent_stderr_is_bounded() -> None:
     assert len(stderr) < 200
 
 
+def test_external_agent_failure_hint_explains_codex_unauthorized() -> None:
+    hint = _EXAMPLE._external_agent_failure_hint(
+        "unexpected status 401 Unauthorized: Missing bearer or basic authentication "
+        "in header, url: https://api.openai.com/v1/responses"
+    )
+
+    assert hint is not None
+    assert "Codex CLI reached OpenAI" in hint
+    assert "CODEX_COMMAND" in hint
+
+
 def test_cli_preserves_raw_codex_jsonl_in_transcript_only(
     tmp_path: Path,
     capsys,

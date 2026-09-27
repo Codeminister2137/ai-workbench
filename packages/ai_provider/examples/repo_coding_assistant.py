@@ -2214,8 +2214,30 @@ def _print_external_agent_event_summary(events: ExternalAgentEventSummary) -> No
         print("external_agent_usage_json: " + json.dumps(events.usage, sort_keys=True))
     if events.failure_reason is not None:
         print(f"external_agent_failure_reason: {events.failure_reason}")
+        hint = _external_agent_failure_hint(events.failure_reason)
+        if hint is not None:
+            print(f"external_agent_failure_hint: {hint}")
     if events.parse_errors:
         print("external_agent_jsonl_parse_errors_json: " + json.dumps(list(events.parse_errors)))
+
+
+def _external_agent_failure_hint(failure_reason: str) -> str | None:
+    """Return an actionable hint for known external-agent failure modes."""
+
+    normalized = failure_reason.lower()
+    if "401" in normalized and "unauthorized" in normalized and "api.openai.com" in normalized:
+        return (
+            "Codex CLI reached OpenAI but its local ChatGPT/API session was rejected. "
+            "Run `codex login status`, then refresh the local Codex login if needed. "
+            "If using the PyCharm-bundled Codex CLI, re-authenticate through PyCharm/Codex "
+            "or set CODEX_COMMAND to a separately authenticated Codex CLI."
+        )
+    if "missing bearer or basic authentication" in normalized:
+        return (
+            "The external agent did not send usable authentication. Refresh that agent's "
+            "local login/session or configure the intended command override."
+        )
+    return None
 
 
 def _write_external_agent_raw_jsonl(raw_jsonl: str) -> None:

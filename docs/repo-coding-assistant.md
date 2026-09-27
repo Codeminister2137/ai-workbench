@@ -458,6 +458,15 @@ The PyCharm-bundled Codex CLI verified in this repository is `codex-cli
 ChatGPT sign-in, while `gpt-5.1` returned an upstream invalid-request error for
 this account. Keep both facts in mind when selecting routes.
 
+If a Codex CLI run fails with `401 Unauthorized` or `Missing bearer or basic
+authentication`, the repo assistant reached the Codex executable but Codex's
+local session was rejected by OpenAI. This is different from missing
+`OPENAI_API_KEY`: Codex CLI routes normally use the Codex/ChatGPT login, not
+the repository `.env` API key. Run Codex login diagnostics, refresh the local
+Codex login through the CLI or PyCharm/Codex, or set `CODEX_COMMAND` to a
+separately authenticated Codex CLI. Until that is fixed, use local Ollama or a
+direct hosted provider route with the relevant API key.
+
 This is not full parity with the Codex IDE/ChatGPT environment: app/plugin
 tools, document-control tools, IDE-private state, and this chat's managed
 approval surface are not automatically available through `codex exec`.
