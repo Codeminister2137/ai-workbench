@@ -67,6 +67,12 @@ from ai_provider import (
 )
 from ai_provider import PrivacyClass as ProviderPrivacyClass
 from ai_provider.codex_mcp import setup_project_codex_mcp
+from ai_provider.external_agents import (
+    build_codex_plugin_command,
+    codex_plugin_status_by_name,
+    parse_codex_plugin_list,
+    run_codex_plugin_operation,
+)
 
 from coding_assist import coding_task_profile, run_coding_prompt
 
@@ -545,7 +551,9 @@ def _parse_codex_plugin_list(text: str) -> dict[str, Any]:
     return {
         "marketplaces": marketplaces,
         "available_count": len(plugins),
-        "installed_count": sum(1 for plugin in plugins if plugin["status"] == "installed"),
+        "installed_count": sum(
+            1 for plugin in plugins if str(plugin["status"]).startswith("installed")
+        ),
         "plugins": plugins,
     }
 
@@ -561,6 +569,13 @@ def _parse_codex_plugin_row(line: str) -> dict[str, str | None] | None:
             "status": "not installed",
             "version": None,
             "path": " ".join(parts[3:]) or None,
+        }
+    if parts[1].startswith("installed") and len(parts) >= 5 and parts[2] == "enabled":
+        return {
+            "name": name,
+            "status": "installed, enabled",
+            "version": parts[3] if parts[3] != "-" else None,
+            "path": " ".join(parts[4:]) or None,
         }
     return {
         "name": name,
@@ -1502,6 +1517,26 @@ def main(argv: Sequence[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
+        "--codex-plugin-install",
+        action="append",
+        default=[],
+        metavar="PLUGIN@MARKETPLACE",
+        help=(
+            "Install one exact Codex plugin selector through `codex plugin add`. "
+            "May be repeated. Requires --execute and does not authorize external services."
+        ),
+    )
+    parser.add_argument(
+        "--codex-plugin-remove",
+        action="append",
+        default=[],
+        metavar="PLUGIN@MARKETPLACE",
+        help=(
+            "Remove one exact Codex plugin selector through `codex plugin remove`. "
+            "May be repeated. Requires --execute."
+        ),
+    )
+    parser.add_argument(
         "--scrutinize-response",
         action="store_true",
         help=(
@@ -1542,6 +1577,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     repo_root = (args.repo_root or find_repo_root(Path.cwd())).resolve()
+    if args.codex_plugin_install or args.codex_plugin_remove:
+        return _run_codex_plugin_management(args=args, repo_root=repo_root, parser=parser)
     if args.codex_mcp_setup:
         try:
             result = setup_project_codex_mcp(
@@ -1890,6 +1927,104 @@ def main(argv: Sequence[str] | None = None) -> int:
     if close_transcript_func is not None:
         close_transcript_func()
     return 0
+
+
+def _run_codex_plugin_management(
+    *,
+    args: argparse.Namespace,
+    repo_root: Path,
+    parser: argparse.ArgumentParser,
+) -> int:
+    """Run explicit Codex plugin install/remove operations."""
+
+    if not args.execute:
+        parser.error("--codex-plugin-install/--codex-plugin-remove require --execute")
+    if args.prompt:
+        parser.error("plugin management cannot be combined with a prompt request")
+    command = _external_agent_command(AccessMethod.CODEX_CLI)
+    if command is None:
+        print("=== Codex plugin management ===")
+        print(f"repo_root: {repo_root}")
+        print("codex_plugin_status: failed")
+        print("failure_reason: Could not find Codex CLI. Set CODEX_COMMAND or install Codex CLI.")
+        return 1
+
+    operations: list[tuple[str, str]] = [
+        *[("add", selector) for selector in args.codex_plugin_install],
+        *[("remove", selector) for selector in args.codex_plugin_remove],
+    ]
+    try:
+        planned_commands = [
+            build_codex_plugin_command(command, action, selector) for action, selector in operations
+        ]
+    except ValueError as exc:
+        parser.error(str(exc))
+
+    print("=== Codex plugin management ===")
+    print(f"repo_root: {repo_root}")
+    print(f"codex_command: {command}")
+    print("codex_plugin_auth_boundary: install/remove only; no OAuth or service authorization")
+    before = _run_diagnostic_command(command, "plugin", "list", timeout_seconds=10.0)
+    print("codex_plugin_before_ok: " + str(before["ok"]))
+    if before["stdout"]:
+        print("codex_plugin_before_stdout:")
+        print(before["stdout"])
+    if before["stderr"]:
+        print("codex_plugin_before_stderr:")
+        print(before["stderr"])
+
+    all_ok = True
+    for planned_command, (action, selector) in zip(planned_commands, operations, strict=True):
+        print(f"codex_plugin_operation: {action} {selector}")
+        print("codex_plugin_command_line_json: " + json.dumps(list(planned_command)))
+        try:
+            result = run_codex_plugin_operation(
+                command,
+                action=action,
+                selector=selector,
+                timeout_seconds=args.timeout_seconds,
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            print("codex_plugin_result_ok: False")
+            print(f"codex_plugin_result_error: {exc}")
+            all_ok = False
+            continue
+        print(f"codex_plugin_result_ok: {result.ok}")
+        print(f"codex_plugin_result_returncode: {result.returncode}")
+        if result.stdout:
+            print("codex_plugin_result_stdout:")
+            print(result.stdout)
+        if result.stderr:
+            print("codex_plugin_result_stderr:")
+            print(result.stderr)
+        all_ok = all_ok and result.ok
+
+    after = _run_diagnostic_command(command, "plugin", "list", timeout_seconds=10.0)
+    print("codex_plugin_after_ok: " + str(after["ok"]))
+    if after["stdout"]:
+        print("codex_plugin_after_stdout:")
+        print(after["stdout"])
+    if after["stderr"]:
+        print("codex_plugin_after_stderr:")
+        print(after["stderr"])
+    if after["ok"]:
+        expected_selectors = tuple(selector for _, selector in operations)
+        expected_status = codex_plugin_status_by_name(
+            parse_codex_plugin_list(after["stdout"]),
+            expected_selectors,
+        )
+        print("codex_plugin_expected_status_json: " + json.dumps(expected_status, sort_keys=True))
+        for action, selector in operations:
+            status = expected_status[selector]["status"] or ""
+            if action == "add" and not status.startswith("installed"):
+                all_ok = False
+            if action == "remove" and status.startswith("installed"):
+                all_ok = False
+    print(
+        "codex_plugin_next_step: start a new Codex CLI session before using installed skills/tools"
+    )
+    print(f"execution_status: {'completed' if all_ok else 'failed'}")
+    return 0 if all_ok else 1
 
 
 def _run_external_agent_cli_mode(

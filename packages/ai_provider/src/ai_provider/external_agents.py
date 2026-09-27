@@ -77,7 +77,7 @@ class CodexPluginListSummary:
     def installed_count(self) -> int:
         """Return how many listed plugins are currently installed."""
 
-        return sum(1 for plugin in self.plugins if plugin.status == "installed")
+        return sum(1 for plugin in self.plugins if plugin.status.startswith("installed"))
 
     @property
     def available_count(self) -> int:
@@ -101,6 +101,37 @@ class CodexPluginListSummary:
                 }
                 for plugin in self.plugins
             ],
+        }
+
+
+@dataclass(frozen=True)
+class CodexPluginOperationResult:
+    """Result of one explicit Codex plugin install or removal command."""
+
+    selector: str
+    action: str
+    command: tuple[str, ...]
+    returncode: int
+    stdout: str
+    stderr: str
+
+    @property
+    def ok(self) -> bool:
+        """Return whether the Codex plugin command completed successfully."""
+
+        return self.returncode == 0
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return a JSON-friendly representation."""
+
+        return {
+            "selector": self.selector,
+            "action": self.action,
+            "command": list(self.command),
+            "ok": self.ok,
+            "returncode": self.returncode,
+            "stdout": self.stdout,
+            "stderr": self.stderr,
         }
 
 
@@ -262,6 +293,61 @@ def diagnostic_text_result(result: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def validate_codex_plugin_selector(selector: str) -> None:
+    """Validate the exact PLUGIN@MARKETPLACE selector expected by Codex CLI."""
+
+    if not selector or selector.strip() != selector:
+        raise ValueError("plugin selector must be non-empty and contain no surrounding space")
+    if selector.count("@") != 1:
+        raise ValueError("plugin selector must use the exact PLUGIN@MARKETPLACE form")
+    plugin, marketplace = selector.split("@", maxsplit=1)
+    if not plugin or not marketplace:
+        raise ValueError("plugin selector must include both plugin and marketplace")
+    allowed = set("abcdefghijklmnopqrstuvwxyz0123456789-_.")
+    if any(char not in allowed for char in plugin) or any(
+        char not in allowed for char in marketplace
+    ):
+        raise ValueError(
+            "plugin selector may contain only lowercase letters, digits, hyphen, underscore, or dot"
+        )
+
+
+def build_codex_plugin_command(command: str, action: str, selector: str) -> tuple[str, ...]:
+    """Build a Codex plugin add/remove command for an exact selector."""
+
+    validate_codex_plugin_selector(selector)
+    if action not in {"add", "remove"}:
+        raise ValueError("plugin action must be 'add' or 'remove'")
+    return (command, "plugin", action, selector)
+
+
+def run_codex_plugin_operation(
+    command: str,
+    *,
+    action: str,
+    selector: str,
+    timeout_seconds: float = 60.0,
+    runner: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
+) -> CodexPluginOperationResult:
+    """Run one explicit Codex plugin add/remove command."""
+
+    plugin_command = build_codex_plugin_command(command, action, selector)
+    completed = runner(
+        plugin_command,
+        text=True,
+        capture_output=True,
+        timeout=timeout_seconds,
+    )
+    return CodexPluginOperationResult(
+        selector=selector,
+        action=action,
+        command=plugin_command,
+        returncode=completed.returncode,
+        stdout=(completed.stdout or "").strip(),
+        stderr=(completed.stderr or "").strip(),
+    )
+
+
 def parse_codex_plugin_list(text: str) -> CodexPluginListSummary:
     """Parse the table-like output from `codex plugin list`."""
 
@@ -288,6 +374,32 @@ def parse_codex_plugin_list(text: str) -> CodexPluginListSummary:
     return CodexPluginListSummary(marketplaces=tuple(marketplaces), plugins=tuple(plugins))
 
 
+def codex_plugin_status_by_name(
+    summary: CodexPluginListSummary,
+    selectors: tuple[str, ...],
+) -> dict[str, dict[str, str | None]]:
+    """Return status details for requested plugin selectors from a parsed list."""
+
+    by_name = {plugin.name: plugin for plugin in summary.plugins}
+    result: dict[str, dict[str, str | None]] = {}
+    for selector in selectors:
+        plugin = by_name.get(selector)
+        result[selector] = (
+            {
+                "status": plugin.status,
+                "version": plugin.version,
+                "path": plugin.path,
+            }
+            if plugin is not None
+            else {
+                "status": "missing_from_plugin_list",
+                "version": None,
+                "path": None,
+            }
+        )
+    return result
+
+
 def _parse_codex_plugin_row(line: str) -> CodexPluginInfo | None:
     parts = line.split()
     if len(parts) < 3 or "@" not in parts[0]:
@@ -297,6 +409,11 @@ def _parse_codex_plugin_row(line: str) -> CodexPluginInfo | None:
         status = "not installed"
         version = None
         path = " ".join(parts[3:]) or None
+        return CodexPluginInfo(name=name, status=status, version=version, path=path)
+    if parts[1].startswith("installed") and len(parts) >= 5 and parts[2] == "enabled":
+        status = "installed, enabled"
+        version = parts[3] if parts[3] != "-" else None
+        path = " ".join(parts[4:]) or None
         return CodexPluginInfo(name=name, status=status, version=version, path=path)
 
     status = parts[1]

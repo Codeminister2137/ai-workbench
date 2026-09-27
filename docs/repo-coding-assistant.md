@@ -299,6 +299,46 @@ Codex command is discoverable: command path, version, login-status text,
 summary, and the relevant config path. The report does not read or print auth
 files, config contents, or tokens.
 
+Use `--codex-plugin-install PLUGIN@MARKETPLACE --execute` to explicitly install
+one or more Codex plugins through `codex plugin add`. The flag may be repeated:
+
+```powershell
+python -m uv run ai-assistant `
+  --codex-plugin-install openai-developers@openai-curated `
+  --codex-plugin-install codex-security@openai-curated `
+  --execute
+```
+
+Use `--codex-plugin-remove PLUGIN@MARKETPLACE --execute` to explicitly remove
+installed plugins through `codex plugin remove`. Plugin management cannot be
+combined with a prompt request. The CLI reports before/after `codex plugin list`
+output, prints the exact command for every operation, and emits
+`codex_plugin_expected_status_json` for the requested selectors. Install runs
+fail when a requested plugin is not installed in the parsed after-list; removal
+runs fail when a requested plugin still appears installed.
+
+The plugin command only installs or removes local Codex plugin bundles. It does
+not authorize external services, complete OAuth, approve app permissions, enable
+write actions in connected services, or import/sync marketplaces. Review any
+plugin apps, MCP servers, and hooks separately, then start a new Codex CLI
+session before relying on newly installed skills or tools.
+
+For plugin parity checks, treat parsed `codex plugin list` / `codex mcp list`
+output as the source of truth. A live Codex model response may self-report
+plugin visibility, but that is weaker evidence and can be misleading when the
+prompt asks about the runtime's own tools or skills.
+
+Initial approved Codex plugin set for this repository:
+
+- `openai-developers@openai-curated`
+- `codex-security@openai-curated`
+- `superpowers@openai-curated`
+- `plugin-eval@openai-curated`
+- `build-web-apps@openai-curated`
+
+See `docs/codex-plugin-review.md` for the point-in-time review of deferred
+plugins and why they were not installed in the first batch.
+
 Use `--codex-mcp-setup` to expose this repository's selected local read/search
 tools to Codex through MCP:
 
@@ -350,7 +390,7 @@ noninteractive command contracts and local executable paths are confirmed.
 | Structured final response | This runtime can constrain some outputs through tool/runtime mechanisms. | `--codex-output-schema` passes an explicit JSON Schema file to `codex exec`. | Implemented as opt-in schema file input. |
 | Approval/sandbox policy | Managed by the active ChatGPT/Codex runtime. | Uses Codex CLI sandbox flags. This installed `codex exec` supports `--json`, `--sandbox`, and `--ephemeral`; `--ask-for-approval` must not be assumed unless local help confirms it. | Partially implemented; human approval parity is a known gap. |
 | MCP tools | Available here through the current managed runtime. | `--codex-mcp-setup` configures a local `repo_assistant_tools` MCP server for read/search repository tools. | Implemented for selected local read/search tools. |
-| Plugins/apps | This session has installed app/plugin tools exposed by ChatGPT. | Diagnostics list Codex plugin marketplace/install status and structured plugin counts. Installing or authorizing plugins is outside this CLI slice. | Diagnostics implemented; install/auth remains a separate decision. |
+| Plugins/apps | This session has installed app/plugin tools exposed by ChatGPT. | Diagnostics list Codex plugin marketplace/install status and structured plugin counts. Explicit install/remove is available through repeated `--codex-plugin-install` / `--codex-plugin-remove` with `--execute`. | Initial approved plugin install set implemented; external-service auth and permissions remain separate decisions. |
 | Document/app-control tools | Available here when connected document sessions expose tools. | Not inherited automatically by `codex exec`. Would require MCP/plugin equivalents and authorization. | Gap; decision required before design. |
 | Web/search | This runtime may have managed browsing tools. | `--codex-search` invokes `codex --search exec ...` for one explicit Codex CLI run. Default runs omit search. | Implemented as explicit opt-in only. |
 | Images/multimodal input | This runtime can receive images when tools/context allow it. | Codex CLI help exposes image attachment flags, but the repo assistant route currently sends text prompts only. | Feasible later through CLI-layer input design. |

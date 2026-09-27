@@ -3,9 +3,12 @@ from pathlib import Path
 from ai_orchestrator import AccessMethod
 from ai_provider.external_agents import (
     ExternalAgentConfig,
+    build_codex_plugin_command,
     build_external_agent_command,
+    codex_plugin_status_by_name,
     parse_codex_plugin_list,
     parse_external_agent_jsonl,
+    validate_codex_plugin_selector,
 )
 
 
@@ -65,7 +68,7 @@ def test_parse_codex_plugin_list_summarizes_marketplace_rows() -> None:
                 "",
                 "PLUGIN                 STATUS         VERSION  PATH",
                 "linear@openai-curated  not installed           C:\\codex\\plugins\\linear",
-                "github@openai-curated  installed      1.2.3    C:\\codex\\plugins\\github",
+                "github@openai-curated  installed, enabled  1.2.3    C:\\codex\\plugins\\github",
             ]
         )
     )
@@ -77,5 +80,40 @@ def test_parse_codex_plugin_list_summarizes_marketplace_rows() -> None:
     assert summary.plugins[0].status == "not installed"
     assert summary.plugins[0].version is None
     assert summary.plugins[1].name == "github@openai-curated"
-    assert summary.plugins[1].status == "installed"
+    assert summary.plugins[1].status == "installed, enabled"
     assert summary.plugins[1].version == "1.2.3"
+
+
+def test_build_codex_plugin_command_requires_exact_selector() -> None:
+    command = build_codex_plugin_command("codex", "add", "github@openai-curated")
+
+    assert command == ("codex", "plugin", "add", "github@openai-curated")
+
+
+def test_validate_codex_plugin_selector_rejects_missing_marketplace() -> None:
+    try:
+        validate_codex_plugin_selector("github")
+    except ValueError as exc:
+        assert "PLUGIN@MARKETPLACE" in str(exc)
+    else:  # pragma: no cover - defensive assertion
+        raise AssertionError("selector without marketplace should fail")
+
+
+def test_codex_plugin_status_by_name_reports_requested_selectors() -> None:
+    summary = parse_codex_plugin_list(
+        "\n".join(
+            [
+                "Marketplace `openai-curated`",
+                "PLUGIN                 STATUS         VERSION  PATH",
+                "github@openai-curated  installed, enabled  1.2.3    C:\\codex\\plugins\\github",
+            ]
+        )
+    )
+
+    status = codex_plugin_status_by_name(
+        summary,
+        ("github@openai-curated", "missing@openai-curated"),
+    )
+
+    assert status["github@openai-curated"]["status"] == "installed, enabled"
+    assert status["missing@openai-curated"]["status"] == "missing_from_plugin_list"

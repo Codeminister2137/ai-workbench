@@ -4,6 +4,7 @@ import importlib.util
 import sys
 from io import StringIO
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -959,7 +960,8 @@ def test_codex_capability_status_reports_expected_diagnostics(monkeypatch) -> No
                         "C:\\codex\\marketplace.json",
                         "PLUGIN                 STATUS         VERSION  PATH",
                         "linear@openai-curated  not installed           C:\\codex\\plugins\\linear",
-                        "github@openai-curated  installed      1.2.3    C:\\codex\\plugins\\github",
+                        "github@openai-curated  installed, enabled  1.2.3    "
+                        "C:\\codex\\plugins\\github",
                     ]
                 ),
                 "",
@@ -980,7 +982,79 @@ def test_codex_capability_status_reports_expected_diagnostics(monkeypatch) -> No
     assert status["plugin_summary"]["available_count"] == 2
     assert status["plugin_summary"]["installed_count"] == 1
     assert status["plugin_summary"]["plugins"][0]["status"] == "not installed"
+    assert status["plugin_summary"]["plugins"][1]["status"] == "installed, enabled"
     assert status["config_path"] == "C:\\codex\\config.toml"
+
+
+def test_cli_can_install_codex_plugins_when_explicitly_executed(
+    capsys,
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    calls: list[tuple[str, ...]] = []
+    plugin_installed = False
+
+    def fake_run(command, *args, **kwargs):
+        nonlocal plugin_installed
+        joined = tuple(command)
+        calls.append(joined)
+        if joined[1:] == ("plugin", "list"):
+            row = (
+                "github@openai-curated  installed, enabled  1.2.3    C:\\codex\\plugins\\github"
+                if plugin_installed
+                else "github@openai-curated  not installed           C:\\codex\\plugins\\github"
+            )
+            return _EXAMPLE.subprocess.CompletedProcess(
+                joined,
+                0,
+                "\n".join(
+                    [
+                        "Marketplace `openai-curated`",
+                        "C:\\codex\\marketplace.json",
+                        "PLUGIN                 STATUS         VERSION  PATH",
+                        row,
+                    ]
+                ),
+                "",
+            )
+        if joined[1:] == ("plugin", "add", "github@openai-curated"):
+            return _EXAMPLE.subprocess.CompletedProcess(joined, 0, "installed\n", "")
+        raise AssertionError(joined)
+
+    monkeypatch.setenv("CODEX_COMMAND", "codex")
+    monkeypatch.setattr(_EXAMPLE.subprocess, "run", fake_run)
+
+    def fake_plugin_operation(command, *, action, selector, timeout_seconds=60.0):
+        nonlocal plugin_installed
+        plugin_command = (command, "plugin", action, selector)
+        calls.append(plugin_command)
+        plugin_installed = action == "add"
+        return SimpleNamespace(
+            ok=True,
+            returncode=0,
+            stdout="installed",
+            stderr="",
+        )
+
+    monkeypatch.setattr(_EXAMPLE, "run_codex_plugin_operation", fake_plugin_operation)
+
+    exit_code = main(
+        [
+            "--repo-root",
+            str(tmp_path),
+            "--codex-plugin-install",
+            "github@openai-curated",
+            "--execute",
+        ]
+    )
+
+    output = capsys.readouterr().out
+    assert exit_code == 0
+    assert ("codex", "plugin", "add", "github@openai-curated") in calls
+    assert "codex_plugin_auth_boundary: install/remove only; no OAuth" in output
+    assert "codex_plugin_expected_status_json:" in output
+    assert "codex_plugin_next_step: start a new Codex CLI session" in output
+    assert "execution_status: completed" in output
 
 
 def test_cli_can_scrutinize_completed_response(capsys, monkeypatch) -> None:
