@@ -861,8 +861,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     for context_file in context_files:
         print(f"context: {context_file.display_path}")
-    print(f"status: {result.orchestration.status.value}")
-    print(f"delegation: {delegation_status}")
+    final_status = result.orchestration.status.value
     execution_status = "planned"
     if result.orchestration.prompt_judge and result.orchestration.prompt_judge.should_refine:
         for issue in result.orchestration.prompt_judge.issues:
@@ -891,16 +890,38 @@ def main(argv: Sequence[str] | None = None) -> int:
     print("\n=== Assistant response ===")
     assistant_response_text = None
     if args.native_tools and args.execute and result.config is not None:
-        native_result = _run_native_agent(
-            prompt,
-            result.config,
-            profile,
-            args,
-            repo_root,
-            progress_callback=print,
-        )
+        try:
+            native_result = _run_native_agent(
+                prompt,
+                result.config,
+                profile,
+                args,
+                repo_root,
+                progress_callback=print,
+            )
+        except ProviderError as exc:
+            print(f"failure_reason: {exc}")
+            final_status = "failed"
+            execution_status = "failed"
+            print(f"status: {final_status}")
+            print(f"delegation: {delegation_status}")
+            print(f"execution_status: {execution_status}")
+            _print_run_metrics(
+                metrics,
+                primary_elapsed_seconds=primary_elapsed_seconds,
+                primary_response=result.response,
+                scrutiny_elapsed_seconds=None,
+                scrutiny_response=None,
+            )
+            if close_transcript_func is not None:
+                close_transcript_func()
+            return 1
         assistant_response_text = native_result.response.message.content
         print(assistant_response_text)
+        delegation_status = _delegation_status_after_native_tools(
+            delegation_status,
+            native_result.tool_results,
+        )
         execution_status = (
             "completed_with_tool_errors"
             if any(item.is_error for item in native_result.tool_results)
@@ -929,6 +950,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         if result.orchestration.prompt_judge.refined_prompt:
             print(f"suggested_prompt: {result.orchestration.prompt_judge.refined_prompt}")
     if result.orchestration.failure_reason:
+        final_status = "failed"
         execution_status = "failed"
     scrutiny_result = None
     scrutiny_elapsed_seconds = None
@@ -994,6 +1016,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                     )
         if scrutiny_failed and execution_status == "completed":
             execution_status = "completed_with_scrutiny_errors"
+    print(f"status: {final_status}")
+    print(f"delegation: {delegation_status}")
     print(f"execution_status: {execution_status}")
     _print_run_metrics(
         metrics,
@@ -1642,6 +1666,25 @@ def _activity_preview(value: str, *, limit: int = 160) -> str:
     if len(preview) <= limit:
         return preview
     return preview[: max(0, limit - 15)].rstrip() + " ...[truncated]"
+
+
+def _delegation_status_after_native_tools(
+    current_status: str,
+    tool_results: Sequence[ToolResult],
+) -> str:
+    """Reflect native delegate-tool usage in the final CLI delegation status."""
+
+    delegated_results = [result for result in tool_results if result.name == "delegate_task"]
+    if not delegated_results:
+        return current_status
+    native_status = (
+        "failed: native delegate_task"
+        if any(result.is_error for result in delegated_results)
+        else "completed: native delegate_task"
+    )
+    if current_status == "disabled":
+        return native_status
+    return f"{current_status}; {native_status}"
 
 
 def _run_action_loop(

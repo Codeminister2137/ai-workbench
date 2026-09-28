@@ -1874,6 +1874,54 @@ def test_stable_cli_reports_provider_failures(capsys, monkeypatch) -> None:
     assert "execution_status: failed" in output
 
 
+def test_native_agent_provider_failure_reports_failed_status(capsys, monkeypatch) -> None:
+    from dataclasses import replace
+
+    from ai_provider import ProviderError
+
+    catalog = _EXAMPLE.load_model_catalog(
+        Path("packages/ai_orchestrator/examples/model_catalog.toml")
+    )
+    prepared = _EXAMPLE.run_coding_prompt(
+        "Create a helper.",
+        _EXAMPLE.coding_task_profile(model_override="qwen2.5-coder:14b"),
+        catalog,
+    )
+    prepared = replace(
+        prepared,
+        response=None,
+        config=_EXAMPLE.BackendConfig(provider=_EXAMPLE.ProviderKind.OLLAMA, model="test"),
+    )
+
+    def fail_native_agent(*args, **kwargs):
+        raise ProviderError("native provider unavailable")
+
+    monkeypatch.setattr(_EXAMPLE, "run_coding_prompt", lambda *args, **kwargs: prepared)
+    monkeypatch.setattr(_EXAMPLE, "_run_native_agent", fail_native_agent)
+
+    assert (
+        main(
+            [
+                "--mode",
+                "implement",
+                "Create a helper.",
+                "--provider",
+                "ollama",
+                "--model",
+                "qwen2.5-coder:14b",
+                "--execute",
+            ]
+        )
+        == 1
+    )
+
+    output = capsys.readouterr().out
+    assert "failure_reason: native provider unavailable" in output
+    assert "status: failed" in output
+    assert "delegation: disabled" in output
+    assert "execution_status: failed" in output
+
+
 class _NativeFakeClient:
     def __init__(self) -> None:
         from ai_provider import BackendInfo, BackendLocation
@@ -1974,7 +2022,7 @@ def test_implement_mode_defaults_to_native_tools(capsys, monkeypatch) -> None:
             message=AIMessage(MessageRole.ASSISTANT, "native done"),
             backend=BackendInfo("ollama", "test", BackendLocation.LOCAL),
         ),
-        tool_results=(),
+        tool_results=(SimpleNamespace(name="delegate_task", is_error=False),),
     )
     monkeypatch.setattr(_EXAMPLE, "run_coding_prompt", lambda *args, **kwargs: prepared)
     monkeypatch.setattr(_EXAMPLE, "_run_native_agent", lambda *args, **kwargs: native_response)
@@ -1997,6 +2045,7 @@ def test_implement_mode_defaults_to_native_tools(capsys, monkeypatch) -> None:
 
     output = capsys.readouterr().out
     assert "native done" in output
+    assert "delegation: completed: native delegate_task" in output
     assert "execution_status: completed" in output
 
 
