@@ -240,6 +240,13 @@ Complexity must be justified by a real requirement.
 
 ---
 
+## License
+
+This repository is source-available for portfolio and review purposes only. No
+open-source license is granted. See `LICENSE.md`.
+
+---
+
 ## Current Starting Point
 
 The first implementation target is:
