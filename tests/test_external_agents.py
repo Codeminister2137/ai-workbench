@@ -5,6 +5,7 @@ from ai_orchestrator import AccessMethod
 from ai_provider.external_agents import (
     ExternalAgentConfig,
     _external_agent_progress_line,
+    _external_agent_stderr_progress_line,
     build_codex_plugin_command,
     build_external_agent_command,
     codex_plugin_status_by_name,
@@ -26,7 +27,7 @@ def test_build_external_agent_command_can_enable_codex_search(tmp_path: Path) ->
 
     command = build_external_agent_command(config)
 
-    assert command[:3] == ("codex", "--search", "exec")
+    assert command[:5] == ("codex", "--search", "--ask-for-approval", "never", "exec")
     assert "exec" in command
     assert command[-1] == "-"
 
@@ -43,8 +44,22 @@ def test_build_external_agent_command_omits_codex_search_by_default(tmp_path: Pa
     command = build_external_agent_command(config)
 
     assert "--search" not in command
-    assert command[:2] == ("codex", "exec")
-    assert "--ask-for-approval" not in command
+    assert command[:4] == ("codex", "--ask-for-approval", "never", "exec")
+
+
+def test_build_external_agent_command_maps_interactive_approval(tmp_path: Path) -> None:
+    config = ExternalAgentConfig(
+        access_method=AccessMethod.CODEX_CLI,
+        command="codex",
+        model="gpt-5.5",
+        cwd=tmp_path,
+        timeout_seconds=60.0,
+        approval_policy="interactive",
+    )
+
+    command = build_external_agent_command(config)
+
+    assert command[:4] == ("codex", "--ask-for-approval", "on-request", "exec")
 
 
 def test_build_external_agent_command_can_attach_codex_images(tmp_path: Path) -> None:
@@ -113,6 +128,15 @@ def test_external_agent_progress_line_summarizes_json_events() -> None:
         == 'external_agent_activity: usage - {"input_tokens": 12, "output_tokens": 3}'
     )
     assert _external_agent_progress_line("plain progress\n") == "external_agent_activity: stdout"
+
+
+def test_external_agent_stderr_progress_suppresses_noisy_codex_model_refresh() -> None:
+    line = (
+        "2026-09-28T08:57:23.532192Z ERROR codex_models_manager::manager: "
+        "failed to refresh available models: unknown variant `max`"
+    )
+
+    assert _external_agent_stderr_progress_line(line) is None
 
 
 def test_external_agent_progress_line_keeps_useful_command_detail() -> None:

@@ -534,6 +534,13 @@ def build_external_agent_command(config: ExternalAgentConfig) -> tuple[str, ...]
     command = [config.command]
     if config.web_search:
         command.append("--search")
+    if config.approval_policy:
+        command.extend(
+            [
+                "--ask-for-approval",
+                _codex_approval_policy(config.approval_policy),
+            ]
+        )
     if config.resume is not None:
         command.extend(["exec", "resume", "--model", config.model])
         if config.json_output:
@@ -574,6 +581,14 @@ def build_external_agent_command(config: ExternalAgentConfig) -> tuple[str, ...]
         command.extend(["--image", str(image_path)])
     command.append("-")
     return tuple(command)
+
+
+def _codex_approval_policy(approval_policy: str) -> str:
+    """Map repo-assistant approval presets to Codex CLI approval policies."""
+
+    if approval_policy == "interactive":
+        return "on-request"
+    return "never"
 
 
 def run_external_agent(
@@ -679,8 +694,10 @@ def run_external_agent(
         else:
             stderr_lines.append(line)
             if progress_callback is not None:
-                progress_callback(_external_agent_stderr_progress_line(line))
-                last_progress = now
+                progress = _external_agent_stderr_progress_line(line)
+                if progress is not None:
+                    progress_callback(progress)
+                    last_progress = now
 
     for reader in readers:
         reader.join(timeout=1.0)
@@ -803,13 +820,25 @@ def _external_agent_progress_line(line: str) -> str | None:
     return f"external_agent_activity: {event_type}"
 
 
-def _external_agent_stderr_progress_line(line: str) -> str:
+def _external_agent_stderr_progress_line(line: str) -> str | None:
     """Return a bounded external-agent stderr activity line."""
 
+    if _is_noisy_codex_model_refresh_stderr(line):
+        return None
     preview = _bounded_preview(line)
     if not preview:
         return "external_agent_activity: stderr"
     return f"external_agent_activity: stderr - {preview}"
+
+
+def _is_noisy_codex_model_refresh_stderr(line: str) -> bool:
+    """Return whether a Codex stderr line is known noisy model metadata refresh output."""
+
+    return (
+        "codex_models_manager::manager" in line
+        and "failed to refresh available models" in line
+        and "unknown variant `max`" in line
+    )
 
 
 def _bounded_preview(value: str, *, limit: int = 360) -> str:

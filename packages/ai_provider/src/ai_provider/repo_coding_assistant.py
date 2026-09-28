@@ -81,6 +81,7 @@ from ai_provider.external_agents import (
     run_codex_plugin_operation,
     run_diagnostic_command,
     run_external_agent as _run_external_agent,
+    _is_noisy_codex_model_refresh_stderr,
 )
 from ai_provider.repo_context import (
     DEFAULT_CONTEXT_BUDGET_CHARS,
@@ -1245,10 +1246,21 @@ def _run_external_agent_cli_mode(
                     print()
             if external_result.stderr:
                 print("\n=== External agent stderr ===")
+                full_stderr_path = _write_external_agent_stderr(
+                    external_result.stderr,
+                    args.log_file,
+                )
+                if full_stderr_path is not None:
+                    print(f"external_agent_stderr_file: {full_stderr_path}")
                 stderr_text = _format_external_agent_stderr(external_result.stderr)
-                print(stderr_text, end="")
-                if not stderr_text.endswith("\n"):
-                    print()
+                if stderr_text:
+                    print(stderr_text, end="")
+                    if not stderr_text.endswith("\n"):
+                        print()
+                else:
+                    print(
+                        "external_agent_stderr_summary: only known noisy Codex model refresh output"
+                    )
             parsed_failure = (
                 external_result.events.failure_reason
                 if external_result.events is not None
@@ -1404,13 +1416,34 @@ def _write_external_agent_raw_jsonl(raw_jsonl: str) -> None:
 def _format_external_agent_stderr(stderr: str, *, limit: int = 2000) -> str:
     """Bound noisy external-agent stderr while preserving the actionable prefix."""
 
-    if len(stderr) <= limit:
-        return stderr
-    omitted = len(stderr) - limit
+    filtered = _filter_external_agent_stderr(stderr)
+    if len(filtered) <= limit:
+        return filtered
+    omitted = len(filtered) - limit
     return (
-        stderr[:limit].rstrip()
-        + f"\n[external agent stderr truncated: {omitted} characters omitted]\n"
+        filtered[:limit].rstrip()
+        + f"\n[external agent stderr preview truncated: {omitted} characters omitted; "
+        "see external_agent_stderr_file for full stderr]\n"
     )
+
+
+def _filter_external_agent_stderr(stderr: str) -> str:
+    """Remove repeated non-actionable Codex stderr lines from the main transcript."""
+
+    lines = [line for line in stderr.splitlines() if not _is_noisy_codex_model_refresh_stderr(line)]
+    if not lines:
+        return ""
+    return "\n".join(lines) + "\n"
+
+
+def _write_external_agent_stderr(stderr: str, log_file: Path | None) -> Path | None:
+    """Persist complete external-agent stderr beside the transcript when available."""
+
+    if log_file is None:
+        return None
+    stderr_path = log_file.with_suffix(log_file.suffix + ".stderr.log")
+    stderr_path.write_text(stderr, encoding="utf-8", errors="replace")
+    return stderr_path
 
 
 def _run_native_agent(

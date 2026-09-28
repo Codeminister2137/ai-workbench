@@ -626,7 +626,7 @@ def test_cli_approval_policy_read_only_maps_to_codex_sandbox(capsys, monkeypatch
     output = capsys.readouterr().out
     assert "approval_policy: read_only" in output
     assert "external_agent_sandbox: read-only" in output
-    assert "--ask-for-approval" not in output
+    assert '"--ask-for-approval", "never"' in output
     assert '"--sandbox", "read-only"' in output
 
 
@@ -660,7 +660,7 @@ def test_cli_approval_policy_trusted_local_maps_to_commit_capable_codex_sandbox(
     output = capsys.readouterr().out
     assert "approval_policy: trusted_local" in output
     assert "external_agent_sandbox: danger-full-access" in output
-    assert "--ask-for-approval" not in output
+    assert '"--ask-for-approval", "never"' in output
     assert '"--sandbox", "danger-full-access"' in output
 
 
@@ -730,6 +730,8 @@ def test_cli_executes_codex_external_agent_route(capsys, monkeypatch) -> None:
                 "--model",
                 "gpt-5.5",
                 "--execute",
+                "--approval-policy",
+                "workspace_write",
                 "--skip-prompt-review",
             ]
         )
@@ -747,9 +749,8 @@ def test_cli_executes_codex_external_agent_route(capsys, monkeypatch) -> None:
     assert "codex done" in output
     assert "execution_status: completed" in output
     command = calls[0]["args"][0]
-    assert command[:2] == ("codex-test", "exec")
+    assert command[:4] == ("codex-test", "--ask-for-approval", "never", "exec")
     assert "--json" in command
-    assert "--ask-for-approval" not in command
     assert "--sandbox" in command
     assert "workspace-write" in command
     assert calls[0]["kwargs"]["input"].startswith("# User request")
@@ -958,8 +959,21 @@ def test_external_agent_stderr_is_bounded() -> None:
     stderr = _EXAMPLE._format_external_agent_stderr("x" * 2500, limit=100)
 
     assert stderr.startswith("x" * 100)
-    assert "external agent stderr truncated: 2400 characters omitted" in stderr
-    assert len(stderr) < 200
+    assert "external agent stderr preview truncated:" in stderr
+    assert "characters omitted" in stderr
+    assert "see external_agent_stderr_file for full stderr" in stderr
+
+
+def test_external_agent_stderr_filters_noisy_codex_model_refresh() -> None:
+    stderr = "\n".join(
+        [
+            "2026-09-28T08:57:23Z ERROR codex_models_manager::manager: "
+            "failed to refresh available models: unknown variant `max`",
+            "actionable stderr",
+        ]
+    )
+
+    assert _EXAMPLE._format_external_agent_stderr(stderr) == "actionable stderr\n"
 
 
 def test_external_agent_failure_hint_explains_codex_unauthorized() -> None:
@@ -1125,7 +1139,7 @@ def test_cli_can_plan_codex_search(capsys, monkeypatch) -> None:
 
     output = capsys.readouterr().out
     assert "external_agent_web_search: True" in output
-    assert '"codex-test", "--search", "exec"' in output
+    assert '"codex-test", "--search", "--ask-for-approval", "never", "exec"' in output
     assert '"exec", "--search"' not in output
 
 

@@ -179,16 +179,18 @@ choose the model-neutral local action policy. The default is `interactive`.
   and continue asking before provider-native shell/custom tools.
 - `trusted_local`: allow local read/write/shell tool actions without asking.
 
-For Codex CLI routes, the current local CLI exposes sandbox modes rather than
-the full policy shape: `read_only` maps to Codex `--sandbox read-only`,
-`interactive` and `workspace_write` map to `--sandbox workspace-write`, and
-`trusted_local` maps to Codex `--sandbox danger-full-access`. Git metadata
-writes such as `git add` and `git commit` require `trusted_local`; the CLI
-rejects commit-like Codex requests under weaker presets before contacting the
-model. The locally verified Codex CLI does not support `exec
---ask-for-approval`, so the wrapper does not forward that flag. `--apply-actions`
-remains available as the legacy fenced-JSON action protocol and now uses the
-same approval policy presets.
+For Codex CLI routes, the current local CLI exposes sandbox modes and a
+top-level approval flag rather than the full managed ChatGPT approval surface:
+`read_only` maps to Codex `--sandbox read-only`, `interactive` and
+`workspace_write` map to `--sandbox workspace-write`, and `trusted_local` maps
+to Codex `--sandbox danger-full-access`. `interactive` forwards
+`--ask-for-approval on-request`; the noninteractive presets forward
+`--ask-for-approval never`. Git metadata writes such as `git add` and
+`git commit` require `trusted_local`; use `--approval-policy trusted_local`
+when the requested external Codex run should stage or commit changes. The CLI
+rejects explicit commit-like Codex requests under weaker presets before
+contacting the model. `--apply-actions` remains available as the legacy
+fenced-JSON action protocol and now uses the same approval policy presets.
 
 That wrapper loads `.env` for the run and starts the Python CLI.
 
@@ -226,6 +228,9 @@ agent does not infer a read-only environment when the requested sandbox is
 `workspace-write` or stronger. If a timeout or process error occurs after
 partial output, the CLI summarizes parsed JSONL events and keeps raw JSONL in
 the transcript-only section rather than dumping it to the console.
+Known noisy Codex model-refresh stderr is filtered out of activity lines and
+the main stderr summary. When a transcript log is active, complete external
+stderr is saved beside it as `*.stderr.log` and the transcript prints that path.
 
 Local execution paths use equivalent bounded activity prefixes:
 `local_agent_activity` for local provider/native tool-loop model calls,
@@ -538,12 +543,12 @@ same policy.
 | Capability | This ChatGPT/Codex session | Repository CLI via Codex CLI | Current status |
 | --- | --- | --- | --- |
 | Repository instructions | Root `AGENTS.md` and runtime instructions are loaded by this session. | The repo assistant includes bounded `AGENTS.md`/`CURRENT_CONTEXT.md` context in the stdin prompt; Codex CLI also has its own `AGENTS.md`/config behavior. | Implemented, with bounded prompt context. |
-| Shell/file coding work | Managed tools can inspect and edit the shared workspace. | `codex exec --json --sandbox workspace-write --ephemeral -` runs inside the repo root. | Implemented for Codex route. |
+| Shell/file coding work | Managed tools can inspect and edit the shared workspace. | `codex --ask-for-approval never exec --json --sandbox workspace-write --ephemeral -` runs inside the repo root for noninteractive workspace-write runs. | Implemented for Codex route. |
 | Machine-readable execution events | Tool calls are available to this runtime. | JSONL stdout is parsed for final answer, command/tool/file-change events, failures, and usage. | Implemented with tolerant parsing. |
 | Raw transcripts/event logs | Conversation and tool output exist in the managed session. | CLI transcript logs preserve invocation metadata, full prompts when requested, run metrics, and raw Codex JSONL. | Implemented as local files under `logs\`. |
 | Final-answer artifact | The managed session displays the final answer in chat. | `--codex-output-last-message` writes Codex's last assistant message to an explicit local file and uses it as a JSONL fallback. | Implemented as opt-in local file output. |
 | Structured final response | This runtime can constrain some outputs through tool/runtime mechanisms. | `--codex-output-schema` passes an explicit JSON Schema file to `codex exec`. | Implemented as opt-in schema file input. |
-| Approval/sandbox policy | Managed by the active ChatGPT/Codex runtime. | `--approval-policy` selects model-neutral presets for native tools and legacy actions. Codex routes map `read_only` to `--sandbox read-only`, `interactive`/`workspace_write` to `--sandbox workspace-write`, and `trusted_local` to `--sandbox danger-full-access` for commit-capable local runs. | Implemented first preset slice; Codex CLI still lacks exact managed approval UI parity. |
+| Approval/sandbox policy | Managed by the active ChatGPT/Codex runtime. | `--approval-policy` selects model-neutral presets for native tools and legacy actions. Codex routes map `read_only` to `--sandbox read-only`, `interactive`/`workspace_write` to `--sandbox workspace-write`, and `trusted_local` to `--sandbox danger-full-access` for commit-capable local runs. Codex approval is forwarded as top-level `--ask-for-approval`. | Implemented first preset slice; Codex CLI still lacks exact managed approval UI parity. |
 | MCP tools | Available here through the current managed runtime. | `--codex-mcp-setup` configures a local `repo_assistant_tools` MCP server for read/search repository tools. | Implemented for selected local read/search tools. |
 | Plugins/apps | This session has installed app/plugin tools exposed by ChatGPT. | Diagnostics list Codex plugin marketplace/install status and structured plugin counts. Explicit install/remove is available through repeated `--codex-plugin-install` / `--codex-plugin-remove` with `--execute`. | Initial approved plugin install set implemented; future connectors one at a time behind reusable authorization. |
 | Document/app-control tools | Available here when connected document sessions expose tools. | Not inherited automatically by `codex exec`. Development-relevant bridges may be added as needed, with read/write capability designed together and writes gated by policy. | Accepted direction in ADR-024; implementation deferred until a concrete development workflow needs it. |
