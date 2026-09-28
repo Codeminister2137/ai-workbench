@@ -625,9 +625,8 @@ def test_cli_approval_policy_read_only_maps_to_codex_sandbox(capsys, monkeypatch
     )
     output = capsys.readouterr().out
     assert "approval_policy: read_only" in output
-    assert "external_agent_approval_policy: never" in output
     assert "external_agent_sandbox: read-only" in output
-    assert '"--ask-for-approval", "never"' in output
+    assert "--ask-for-approval" not in output
     assert '"--sandbox", "read-only"' in output
 
 
@@ -660,9 +659,8 @@ def test_cli_approval_policy_trusted_local_maps_to_commit_capable_codex_sandbox(
     )
     output = capsys.readouterr().out
     assert "approval_policy: trusted_local" in output
-    assert "external_agent_approval_policy: never" in output
     assert "external_agent_sandbox: danger-full-access" in output
-    assert '"--ask-for-approval", "never"' in output
+    assert "--ask-for-approval" not in output
     assert '"--sandbox", "danger-full-access"' in output
 
 
@@ -748,8 +746,9 @@ def test_cli_executes_codex_external_agent_route(capsys, monkeypatch) -> None:
     assert "codex done" in output
     assert "execution_status: completed" in output
     command = calls[0]["args"][0]
-    assert command[:4] == ("codex-test", "--ask-for-approval", "on-request", "exec")
+    assert command[:2] == ("codex-test", "exec")
     assert "--json" in command
+    assert "--ask-for-approval" not in command
     assert "--sandbox" in command
     assert "workspace-write" in command
     assert calls[0]["kwargs"]["input"].startswith("# User request")
@@ -1122,7 +1121,7 @@ def test_cli_can_plan_codex_search(capsys, monkeypatch) -> None:
 
     output = capsys.readouterr().out
     assert "external_agent_web_search: True" in output
-    assert '"codex-test", "--search", "--ask-for-approval", "on-request", "exec"' in output
+    assert '"codex-test", "--search", "exec"' in output
     assert '"exec", "--search"' not in output
 
 
@@ -1759,6 +1758,58 @@ def test_cli_reports_delegation_decision(
     assert "execution_status: completed" in output
 
 
+def test_local_context_delegation_reports_activity(monkeypatch) -> None:
+    from ai_orchestrator import PrivacyClass as OrchestratorPrivacyClass
+    from ai_provider import AIMessage, AIResponse, BackendInfo, BackendLocation, MessageRole
+
+    class FakeClient:
+        backend = BackendInfo(
+            provider="ollama",
+            model="qwen2.5-coder:14b",
+            location=BackendLocation.LOCAL,
+        )
+
+        def complete(self, request):
+            return AIResponse(
+                message=AIMessage(
+                    MessageRole.ASSISTANT,
+                    "Keep the CLI local-first. [source:src.py:1]",
+                ),
+                backend=self.backend,
+            )
+
+    catalog = _EXAMPLE.load_model_catalog(
+        Path("packages/ai_orchestrator/examples/model_catalog.toml")
+    )
+    profile = _EXAMPLE.coding_task_profile(
+        privacy_class=OrchestratorPrivacyClass.LOCAL_ONLY,
+        provider_override="ollama",
+        model_override="qwen2.5-coder:14b",
+    )
+    events: list[str] = []
+
+    summary, status = run_local_context_delegation(
+        (
+            _EXAMPLE.RepoContextFile(
+                path=Path("src.py"),
+                display_path="src.py",
+                content="value = 1\n",
+                inside_repo=True,
+            ),
+        ),
+        profile,
+        catalog,
+        client_factory=lambda config: FakeClient(),
+        progress_callback=events.append,
+    )
+
+    assert summary == "Keep the CLI local-first. [source:src.py:1]"
+    assert status.startswith("accepted:")
+    assert events[0] == "delegated_agent_activity: started - context_extraction"
+    assert any(event.startswith("delegated_agent_activity: model_request -") for event in events)
+    assert any(event.startswith("delegated_agent_activity: completed -") for event in events)
+
+
 def test_review_mode_rejects_native_tools_before_provider_contact(monkeypatch) -> None:
     def fail_if_called(*args, **kwargs):
         raise AssertionError("invalid review mode must stop before provider contact")
@@ -1858,20 +1909,28 @@ def test_native_agent_mode_executes_provider_tool_calls(tmp_path: Path, monkeypa
             "ollama_startup_timeout_seconds": 1.0,
             "system": None,
             "max_action_rounds": 3,
+            "approval_policy": "trusted_local",
+            "ollama_log_file": None,
+            "ollama_profile": None,
         },
     )()
     profile = coding_task_profile(privacy_class=OrchestratorPrivacyClass.LOCAL_ONLY)
+    events: list[str] = []
     result = _run_native_agent(
         "Create native.txt",
         BackendConfig(provider=ProviderKind.OLLAMA, model="test"),
         profile,
         args,
         tmp_path,
+        progress_callback=events.append,
     )
 
     assert result.response.message.content == "native complete"
     assert (tmp_path / "native.txt").read_text(encoding="utf-8") == "native"
     assert result.tool_results[0].is_error is False
+    assert events[0] == "local_agent_activity: model_request - provider=ollama model=test"
+    assert "local_agent_activity: completed - iterations=2 tool_results=1" in events
+    assert any(event.startswith("local_tool_activity: ok - create_file:") for event in events)
 
 
 def test_tee_output_writes_to_terminal_and_transcript() -> None:

@@ -122,6 +122,8 @@ def run_coding_prompt(
     ollama_log_path: Path | None = None,
     ollama_resource_profile: OllamaResourceProfile | None = None,
     client_factory: Callable[[BackendConfig], ChatClient] = create_chat_client,
+    progress_callback: Callable[[str], None] | None = None,
+    progress_prefix: str = "local_agent_activity",
 ) -> CodingAssistResult:
     """Prepare and optionally execute one coding-oriented AI request."""
 
@@ -134,6 +136,8 @@ def run_coding_prompt(
         timeout_seconds=timeout_seconds,
     )
     if not orchestration.is_ready or orchestration.execution_plan is None:
+        if progress_callback is not None:
+            progress_callback(f"{progress_prefix}: failed - orchestration not ready")
         return CodingAssistResult(orchestration=orchestration)
 
     config = backend_config_from_execution_target(orchestration.execution_plan.target)
@@ -144,13 +148,24 @@ def run_coding_prompt(
         system_prompt=system_prompt,
     )
     if not execute:
+        if progress_callback is not None:
+            progress_callback(
+                f"{progress_prefix}: planned - route={orchestration.execution_plan.target.route_id}"
+            )
         return CodingAssistResult(
             orchestration=orchestration,
             config=config,
             request=request,
         )
 
+    if progress_callback is not None:
+        progress_callback(
+            f"{progress_prefix}: model_request - provider={config.provider.value} "
+            f"model={config.model}"
+        )
     if start_ollama and config.provider is ProviderKind.OLLAMA:
+        if progress_callback is not None:
+            progress_callback(f"{progress_prefix}: ollama_start - base_url={config.base_url}")
         if ollama_log_path is None and ollama_resource_profile is None:
             ensure_ollama_server(
                 config.base_url,
@@ -182,6 +197,11 @@ def run_coding_prompt(
 
     client = client_factory(config)
     response = client.complete(request)
+    if progress_callback is not None:
+        progress_callback(
+            f"{progress_prefix}: completed - provider={response.backend.provider} "
+            f"model={response.backend.model}"
+        )
     return CodingAssistResult(
         orchestration=orchestration,
         config=config,

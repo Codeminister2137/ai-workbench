@@ -534,8 +534,6 @@ def build_external_agent_command(config: ExternalAgentConfig) -> tuple[str, ...]
     command = [config.command]
     if config.web_search:
         command.append("--search")
-    command.extend(["--ask-for-approval", config.approval_policy])
-
     if config.resume is not None:
         command.extend(["exec", "resume", "--model", config.model])
         if config.json_output:
@@ -681,7 +679,7 @@ def run_external_agent(
         else:
             stderr_lines.append(line)
             if progress_callback is not None:
-                progress_callback("external_agent_activity: stderr")
+                progress_callback(_external_agent_stderr_progress_line(line))
                 last_progress = now
 
     for reader in readers:
@@ -766,13 +764,88 @@ def _external_agent_progress_line(line: str) -> str | None:
     if not isinstance(event, dict):
         return "external_agent_activity: stdout"
     event_type = _event_type(event) or "json_event"
-    if _find_final_answer(event, event_type):
-        return "external_agent_activity: final_answer"
-    if _find_failure_reason(event, event_type):
-        return "external_agent_activity: failure"
-    if _find_usage(event) is not None:
-        return "external_agent_activity: usage"
+    if "reasoning" in event_type:
+        return f"external_agent_activity: {event_type}"
+
+    command = _find_string_payload(event, ("command",))
+    if command:
+        command_event_type = event_type
+        nested = event.get("item")
+        if isinstance(nested, dict):
+            command_event_type = _event_type(nested) or command_event_type
+        status = _find_string_payload(event, ("status",))
+        status_detail = f" {status}" if status else ""
+        return (
+            f"external_agent_activity: {command_event_type}{status_detail} - command: "
+            f"{_bounded_preview(command)}"
+        )
+
+    final_answer = _find_final_answer(event, event_type)
+    if final_answer:
+        return f"external_agent_activity: final_answer - {_bounded_preview(final_answer)}"
+
+    failure_reason = _find_failure_reason(event, event_type)
+    if failure_reason:
+        return f"external_agent_activity: failure - {_bounded_preview(failure_reason)}"
+
+    usage = _find_usage(event)
+    if usage is not None:
+        return f"external_agent_activity: usage - {_bounded_json(usage)}"
+
+    query = _find_string_payload(event, ("query", "search_query"))
+    if query:
+        return f"external_agent_activity: {event_type} - query: {_bounded_preview(query)}"
+
+    text = _find_text_payload(event)
+    if text and "reasoning" not in event_type:
+        return f"external_agent_activity: {event_type} - {_bounded_preview(text)}"
+
     return f"external_agent_activity: {event_type}"
+
+
+def _external_agent_stderr_progress_line(line: str) -> str:
+    """Return a bounded external-agent stderr activity line."""
+
+    preview = _bounded_preview(line)
+    if not preview:
+        return "external_agent_activity: stderr"
+    return f"external_agent_activity: stderr - {preview}"
+
+
+def _bounded_preview(value: str, *, limit: int = 160) -> str:
+    """Return a single-line preview without exposing unbounded event payloads."""
+
+    preview = " ".join(value.strip().split())
+    if len(preview) <= limit:
+        return preview
+    return preview[: max(0, limit - 15)].rstrip() + " ...[truncated]"
+
+
+def _bounded_json(value: dict[str, Any], *, limit: int = 180) -> str:
+    """Return a compact bounded JSON object preview."""
+
+    text = json.dumps(value, sort_keys=True)
+    return _bounded_preview(text, limit=limit)
+
+
+def _find_string_payload(value: Any, keys: tuple[str, ...]) -> str | None:
+    """Find a string payload for any of the supplied keys."""
+
+    if isinstance(value, dict):
+        for key in keys:
+            nested = value.get(key)
+            if isinstance(nested, str) and nested.strip():
+                return nested.strip()
+        for nested in value.values():
+            found = _find_string_payload(nested, keys)
+            if found:
+                return found
+    if isinstance(value, list):
+        for item in value:
+            found = _find_string_payload(item, keys)
+            if found:
+                return found
+    return None
 
 
 def _event_type(event: dict[str, Any]) -> str:

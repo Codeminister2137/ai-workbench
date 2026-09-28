@@ -185,8 +185,8 @@ the full policy shape: `read_only` maps to Codex `--sandbox read-only`,
 `trusted_local` maps to Codex `--sandbox danger-full-access`. Git metadata
 writes such as `git add` and `git commit` require `trusted_local`; the CLI
 rejects commit-like Codex requests under weaker presets before contacting the
-model. The wrapper also forwards Codex `--ask-for-approval`: `interactive` uses
-`on-request`, while non-interactive presets use `never`. `--apply-actions`
+model. The locally verified Codex CLI does not support `exec
+--ask-for-approval`, so the wrapper does not forward that flag. `--apply-actions`
 remains available as the legacy fenced-JSON action protocol and now uses the
 same approval policy presets.
 
@@ -215,9 +215,19 @@ status, and final `execution_status`.
 For external-agent routes such as Codex CLI, `--timeout-seconds` is treated as
 an inactivity timeout. Model output resets the timer, and the CLI prints bounded
 `external_agent_activity` or `external_agent_status` lines during long runs so
-the transcript shows that work is still active. If a timeout or process error
-occurs after partial output, the CLI summarizes parsed JSONL events and keeps
-raw JSONL in the transcript-only section rather than dumping it to the console.
+the transcript shows that work is still active. Activity lines include bounded
+details from parsed JSONL where useful, such as command previews,
+final-answer previews, failure reasons, search queries, usage summaries, and
+stderr previews. Hidden reasoning-summary events remain type-only and raw JSONL
+stays in the transcript-only section. If a timeout or process error occurs
+after partial output, the CLI summarizes parsed JSONL events and keeps raw JSONL
+in the transcript-only section rather than dumping it to the console.
+
+Local execution paths use equivalent bounded activity prefixes:
+`local_agent_activity` for local provider/native tool-loop model calls,
+`delegated_agent_activity` for local context extraction, `scrutiny_activity`
+for response scrutiny, and `local_tool_activity` for native-tool or legacy
+action follow-up work.
 
 By default, transcript logs do not include the complete assembled model prompt.
 Use `--log-full-prompt` with `--log-file` when building evaluation data that

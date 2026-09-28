@@ -840,7 +840,6 @@ def _build_external_agent_command(config: ExternalAgentConfig) -> tuple[str, ...
     command = [config.command]
     if config.web_search:
         command.append("--search")
-    command.extend(["--ask-for-approval", config.approval_policy])
 
     if config.resume is not None:
         command.extend(["exec", "resume", "--model", config.model])
@@ -1219,20 +1218,29 @@ def run_local_context_delegation(
     *,
     client_factory: Callable[[BackendConfig], ChatClient] = create_chat_client,
     max_chars: int = DEFAULT_DELEGATION_CONTEXT_BUDGET_CHARS,
+    progress_callback: Callable[[str], None] | None = None,
 ) -> tuple[str | None, str]:
     """Extract source-grounded context locally for injection into a primary prompt."""
 
+    if progress_callback is not None:
+        progress_callback("delegated_agent_activity: started - context_extraction")
     decision = assess_delegation(
         task_type=primary_profile.task_type,
         delegation_kind=DelegationKind.CONTEXT_EXTRACTION,
     )
     if not decision.allowed:
+        if progress_callback is not None:
+            progress_callback(
+                f"delegated_agent_activity: rejected - {_activity_preview(decision.reason)}"
+            )
         return None, f"rejected: {decision.reason}"
     delegation_context, sources = build_delegation_context(
         context_files,
         max_chars=max_chars,
     )
     if not sources:
+        if progress_callback is not None:
+            progress_callback("delegated_agent_activity: skipped - no repository context")
         return None, "skipped: no repository context was loaded"
     plan = plan_delegated_subtask(
         parent_profile=primary_profile,
@@ -1248,6 +1256,11 @@ def run_local_context_delegation(
         base_url=plan.execution_plan.target.base_url,
         timeout_seconds=plan.execution_plan.target.timeout_seconds or 60.0,
     )
+    if progress_callback is not None:
+        progress_callback(
+            "delegated_agent_activity: model_request - "
+            f"route={plan.execution_plan.target.route_id} sources={len(sources)}"
+        )
     request = AIRequest(
         messages=(
             AIMessage(
@@ -1266,7 +1279,14 @@ def run_local_context_delegation(
     response = client_factory(config).complete(request)
     summary = response.message.content.strip()
     if not _has_source_citation(summary, sources):
+        if progress_callback is not None:
+            progress_callback(
+                "delegated_agent_activity: rejected - local summary contained no "
+                "verifiable source citation"
+            )
         return None, "rejected: local summary contained no verifiable source citation"
+    if progress_callback is not None:
+        progress_callback(f"delegated_agent_activity: completed - {_activity_preview(summary)}")
     return summary, f"accepted: {plan.execution_plan.target.route_id}"
 
 
@@ -1749,6 +1769,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             profile,
             catalog,
             max_chars=args.delegation_context_budget_chars,
+            progress_callback=print,
         )
         if delegated_summary is not None:
             prompt = f"{prompt}\n\n## Verified local context extraction\n{delegated_summary}"
@@ -1851,6 +1872,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             ollama_startup_timeout_seconds=args.ollama_startup_timeout_seconds,
             ollama_log_path=args.ollama_log_file if args.start_ollama else None,
             ollama_resource_profile=ollama_resource_profile,
+            progress_callback=print if args.execute and not args.native_tools else None,
+            progress_prefix="local_agent_activity",
         )
         primary_elapsed_seconds = time.perf_counter() - primary_started
     except ProviderError as exc:
@@ -1916,6 +1939,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             profile,
             args,
             repo_root,
+            progress_callback=print,
         )
         assistant_response_text = native_result.response.message.content
         print(assistant_response_text)
@@ -1979,6 +2003,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 execute=True,
                 system_prompt=_RESPONSE_SCRUTINY_SYSTEM_PROMPT,
                 start_ollama=False,
+                progress_callback=print,
+                progress_prefix="scrutiny_activity",
             )
             scrutiny_elapsed_seconds = time.perf_counter() - scrutiny_started
         except ProviderError as exc:
@@ -2220,7 +2246,6 @@ def _run_external_agent_cli_mode(
             repo_root=repo_root,
             timeout_seconds=args.timeout_seconds,
             sandbox=_codex_sandbox_for_approval_policy(args.approval_policy),
-            approval_policy=_codex_approval_for_approval_policy(args.approval_policy),
             codex_persist_session=args.codex_persist_session,
             codex_resume=args.codex_resume,
             output_last_message_path=args.codex_output_last_message,
@@ -2230,7 +2255,6 @@ def _run_external_agent_cli_mode(
         )
         print(f"external_agent_command: {config.command}")
         print(f"approval_policy: {args.approval_policy}")
-        print(f"external_agent_approval_policy: {config.approval_policy}")
         print(f"external_agent_sandbox: {config.sandbox}")
         print(f"external_agent_ephemeral: {config.ephemeral}")
         if config.resume is not None:
@@ -2425,9 +2449,18 @@ def _run_native_agent(
     profile: Any,
     args: argparse.Namespace,
     repo_root: Path,
+    *,
+    progress_callback: Callable[[str], None] | None = None,
 ) -> Any:
     """Run the provider-native agent loop inside the repository boundary."""
+    if progress_callback is not None:
+        progress_callback(
+            f"local_agent_activity: model_request - provider={config.provider.value} "
+            f"model={config.model}"
+        )
     if args.start_ollama and config.provider is ProviderKind.OLLAMA:
+        if progress_callback is not None:
+            progress_callback(f"local_agent_activity: ollama_start - base_url={config.base_url}")
         ensure_ollama_server(
             config.base_url,
             command=args.ollama_command,
@@ -2467,12 +2500,33 @@ def _run_native_agent(
         ),
         max_iterations=args.max_action_rounds,
     )
-    return agent.run(
+    result = agent.run(
         prompt,
         system_prompt=build_default_system_prompt(args.system),
         model=config.model,
         privacy_class=PrivacyClass(profile.privacy_class.value),
     )
+    if progress_callback is not None:
+        progress_callback(
+            f"local_agent_activity: completed - iterations={result.iterations} "
+            f"tool_results={len(result.tool_results)}"
+        )
+        for tool_result in result.tool_results:
+            status = "error" if tool_result.is_error else "ok"
+            progress_callback(
+                f"local_tool_activity: {status} - {tool_result.name}: "
+                f"{_activity_preview(tool_result.output)}"
+            )
+    return result
+
+
+def _activity_preview(value: str, *, limit: int = 160) -> str:
+    """Return a bounded single-line activity detail."""
+
+    preview = " ".join(value.strip().split())
+    if len(preview) <= limit:
+        return preview
+    return preview[: max(0, limit - 15)].rstrip() + " ...[truncated]"
 
 
 def _run_action_loop(
@@ -2521,6 +2575,8 @@ def _run_action_loop(
             ollama_command=args.ollama_command,
             ollama_startup_timeout_seconds=args.ollama_startup_timeout_seconds,
             ollama_log_path=args.ollama_log_file if args.start_ollama else None,
+            progress_callback=print,
+            progress_prefix="local_tool_activity",
         )
         if result.response is None:
             if result.orchestration.failure_reason:
@@ -2540,17 +2596,6 @@ def _codex_sandbox_for_approval_policy(approval_policy: str) -> str:
     if preset is ApprovalPolicyPreset.TRUSTED_LOCAL:
         return "danger-full-access"
     return "workspace-write"
-
-
-def _codex_approval_for_approval_policy(approval_policy: str) -> str:
-    """Map model-neutral approval presets to Codex CLI approval modes."""
-
-    preset = ApprovalPolicyPreset(approval_policy)
-    if preset is ApprovalPolicyPreset.INTERACTIVE:
-        return "on-request"
-    if preset is ApprovalPolicyPreset.READ_ONLY:
-        return "never"
-    return "never"
 
 
 def _prompt_requests_git_metadata_write(prompt: str) -> bool:

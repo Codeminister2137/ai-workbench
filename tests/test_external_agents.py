@@ -25,7 +25,7 @@ def test_build_external_agent_command_can_enable_codex_search(tmp_path: Path) ->
 
     command = build_external_agent_command(config)
 
-    assert command[:5] == ("codex", "--search", "--ask-for-approval", "never", "exec")
+    assert command[:3] == ("codex", "--search", "exec")
     assert "exec" in command
     assert command[-1] == "-"
 
@@ -42,22 +42,8 @@ def test_build_external_agent_command_omits_codex_search_by_default(tmp_path: Pa
     command = build_external_agent_command(config)
 
     assert "--search" not in command
-    assert command[:4] == ("codex", "--ask-for-approval", "never", "exec")
-
-
-def test_build_external_agent_command_can_set_codex_approval_policy(tmp_path: Path) -> None:
-    config = ExternalAgentConfig(
-        access_method=AccessMethod.CODEX_CLI,
-        command="codex",
-        model="gpt-5.5",
-        cwd=tmp_path,
-        timeout_seconds=60.0,
-        approval_policy="on-request",
-    )
-
-    command = build_external_agent_command(config)
-
-    assert command[:4] == ("codex", "--ask-for-approval", "on-request", "exec")
+    assert command[:2] == ("codex", "exec")
+    assert "--ask-for-approval" not in command
 
 
 def test_build_external_agent_command_can_attach_codex_images(tmp_path: Path) -> None:
@@ -102,7 +88,20 @@ def test_external_agent_progress_line_summarizes_json_events() -> None:
     )
     assert (
         _external_agent_progress_line('{"type":"final_answer","content":"done"}\n')
-        == "external_agent_activity: final_answer"
+        == "external_agent_activity: final_answer - done"
+    )
+    assert (
+        _external_agent_progress_line(
+            '{"type":"item.started","item":{"type":"command_execution",'
+            '"command":"git status --short","status":"in_progress"}}\n'
+        )
+        == "external_agent_activity: command_execution in_progress - command: git status --short"
+    )
+    assert (
+        _external_agent_progress_line(
+            '{"type":"turn.completed","usage":{"input_tokens":12,"output_tokens":3}}\n'
+        )
+        == 'external_agent_activity: usage - {"input_tokens": 12, "output_tokens": 3}'
     )
     assert _external_agent_progress_line("plain progress\n") == "external_agent_activity: stdout"
 
