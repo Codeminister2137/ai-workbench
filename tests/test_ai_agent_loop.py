@@ -6,7 +6,10 @@ from ai_agent import (
     AgentLoop,
     PermissionManager,
     PermissionPolicy,
+    ToolCall,
     ToolContext,
+    ToolResult,
+    coding_tools_with_delegation,
     default_coding_tools,
 )
 from ai_provider import (
@@ -69,3 +72,23 @@ def test_agent_loop_executes_tools_and_returns_final_response(tmp_path: Path) ->
     assert (tmp_path / "out.txt").read_text() == "done"
     assert len(client.requests[0].tools) == 7
     assert client.requests[1].messages[-1].role is MessageRole.TOOL
+
+
+def test_delegation_tool_runs_bounded_child_task(tmp_path: Path) -> None:
+    calls: list[str] = []
+
+    def runner(task: str, context: ToolContext) -> ToolResult:
+        calls.append(task)
+        (context.workspace_root / "child.txt").write_text("child", encoding="utf-8")
+        return ToolResult(name="delegate_task", output="child done")
+
+    registry = coding_tools_with_delegation(runner)
+    result = registry.execute(
+        ToolCall("delegate_task", {"task": "write a small helper"}),
+        ToolContext(tmp_path),
+    )
+
+    assert result.output == "child done"
+    assert calls == ["write a small helper"]
+    assert (tmp_path / "child.txt").read_text(encoding="utf-8") == "child"
+    assert len(registry.list_definitions()) == 8

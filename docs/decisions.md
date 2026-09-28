@@ -73,6 +73,17 @@ explicit task need and visible route/cost reporting.
 
 Detailed ADR: `docs/decisions/ADR-025-local-first-auxiliary-ai-work.md`
 
+## ADR-026 - Agent-Specific Delegation As Default CLI Capability
+**Status:** Accepted
+**Date:** 2026-09-28
+
+Use the `ai_agent` loop as the default provider-native implementation path in
+the repo assistant CLI. The primary model receives a bounded `delegate_task`
+tool so it can hand suitable support work, including small code writes under
+the selected approval policy, to a derived local/cheaper child route.
+
+Detailed ADR: `docs/decisions/ADR-026-agent-specific-delegation-default.md`
+
 ## Template
 ```text
 ## ADR-NNN — Short Name

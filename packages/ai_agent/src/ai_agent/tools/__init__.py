@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ai_agent.tools.base import BaseTool, ToolContext, ToolRegistry
+from ai_agent.tools.delegation import DelegateTaskTool, coding_tools_with_delegation
 from ai_agent.tools.filesystem import (
     CreateFileTool,
     EditFileTool,
@@ -31,6 +32,7 @@ def default_coding_tools() -> ToolRegistry:
 __all__ = [
     "BaseTool",
     "CreateFileTool",
+    "DelegateTaskTool",
     "EditFileTool",
     "FindFilesTool",
     "GrepSearchTool",
@@ -39,5 +41,6 @@ __all__ = [
     "RunCommandTool",
     "ToolContext",
     "ToolRegistry",
+    "coding_tools_with_delegation",
     "default_coding_tools",
 ]

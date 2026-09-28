@@ -1951,6 +1951,158 @@ def test_native_agent_mode_executes_provider_tool_calls(tmp_path: Path, monkeypa
     assert any(event.startswith("local_tool_activity: ok - create_file:") for event in events)
 
 
+def test_implement_mode_defaults_to_native_tools(capsys, monkeypatch) -> None:
+    from dataclasses import replace
+
+    from ai_provider import AIMessage, AIResponse, BackendInfo, BackendLocation, MessageRole
+
+    catalog = _EXAMPLE.load_model_catalog(
+        Path("packages/ai_orchestrator/examples/model_catalog.toml")
+    )
+    prepared = _EXAMPLE.run_coding_prompt(
+        "Create a helper.",
+        _EXAMPLE.coding_task_profile(model_override="qwen2.5-coder:14b"),
+        catalog,
+    )
+    prepared = replace(
+        prepared,
+        response=None,
+        config=_EXAMPLE.BackendConfig(provider=_EXAMPLE.ProviderKind.OLLAMA, model="test"),
+    )
+    native_response = SimpleNamespace(
+        response=AIResponse(
+            message=AIMessage(MessageRole.ASSISTANT, "native done"),
+            backend=BackendInfo("ollama", "test", BackendLocation.LOCAL),
+        ),
+        tool_results=(),
+    )
+    monkeypatch.setattr(_EXAMPLE, "run_coding_prompt", lambda *args, **kwargs: prepared)
+    monkeypatch.setattr(_EXAMPLE, "_run_native_agent", lambda *args, **kwargs: native_response)
+
+    assert (
+        main(
+            [
+                "--mode",
+                "implement",
+                "Create a helper.",
+                "--provider",
+                "ollama",
+                "--model",
+                "qwen2.5-coder:14b",
+                "--execute",
+            ]
+        )
+        == 0
+    )
+
+    output = capsys.readouterr().out
+    assert "native done" in output
+    assert "execution_status: completed" in output
+
+
+def test_native_agent_can_delegate_small_write_task(tmp_path: Path, monkeypatch) -> None:
+    from ai_orchestrator import PrivacyClass as OrchestratorPrivacyClass
+    from ai_provider import BackendConfig, ProviderKind
+
+    class PrimaryClient:
+        def __init__(self) -> None:
+            from ai_provider import BackendInfo, BackendLocation
+
+            self.backend = BackendInfo("ollama", "primary", BackendLocation.LOCAL)
+            self.calls = 0
+
+        def complete(self, request):
+            from ai_provider import AIMessage, AIResponse, AIToolCall, MessageRole
+
+            self.calls += 1
+            if self.calls == 1:
+                return AIResponse(
+                    message=AIMessage(
+                        MessageRole.ASSISTANT,
+                        "",
+                        tool_calls=(
+                            AIToolCall(
+                                "delegate-1",
+                                "delegate_task",
+                                {"task": "Create delegated.txt with delegated content."},
+                            ),
+                        ),
+                    ),
+                    backend=self.backend,
+                )
+            return AIResponse(
+                message=AIMessage(MessageRole.ASSISTANT, "primary complete"),
+                backend=self.backend,
+            )
+
+        def stream(self, request):
+            raise NotImplementedError
+
+    class ChildClient:
+        def __init__(self) -> None:
+            from ai_provider import BackendInfo, BackendLocation
+
+            self.backend = BackendInfo("ollama", "child", BackendLocation.LOCAL)
+            self.calls = 0
+
+        def complete(self, request):
+            from ai_provider import AIMessage, AIResponse, AIToolCall, MessageRole
+
+            self.calls += 1
+            if self.calls == 1:
+                return AIResponse(
+                    message=AIMessage(
+                        MessageRole.ASSISTANT,
+                        "",
+                        tool_calls=(
+                            AIToolCall(
+                                "child-write",
+                                "create_file",
+                                {"path": "delegated.txt", "content": "delegated"},
+                            ),
+                        ),
+                    ),
+                    backend=self.backend,
+                )
+            return AIResponse(
+                message=AIMessage(MessageRole.ASSISTANT, "child complete"),
+                backend=self.backend,
+            )
+
+        def stream(self, request):
+            raise NotImplementedError
+
+    clients = [PrimaryClient(), ChildClient()]
+    monkeypatch.setattr(_EXAMPLE, "create_chat_client", lambda config: clients.pop(0))
+    args = SimpleNamespace(
+        start_ollama=False,
+        ollama_command="ollama",
+        ollama_startup_timeout_seconds=1.0,
+        system=None,
+        max_action_rounds=3,
+        approval_policy="trusted_local",
+        ollama_log_file=None,
+        ollama_profile=None,
+        catalog=Path("packages/ai_orchestrator/examples/model_catalog.toml"),
+        timeout_seconds=30.0,
+    )
+    events: list[str] = []
+
+    result = _run_native_agent(
+        "Delegate the small file write.",
+        BackendConfig(provider=ProviderKind.OLLAMA, model="primary"),
+        _EXAMPLE.coding_task_profile(privacy_class=OrchestratorPrivacyClass.LOCAL_ONLY),
+        args,
+        tmp_path,
+        progress_callback=events.append,
+    )
+
+    assert result.response.message.content == "primary complete"
+    assert (tmp_path / "delegated.txt").read_text(encoding="utf-8") == "delegated"
+    assert result.tool_results[0].name == "delegate_task"
+    assert any(event.startswith("delegated_agent_activity: model_request -") for event in events)
+
+
 def test_tee_output_writes_to_terminal_and_transcript() -> None:
     from io import StringIO
 

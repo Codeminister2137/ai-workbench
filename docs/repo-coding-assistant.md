@@ -162,14 +162,18 @@ creating a separate one-off command. Keep the command synchronized with the
 **Canonical Manual Live Acceptance Check** section in `CURRENT_CONTEXT.md`;
 future sessions should read that section first.
 
-To use the new provider-native tool-calling loop, add `--native-tools`:
+Executed implementation-mode provider routes use the provider-native
+tool-calling loop by default:
 
 ```powershell
-.\scripts\repo-assistant.ps1 "YOUR REQUEST" --provider ollama --model qwen2.5-coder:14b --execute --native-tools --start-ollama
+.\scripts\repo-assistant.ps1 "YOUR REQUEST" --mode implement --provider ollama --model qwen2.5-coder:14b --execute --start-ollama
 ```
 
-Native mode uses the shared `ai_provider` tool-call contract and `ai_agent.AgentLoop`.
-Use `--approval-policy read_only|interactive|workspace_write|trusted_local` to
+Native mode uses the shared `ai_provider` tool-call contract and
+`ai_agent.AgentLoop`. `--native-tools` is still accepted for explicitness and
+compatibility. Use `--no-native-tools` to opt into the older text-only provider
+response path. Use
+`--approval-policy read_only|interactive|workspace_write|trusted_local` to
 choose the model-neutral local action policy. The default is `interactive`.
 
 - `read_only`: allow read/search tools, deny local writes and shell commands.
@@ -178,6 +182,12 @@ choose the model-neutral local action policy. The default is `interactive`.
 - `workspace_write`: allow workspace file writes, but deny legacy shell actions
   and continue asking before provider-native shell/custom tools.
 - `trusted_local`: allow local read/write/shell tool actions without asking.
+
+The primary native agent also receives `delegate_task`, a bounded delegation
+tool for handing focused support work to a derived local/cheaper child route.
+The child agent can inspect files, run the standard coding tools, and write
+small code changes when the active approval policy permits writes. Nested
+delegation is disabled so runs remain bounded and reviewable.
 
 For Codex CLI routes, the current local CLI exposes sandbox modes and a
 top-level approval flag rather than the full managed ChatGPT approval surface:

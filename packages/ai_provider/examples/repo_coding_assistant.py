@@ -35,6 +35,8 @@ from ai_agent import (
     PermissionPolicy,
     ToolCategory,
     ToolContext,
+    ToolResult,
+    coding_tools_with_delegation,
     codex_authorization_registry,
     default_coding_tools,
 )
@@ -1660,8 +1662,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--native-tools",
         action="store_true",
         help=(
-            "Use provider-native tool calling with the ai-agent loop. "
-            "Requires --execute; writes and commands ask for approval."
+            "Use provider-native tool calling with the ai-agent loop. This is the "
+            "default for executed implement-mode provider routes; the flag is kept "
+            "for explicitness and compatibility."
+        ),
+    )
+    parser.add_argument(
+        "--no-native-tools",
+        action="store_true",
+        help=(
+            "Disable the default provider-native tool loop and use the older "
+            "single-response provider execution path."
         ),
     )
     parser.add_argument(
@@ -1718,6 +1729,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         parser.error("prompt is required unless --local-capabilities is used")
     if args.mode == "plan":
         args.execute = False
+    if args.native_tools and args.no_native_tools:
+        parser.error("--native-tools cannot be combined with --no-native-tools")
+    use_native_tools = args.native_tools or (
+        args.mode == "implement" and args.execute and not args.no_native_tools
+    )
+    args.native_tools = use_native_tools
     if args.mode in {"ask", "review"} and (args.apply_actions or args.native_tools):
         parser.error(f"--mode {args.mode} does not permit file or command actions")
     if args.scrutinize_response and not args.execute:
@@ -1726,8 +1743,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         parser.error("--scrutinize-response is available only in ask or review mode")
     if args.mode == "implement" and not args.execute:
         parser.error("--mode implement requires --execute")
-    if args.mode == "implement" and not (args.apply_actions or args.native_tools):
-        parser.error("--mode implement requires --apply-actions or --native-tools")
+    if args.mode == "implement" and not (
+        args.apply_actions or args.native_tools or args.no_native_tools
+    ):
+        parser.error("--mode implement requires --apply-actions or native tools")
     if args.log_full_prompt and args.log_file is None:
         parser.error("--log-full-prompt requires --log-file")
     if args.codex_persist_session and args.codex_resume:
@@ -2575,9 +2594,102 @@ def _run_native_agent(
         else None
     )
     client = create_chat_client(config)
+    child_depth = int(getattr(args, "_delegation_depth", 0))
+
+    def run_delegated_task(task: str, context: ToolContext) -> ToolResult:
+        if child_depth >= 1:
+            return ToolResult(
+                name="delegate_task",
+                output="Error: nested delegation is disabled for bounded CLI runs.",
+                is_error=True,
+            )
+        if progress_callback is not None:
+            progress_callback(
+                f"delegated_agent_activity: started - coding_subtask {_activity_preview(task)}"
+            )
+        try:
+            child_profile = derive_subtask_profile(
+                parent=profile,
+                task_type=TaskType.CODING,
+                quality_threshold=QualityThreshold.STANDARD,
+                latency_target=LatencyTarget.BACKGROUND,
+                cost_policy_tier=CostPolicyTier.LOCAL_ONLY,
+                privacy_class=OrchestratorPrivacyClass.LOCAL_ONLY,
+            )
+            child_orchestration = prepare_execution(
+                task,
+                child_profile,
+                load_model_catalog(
+                    getattr(
+                        args,
+                        "catalog",
+                        Path("packages/ai_orchestrator/examples/model_catalog.toml"),
+                    )
+                ),
+                review_prompt=False,
+                timeout_seconds=getattr(args, "timeout_seconds", 180.0),
+            )
+            if not child_orchestration.is_ready or child_orchestration.execution_plan is None:
+                reason = child_orchestration.failure_reason or child_orchestration.status.value
+                return ToolResult(
+                    name="delegate_task",
+                    output=f"Error: delegated subtask route was not ready: {reason}",
+                    is_error=True,
+                )
+            child_config = BackendConfig(
+                provider=ProviderKind(child_orchestration.execution_plan.target.provider),
+                model=child_orchestration.execution_plan.target.model,
+                base_url=child_orchestration.execution_plan.target.base_url,
+                timeout_seconds=child_orchestration.execution_plan.target.timeout_seconds,
+            )
+            if progress_callback is not None:
+                progress_callback(
+                    "delegated_agent_activity: model_request - "
+                    f"route={child_orchestration.execution_plan.target.route_id} "
+                    f"model={child_config.model}"
+                )
+            child_args = argparse.Namespace(**vars(args))
+            child_args._delegation_depth = child_depth + 1
+            child_result = _run_native_agent(
+                task,
+                child_config,
+                child_profile,
+                child_args,
+                context.workspace_root,
+                progress_callback=progress_callback,
+            )
+        except Exception as exc:  # noqa: BLE001
+            return ToolResult(
+                name="delegate_task",
+                output=f"Error: delegated subtask failed: {exc}",
+                is_error=True,
+            )
+
+        output = child_result.response.message.content
+        if progress_callback is not None:
+            progress_callback(
+                "delegated_agent_activity: completed - "
+                f"iterations={child_result.iterations} "
+                f"tool_results={len(child_result.tool_results)}"
+            )
+        return ToolResult(
+            name="delegate_task",
+            output=output,
+            is_error=any(item.is_error for item in child_result.tool_results),
+            metadata={
+                "iterations": child_result.iterations,
+                "tool_results": len(child_result.tool_results),
+            },
+        )
+
+    registry = (
+        default_coding_tools()
+        if child_depth >= 1
+        else coding_tools_with_delegation(run_delegated_task)
+    )
     agent = AgentLoop(
         client,
-        default_coding_tools(),
+        registry,
         ToolContext(workspace_root=repo_root),
         permissions=PermissionManager(
             policy=permission_policy,

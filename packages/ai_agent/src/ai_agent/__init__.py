@@ -28,6 +28,7 @@ from ai_agent.permissions import ApprovalPolicyPreset, PermissionManager, Permis
 from ai_agent.tools import (
     BaseTool,
     CreateFileTool,
+    DelegateTaskTool,
     EditFileTool,
     FindFilesTool,
     GrepSearchTool,
@@ -36,6 +37,7 @@ from ai_agent.tools import (
     RunCommandTool,
     ToolContext,
     ToolRegistry,
+    coding_tools_with_delegation,
     default_coding_tools,
 )
 
@@ -50,6 +52,7 @@ __all__ = [
     "CODEX_SERVICE_ID",
     "CapabilityGrant",
     "CreateFileTool",
+    "DelegateTaskTool",
     "CredentialLocation",
     "EditFileTool",
     "FindFilesTool",
@@ -67,6 +70,7 @@ __all__ = [
     "ToolDefinition",
     "ToolParameter",
     "ToolRegistry",
+    "coding_tools_with_delegation",
     "ToolResult",
     "default_coding_tools",
     "codex_authorization_from_status",
