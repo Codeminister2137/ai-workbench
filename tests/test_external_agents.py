@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from ai_orchestrator import AccessMethod
@@ -92,6 +93,14 @@ def test_external_agent_progress_line_summarizes_json_events() -> None:
     )
     assert (
         _external_agent_progress_line(
+            '{"type":"item.completed","item":{"type":"agent_message",'
+            '"text":"Inspecting repository state before making a decision."}}\n'
+        )
+        == "external_agent_activity: item.completed - "
+        "Inspecting repository state before making a decision."
+    )
+    assert (
+        _external_agent_progress_line(
             '{"type":"item.started","item":{"type":"command_execution",'
             '"command":"git status --short","status":"in_progress"}}\n'
         )
@@ -104,6 +113,32 @@ def test_external_agent_progress_line_summarizes_json_events() -> None:
         == 'external_agent_activity: usage - {"input_tokens": 12, "output_tokens": 3}'
     )
     assert _external_agent_progress_line("plain progress\n") == "external_agent_activity: stdout"
+
+
+def test_external_agent_progress_line_keeps_useful_command_detail() -> None:
+    long_command = (
+        '"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '
+        '"Get-Content -Path packages\\ai_provider\\src\\ai_provider\\repo_coding_assistant.py '
+        '| Select-Object -Skip 1380 -First 110"'
+    )
+
+    progress = _external_agent_progress_line(
+        json.dumps(
+            {
+                "type": "item.started",
+                "item": {
+                    "type": "command_execution",
+                    "command": long_command,
+                    "status": "in_progress",
+                },
+            }
+        )
+        + "\n"
+    )
+
+    assert progress is not None
+    assert "repo_coding_assistant.py" in progress
+    assert len(progress) > 180
 
 
 def test_parse_codex_plugin_list_summarizes_marketplace_rows() -> None:

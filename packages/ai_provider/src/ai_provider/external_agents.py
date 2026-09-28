@@ -780,7 +780,7 @@ def _external_agent_progress_line(line: str) -> str | None:
             f"{_bounded_preview(command)}"
         )
 
-    final_answer = _find_final_answer(event, event_type)
+    final_answer = _find_explicit_final_answer(event, event_type)
     if final_answer:
         return f"external_agent_activity: final_answer - {_bounded_preview(final_answer)}"
 
@@ -812,7 +812,7 @@ def _external_agent_stderr_progress_line(line: str) -> str:
     return f"external_agent_activity: stderr - {preview}"
 
 
-def _bounded_preview(value: str, *, limit: int = 160) -> str:
+def _bounded_preview(value: str, *, limit: int = 360) -> str:
     """Return a single-line preview without exposing unbounded event payloads."""
 
     preview = " ".join(value.strip().split())
@@ -826,6 +826,22 @@ def _bounded_json(value: dict[str, Any], *, limit: int = 180) -> str:
 
     text = json.dumps(value, sort_keys=True)
     return _bounded_preview(text, limit=limit)
+
+
+def _find_explicit_final_answer(event: dict[str, Any], event_type: str) -> str | None:
+    """Find only event shapes that explicitly represent the final answer."""
+
+    explicit = event.get("final_answer")
+    if isinstance(explicit, str) and explicit.strip():
+        return explicit.strip()
+    if event_type == "final_answer" or event_type.endswith(".final_answer"):
+        return _find_text_payload(event)
+    nested = event.get("item")
+    if isinstance(nested, dict):
+        nested_type = _event_type(nested)
+        if nested_type == "final_answer" or nested_type.endswith(".final_answer"):
+            return _find_text_payload(nested)
+    return None
 
 
 def _find_string_payload(value: Any, keys: tuple[str, ...]) -> str | None:

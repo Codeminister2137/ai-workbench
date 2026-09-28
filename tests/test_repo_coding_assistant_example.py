@@ -738,6 +738,7 @@ def test_cli_executes_codex_external_agent_route(capsys, monkeypatch) -> None:
     output = capsys.readouterr().out
     assert "external_agent_returncode: 0" in output
     assert "external_agent_jsonl_events: parsed" in output
+    assert "external_agent_command_line_json:" in output
     assert "external_agent_command_event_count: 1" in output
     assert "external_agent_tool_event_count: 1" in output
     assert "external_agent_web_search_event_count: 1" in output
@@ -752,6 +753,9 @@ def test_cli_executes_codex_external_agent_route(capsys, monkeypatch) -> None:
     assert "--sandbox" in command
     assert "workspace-write" in command
     assert calls[0]["kwargs"]["input"].startswith("# User request")
+    assert "# External agent execution metadata" in calls[0]["kwargs"]["input"]
+    assert "codex_sandbox: workspace-write" in calls[0]["kwargs"]["input"]
+    assert "Do not describe the session as read-only" in calls[0]["kwargs"]["input"]
     assert calls[0]["kwargs"]["encoding"] == "utf-8"
     assert calls[0]["kwargs"]["errors"] == "replace"
     assert "# Repository context" in calls[0]["kwargs"]["input"]

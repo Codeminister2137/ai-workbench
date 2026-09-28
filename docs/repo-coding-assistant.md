@@ -217,11 +217,15 @@ an inactivity timeout. Model output resets the timer, and the CLI prints bounded
 `external_agent_activity` or `external_agent_status` lines during long runs so
 the transcript shows that work is still active. Activity lines include bounded
 details from parsed JSONL where useful, such as command previews,
-final-answer previews, failure reasons, search queries, usage summaries, and
-stderr previews. Hidden reasoning-summary events remain type-only and raw JSONL
-stays in the transcript-only section. If a timeout or process error occurs
-after partial output, the CLI summarizes parsed JSONL events and keeps raw JSONL
-in the transcript-only section rather than dumping it to the console.
+agent-message previews, explicit final-answer previews, failure reasons, search
+queries, usage summaries, and stderr previews. Hidden reasoning-summary events
+remain type-only and raw JSONL stays in the transcript-only section. The CLI
+prints the exact `external_agent_command_line_json` before execution and adds
+the effective approval policy and Codex sandbox to the prompt so the external
+agent does not infer a read-only environment when the requested sandbox is
+`workspace-write` or stronger. If a timeout or process error occurs after
+partial output, the CLI summarizes parsed JSONL events and keeps raw JSONL in
+the transcript-only section rather than dumping it to the console.
 
 Local execution paths use equivalent bounded activity prefixes:
 `local_agent_activity` for local provider/native tool-loop model calls,

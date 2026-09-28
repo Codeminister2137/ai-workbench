@@ -2256,6 +2256,8 @@ def _run_external_agent_cli_mode(
         print(f"external_agent_command: {config.command}")
         print(f"approval_policy: {args.approval_policy}")
         print(f"external_agent_sandbox: {config.sandbox}")
+        command = _build_external_agent_command(config)
+        print("external_agent_command_line_json: " + json.dumps(list(command)))
         print(f"external_agent_ephemeral: {config.ephemeral}")
         if config.resume is not None:
             print(f"external_agent_resume: {config.resume}")
@@ -2274,8 +2276,14 @@ def _run_external_agent_cli_mode(
         print("\n=== Assistant response ===")
         response_header_printed = True
         if args.execute and args.mode != "plan":
+            external_prompt = _external_agent_prompt_with_execution_metadata(
+                prompt,
+                approval_policy=args.approval_policy,
+                sandbox=config.sandbox,
+                mode=args.mode,
+            )
             primary_started = time.perf_counter()
-            external_result = _run_external_agent(prompt, config)
+            external_result = _run_external_agent(external_prompt, config)
             primary_elapsed_seconds = time.perf_counter() - primary_started
             print(f"external_agent_returncode: {external_result.returncode}")
             if external_result.events is not None:
@@ -2311,9 +2319,7 @@ def _run_external_agent_cli_mode(
             )
             exit_code = 0 if execution_status == "completed" else external_result.returncode or 1
         else:
-            command = _build_external_agent_command(config)
             print("execution: skipped")
-            print("external_agent_command_line_json: " + json.dumps(list(command)))
     except (FileNotFoundError, NotImplementedError, subprocess.TimeoutExpired) as exc:
         if not response_header_printed:
             print("\n=== Assistant response ===")
@@ -2337,6 +2343,28 @@ def _run_external_agent_cli_mode(
     if close_transcript is not None:
         close_transcript()
     return exit_code
+
+
+def _external_agent_prompt_with_execution_metadata(
+    prompt: str,
+    *,
+    approval_policy: str,
+    sandbox: str,
+    mode: str,
+) -> str:
+    """Add execution metadata so external agents do not infer the wrong sandbox."""
+
+    return (
+        f"{prompt}\n\n"
+        "# External agent execution metadata\n"
+        f"repo_assistant_mode: {mode}\n"
+        f"repo_assistant_approval_policy: {approval_policy}\n"
+        f"codex_sandbox: {sandbox}\n"
+        "filesystem_note: Use the sandbox value above as the effective Codex CLI "
+        "filesystem policy for this run. Do not describe the session as read-only "
+        "unless a command result explicitly reports a read-only or permission-denied "
+        "failure."
+    )
 
 
 def _print_external_agent_event_summary(events: ExternalAgentEventSummary) -> None:
