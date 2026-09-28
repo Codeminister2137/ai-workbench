@@ -918,6 +918,54 @@ def test_cli_does_not_print_raw_jsonl_when_codex_fails(capsys, monkeypatch) -> N
     assert raw_jsonl.strip() not in output
 
 
+def test_cli_reports_nonzero_external_agent_exit_without_jsonl_failure(
+    tmp_path: Path,
+    capsys,
+    monkeypatch,
+) -> None:
+    def fake_run(*args, **kwargs):
+        return _EXAMPLE.subprocess.CompletedProcess(
+            args[0],
+            2,
+            '{"type":"final_answer","content":"partial answer"}\n',
+            "plain stderr failure detail",
+        )
+
+    log_file = tmp_path / "transcript.log"
+    monkeypatch.setenv("CODEX_COMMAND", "codex-test")
+    monkeypatch.setattr(_EXAMPLE.subprocess, "run", fake_run)
+
+    assert (
+        main(
+            [
+                "--mode",
+                "ask",
+                "Review this repository.",
+                "--privacy",
+                "external_allowed",
+                "--route-id",
+                "openai-codex-gpt-5-5",
+                "--provider",
+                "openai",
+                "--model",
+                "gpt-5.5",
+                "--execute",
+                "--skip-prompt-review",
+                "--log-file",
+                str(log_file),
+            ]
+        )
+        == 2
+    )
+
+    output = capsys.readouterr().out
+    assert "partial answer" in output
+    assert "external_agent_failure_reason: process exited with code 2" in output
+    assert "external_agent_failure_hint: inspect external_agent_stderr_file" in output
+    assert "external_agent_stderr_file:" in output
+    assert "execution_status: failed" in output
+
+
 def test_cli_explains_codex_timeout_without_duplicate_response_header(
     capsys,
     monkeypatch,
@@ -958,10 +1006,25 @@ def test_cli_explains_codex_timeout_without_duplicate_response_header(
 def test_external_agent_stderr_is_bounded() -> None:
     stderr = _EXAMPLE._format_external_agent_stderr("x" * 2500, limit=100)
 
-    assert stderr.startswith("x" * 100)
-    assert "external agent stderr preview truncated:" in stderr
+    assert stderr.startswith("external_agent_stderr_preview:")
+    assert "x" * 100 in stderr
+    assert "stderr preview truncated:" in stderr
     assert "characters omitted" in stderr
     assert "see external_agent_stderr_file for full stderr" in stderr
+
+
+def test_external_agent_jsonl_parser_ignores_completed_failure_mentions() -> None:
+    events = parse_external_agent_jsonl(
+        "\n".join(
+            [
+                '{"type":"item.completed","item":{"type":"agent_message",'
+                '"text":"Validation initially failed, then passed."}}',
+                '{"type":"turn.completed","usage":{"input_tokens":1,"output_tokens":1}}',
+            ]
+        )
+    )
+
+    assert events.failure_reason is None
 
 
 def test_external_agent_stderr_filters_noisy_codex_model_refresh() -> None:
@@ -2045,6 +2108,14 @@ def test_implement_mode_defaults_to_native_tools(capsys, monkeypatch) -> None:
 
     output = capsys.readouterr().out
     assert "native done" in output
+    assert "provider_native_tools: enabled" in output
+    assert "provider_native_approval_policy: interactive" in output
+    assert (
+        'provider_native_tool_policy_json: {"custom": "ask_user", "read": "allow", '
+        '"search": "allow", "shell": "ask_user", "write": "ask_user"}'
+    ) in output
+    assert "provider_native_requires_interactive_approval: True" in output
+    assert ("provider_native_delegation: enabled: primary agent may call delegate_task") in output
     assert "delegation: completed: native delegate_task" in output
     assert "execution_status: completed" in output
 
@@ -2149,6 +2220,13 @@ def test_native_agent_can_delegate_small_write_task(tmp_path: Path, monkeypatch)
     assert result.response.message.content == "primary complete"
     assert (tmp_path / "delegated.txt").read_text(encoding="utf-8") == "delegated"
     assert result.tool_results[0].name == "delegate_task"
+    assert "Delegated task status: completed" in result.tool_results[0].output
+    assert "Tool results: 1 total, 0 failed" in result.tool_results[0].output
+    assert (
+        "- 1. create_file: ok - Successfully created file delegated.txt"
+        in result.tool_results[0].output
+    )
+    assert "Child final response:\nchild complete" in result.tool_results[0].output
     assert any(event.startswith("delegated_agent_activity: model_request -") for event in events)
 
 

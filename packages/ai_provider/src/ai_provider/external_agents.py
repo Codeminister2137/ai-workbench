@@ -508,7 +508,7 @@ def parse_external_agent_jsonl(text: str) -> ExternalAgentEventSummary:
         if event_usage is not None:
             usage = event_usage
         event_failure = _find_failure_reason(event, event_type)
-        if event_failure is not None and (failure_reason is None or event_failure != event_type):
+        if event_failure is not None:
             failure_reason = event_failure
         event_answer = _find_final_answer(event, event_type)
         if event_answer:
@@ -972,8 +972,7 @@ def _find_usage(value: Any) -> dict[str, Any] | None:
 def _find_failure_reason(event: dict[str, Any], event_type: str) -> str | None:
     """Find a failure or error reason in an event."""
 
-    haystack = _event_haystack(event, event_type)
-    if not any(token in haystack for token in ("error", "failed", "failure")):
+    if not _has_failure_marker(event, event_type):
         return None
     for key in ("error", "failure", "details"):
         value = event.get(key)
@@ -989,7 +988,36 @@ def _find_failure_reason(event: dict[str, Any], event_type: str) -> str | None:
         value = event.get(key)
         if isinstance(value, str) and value.strip():
             return value.strip()
+    nested = event.get("item")
+    if isinstance(nested, dict):
+        nested_failure = _find_failure_reason(nested, _event_type(nested))
+        if nested_failure is not None:
+            return nested_failure
     return event_type or "external agent reported failure"
+
+
+def _has_failure_marker(event: dict[str, Any], event_type: str) -> bool:
+    """Return whether event labels explicitly report a failure."""
+
+    labels = [event_type]
+    for key in ("type", "event", "kind", "name", "subtype", "status"):
+        value = event.get(key)
+        if isinstance(value, str):
+            labels.append(value.lower())
+    nested = event.get("item")
+    if isinstance(nested, dict):
+        labels.append(_event_type(nested))
+        status = nested.get("status")
+        if isinstance(status, str):
+            labels.append(status.lower())
+    return any(
+        label in {"error", "failed", "failure"}
+        or label.endswith(".failed")
+        or label.endswith("_failed")
+        or label.endswith(".error")
+        or label.endswith("_error")
+        for label in labels
+    )
 
 
 def _find_final_answer(event: dict[str, Any], event_type: str) -> str | None:

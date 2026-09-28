@@ -675,7 +675,7 @@ def parse_external_agent_jsonl(text: str) -> ExternalAgentEventSummary:
         if event_usage is not None:
             usage = event_usage
         event_failure = _find_failure_reason(event, event_type)
-        if event_failure is not None and (failure_reason is None or event_failure != event_type):
+        if event_failure is not None:
             failure_reason = event_failure
         event_answer = _find_final_answer(event, event_type)
         if event_answer:
@@ -771,8 +771,7 @@ def _find_usage(value: Any) -> dict[str, Any] | None:
 def _find_failure_reason(event: dict[str, Any], event_type: str) -> str | None:
     """Find a failure or error reason in an event."""
 
-    haystack = _event_haystack(event, event_type)
-    if not any(token in haystack for token in ("error", "failed", "failure")):
+    if not _has_failure_marker(event, event_type):
         return None
     for key in ("error", "failure", "details"):
         value = event.get(key)
@@ -788,7 +787,36 @@ def _find_failure_reason(event: dict[str, Any], event_type: str) -> str | None:
         value = event.get(key)
         if isinstance(value, str) and value.strip():
             return value.strip()
+    nested = event.get("item")
+    if isinstance(nested, dict):
+        nested_failure = _find_failure_reason(nested, _event_type(nested))
+        if nested_failure is not None:
+            return nested_failure
     return event_type or "external agent reported failure"
+
+
+def _has_failure_marker(event: dict[str, Any], event_type: str) -> bool:
+    """Return whether event labels explicitly report a failure."""
+
+    labels = [event_type]
+    for key in ("type", "event", "kind", "name", "subtype", "status"):
+        value = event.get(key)
+        if isinstance(value, str):
+            labels.append(value.lower())
+    nested = event.get("item")
+    if isinstance(nested, dict):
+        labels.append(_event_type(nested))
+        status = nested.get("status")
+        if isinstance(status, str):
+            labels.append(status.lower())
+    return any(
+        label in {"error", "failed", "failure"}
+        or label.endswith(".failed")
+        or label.endswith("_failed")
+        or label.endswith(".error")
+        or label.endswith("_error")
+        for label in labels
+    )
 
 
 def _find_final_answer(event: dict[str, Any], event_type: str) -> str | None:
@@ -1963,6 +1991,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                     else "unreachable"
                 )
             )
+    if args.native_tools:
+        _print_provider_native_policy_diagnostics(
+            args.approval_policy,
+            delegation_enabled=args.mode == "implement" and not args.no_native_tools,
+        )
     print("\n=== Assistant response ===")
     assistant_response_text = None
     if args.native_tools and args.execute and result.config is not None:
@@ -2381,6 +2414,13 @@ def _run_external_agent_cli_mode(
                 if external_result.events is not None
                 else None
             )
+            if external_result.returncode != 0 and parsed_failure is None:
+                print(
+                    "external_agent_failure_reason: "
+                    f"process exited with code {external_result.returncode}"
+                )
+                if external_result.stderr:
+                    print("external_agent_failure_hint: inspect external_agent_stderr_file")
             execution_status = (
                 "completed"
                 if external_result.returncode == 0 and parsed_failure is None
@@ -2529,15 +2569,17 @@ def _write_external_agent_raw_jsonl(raw_jsonl: str) -> None:
 
 
 def _format_external_agent_stderr(stderr: str, *, limit: int = 2000) -> str:
-    """Bound noisy external-agent stderr while preserving the actionable prefix."""
+    """Bound noisy external-agent stderr while pointing to the complete log."""
 
     filtered = _filter_external_agent_stderr(stderr)
     if len(filtered) <= limit:
         return filtered
     omitted = len(filtered) - limit
     return (
-        filtered[:limit].rstrip()
-        + f"\n[external agent stderr preview truncated: {omitted} characters omitted; "
+        "external_agent_stderr_preview: "
+        "truncated non-JSON stderr; see external_agent_stderr_file for complete output\n"
+        + filtered[:limit].rstrip()
+        + f"\n[stderr preview truncated: {omitted} characters omitted; "
         "see external_agent_stderr_file for full stderr]\n"
     )
 
@@ -2689,7 +2731,12 @@ def _run_native_agent(
                 is_error=True,
             )
 
-        output = child_result.response.message.content
+        output = _format_delegated_task_output(
+            task=task,
+            child_output=child_result.response.message.content,
+            iterations=child_result.iterations,
+            tool_results=child_result.tool_results,
+        )
         if progress_callback is not None:
             progress_callback(
                 "delegated_agent_activity: completed - "
@@ -2750,6 +2797,37 @@ def _activity_preview(value: str, *, limit: int = 160) -> str:
     return preview[: max(0, limit - 15)].rstrip() + " ...[truncated]"
 
 
+def _format_delegated_task_output(
+    *,
+    task: str,
+    child_output: str,
+    iterations: int,
+    tool_results: Sequence[ToolResult],
+) -> str:
+    """Build a bounded child-agent handoff for the primary model."""
+
+    failed_count = sum(1 for result in tool_results if result.is_error)
+    status = "failed" if failed_count else "completed"
+    lines = [
+        f"Delegated task status: {status}",
+        f"Task: {_activity_preview(task, limit=240)}",
+        f"Iterations: {iterations}",
+        f"Tool results: {len(tool_results)} total, {failed_count} failed",
+    ]
+    if tool_results:
+        lines.append("Tool result summary:")
+        for index, result in enumerate(tool_results[:5], start=1):
+            result_status = "error" if result.is_error else "ok"
+            lines.append(
+                f"- {index}. {result.name}: {result_status} - "
+                f"{_activity_preview(result.output, limit=240)}"
+            )
+        if len(tool_results) > 5:
+            lines.append(f"- ... {len(tool_results) - 5} additional tool result(s) omitted")
+    lines.extend(["Child final response:", child_output.strip() or "(empty)"])
+    return "\n".join(lines)
+
+
 def _delegation_status_after_native_tools(
     current_status: str,
     tool_results: Sequence[ToolResult],
@@ -2767,6 +2845,28 @@ def _delegation_status_after_native_tools(
     if current_status == "disabled":
         return native_status
     return f"{current_status}; {native_status}"
+
+
+def _print_provider_native_policy_diagnostics(
+    approval_policy: str,
+    *,
+    delegation_enabled: bool,
+) -> None:
+    """Print secret-free provider-native tool policy diagnostics."""
+
+    policy = PermissionPolicy.from_approval_preset(approval_policy)
+    actions = {
+        category.value: policy.action_for_category(category).value for category in ToolCategory
+    }
+    requires_approval = any(action == "ask_user" for action in actions.values())
+    print("provider_native_tools: enabled")
+    print(f"provider_native_approval_policy: {approval_policy}")
+    print("provider_native_tool_policy_json: " + json.dumps(actions, sort_keys=True))
+    print(f"provider_native_requires_interactive_approval: {requires_approval}")
+    print(
+        "provider_native_delegation: "
+        + ("enabled: primary agent may call delegate_task" if delegation_enabled else "disabled")
+    )
 
 
 def _run_action_loop(

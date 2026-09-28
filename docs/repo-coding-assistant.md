@@ -183,11 +183,20 @@ choose the model-neutral local action policy. The default is `interactive`.
   and continue asking before provider-native shell/custom tools.
 - `trusted_local`: allow local read/write/shell tool actions without asking.
 
+When provider-native tools are active, the transcript prints secret-free policy
+diagnostics before the assistant response. The diagnostic block includes the
+active approval preset, the read/search/write/shell/custom action mapping,
+whether interactive approval can be requested, and whether `delegate_task` is
+available to the primary agent.
+
 The primary native agent also receives `delegate_task`, a bounded delegation
 tool for handing focused support work to a derived local/cheaper child route.
 The child agent can inspect files, run the standard coding tools, and write
 small code changes when the active approval policy permits writes. Nested
-delegation is disabled so runs remain bounded and reviewable.
+delegation is disabled so runs remain bounded and reviewable. Delegated task
+results are returned to the primary agent as a bounded handoff containing child
+status, iteration count, tool-result counts, a short tool-result summary, and
+the child final response.
 
 For Codex CLI routes, the current local CLI exposes sandbox modes and a
 top-level approval flag rather than the full managed ChatGPT approval surface:
@@ -208,6 +217,13 @@ The CLI prints phase headers so metadata and the model response are easy to
 scan. To preserve a complete local transcript for later analysis, opt in with
 `--log-file`; transcript files may contain the request and repository context,
 so keep them local:
+
+External-agent JSONL stdout is summarized for the console while the raw JSONL is
+kept in the transcript only. If the external agent writes long stderr output,
+the console shows a bounded preview and an `external_agent_stderr_file` path for
+the full stderr. Non-zero external-agent exits also print an explicit
+`external_agent_failure_reason`, so a truncated stderr preview is supporting
+diagnostic detail rather than the only failure explanation.
 
 ```powershell
 .\scripts\repo-assistant.ps1 `

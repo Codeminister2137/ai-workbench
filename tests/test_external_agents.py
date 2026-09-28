@@ -97,6 +97,54 @@ def test_parse_external_agent_jsonl_counts_web_search_events() -> None:
     assert events.final_answer == "done"
 
 
+def test_parse_external_agent_jsonl_ignores_completed_command_output_failures() -> None:
+    events = parse_external_agent_jsonl(
+        "\n".join(
+            [
+                json.dumps(
+                    {
+                        "type": "item.completed",
+                        "item": {
+                            "type": "command_execution",
+                            "status": "completed",
+                            "aggregated_output": "FAILED tests/test_example.py::test_case",
+                        },
+                    }
+                ),
+                json.dumps(
+                    {
+                        "type": "item.completed",
+                        "item": {
+                            "type": "agent_message",
+                            "text": "## SUMMARY\nValidation found one failed test before the fix.",
+                        },
+                    }
+                ),
+                '{"type":"turn.completed","usage":{"input_tokens":10,"output_tokens":5}}',
+            ]
+        )
+    )
+
+    assert events.failure_reason is None
+
+
+def test_parse_external_agent_jsonl_reports_explicit_failed_status() -> None:
+    events = parse_external_agent_jsonl(
+        json.dumps(
+            {
+                "type": "item.completed",
+                "item": {
+                    "type": "command_execution",
+                    "status": "failed",
+                    "error": {"message": "pytest failed"},
+                },
+            }
+        )
+    )
+
+    assert events.failure_reason == "pytest failed"
+
+
 def test_external_agent_progress_line_summarizes_json_events() -> None:
     assert (
         _external_agent_progress_line('{"type":"response.reasoning_summary.delta"}\n')
