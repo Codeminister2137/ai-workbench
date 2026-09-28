@@ -1,4 +1,5 @@
 # Local conversation data
+council.json
 data/
 *.sqlite
 *.sqlite3

@@ -314,7 +314,7 @@ Context:
 $SELECTION
 
 Instructions:
-- Use docs/plans/03_Job_Search_Automation_Project_Plan.docx.
+- Use the private local job-search plan under docs/plans/ when present.
 - Optimize for relevant applications with less repetitive effort, not blind volume.
 - Candidate profile is the source of truth; every factual claim must trace to evidence.
 - Never invent or upgrade experience, employment, projects, certifications, metrics, responsibilities, or tools.
@@ -336,7 +336,7 @@ Context:
 $SELECTION
 
 Instructions:
-- Use docs/plans/02_AI_Council_Project_Plan.docx and keep Council responsibilities separate from Orchestrator/provider responsibilities.
+- Use the private local AI Council plan under docs/plans/ when present, and keep Council responsibilities separate from Orchestrator/provider responsibilities.
 - Council owns multi-perspective workflow, response collection, disagreement handling, synthesis, presentation, and export.
 - Preserve raw answers, provenance, uncertainty, minority claims, and visible local/cloud/hybrid routing.
 - Do not put provider adapters, model routing policy, prompt judging/refinement, or quota-aware routing inside the Council.
@@ -376,7 +376,7 @@ Context:
 $SELECTION
 
 Instructions:
-- Use docs/plans/05_AI_Orchestrator_Project_Plan.docx and the provider/orchestrator boundary in docs/architecture.md.
+- Use the private local Orchestrator plan under docs/plans/ when present, and the provider/orchestrator boundary in docs/architecture.md.
 - The Orchestrator owns prompt judging/refinement, task profiles, model recommendation, request configuration, routing, fallbacks, privacy constraints, quota/economics awareness, and usage integration.
 - It must not implement provider adapters or become the Council.
 - Preserve original prompts. Refinement must not silently change user intent or invent facts.
@@ -397,7 +397,7 @@ Context:
 $SELECTION
 
 Instructions:
-- Use docs/plans/01_AI_Provider_Agnostic_Infrastructure_Plan.docx, docs/architecture.md, and ADR-014/ADR-015 as planning context.
+- Use the private local provider-infrastructure plan under docs/plans/ when present, plus docs/architecture.md and ADR-014/ADR-015 as planning context.
 - The provider layer owns common contracts, adapters, provider identity, errors, usage metadata, timeouts, and local/cloud visibility.
 - It does not own prompt judging, model selection policy, Council synthesis, job-search logic, or autonomous agents.
 - Keep the interface small and capability-gated. Preserve useful raw provider metadata.
@@ -521,7 +521,7 @@ Context:
 $SELECTION
 
 Instructions:
-- First read CURRENT_CONTEXT.md, AGENTS.md, docs/architecture.md, docs/decisions.md, docs/workflow.md, docs/project-map.md, docs/definition-of-done.md, relevant ADRs, and relevant docs/plans files.
+- First read CURRENT_CONTEXT.md, AGENTS.md, docs/architecture.md, docs/decisions.md, docs/workflow.md, docs/project-map.md, docs/definition-of-done.md, relevant ADRs, and relevant private local docs/plans files when present.
 - Verify the handoff against current code, tests, config, and git status before trusting it.
 - Identify whether the next step belongs in ai_provider or ai_orchestrator and confirm the boundary.
 - If the next action is clear and no material decision is required, implement it with focused tests and validation.
@@ -542,8 +542,8 @@ Context:
 $SELECTION
 
 Instructions:
-- Read CURRENT_CONTEXT.md if present, AGENTS.md, docs/architecture.md, docs/decisions.md, docs/workflow.md, docs/project-map.md, docs/definition-of-done.md, relevant ADRs, and relevant docs/plans files.
-- Identify which plan files are relevant and which are skipped as unrelated or superseded.
+- Read CURRENT_CONTEXT.md if present, AGENTS.md, docs/architecture.md, docs/decisions.md, docs/workflow.md, docs/project-map.md, docs/definition-of-done.md, relevant ADRs, and relevant private local docs/plans files when present.
+- Identify which available local plan files are relevant and which are skipped as unrelated or superseded.
 - Inspect the current code and tests before assuming documentation is current.
 - Do not modify files.
 
@@ -561,7 +561,7 @@ Context:
 $SELECTION
 
 Instructions:
-- Inspect the current repository state, relevant docs/plans, recent work, validation status, git status, and open risks.
+- Inspect the current repository state, relevant private local docs/plans when present, recent work, validation status, git status, and open risks.
 - Keep CURRENT_CONTEXT.md compact and action-oriented; it is an ignored local handoff, not an ADR or history log.
 - Preserve only information needed to restart work quickly: last completed work, validation baseline, active boundaries, open risks, and next recommended action.
 - Remove stale or duplicated details when they no longer help resumption.

@@ -113,7 +113,7 @@ pass:
   generated artifacts;
 - keep secrets, logs, SQLite files, PDFs, email history, local context, caches,
   and IDE metadata ignored;
-- decide whether private planning documents in `docs/plans/` should remain in
-  the public repository, be summarized, or stay private;
+- keep private planning documents in ignored local `docs/plans/` files unless a
+  separate decision approves a public summary;
 - ensure each published package or app has a clear README and safe example
   configuration.

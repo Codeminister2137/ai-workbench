@@ -430,11 +430,16 @@ Then read targeted authoritative docs for the task:
 * relevant sections of `docs/architecture.md`, `docs/decisions.md`,
   `docs/workflow.md`, `docs/project-map.md`, and `docs/definition-of-done.md`;
 * relevant detailed ADRs in `docs/decisions/`;
-* relevant project plans in `docs/plans/`.
+* relevant private local project plans in `docs/plans/`, when present.
 
 Use those files as active boundaries, not background decoration. If they conflict with the current request or the current code, identify the conflict and ask the user when the resolution is material.
 
-When planning non-trivial work, explicitly identify which `docs/plans/` files are relevant and take them into account before proposing implementation steps. If a plan is skipped because it is unrelated, obsolete, or superseded by code/decisions, state that briefly. If a `.docx` plan is relevant, extract/read its text rather than ignoring it because it is not Markdown.
+When planning non-trivial work, explicitly identify which available private local
+`docs/plans/` files are relevant and take them into account before proposing
+implementation steps. If a plan is skipped because it is unrelated, obsolete, or
+superseded by code/decisions, state that briefly. If a `.docx` plan is relevant,
+extract/read its text rather than ignoring it because it is not Markdown. These
+plans are local context and are not part of the public repository.
 
 Do a fuller documentation sweep only when:
 

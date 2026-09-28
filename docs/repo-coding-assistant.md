@@ -558,11 +558,10 @@ diagnostics, but their execution adapters remain disabled until their official
 noninteractive command contracts and local executable paths are confirmed.
 
 The accepted parity direction is recorded in
-`docs/decisions/ADR-024-codex-cli-parity-authorization-and-dev-tool-policy.md`
-and `docs/plans/repo-assistant-cli-parity-plan.md`. Codex remains the baseline
-capability target, but approval policy, tool authorization, and development
-tool contracts should stay model-neutral so alternate executors can use the
-same policy.
+`docs/decisions/ADR-024-codex-cli-parity-authorization-and-dev-tool-policy.md`.
+Codex remains the baseline capability target, but approval policy, tool
+authorization, and development tool contracts should stay model-neutral so
+alternate executors can use the same policy.
 
 ### Codex Capability Matrix
 

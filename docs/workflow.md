@@ -11,7 +11,7 @@ For most work:
    targeted file discovery/search.
 2. Read local `CURRENT_CONTEXT.md` when present.
 3. Read the relevant sections of root/nested `AGENTS.md` files and canonical docs.
-4. Read only the ADRs and project plans that affect the current task.
+4. Read only the ADRs and any private local project plans that affect the current task.
 5. Inspect current code, tests, and configuration in the affected area.
 
 Do a fuller documentation sweep when the task changes architecture, privacy,
@@ -19,7 +19,10 @@ dependencies, persistence, public APIs, data contracts, or provider/application
 boundaries; when docs and code conflict; when resuming after context loss; or
 when a durable decision may be needed.
 
-When reporting an investigation or implementation plan, identify the `docs/plans/` files used as planning input. If a plan is not used because it is unrelated, obsolete, or superseded, say so briefly.
+When reporting an investigation or implementation plan, identify any private
+local `docs/plans/` files used as planning input. The public repository does not
+track those files. If a local plan is not used because it is unrelated, obsolete,
+or superseded, say so briefly.
 
 ## 2. Investigation pass
 Do not modify files. Report:

@@ -192,9 +192,11 @@ See `AGENTS.md` for the detailed operating rules.
 | `docs/repo-coding-assistant.md` | How to run the repo-aware coding assistant CLI               |
 | `docs/project-map.md`        | Where different responsibilities belong                         |
 | `docs/definition-of-done.md` | Completion checklist                                            |
-| `docs/plans/`                | Detailed project plans                                          |
 | `scripts/repo-assistant.ps1` | One-command launcher for the repo-aware coding assistant        |
 | `scripts/session-boundary.ps1` | Read-only Codex/PyCharm chat boundary helper                 |
+
+Private planning notes may exist locally under `docs/plans/`, but that
+directory is ignored and is not part of the public repository.
 
 ---
 

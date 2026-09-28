@@ -29,7 +29,8 @@ Use this file to decide where a change belongs before adding new abstractions.
 - `api-docs.md` — generated Python API documentation workflow using `pdoc`.
 - `repo-coding-assistant.md` — practical runbook for the repo-aware coding
   assistant CLI, including setup, commands, provider selection, and precautions.
-- `plans/` — project plans that must be considered before planning non-trivial work in the related area.
+- `plans/` — ignored private local project plans, when present. They are not
+  part of the public repository.
 
 ## Layout
 

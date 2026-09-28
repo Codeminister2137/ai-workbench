@@ -3,7 +3,7 @@ name = "ai-council"
 version = "0.1.0"
 description = ""
 authors = [
-    {name = "Codeminister2137",email = "kubajaworski99@wp.pl"}
+    {name = "AI Projects contributors"}
 ]
 requires-python = ">=3.13,<3.15"
 dependencies = [
