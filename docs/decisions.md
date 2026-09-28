@@ -84,6 +84,18 @@ the selected approval policy, to a derived local/cheaper child route.
 
 Detailed ADR: `docs/decisions/ADR-026-agent-specific-delegation-default.md`
 
+## ADR-027 - GitHub Publication Keeps The Workspace Monorepo
+**Status:** Accepted
+**Date:** 2026-09-28
+
+Publish the project as one cleaned-up GitHub monorepo for now. Keep strong
+internal package and app boundaries, make each meaningful component independently
+documented and testable, and defer physical repository extraction until stable
+APIs, release cadence, privacy boundaries, or review workflow create a concrete
+need.
+
+Detailed ADR: `docs/decisions/ADR-027-github-publication-monorepo.md`
+
 ## Template
 ```text
 ## ADR-NNN — Short Name

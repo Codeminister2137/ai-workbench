@@ -71,6 +71,12 @@ same criteria.
 ## 2. Modular monolith first
 Start as a modular monolith. Extract a separately deployable service only for a demonstrated need such as independent scaling/deployment, a different security/runtime boundary, operational isolation, or a real development bottleneck.
 
+For GitHub publication, keep the workspace as one cleaned-up monorepo with
+strong internal `packages/` and `apps/` boundaries. Separate repositories remain
+a future option only when a concrete extraction criterion is met, such as stable
+independent releases, different access/privacy boundaries, or a real review and
+development bottleneck.
+
 ## 3. Provider-agnostic AI infrastructure
 The provider layer exposes common AI request/response contracts and translates them to provider APIs. It owns provider authentication, request/response translation, provider errors, streaming, model IDs, and usage metadata.
 
