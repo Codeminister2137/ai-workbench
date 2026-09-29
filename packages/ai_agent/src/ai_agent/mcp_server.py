@@ -9,12 +9,33 @@ from collections.abc import Iterable, Sequence
 from pathlib import Path
 from typing import Any
 
-from ai_agent.contracts import ToolCall, ToolDefinition
+from ai_orchestrator import (
+    CostPolicyTier,
+    LatencyTarget,
+    QualityThreshold,
+    TaskProfile,
+    TaskType,
+    derive_subtask_profile,
+    load_model_catalog,
+    prepare_execution,
+)
+from ai_orchestrator import (
+    PrivacyClass as OrchestratorPrivacyClass,
+)
+from ai_provider import BackendConfig, PrivacyClass, ProviderKind, create_chat_client
+
+from ai_agent.contracts import ToolCall, ToolDefinition, ToolResult
+from ai_agent.loop import AgentLoop
 from ai_agent.tools import FindFilesTool, GrepSearchTool, ListDirTool, ReadFileTool, ToolContext
 from ai_agent.tools.base import BaseTool, ToolRegistry
+from ai_agent.tools.delegation import DelegateTaskTool
 
 READ_SEARCH_TOOLS = ("read_file", "list_dir", "find_files", "grep_search")
+CODEX_MCP_TOOLS = (*READ_SEARCH_TOOLS, "delegate_task")
 PROTOCOL_VERSION = "2025-06-18"
+DEFAULT_CATALOG_PATH = Path("packages/ai_orchestrator/examples/model_catalog.toml")
+DEFAULT_DELEGATION_TIMEOUT_SECONDS = 180.0
+DEFAULT_DELEGATION_MAX_ITERATIONS = 3
 
 
 def read_search_tool_registry() -> ToolRegistry:
@@ -27,6 +48,130 @@ def read_search_tool_registry() -> ToolRegistry:
             FindFilesTool(),
             GrepSearchTool(),
         )
+    )
+
+
+def codex_mcp_tool_registry(
+    *,
+    catalog_path: Path,
+    timeout_seconds: float = DEFAULT_DELEGATION_TIMEOUT_SECONDS,
+    max_iterations: int = DEFAULT_DELEGATION_MAX_ITERATIONS,
+) -> ToolRegistry:
+    """Create the MCP-exposed registry, including bounded local delegation."""
+
+    registry = read_search_tool_registry()
+    registry.register(
+        DelegateTaskTool(
+            runner=_local_read_only_delegated_task_runner(
+                catalog_path=catalog_path,
+                timeout_seconds=timeout_seconds,
+                max_iterations=max_iterations,
+            )
+        )
+    )
+    return registry
+
+
+def _local_read_only_delegated_task_runner(
+    *,
+    catalog_path: Path,
+    timeout_seconds: float,
+    max_iterations: int,
+):
+    def run(task: str, context: ToolContext) -> ToolResult:
+        parent_profile = TaskProfile(
+            task_type=TaskType.CODING,
+            privacy_class=OrchestratorPrivacyClass.LOCAL_ONLY,
+            cost_policy_tier=CostPolicyTier.LOCAL_ONLY,
+        )
+        profile = derive_subtask_profile(
+            parent=parent_profile,
+            task_type=TaskType.CODING,
+            quality_threshold=QualityThreshold.STANDARD,
+            latency_target=LatencyTarget.BACKGROUND,
+            cost_policy_tier=CostPolicyTier.LOCAL_ONLY,
+            privacy_class=OrchestratorPrivacyClass.LOCAL_ONLY,
+        )
+        catalog = load_model_catalog(catalog_path)
+        orchestration = prepare_execution(
+            task,
+            profile,
+            catalog,
+            review_prompt=False,
+            timeout_seconds=timeout_seconds,
+        )
+        if not orchestration.is_ready or orchestration.execution_plan is None:
+            reason = orchestration.failure_reason or orchestration.status.value
+            return ToolResult(
+                name="delegate_task",
+                output=f"Error: delegated subtask route was not ready: {reason}",
+                is_error=True,
+            )
+
+        target = orchestration.execution_plan.target
+        if target.access_method.value != "local_runtime":
+            return ToolResult(
+                name="delegate_task",
+                output=(
+                    "Error: delegated subtask selected a non-local route. "
+                    f"route={target.route_id} access_method={target.access_method.value}"
+                ),
+                is_error=True,
+            )
+
+        config = BackendConfig(
+            provider=ProviderKind(target.provider),
+            model=target.model,
+            base_url=target.base_url,
+            timeout_seconds=target.timeout_seconds,
+        )
+        agent = AgentLoop(
+            create_chat_client(config),
+            read_search_tool_registry(),
+            context,
+            max_iterations=max_iterations,
+        )
+        result = agent.run(
+            _delegated_task_prompt(task),
+            model=config.model,
+            privacy_class=PrivacyClass.LOCAL_ONLY,
+        )
+        failed_count = sum(1 for item in result.tool_results if item.is_error)
+        output = "\n".join(
+            [
+                "Delegated task status: " + ("failed" if failed_count else "completed"),
+                f"Route: {target.route_id}",
+                f"Model: {target.model}",
+                "Tool surface: read/search only; nested delegation, writes, "
+                "and shell are disabled.",
+                f"Iterations: {result.iterations}",
+                f"Tool results: {len(result.tool_results)} total, {failed_count} failed",
+                "Child final response:",
+                result.response.message.content.strip() or "(empty)",
+            ]
+        )
+        return ToolResult(
+            name="delegate_task",
+            output=output,
+            is_error=failed_count > 0,
+            metadata={
+                "route_id": target.route_id,
+                "model": target.model,
+                "iterations": result.iterations,
+                "tool_results": len(result.tool_results),
+            },
+        )
+
+    return run
+
+
+def _delegated_task_prompt(task: str) -> str:
+    return (
+        "You are a bounded local child agent for the repository coding assistant.\n"
+        "Use only read/search tools. Do not edit files, run shell commands, choose "
+        "architecture, or make product decisions. Return concise findings with file "
+        "paths and line references when relevant.\n\n"
+        f"Task:\n{task}"
     )
 
 
@@ -48,7 +193,7 @@ def tool_definition_to_mcp_tool(definition: ToolDefinition) -> dict[str, Any]:
             "required": required,
         },
         "annotations": {
-            "readOnlyHint": True,
+            "readOnlyHint": definition.name != "delegate_task",
             "openWorldHint": False,
             "destructiveHint": False,
         },
@@ -82,9 +227,11 @@ def handle_mcp_message(
                     "version": "0.1.0",
                 },
                 "instructions": (
-                    "Use these tools only for read-only repository inspection inside the "
-                    "configured workspace. Paths outside the workspace are rejected. "
-                    "No write or shell tools are exposed by this MCP server."
+                    "Use these tools only for repository inspection and bounded local "
+                    "delegation inside the configured workspace. Paths outside the "
+                    "workspace are rejected. The delegate_task tool routes to a local-only "
+                    "child agent with read/search tools only. No write or shell tools are "
+                    "exposed by this MCP server."
                 ),
             },
         }
@@ -148,8 +295,35 @@ def main(argv: Sequence[str] | None = None) -> int:
         default=Path.cwd(),
         help="Workspace root that MCP tool calls are restricted to.",
     )
+    parser.add_argument(
+        "--catalog",
+        type=Path,
+        default=DEFAULT_CATALOG_PATH,
+        help="Model catalog used for local-only delegated subtasks.",
+    )
+    parser.add_argument(
+        "--delegation-timeout-seconds",
+        type=float,
+        default=DEFAULT_DELEGATION_TIMEOUT_SECONDS,
+        help="Provider timeout for local-only delegated subtasks.",
+    )
+    parser.add_argument(
+        "--delegation-max-iterations",
+        type=int,
+        default=DEFAULT_DELEGATION_MAX_ITERATIONS,
+        help="Maximum child-agent tool iterations for delegated subtasks.",
+    )
     args = parser.parse_args(argv)
-    return run_stdio_server(workspace_root=args.workspace_root)
+    workspace_root = args.workspace_root.resolve()
+    catalog_path = args.catalog if args.catalog.is_absolute() else workspace_root / args.catalog
+    return run_stdio_server(
+        workspace_root=workspace_root,
+        registry=codex_mcp_tool_registry(
+            catalog_path=catalog_path,
+            timeout_seconds=args.delegation_timeout_seconds,
+            max_iterations=args.delegation_max_iterations,
+        ),
+    )
 
 
 def _handle_tool_call(

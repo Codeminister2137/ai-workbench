@@ -1,3 +1,4 @@
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -11,10 +12,13 @@ def test_setup_project_codex_mcp_creates_project_config(tmp_path: Path) -> None:
     assert result.created is True
     assert result.config_path == tmp_path / ".codex" / "config.toml"
     assert "[mcp_servers.repo_assistant_tools]" in text
-    assert 'command = "python"' in text
-    assert '"-m", "uv", "run", "ai-agent-mcp", "--workspace-root"' in text
+    assert f'command = "{str(Path(sys.executable)).replace(chr(92), chr(92) * 2)}"' in text
+    assert '"-m", "ai_agent.mcp_server", "--workspace-root"' in text
     assert f'"{str(tmp_path).replace(chr(92), chr(92) * 2)}"' in text
-    assert 'enabled_tools = ["read_file", "list_dir", "find_files", "grep_search"]' in text
+    assert (
+        'enabled_tools = ["read_file", "list_dir", "find_files", "grep_search", '
+        '"delegate_task"]' in text
+    )
     assert 'default_tools_approval_mode = "auto"' in text
     assert "required = false" in text
     assert result.global_registered is False
@@ -115,11 +119,9 @@ def test_build_codex_mcp_add_command_uses_repo_workspace_root(tmp_path: Path) ->
         "add",
         "repo_assistant_tools",
         "--",
-        "python",
+        sys.executable,
         "-m",
-        "uv",
-        "run",
-        "ai-agent-mcp",
+        "ai_agent.mcp_server",
         "--workspace-root",
         str(tmp_path.resolve()),
     )

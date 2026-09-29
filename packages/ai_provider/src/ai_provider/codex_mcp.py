@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 import subprocess
+import sys
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -11,7 +12,13 @@ from pathlib import Path
 from ai_provider.external_agents import default_codex_command
 
 CODEX_MCP_SERVER_NAME = "repo_assistant_tools"
-CODEX_MCP_ENABLED_TOOLS = ("read_file", "list_dir", "find_files", "grep_search")
+CODEX_MCP_ENABLED_TOOLS = (
+    "read_file",
+    "list_dir",
+    "find_files",
+    "grep_search",
+    "delegate_task",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,16 +44,14 @@ def setup_project_codex_mcp(
     codex_command: str | None = None,
     runner: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
 ) -> CodexMcpSetupResult:
-    """Create/update Codex MCP config for repo read/search tools."""
+    """Create/update Codex MCP config for repo inspection and delegation tools."""
 
     repo_root = repo_root.resolve()
     config_path = repo_root / ".codex" / "config.toml"
-    command = "python"
+    command = sys.executable
     args = (
         "-m",
-        "uv",
-        "run",
-        "ai-agent-mcp",
+        "ai_agent.mcp_server",
         "--workspace-root",
         str(repo_root),
     )
@@ -136,11 +141,9 @@ def build_codex_mcp_add_command(
         "add",
         server_name,
         "--",
-        "python",
+        sys.executable,
         "-m",
-        "uv",
-        "run",
-        "ai-agent-mcp",
+        "ai_agent.mcp_server",
         "--workspace-root",
         str(repo_root.resolve()),
     )
