@@ -4,6 +4,7 @@ import argparse
 import atexit
 import json
 import re
+import shlex
 import subprocess
 import sys
 import time
@@ -42,6 +43,7 @@ from ai_orchestrator import (
     LatencyTarget,
     OrchestrationResult,
     QualityThreshold,
+    TaskCapability,
     TaskType,
     assess_delegation,
     derive_subtask_profile,
@@ -129,6 +131,7 @@ from ai_provider.transcripts import (
 
 
 DEFAULT_DELEGATION_CONTEXT_BUDGET_CHARS = 6_000
+DEFAULT_VALIDATION_COMMAND = "python -m pytest -q"
 CLI_MODES = ("ask", "review", "implement", "plan", "diagnose")
 APPROVAL_POLICY_PRESETS = tuple(item.value for item in ApprovalPolicyPreset)
 _TIMEOUT_OPTION_NAMES = ("--timeout-seconds",)
@@ -186,6 +189,19 @@ class AuxiliaryPanelResult:
     model: str | None = None
     response_text: str | None = None
     failure_reason: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ValidationCommandResult:
+    """Captured result for one deterministic validation command."""
+
+    command: str
+    returncode: int | None
+    status: str
+    elapsed_seconds: float
+    stdout_preview: str = ""
+    stderr_preview: str = ""
+    failure_reason: str = ""
 
 
 def _capability_report(snapshot: Any) -> dict[str, Any]:
@@ -517,6 +533,15 @@ def _print_orchestrated_stage_plan(
     print("away_plan_auxiliary_route_policy: derived_local_cheap")
     print("away_plan_external_writes: disabled")
     print(f"away_plan_approval_policy: {args.approval_policy}")
+    validation_commands = _validation_commands_from_args(args)
+    print(
+        "away_plan_validation_commands_json: "
+        + json.dumps(list(validation_commands), sort_keys=True)
+    )
+    print(
+        "away_plan_max_repair_cycles: "
+        + ("unbounded" if args.max_repair_cycles == -1 else str(args.max_repair_cycles))
+    )
     for name, route, purpose in _ORCHESTRATED_STAGE_PLAN:
         print(f"away_stage: {name} route={route} status=planned purpose={purpose}")
 
@@ -568,6 +593,159 @@ def _execution_status_with_auxiliary_result(
     if execution_status == "completed" and auxiliary_status not in (None, "completed"):
         return "completed_with_auxiliary_errors"
     return execution_status
+
+
+def _execution_status_with_validation_stage(
+    execution_status: str,
+    validation_stage: OrchestratedStageRecord,
+) -> str:
+    """Surface deterministic validation failures in the final execution status."""
+
+    validation_status = str((validation_stage.details or {}).get("validation_status", ""))
+    if execution_status == "completed" and validation_status in {"failed", "timeout"}:
+        return "completed_with_validation_errors"
+    return execution_status
+
+
+def _git_status_short(repo_root: Path) -> tuple[str, ...]:
+    """Return concise Git working tree status for final handoff metadata."""
+
+    try:
+        result = subprocess.run(
+            ["git", "status", "--short"],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            timeout=10.0,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return (f"git status unavailable: {exc}",)
+    if result.returncode != 0:
+        detail = result.stderr.strip() or f"git status exited with code {result.returncode}"
+        return (f"git status failed: {detail}",)
+    return tuple(line for line in result.stdout.splitlines() if line.strip())
+
+
+def _activity_preview_lines(text: str, *, limit: int = 1_500) -> str:
+    """Return a compact preview for command output fields."""
+
+    normalized = "\n".join(line.rstrip() for line in text.splitlines() if line.strip())
+    if len(normalized) <= limit:
+        return normalized
+    return normalized[: max(0, limit - 15)].rstrip() + " ...[truncated]"
+
+
+def _validation_commands_from_args(args: argparse.Namespace) -> tuple[str, ...]:
+    """Return deterministic validation commands selected for this run."""
+
+    if args.skip_validation:
+        return ()
+    commands = tuple(command.strip() for command in args.validation_command if command.strip())
+    return commands or (DEFAULT_VALIDATION_COMMAND,)
+
+
+def _run_validation_commands(
+    commands: Sequence[str],
+    *,
+    repo_root: Path,
+    timeout_seconds: float,
+    progress_callback: Callable[[str], None] = print,
+) -> tuple[ValidationCommandResult, ...]:
+    """Run deterministic local validation commands and capture bounded output."""
+
+    results: list[ValidationCommandResult] = []
+    for index, command in enumerate(commands, start=1):
+        progress_callback(f"validation_command: {command}")
+        started = time.perf_counter()
+        try:
+            completed = subprocess.run(
+                shlex.split(command, posix=sys.platform != "win32"),
+                cwd=repo_root,
+                capture_output=True,
+                text=True,
+                timeout=timeout_seconds,
+                check=False,
+            )
+        except subprocess.TimeoutExpired as exc:
+            elapsed = time.perf_counter() - started
+            stdout = exc.stdout if isinstance(exc.stdout, str) else ""
+            stderr = exc.stderr if isinstance(exc.stderr, str) else ""
+            results.append(
+                ValidationCommandResult(
+                    command=command,
+                    returncode=None,
+                    status="timeout",
+                    elapsed_seconds=elapsed,
+                    stdout_preview=_activity_preview_lines(stdout),
+                    stderr_preview=_activity_preview_lines(stderr),
+                    failure_reason=f"validation command timed out after {timeout_seconds:g}s",
+                )
+            )
+            progress_callback(f"validation_result: {index} status=timeout")
+        except OSError as exc:
+            elapsed = time.perf_counter() - started
+            results.append(
+                ValidationCommandResult(
+                    command=command,
+                    returncode=None,
+                    status="failed_to_start",
+                    elapsed_seconds=elapsed,
+                    failure_reason=str(exc),
+                )
+            )
+            progress_callback(f"validation_result: {index} status=failed_to_start")
+        else:
+            elapsed = time.perf_counter() - started
+            status = "passed" if completed.returncode == 0 else "failed"
+            results.append(
+                ValidationCommandResult(
+                    command=command,
+                    returncode=completed.returncode,
+                    status=status,
+                    elapsed_seconds=elapsed,
+                    stdout_preview=_activity_preview_lines(completed.stdout),
+                    stderr_preview=_activity_preview_lines(completed.stderr),
+                    failure_reason=""
+                    if completed.returncode == 0
+                    else f"validation command exited with code {completed.returncode}",
+                )
+            )
+            progress_callback(
+                f"validation_result: {index} status={status} returncode={completed.returncode}"
+            )
+    return tuple(results)
+
+
+def _validation_status(results: Sequence[ValidationCommandResult]) -> str:
+    """Collapse command results into the stage-level validation status."""
+
+    if not results:
+        return "not_run"
+    if all(result.status == "passed" for result in results):
+        return "passed"
+    if any(result.status == "timeout" for result in results):
+        return "timeout"
+    return "failed"
+
+
+def _validation_results_json(
+    results: Sequence[ValidationCommandResult],
+) -> list[dict[str, object]]:
+    """Return stable JSON-friendly validation result metadata."""
+
+    return [
+        {
+            "command": result.command,
+            "returncode": result.returncode,
+            "status": result.status,
+            "elapsed_seconds": round(result.elapsed_seconds, 3),
+            "stdout_preview": result.stdout_preview,
+            "stderr_preview": result.stderr_preview,
+            "failure_reason": result.failure_reason,
+        }
+        for result in results
+    ]
 
 
 class OrchestratedRunTracker:
@@ -654,6 +832,110 @@ class OrchestratedRunTracker:
             f"completed_at={record.completed_at_utc}"
         )
         return record
+
+    def record_validation_stage(
+        self,
+        *,
+        args: argparse.Namespace,
+        repo_root: Path,
+        execution_status: str,
+    ) -> OrchestratedStageRecord:
+        """Persist deterministic validation-stage status for this foreground slice."""
+
+        commands = _validation_commands_from_args(args)
+        self.start_stage(
+            "validation",
+            details={
+                "execution_status_before_validation": execution_status,
+                "commands": list(commands),
+            },
+        )
+        if execution_status == "failed":
+            return self.complete_stage(
+                "validation",
+                status="skipped",
+                details={
+                    "validation_status": "not_run",
+                    "skip_reason": "primary execution failed before validation",
+                },
+            )
+        if not commands:
+            return self.complete_stage(
+                "validation",
+                status="skipped",
+                details={
+                    "validation_status": "not_run",
+                    "skip_reason": "validation skipped by --skip-validation",
+                },
+            )
+        results = _run_validation_commands(
+            commands,
+            repo_root=repo_root,
+            timeout_seconds=args.validation_timeout_seconds,
+            progress_callback=self._progress_callback,
+        )
+        validation_status = _validation_status(results)
+        stage_status = "completed" if validation_status == "passed" else validation_status
+        return self.complete_stage(
+            "validation",
+            status=stage_status,
+            details={
+                "validation_status": validation_status,
+                "results": _validation_results_json(results),
+            },
+        )
+
+    def record_final_handoff_stage(
+        self,
+        *,
+        execution_status: str,
+        validation_stage: OrchestratedStageRecord | None,
+        repo_root: Path,
+        assistant_response_text: str | None,
+        final_answer_text: str | None = None,
+    ) -> OrchestratedStageRecord:
+        """Persist final handoff fields for the returning user."""
+
+        changed_files = _git_status_short(repo_root)
+        validation_status = (
+            str((validation_stage.details or {}).get("validation_status", validation_stage.status))
+            if validation_stage is not None
+            else "not_recorded"
+        )
+        self.start_stage(
+            "final_handoff",
+            details={
+                "execution_status": execution_status,
+                "validation_status": validation_status,
+            },
+        )
+        handoff_status = "failed" if execution_status == "failed" else "completed"
+        blockers = ""
+        risks = ""
+        next_action = "review the assistant response"
+        if execution_status == "failed":
+            blockers = "execution failed"
+            next_action = "inspect failure details and decide whether to repair"
+        elif validation_status in {"failed", "timeout"}:
+            blockers = f"validation {validation_status}"
+            next_action = "inspect validation failures and repair remaining issues"
+        elif validation_status == "not_run":
+            risks = "validation not run by deterministic wrapper"
+            next_action = "run deterministic validation before treating the work as done"
+        return self.complete_stage(
+            "final_handoff",
+            status=handoff_status,
+            details={
+                "execution_status": execution_status,
+                "validation_status": validation_status,
+                "changed_files": changed_files,
+                "assistant_response_available": assistant_response_text is not None,
+                "final_answer_available": final_answer_text is not None,
+                "blockers": blockers,
+                "risks": risks,
+                "next_action": next_action,
+            },
+        )
 
 
 def _resolve_orchestrated_run_db_path(args: argparse.Namespace, repo_root: Path) -> Path:
@@ -846,6 +1128,37 @@ def main(argv: Sequence[str] | None = None) -> int:
         help=(
             "SQLite database path for durable orchestrated run and stage records. "
             "Relative paths are resolved from the repository root."
+        ),
+    )
+    parser.add_argument(
+        "--validation-command",
+        action="append",
+        default=[],
+        metavar="CMD",
+        help=(
+            "Deterministic validation command to run during orchestrated executed runs. "
+            f"May be repeated. Defaults to `{DEFAULT_VALIDATION_COMMAND}`."
+        ),
+    )
+    parser.add_argument(
+        "--skip-validation",
+        action="store_true",
+        help="Skip deterministic validation in orchestrated executed runs.",
+    )
+    parser.add_argument(
+        "--validation-timeout-seconds",
+        type=float,
+        default=300.0,
+        help="Timeout for each deterministic validation command.",
+    )
+    parser.add_argument(
+        "--max-repair-cycles",
+        type=int,
+        default=3,
+        help=(
+            "Maximum orchestrated repair cycles after failed validation. Use 0 to "
+            "disable repairs and -1 to disable the cycle cap while preserving the "
+            "--away-minutes wall-clock budget."
         ),
     )
     parser.add_argument(
@@ -1069,6 +1382,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     _configure_away_mode(args, argv, parser)
     if args.orchestrated and args.away_minutes is None:
         parser.error("--orchestrated requires --away-minutes")
+    if args.validation_timeout_seconds <= 0:
+        parser.error("--validation-timeout-seconds must be greater than zero")
+    if args.max_repair_cycles < -1:
+        parser.error("--max-repair-cycles must be -1 or greater")
     if args.native_tools and args.no_native_tools:
         parser.error("--native-tools cannot be combined with --no-native-tools")
     use_native_tools = args.native_tools or (
@@ -1231,6 +1548,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
         return _run_external_agent_cli_mode(
             prompt=prompt,
+            system_prompt=primary_system_prompt,
             args=args,
             repo_root=repo_root,
             profile=profile,
@@ -1412,6 +1730,21 @@ def main(argv: Sequence[str] | None = None) -> int:
                     status="failed",
                     details={"failure_reason": str(exc)},
                 )
+                validation_stage = orchestrated_tracker.record_validation_stage(
+                    args=args,
+                    repo_root=repo_root,
+                    execution_status=execution_status,
+                )
+                execution_status = _execution_status_with_validation_stage(
+                    execution_status,
+                    validation_stage,
+                )
+                orchestrated_tracker.record_final_handoff_stage(
+                    execution_status=execution_status,
+                    validation_stage=validation_stage,
+                    repo_root=repo_root,
+                    assistant_response_text=assistant_response_text,
+                )
                 orchestrated_tracker.finish_run(execution_status=execution_status)
             print(f"status: {final_status}")
             print(f"delegation: {delegation_status}")
@@ -1578,6 +1911,22 @@ def main(argv: Sequence[str] | None = None) -> int:
     print(f"delegation: {delegation_status}")
     print(f"execution_status: {execution_status}")
     if orchestrated_tracker is not None and args.execute:
+        validation_stage = orchestrated_tracker.record_validation_stage(
+            args=args,
+            repo_root=repo_root,
+            execution_status=execution_status,
+        )
+        execution_status = _execution_status_with_validation_stage(
+            execution_status,
+            validation_stage,
+        )
+        print(f"final_execution_status: {execution_status}")
+        orchestrated_tracker.record_final_handoff_stage(
+            execution_status=execution_status,
+            validation_stage=validation_stage,
+            repo_root=repo_root,
+            assistant_response_text=assistant_response_text,
+        )
         orchestrated_tracker.finish_run(execution_status=execution_status)
     _print_run_metrics(
         metrics,
@@ -1744,6 +2093,7 @@ def _run_codex_login(
 def _run_external_agent_cli_mode(
     *,
     prompt: str,
+    system_prompt: str,
     args: argparse.Namespace,
     repo_root: Path,
     profile: Any,
@@ -1759,6 +2109,8 @@ def _run_external_agent_cli_mode(
 
     assert orchestration.execution_plan is not None
     target = orchestration.execution_plan.target
+    if args.codex_mcp_tools and delegation_status == "disabled":
+        delegation_status = "enabled: external Codex MCP delegate_task available"
     print("=== Repo Coding Assistant ===")
     print(f"mode: {args.mode}")
     print(f"repo_root: {repo_root}")
@@ -1887,6 +2239,7 @@ def _run_external_agent_cli_mode(
                 )
             external_prompt = _external_agent_prompt_with_execution_metadata(
                 prompt,
+                system_prompt=system_prompt,
                 approval_policy=args.approval_policy,
                 sandbox=config.sandbox,
                 mode=args.mode,
@@ -1895,6 +2248,7 @@ def _run_external_agent_cli_mode(
             external_result = _run_external_agent(
                 external_prompt,
                 config,
+                progress_callback=print,
             )
             primary_elapsed_seconds = time.perf_counter() - primary_started
             print("\n=== External agent diagnostics ===")
@@ -1979,6 +2333,23 @@ def _run_external_agent_cli_mode(
     )
     print(f"execution_status: {execution_status}")
     if orchestrated_tracker is not None and args.execute:
+        validation_stage = orchestrated_tracker.record_validation_stage(
+            args=args,
+            repo_root=repo_root,
+            execution_status=execution_status,
+        )
+        execution_status = _execution_status_with_validation_stage(
+            execution_status,
+            validation_stage,
+        )
+        print(f"final_execution_status: {execution_status}")
+        orchestrated_tracker.record_final_handoff_stage(
+            execution_status=execution_status,
+            validation_stage=validation_stage,
+            repo_root=repo_root,
+            assistant_response_text=None,
+            final_answer_text=final_answer_text,
+        )
         orchestrated_tracker.finish_run(execution_status=execution_status)
     _print_run_metrics(
         metrics,
@@ -2001,6 +2372,7 @@ def _run_external_agent_cli_mode(
 def _external_agent_prompt_with_execution_metadata(
     prompt: str,
     *,
+    system_prompt: str,
     approval_policy: str,
     sandbox: str,
     mode: str,
@@ -2008,6 +2380,8 @@ def _external_agent_prompt_with_execution_metadata(
     """Add execution metadata so external agents do not infer the wrong sandbox."""
 
     return (
+        "# Repo assistant system prompt\n"
+        f"{system_prompt.rstrip()}\n\n"
         f"{prompt}\n\n"
         "# External agent execution metadata\n"
         f"repo_assistant_mode: {mode}\n"
@@ -2377,6 +2751,7 @@ def _run_native_agent(
             child_profile = derive_subtask_profile(
                 parent=profile,
                 task_type=TaskType.CODING,
+                required_capabilities=frozenset({TaskCapability.CHAT, TaskCapability.TOOLS}),
                 quality_threshold=QualityThreshold.STANDARD,
                 latency_target=LatencyTarget.BACKGROUND,
                 cost_policy_tier=CostPolicyTier.LOCAL_ONLY,

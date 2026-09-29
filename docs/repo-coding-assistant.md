@@ -148,6 +148,26 @@ approval boundary deliberately: `interactive` may pause for a prompt, while
 `trusted_local` permits local read/write/shell actions under the repo
 assistant's existing tool policies.
 
+Executed orchestrated runs now update deterministic validation and final
+handoff stages before the run is marked complete. The validation stage runs
+`python -m pytest -q` by default, records command output previews and return
+codes, and can be changed with repeated `--validation-command CMD` flags or
+disabled with `--skip-validation`. Ruff and Pyright remain available through the
+repository's pre-commit hooks; pass a pre-commit command explicitly when an
+orchestrated run should include that broader gate. The final handoff stage
+records the execution status, validation status, concise `git status --short`
+output, response availability, blockers, risks, and next action fields in the
+local SQLite stage details. Failed deterministic validation changes the final
+run record to `completed_with_validation_errors` instead of clean completion.
+
+The staged workflow exposes a default repair policy of three repair cycles. Use
+`--max-repair-cycles N` to choose a different limit,
+`--max-repair-cycles 0` to disable repair attempts, or
+`--max-repair-cycles -1` to remove the cycle cap while still respecting the
+`--away-minutes` wall-clock budget. When unresolved failures remain at the end
+of the run, the final handoff is responsible for preserving the validation
+details, blockers, and next action for the returning user.
+
 Every run prints an `execution_status` line. It distinguishes planned runs,
 completed responses, completed runs with tool/action errors, and failed
 orchestration. A response is not reported as a fully successful implementation
@@ -279,16 +299,20 @@ assistant response, action-loop output, scrutiny output, normalized scrutiny
 status, and final `execution_status`.
 
 For external-agent routes such as Codex CLI, `--timeout-seconds` is treated as
-an inactivity timeout. Model output resets the timer. The CLI prints parsed
-event counts, usage, delegation status, failure reasons, and concise stderr
-summaries in the diagnostics block instead of streaming every
-`external_agent_activity` line into the user-facing answer area. Hidden
-reasoning-summary events remain type-only and raw JSONL stays in the
-transcript-only section. The CLI prints the exact
+an inactivity timeout. Model output resets the timer. During execution, the CLI
+prints bounded `external_agent_activity` and `external_agent_status` lines so a
+foreground run shows that work is still happening without dumping raw JSONL.
+The diagnostics block then prints parsed event counts, usage, delegation
+status, failure reasons, and concise stderr summaries. Hidden reasoning-summary
+events remain type-only and raw JSONL stays in the transcript-only section. The
+CLI prints the exact
 `external_agent_command_line_json` before execution and adds the effective
 approval policy and Codex sandbox to the prompt so the external agent does not
 infer a read-only environment when the requested sandbox is `workspace-write` or
-stronger. If a timeout or process error occurs after partial output, the CLI
+stronger. It also includes the repo-assistant system prompt in the external
+agent stdin prompt so external routes receive the same high-level repo-aware
+contract as provider-native routes. If a timeout or process error occurs after
+partial output, the CLI
 summarizes parsed JSONL events and keeps raw JSONL in the transcript-only
 section rather than dumping it to the console. Known noisy Codex model-refresh
 stderr is filtered out of the main stderr summary. When a transcript log is

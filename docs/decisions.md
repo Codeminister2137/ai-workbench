@@ -107,6 +107,18 @@ external service.
 
 Detailed ADR: `docs/decisions/ADR-028-sqlite-run-records-for-orchestrated-repo-assistant.md`
 
+## ADR-029 - Orchestrated Repo Assistant Supervised Validation
+**Status:** Accepted
+**Date:** 2026-09-30
+
+Use a multi-pass supervised workflow direction for orchestrated implementation
+runs, with local/cheap delegated support, deterministic pytest validation as
+the default completion gate, Ruff/Pyright through pre-commit by default, and
+configurable repair-cycle limits including an unbounded cycle setting that still
+respects the wall-clock budget.
+
+Detailed ADR: `docs/decisions/ADR-029-orchestrated-repo-assistant-supervised-validation.md`
+
 ## Template
 ```text
 ## ADR-NNN — Short Name

@@ -3,21 +3,17 @@ from __future__ import annotations
 import argparse
 import atexit
 import json
-import os
 import re
-import shutil
+import shlex
 import subprocess
 import sys
 import time
-import tracemalloc
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime
-from io import TextIOBase
 from pathlib import Path
 from typing import Any
 
-# Imports below use the repository's source layout when this example is run directly.
+# Imports below use the repository's source layout when this module is run directly.
 # ruff: noqa: E402, I001
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 for _package_dir in (
@@ -47,6 +43,7 @@ from ai_orchestrator import (
     LatencyTarget,
     OrchestrationResult,
     QualityThreshold,
+    TaskCapability,
     TaskType,
     assess_delegation,
     derive_subtask_profile,
@@ -58,7 +55,6 @@ from ai_orchestrator import PrivacyClass as OrchestratorPrivacyClass
 from ai_provider import (
     AIMessage,
     AIRequest,
-    AIResponse,
     BackendConfig,
     ChatClient,
     MessageRole,
@@ -72,12 +68,44 @@ from ai_provider import (
     is_ollama_server_available,
 )
 from ai_provider import PrivacyClass as ProviderPrivacyClass
+
+from ai_provider.coding_assist import coding_task_profile, run_coding_prompt
 from ai_provider.codex_mcp import setup_project_codex_mcp
 from ai_provider.external_agents import (
+    ExternalAgentConfig as ExternalAgentConfig,  # noqa: F401 - compatibility export
+    ExternalAgentEventSummary,
+    build_external_agent_command as _build_external_agent_command,
     build_codex_plugin_command,
     codex_plugin_status_by_name,
+    codex_capability_status as _codex_capability_status,  # noqa: F401 - compatibility export
+    external_agent_config_from_orchestration as _external_agent_config_from_orchestration,
+    external_agent_command,
+    external_agent_status as _external_agent_status,
+    is_external_agent_access_method as _is_external_agent_access_method,
+    parse_external_agent_jsonl as parse_external_agent_jsonl,  # noqa: F401 - compatibility export
     parse_codex_plugin_list,
     run_codex_plugin_operation,
+    run_diagnostic_command,
+    run_external_agent as _run_external_agent_impl,
+    _is_noisy_codex_model_refresh_stderr,
+    _external_agent_result_from_completed_process,
+)
+from ai_provider.repo_context import (
+    DEFAULT_CONTEXT_BUDGET_CHARS,
+    DEFAULT_CONTEXT_FILE_BUDGET_CHARS,
+    RepoContextFile as RepoContextFile,  # noqa: F401 - compatibility export
+    build_default_system_prompt,
+    build_repo_prompt,
+    find_repo_root,
+    load_prompt_context,
+    _limit_context_content as _limit_context_content,
+)
+from ai_provider.repo_actions import (
+    AssistantAction as AssistantAction,  # noqa: F401 - compatibility export
+    AssistantActionResult as AssistantActionResult,  # noqa: F401 - compatibility export
+    execute_actions,
+    extract_actions,
+    format_action_results as _format_action_results,
 )
 from ai_provider.orchestrated_runs import (
     DEFAULT_ORCHESTRATED_RUN_DB,
@@ -86,42 +114,26 @@ from ai_provider.orchestrated_runs import (
     OrchestratedStageRecord,
     SQLiteOrchestratedRunStore,
 )
-
-from coding_assist import coding_task_profile, run_coding_prompt
-
-
-@dataclass(frozen=True, slots=True)
-class RepoContextFile:
-    """One file approved for inclusion in a repo-aware prompt."""
-
-    path: Path
-    display_path: str
-    content: str
-    inside_repo: bool
-
-
-@dataclass(frozen=True, slots=True)
-class AssistantAction:
-    """One proposed local action emitted by the assistant model."""
-
-    action_type: str
-    args: dict[str, Any]
+from ai_provider.scrutiny import (
+    RESPONSE_SCRUTINY_SYSTEM_PROMPT as _RESPONSE_SCRUTINY_SYSTEM_PROMPT,
+    ResponseScrutinyReport as ResponseScrutinyReport,  # noqa: F401 - compatibility export
+    build_response_scrutiny_prompt,
+    parse_response_scrutiny_report,
+)
+from ai_provider.transcripts import (
+    RunMetrics,
+    TeeOutput as _TeeOutput,
+    print_external_agent_input as _print_external_agent_input,
+    print_model_input as _print_model_input,
+    print_run_metrics as _print_run_metrics,
+    print_transcript_header as _print_transcript_header,
+    start_run_metrics as _start_run_metrics,
+    write_transcript_only as _write_transcript_only,
+)
 
 
-@dataclass(frozen=True, slots=True)
-class AssistantActionResult:
-    """Result of one local assistant action."""
-
-    action_type: str
-    ok: bool
-    summary: str
-    output: str = ""
-
-
-_ACTION_BLOCK_PATTERN = re.compile(r"```(?:json)?\s*(\{.*?\})\s*```", re.DOTALL)
-DEFAULT_CONTEXT_BUDGET_CHARS = 5_000
-DEFAULT_CONTEXT_FILE_BUDGET_CHARS = 2_500
 DEFAULT_DELEGATION_CONTEXT_BUDGET_CHARS = 6_000
+DEFAULT_VALIDATION_COMMAND = "python -m pytest -q"
 CLI_MODES = ("ask", "review", "implement", "plan", "diagnose")
 APPROVAL_POLICY_PRESETS = tuple(item.value for item in ApprovalPolicyPreset)
 _TIMEOUT_OPTION_NAMES = ("--timeout-seconds",)
@@ -167,60 +179,6 @@ _ORCHESTRATED_STAGE_PLAN: tuple[tuple[str, str, str], ...] = (
         "report changed files, validation, blockers, risks, and next action",
     ),
 )
-_TOOL_SYSTEM_PROMPT = """
-You are a repo-aware coding assistant. Use the provided repository context,
-preserve the permission boundary, and do not claim to have edited or executed
-files unless an action result proves it.
-
-When you need local tools, emit exactly one JSON object in a fenced json block:
-
-```json
-{"actions":[{"type":"read_file","path":"relative/path.py"}]}
-```
-
-Supported action types:
-- read_file: {"type":"read_file","path":"relative/path"}
-- list_dir: {"type":"list_dir","path":"relative/path"}
-- write_file: {"type":"write_file","path":"relative/path","content":"full file content"}
-- run_command: {"type":"run_command","command":"command string","cwd":"optional/relative/path"}
-
-Prefer the smallest useful action set. Do not invent persistent state, background
-jobs, external actions, or hidden side effects.
-""".strip()
-_RESPONSE_SCRUTINY_SYSTEM_PROMPT = """
-You scrutinize a repo-aware coding assistant response for usefulness and accuracy.
-Compare the candidate response with the original request and the supplied repository
-context. Do not invent facts or claim that a recommendation is required when the
-context does not support it.
-
-Return a concise report with exactly these headings:
-VERDICT: pass | needs_revision | fail
-SCORE: 0-10
-STRENGTHS:
-ISSUES:
-RECOMMENDED_NEXT_ACTION:
-REVISED_RESPONSE:
-
-Judge whether the answer is grounded in the repository, distinguishes completed
-work from remaining work, identifies the smallest useful next action, avoids
-generic filler, and states uncertainty or decision boundaries. If the candidate
-is already good, say so rather than proposing unnecessary changes.
-""".strip()
-_RESPONSE_SCRUTINY_HEADINGS = (
-    "VERDICT",
-    "SCORE",
-    "STRENGTHS",
-    "ISSUES",
-    "RECOMMENDED_NEXT_ACTION",
-    "REVISED_RESPONSE",
-)
-_RESPONSE_SCRUTINY_VERDICTS = {"pass", "needs_revision", "fail"}
-_RESPONSE_SCRUTINY_HEADING_PATTERN = (
-    r"(?mi)^[ \t]*(?:#{1,6}[ \t]+)?(?:\*\*)?"
-    r"(VERDICT|SCORE|STRENGTHS|ISSUES|RECOMMENDED[ _]NEXT[ _]ACTION|REVISED[ _]RESPONSE)"
-    r"(?:\*\*)?:(?:\*\*)?[ \t]*(.*)$"
-)
-_FENCED_JSON_PATTERN = re.compile(r"```(?:json)?\s*(\{.*?\})\s*```", re.DOTALL)
 
 
 @dataclass(frozen=True, slots=True)
@@ -235,817 +193,32 @@ class AuxiliaryPanelResult:
     failure_reason: str | None = None
 
 
-@dataclass(frozen=True)
-class ResponseScrutinyReport:
-    """Parsed second-pass response-quality report."""
+@dataclass(frozen=True, slots=True)
+class ValidationCommandResult:
+    """Captured result for one deterministic validation command."""
 
-    verdict: str
-    score: int
-    strengths: str
-    issues: str
-    recommended_next_action: str
-    revised_response: str
-    raw_text: str
-
-
-@dataclass(frozen=True)
-class RunMetrics:
-    """Local process metrics captured for one CLI run."""
-
-    started_wall_seconds: float
-    started_cpu_seconds: float
-    tracemalloc_started: bool
-
-
-@dataclass(frozen=True)
-class ExternalAgentConfig:
-    """Runtime configuration for an external coding-agent CLI."""
-
-    access_method: AccessMethod
     command: str
-    model: str
-    cwd: Path
-    timeout_seconds: float
-    sandbox: str = "workspace-write"
-    approval_policy: str = "never"
-    ephemeral: bool = True
-    json_output: bool = True
-    resume: str | None = None
-    output_last_message_path: Path | None = None
-    output_schema_path: Path | None = None
-    web_search: bool = False
-    image_paths: tuple[Path, ...] = ()
-    codex_mcp_tools: bool = False
-
-
-@dataclass(frozen=True)
-class ExternalAgentEventSummary:
-    """Structured summary parsed from an external agent JSONL event stream."""
-
-    final_answer: str | None
-    command_events: tuple[dict[str, Any], ...]
-    tool_events: tuple[dict[str, Any], ...]
-    web_search_events: tuple[dict[str, Any], ...]
-    file_change_events: tuple[dict[str, Any], ...]
-    usage: dict[str, Any] | None
-    failure_reason: str | None
-    parse_errors: tuple[str, ...]
-
-
-@dataclass(frozen=True)
-class ExternalAgentResult:
-    """Completed external coding-agent process result."""
-
-    command: tuple[str, ...]
-    returncode: int
-    stdout: str
-    stderr: str
-    last_message: str | None = None
-    events: ExternalAgentEventSummary | None = None
-
-
-class _TeeOutput(TextIOBase):
-    """Write CLI output to the terminal and an optional transcript file."""
-
-    def __init__(self, terminal: Any, transcript: Any) -> None:
-        self._terminal = terminal
-        self._transcript = transcript
-
-    def write(self, text: str) -> int:
-        self._transcript.write(text)
-        try:
-            self._terminal.write(text)
-        except UnicodeEncodeError:
-            encoding = getattr(self._terminal, "encoding", None) or "utf-8"
-            safe_text = text.encode(encoding, errors="replace").decode(encoding)
-            self._terminal.write(safe_text)
-        return len(text)
-
-    def write_transcript_only(self, text: str) -> int:
-        """Write text only to the transcript file, not the terminal."""
-
-        return self._transcript.write(text)
-
-    def flush(self) -> None:
-        self._terminal.flush()
-        if not self._transcript.closed:
-            self._transcript.flush()
-
-
-def _print_transcript_header(args: argparse.Namespace, argv: Sequence[str] | None) -> None:
-    """Print reproducible CLI invocation metadata for transcript logs."""
-
-    effective_argv = list(argv) if argv is not None else sys.argv[1:]
-    print("=== CLI invocation ===")
-    print(f"timestamp_utc: {datetime.now(UTC).isoformat()}")
-    print(f"cwd: {Path.cwd()}")
-    print("argv_json: " + json.dumps(effective_argv, ensure_ascii=False))
-    print("request:")
-    assert args.prompt is not None
-    print(args.prompt)
-    print()
-
-
-def _print_model_input(label: str, *, system_prompt: str, prompt: str) -> None:
-    """Print the exact model input for evaluation transcripts."""
-
-    print(f"\n=== {label} model input ===")
-    print("system_prompt:")
-    print("```text")
-    print(system_prompt.rstrip())
-    print("```")
-    print("user_prompt:")
-    print("```text")
-    print(prompt.rstrip())
-    print("```")
-
-
-def _print_external_agent_input(label: str, *, prompt: str) -> None:
-    """Print the exact stdin prompt sent to an external agent CLI."""
-
-    print(f"\n=== {label} external-agent input ===")
-    print("stdin_prompt:")
-    print("```text")
-    print(prompt.rstrip())
-    print("```")
-
-
-def _write_transcript_only(text: str) -> None:
-    """Write content to the transcript side of stdout when tee logging is active."""
-
-    writer = getattr(sys.stdout, "write_transcript_only", None)
-    if callable(writer):
-        writer(text)
-
-
-def _start_run_metrics() -> RunMetrics:
-    """Start local process metrics for transcript observability."""
-
-    tracemalloc_started = False
-    if not tracemalloc.is_tracing():
-        tracemalloc.start()
-        tracemalloc_started = True
-    return RunMetrics(
-        started_wall_seconds=time.perf_counter(),
-        started_cpu_seconds=time.process_time(),
-        tracemalloc_started=tracemalloc_started,
-    )
-
-
-def _print_response_usage(prefix: str, response: AIResponse | None) -> None:
-    """Print token and provider latency metrics for one response."""
-
-    if response is None:
-        print(f"{prefix}_usage_source: unavailable")
-        return
-    print(f"{prefix}_usage_source: {response.usage.source.value}")
-    print(f"{prefix}_input_tokens: {response.usage.input_tokens}")
-    print(f"{prefix}_output_tokens: {response.usage.output_tokens}")
-    print(f"{prefix}_total_tokens: {response.usage.total_tokens}")
-    print(f"{prefix}_provider_latency_ms: {response.latency_ms}")
-
-
-def _print_run_metrics(
-    metrics: RunMetrics,
-    *,
-    primary_elapsed_seconds: float | None,
-    primary_response: AIResponse | None,
-    scrutiny_elapsed_seconds: float | None,
-    scrutiny_response: AIResponse | None,
-) -> None:
-    """Print local process and provider-reported metrics for transcript analysis."""
-
-    current_bytes, peak_bytes = tracemalloc.get_traced_memory()
-    total_wall_seconds = time.perf_counter() - metrics.started_wall_seconds
-    total_cpu_seconds = time.process_time() - metrics.started_cpu_seconds
-    print("\n=== Run metrics ===")
-    print(f"total_wall_seconds: {total_wall_seconds:.3f}")
-    print(f"process_cpu_seconds: {total_cpu_seconds:.3f}")
-    print(f"python_memory_current_bytes: {current_bytes}")
-    print(f"python_memory_peak_bytes: {peak_bytes}")
-    print(f"primary_elapsed_seconds: {_format_optional_seconds(primary_elapsed_seconds)}")
-    _print_response_usage("primary", primary_response)
-    print(f"scrutiny_elapsed_seconds: {_format_optional_seconds(scrutiny_elapsed_seconds)}")
-    _print_response_usage("scrutiny", scrutiny_response)
-    if metrics.tracemalloc_started:
-        tracemalloc.stop()
-
-
-def _format_optional_seconds(value: float | None) -> str:
-    """Format an optional elapsed-time value for stable transcript output."""
-
-    if value is None:
-        return "None"
-    return f"{value:.3f}"
-
-
-def _is_external_agent_access_method(access_method: AccessMethod) -> bool:
-    """Return whether an access method uses an external coding-agent client."""
-
-    return access_method in {
-        AccessMethod.CODEX_CLI,
-        AccessMethod.ANTIGRAVITY_CLI,
-        AccessMethod.COPILOT_CLI,
-        AccessMethod.KIRO_CLI,
-    }
-
-
-def _default_codex_command() -> str | None:
-    """Return Codex CLI from env, PATH, or the PyCharm bundled install."""
-
-    configured = os.environ.get("CODEX_COMMAND")
-    if configured:
-        return configured
-
-    command = shutil.which("codex")
-    if command:
-        return command
-
-    local_app_data = os.environ.get("LOCALAPPDATA")
-    if not local_app_data:
-        return None
-
-    bundled = (
-        Path(local_app_data)
-        / "JetBrains"
-        / "PyCharm2025.3"
-        / "aia"
-        / "codex"
-        / "bin"
-        / "codex-x86_64-pc-windows-msvc.exe"
-    )
-    return str(bundled) if bundled.exists() else None
-
-
-def _external_agent_command(access_method: AccessMethod) -> str | None:
-    """Return the configured command for a supported external coding-agent route."""
-
-    if access_method is AccessMethod.CODEX_CLI:
-        return _default_codex_command()
-    if access_method is AccessMethod.ANTIGRAVITY_CLI:
-        return os.environ.get("ANTIGRAVITY_COMMAND") or shutil.which("antigravity")
-    if access_method is AccessMethod.COPILOT_CLI:
-        return os.environ.get("GITHUB_COPILOT_COMMAND") or shutil.which("copilot")
-    if access_method is AccessMethod.KIRO_CLI:
-        return os.environ.get("KIRO_COMMAND") or shutil.which("kiro")
-    return None
-
-
-def _external_agent_status() -> dict[str, Any]:
-    """Return local discovery status for configured external coding-agent clients."""
-
-    codex_command = _external_agent_command(AccessMethod.CODEX_CLI)
-    return {
-        "codex_available": codex_command is not None,
-        "codex_command": codex_command,
-        "codex": _codex_capability_status(codex_command),
-        "antigravity_available": _external_agent_command(AccessMethod.ANTIGRAVITY_CLI) is not None,
-        "antigravity_command": _external_agent_command(AccessMethod.ANTIGRAVITY_CLI),
-        "copilot_available": _external_agent_command(AccessMethod.COPILOT_CLI) is not None,
-        "copilot_command": _external_agent_command(AccessMethod.COPILOT_CLI),
-        "kiro_available": _external_agent_command(AccessMethod.KIRO_CLI) is not None,
-        "kiro_command": _external_agent_command(AccessMethod.KIRO_CLI),
-    }
-
-
-def _run_diagnostic_command(
-    command: str,
-    *args: str,
-    timeout_seconds: float = 5.0,
-) -> dict[str, Any]:
-    """Run a read-only local diagnostic command and return redacted process metadata."""
-
-    try:
-        completed = subprocess.run(
-            (command, *args),
-            text=True,
-            capture_output=True,
-            timeout=timeout_seconds,
-        )
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        return {
-            "ok": False,
-            "returncode": None,
-            "stdout": "",
-            "stderr": str(exc),
-        }
-    return {
-        "ok": completed.returncode == 0,
-        "returncode": completed.returncode,
-        "stdout": completed.stdout.strip(),
-        "stderr": completed.stderr.strip(),
-    }
-
-
-def _codex_config_path(command: str | None = None) -> str:
-    """Return the Codex config path without reading config contents."""
-
-    codex_home = os.environ.get("CODEX_HOME")
-    if codex_home:
-        return str(Path(codex_home) / "config.toml")
-    if command:
-        command_path = Path(command)
-        if command_path.parent.name == "bin":
-            return str(command_path.parent.parent / "config.toml")
-    return str(Path.home() / ".codex" / "config.toml")
-
-
-def _codex_capability_status(command: str | None) -> dict[str, Any]:
-    """Return best-effort Codex CLI diagnostics without exposing secrets."""
-
-    if command is None:
-        return {
-            "available": False,
-            "command": None,
-            "version": None,
-            "login_status": "unavailable",
-            "exec_json_supported": False,
-            "config_path": _codex_config_path(command),
-            "mcp_list": None,
-            "plugin_list": None,
-            "plugin_summary": None,
-        }
-
-    version = _run_diagnostic_command(command, "--version")
-    login = _run_diagnostic_command(command, "login", "status")
-    exec_help = _run_diagnostic_command(command, "exec", "--help")
-    mcp_list = _run_diagnostic_command(command, "mcp", "list")
-    plugin_list = _run_diagnostic_command(command, "plugin", "list")
-    return {
-        "available": True,
-        "command": command,
-        "version": version["stdout"] or version["stderr"] or None,
-        "login_status": login["stdout"] or login["stderr"] or None,
-        "exec_json_supported": "--json" in str(exec_help["stdout"]),
-        "config_path": _codex_config_path(command),
-        "mcp_list": _diagnostic_text_result(mcp_list),
-        "plugin_list": _diagnostic_text_result(plugin_list),
-        "plugin_summary": _parse_codex_plugin_list(plugin_list["stdout"])
-        if plugin_list["ok"]
-        else None,
-    }
-
-
-def _diagnostic_text_result(result: dict[str, Any]) -> dict[str, Any]:
-    """Normalize a diagnostic command result for JSON reporting."""
-
-    return {
-        "ok": result["ok"],
-        "returncode": result["returncode"],
-        "stdout": result["stdout"],
-        "stderr": result["stderr"],
-    }
-
-
-def _parse_codex_plugin_list(text: str) -> dict[str, Any]:
-    """Parse the table-like output from `codex plugin list`."""
-
-    marketplaces: list[str] = []
-    plugins: list[dict[str, str | None]] = []
-    for raw_line in text.splitlines():
-        line = raw_line.strip()
-        if not line:
-            continue
-        if line.startswith("Marketplace `") and line.endswith("`"):
-            marketplaces.append(line.removeprefix("Marketplace `").removesuffix("`"))
-            continue
-        if (
-            line.startswith("PLUGIN ")
-            or line.startswith("PATH")
-            or line.endswith("marketplace.json")
-        ):
-            continue
-        if "@" not in line:
-            continue
-        plugin = _parse_codex_plugin_row(line)
-        if plugin is not None:
-            plugins.append(plugin)
-    return {
-        "marketplaces": marketplaces,
-        "available_count": len(plugins),
-        "installed_count": sum(
-            1 for plugin in plugins if str(plugin["status"]).startswith("installed")
-        ),
-        "plugins": plugins,
-    }
-
-
-def _parse_codex_plugin_row(line: str) -> dict[str, str | None] | None:
-    parts = line.split()
-    if len(parts) < 3 or "@" not in parts[0]:
-        return None
-    name = parts[0]
-    if parts[1] == "not" and len(parts) >= 4 and parts[2] == "installed":
-        return {
-            "name": name,
-            "status": "not installed",
-            "version": None,
-            "path": " ".join(parts[3:]) or None,
-        }
-    if parts[1].startswith("installed") and len(parts) >= 5 and parts[2] == "enabled":
-        return {
-            "name": name,
-            "status": "installed, enabled",
-            "version": parts[3] if parts[3] != "-" else None,
-            "path": " ".join(parts[4:]) or None,
-        }
-    return {
-        "name": name,
-        "status": parts[1],
-        "version": parts[2] if parts[2] != "-" else None,
-        "path": " ".join(parts[3:]) if len(parts) > 3 else None,
-    }
-
-
-def _external_agent_config_from_orchestration(
-    orchestration: OrchestrationResult,
-    *,
-    repo_root: Path,
-    timeout_seconds: float,
-    sandbox: str = "workspace-write",
-    approval_policy: str = "never",
-    codex_persist_session: bool = False,
-    codex_resume: str | None = None,
-    output_last_message_path: Path | None = None,
-    output_schema_path: Path | None = None,
-    web_search: bool = False,
-    image_paths: tuple[Path, ...] = (),
-    codex_mcp_tools: bool = False,
-) -> ExternalAgentConfig:
-    """Adapt a ready orchestration result to an external-agent runtime config."""
-
-    assert orchestration.execution_plan is not None
-    target = orchestration.execution_plan.target
-    if target.access_method is not AccessMethod.CODEX_CLI:
-        raise NotImplementedError(
-            f"{target.access_method.value} execution is not implemented yet. "
-            "Configure the official command first, then add an executor adapter."
-        )
-    command = _external_agent_command(target.access_method)
-    if command is None:
-        raise FileNotFoundError(
-            "Could not find Codex CLI. Set CODEX_COMMAND or install/configure Codex CLI."
-        )
-    return ExternalAgentConfig(
-        access_method=target.access_method,
-        command=command,
-        model=target.model,
-        cwd=repo_root,
-        timeout_seconds=timeout_seconds,
-        sandbox=sandbox,
-        approval_policy=approval_policy,
-        ephemeral=not codex_persist_session and codex_resume is None,
-        resume=codex_resume,
-        output_last_message_path=output_last_message_path,
-        output_schema_path=output_schema_path,
-        web_search=web_search,
-        image_paths=image_paths,
-        codex_mcp_tools=codex_mcp_tools,
-    )
-
-
-def parse_external_agent_jsonl(text: str) -> ExternalAgentEventSummary:
-    """Parse Codex-style JSONL events into the stable fields this CLI reports."""
-
-    final_answer = None
-    command_events: list[dict[str, Any]] = []
-    tool_events: list[dict[str, Any]] = []
-    web_search_events: list[dict[str, Any]] = []
-    file_change_events: list[dict[str, Any]] = []
-    usage = None
-    failure_reason = None
-    parse_errors: list[str] = []
-    for line_number, line in enumerate(text.splitlines(), start=1):
-        stripped = line.strip()
-        if not stripped:
-            continue
-        try:
-            event = json.loads(stripped)
-        except json.JSONDecodeError as exc:
-            parse_errors.append(f"line {line_number}: {exc.msg}")
-            continue
-        if not isinstance(event, dict):
-            parse_errors.append(f"line {line_number}: expected JSON object")
-            continue
-        event_type = _event_type(event)
-        if _is_command_event(event, event_type):
-            command_events.append(event)
-        if _is_tool_event(event, event_type):
-            tool_events.append(event)
-        if _is_web_search_event(event, event_type):
-            web_search_events.append(event)
-        if _is_file_change_event(event, event_type):
-            file_change_events.append(event)
-        event_usage = _find_usage(event)
-        if event_usage is not None:
-            usage = event_usage
-        event_failure = _find_failure_reason(event, event_type)
-        if event_failure is not None:
-            failure_reason = event_failure
-        event_answer = _find_final_answer(event, event_type)
-        if event_answer:
-            final_answer = event_answer
-    return ExternalAgentEventSummary(
-        final_answer=final_answer,
-        command_events=tuple(command_events),
-        tool_events=tuple(tool_events),
-        web_search_events=tuple(web_search_events),
-        file_change_events=tuple(file_change_events),
-        usage=usage,
-        failure_reason=failure_reason,
-        parse_errors=tuple(parse_errors),
-    )
-
-
-def _event_type(event: dict[str, Any]) -> str:
-    """Return the best-effort type label for a JSONL event."""
-
-    for key in ("type", "event", "kind", "name"):
-        value = event.get(key)
-        if isinstance(value, str):
-            return value.lower()
-    nested = event.get("item")
-    if isinstance(nested, dict):
-        return _event_type(nested)
-    return ""
-
-
-def _is_command_event(event: dict[str, Any], event_type: str) -> bool:
-    """Return whether an event appears to describe shell command activity."""
-
-    haystack = _event_haystack(event, event_type)
-    return any(token in haystack for token in ("command", "shell", "exec", "terminal"))
-
-
-def _is_tool_event(event: dict[str, Any], event_type: str) -> bool:
-    """Return whether an event appears to describe a tool call."""
-
-    haystack = _event_haystack(event, event_type)
-    return "tool" in haystack or "function_call" in haystack
-
-
-def _is_web_search_event(event: dict[str, Any], event_type: str) -> bool:
-    """Return whether an event appears to describe Codex web search activity."""
-
-    haystack = _event_haystack(event, event_type)
-    return "web_search" in haystack
-
-
-def _is_file_change_event(event: dict[str, Any], event_type: str) -> bool:
-    """Return whether an event appears to describe a file modification."""
-
-    haystack = _event_haystack(event, event_type)
-    return any(token in haystack for token in ("file_change", "patch", "diff", "edit", "write"))
-
-
-def _event_haystack(event: dict[str, Any], event_type: str) -> str:
-    """Build a shallow searchable label string for classifying event families."""
-
-    labels = [event_type]
-    for key in ("type", "event", "kind", "name", "subtype", "status"):
-        value = event.get(key)
-        if isinstance(value, str):
-            labels.append(value.lower())
-    nested = event.get("item")
-    if isinstance(nested, dict):
-        labels.append(_event_haystack(nested, _event_type(nested)))
-    return " ".join(labels)
-
-
-def _find_usage(value: Any) -> dict[str, Any] | None:
-    """Find the first nested usage/token payload in an event."""
-
-    if isinstance(value, dict):
-        for key, nested in value.items():
-            key_lower = key.lower()
-            if key_lower == "usage" and isinstance(nested, dict):
-                return nested
-            if "token" in key_lower and isinstance(nested, dict):
-                return nested
-            found = _find_usage(nested)
-            if found is not None:
-                return found
-    elif isinstance(value, list):
-        for item in value:
-            found = _find_usage(item)
-            if found is not None:
-                return found
-    return None
-
-
-def _find_failure_reason(event: dict[str, Any], event_type: str) -> str | None:
-    """Find a failure or error reason in an event."""
-
-    if not _has_failure_marker(event, event_type):
-        return None
-    for key in ("error", "failure", "details"):
-        value = event.get(key)
-        if isinstance(value, dict):
-            for nested_key in ("message", "error", "failure_reason", "reason", "detail"):
-                nested_value = value.get(nested_key)
-                if isinstance(nested_value, str) and nested_value.strip():
-                    return nested_value.strip()
-            nested = _find_failure_reason(value, _event_type(value) or key)
-            if nested is not None:
-                return nested
-    for key in ("message", "error", "failure_reason", "reason", "detail"):
-        value = event.get(key)
-        if isinstance(value, str) and value.strip():
-            return value.strip()
-    nested = event.get("item")
-    if isinstance(nested, dict):
-        nested_failure = _find_failure_reason(nested, _event_type(nested))
-        if nested_failure is not None:
-            return nested_failure
-    return event_type or "external agent reported failure"
-
-
-def _has_failure_marker(event: dict[str, Any], event_type: str) -> bool:
-    """Return whether event labels explicitly report a failure."""
-
-    labels = [event_type]
-    for key in ("type", "event", "kind", "name", "subtype", "status"):
-        value = event.get(key)
-        if isinstance(value, str):
-            labels.append(value.lower())
-    nested = event.get("item")
-    if isinstance(nested, dict):
-        labels.append(_event_type(nested))
-        status = nested.get("status")
-        if isinstance(status, str):
-            labels.append(status.lower())
-    return any(
-        label in {"error", "failed", "failure"}
-        or label.endswith(".failed")
-        or label.endswith("_failed")
-        or label.endswith(".error")
-        or label.endswith("_error")
-        for label in labels
-    )
-
-
-def _find_final_answer(event: dict[str, Any], event_type: str) -> str | None:
-    """Find a final assistant answer in a Codex JSONL event."""
-
-    explicit = event.get("final_answer")
-    if isinstance(explicit, str) and explicit.strip():
-        return explicit.strip()
-    if "final" in event_type or event.get("role") == "assistant":
-        text = _find_text_payload(event)
-        if text:
-            return text
-    if event_type in {"assistant_message", "agent_message", "message", "response"}:
-        text = _find_text_payload(event)
-        if text:
-            return text
-    nested = event.get("item")
-    if isinstance(nested, dict):
-        return _find_final_answer(nested, _event_type(nested))
-    return None
-
-
-def _find_text_payload(value: Any) -> str | None:
-    """Find a human-readable text payload inside common event shapes."""
-
-    if isinstance(value, str):
-        return value.strip() or None
-    if isinstance(value, dict):
-        for key in ("text", "content", "message", "answer", "output"):
-            nested = value.get(key)
-            if isinstance(nested, str) and nested.strip():
-                return nested.strip()
-        for key in ("content", "message", "delta", "item"):
-            nested = value.get(key)
-            found = _find_text_payload(nested)
-            if found:
-                return found
-    if isinstance(value, list):
-        parts = [_find_text_payload(item) for item in value]
-        text = "\n".join(part for part in parts if part)
-        return text or None
-    return None
-
-
-def _build_external_agent_command(config: ExternalAgentConfig) -> tuple[str, ...]:
-    """Build the noninteractive command for an external coding-agent client."""
-
-    if config.access_method is not AccessMethod.CODEX_CLI:
-        raise NotImplementedError(f"{config.access_method.value} execution is not implemented.")
-
-    command = [config.command]
-    if config.web_search:
-        command.append("--search")
-    if config.codex_mcp_tools:
-        command.extend(_codex_mcp_config_overrides(config.cwd))
-    if config.approval_policy:
-        command.extend(
-            [
-                "--ask-for-approval",
-                _codex_approval_policy(config.approval_policy),
-            ]
-        )
-
-    if config.resume is not None:
-        command.extend(["exec", "resume", "--model", config.model])
-        if config.json_output:
-            command.append("--json")
-        if config.output_last_message_path is not None:
-            command.extend(["--output-last-message", str(config.output_last_message_path)])
-        if config.output_schema_path is not None:
-            command.extend(["--output-schema", str(config.output_schema_path)])
-        for image_path in config.image_paths:
-            command.extend(["--image", str(image_path)])
-        if config.resume == "last":
-            command.append("--last")
-        else:
-            command.append(config.resume)
-        command.append("-")
-        return tuple(command)
-
-    command.extend(
-        [
-            "exec",
-            "--cd",
-            str(config.cwd),
-            "--model",
-            config.model,
-            "--sandbox",
-            config.sandbox,
-        ]
-    )
-    if config.ephemeral:
-        command.append("--ephemeral")
-    if config.json_output:
-        command.append("--json")
-    if config.output_last_message_path is not None:
-        command.extend(["--output-last-message", str(config.output_last_message_path)])
-    if config.output_schema_path is not None:
-        command.extend(["--output-schema", str(config.output_schema_path)])
-    for image_path in config.image_paths:
-        command.extend(["--image", str(image_path)])
-    command.append("-")
-    return tuple(command)
-
-
-def _codex_mcp_config_overrides(repo_root: Path) -> list[str]:
-    """Return top-level Codex config overrides for project-local MCP tools."""
-
-    repo_root = repo_root.resolve()
-    return [
-        "-c",
-        f"mcp_servers.repo_assistant_tools.command={_codex_config_string(sys.executable)}",
-        "-c",
-        "mcp_servers.repo_assistant_tools.args="
-        + _codex_config_array(
-            (
-                "-m",
-                "ai_agent.mcp_server",
-                "--workspace-root",
-                str(repo_root),
-            )
-        ),
-        "-c",
-        f"mcp_servers.repo_assistant_tools.cwd={_codex_config_string(str(repo_root))}",
-        "-c",
-        "mcp_servers.repo_assistant_tools.enabled=true",
-        "-c",
-        "mcp_servers.repo_assistant_tools.required=false",
-        "-c",
-        "mcp_servers.repo_assistant_tools.default_tools_approval_mode='auto'",
-        "-c",
-        "mcp_servers.repo_assistant_tools.startup_timeout_sec=10",
-        "-c",
-        "mcp_servers.repo_assistant_tools.tool_timeout_sec=60",
-        "-c",
-        "mcp_servers.repo_assistant_tools.enabled_tools="
-        + _codex_config_array(
-            ("read_file", "list_dir", "find_files", "grep_search", "delegate_task")
-        ),
-    ]
-
-
-def _codex_config_array(values: tuple[str, ...]) -> str:
-    return "[" + ",".join(_codex_config_string(value) for value in values) + "]"
-
-
-def _codex_config_string(value: str) -> str:
-    return "'" + value.replace("\\", "\\\\").replace("'", "\\'") + "'"
-
-
-def _codex_approval_policy(approval_policy: str) -> str:
-    """Map repo-assistant approval presets to Codex CLI approval policies."""
-
-    if approval_policy == "interactive":
-        return "on-request"
-    return "never"
-
-
-def _run_external_agent(prompt: str, config: ExternalAgentConfig) -> ExternalAgentResult:
-    """Run an external coding-agent process with the prompt on stdin."""
-
+    returncode: int | None
+    status: str
+    elapsed_seconds: float
+    stdout_preview: str = ""
+    stderr_preview: str = ""
+    failure_reason: str = ""
+
+
+def _run_external_agent(*args: Any, **kwargs: Any) -> Any:
+    """Compatibility wrapper that keeps example tests patchable via subprocess.run."""
+
+    if "runner" in kwargs or "popen_factory" in kwargs:
+        return _run_external_agent_impl(*args, **kwargs)
+    prompt = args[0]
+    config = args[1]
     command = _build_external_agent_command(config)
     if config.output_last_message_path is not None:
         config.output_last_message_path.parent.mkdir(parents=True, exist_ok=True)
+    progress_callback = kwargs.get("progress_callback")
+    if progress_callback is not None:
+        progress_callback("external_agent_status: running elapsed_seconds=0.0")
     completed = subprocess.run(
         command,
         input=prompt,
@@ -1056,19 +229,7 @@ def _run_external_agent(prompt: str, config: ExternalAgentConfig) -> ExternalAge
         timeout=config.timeout_seconds,
         cwd=config.cwd,
     )
-    stdout = completed.stdout or ""
-    events = parse_external_agent_jsonl(stdout) if config.json_output and stdout else None
-    last_message = None
-    if config.output_last_message_path is not None and config.output_last_message_path.exists():
-        last_message = config.output_last_message_path.read_text(encoding="utf-8", errors="replace")
-    return ExternalAgentResult(
-        command=command,
-        returncode=completed.returncode,
-        stdout=stdout,
-        stderr=completed.stderr or "",
-        last_message=last_message,
-        events=events,
-    )
+    return _external_agent_result_from_completed_process(command, config, completed)
 
 
 def _capability_report(snapshot: Any) -> dict[str, Any]:
@@ -1103,222 +264,6 @@ def _capability_report(snapshot: Any) -> dict[str, Any]:
         "external_agents": external_agents,
         "authorization": codex_authorization_registry(external_agents["codex"]).to_dict(),
     }
-
-
-def build_response_scrutiny_prompt(original_prompt: str, response: str) -> str:
-    """Build a bounded second-pass prompt for evaluating one assistant response."""
-
-    return (
-        "Original repository-analysis request:\n"
-        f"{original_prompt}\n\n"
-        "Candidate assistant response:\n"
-        f"{response}\n\n"
-        "Scrutinize the candidate response using the required report format."
-    )
-
-
-def parse_response_scrutiny_report(text: str) -> ResponseScrutinyReport:
-    """Parse and validate the structured response-scrutiny report."""
-
-    sections = _parse_response_scrutiny_heading_sections(text)
-    if sections is None:
-        sections = _parse_response_scrutiny_json_sections(text)
-
-    missing = [heading for heading in _RESPONSE_SCRUTINY_HEADINGS if heading not in sections]
-    if missing:
-        raise ValueError("missing scrutiny heading(s): " + ", ".join(missing))
-
-    verdict = sections["VERDICT"].strip().lower()
-    if verdict not in _RESPONSE_SCRUTINY_VERDICTS:
-        raise ValueError(f"invalid scrutiny verdict: {sections['VERDICT']!r}")
-
-    try:
-        score = int(sections["SCORE"].strip())
-    except ValueError as exc:
-        raise ValueError(f"invalid scrutiny score: {sections['SCORE']!r}") from exc
-    if not 0 <= score <= 10:
-        raise ValueError(f"scrutiny score out of range: {score}")
-
-    return ResponseScrutinyReport(
-        verdict=verdict,
-        score=score,
-        strengths=sections["STRENGTHS"],
-        issues=sections["ISSUES"],
-        recommended_next_action=sections["RECOMMENDED_NEXT_ACTION"],
-        revised_response=sections["REVISED_RESPONSE"],
-        raw_text=text,
-    )
-
-
-def _parse_response_scrutiny_heading_sections(text: str) -> dict[str, str] | None:
-    """Parse report sections from canonical heading lines."""
-
-    matches = list(
-        re.finditer(
-            _RESPONSE_SCRUTINY_HEADING_PATTERN,
-            text,
-        )
-    )
-    if not matches:
-        return None
-
-    sections: dict[str, str] = {}
-    for index, match in enumerate(matches):
-        heading = match.group(1).upper().replace(" ", "_")
-        if heading in sections:
-            raise ValueError(f"duplicate scrutiny heading: {heading}")
-        section_end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
-        first_line = match.group(2).strip()
-        continuation = text[match.end() : section_end].strip()
-        sections[heading] = f"{first_line}\n{continuation}".strip() if continuation else first_line
-
-    return sections
-
-
-def _parse_response_scrutiny_json_sections(text: str) -> dict[str, str]:
-    """Parse report sections from a JSON object with canonical keys."""
-
-    candidate = text.strip()
-    match = _FENCED_JSON_PATTERN.search(candidate)
-    if match:
-        candidate = match.group(1)
-    try:
-        parsed = json.loads(candidate)
-    except json.JSONDecodeError:
-        return {}
-    if not isinstance(parsed, dict):
-        return {}
-    return {
-        heading: _stringify_scrutiny_section(parsed[heading])
-        for heading in _RESPONSE_SCRUTINY_HEADINGS
-        if heading in parsed
-    }
-
-
-def _stringify_scrutiny_section(value: Any) -> str:
-    """Convert JSON scrutiny values to stable transcript text."""
-
-    if value is None:
-        return ""
-    if isinstance(value, str):
-        return value.strip()
-    return json.dumps(value, ensure_ascii=False, indent=2)
-
-
-def find_repo_root(start: Path) -> Path:
-    """Find the nearest Git repository root at or above start."""
-
-    current = start.resolve()
-    if current.is_file():
-        current = current.parent
-    for candidate in (current, *current.parents):
-        if (candidate / ".git").exists():
-            return candidate
-    return current
-
-
-def build_default_system_prompt(extra_system_prompt: str | None = None) -> str:
-    """Return the repo-aware system prompt with optional caller instructions."""
-
-    if not extra_system_prompt:
-        return _TOOL_SYSTEM_PROMPT
-    return f"{_TOOL_SYSTEM_PROMPT}\n\nAdditional instruction:\n{extra_system_prompt.strip()}"
-
-
-def load_prompt_context(
-    repo_root: Path,
-    selected_paths: Sequence[Path],
-    *,
-    input_func: Callable[[str], str] = input,
-    allow_outside_files: bool = False,
-    context_budget_chars: int | None = DEFAULT_CONTEXT_BUDGET_CHARS,
-    context_file_budget_chars: int = DEFAULT_CONTEXT_FILE_BUDGET_CHARS,
-) -> tuple[RepoContextFile, ...]:
-    """Load approved context files within deterministic size budgets."""
-
-    if context_budget_chars is not None and context_budget_chars <= 0:
-        raise ValueError("context_budget_chars must be greater than zero or None.")
-    if context_file_budget_chars <= 0:
-        raise ValueError("context_file_budget_chars must be greater than zero.")
-
-    context_paths = [
-        repo_root / "AGENTS.md",
-        repo_root / "CURRENT_CONTEXT.md",
-        *selected_paths,
-    ]
-    loaded: list[RepoContextFile] = []
-    seen: set[Path] = set()
-    for path in context_paths:
-        resolved = _resolve_context_path(repo_root, path)
-        if resolved in seen or not resolved.exists() or not resolved.is_file():
-            continue
-        seen.add(resolved)
-        inside_repo = _is_relative_to(resolved, repo_root)
-        if not inside_repo and not allow_outside_files:
-            if not _confirm_outside_read(resolved, input_func=input_func):
-                continue
-        remaining_budget = (
-            None
-            if context_budget_chars is None
-            else max(context_budget_chars - sum(len(item.content) for item in loaded), 0)
-        )
-        if remaining_budget == 0:
-            continue
-        content_limit = context_file_budget_chars
-        if remaining_budget is not None:
-            content_limit = min(content_limit, remaining_budget)
-        loaded.append(
-            RepoContextFile(
-                path=resolved,
-                display_path=_display_path(repo_root, resolved),
-                content=_limit_context_content(
-                    resolved.read_text(encoding="utf-8", errors="replace"),
-                    content_limit,
-                ),
-                inside_repo=inside_repo,
-            )
-        )
-    return tuple(loaded)
-
-
-def _limit_context_content(content: str, max_chars: int) -> str:
-    """Keep the beginning and end of a file while marking omitted content."""
-
-    if len(content) <= max_chars:
-        return content
-    marker = f"\n[context truncated; {len(content) - max_chars} chars]\n"
-    available = max_chars - len(marker)
-    if available <= 0:
-        return marker[:max_chars]
-    head_chars = (available + 1) // 2
-    tail_chars = available // 2
-    tail = content[-tail_chars:].lstrip() if tail_chars else ""
-    return content[:head_chars].rstrip() + marker + tail
-
-
-def build_repo_prompt(user_prompt: str, context_files: Sequence[RepoContextFile]) -> str:
-    """Combine the user's request and approved repository context into one prompt."""
-
-    sections = [
-        "# User request",
-        user_prompt.strip(),
-        "",
-        "# Repository context",
-    ]
-    if not context_files:
-        sections.append("No repository context files were loaded.")
-    for context_file in context_files:
-        boundary = "inside-repo" if context_file.inside_repo else "outside-repo-approved"
-        sections.extend(
-            [
-                "",
-                f"## {context_file.display_path} ({boundary})",
-                "```text",
-                context_file.content.rstrip(),
-                "```",
-            ]
-        )
-    return "\n".join(sections).strip()
 
 
 def build_delegation_context(
@@ -1525,59 +470,6 @@ def run_auxiliary_panel(
     )
 
 
-def extract_actions(response_text: str) -> tuple[AssistantAction, ...]:
-    """Extract assistant action requests from a fenced JSON block or raw JSON."""
-
-    payloads = [match.group(1) for match in _ACTION_BLOCK_PATTERN.finditer(response_text)]
-    stripped = response_text.strip()
-    if stripped.startswith("{") and stripped.endswith("}"):
-        payloads.append(stripped)
-
-    for payload in payloads:
-        try:
-            parsed = json.loads(payload)
-        except json.JSONDecodeError:
-            continue
-        raw_actions = parsed.get("actions")
-        if not isinstance(raw_actions, list):
-            continue
-        actions: list[AssistantAction] = []
-        for raw_action in raw_actions:
-            if not isinstance(raw_action, dict):
-                continue
-            action_type = raw_action.get("type")
-            if not isinstance(action_type, str):
-                continue
-            args = {key: value for key, value in raw_action.items() if key != "type"}
-            actions.append(AssistantAction(action_type=action_type, args=args))
-        return tuple(actions)
-    return ()
-
-
-def execute_actions(
-    actions: Sequence[AssistantAction],
-    repo_root: Path,
-    *,
-    authorize_action: Callable[[AssistantAction], bool] | None = None,
-    input_func: Callable[[str], str] = input,
-    allow_outside_files: bool = False,
-    command_timeout_seconds: float = 60.0,
-) -> tuple[AssistantActionResult, ...]:
-    """Execute approved local actions proposed by the assistant."""
-
-    return tuple(
-        _execute_action(
-            action,
-            repo_root,
-            authorize_action=authorize_action,
-            input_func=input_func,
-            allow_outside_files=allow_outside_files,
-            command_timeout_seconds=command_timeout_seconds,
-        )
-        for action in actions
-    )
-
-
 def _configure_away_mode(
     args: argparse.Namespace,
     argv: Sequence[str] | None,
@@ -1669,6 +561,15 @@ def _print_orchestrated_stage_plan(
     print("away_plan_auxiliary_route_policy: derived_local_cheap")
     print("away_plan_external_writes: disabled")
     print(f"away_plan_approval_policy: {args.approval_policy}")
+    validation_commands = _validation_commands_from_args(args)
+    print(
+        "away_plan_validation_commands_json: "
+        + json.dumps(list(validation_commands), sort_keys=True)
+    )
+    print(
+        "away_plan_max_repair_cycles: "
+        + ("unbounded" if args.max_repair_cycles == -1 else str(args.max_repair_cycles))
+    )
     for name, route, purpose in _ORCHESTRATED_STAGE_PLAN:
         print(f"away_stage: {name} route={route} status=planned purpose={purpose}")
 
@@ -1720,6 +621,159 @@ def _execution_status_with_auxiliary_result(
     if execution_status == "completed" and auxiliary_status not in (None, "completed"):
         return "completed_with_auxiliary_errors"
     return execution_status
+
+
+def _execution_status_with_validation_stage(
+    execution_status: str,
+    validation_stage: OrchestratedStageRecord,
+) -> str:
+    """Surface deterministic validation failures in the final execution status."""
+
+    validation_status = str((validation_stage.details or {}).get("validation_status", ""))
+    if execution_status == "completed" and validation_status in {"failed", "timeout"}:
+        return "completed_with_validation_errors"
+    return execution_status
+
+
+def _git_status_short(repo_root: Path) -> tuple[str, ...]:
+    """Return concise Git working tree status for final handoff metadata."""
+
+    try:
+        result = subprocess.run(
+            ["git", "status", "--short"],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            timeout=10.0,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return (f"git status unavailable: {exc}",)
+    if result.returncode != 0:
+        detail = result.stderr.strip() or f"git status exited with code {result.returncode}"
+        return (f"git status failed: {detail}",)
+    return tuple(line for line in result.stdout.splitlines() if line.strip())
+
+
+def _activity_preview_lines(text: str, *, limit: int = 1_500) -> str:
+    """Return a compact preview for command output fields."""
+
+    normalized = "\n".join(line.rstrip() for line in text.splitlines() if line.strip())
+    if len(normalized) <= limit:
+        return normalized
+    return normalized[: max(0, limit - 15)].rstrip() + " ...[truncated]"
+
+
+def _validation_commands_from_args(args: argparse.Namespace) -> tuple[str, ...]:
+    """Return deterministic validation commands selected for this run."""
+
+    if args.skip_validation:
+        return ()
+    commands = tuple(command.strip() for command in args.validation_command if command.strip())
+    return commands or (DEFAULT_VALIDATION_COMMAND,)
+
+
+def _run_validation_commands(
+    commands: Sequence[str],
+    *,
+    repo_root: Path,
+    timeout_seconds: float,
+    progress_callback: Callable[[str], None] = print,
+) -> tuple[ValidationCommandResult, ...]:
+    """Run deterministic local validation commands and capture bounded output."""
+
+    results: list[ValidationCommandResult] = []
+    for index, command in enumerate(commands, start=1):
+        progress_callback(f"validation_command: {command}")
+        started = time.perf_counter()
+        try:
+            completed = subprocess.run(
+                shlex.split(command, posix=sys.platform != "win32"),
+                cwd=repo_root,
+                capture_output=True,
+                text=True,
+                timeout=timeout_seconds,
+                check=False,
+            )
+        except subprocess.TimeoutExpired as exc:
+            elapsed = time.perf_counter() - started
+            stdout = exc.stdout if isinstance(exc.stdout, str) else ""
+            stderr = exc.stderr if isinstance(exc.stderr, str) else ""
+            results.append(
+                ValidationCommandResult(
+                    command=command,
+                    returncode=None,
+                    status="timeout",
+                    elapsed_seconds=elapsed,
+                    stdout_preview=_activity_preview_lines(stdout),
+                    stderr_preview=_activity_preview_lines(stderr),
+                    failure_reason=f"validation command timed out after {timeout_seconds:g}s",
+                )
+            )
+            progress_callback(f"validation_result: {index} status=timeout")
+        except OSError as exc:
+            elapsed = time.perf_counter() - started
+            results.append(
+                ValidationCommandResult(
+                    command=command,
+                    returncode=None,
+                    status="failed_to_start",
+                    elapsed_seconds=elapsed,
+                    failure_reason=str(exc),
+                )
+            )
+            progress_callback(f"validation_result: {index} status=failed_to_start")
+        else:
+            elapsed = time.perf_counter() - started
+            status = "passed" if completed.returncode == 0 else "failed"
+            results.append(
+                ValidationCommandResult(
+                    command=command,
+                    returncode=completed.returncode,
+                    status=status,
+                    elapsed_seconds=elapsed,
+                    stdout_preview=_activity_preview_lines(completed.stdout),
+                    stderr_preview=_activity_preview_lines(completed.stderr),
+                    failure_reason=""
+                    if completed.returncode == 0
+                    else f"validation command exited with code {completed.returncode}",
+                )
+            )
+            progress_callback(
+                f"validation_result: {index} status={status} returncode={completed.returncode}"
+            )
+    return tuple(results)
+
+
+def _validation_status(results: Sequence[ValidationCommandResult]) -> str:
+    """Collapse command results into the stage-level validation status."""
+
+    if not results:
+        return "not_run"
+    if all(result.status == "passed" for result in results):
+        return "passed"
+    if any(result.status == "timeout" for result in results):
+        return "timeout"
+    return "failed"
+
+
+def _validation_results_json(
+    results: Sequence[ValidationCommandResult],
+) -> list[dict[str, object]]:
+    """Return stable JSON-friendly validation result metadata."""
+
+    return [
+        {
+            "command": result.command,
+            "returncode": result.returncode,
+            "status": result.status,
+            "elapsed_seconds": round(result.elapsed_seconds, 3),
+            "stdout_preview": result.stdout_preview,
+            "stderr_preview": result.stderr_preview,
+            "failure_reason": result.failure_reason,
+        }
+        for result in results
+    ]
 
 
 class OrchestratedRunTracker:
@@ -1806,6 +860,110 @@ class OrchestratedRunTracker:
             f"completed_at={record.completed_at_utc}"
         )
         return record
+
+    def record_validation_stage(
+        self,
+        *,
+        args: argparse.Namespace,
+        repo_root: Path,
+        execution_status: str,
+    ) -> OrchestratedStageRecord:
+        """Persist deterministic validation-stage status for this foreground slice."""
+
+        commands = _validation_commands_from_args(args)
+        self.start_stage(
+            "validation",
+            details={
+                "execution_status_before_validation": execution_status,
+                "commands": list(commands),
+            },
+        )
+        if execution_status == "failed":
+            return self.complete_stage(
+                "validation",
+                status="skipped",
+                details={
+                    "validation_status": "not_run",
+                    "skip_reason": "primary execution failed before validation",
+                },
+            )
+        if not commands:
+            return self.complete_stage(
+                "validation",
+                status="skipped",
+                details={
+                    "validation_status": "not_run",
+                    "skip_reason": "validation skipped by --skip-validation",
+                },
+            )
+        results = _run_validation_commands(
+            commands,
+            repo_root=repo_root,
+            timeout_seconds=args.validation_timeout_seconds,
+            progress_callback=self._progress_callback,
+        )
+        validation_status = _validation_status(results)
+        stage_status = "completed" if validation_status == "passed" else validation_status
+        return self.complete_stage(
+            "validation",
+            status=stage_status,
+            details={
+                "validation_status": validation_status,
+                "results": _validation_results_json(results),
+            },
+        )
+
+    def record_final_handoff_stage(
+        self,
+        *,
+        execution_status: str,
+        validation_stage: OrchestratedStageRecord | None,
+        repo_root: Path,
+        assistant_response_text: str | None,
+        final_answer_text: str | None = None,
+    ) -> OrchestratedStageRecord:
+        """Persist final handoff fields for the returning user."""
+
+        changed_files = _git_status_short(repo_root)
+        validation_status = (
+            str((validation_stage.details or {}).get("validation_status", validation_stage.status))
+            if validation_stage is not None
+            else "not_recorded"
+        )
+        self.start_stage(
+            "final_handoff",
+            details={
+                "execution_status": execution_status,
+                "validation_status": validation_status,
+            },
+        )
+        handoff_status = "failed" if execution_status == "failed" else "completed"
+        blockers = ""
+        risks = ""
+        next_action = "review the assistant response"
+        if execution_status == "failed":
+            blockers = "execution failed"
+            next_action = "inspect failure details and decide whether to repair"
+        elif validation_status in {"failed", "timeout"}:
+            blockers = f"validation {validation_status}"
+            next_action = "inspect validation failures and repair remaining issues"
+        elif validation_status == "not_run":
+            risks = "validation not run by deterministic wrapper"
+            next_action = "run deterministic validation before treating the work as done"
+        return self.complete_stage(
+            "final_handoff",
+            status=handoff_status,
+            details={
+                "execution_status": execution_status,
+                "validation_status": validation_status,
+                "changed_files": changed_files,
+                "assistant_response_available": assistant_response_text is not None,
+                "final_answer_available": final_answer_text is not None,
+                "blockers": blockers,
+                "risks": risks,
+                "next_action": next_action,
+            },
+        )
 
 
 def _resolve_orchestrated_run_db_path(args: argparse.Namespace, repo_root: Path) -> Path:
@@ -1998,6 +1156,37 @@ def main(argv: Sequence[str] | None = None) -> int:
         help=(
             "SQLite database path for durable orchestrated run and stage records. "
             "Relative paths are resolved from the repository root."
+        ),
+    )
+    parser.add_argument(
+        "--validation-command",
+        action="append",
+        default=[],
+        metavar="CMD",
+        help=(
+            "Deterministic validation command to run during orchestrated executed runs. "
+            f"May be repeated. Defaults to `{DEFAULT_VALIDATION_COMMAND}`."
+        ),
+    )
+    parser.add_argument(
+        "--skip-validation",
+        action="store_true",
+        help="Skip deterministic validation in orchestrated executed runs.",
+    )
+    parser.add_argument(
+        "--validation-timeout-seconds",
+        type=float,
+        default=300.0,
+        help="Timeout for each deterministic validation command.",
+    )
+    parser.add_argument(
+        "--max-repair-cycles",
+        type=int,
+        default=3,
+        help=(
+            "Maximum orchestrated repair cycles after failed validation. Use 0 to "
+            "disable repairs and -1 to disable the cycle cap while preserving the "
+            "--away-minutes wall-clock budget."
         ),
     )
     parser.add_argument(
@@ -2221,6 +1410,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     _configure_away_mode(args, argv, parser)
     if args.orchestrated and args.away_minutes is None:
         parser.error("--orchestrated requires --away-minutes")
+    if args.validation_timeout_seconds <= 0:
+        parser.error("--validation-timeout-seconds must be greater than zero")
+    if args.max_repair_cycles < -1:
+        parser.error("--max-repair-cycles must be -1 or greater")
     if args.native_tools and args.no_native_tools:
         parser.error("--native-tools cannot be combined with --no-native-tools")
     use_native_tools = args.native_tools or (
@@ -2383,6 +1576,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
         return _run_external_agent_cli_mode(
             prompt=prompt,
+            system_prompt=primary_system_prompt,
             args=args,
             repo_root=repo_root,
             profile=profile,
@@ -2564,6 +1758,21 @@ def main(argv: Sequence[str] | None = None) -> int:
                     status="failed",
                     details={"failure_reason": str(exc)},
                 )
+                validation_stage = orchestrated_tracker.record_validation_stage(
+                    args=args,
+                    repo_root=repo_root,
+                    execution_status=execution_status,
+                )
+                execution_status = _execution_status_with_validation_stage(
+                    execution_status,
+                    validation_stage,
+                )
+                orchestrated_tracker.record_final_handoff_stage(
+                    execution_status=execution_status,
+                    validation_stage=validation_stage,
+                    repo_root=repo_root,
+                    assistant_response_text=assistant_response_text,
+                )
                 orchestrated_tracker.finish_run(execution_status=execution_status)
             print(f"status: {final_status}")
             print(f"delegation: {delegation_status}")
@@ -2730,6 +1939,22 @@ def main(argv: Sequence[str] | None = None) -> int:
     print(f"delegation: {delegation_status}")
     print(f"execution_status: {execution_status}")
     if orchestrated_tracker is not None and args.execute:
+        validation_stage = orchestrated_tracker.record_validation_stage(
+            args=args,
+            repo_root=repo_root,
+            execution_status=execution_status,
+        )
+        execution_status = _execution_status_with_validation_stage(
+            execution_status,
+            validation_stage,
+        )
+        print(f"final_execution_status: {execution_status}")
+        orchestrated_tracker.record_final_handoff_stage(
+            execution_status=execution_status,
+            validation_stage=validation_stage,
+            repo_root=repo_root,
+            assistant_response_text=assistant_response_text,
+        )
         orchestrated_tracker.finish_run(execution_status=execution_status)
     _print_run_metrics(
         metrics,
@@ -2755,7 +1980,7 @@ def _run_codex_plugin_management(
         parser.error("--codex-plugin-install/--codex-plugin-remove require --execute")
     if args.prompt:
         parser.error("plugin management cannot be combined with a prompt request")
-    command = _external_agent_command(AccessMethod.CODEX_CLI)
+    command = external_agent_command(AccessMethod.CODEX_CLI)
     if command is None:
         print("=== Codex plugin management ===")
         print(f"repo_root: {repo_root}")
@@ -2778,7 +2003,7 @@ def _run_codex_plugin_management(
     print(f"repo_root: {repo_root}")
     print(f"codex_command: {command}")
     print("codex_plugin_auth_boundary: install/remove only; no OAuth or service authorization")
-    before = _run_diagnostic_command(command, "plugin", "list", timeout_seconds=10.0)
+    before = run_diagnostic_command(command, "plugin", "list", timeout_seconds=10.0)
     print("codex_plugin_before_ok: " + str(before["ok"]))
     if before["stdout"]:
         print("codex_plugin_before_stdout:")
@@ -2813,7 +2038,7 @@ def _run_codex_plugin_management(
             print(result.stderr)
         all_ok = all_ok and result.ok
 
-    after = _run_diagnostic_command(command, "plugin", "list", timeout_seconds=10.0)
+    after = run_diagnostic_command(command, "plugin", "list", timeout_seconds=10.0)
     print("codex_plugin_after_ok: " + str(after["ok"]))
     if after["stdout"]:
         print("codex_plugin_after_stdout:")
@@ -2853,7 +2078,7 @@ def _run_codex_login(
         parser.error("--codex-login and --codex-login-device are mutually exclusive")
     if args.prompt:
         parser.error("Codex login cannot be combined with a prompt request")
-    command = _external_agent_command(AccessMethod.CODEX_CLI)
+    command = external_agent_command(AccessMethod.CODEX_CLI)
     if command is None:
         print("=== Codex login ===")
         print(f"repo_root: {repo_root}")
@@ -2881,7 +2106,7 @@ def _run_codex_login(
         print("execution_status: failed")
         return 1
 
-    status = _run_diagnostic_command(command, "login", "status", timeout_seconds=10.0)
+    status = run_diagnostic_command(command, "login", "status", timeout_seconds=10.0)
     print(f"codex_login_returncode: {result.returncode}")
     print(f"codex_login_status_ok: {status['ok']}")
     if status["stdout"]:
@@ -2896,6 +2121,7 @@ def _run_codex_login(
 def _run_external_agent_cli_mode(
     *,
     prompt: str,
+    system_prompt: str,
     args: argparse.Namespace,
     repo_root: Path,
     profile: Any,
@@ -2911,6 +2137,8 @@ def _run_external_agent_cli_mode(
 
     assert orchestration.execution_plan is not None
     target = orchestration.execution_plan.target
+    if args.codex_mcp_tools and delegation_status == "disabled":
+        delegation_status = "enabled: external Codex MCP delegate_task available"
     print("=== Repo Coding Assistant ===")
     print(f"mode: {args.mode}")
     print(f"repo_root: {repo_root}")
@@ -3039,12 +2267,17 @@ def _run_external_agent_cli_mode(
                 )
             external_prompt = _external_agent_prompt_with_execution_metadata(
                 prompt,
+                system_prompt=system_prompt,
                 approval_policy=args.approval_policy,
                 sandbox=config.sandbox,
                 mode=args.mode,
             )
             primary_started = time.perf_counter()
-            external_result = _run_external_agent(external_prompt, config)
+            external_result = _run_external_agent(
+                external_prompt,
+                config,
+                progress_callback=print,
+            )
             primary_elapsed_seconds = time.perf_counter() - primary_started
             print("\n=== External agent diagnostics ===")
             print(f"external_agent_returncode: {external_result.returncode}")
@@ -3128,6 +2361,23 @@ def _run_external_agent_cli_mode(
     )
     print(f"execution_status: {execution_status}")
     if orchestrated_tracker is not None and args.execute:
+        validation_stage = orchestrated_tracker.record_validation_stage(
+            args=args,
+            repo_root=repo_root,
+            execution_status=execution_status,
+        )
+        execution_status = _execution_status_with_validation_stage(
+            execution_status,
+            validation_stage,
+        )
+        print(f"final_execution_status: {execution_status}")
+        orchestrated_tracker.record_final_handoff_stage(
+            execution_status=execution_status,
+            validation_stage=validation_stage,
+            repo_root=repo_root,
+            assistant_response_text=None,
+            final_answer_text=final_answer_text,
+        )
         orchestrated_tracker.finish_run(execution_status=execution_status)
     _print_run_metrics(
         metrics,
@@ -3150,6 +2400,7 @@ def _run_external_agent_cli_mode(
 def _external_agent_prompt_with_execution_metadata(
     prompt: str,
     *,
+    system_prompt: str,
     approval_policy: str,
     sandbox: str,
     mode: str,
@@ -3157,6 +2408,8 @@ def _external_agent_prompt_with_execution_metadata(
     """Add execution metadata so external agents do not infer the wrong sandbox."""
 
     return (
+        "# Repo assistant system prompt\n"
+        f"{system_prompt.rstrip()}\n\n"
         f"{prompt}\n\n"
         "# External agent execution metadata\n"
         f"repo_assistant_mode: {mode}\n"
@@ -3462,16 +2715,6 @@ def _write_external_agent_stderr(stderr: str, log_file: Path | None) -> Path | N
     return stderr_path
 
 
-def _is_noisy_codex_model_refresh_stderr(line: str) -> bool:
-    """Return whether a Codex stderr line is known noisy model metadata refresh output."""
-
-    return (
-        "codex_models_manager::manager" in line
-        and "failed to refresh available models" in line
-        and "unknown variant `max`" in line
-    )
-
-
 def _run_native_agent(
     prompt: str,
     config: BackendConfig,
@@ -3536,6 +2779,7 @@ def _run_native_agent(
             child_profile = derive_subtask_profile(
                 parent=profile,
                 task_type=TaskType.CODING,
+                required_capabilities=frozenset({TaskCapability.CHAT, TaskCapability.TOOLS}),
                 quality_threshold=QualityThreshold.STANDARD,
                 latency_target=LatencyTarget.BACKGROUND,
                 cost_policy_tier=CostPolicyTier.LOCAL_ONLY,
@@ -3849,221 +3093,6 @@ def _confirm_legacy_action(action: AssistantAction, category: str) -> bool:
 
     answer = input(f"Allow {category} action '{action.action_type}'? [y/N]: ")
     return answer.strip().lower() in {"y", "yes"}
-
-
-def _resolve_context_path(repo_root: Path, path: Path) -> Path:
-    if path.is_absolute():
-        return path.resolve()
-    return (repo_root / path).resolve()
-
-
-def _is_relative_to(path: Path, parent: Path) -> bool:
-    try:
-        path.relative_to(parent)
-    except ValueError:
-        return False
-    return True
-
-
-def _display_path(repo_root: Path, path: Path) -> str:
-    if _is_relative_to(path, repo_root):
-        return str(path.relative_to(repo_root))
-    return str(path)
-
-
-def _confirm_outside_read(path: Path, *, input_func: Callable[[str], str]) -> bool:
-    try:
-        answer = input_func(f"Read file outside repository? {path} [y/N]: ")
-    except EOFError:
-        return False
-    return answer.strip().lower() in {"y", "yes"}
-
-
-def _execute_action(
-    action: AssistantAction,
-    repo_root: Path,
-    *,
-    authorize_action: Callable[[AssistantAction], bool] | None,
-    input_func: Callable[[str], str],
-    allow_outside_files: bool,
-    command_timeout_seconds: float,
-) -> AssistantActionResult:
-    if authorize_action is not None and not authorize_action(action):
-        return AssistantActionResult(
-            action.action_type,
-            False,
-            f"Skipped by approval policy: {action.action_type}",
-        )
-    if action.action_type == "read_file":
-        return _read_file_action(action, repo_root, input_func, allow_outside_files)
-    if action.action_type == "list_dir":
-        return _list_dir_action(action, repo_root, input_func, allow_outside_files)
-    if action.action_type == "write_file":
-        return _write_file_action(action, repo_root, input_func, allow_outside_files)
-    if action.action_type == "run_command":
-        return _run_command_action(
-            action,
-            repo_root,
-            input_func,
-            allow_outside_files,
-            command_timeout_seconds,
-        )
-    return AssistantActionResult(
-        action_type=action.action_type,
-        ok=False,
-        summary=f"Unsupported action type: {action.action_type}",
-    )
-
-
-def _read_file_action(
-    action: AssistantAction,
-    repo_root: Path,
-    input_func: Callable[[str], str],
-    allow_outside_files: bool,
-) -> AssistantActionResult:
-    path = _action_path(action, repo_root)
-    if path is None:
-        return AssistantActionResult(action.action_type, False, "read_file requires path.")
-    if not _path_allowed(path, repo_root, input_func, allow_outside_files):
-        return AssistantActionResult(action.action_type, False, f"Skipped outside path: {path}")
-    if not path.is_file():
-        return AssistantActionResult(action.action_type, False, f"File not found: {path}")
-    content = path.read_text(encoding="utf-8", errors="replace")
-    return AssistantActionResult(
-        action.action_type,
-        True,
-        f"Read {_display_path(repo_root, path)}",
-        content,
-    )
-
-
-def _list_dir_action(
-    action: AssistantAction,
-    repo_root: Path,
-    input_func: Callable[[str], str],
-    allow_outside_files: bool,
-) -> AssistantActionResult:
-    path = _action_path(action, repo_root) or repo_root
-    if not _path_allowed(path, repo_root, input_func, allow_outside_files):
-        return AssistantActionResult(action.action_type, False, f"Skipped outside path: {path}")
-    if not path.is_dir():
-        return AssistantActionResult(action.action_type, False, f"Directory not found: {path}")
-    names = sorted(child.name for child in path.iterdir())
-    return AssistantActionResult(
-        action.action_type,
-        True,
-        f"Listed {_display_path(repo_root, path)}",
-        "\n".join(names),
-    )
-
-
-def _write_file_action(
-    action: AssistantAction,
-    repo_root: Path,
-    input_func: Callable[[str], str],
-    allow_outside_files: bool,
-) -> AssistantActionResult:
-    path = _action_path(action, repo_root)
-    content = action.args.get("content")
-    if path is None or not isinstance(content, str):
-        return AssistantActionResult(
-            action.action_type,
-            False,
-            "write_file requires path and string content.",
-        )
-    if not _path_allowed(path, repo_root, input_func, allow_outside_files):
-        return AssistantActionResult(action.action_type, False, f"Skipped outside path: {path}")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content, encoding="utf-8")
-    return AssistantActionResult(
-        action.action_type,
-        True,
-        f"Wrote {_display_path(repo_root, path)}",
-    )
-
-
-def _run_command_action(
-    action: AssistantAction,
-    repo_root: Path,
-    input_func: Callable[[str], str],
-    allow_outside_files: bool,
-    command_timeout_seconds: float,
-) -> AssistantActionResult:
-    command = action.args.get("command")
-    if not isinstance(command, str) or not command.strip():
-        return AssistantActionResult(action.action_type, False, "run_command requires command.")
-    cwd_value = action.args.get("cwd")
-    cwd = (
-        _resolve_context_path(repo_root, Path(cwd_value))
-        if isinstance(cwd_value, str)
-        else repo_root
-    )
-    if not _path_allowed(cwd, repo_root, input_func, allow_outside_files):
-        return AssistantActionResult(action.action_type, False, f"Skipped outside cwd: {cwd}")
-    try:
-        completed = subprocess.run(
-            _shell_command(command),
-            cwd=cwd,
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=command_timeout_seconds,
-        )
-    except subprocess.TimeoutExpired:
-        return AssistantActionResult(
-            action.action_type,
-            False,
-            f"Command timed out after {command_timeout_seconds:g}s: {command}",
-        )
-    output = "\n".join(part for part in (completed.stdout, completed.stderr) if part)
-    return AssistantActionResult(
-        action.action_type,
-        completed.returncode == 0,
-        f"Command exited {completed.returncode}: {command}",
-        output,
-    )
-
-
-def _action_path(action: AssistantAction, repo_root: Path) -> Path | None:
-    path_value = action.args.get("path")
-    if not isinstance(path_value, str) or not path_value.strip():
-        return None
-    return _resolve_context_path(repo_root, Path(path_value))
-
-
-def _path_allowed(
-    path: Path,
-    repo_root: Path,
-    input_func: Callable[[str], str],
-    allow_outside_files: bool,
-) -> bool:
-    if _is_relative_to(path.resolve(), repo_root):
-        return True
-    if allow_outside_files:
-        return True
-    return _confirm_outside_read(path.resolve(), input_func=input_func)
-
-
-def _shell_command(command: str) -> list[str]:
-    if os.name == "nt":
-        return ["powershell", "-NoProfile", "-Command", command]
-    return ["/bin/sh", "-c", command]
-
-
-def _format_action_results(results: Sequence[AssistantActionResult]) -> str:
-    sections: list[str] = ["# Action results"]
-    for index, result in enumerate(results, start=1):
-        status = "ok" if result.ok else "failed"
-        sections.extend(
-            [
-                "",
-                f"## {index}. {result.action_type} ({status})",
-                result.summary,
-            ]
-        )
-        if result.output:
-            sections.extend(["```text", result.output.rstrip(), "```"])
-    return "\n".join(sections)
 
 
 if __name__ == "__main__":

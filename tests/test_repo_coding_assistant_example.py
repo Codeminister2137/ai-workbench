@@ -603,6 +603,8 @@ def test_cli_plans_codex_external_agent_route(capsys, monkeypatch) -> None:
     assert "external_agent_command: codex-test" in output
     assert "external_agent_command_line_json:" in output
     assert "external_agent_mcp_tools: True" in output
+    assert "delegation: enabled: external Codex MCP delegate_task available" in output
+    assert "delegation: disabled" not in output
     assert "delegate_task" in output
     assert "execution_status: planned" in output
 
@@ -689,6 +691,8 @@ def test_cli_orchestrated_plan_prints_stage_plan_without_provider(
     assert "away_plan_auxiliary_route_policy: derived_local_cheap" in output
     assert "away_plan_external_writes: disabled" in output
     assert "away_plan_approval_policy: trusted_local" in output
+    assert 'away_plan_validation_commands_json: ["python -m pytest -q"]' in output
+    assert "away_plan_max_repair_cycles: 3" in output
     assert "away_stage: prompt_review route=deterministic/local status=planned" in output
     assert "away_stage: planning route=primary status=planned" in output
     assert "away_stage: auxiliary_panel route=derived_local_cheap status=planned" in output
@@ -821,6 +825,18 @@ def test_cli_orchestrated_implement_updates_stage_statuses(
         ),
     )
     monkeypatch.setattr(_EXAMPLE, "_run_native_agent", lambda *args, **kwargs: native_response)
+    monkeypatch.setattr(
+        _EXAMPLE,
+        "_run_validation_commands",
+        lambda *args, **kwargs: (
+            _EXAMPLE.ValidationCommandResult(
+                command="python -m pytest -q",
+                returncode=0,
+                status="passed",
+                elapsed_seconds=0.01,
+            ),
+        ),
+    )
 
     assert (
         main(
@@ -850,6 +866,10 @@ def test_cli_orchestrated_implement_updates_stage_statuses(
     assert "away_stage_status: auxiliary_panel status=completed" in output
     assert "away_stage_status: implementation status=running" in output
     assert "away_stage_status: implementation status=completed" in output
+    assert "away_stage_status: validation status=running" in output
+    assert "away_stage_status: validation status=completed" in output
+    assert "away_stage_status: final_handoff status=running" in output
+    assert "away_stage_status: final_handoff status=completed" in output
     run_id = next(
         line.removeprefix("away_run_id: ")
         for line in output.splitlines()
@@ -874,6 +894,29 @@ def test_cli_orchestrated_implement_updates_stage_statuses(
     assert stage_by_name["implementation"].status == "completed"
     assert stage_by_name["implementation"].started_at_utc is not None
     assert stage_by_name["implementation"].completed_at_utc is not None
+    assert stage_by_name["validation"].status == "completed"
+    assert stage_by_name["validation"].started_at_utc is not None
+    assert stage_by_name["validation"].completed_at_utc is not None
+    validation_details = stage_by_name["validation"].details
+    assert validation_details is not None
+    assert validation_details["execution_status_before_validation"] == "completed"
+    assert validation_details["validation_status"] == "passed"
+    assert validation_details["commands"] == ["python -m pytest -q"]
+    validation_results = validation_details["results"]
+    assert isinstance(validation_results, list)
+    assert isinstance(validation_results[0], dict)
+    assert validation_results[0]["status"] == "passed"
+    assert stage_by_name["final_handoff"].status == "completed"
+    assert stage_by_name["final_handoff"].started_at_utc is not None
+    assert stage_by_name["final_handoff"].completed_at_utc is not None
+    final_handoff_details = stage_by_name["final_handoff"].details
+    assert final_handoff_details is not None
+    assert final_handoff_details["execution_status"] == "completed"
+    assert final_handoff_details["validation_status"] == "passed"
+    assert final_handoff_details["assistant_response_available"] is True
+    assert final_handoff_details["final_answer_available"] is False
+    assert isinstance(final_handoff_details["changed_files"], list)
+    assert final_handoff_details["next_action"] == "review the assistant response"
 
 
 def test_cli_orchestrated_auxiliary_failure_affects_final_status(
@@ -917,6 +960,18 @@ def test_cli_orchestrated_auxiliary_failure_affects_final_status(
         ),
     )
     monkeypatch.setattr(_EXAMPLE, "_run_native_agent", lambda *args, **kwargs: native_response)
+    monkeypatch.setattr(
+        _EXAMPLE,
+        "_run_validation_commands",
+        lambda *args, **kwargs: (
+            _EXAMPLE.ValidationCommandResult(
+                command="python -m pytest -q",
+                returncode=0,
+                status="passed",
+                elapsed_seconds=0.01,
+            ),
+        ),
+    )
 
     assert (
         main(
@@ -955,6 +1010,103 @@ def test_cli_orchestrated_auxiliary_failure_affects_final_status(
     stage_by_name = {record.name: record for record in store.list_stages(run_id)}
     assert stage_by_name["auxiliary_panel"].status == "failed"
     assert stage_by_name["implementation"].status == "completed"
+
+
+def test_cli_orchestrated_validation_failure_affects_final_status(
+    capsys,
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    from dataclasses import replace
+
+    from ai_provider import AIMessage, AIResponse, BackendInfo, BackendLocation, MessageRole
+
+    catalog = _EXAMPLE.load_model_catalog(
+        Path("packages/ai_orchestrator/examples/model_catalog.toml")
+    )
+    prepared = _EXAMPLE.run_coding_prompt(
+        "Create a helper.",
+        _EXAMPLE.coding_task_profile(model_override="qwen2.5-coder:14b"),
+        catalog,
+    )
+    prepared = replace(
+        prepared,
+        response=None,
+        config=_EXAMPLE.BackendConfig(provider=_EXAMPLE.ProviderKind.OLLAMA, model="test"),
+    )
+    native_response = SimpleNamespace(
+        response=AIResponse(
+            message=AIMessage(MessageRole.ASSISTANT, "native done"),
+            backend=BackendInfo("ollama", "test", BackendLocation.LOCAL),
+        ),
+        tool_results=(),
+    )
+    run_db = tmp_path / "repo-assistant-runs.sqlite3"
+
+    monkeypatch.setattr(_EXAMPLE, "run_coding_prompt", lambda *args, **kwargs: prepared)
+    monkeypatch.setattr(
+        _EXAMPLE,
+        "run_auxiliary_panel",
+        lambda *args, **kwargs: _EXAMPLE.AuxiliaryPanelResult(status="completed"),
+    )
+    monkeypatch.setattr(_EXAMPLE, "_run_native_agent", lambda *args, **kwargs: native_response)
+    monkeypatch.setattr(
+        _EXAMPLE,
+        "_run_validation_commands",
+        lambda *args, **kwargs: (
+            _EXAMPLE.ValidationCommandResult(
+                command="python -m pytest -q",
+                returncode=1,
+                status="failed",
+                elapsed_seconds=0.01,
+                stdout_preview="FAILED tests/test_example.py::test_failure",
+                failure_reason="validation command exited with code 1",
+            ),
+        ),
+    )
+
+    assert (
+        main(
+            [
+                "--mode",
+                "implement",
+                "Create a helper.",
+                "--provider",
+                "ollama",
+                "--model",
+                "qwen2.5-coder:14b",
+                "--execute",
+                "--away-minutes",
+                "30",
+                "--orchestrated",
+                "--away-run-db",
+                str(run_db),
+            ]
+        )
+        == 0
+    )
+
+    output = capsys.readouterr().out
+    assert "away_stage_status: validation status=failed" in output
+    assert "final_execution_status: completed_with_validation_errors" in output
+    run_id = next(
+        line.removeprefix("away_run_id: ")
+        for line in output.splitlines()
+        if line.startswith("away_run_id: ")
+    )
+    store = SQLiteOrchestratedRunStore(run_db)
+    run_record = store.get_run(run_id)
+    assert run_record is not None
+    assert run_record.status == "completed"
+    assert run_record.execution_status == "completed_with_validation_errors"
+    stage_by_name = {record.name: record for record in store.list_stages(run_id)}
+    assert stage_by_name["validation"].status == "failed"
+    validation_details = stage_by_name["validation"].details
+    assert validation_details is not None
+    assert validation_details["validation_status"] == "failed"
+    final_handoff_details = stage_by_name["final_handoff"].details
+    assert final_handoff_details is not None
+    assert final_handoff_details["blockers"] == "validation failed"
 
 
 def test_cli_orchestrated_requires_away_minutes() -> None:
@@ -1091,11 +1243,14 @@ def test_cli_rejects_codex_commit_request_without_trusted_local(monkeypatch) -> 
         )
 
 
-def test_cli_executes_codex_external_agent_route(capsys, monkeypatch) -> None:
+def test_cli_executes_codex_external_agent_route(capsys, monkeypatch, tmp_path: Path) -> None:
     calls: list[dict[str, Any]] = []
+    run_db = tmp_path / "repo-assistant-runs.sqlite3"
 
     def fake_run(*args, **kwargs):
         calls.append({"args": args, "kwargs": kwargs})
+        if tuple(args[0][:2]) == ("git", "status"):
+            return _EXAMPLE.subprocess.CompletedProcess(args[0], 0, " M example.py\n", "")
         return _EXAMPLE.subprocess.CompletedProcess(
             args[0],
             0,
@@ -1116,6 +1271,18 @@ def test_cli_executes_codex_external_agent_route(capsys, monkeypatch) -> None:
 
     monkeypatch.setenv("CODEX_COMMAND", "codex-test")
     monkeypatch.setattr(_EXAMPLE.subprocess, "run", fake_run)
+    monkeypatch.setattr(
+        _EXAMPLE,
+        "_run_validation_commands",
+        lambda *args, **kwargs: (
+            _EXAMPLE.ValidationCommandResult(
+                command="python -m pytest -q",
+                returncode=0,
+                status="passed",
+                elapsed_seconds=0.01,
+            ),
+        ),
+    )
 
     assert (
         main(
@@ -1135,6 +1302,12 @@ def test_cli_executes_codex_external_agent_route(capsys, monkeypatch) -> None:
                 "--approval-policy",
                 "workspace_write",
                 "--skip-prompt-review",
+                "--codex-mcp-tools",
+                "--away-minutes",
+                "30",
+                "--orchestrated",
+                "--away-run-db",
+                str(run_db),
             ]
         )
         == 0
@@ -1148,22 +1321,56 @@ def test_cli_executes_codex_external_agent_route(capsys, monkeypatch) -> None:
     assert "external_agent_web_search_event_count: 1" in output
     assert "external_agent_file_change_event_count: 1" in output
     assert "external_agent_usage_json:" in output
-    assert "delegation: completed: external Codex MCP delegate_task" in output
+    assert (
+        "delegation: enabled: external Codex MCP delegate_task available; "
+        "completed: external Codex MCP delegate_task"
+    ) in output
     assert "codex done" in output
     assert "execution_status: completed" in output
+    assert "external_agent_status: running elapsed_seconds=0.0" in output
+    assert "away_stage_status: validation status=completed" in output
+    assert "away_stage_status: final_handoff status=completed" in output
     assert output.rfind("codex done") > output.rfind("execution_status: completed")
-    command = calls[0]["args"][0]
-    assert command[:4] == ("codex-test", "--ask-for-approval", "never", "exec")
+    command = next(call["args"][0] for call in calls if "exec" in call["args"][0])
+    exec_index = command.index("exec")
+    approval_index = command.index("--ask-for-approval")
+    assert command[0] == "codex-test"
+    assert command[approval_index : approval_index + 2] == ("--ask-for-approval", "never")
+    assert approval_index < exec_index
     assert "--json" in command
     assert "--sandbox" in command
     assert "workspace-write" in command
-    assert calls[0]["kwargs"]["input"].startswith("# User request")
-    assert "# External agent execution metadata" in calls[0]["kwargs"]["input"]
-    assert "codex_sandbox: workspace-write" in calls[0]["kwargs"]["input"]
-    assert "Do not describe the session as read-only" in calls[0]["kwargs"]["input"]
+    exec_call = next(call for call in calls if "exec" in call["args"][0])
+    stdin_prompt = exec_call["kwargs"]["input"]
+    assert stdin_prompt.startswith("# Repo assistant system prompt")
+    assert "You are a repo-aware coding assistant." in stdin_prompt
+    assert "# User request" in stdin_prompt
+    assert "# External agent execution metadata" in stdin_prompt
+    assert "codex_sandbox: workspace-write" in stdin_prompt
+    assert "Do not describe the session as read-only" in stdin_prompt
     assert calls[0]["kwargs"]["encoding"] == "utf-8"
     assert calls[0]["kwargs"]["errors"] == "replace"
-    assert "# Repository context" in calls[0]["kwargs"]["input"]
+    assert "# Repository context" in stdin_prompt
+    run_id = next(
+        line.removeprefix("away_run_id: ")
+        for line in output.splitlines()
+        if line.startswith("away_run_id: ")
+    )
+    store = SQLiteOrchestratedRunStore(run_db)
+    run_record = store.get_run(run_id)
+    assert run_record is not None
+    assert run_record.execution_status == "completed"
+    stage_by_name = {record.name: record for record in store.list_stages(run_id)}
+    assert stage_by_name["validation"].status == "completed"
+    validation_details = stage_by_name["validation"].details
+    assert validation_details is not None
+    assert validation_details["validation_status"] == "passed"
+    assert stage_by_name["final_handoff"].status == "completed"
+    final_handoff_details = stage_by_name["final_handoff"].details
+    assert final_handoff_details is not None
+    assert final_handoff_details["final_answer_available"] is True
+    assert final_handoff_details["assistant_response_available"] is False
+    assert final_handoff_details["changed_files"] == [" M example.py"]
 
 
 def test_cli_can_plan_persistent_codex_session(capsys, monkeypatch) -> None:
@@ -2029,6 +2236,18 @@ def test_cli_can_scrutinize_completed_response(capsys, monkeypatch, tmp_path: Pa
         return primary if len(calls) == 1 else scrutiny
 
     monkeypatch.setattr(_EXAMPLE, "run_coding_prompt", fake_run)
+    monkeypatch.setattr(
+        _EXAMPLE,
+        "_run_validation_commands",
+        lambda *args, **kwargs: (
+            _EXAMPLE.ValidationCommandResult(
+                command="python -m pytest -q",
+                returncode=0,
+                status="passed",
+                elapsed_seconds=0.01,
+            ),
+        ),
+    )
 
     assert (
         main(
