@@ -214,9 +214,9 @@ different value without duplicating the workflow:
 
 When adding a CLI feature that should be part of the standard broad-analysis
 workflow, update `scripts\repo-assistant-broad-analysis.ps1` rather than
-creating a separate one-off command. Keep the command synchronized with the
-**Canonical Manual Live Acceptance Check** section in `CURRENT_CONTEXT.md`;
-future sessions should read that section first.
+creating a separate one-off command. Keep this runbook synchronized with that
+script; `CURRENT_CONTEXT.md` may point here as a short handoff, but it is not
+the durable source of the command.
 
 Executed implementation-mode provider routes use the provider-native
 tool-calling loop by default:

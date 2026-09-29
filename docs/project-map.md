@@ -50,6 +50,19 @@ Location: `packages/ai_orchestrator/`
 
 Owns task classification, prompt evaluation/refinement, model selection, request configuration, routing, fallback, quota/economics awareness, and usage integration. It owns neutral orchestration contracts and does not directly implement provider APIs or require `ai_provider` for core decision-making.
 
+### AI Agent
+Location: `packages/ai_agent/`
+
+Owns provider-neutral agent loop behavior and local coding-tool contracts used
+by the repo coding assistant. It contains the tool registry, permission policy
+mapping, authorization diagnostics, MCP server entry point, and bounded
+delegation support such as `delegate_task`.
+
+Use this package when work concerns local tool execution, approval-policy
+enforcement, MCP tool exposure, or agent-loop behavior. Keep provider API
+translation in `ai_provider` and high-level route selection in
+`ai_orchestrator`.
+
 ### AI Council
 Location: `apps/ai_council/`
 
