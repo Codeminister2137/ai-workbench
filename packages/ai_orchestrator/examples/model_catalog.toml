@@ -47,7 +47,7 @@ notes = "Local Ollama model. Latency is measured locally; quality is not yet eva
 [models.capabilities]
 chat = true
 streaming = true
-tools = false
+tools = true
 structured_output = false
 multimodal_input = false
 embeddings = false
@@ -111,7 +111,7 @@ notes = "Local Ollama model. Latency is measured locally; quality is not yet eva
 [models.capabilities]
 chat = true
 streaming = true
-tools = false
+tools = true
 structured_output = false
 multimodal_input = false
 embeddings = false

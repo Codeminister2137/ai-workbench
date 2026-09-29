@@ -1,3 +1,4 @@
+from io import StringIO
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -9,7 +10,7 @@ from ai_agent.mcp_server import (
     tool_definition_to_mcp_tool,
 )
 from ai_agent.tools import ReadFileTool, ToolContext
-from ai_orchestrator import AccessMethod
+from ai_orchestrator import AccessMethod, TaskCapability
 
 
 def test_mcp_initialize_and_tools_list(tmp_path: Path) -> None:
@@ -87,6 +88,19 @@ def test_mcp_tools_call_runs_workspace_bounded_tool(tmp_path: Path) -> None:
     assert "   2 | second" in response["result"]["content"][0]["text"]
 
 
+def test_mcp_write_message_escapes_non_ascii_for_stdio_transport() -> None:
+    output = StringIO()
+
+    _MCP_SERVER._write_message(  # noqa: SLF001 - regression for stdio transport encoding.
+        output,
+        {"jsonrpc": "2.0", "id": 1, "result": {"text": "non-breaking hyphen: \u2011"}},
+    )
+
+    text = output.getvalue()
+    assert "\\u2011" in text
+    assert "\u2011" not in text
+
+
 def test_mcp_delegate_task_runs_local_read_only_child_agent(
     tmp_path: Path,
     monkeypatch,
@@ -119,9 +133,15 @@ def test_mcp_delegate_task_runs_local_read_only_child_agent(
         failure_reason=None,
         status=SimpleNamespace(value="ready"),
     )
+    captured_profile = None
+
+    def fake_prepare_execution(prompt, profile, *args, **kwargs):
+        nonlocal captured_profile
+        captured_profile = profile
+        return orchestration
 
     monkeypatch.setattr(_MCP_SERVER, "load_model_catalog", lambda path: ())
-    monkeypatch.setattr(_MCP_SERVER, "prepare_execution", lambda *args, **kwargs: orchestration)
+    monkeypatch.setattr(_MCP_SERVER, "prepare_execution", fake_prepare_execution)
     monkeypatch.setattr(_MCP_SERVER, "create_chat_client", lambda config: object())
     monkeypatch.setattr(_MCP_SERVER, "AgentLoop", FakeAgentLoop)
     registry = codex_mcp_tool_registry(catalog_path=tmp_path / "catalog.toml")
@@ -140,10 +160,17 @@ def test_mcp_delegate_task_runs_local_read_only_child_agent(
     assert response is not None
     assert response["result"]["isError"] is False
     text = response["result"]["content"][0]["text"]
+    structured = response["result"]["structuredContent"]
     assert "Delegated task status: completed" in text
     assert "Route: local-child" in text
     assert "Tool surface: read/search only" in text
     assert "child findings" in text
+    assert structured["output"] == text
+    assert structured["metadata"]["child_response"] == "child findings"
+    assert captured_profile is not None
+    assert captured_profile.required_capabilities == frozenset(
+        {TaskCapability.CHAT, TaskCapability.TOOLS}
+    )
 
 
 def test_mcp_tools_call_rejects_unknown_or_outside_workspace_tool(tmp_path: Path) -> None:

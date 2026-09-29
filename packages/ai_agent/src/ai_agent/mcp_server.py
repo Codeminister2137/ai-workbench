@@ -13,6 +13,7 @@ from ai_orchestrator import (
     CostPolicyTier,
     LatencyTarget,
     QualityThreshold,
+    TaskCapability,
     TaskProfile,
     TaskType,
     derive_subtask_profile,
@@ -35,7 +36,7 @@ CODEX_MCP_TOOLS = (*READ_SEARCH_TOOLS, "delegate_task")
 PROTOCOL_VERSION = "2025-06-18"
 DEFAULT_CATALOG_PATH = Path("packages/ai_orchestrator/examples/model_catalog.toml")
 DEFAULT_DELEGATION_TIMEOUT_SECONDS = 180.0
-DEFAULT_DELEGATION_MAX_ITERATIONS = 3
+DEFAULT_DELEGATION_MAX_ITERATIONS = 8
 
 
 def read_search_tool_registry() -> ToolRegistry:
@@ -87,6 +88,7 @@ def _local_read_only_delegated_task_runner(
         profile = derive_subtask_profile(
             parent=parent_profile,
             task_type=TaskType.CODING,
+            required_capabilities=frozenset({TaskCapability.CHAT, TaskCapability.TOOLS}),
             quality_threshold=QualityThreshold.STANDARD,
             latency_target=LatencyTarget.BACKGROUND,
             cost_policy_tier=CostPolicyTier.LOCAL_ONLY,
@@ -159,6 +161,7 @@ def _local_read_only_delegated_task_runner(
                 "model": target.model,
                 "iterations": result.iterations,
                 "tool_results": len(result.tool_results),
+                "child_response": result.response.message.content.strip(),
             },
         )
 
@@ -353,6 +356,7 @@ def _handle_tool_call(
             "isError": result.is_error,
             "structuredContent": {
                 "metadata": result.metadata,
+                "output": result.output,
                 "tool": result.name,
             },
         },
@@ -360,7 +364,7 @@ def _handle_tool_call(
 
 
 def _write_message(output_stream: Any, message: dict[str, Any]) -> None:
-    output_stream.write(json.dumps(message, ensure_ascii=False) + "\n")
+    output_stream.write(json.dumps(message, ensure_ascii=True) + "\n")
     output_stream.flush()
 
 
