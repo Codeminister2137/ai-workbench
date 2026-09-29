@@ -129,18 +129,23 @@ while you are away. The flag prints `away_budget_*` fields in the transcript,
 adds explicit unattended-run guidance to the model prompt, and, unless
 `--timeout-seconds` is supplied, sets provider and external-agent timeouts to
 `N * 60` seconds. Add `--orchestrated` to plan or run the staged unattended
-workflow rather than only extending the timeout and prompt guidance.
+workflow rather than only extending the timeout and prompt guidance. Orchestrated
+runs create a local SQLite run record and planned stage rows in
+`data/repo-assistant-runs.sqlite3` by default; use `--away-run-db PATH` to
+override the local database path.
 
 In `--mode plan`, `--away-minutes N --orchestrated` prints the intended
 foreground stages, the primary route, the local/cheap auxiliary route policy,
 and the approval boundary without contacting a provider. The stages are prompt
 review, planning, auxiliary panel, implementation, validation, scrutiny,
 bounded repair, and final handoff. This is not a background scheduler, daemon,
-or durable job queue. External Codex-style routes still report their timeout as
-an inactivity timeout because model output resets the timer. For unattended
-implementation runs, choose the approval boundary deliberately: `interactive`
-may pause for a prompt, while `trusted_local` permits local read/write/shell
-actions under the repo assistant's existing tool policies.
+or job queue, but the SQLite records give later foreground stages and a future
+resume/background runner a stable run ID and stage-tracking surface. External
+Codex-style routes still report their timeout as an inactivity timeout because
+model output resets the timer. For unattended implementation runs, choose the
+approval boundary deliberately: `interactive` may pause for a prompt, while
+`trusted_local` permits local read/write/shell actions under the repo
+assistant's existing tool policies.
 
 Every run prints an `execution_status` line. It distinguishes planned runs,
 completed responses, completed runs with tool/action errors, and failed

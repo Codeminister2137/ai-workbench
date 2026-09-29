@@ -96,6 +96,17 @@ need.
 
 Detailed ADR: `docs/decisions/ADR-027-github-publication-monorepo.md`
 
+## ADR-028 - SQLite Run Records For Orchestrated Repo Assistant
+**Status:** Accepted
+**Date:** 2026-09-29
+
+Use a small SQLite-backed storage interface in `ai_provider` for local
+orchestrated repo-assistant run and stage records. The first use is foreground
+CLI tracking only; it does not introduce a daemon, queue, background runner, or
+external service.
+
+Detailed ADR: `docs/decisions/ADR-028-sqlite-run-records-for-orchestrated-repo-assistant.md`
+
 ## Template
 ```text
 ## ADR-NNN — Short Name

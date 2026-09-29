@@ -79,6 +79,13 @@ from ai_provider.external_agents import (
     parse_codex_plugin_list,
     run_codex_plugin_operation,
 )
+from ai_provider.orchestrated_runs import (
+    DEFAULT_ORCHESTRATED_RUN_DB,
+    OrchestratedRunRecord,
+    OrchestratedStagePlanItem,
+    OrchestratedStageRecord,
+    SQLiteOrchestratedRunStore,
+)
 
 from coding_assist import coding_task_profile, run_coding_prompt
 
@@ -1490,11 +1497,18 @@ def _print_orchestrated_stage_plan(
     *,
     args: argparse.Namespace,
     orchestration: OrchestrationResult,
+    run_record: OrchestratedRunRecord | None = None,
+    stage_records: Sequence[OrchestratedStageRecord] = (),
 ) -> None:
     """Print the foreground unattended workflow plan without running stages."""
 
     print("\n=== Orchestrated away-work plan ===")
     print("away_orchestrated: enabled")
+    if run_record is not None:
+        print(f"away_run_db: {args.away_run_db}")
+        print(f"away_run_id: {run_record.run_id}")
+        print(f"away_run_status: {run_record.status}")
+        print(f"away_run_stage_records: {len(stage_records)}")
     print(f"away_plan_mode: {args.mode}")
     print(f"away_plan_budget_minutes: {args.away_minutes:g}")
     print(f"away_plan_budget_seconds: {args.away_minutes * 60:g}")
@@ -1517,6 +1531,51 @@ def _print_orchestrated_stage_plan(
     print(f"away_plan_approval_policy: {args.approval_policy}")
     for name, route, purpose in _ORCHESTRATED_STAGE_PLAN:
         print(f"away_stage: {name} route={route} status=planned purpose={purpose}")
+
+
+def _persist_orchestrated_run_plan(
+    *,
+    args: argparse.Namespace,
+    repo_root: Path,
+    orchestration: OrchestrationResult,
+    prompt: str,
+) -> tuple[OrchestratedRunRecord, tuple[OrchestratedStageRecord, ...]]:
+    """Persist the durable run and planned stage rows for an orchestrated CLI run."""
+
+    store = SQLiteOrchestratedRunStore(_resolve_orchestrated_run_db_path(args, repo_root))
+    target = (
+        orchestration.execution_plan.target if orchestration.execution_plan is not None else None
+    )
+    run_record = store.create_run(
+        repo_root=repo_root,
+        mode=args.mode,
+        prompt=prompt,
+        budget_seconds=args.away_minutes * 60,
+        approval_policy=args.approval_policy,
+        primary_route_id=target.route_id if target is not None else None,
+        primary_provider=target.provider if target is not None else None,
+        primary_model=target.model if target is not None else None,
+    )
+    stage_records = store.replace_stage_plan(
+        run_record.run_id,
+        tuple(
+            OrchestratedStagePlanItem(
+                name=name,
+                route_policy=route,
+                purpose=purpose,
+            )
+            for name, route, purpose in _ORCHESTRATED_STAGE_PLAN
+        ),
+    )
+    args.away_run_db = store.path
+    return run_record, stage_records
+
+
+def _resolve_orchestrated_run_db_path(args: argparse.Namespace, repo_root: Path) -> Path:
+    path = Path(args.away_run_db)
+    if path.is_absolute():
+        return path
+    return repo_root / path
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -1693,6 +1752,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         help=(
             "Plan or run the staged foreground unattended workflow. Requires "
             "--away-minutes and currently exposes a dry-run stage plan in plan mode."
+        ),
+    )
+    parser.add_argument(
+        "--away-run-db",
+        type=Path,
+        default=DEFAULT_ORCHESTRATED_RUN_DB,
+        help=(
+            "SQLite database path for durable orchestrated run and stage records. "
+            "Relative paths are resolved from the repository root."
         ),
     )
     parser.add_argument(
@@ -2159,7 +2227,18 @@ def main(argv: Sequence[str] | None = None) -> int:
             delegation_enabled=args.mode == "implement" and not args.no_native_tools,
         )
     if args.orchestrated:
-        _print_orchestrated_stage_plan(args=args, orchestration=result.orchestration)
+        run_record, stage_records = _persist_orchestrated_run_plan(
+            args=args,
+            repo_root=repo_root,
+            orchestration=result.orchestration,
+            prompt=args.prompt,
+        )
+        _print_orchestrated_stage_plan(
+            args=args,
+            orchestration=result.orchestration,
+            run_record=run_record,
+            stage_records=stage_records,
+        )
     print("\n=== Assistant response ===")
     assistant_response_text = None
     if args.native_tools and args.execute and result.config is not None:
@@ -2533,7 +2612,18 @@ def _run_external_agent_cli_mode(
                 + json.dumps([str(path) for path in config.image_paths])
             )
         if args.orchestrated:
-            _print_orchestrated_stage_plan(args=args, orchestration=orchestration)
+            run_record, stage_records = _persist_orchestrated_run_plan(
+                args=args,
+                repo_root=repo_root,
+                orchestration=orchestration,
+                prompt=args.prompt,
+            )
+            _print_orchestrated_stage_plan(
+                args=args,
+                orchestration=orchestration,
+                run_record=run_record,
+                stage_records=stage_records,
+            )
         print("\n=== Assistant response ===")
         response_header_printed = True
         if args.execute and args.mode != "plan":

@@ -9,6 +9,7 @@ from typing import Any
 
 import pytest
 from ai_provider.codex_mcp import CodexMcpSetupResult
+from ai_provider.orchestrated_runs import SQLiteOrchestratedRunStore
 
 _EXAMPLE_PATH = (
     Path(__file__).resolve().parents[1]
@@ -289,6 +290,7 @@ def test_cli_help_lists_google_provider() -> None:
     assert "--codex-login-device" in result.stdout
     assert "--away-minutes" in result.stdout
     assert "--orchestrated" in result.stdout
+    assert "--away-run-db" in result.stdout
 
 
 def test_repo_assistant_script_uses_stable_package_entrypoint() -> None:
@@ -637,11 +639,13 @@ def test_cli_away_minutes_sets_visible_foreground_budget(capsys, monkeypatch) ->
 def test_cli_orchestrated_plan_prints_stage_plan_without_provider(
     capsys,
     monkeypatch,
+    tmp_path: Path,
 ) -> None:
     def fail_if_called(*args, **kwargs):
         raise AssertionError("orchestrated plan mode must not contact a provider")
 
     monkeypatch.setattr(_EXAMPLE, "create_chat_client", fail_if_called)
+    run_db = tmp_path / "repo-assistant-runs.sqlite3"
 
     assert (
         main(
@@ -658,6 +662,8 @@ def test_cli_orchestrated_plan_prints_stage_plan_without_provider(
                 "--orchestrated",
                 "--approval-policy",
                 "trusted_local",
+                "--away-run-db",
+                str(run_db),
             ]
         )
         == 0
@@ -670,6 +676,10 @@ def test_cli_orchestrated_plan_prints_stage_plan_without_provider(
     assert "away_plan_budget_seconds: 3600" in output
     assert "away_plan_execution: not_started" in output
     assert "away_plan_skip_reason: plan mode never contacts a provider" in output
+    assert f"away_run_db: {run_db}" in output
+    assert "away_run_id: " in output
+    assert "away_run_status: planned" in output
+    assert "away_run_stage_records: 8" in output
     assert "away_plan_primary_provider: ollama" in output
     assert "away_plan_primary_model: qwen2.5-coder:14b" in output
     assert "away_plan_auxiliary_route_policy: derived_local_cheap" in output
@@ -684,6 +694,33 @@ def test_cli_orchestrated_plan_prints_stage_plan_without_provider(
     assert "away_stage: repair route=policy_bounded status=planned" in output
     assert "away_stage: final_handoff route=deterministic/local status=planned" in output
     assert "execution_status: planned" in output
+
+    run_id = next(
+        line.removeprefix("away_run_id: ")
+        for line in output.splitlines()
+        if line.startswith("away_run_id: ")
+    )
+    store = SQLiteOrchestratedRunStore(run_db)
+    run_record = store.get_run(run_id)
+    assert run_record is not None
+    assert run_record.mode == "plan"
+    assert run_record.budget_seconds == 3600
+    assert run_record.approval_policy == "trusted_local"
+    assert run_record.primary_provider == "ollama"
+    assert run_record.primary_model == "qwen2.5-coder:14b"
+    assert run_record.status == "planned"
+    stage_records = store.list_stages(run_id)
+    assert [record.name for record in stage_records] == [
+        "prompt_review",
+        "planning",
+        "auxiliary_panel",
+        "implementation",
+        "validation",
+        "scrutiny",
+        "repair",
+        "final_handoff",
+    ]
+    assert all(record.status == "planned" for record in stage_records)
 
 
 def test_cli_orchestrated_requires_away_minutes() -> None:
