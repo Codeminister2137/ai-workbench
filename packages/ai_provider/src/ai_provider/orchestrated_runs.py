@@ -294,6 +294,144 @@ class SQLiteOrchestratedRunStore:
             ).fetchall()
         return tuple(_stage_record_from_row(row) for row in rows)
 
+    def update_run_status(
+        self,
+        run_id: str,
+        *,
+        status: str | None = None,
+        execution_status: str | None = None,
+    ) -> OrchestratedRunRecord:
+        """Update mutable run status fields and return the refreshed record."""
+
+        self.initialize()
+        now = _utc_now()
+        with self._connect() as connection:
+            existing = connection.execute(
+                "SELECT status, execution_status FROM orchestrated_runs WHERE run_id = ?",
+                (run_id,),
+            ).fetchone()
+            if existing is None:
+                raise KeyError(f"orchestrated run does not exist: {run_id}")
+            next_status = str(existing[0]) if status is None else status
+            next_execution_status = (
+                str(existing[1])
+                if execution_status is None and existing[1] is not None
+                else execution_status
+            )
+            connection.execute(
+                """
+                UPDATE orchestrated_runs
+                SET updated_at_utc = ?, status = ?, execution_status = ?
+                WHERE run_id = ?
+                """,
+                (now, next_status, next_execution_status, run_id),
+            )
+        record = self.get_run(run_id)
+        if record is None:
+            raise KeyError(f"orchestrated run does not exist: {run_id}")
+        return record
+
+    def start_stage(
+        self,
+        run_id: str,
+        stage_name: str,
+        *,
+        details: dict[str, object] | None = None,
+    ) -> OrchestratedStageRecord:
+        """Mark one planned stage as running."""
+
+        return self.update_stage(
+            run_id,
+            stage_name,
+            status="running",
+            started_at_utc=_utc_now(),
+            details=details,
+        )
+
+    def complete_stage(
+        self,
+        run_id: str,
+        stage_name: str,
+        *,
+        status: str = "completed",
+        details: dict[str, object] | None = None,
+    ) -> OrchestratedStageRecord:
+        """Mark one stage as terminal with completion details."""
+
+        return self.update_stage(
+            run_id,
+            stage_name,
+            status=status,
+            completed_at_utc=_utc_now(),
+            details=details,
+        )
+
+    def update_stage(
+        self,
+        run_id: str,
+        stage_name: str,
+        *,
+        status: str,
+        started_at_utc: str | None = None,
+        completed_at_utc: str | None = None,
+        details: dict[str, object] | None = None,
+    ) -> OrchestratedStageRecord:
+        """Update one stage row while preserving unspecified timestamps/details."""
+
+        self.initialize()
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT
+                    run_id,
+                    stage_order,
+                    name,
+                    route_policy,
+                    status,
+                    purpose,
+                    started_at_utc,
+                    completed_at_utc,
+                    details_json
+                FROM orchestrated_run_stages
+                WHERE run_id = ? AND name = ?
+                """,
+                (run_id, stage_name),
+            ).fetchone()
+            if row is None:
+                raise KeyError(f"orchestrated stage does not exist: {run_id} {stage_name}")
+            current = _stage_record_from_row(row)
+            next_details = dict(current.details or {})
+            if details:
+                next_details.update(details)
+            next_started_at = started_at_utc or current.started_at_utc
+            next_completed_at = completed_at_utc or current.completed_at_utc
+            connection.execute(
+                """
+                UPDATE orchestrated_run_stages
+                SET status = ?,
+                    started_at_utc = ?,
+                    completed_at_utc = ?,
+                    details_json = ?
+                WHERE run_id = ? AND name = ?
+                """,
+                (
+                    status,
+                    next_started_at,
+                    next_completed_at,
+                    json.dumps(next_details, sort_keys=True),
+                    run_id,
+                    stage_name,
+                ),
+            )
+            connection.execute(
+                "UPDATE orchestrated_runs SET updated_at_utc = ? WHERE run_id = ?",
+                (_utc_now(), run_id),
+            )
+        records = [record for record in self.list_stages(run_id) if record.name == stage_name]
+        if not records:
+            raise KeyError(f"orchestrated stage does not exist: {run_id} {stage_name}")
+        return records[0]
+
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.path)
         connection.execute("PRAGMA foreign_keys = ON")

@@ -723,6 +723,155 @@ def test_cli_orchestrated_plan_prints_stage_plan_without_provider(
     assert all(record.status == "planned" for record in stage_records)
 
 
+def test_auxiliary_panel_uses_local_cheap_route_with_fake_client() -> None:
+    from ai_provider import AIMessage, AIResponse, BackendInfo, BackendLocation, MessageRole
+
+    captured = {}
+
+    class FakeClient:
+        def __init__(self, config) -> None:
+            self.backend = BackendInfo(
+                provider=config.provider.value,
+                model=config.model,
+                location=BackendLocation.LOCAL,
+            )
+
+        def complete(self, request):
+            captured["request"] = request
+            return AIResponse(
+                message=AIMessage(MessageRole.ASSISTANT, "check tests and decision boundaries"),
+                backend=self.backend,
+            )
+
+        def stream(self, request):
+            raise NotImplementedError
+
+    catalog = _EXAMPLE.load_model_catalog(
+        Path("packages/ai_orchestrator/examples/model_catalog.toml")
+    )
+    parent_profile = _EXAMPLE.coding_task_profile(
+        privacy_class=_EXAMPLE.OrchestratorPrivacyClass.EXTERNAL_ALLOWED,
+        provider_override="openai",
+        model_override="gpt-5.5",
+    )
+    events: list[str] = []
+
+    result = _EXAMPLE.run_auxiliary_panel(
+        "Implement the next CLI slice.",
+        parent_profile,
+        catalog,
+        client_factory=FakeClient,
+        progress_callback=events.append,
+    )
+
+    assert result.status == "completed"
+    assert result.provider == "ollama"
+    assert result.model is not None
+    assert result.response_text == "check tests and decision boundaries"
+    assert captured["request"].privacy_class == _EXAMPLE.ProviderPrivacyClass.LOCAL_ONLY
+    assert "auxiliary reviewer" in captured["request"].messages[-1].content
+    assert any(event.startswith("auxiliary_panel_activity: model_request -") for event in events)
+
+
+def test_cli_orchestrated_implement_updates_stage_statuses(
+    capsys,
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    from dataclasses import replace
+
+    from ai_provider import AIMessage, AIResponse, BackendInfo, BackendLocation, MessageRole
+
+    catalog = _EXAMPLE.load_model_catalog(
+        Path("packages/ai_orchestrator/examples/model_catalog.toml")
+    )
+    prepared = _EXAMPLE.run_coding_prompt(
+        "Create a helper.",
+        _EXAMPLE.coding_task_profile(model_override="qwen2.5-coder:14b"),
+        catalog,
+    )
+    prepared = replace(
+        prepared,
+        response=None,
+        config=_EXAMPLE.BackendConfig(provider=_EXAMPLE.ProviderKind.OLLAMA, model="test"),
+    )
+    native_response = SimpleNamespace(
+        response=AIResponse(
+            message=AIMessage(MessageRole.ASSISTANT, "native done"),
+            backend=BackendInfo("ollama", "test", BackendLocation.LOCAL),
+        ),
+        tool_results=(),
+    )
+    run_db = tmp_path / "repo-assistant-runs.sqlite3"
+
+    monkeypatch.setattr(_EXAMPLE, "run_coding_prompt", lambda *args, **kwargs: prepared)
+    monkeypatch.setattr(
+        _EXAMPLE,
+        "run_auxiliary_panel",
+        lambda *args, **kwargs: _EXAMPLE.AuxiliaryPanelResult(
+            status="completed",
+            route_id="ollama-qwen2.5-coder:14b",
+            provider="ollama",
+            model="qwen2.5-coder:14b",
+            response_text="auxiliary done",
+        ),
+    )
+    monkeypatch.setattr(_EXAMPLE, "_run_native_agent", lambda *args, **kwargs: native_response)
+
+    assert (
+        main(
+            [
+                "--mode",
+                "implement",
+                "Create a helper.",
+                "--provider",
+                "ollama",
+                "--model",
+                "qwen2.5-coder:14b",
+                "--execute",
+                "--away-minutes",
+                "30",
+                "--orchestrated",
+                "--away-run-db",
+                str(run_db),
+            ]
+        )
+        == 0
+    )
+
+    output = capsys.readouterr().out
+    assert "=== Auxiliary panel ===" in output
+    assert "auxiliary done" in output
+    assert "away_stage_status: auxiliary_panel status=running" in output
+    assert "away_stage_status: auxiliary_panel status=completed" in output
+    assert "away_stage_status: implementation status=running" in output
+    assert "away_stage_status: implementation status=completed" in output
+    run_id = next(
+        line.removeprefix("away_run_id: ")
+        for line in output.splitlines()
+        if line.startswith("away_run_id: ")
+    )
+    store = SQLiteOrchestratedRunStore(run_db)
+    run_record = store.get_run(run_id)
+    assert run_record is not None
+    assert run_record.status == "completed"
+    assert run_record.execution_status == "completed"
+    stage_by_name = {record.name: record for record in store.list_stages(run_id)}
+    assert stage_by_name["auxiliary_panel"].status == "completed"
+    assert stage_by_name["auxiliary_panel"].started_at_utc is not None
+    assert stage_by_name["auxiliary_panel"].completed_at_utc is not None
+    assert stage_by_name["auxiliary_panel"].details == {
+        "failure_reason": "",
+        "model": "qwen2.5-coder:14b",
+        "provider": "ollama",
+        "route_id": "ollama-qwen2.5-coder:14b",
+        "route_policy": "derived_local_cheap",
+    }
+    assert stage_by_name["implementation"].status == "completed"
+    assert stage_by_name["implementation"].started_at_utc is not None
+    assert stage_by_name["implementation"].completed_at_utc is not None
+
+
 def test_cli_orchestrated_requires_away_minutes() -> None:
     with pytest.raises(SystemExit):
         main(["--mode", "plan", "Work.", "--orchestrated"])

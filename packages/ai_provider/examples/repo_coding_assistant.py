@@ -223,6 +223,18 @@ _RESPONSE_SCRUTINY_HEADING_PATTERN = (
 _FENCED_JSON_PATTERN = re.compile(r"```(?:json)?\s*(\{.*?\})\s*```", re.DOTALL)
 
 
+@dataclass(frozen=True, slots=True)
+class AuxiliaryPanelResult:
+    """Result from one local-first auxiliary support pass."""
+
+    status: str
+    route_id: str | None = None
+    provider: str | None = None
+    model: str | None = None
+    response_text: str | None = None
+    failure_reason: str | None = None
+
+
 @dataclass(frozen=True)
 class ResponseScrutinyReport:
     """Parsed second-pass response-quality report."""
@@ -1385,6 +1397,84 @@ def run_local_context_delegation(
     return summary, f"accepted: {plan.execution_plan.target.route_id}"
 
 
+def run_auxiliary_panel(
+    prompt: str,
+    primary_profile: Any,
+    catalog: tuple[Any, ...],
+    *,
+    timeout_seconds: float = 60.0,
+    client_factory: Callable[[BackendConfig], ChatClient] = create_chat_client,
+    progress_callback: Callable[[str], None] | None = None,
+) -> AuxiliaryPanelResult:
+    """Run one local-first auxiliary critique pass for an orchestrated coding run."""
+
+    decision = assess_delegation(
+        task_type=primary_profile.task_type,
+        delegation_kind=DelegationKind.TEST_CASE_GENERATION,
+    )
+    if not decision.allowed:
+        if progress_callback is not None:
+            progress_callback(f"auxiliary_panel_activity: skipped - {decision.reason}")
+        return AuxiliaryPanelResult(status="skipped", failure_reason=decision.reason)
+    auxiliary_profile = derive_subtask_profile(
+        parent=primary_profile,
+        task_type=TaskType.CODING,
+        quality_threshold=QualityThreshold.STANDARD,
+        latency_target=LatencyTarget.BACKGROUND,
+        cost_policy_tier=CostPolicyTier.LOCAL_ONLY,
+        privacy_class=OrchestratorPrivacyClass.LOCAL_ONLY,
+    )
+    auxiliary_prompt = (
+        "You are an auxiliary reviewer for a repo coding run. Identify concrete "
+        "implementation risks, likely tests, and decision-boundary concerns for the "
+        "primary agent. Do not make architecture or product decisions. Keep the answer "
+        "brief and source-grounded when repository context is present.\n\n"
+        f"{prompt}"
+    )
+    try:
+        result = run_coding_prompt(
+            auxiliary_prompt,
+            auxiliary_profile,
+            catalog,
+            review_prompt=False,
+            timeout_seconds=timeout_seconds,
+            execute=True,
+            system_prompt="Provide bounded auxiliary coding review only.",
+            start_ollama=False,
+            client_factory=client_factory,
+            progress_callback=progress_callback,
+            progress_prefix="auxiliary_panel_activity",
+        )
+    except ProviderError as exc:
+        if progress_callback is not None:
+            progress_callback(f"auxiliary_panel_activity: failed - {exc}")
+        return AuxiliaryPanelResult(status="failed", failure_reason=str(exc))
+    route = (
+        result.orchestration.execution_plan.target if result.orchestration.execution_plan else None
+    )
+    if result.response is None:
+        reason = result.orchestration.failure_reason or result.orchestration.status.value
+        if progress_callback is not None:
+            progress_callback(f"auxiliary_panel_activity: failed - {reason}")
+        return AuxiliaryPanelResult(
+            status="failed",
+            route_id=route.route_id if route is not None else None,
+            provider=route.provider if route is not None else None,
+            model=route.model if route is not None else None,
+            failure_reason=reason,
+        )
+    text = result.response.message.content.strip()
+    if progress_callback is not None:
+        progress_callback(f"auxiliary_panel_activity: completed - {_activity_preview(text)}")
+    return AuxiliaryPanelResult(
+        status="completed",
+        route_id=route.route_id if route is not None else None,
+        provider=result.response.backend.provider,
+        model=result.response.backend.model,
+        response_text=text,
+    )
+
+
 def extract_actions(response_text: str) -> tuple[AssistantAction, ...]:
     """Extract assistant action requests from a fenced JSON block or raw JSON."""
 
@@ -1569,6 +1659,92 @@ def _persist_orchestrated_run_plan(
     )
     args.away_run_db = store.path
     return run_record, stage_records
+
+
+class OrchestratedRunTracker:
+    """Persist and print stage transitions for one foreground orchestrated run."""
+
+    def __init__(
+        self,
+        *,
+        store: SQLiteOrchestratedRunStore,
+        run_record: OrchestratedRunRecord,
+        progress_callback: Callable[[str], None] = print,
+    ) -> None:
+        self._store = store
+        self.run_record = run_record
+        self._progress_callback = progress_callback
+
+    @classmethod
+    def create(
+        cls,
+        *,
+        args: argparse.Namespace,
+        repo_root: Path,
+        orchestration: OrchestrationResult,
+        prompt: str,
+        progress_callback: Callable[[str], None] = print,
+    ) -> tuple[OrchestratedRunTracker, tuple[OrchestratedStageRecord, ...]]:
+        run_record, stage_records = _persist_orchestrated_run_plan(
+            args=args,
+            repo_root=repo_root,
+            orchestration=orchestration,
+            prompt=prompt,
+        )
+        store = SQLiteOrchestratedRunStore(_resolve_orchestrated_run_db_path(args, repo_root))
+        return (
+            cls(store=store, run_record=run_record, progress_callback=progress_callback),
+            stage_records,
+        )
+
+    def begin_run(self) -> None:
+        self.run_record = self._store.update_run_status(
+            self.run_record.run_id,
+            status="running",
+            execution_status="running",
+        )
+
+    def finish_run(self, *, execution_status: str) -> None:
+        self.run_record = self._store.update_run_status(
+            self.run_record.run_id,
+            status="completed" if execution_status != "failed" else "failed",
+            execution_status=execution_status,
+        )
+
+    def start_stage(
+        self,
+        stage_name: str,
+        *,
+        details: dict[str, object] | None = None,
+    ) -> OrchestratedStageRecord:
+        record = self._store.start_stage(
+            self.run_record.run_id,
+            stage_name,
+            details=details,
+        )
+        self._progress_callback(
+            f"away_stage_status: {stage_name} status=running started_at={record.started_at_utc}"
+        )
+        return record
+
+    def complete_stage(
+        self,
+        stage_name: str,
+        *,
+        status: str = "completed",
+        details: dict[str, object] | None = None,
+    ) -> OrchestratedStageRecord:
+        record = self._store.complete_stage(
+            self.run_record.run_id,
+            stage_name,
+            status=status,
+            details=details,
+        )
+        self._progress_callback(
+            f"away_stage_status: {stage_name} status={status} "
+            f"completed_at={record.completed_at_utc}"
+        )
+        return record
 
 
 def _resolve_orchestrated_run_db_path(args: argparse.Namespace, repo_root: Path) -> Path:
@@ -2133,6 +2309,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             prompt=prompt,
             args=args,
             repo_root=repo_root,
+            profile=profile,
+            catalog=catalog,
             context_files=context_files,
             context_budget_chars=context_budget_chars,
             orchestration=external_orchestration,
@@ -2226,8 +2404,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             args.approval_policy,
             delegation_enabled=args.mode == "implement" and not args.no_native_tools,
         )
+    orchestrated_tracker = None
     if args.orchestrated:
-        run_record, stage_records = _persist_orchestrated_run_plan(
+        orchestrated_tracker, stage_records = OrchestratedRunTracker.create(
             args=args,
             repo_root=repo_root,
             orchestration=result.orchestration,
@@ -2236,12 +2415,58 @@ def main(argv: Sequence[str] | None = None) -> int:
         _print_orchestrated_stage_plan(
             args=args,
             orchestration=result.orchestration,
-            run_record=run_record,
+            run_record=orchestrated_tracker.run_record,
             stage_records=stage_records,
         )
+        if args.mode == "implement" and args.execute:
+            orchestrated_tracker.begin_run()
+            orchestrated_tracker.start_stage(
+                "auxiliary_panel",
+                details={"route_policy": "derived_local_cheap"},
+            )
+            print("\n=== Auxiliary panel ===")
+            auxiliary_result = run_auxiliary_panel(
+                prompt,
+                profile,
+                catalog,
+                timeout_seconds=args.timeout_seconds,
+                progress_callback=print,
+            )
+            if auxiliary_result.route_id is not None:
+                print(f"auxiliary_panel_route_id: {auxiliary_result.route_id}")
+            if auxiliary_result.provider is not None:
+                print(f"auxiliary_panel_provider: {auxiliary_result.provider}")
+            if auxiliary_result.model is not None:
+                print(f"auxiliary_panel_model: {auxiliary_result.model}")
+            if auxiliary_result.response_text is not None:
+                print(auxiliary_result.response_text)
+            if auxiliary_result.failure_reason is not None:
+                print(f"auxiliary_panel_failure_reason: {auxiliary_result.failure_reason}")
+            print(f"auxiliary_panel_status: {auxiliary_result.status}")
+            orchestrated_tracker.complete_stage(
+                "auxiliary_panel",
+                status=auxiliary_result.status,
+                details={
+                    "route_id": auxiliary_result.route_id or "",
+                    "provider": auxiliary_result.provider or "",
+                    "model": auxiliary_result.model or "",
+                    "failure_reason": auxiliary_result.failure_reason or "",
+                },
+            )
     print("\n=== Assistant response ===")
     assistant_response_text = None
     if args.native_tools and args.execute and result.config is not None:
+        if orchestrated_tracker is not None and args.mode == "implement":
+            orchestrated_tracker.start_stage(
+                "implementation",
+                details={
+                    "route_id": result.orchestration.execution_plan.target.route_id
+                    if result.orchestration.execution_plan is not None
+                    else "",
+                    "provider": result.config.provider.value,
+                    "model": result.config.model,
+                },
+            )
         try:
             native_result = _run_native_agent(
                 prompt,
@@ -2255,6 +2480,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f"failure_reason: {exc}")
             final_status = "failed"
             execution_status = "failed"
+            if orchestrated_tracker is not None and args.mode == "implement":
+                orchestrated_tracker.complete_stage(
+                    "implementation",
+                    status="failed",
+                    details={"failure_reason": str(exc)},
+                )
+                orchestrated_tracker.finish_run(execution_status=execution_status)
             print(f"status: {final_status}")
             print(f"delegation: {delegation_status}")
             print(f"execution_status: {execution_status}")
@@ -2279,9 +2511,29 @@ def main(argv: Sequence[str] | None = None) -> int:
             if any(item.is_error for item in native_result.tool_results)
             else "completed"
         )
+        if orchestrated_tracker is not None and args.mode == "implement":
+            orchestrated_tracker.complete_stage(
+                "implementation",
+                status=execution_status,
+                details={
+                    "tool_results": len(native_result.tool_results),
+                    "tool_errors": sum(1 for item in native_result.tool_results if item.is_error),
+                },
+            )
     elif result.response is not None:
         assistant_response_text = result.response.message.content
         print(assistant_response_text)
+        if orchestrated_tracker is not None and args.mode == "implement":
+            orchestrated_tracker.start_stage(
+                "implementation",
+                details={
+                    "route_id": result.orchestration.execution_plan.target.route_id
+                    if result.orchestration.execution_plan is not None
+                    else "",
+                    "provider": result.config.provider.value if result.config is not None else "",
+                    "model": result.config.model if result.config is not None else "",
+                },
+            )
         if args.apply_actions:
             actions_ok = _run_action_loop(
                 result.response.message.content,
@@ -2294,6 +2546,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             execution_status = "completed" if actions_ok else "completed_with_action_errors"
         else:
             execution_status = "completed"
+        if orchestrated_tracker is not None and args.mode == "implement":
+            orchestrated_tracker.complete_stage("implementation", status=execution_status)
     elif result.orchestration.failure_reason:
         print(f"failure_reason: {result.orchestration.failure_reason}")
     elif result.orchestration.prompt_judge and result.orchestration.prompt_judge.should_refine:
@@ -2371,6 +2625,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     print(f"status: {final_status}")
     print(f"delegation: {delegation_status}")
     print(f"execution_status: {execution_status}")
+    if orchestrated_tracker is not None and args.mode == "implement":
+        orchestrated_tracker.finish_run(execution_status=execution_status)
     _print_run_metrics(
         metrics,
         primary_elapsed_seconds=primary_elapsed_seconds,
@@ -2538,6 +2794,8 @@ def _run_external_agent_cli_mode(
     prompt: str,
     args: argparse.Namespace,
     repo_root: Path,
+    profile: Any,
+    catalog: tuple[Any, ...],
     context_files: Sequence[RepoContextFile],
     context_budget_chars: int | None,
     orchestration: OrchestrationResult,
@@ -2578,6 +2836,7 @@ def _run_external_agent_cli_mode(
     execution_status = "planned"
     exit_code = 0
     response_header_printed = False
+    orchestrated_tracker = None
     try:
         config = _external_agent_config_from_orchestration(
             orchestration,
@@ -2612,7 +2871,7 @@ def _run_external_agent_cli_mode(
                 + json.dumps([str(path) for path in config.image_paths])
             )
         if args.orchestrated:
-            run_record, stage_records = _persist_orchestrated_run_plan(
+            orchestrated_tracker, stage_records = OrchestratedRunTracker.create(
                 args=args,
                 repo_root=repo_root,
                 orchestration=orchestration,
@@ -2621,12 +2880,56 @@ def _run_external_agent_cli_mode(
             _print_orchestrated_stage_plan(
                 args=args,
                 orchestration=orchestration,
-                run_record=run_record,
+                run_record=orchestrated_tracker.run_record,
                 stage_records=stage_records,
             )
+            if args.execute and args.mode == "implement":
+                orchestrated_tracker.begin_run()
+                orchestrated_tracker.start_stage(
+                    "auxiliary_panel",
+                    details={"route_policy": "derived_local_cheap"},
+                )
+                print("\n=== Auxiliary panel ===")
+                auxiliary_result = run_auxiliary_panel(
+                    prompt,
+                    profile,
+                    catalog,
+                    timeout_seconds=args.timeout_seconds,
+                    progress_callback=print,
+                )
+                if auxiliary_result.route_id is not None:
+                    print(f"auxiliary_panel_route_id: {auxiliary_result.route_id}")
+                if auxiliary_result.provider is not None:
+                    print(f"auxiliary_panel_provider: {auxiliary_result.provider}")
+                if auxiliary_result.model is not None:
+                    print(f"auxiliary_panel_model: {auxiliary_result.model}")
+                if auxiliary_result.response_text is not None:
+                    print(auxiliary_result.response_text)
+                if auxiliary_result.failure_reason is not None:
+                    print(f"auxiliary_panel_failure_reason: {auxiliary_result.failure_reason}")
+                print(f"auxiliary_panel_status: {auxiliary_result.status}")
+                orchestrated_tracker.complete_stage(
+                    "auxiliary_panel",
+                    status=auxiliary_result.status,
+                    details={
+                        "route_id": auxiliary_result.route_id or "",
+                        "provider": auxiliary_result.provider or "",
+                        "model": auxiliary_result.model or "",
+                        "failure_reason": auxiliary_result.failure_reason or "",
+                    },
+                )
         print("\n=== Assistant response ===")
         response_header_printed = True
         if args.execute and args.mode != "plan":
+            if orchestrated_tracker is not None and args.mode == "implement":
+                orchestrated_tracker.start_stage(
+                    "implementation",
+                    details={
+                        "route_id": target.route_id,
+                        "provider": target.provider,
+                        "model": target.model,
+                    },
+                )
             external_prompt = _external_agent_prompt_with_execution_metadata(
                 prompt,
                 approval_policy=args.approval_policy,
@@ -2686,6 +2989,15 @@ def _run_external_agent_cli_mode(
                 if external_result.returncode == 0 and parsed_failure is None
                 else "failed"
             )
+            if orchestrated_tracker is not None and args.mode == "implement":
+                orchestrated_tracker.complete_stage(
+                    "implementation",
+                    status=execution_status,
+                    details={
+                        "returncode": external_result.returncode,
+                        "failure_reason": parsed_failure or "",
+                    },
+                )
             exit_code = 0 if execution_status == "completed" else external_result.returncode or 1
         else:
             print("execution: skipped")
@@ -2699,9 +3011,17 @@ def _run_external_agent_cli_mode(
         if hint is not None:
             print(f"failure_hint: {hint}")
         execution_status = "failed"
+        if orchestrated_tracker is not None and args.mode == "implement":
+            orchestrated_tracker.complete_stage(
+                "implementation",
+                status="failed",
+                details={"failure_reason": str(exc)},
+            )
         exit_code = 1
 
     print(f"execution_status: {execution_status}")
+    if orchestrated_tracker is not None and args.mode == "implement":
+        orchestrated_tracker.finish_run(execution_status=execution_status)
     _print_run_metrics(
         metrics,
         primary_elapsed_seconds=primary_elapsed_seconds,
