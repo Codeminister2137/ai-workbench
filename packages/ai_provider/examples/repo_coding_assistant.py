@@ -1661,6 +1661,17 @@ def _persist_orchestrated_run_plan(
     return run_record, stage_records
 
 
+def _execution_status_with_auxiliary_result(
+    execution_status: str,
+    auxiliary_status: str | None,
+) -> str:
+    """Preserve successful implementation status while surfacing auxiliary failures."""
+
+    if execution_status == "completed" and auxiliary_status not in (None, "completed"):
+        return "completed_with_auxiliary_errors"
+    return execution_status
+
+
 class OrchestratedRunTracker:
     """Persist and print stage transitions for one foreground orchestrated run."""
 
@@ -2405,6 +2416,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             delegation_enabled=args.mode == "implement" and not args.no_native_tools,
         )
     orchestrated_tracker = None
+    auxiliary_status = None
     if args.orchestrated:
         orchestrated_tracker, stage_records = OrchestratedRunTracker.create(
             args=args,
@@ -2443,6 +2455,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             if auxiliary_result.failure_reason is not None:
                 print(f"auxiliary_panel_failure_reason: {auxiliary_result.failure_reason}")
             print(f"auxiliary_panel_status: {auxiliary_result.status}")
+            auxiliary_status = auxiliary_result.status
             orchestrated_tracker.complete_stage(
                 "auxiliary_panel",
                 status=auxiliary_result.status,
@@ -2563,6 +2576,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.scrutinize_response and assistant_response_text is not None:
         print("\n=== Response scrutiny ===")
         scrutiny_failed = False
+        scrutiny_stage_status = "completed"
+        scrutiny_stage_details: dict[str, object] = {"route_policy": "derived_local_cheap"}
+        if orchestrated_tracker is not None:
+            if orchestrated_tracker.run_record.status == "planned":
+                orchestrated_tracker.begin_run()
+            orchestrated_tracker.start_stage("scrutiny", details=scrutiny_stage_details)
         try:
             scrutiny_started = time.perf_counter()
             scrutiny_prompt = build_response_scrutiny_prompt(prompt, assistant_response_text)
@@ -2597,6 +2616,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             print("scrutiny_status: failed")
             print(f"scrutiny_failure_reason: {exc}")
             scrutiny_failed = True
+            scrutiny_stage_status = "failed"
+            scrutiny_stage_details["failure_reason"] = str(exc)
         else:
             if scrutiny_result.response is not None:
                 scrutiny_text = scrutiny_result.response.message.content
@@ -2607,25 +2628,43 @@ def main(argv: Sequence[str] | None = None) -> int:
                     print("scrutiny_status: invalid")
                     print(f"scrutiny_failure_reason: {exc}")
                     scrutiny_failed = True
+                    scrutiny_stage_status = "invalid"
+                    scrutiny_stage_details["failure_reason"] = str(exc)
                 else:
                     print(f"scrutiny_verdict: {scrutiny_report.verdict}")
                     print(f"scrutiny_score: {scrutiny_report.score}")
                     print("scrutiny_status: completed")
+                    scrutiny_stage_details["verdict"] = scrutiny_report.verdict
+                    scrutiny_stage_details["score"] = scrutiny_report.score
                     if scrutiny_report.verdict != "pass" and execution_status == "completed":
                         execution_status = "completed_with_scrutiny_findings"
             else:
                 print("scrutiny_status: failed")
                 scrutiny_failed = True
+                scrutiny_stage_status = "failed"
                 if scrutiny_result.orchestration.failure_reason:
+                    scrutiny_stage_details["failure_reason"] = (
+                        scrutiny_result.orchestration.failure_reason
+                    )
                     print(
                         f"scrutiny_failure_reason: {scrutiny_result.orchestration.failure_reason}"
                     )
         if scrutiny_failed and execution_status == "completed":
             execution_status = "completed_with_scrutiny_errors"
+        if orchestrated_tracker is not None:
+            orchestrated_tracker.complete_stage(
+                "scrutiny",
+                status=scrutiny_stage_status,
+                details=scrutiny_stage_details,
+            )
+    execution_status = _execution_status_with_auxiliary_result(
+        execution_status,
+        auxiliary_status,
+    )
     print(f"status: {final_status}")
     print(f"delegation: {delegation_status}")
     print(f"execution_status: {execution_status}")
-    if orchestrated_tracker is not None and args.mode == "implement":
+    if orchestrated_tracker is not None and args.execute:
         orchestrated_tracker.finish_run(execution_status=execution_status)
     _print_run_metrics(
         metrics,
@@ -2837,6 +2876,7 @@ def _run_external_agent_cli_mode(
     exit_code = 0
     response_header_printed = False
     orchestrated_tracker = None
+    auxiliary_status = None
     try:
         config = _external_agent_config_from_orchestration(
             orchestration,
@@ -2908,6 +2948,7 @@ def _run_external_agent_cli_mode(
                 if auxiliary_result.failure_reason is not None:
                     print(f"auxiliary_panel_failure_reason: {auxiliary_result.failure_reason}")
                 print(f"auxiliary_panel_status: {auxiliary_result.status}")
+                auxiliary_status = auxiliary_result.status
                 orchestrated_tracker.complete_stage(
                     "auxiliary_panel",
                     status=auxiliary_result.status,
@@ -3019,8 +3060,12 @@ def _run_external_agent_cli_mode(
             )
         exit_code = 1
 
+    execution_status = _execution_status_with_auxiliary_result(
+        execution_status,
+        auxiliary_status,
+    )
     print(f"execution_status: {execution_status}")
-    if orchestrated_tracker is not None and args.mode == "implement":
+    if orchestrated_tracker is not None and args.execute:
         orchestrated_tracker.finish_run(execution_status=execution_status)
     _print_run_metrics(
         metrics,

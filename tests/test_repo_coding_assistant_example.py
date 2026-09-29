@@ -872,6 +872,87 @@ def test_cli_orchestrated_implement_updates_stage_statuses(
     assert stage_by_name["implementation"].completed_at_utc is not None
 
 
+def test_cli_orchestrated_auxiliary_failure_affects_final_status(
+    capsys,
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    from dataclasses import replace
+
+    from ai_provider import AIMessage, AIResponse, BackendInfo, BackendLocation, MessageRole
+
+    catalog = _EXAMPLE.load_model_catalog(
+        Path("packages/ai_orchestrator/examples/model_catalog.toml")
+    )
+    prepared = _EXAMPLE.run_coding_prompt(
+        "Create a helper.",
+        _EXAMPLE.coding_task_profile(model_override="qwen2.5-coder:14b"),
+        catalog,
+    )
+    prepared = replace(
+        prepared,
+        response=None,
+        config=_EXAMPLE.BackendConfig(provider=_EXAMPLE.ProviderKind.OLLAMA, model="test"),
+    )
+    native_response = SimpleNamespace(
+        response=AIResponse(
+            message=AIMessage(MessageRole.ASSISTANT, "native done"),
+            backend=BackendInfo("ollama", "test", BackendLocation.LOCAL),
+        ),
+        tool_results=(),
+    )
+    run_db = tmp_path / "repo-assistant-runs.sqlite3"
+
+    monkeypatch.setattr(_EXAMPLE, "run_coding_prompt", lambda *args, **kwargs: prepared)
+    monkeypatch.setattr(
+        _EXAMPLE,
+        "run_auxiliary_panel",
+        lambda *args, **kwargs: _EXAMPLE.AuxiliaryPanelResult(
+            status="failed",
+            failure_reason="local model unavailable",
+        ),
+    )
+    monkeypatch.setattr(_EXAMPLE, "_run_native_agent", lambda *args, **kwargs: native_response)
+
+    assert (
+        main(
+            [
+                "--mode",
+                "implement",
+                "Create a helper.",
+                "--provider",
+                "ollama",
+                "--model",
+                "qwen2.5-coder:14b",
+                "--execute",
+                "--away-minutes",
+                "30",
+                "--orchestrated",
+                "--away-run-db",
+                str(run_db),
+            ]
+        )
+        == 0
+    )
+
+    output = capsys.readouterr().out
+    assert "auxiliary_panel_status: failed" in output
+    assert "execution_status: completed_with_auxiliary_errors" in output
+    run_id = next(
+        line.removeprefix("away_run_id: ")
+        for line in output.splitlines()
+        if line.startswith("away_run_id: ")
+    )
+    store = SQLiteOrchestratedRunStore(run_db)
+    run_record = store.get_run(run_id)
+    assert run_record is not None
+    assert run_record.status == "completed"
+    assert run_record.execution_status == "completed_with_auxiliary_errors"
+    stage_by_name = {record.name: record for record in store.list_stages(run_id)}
+    assert stage_by_name["auxiliary_panel"].status == "failed"
+    assert stage_by_name["implementation"].status == "completed"
+
+
 def test_cli_orchestrated_requires_away_minutes() -> None:
     with pytest.raises(SystemExit):
         main(["--mode", "plan", "Work.", "--orchestrated"])
@@ -1791,7 +1872,7 @@ def test_cli_can_install_codex_plugins_when_explicitly_executed(
     assert "execution_status: completed" in output
 
 
-def test_cli_can_scrutinize_completed_response(capsys, monkeypatch) -> None:
+def test_cli_can_scrutinize_completed_response(capsys, monkeypatch, tmp_path: Path) -> None:
     from dataclasses import replace
 
     from ai_provider import (
@@ -1848,6 +1929,7 @@ def test_cli_can_scrutinize_completed_response(capsys, monkeypatch) -> None:
         ),
     )
     calls: list[tuple[str, bool, str | None]] = []
+    run_db = tmp_path / "repo-assistant-runs.sqlite3"
 
     def fake_run(prompt, profile, catalog, **kwargs):
         calls.append((prompt, kwargs["execute"], kwargs.get("system_prompt")))
@@ -1867,6 +1949,11 @@ def test_cli_can_scrutinize_completed_response(capsys, monkeypatch) -> None:
                 "qwen2.5-coder:14b",
                 "--execute",
                 "--scrutinize-response",
+                "--away-minutes",
+                "30",
+                "--orchestrated",
+                "--away-run-db",
+                str(run_db),
             ]
         )
         == 0
@@ -1884,6 +1971,25 @@ def test_cli_can_scrutinize_completed_response(capsys, monkeypatch) -> None:
     assert calls[1][1] is True
     assert "Candidate assistant response:\nprimary answer" in calls[1][0]
     assert calls[1][2] == _EXAMPLE._RESPONSE_SCRUTINY_SYSTEM_PROMPT
+    run_id = next(
+        line.removeprefix("away_run_id: ")
+        for line in output.splitlines()
+        if line.startswith("away_run_id: ")
+    )
+    store = SQLiteOrchestratedRunStore(run_db)
+    run_record = store.get_run(run_id)
+    assert run_record is not None
+    assert run_record.status == "completed"
+    assert run_record.execution_status == "completed_with_scrutiny_findings"
+    stage_by_name = {record.name: record for record in store.list_stages(run_id)}
+    assert stage_by_name["scrutiny"].status == "completed"
+    assert stage_by_name["scrutiny"].started_at_utc is not None
+    assert stage_by_name["scrutiny"].completed_at_utc is not None
+    assert stage_by_name["scrutiny"].details == {
+        "route_policy": "derived_local_cheap",
+        "score": 4,
+        "verdict": "needs_revision",
+    }
 
 
 def test_parse_response_scrutiny_report_validates_required_shape() -> None:
