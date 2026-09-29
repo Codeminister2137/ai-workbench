@@ -5,6 +5,7 @@ import os
 import queue
 import shutil
 import subprocess
+import sys
 import threading
 import time
 from collections.abc import Callable
@@ -33,6 +34,7 @@ class ExternalAgentConfig:
     output_schema_path: Path | None = None
     web_search: bool = False
     image_paths: tuple[Path, ...] = ()
+    codex_mcp_tools: bool = False
 
 
 @dataclass(frozen=True)
@@ -440,6 +442,7 @@ def external_agent_config_from_orchestration(
     output_schema_path: Path | None = None,
     web_search: bool = False,
     image_paths: tuple[Path, ...] = (),
+    codex_mcp_tools: bool = False,
 ) -> ExternalAgentConfig:
     """Adapt a ready orchestration result to an external-agent runtime config."""
 
@@ -469,6 +472,7 @@ def external_agent_config_from_orchestration(
         output_schema_path=output_schema_path,
         web_search=web_search,
         image_paths=image_paths,
+        codex_mcp_tools=codex_mcp_tools,
     )
 
 
@@ -534,6 +538,8 @@ def build_external_agent_command(config: ExternalAgentConfig) -> tuple[str, ...]
     command = [config.command]
     if config.web_search:
         command.append("--search")
+    if config.codex_mcp_tools:
+        command.extend(_codex_mcp_config_overrides(config.cwd))
     if config.approval_policy:
         command.extend(
             [
@@ -581,6 +587,51 @@ def build_external_agent_command(config: ExternalAgentConfig) -> tuple[str, ...]
         command.extend(["--image", str(image_path)])
     command.append("-")
     return tuple(command)
+
+
+def _codex_mcp_config_overrides(repo_root: Path) -> list[str]:
+    """Return top-level Codex config overrides for project-local MCP tools."""
+
+    repo_root = repo_root.resolve()
+    return [
+        "-c",
+        f"mcp_servers.repo_assistant_tools.command={_codex_config_string(sys.executable)}",
+        "-c",
+        "mcp_servers.repo_assistant_tools.args="
+        + _codex_config_array(
+            (
+                "-m",
+                "ai_agent.mcp_server",
+                "--workspace-root",
+                str(repo_root),
+            )
+        ),
+        "-c",
+        f"mcp_servers.repo_assistant_tools.cwd={_codex_config_string(str(repo_root))}",
+        "-c",
+        "mcp_servers.repo_assistant_tools.enabled=true",
+        "-c",
+        "mcp_servers.repo_assistant_tools.required=false",
+        "-c",
+        "mcp_servers.repo_assistant_tools.default_tools_approval_mode='auto'",
+        "-c",
+        "mcp_servers.repo_assistant_tools.startup_timeout_sec=10",
+        "-c",
+        "mcp_servers.repo_assistant_tools.tool_timeout_sec=60",
+        "-c",
+        "mcp_servers.repo_assistant_tools.enabled_tools="
+        + _codex_config_array(
+            ("read_file", "list_dir", "find_files", "grep_search", "delegate_task")
+        ),
+    ]
+
+
+def _codex_config_array(values: tuple[str, ...]) -> str:
+    return "[" + ",".join(_codex_config_string(value) for value in values) + "]"
+
+
+def _codex_config_string(value: str) -> str:
+    return "'" + value.replace("\\", "\\\\").replace("'", "\\'") + "'"
 
 
 def _codex_approval_policy(approval_policy: str) -> str:

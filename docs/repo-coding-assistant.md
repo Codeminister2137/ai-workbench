@@ -54,10 +54,11 @@ Use the Codex route when you want behavior closest to this chat's coding model:
   --execute --skip-prompt-review
 ```
 
-Use `--codex-search`, `--codex-image`, `--codex-output-schema`, or
-`--codex-persist-session` only when the specific task needs them. They are
-opt-in because they change network behavior, attach local files, constrain
-output, or write Codex session state outside the repository.
+Use `--codex-search`, `--codex-mcp-tools`, `--codex-image`,
+`--codex-output-schema`, or `--codex-persist-session` only when the specific
+task needs them. They are opt-in because they change network behavior, expose
+project-local tools to the Codex run, attach local files, constrain output, or
+write Codex session state outside the repository.
 
 Keep PyCharm AI Assistant chat for now when the work depends on IDE-only
 context, this chat's managed app/document-control tools, or a material product
@@ -253,12 +254,14 @@ scan. To preserve a complete local transcript for later analysis, opt in with
 `--log-file`; transcript files may contain the request and repository context,
 so keep them local:
 
-External-agent JSONL stdout is summarized for the console while the raw JSONL is
-kept in the transcript only. If the external agent writes long stderr output,
-the console shows a bounded preview and an `external_agent_stderr_file` path for
-the full stderr. Non-zero external-agent exits also print an explicit
-`external_agent_failure_reason`, so a truncated stderr preview is supporting
-diagnostic detail rather than the only failure explanation.
+External-agent JSONL stdout is summarized in an `=== External agent diagnostics
+===` block while the raw JSONL is kept in the transcript only. The final
+assistant answer is printed after diagnostics, run status, and metrics so user
+summaries do not have raw failures or activity previews appended below them. If
+the external agent writes stderr, the console shows a concise stderr summary and
+an `external_agent_stderr_file` path for the full filtered stderr. Non-zero
+external-agent exits also print an explicit `external_agent_failure_reason`, so
+stderr is supporting diagnostic detail rather than the only failure explanation.
 
 ```powershell
 .\scripts\repo-assistant.ps1 `
@@ -276,22 +279,21 @@ assistant response, action-loop output, scrutiny output, normalized scrutiny
 status, and final `execution_status`.
 
 For external-agent routes such as Codex CLI, `--timeout-seconds` is treated as
-an inactivity timeout. Model output resets the timer, and the CLI prints bounded
-`external_agent_activity` or `external_agent_status` lines during long runs so
-the transcript shows that work is still active. Activity lines include bounded
-details from parsed JSONL where useful, such as command previews,
-agent-message previews, explicit final-answer previews, failure reasons, search
-queries, usage summaries, and stderr previews. Hidden reasoning-summary events
-remain type-only and raw JSONL stays in the transcript-only section. The CLI
-prints the exact `external_agent_command_line_json` before execution and adds
-the effective approval policy and Codex sandbox to the prompt so the external
-agent does not infer a read-only environment when the requested sandbox is
-`workspace-write` or stronger. If a timeout or process error occurs after
-partial output, the CLI summarizes parsed JSONL events and keeps raw JSONL in
-the transcript-only section rather than dumping it to the console.
-Known noisy Codex model-refresh stderr is filtered out of activity lines and
-the main stderr summary. When a transcript log is active, complete external
-stderr is saved beside it as `*.stderr.log` and the transcript prints that path.
+an inactivity timeout. Model output resets the timer. The CLI prints parsed
+event counts, usage, delegation status, failure reasons, and concise stderr
+summaries in the diagnostics block instead of streaming every
+`external_agent_activity` line into the user-facing answer area. Hidden
+reasoning-summary events remain type-only and raw JSONL stays in the
+transcript-only section. The CLI prints the exact
+`external_agent_command_line_json` before execution and adds the effective
+approval policy and Codex sandbox to the prompt so the external agent does not
+infer a read-only environment when the requested sandbox is `workspace-write` or
+stronger. If a timeout or process error occurs after partial output, the CLI
+summarizes parsed JSONL events and keeps raw JSONL in the transcript-only
+section rather than dumping it to the console. Known noisy Codex model-refresh
+stderr is filtered out of the main stderr summary. When a transcript log is
+active, complete external stderr is saved beside it as `*.stderr.log` and the
+transcript prints that path.
 
 Local execution paths use equivalent bounded activity prefixes:
 `local_agent_activity` for local provider/native tool-loop model calls,
@@ -468,6 +470,10 @@ off by default because it allows external web/search activity in addition to
 sending the selected repository context to Codex. The verified local Codex CLI
 expects search as a top-level flag, so the repository CLI invokes
 `codex --search exec ...` rather than the unsupported `codex exec --search ...`.
+Use `--codex-mcp-tools` to inject this repository's project-local MCP server
+into one Codex route via Codex `-c` config overrides. This exposes
+`read_file`, `list_dir`, `find_files`, `grep_search`, and the local-only
+`delegate_task` bridge for that run without requiring global MCP registration.
 Use repeated `--codex-image path\to\screenshot.png` flags to attach local image
 files to the initial Codex prompt. This is useful for screenshots, diagrams, or
 visual regressions; the prompt should still state what Codex should inspect and
@@ -527,8 +533,8 @@ Initial approved Codex plugin set for this repository:
 See `docs/codex-plugin-review.md` for the point-in-time review of deferred
 plugins and why they were not installed in the first batch.
 
-Use `--codex-mcp-setup` to expose this repository's selected local read/search
-tools to Codex through MCP:
+Use `--codex-mcp-setup` to expose this repository's selected local inspection
+and delegation tools to Codex through MCP:
 
 ```powershell
 python -m uv run ai-assistant --codex-mcp-setup
@@ -537,7 +543,9 @@ python -m uv run ai-assistant --codex-mcp-setup
 The setup command writes local `.codex\config.toml` for project-scoped Codex
 config. The file contains this checkout's absolute workspace path and is ignored
 by Git; rerun the setup command for each local checkout. It does not change
-user-level Codex MCP configuration by default.
+user-level Codex MCP configuration by default. For single repo-assistant runs,
+prefer `--codex-mcp-tools`; it passes the same project-local server definition
+to Codex via per-run `-c` overrides.
 
 To also register the server persistently with the official Codex MCP CLI, pass
 the explicit global-registration flag:
@@ -550,9 +558,12 @@ That command runs `codex mcp add repo_assistant_tools -- ...`, so
 `codex mcp list` can see the server outside this project-scoped config. Use it
 only when you intentionally want to update the broader Codex environment.
 
-The first exposed MCP server is intentionally limited to read/search tools:
-`read_file`, `list_dir`, `find_files`, and `grep_search`. It does not expose
-write or shell tools. Tool calls are bounded to the configured workspace root.
+The exposed MCP server is intentionally limited to read/search tools plus
+bounded local delegation: `read_file`, `list_dir`, `find_files`, `grep_search`,
+and `delegate_task`. It does not expose write or shell tools. Tool calls are
+bounded to the configured workspace root. `delegate_task` routes to a local-only
+child agent with the same read/search tool surface, nested delegation disabled,
+and no MCP write or shell capability.
 
 The PyCharm-bundled Codex CLI verified in this repository is `codex-cli
 0.137.0`. On 2026-09-26, `gpt-5.5` completed a low-risk JSONL execution through
@@ -609,7 +620,7 @@ alternate executors can use the same policy.
 | Final-answer artifact | The managed session displays the final answer in chat. | `--codex-output-last-message` writes Codex's last assistant message to an explicit local file and uses it as a JSONL fallback. | Implemented as opt-in local file output. |
 | Structured final response | This runtime can constrain some outputs through tool/runtime mechanisms. | `--codex-output-schema` passes an explicit JSON Schema file to `codex exec`. | Implemented as opt-in schema file input. |
 | Approval/sandbox policy | Managed by the active ChatGPT/Codex runtime. | `--approval-policy` selects model-neutral presets for native tools and legacy actions. Codex routes map `read_only` to `--sandbox read-only`, `interactive`/`workspace_write` to `--sandbox workspace-write`, and `trusted_local` to `--sandbox danger-full-access` for commit-capable local runs. Codex approval is forwarded as top-level `--ask-for-approval`. | Implemented first preset slice; Codex CLI still lacks exact managed approval UI parity. |
-| MCP tools | Available here through the current managed runtime. | `--codex-mcp-setup` configures a local `repo_assistant_tools` MCP server for read/search repository tools. | Implemented for selected local read/search tools. |
+| MCP tools | Available here through the current managed runtime. | `--codex-mcp-tools` injects the local `repo_assistant_tools` MCP server for one Codex run; `--codex-mcp-setup` can also write project config. The server exposes read/search repository tools plus bounded local `delegate_task`. | Implemented for selected local read/search tools and local-only delegation. |
 | Plugins/apps | This session has installed app/plugin tools exposed by ChatGPT. | Diagnostics list Codex plugin marketplace/install status and structured plugin counts. Explicit install/remove is available through repeated `--codex-plugin-install` / `--codex-plugin-remove` with `--execute`. | Initial approved plugin install set implemented; future connectors one at a time behind reusable authorization. |
 | Document/app-control tools | Available here when connected document sessions expose tools. | Not inherited automatically by `codex exec`. Development-relevant bridges may be added as needed, with read/write capability designed together and writes gated by policy. | Accepted direction in ADR-024; implementation deferred until a concrete development workflow needs it. |
 | Web/search | This runtime may have managed browsing tools. | `--codex-search` invokes `codex --search exec ...` for one explicit Codex CLI run. Default runs omit search. | Implemented as explicit opt-in only. |

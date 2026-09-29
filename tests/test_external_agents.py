@@ -1,4 +1,5 @@
 import json
+import sys
 from pathlib import Path
 
 from ai_orchestrator import AccessMethod
@@ -45,6 +46,29 @@ def test_build_external_agent_command_omits_codex_search_by_default(tmp_path: Pa
 
     assert "--search" not in command
     assert command[:4] == ("codex", "--ask-for-approval", "never", "exec")
+
+
+def test_build_external_agent_command_can_enable_project_mcp_tools(tmp_path: Path) -> None:
+    config = ExternalAgentConfig(
+        access_method=AccessMethod.CODEX_CLI,
+        command="codex",
+        model="gpt-5.5",
+        cwd=tmp_path,
+        timeout_seconds=60.0,
+        codex_mcp_tools=True,
+    )
+
+    command = build_external_agent_command(config)
+
+    assert command[0] == "codex"
+    assert "exec" in command
+    assert command.index("-c") < command.index("exec")
+    command_text = " ".join(command)
+    escaped_python = sys.executable.replace("\\", "\\\\")
+    assert f"mcp_servers.repo_assistant_tools.command='{escaped_python}'" in command_text
+    assert "ai_agent.mcp_server" in command_text
+    assert "delegate_task" in command_text
+    assert str(tmp_path.resolve()) in command_text
 
 
 def test_build_external_agent_command_maps_interactive_approval(tmp_path: Path) -> None:

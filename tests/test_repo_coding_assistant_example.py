@@ -283,6 +283,7 @@ def test_cli_help_lists_google_provider() -> None:
     assert "--scrutinize-response" in result.stdout
     assert "--approval-policy" in result.stdout
     assert "--codex-search" in result.stdout
+    assert "--codex-mcp-tools" in result.stdout
     assert "--codex-image" in result.stdout
     assert "--codex-mcp-setup" in result.stdout
     assert "--codex-mcp-register-global" in result.stdout
@@ -351,7 +352,7 @@ def test_cli_can_setup_project_codex_mcp_without_prompt(
     assert "codex_mcp_enabled_tools_json:" in output
     assert "codex_mcp_global_registered: False" in output
     assert "[mcp_servers.repo_assistant_tools]" in text
-    assert "ai-agent-mcp" in text
+    assert "ai_agent.mcp_server" in text
     assert "run_command" not in text
 
 
@@ -370,9 +371,9 @@ def test_cli_can_setup_and_register_codex_mcp_when_explicitly_requested(
         return CodexMcpSetupResult(
             config_path=repo_root / ".codex" / "config.toml",
             server_name="repo_assistant_tools",
-            command="python",
-            args=("-m", "uv", "run", "ai-agent-mcp"),
-            enabled_tools=("read_file", "list_dir", "find_files", "grep_search"),
+            command=sys.executable,
+            args=("-m", "ai_agent.mcp_server"),
+            enabled_tools=("read_file", "list_dir", "find_files", "grep_search", "delegate_task"),
             created=True,
             global_registered=True,
             global_add_stdout="Added global MCP server.",
@@ -590,6 +591,7 @@ def test_cli_plans_codex_external_agent_route(capsys, monkeypatch) -> None:
                 "openai",
                 "--model",
                 "gpt-5.5",
+                "--codex-mcp-tools",
                 "--skip-prompt-review",
             ]
         )
@@ -600,6 +602,8 @@ def test_cli_plans_codex_external_agent_route(capsys, monkeypatch) -> None:
     assert "access_method: codex_cli" in output
     assert "external_agent_command: codex-test" in output
     assert "external_agent_command_line_json:" in output
+    assert "external_agent_mcp_tools: True" in output
+    assert "delegate_task" in output
     assert "execution_status: planned" in output
 
 
@@ -1099,6 +1103,7 @@ def test_cli_executes_codex_external_agent_route(capsys, monkeypatch) -> None:
                 [
                     '{"type":"command.started","command":"git status --short"}',
                     '{"type":"tool.completed","name":"read_file"}',
+                    '{"type":"tool.completed","name":"delegate_task"}',
                     '{"type":"item.completed","item":{"type":"web_search","query":"OpenAI"}}',
                     '{"type":"file_change","path":"example.py"}',
                     '{"type":"turn.completed","usage":{"input_tokens":12,"output_tokens":3}}',
@@ -1139,12 +1144,14 @@ def test_cli_executes_codex_external_agent_route(capsys, monkeypatch) -> None:
     assert "external_agent_jsonl_events: parsed" in output
     assert "external_agent_command_line_json:" in output
     assert "external_agent_command_event_count: 1" in output
-    assert "external_agent_tool_event_count: 1" in output
+    assert "external_agent_tool_event_count: 2" in output
     assert "external_agent_web_search_event_count: 1" in output
     assert "external_agent_file_change_event_count: 1" in output
     assert "external_agent_usage_json:" in output
+    assert "delegation: completed: external Codex MCP delegate_task" in output
     assert "codex done" in output
     assert "execution_status: completed" in output
+    assert output.rfind("codex done") > output.rfind("execution_status: completed")
     command = calls[0]["args"][0]
     assert command[:4] == ("codex-test", "--ask-for-approval", "never", "exec")
     assert "--json" in command
@@ -1360,7 +1367,10 @@ def test_cli_reports_nonzero_external_agent_exit_without_jsonl_failure(
     assert "external_agent_failure_reason: process exited with code 2" in output
     assert "external_agent_failure_hint: inspect external_agent_stderr_file" in output
     assert "external_agent_stderr_file:" in output
+    assert "external_agent_stderr_summary: filtered stderr captured" in output
+    assert "external_agent_stderr_first_line: plain stderr failure detail" in output
     assert "execution_status: failed" in output
+    assert output.rfind("partial answer") > output.rfind("execution_status: failed")
 
 
 def test_cli_explains_codex_timeout_without_duplicate_response_header(
@@ -1400,14 +1410,26 @@ def test_cli_explains_codex_timeout_without_duplicate_response_header(
     assert "--codex-login-device" in output
 
 
-def test_external_agent_stderr_is_bounded() -> None:
-    stderr = _EXAMPLE._format_external_agent_stderr("x" * 2500, limit=100)
+def test_external_agent_stderr_summarizes_pytest_failures() -> None:
+    stderr = "\n".join(
+        [
+            "2026-09-29T16:24:07Z ERROR codex_core::tools::router: error=Exit code: 1",
+            "Output:",
+            "================================== FAILURES ===================================",
+            "__________________ test_cli_plans_codex_external_agent_route __________________",
+            "FAILED tests/test_repo_coding_assistant_example.py::test_one - AssertionError",
+            "FAILED tests/test_repo_coding_assistant_example.py::test_two - AssertionError",
+        ]
+    )
 
-    assert stderr.startswith("external_agent_stderr_preview:")
-    assert "x" * 100 in stderr
-    assert "stderr preview truncated:" in stderr
-    assert "characters omitted" in stderr
-    assert "see external_agent_stderr_file for full stderr" in stderr
+    summary = _EXAMPLE._format_external_agent_stderr(stderr, limit=1)
+
+    assert summary.startswith("external_agent_stderr_summary:")
+    assert "FAILURES" not in summary
+    assert "external_agent_stderr_first_line: test_cli_plans_codex_external_agent_route" in summary
+    assert "pytest_failures_detected: 2" in summary
+    assert "pytest_failure: tests/test_repo_coding_assistant_example.py::test_one" in summary
+    assert "pytest_failures_omitted: 1; see external_agent_stderr_file" in summary
 
 
 def test_external_agent_jsonl_parser_ignores_completed_failure_mentions() -> None:
@@ -1424,6 +1446,28 @@ def test_external_agent_jsonl_parser_ignores_completed_failure_mentions() -> Non
     assert events.failure_reason is None
 
 
+def test_external_agent_delegation_status_detects_codex_collab_events() -> None:
+    events = parse_external_agent_jsonl(
+        "\n".join(
+            [
+                (
+                    '{"type":"item.completed","item":{"type":"collab_tool_call",'
+                    '"tool":"spawn_agent","status":"completed"}}'
+                ),
+                (
+                    '{"type":"item.completed","item":{"type":"collab_tool_call",'
+                    '"tool":"wait","status":"completed"}}'
+                ),
+            ]
+        )
+    )
+
+    assert (
+        _EXAMPLE._delegation_status_after_external_agent_events("disabled", events)
+        == "completed: external Codex collab delegation"
+    )
+
+
 def test_external_agent_stderr_filters_noisy_codex_model_refresh() -> None:
     stderr = "\n".join(
         [
@@ -1433,7 +1477,32 @@ def test_external_agent_stderr_filters_noisy_codex_model_refresh() -> None:
         ]
     )
 
-    assert _EXAMPLE._format_external_agent_stderr(stderr) == "actionable stderr\n"
+    assert _EXAMPLE._format_external_agent_stderr(stderr) == (
+        "external_agent_stderr_summary: filtered stderr captured; "
+        "see external_agent_stderr_file for full output\n"
+        "external_agent_stderr_first_line: actionable stderr\n"
+    )
+
+
+def test_external_agent_stderr_sidecar_filters_noisy_codex_model_refresh(
+    tmp_path: Path,
+) -> None:
+    log_file = tmp_path / "repo-assistant.log"
+    stderr = "\n".join(
+        [
+            "2026-09-28T08:57:23Z ERROR codex_models_manager::manager: "
+            "failed to refresh available models: unknown variant `max`; body: huge",
+            "actionable stderr",
+        ]
+    )
+
+    stderr_path = _EXAMPLE._write_external_agent_stderr(stderr, log_file)
+
+    assert stderr_path is not None
+    text = stderr_path.read_text(encoding="utf-8")
+    assert "[omitted 1 known noisy Codex model-refresh stderr line(s)]" in text
+    assert "actionable stderr" in text
+    assert "body: huge" not in text
 
 
 def test_external_agent_failure_hint_explains_codex_unauthorized() -> None:
@@ -1445,6 +1514,14 @@ def test_external_agent_failure_hint_explains_codex_unauthorized() -> None:
     assert hint is not None
     assert "Codex CLI reached OpenAI" in hint
     assert "CODEX_COMMAND" in hint
+
+
+def test_external_agent_failure_hint_explains_codex_collab_failure() -> None:
+    hint = _EXAMPLE._external_agent_failure_hint("collab_tool_call")
+
+    assert hint is not None
+    assert "external Codex CLI" in hint
+    assert "repo-assistant provider-native delegation" in hint
 
 
 def test_cli_preserves_raw_codex_jsonl_in_transcript_only(
@@ -1671,6 +1748,22 @@ def test_codex_search_requires_codex_route() -> None:
                 "--model",
                 "qwen2.5-coder:14b",
                 "--codex-search",
+            ]
+        )
+
+
+def test_codex_mcp_tools_requires_codex_route() -> None:
+    with pytest.raises(SystemExit):
+        main(
+            [
+                "--mode",
+                "plan",
+                "Invalid route.",
+                "--provider",
+                "ollama",
+                "--model",
+                "qwen2.5-coder:14b",
+                "--codex-mcp-tools",
             ]
         )
 

@@ -275,6 +275,7 @@ class ExternalAgentConfig:
     output_schema_path: Path | None = None
     web_search: bool = False
     image_paths: tuple[Path, ...] = ()
+    codex_mcp_tools: bool = False
 
 
 @dataclass(frozen=True)
@@ -669,6 +670,7 @@ def _external_agent_config_from_orchestration(
     output_schema_path: Path | None = None,
     web_search: bool = False,
     image_paths: tuple[Path, ...] = (),
+    codex_mcp_tools: bool = False,
 ) -> ExternalAgentConfig:
     """Adapt a ready orchestration result to an external-agent runtime config."""
 
@@ -698,6 +700,7 @@ def _external_agent_config_from_orchestration(
         output_schema_path=output_schema_path,
         web_search=web_search,
         image_paths=image_paths,
+        codex_mcp_tools=codex_mcp_tools,
     )
 
 
@@ -932,6 +935,8 @@ def _build_external_agent_command(config: ExternalAgentConfig) -> tuple[str, ...
     command = [config.command]
     if config.web_search:
         command.append("--search")
+    if config.codex_mcp_tools:
+        command.extend(_codex_mcp_config_overrides(config.cwd))
     if config.approval_policy:
         command.extend(
             [
@@ -980,6 +985,51 @@ def _build_external_agent_command(config: ExternalAgentConfig) -> tuple[str, ...
         command.extend(["--image", str(image_path)])
     command.append("-")
     return tuple(command)
+
+
+def _codex_mcp_config_overrides(repo_root: Path) -> list[str]:
+    """Return top-level Codex config overrides for project-local MCP tools."""
+
+    repo_root = repo_root.resolve()
+    return [
+        "-c",
+        f"mcp_servers.repo_assistant_tools.command={_codex_config_string(sys.executable)}",
+        "-c",
+        "mcp_servers.repo_assistant_tools.args="
+        + _codex_config_array(
+            (
+                "-m",
+                "ai_agent.mcp_server",
+                "--workspace-root",
+                str(repo_root),
+            )
+        ),
+        "-c",
+        f"mcp_servers.repo_assistant_tools.cwd={_codex_config_string(str(repo_root))}",
+        "-c",
+        "mcp_servers.repo_assistant_tools.enabled=true",
+        "-c",
+        "mcp_servers.repo_assistant_tools.required=false",
+        "-c",
+        "mcp_servers.repo_assistant_tools.default_tools_approval_mode='auto'",
+        "-c",
+        "mcp_servers.repo_assistant_tools.startup_timeout_sec=10",
+        "-c",
+        "mcp_servers.repo_assistant_tools.tool_timeout_sec=60",
+        "-c",
+        "mcp_servers.repo_assistant_tools.enabled_tools="
+        + _codex_config_array(
+            ("read_file", "list_dir", "find_files", "grep_search", "delegate_task")
+        ),
+    ]
+
+
+def _codex_config_array(values: tuple[str, ...]) -> str:
+    return "[" + ",".join(_codex_config_string(value) for value in values) + "]"
+
+
+def _codex_config_string(value: str) -> str:
+    return "'" + value.replace("\\", "\\\\").replace("'", "\\'") + "'"
 
 
 def _codex_approval_policy(approval_policy: str) -> str:
@@ -2041,6 +2091,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
+        "--codex-mcp-tools",
+        action="store_true",
+        help=(
+            "For Codex CLI routes, inject this repository's project-local MCP "
+            "read/search/delegate tools into this run via Codex -c config overrides."
+        ),
+    )
+    parser.add_argument(
         "--codex-image",
         action="append",
         default=[],
@@ -2292,6 +2350,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         and external_orchestration.execution_plan.target.access_method is not AccessMethod.CODEX_CLI
     ):
         parser.error("--codex-search requires a Codex CLI route")
+    if (
+        args.codex_mcp_tools
+        and external_orchestration.is_ready
+        and external_orchestration.execution_plan is not None
+        and external_orchestration.execution_plan.target.access_method is not AccessMethod.CODEX_CLI
+    ):
+        parser.error("--codex-mcp-tools requires a Codex CLI route")
     if (
         args.codex_image
         and external_orchestration.is_ready
@@ -2875,6 +2940,7 @@ def _run_external_agent_cli_mode(
     execution_status = "planned"
     exit_code = 0
     response_header_printed = False
+    final_answer_text: str | None = None
     orchestrated_tracker = None
     auxiliary_status = None
     try:
@@ -2889,6 +2955,7 @@ def _run_external_agent_cli_mode(
             output_schema_path=args.codex_output_schema,
             web_search=args.codex_search,
             image_paths=tuple(args.codex_image),
+            codex_mcp_tools=args.codex_mcp_tools,
         )
         print(f"external_agent_command: {config.command}")
         print(f"approval_policy: {args.approval_policy}")
@@ -2903,6 +2970,7 @@ def _run_external_agent_cli_mode(
         if config.output_schema_path is not None:
             print(f"external_agent_output_schema: {config.output_schema_path}")
         print(f"external_agent_web_search: {config.web_search}")
+        print(f"external_agent_mcp_tools: {config.codex_mcp_tools}")
         print("external_agent_timeout_mode: inactivity")
         print(f"external_agent_inactivity_timeout_seconds: {config.timeout_seconds:g}")
         if config.image_paths:
@@ -2959,8 +3027,6 @@ def _run_external_agent_cli_mode(
                         "failure_reason": auxiliary_result.failure_reason or "",
                     },
                 )
-        print("\n=== Assistant response ===")
-        response_header_printed = True
         if args.execute and args.mode != "plan":
             if orchestrated_tracker is not None and args.mode == "implement":
                 orchestrated_tracker.start_stage(
@@ -2980,44 +3046,38 @@ def _run_external_agent_cli_mode(
             primary_started = time.perf_counter()
             external_result = _run_external_agent(external_prompt, config)
             primary_elapsed_seconds = time.perf_counter() - primary_started
+            print("\n=== External agent diagnostics ===")
             print(f"external_agent_returncode: {external_result.returncode}")
             if external_result.events is not None:
                 _print_external_agent_event_summary(external_result.events)
                 _write_external_agent_raw_jsonl(external_result.stdout)
                 if external_result.events.final_answer:
-                    print(external_result.events.final_answer)
+                    final_answer_text = external_result.events.final_answer
                 elif external_result.last_message:
-                    print(external_result.last_message, end="")
-                    if not external_result.last_message.endswith("\n"):
-                        print()
+                    final_answer_text = external_result.last_message
                 else:
                     print("external_agent_final_answer: unavailable")
             elif external_result.stdout:
-                print(external_result.stdout, end="")
-                if not external_result.stdout.endswith("\n"):
-                    print()
+                final_answer_text = external_result.stdout
             if external_result.stderr:
-                print("\n=== External agent stderr ===")
                 full_stderr_path = _write_external_agent_stderr(
                     external_result.stderr,
                     args.log_file,
                 )
                 if full_stderr_path is not None:
                     print(f"external_agent_stderr_file: {full_stderr_path}")
-                stderr_text = _format_external_agent_stderr(external_result.stderr)
-                if stderr_text:
-                    print(stderr_text, end="")
-                    if not stderr_text.endswith("\n"):
-                        print()
-                else:
-                    print(
-                        "external_agent_stderr_summary: only known noisy Codex model refresh output"
-                    )
+                print(_format_external_agent_stderr(external_result.stderr), end="")
             parsed_failure = (
                 external_result.events.failure_reason
                 if external_result.events is not None
                 else None
             )
+            if external_result.events is not None:
+                delegation_status = _delegation_status_after_external_agent_events(
+                    delegation_status,
+                    external_result.events,
+                )
+                print(f"delegation: {delegation_status}")
             if external_result.returncode != 0 and parsed_failure is None:
                 print(
                     "external_agent_failure_reason: "
@@ -3041,6 +3101,8 @@ def _run_external_agent_cli_mode(
                 )
             exit_code = 0 if execution_status == "completed" else external_result.returncode or 1
         else:
+            print("\n=== Assistant response ===")
+            response_header_printed = True
             print("execution: skipped")
     except (FileNotFoundError, NotImplementedError, subprocess.TimeoutExpired) as exc:
         if not response_header_printed:
@@ -3074,6 +3136,12 @@ def _run_external_agent_cli_mode(
         scrutiny_elapsed_seconds=None,
         scrutiny_response=None,
     )
+    if final_answer_text is not None:
+        print("\n=== Assistant response ===")
+        response_header_printed = True
+        print(final_answer_text, end="")
+        if not final_answer_text.endswith("\n"):
+            print()
     if close_transcript is not None:
         close_transcript()
     return exit_code
@@ -3118,6 +3186,85 @@ def _print_external_agent_event_summary(events: ExternalAgentEventSummary) -> No
             print(f"external_agent_failure_hint: {hint}")
     if events.parse_errors:
         print("external_agent_jsonl_parse_errors_json: " + json.dumps(list(events.parse_errors)))
+
+
+def _delegation_status_after_external_agent_events(
+    current_status: str,
+    events: ExternalAgentEventSummary,
+) -> str:
+    """Reflect external Codex MCP delegate_task activity in final delegation status."""
+
+    delegated_events = [
+        event for event in events.tool_events if _event_mentions_tool(event, "delegate_task")
+    ]
+    if delegated_events:
+        failed = any(_event_has_failed_status(event) for event in delegated_events)
+        external_status = (
+            "failed: external Codex MCP delegate_task"
+            if failed
+            else "completed: external Codex MCP delegate_task"
+        )
+    else:
+        collab_events = [
+            event for event in events.tool_events if _event_mentions_codex_collab_delegation(event)
+        ]
+        if not collab_events:
+            return current_status
+        failed = any(_event_has_failed_status(event) for event in collab_events)
+        external_status = (
+            "failed: external Codex collab delegation"
+            if failed
+            else "completed: external Codex collab delegation"
+        )
+    if current_status == "disabled":
+        return external_status
+    return f"{current_status}; {external_status}"
+
+
+def _event_mentions_codex_collab_delegation(event: dict[str, Any]) -> bool:
+    """Return whether a Codex JSONL event references its internal sidecar agents."""
+
+    if event.get("type") == "collab_tool_call" and event.get("tool") in {"spawn_agent", "wait"}:
+        return True
+    nested = event.get("item")
+    if isinstance(nested, dict):
+        return _event_mentions_codex_collab_delegation(nested)
+    return False
+
+
+def _event_mentions_tool(event: dict[str, Any], tool_name: str) -> bool:
+    """Return whether a parsed external-agent event references one tool name."""
+
+    if any(event.get(key) == tool_name for key in ("name", "tool", "tool_name")):
+        return True
+    nested = event.get("item")
+    if isinstance(nested, dict):
+        return _event_mentions_tool(nested, tool_name)
+    content = event.get("content")
+    if isinstance(content, list):
+        return any(
+            isinstance(item, dict) and _event_mentions_tool(item, tool_name) for item in content
+        )
+    return False
+
+
+def _event_has_failed_status(event: dict[str, Any]) -> bool:
+    """Return whether a parsed external-agent event reports a failed tool call."""
+
+    for key in ("status", "outcome"):
+        value = event.get(key)
+        if isinstance(value, str) and value.lower() in {"error", "failed", "failure"}:
+            return True
+    for key in ("error", "failure", "failure_reason", "reason"):
+        value = event.get(key)
+        if isinstance(value, str) and value.strip():
+            return True
+        if isinstance(value, dict):
+            return True
+    nested = event.get("item")
+    if isinstance(nested, dict):
+        return _event_has_failed_status(nested)
+    return False
 
 
 def _external_agent_exception_hint(exc: Exception) -> str | None:
@@ -3167,6 +3314,13 @@ def _external_agent_failure_hint(failure_reason: str) -> str | None:
     """Return an actionable hint for known external-agent failure modes."""
 
     normalized = failure_reason.lower()
+    if "collab_tool_call" in normalized:
+        return (
+            "The external Codex CLI failed while using its own multi-agent/collab tool. "
+            "This is separate from repo-assistant provider-native delegation; rerun the "
+            "task without relying on Codex internal sidecar agents, or use a native "
+            "provider route when the repo-assistant delegate_task tool is required."
+        )
     if "401" in normalized and "unauthorized" in normalized and "api.openai.com" in normalized:
         return (
             "Codex CLI reached OpenAI but its local ChatGPT/API session was rejected. "
@@ -3193,38 +3347,118 @@ def _write_external_agent_raw_jsonl(raw_jsonl: str) -> None:
         _write_transcript_only("\n")
 
 
-def _format_external_agent_stderr(stderr: str, *, limit: int = 2000) -> str:
-    """Bound noisy external-agent stderr while pointing to the complete log."""
+def _format_external_agent_stderr(stderr: str, *, limit: int = 5) -> str:
+    """Summarize external-agent stderr while leaving full detail in the sidecar."""
 
-    filtered = _filter_external_agent_stderr(stderr)
-    if len(filtered) <= limit:
-        return filtered
-    omitted = len(filtered) - limit
-    return (
-        "external_agent_stderr_preview: "
-        "truncated non-JSON stderr; see external_agent_stderr_file for complete output\n"
-        + filtered[:limit].rstrip()
-        + f"\n[stderr preview truncated: {omitted} characters omitted; "
-        "see external_agent_stderr_file for full stderr]\n"
-    )
+    filtered, _ = _filter_external_agent_stderr(stderr)
+    if not filtered:
+        return "external_agent_stderr_summary: only known noisy Codex model refresh output\n"
+
+    lines = [line.strip() for line in filtered.splitlines() if line.strip()]
+    summary = [
+        "external_agent_stderr_summary: filtered stderr captured; "
+        "see external_agent_stderr_file for full output"
+    ]
+    first_line = _first_actionable_stderr_line(lines)
+    if first_line is not None:
+        summary.append(f"external_agent_stderr_first_line: {first_line}")
+
+    pytest_failures = _extract_pytest_failure_names(lines)
+    if pytest_failures:
+        summary.append(f"pytest_failures_detected: {len(pytest_failures)}")
+        for failure in pytest_failures[:limit]:
+            summary.append(f"pytest_failure: {failure}")
+        if len(pytest_failures) > limit:
+            summary.append(
+                f"pytest_failures_omitted: {len(pytest_failures) - limit}; "
+                "see external_agent_stderr_file"
+            )
+    return "\n".join(summary) + "\n"
 
 
-def _filter_external_agent_stderr(stderr: str) -> str:
-    """Remove repeated non-actionable Codex stderr lines from the main transcript."""
+def _first_actionable_stderr_line(lines: Sequence[str]) -> str | None:
+    """Return the first concise stderr line worth showing in the main transcript."""
 
-    lines = [line for line in stderr.splitlines() if not _is_noisy_codex_model_refresh_stderr(line)]
+    for line in lines:
+        if (
+            line in {"Output:", "FAILURES"}
+            or set(line) <= {"=", "_", "-", " "}
+            or re.match(r"^[=\s]+[A-Z ]+[=\s]+$", line)
+        ):
+            continue
+        if line.startswith("202") and " ERROR " in line:
+            continue
+        heading_match = re.match(r"^_+\s+(.+?)\s+_+$", line)
+        if heading_match:
+            return heading_match.group(1)
+        return line
+    return None
+
+
+def _extract_pytest_failure_names(lines: Sequence[str]) -> list[str]:
+    """Extract failed pytest node IDs or failure headings from captured stderr."""
+
+    failures: list[str] = []
+    for line in lines:
+        if line.startswith("FAILED "):
+            parts = line.split(maxsplit=2)
+            if len(parts) >= 2:
+                failures.append(parts[1])
+    if failures:
+        return _dedupe_preserving_order(failures)
+
+    heading_pattern = re.compile(r"^_+\s+(.+?)\s+_+$")
+    for line in lines:
+        match = heading_pattern.match(line)
+        if match:
+            failures.append(match.group(1))
+    return _dedupe_preserving_order(failures)
+
+
+def _dedupe_preserving_order(values: Sequence[str]) -> list[str]:
+    """Return unique strings in their original order."""
+
+    seen: set[str] = set()
+    deduped: list[str] = []
+    for value in values:
+        if value in seen:
+            continue
+        seen.add(value)
+        deduped.append(value)
+    return deduped
+
+
+def _filter_external_agent_stderr(stderr: str) -> tuple[str, int]:
+    """Remove repeated non-actionable Codex stderr lines from transcript output."""
+
+    filtered_lines = []
+    omitted_noisy_lines = 0
+    for line in stderr.splitlines():
+        if _is_noisy_codex_model_refresh_stderr(line):
+            omitted_noisy_lines += 1
+            continue
+        filtered_lines.append(line)
+    lines = filtered_lines
     if not lines:
-        return ""
-    return "\n".join(lines) + "\n"
+        return "", omitted_noisy_lines
+    return "\n".join(lines) + "\n", omitted_noisy_lines
 
 
 def _write_external_agent_stderr(stderr: str, log_file: Path | None) -> Path | None:
-    """Persist complete external-agent stderr beside the transcript when available."""
+    """Persist filtered external-agent stderr beside the transcript when available."""
 
     if log_file is None:
         return None
     stderr_path = log_file.with_suffix(log_file.suffix + ".stderr.log")
-    stderr_path.write_text(stderr, encoding="utf-8", errors="replace")
+    filtered, omitted_noisy_lines = _filter_external_agent_stderr(stderr)
+    parts: list[str] = []
+    if omitted_noisy_lines:
+        parts.append(
+            f"[omitted {omitted_noisy_lines} known noisy Codex model-refresh stderr line(s)]\n"
+        )
+    if filtered:
+        parts.append(filtered)
+    stderr_path.write_text("".join(parts), encoding="utf-8", errors="replace")
     return stderr_path
 
 
