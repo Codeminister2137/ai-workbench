@@ -117,6 +117,49 @@ DEFAULT_CONTEXT_FILE_BUDGET_CHARS = 2_500
 DEFAULT_DELEGATION_CONTEXT_BUDGET_CHARS = 6_000
 CLI_MODES = ("ask", "review", "implement", "plan", "diagnose")
 APPROVAL_POLICY_PRESETS = tuple(item.value for item in ApprovalPolicyPreset)
+_TIMEOUT_OPTION_NAMES = ("--timeout-seconds",)
+_ORCHESTRATED_STAGE_PLAN: tuple[tuple[str, str, str], ...] = (
+    (
+        "prompt_review",
+        "deterministic/local",
+        "review the user request and refine or block before provider execution",
+    ),
+    (
+        "planning",
+        "primary",
+        "ask the primary route for a bounded implementation plan",
+    ),
+    (
+        "auxiliary_panel",
+        "derived_local_cheap",
+        "run local or cheaper reviewer/test/risk support passes",
+    ),
+    (
+        "implementation",
+        "primary",
+        "run the selected implementation route with approved local tools",
+    ),
+    (
+        "validation",
+        "deterministic/local",
+        "run allowed checks and record skipped or failed validation",
+    ),
+    (
+        "scrutiny",
+        "derived_local_cheap",
+        "critique the final response and claimed validation",
+    ),
+    (
+        "repair",
+        "policy_bounded",
+        "attempt one targeted repair only when time and findings justify it",
+    ),
+    (
+        "final_handoff",
+        "deterministic/local",
+        "report changed files, validation, blockers, risks, and next action",
+    ),
+)
 _TOOL_SYSTEM_PROMPT = """
 You are a repo-aware coding assistant. Use the provided repository context,
 preserve the permission boundary, and do not claim to have edited or executed
@@ -1388,6 +1431,94 @@ def execute_actions(
     )
 
 
+def _configure_away_mode(
+    args: argparse.Namespace,
+    argv: Sequence[str] | None,
+    parser: argparse.ArgumentParser,
+) -> None:
+    """Apply deterministic unattended-run budget defaults."""
+
+    if args.away_minutes is None:
+        return
+    if args.away_minutes <= 0:
+        parser.error("--away-minutes must be greater than zero")
+    if not _argv_has_option(argv, _TIMEOUT_OPTION_NAMES):
+        args.timeout_seconds = args.away_minutes * 60
+
+
+def _argv_has_option(argv: Sequence[str] | None, option_names: Sequence[str]) -> bool:
+    """Return whether the raw argv included any of the supplied option names."""
+
+    effective_argv = tuple(argv) if argv is not None else tuple(sys.argv[1:])
+    option_prefixes = tuple(f"{name}=" for name in option_names)
+    return any(item in option_names or item.startswith(option_prefixes) for item in effective_argv)
+
+
+def _system_prompt_with_away_budget(system_prompt: str, *, away_minutes: float) -> str:
+    """Append foreground budget guidance for unattended CLI runs."""
+
+    return (
+        f"{system_prompt.rstrip()}\n\n"
+        "Unattended run budget:\n"
+        f"- The user may be away for up to {away_minutes:g} minute(s).\n"
+        "- Work within the explicit CLI mode, approval policy, privacy class, and "
+        "cost policy already supplied.\n"
+        "- Use available approved tools and bounded delegate_task calls when they "
+        "materially help, but keep subtasks focused and reviewable.\n"
+        "- Do not wait for interactive clarification during the run. If a material "
+        "product, architecture, privacy, dependency, or data decision blocks safe "
+        "progress, stop at that decision boundary and explain the options.\n"
+        "- Before finishing, summarize completed work, validation attempted, remaining "
+        "risks, and the next action for the returning user."
+    )
+
+
+def _prompt_with_away_budget(prompt: str, *, away_minutes: float) -> str:
+    """Add visible unattended-run guidance to the executable prompt."""
+
+    return (
+        f"{prompt.rstrip()}\n\n"
+        "## Unattended run budget\n"
+        f"The user may be away for up to {away_minutes:g} minute(s). Use the available "
+        "approved tools and bounded delegation where useful, stay within the explicit "
+        "CLI approval/privacy/cost boundaries, and stop at any material decision boundary "
+        "that requires user input."
+    )
+
+
+def _print_orchestrated_stage_plan(
+    *,
+    args: argparse.Namespace,
+    orchestration: OrchestrationResult,
+) -> None:
+    """Print the foreground unattended workflow plan without running stages."""
+
+    print("\n=== Orchestrated away-work plan ===")
+    print("away_orchestrated: enabled")
+    print(f"away_plan_mode: {args.mode}")
+    print(f"away_plan_budget_minutes: {args.away_minutes:g}")
+    print(f"away_plan_budget_seconds: {args.away_minutes * 60:g}")
+    if args.mode == "plan":
+        print("away_plan_execution: not_started")
+        print("away_plan_skip_reason: plan mode never contacts a provider")
+    else:
+        print("away_plan_execution: foreground_run")
+    if orchestration.execution_plan is not None:
+        target = orchestration.execution_plan.target
+        print(f"away_plan_primary_route_id: {target.route_id}")
+        print(f"away_plan_primary_provider: {target.provider}")
+        print(f"away_plan_primary_model: {target.model}")
+        print(f"away_plan_primary_access_method: {target.access_method.value}")
+        print(f"away_plan_primary_cost_policy_tier: {target.cost_policy_tier.value}")
+    else:
+        print("away_plan_primary_route_id: unavailable")
+    print("away_plan_auxiliary_route_policy: derived_local_cheap")
+    print("away_plan_external_writes: disabled")
+    print(f"away_plan_approval_policy: {args.approval_policy}")
+    for name, route, purpose in _ORCHESTRATED_STAGE_PLAN:
+        print(f"away_stage: {name} route={route} status=planned purpose={purpose}")
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Run a minimal repo-aware coding assistant request."
@@ -1545,6 +1676,23 @@ def main(argv: Sequence[str] | None = None) -> int:
         help=(
             "Provider timeout. For external-agent routes, this is an inactivity "
             "timeout and model output resets the timer."
+        ),
+    )
+    parser.add_argument(
+        "--away-minutes",
+        type=float,
+        help=(
+            "Visible foreground work budget for unattended runs. If --timeout-seconds "
+            "is not supplied, provider and external-agent timeouts are set to this "
+            "many minutes."
+        ),
+    )
+    parser.add_argument(
+        "--orchestrated",
+        action="store_true",
+        help=(
+            "Plan or run the staged foreground unattended workflow. Requires "
+            "--away-minutes and currently exposes a dry-run stage plan in plan mode."
         ),
     )
     parser.add_argument(
@@ -1757,6 +1905,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         parser.error("prompt is required unless --local-capabilities is used")
     if args.mode == "plan":
         args.execute = False
+    _configure_away_mode(args, argv, parser)
+    if args.orchestrated and args.away_minutes is None:
+        parser.error("--orchestrated requires --away-minutes")
     if args.native_tools and args.no_native_tools:
         parser.error("--native-tools cannot be combined with --no-native-tools")
     use_native_tools = args.native_tools or (
@@ -1809,6 +1960,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         context_file_budget_chars=args.context_file_budget_chars,
     )
     prompt = build_repo_prompt(args.prompt, context_files)
+    if args.away_minutes is not None:
+        prompt = _prompt_with_away_budget(prompt, away_minutes=args.away_minutes)
     catalog = load_model_catalog(args.catalog)
     profile = coding_task_profile(
         privacy_class=OrchestratorPrivacyClass(args.privacy),
@@ -1838,6 +1991,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     elif args.delegate_context:
         delegation_status = "planned: requires --execute"
     primary_system_prompt = build_default_system_prompt(args.system)
+    if args.away_minutes is not None:
+        primary_system_prompt = _system_prompt_with_away_budget(
+            primary_system_prompt,
+            away_minutes=args.away_minutes,
+        )
     ollama_resource_profile = (
         get_ollama_resource_profile(args.ollama_profile)
         if args.ollama_profile is not None
@@ -1959,6 +2117,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     print("=== Repo Coding Assistant ===")
     print(f"mode: {args.mode}")
     print(f"repo_root: {repo_root}")
+    if args.away_minutes is not None:
+        print(f"away_budget_minutes: {args.away_minutes:g}")
+        print(f"away_budget_seconds: {args.away_minutes * 60:g}")
+        print(f"away_timeout_seconds: {args.timeout_seconds:g}")
     print(
         f"context_chars: {sum(len(item.content) for item in context_files)}"
         + (f"/{args.context_budget_chars}" if context_budget_chars is not None else "/unlimited")
@@ -1996,6 +2158,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             args.approval_policy,
             delegation_enabled=args.mode == "implement" and not args.no_native_tools,
         )
+    if args.orchestrated:
+        _print_orchestrated_stage_plan(args=args, orchestration=result.orchestration)
     print("\n=== Assistant response ===")
     assistant_response_text = None
     if args.native_tools and args.execute and result.config is not None:
@@ -2309,6 +2473,10 @@ def _run_external_agent_cli_mode(
     print("=== Repo Coding Assistant ===")
     print(f"mode: {args.mode}")
     print(f"repo_root: {repo_root}")
+    if args.away_minutes is not None:
+        print(f"away_budget_minutes: {args.away_minutes:g}")
+        print(f"away_budget_seconds: {args.away_minutes * 60:g}")
+        print(f"away_timeout_seconds: {args.timeout_seconds:g}")
     print(
         f"context_chars: {sum(len(item.content) for item in context_files)}"
         + (f"/{args.context_budget_chars}" if context_budget_chars is not None else "/unlimited")
@@ -2364,6 +2532,8 @@ def _run_external_agent_cli_mode(
                 "external_agent_images_json: "
                 + json.dumps([str(path) for path in config.image_paths])
             )
+        if args.orchestrated:
+            _print_orchestrated_stage_plan(args=args, orchestration=orchestration)
         print("\n=== Assistant response ===")
         response_header_printed = True
         if args.execute and args.mode != "plan":

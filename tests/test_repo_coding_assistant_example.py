@@ -287,6 +287,8 @@ def test_cli_help_lists_google_provider() -> None:
     assert "--codex-mcp-register-global" in result.stdout
     assert "--codex-login" in result.stdout
     assert "--codex-login-device" in result.stdout
+    assert "--away-minutes" in result.stdout
+    assert "--orchestrated" in result.stdout
 
 
 def test_repo_assistant_script_uses_stable_package_entrypoint() -> None:
@@ -597,6 +599,134 @@ def test_cli_plans_codex_external_agent_route(capsys, monkeypatch) -> None:
     assert "external_agent_command: codex-test" in output
     assert "external_agent_command_line_json:" in output
     assert "execution_status: planned" in output
+
+
+def test_cli_away_minutes_sets_visible_foreground_budget(capsys, monkeypatch) -> None:
+    monkeypatch.setenv("CODEX_COMMAND", "codex-test")
+
+    assert (
+        main(
+            [
+                "--mode",
+                "plan",
+                "Work on the next repository task.",
+                "--privacy",
+                "external_allowed",
+                "--route-id",
+                "openai-codex-gpt-5-5",
+                "--provider",
+                "openai",
+                "--model",
+                "gpt-5.5",
+                "--skip-prompt-review",
+                "--away-minutes",
+                "60",
+            ]
+        )
+        == 0
+    )
+
+    output = capsys.readouterr().out
+    assert "away_budget_minutes: 60" in output
+    assert "away_budget_seconds: 3600" in output
+    assert "away_timeout_seconds: 3600" in output
+    assert "external_agent_timeout_mode: inactivity" in output
+    assert "external_agent_inactivity_timeout_seconds: 3600" in output
+
+
+def test_cli_orchestrated_plan_prints_stage_plan_without_provider(
+    capsys,
+    monkeypatch,
+) -> None:
+    def fail_if_called(*args, **kwargs):
+        raise AssertionError("orchestrated plan mode must not contact a provider")
+
+    monkeypatch.setattr(_EXAMPLE, "create_chat_client", fail_if_called)
+
+    assert (
+        main(
+            [
+                "--mode",
+                "plan",
+                "Implement the next CLI stabilization slice.",
+                "--provider",
+                "ollama",
+                "--model",
+                "qwen2.5-coder:14b",
+                "--away-minutes",
+                "60",
+                "--orchestrated",
+                "--approval-policy",
+                "trusted_local",
+            ]
+        )
+        == 0
+    )
+
+    output = capsys.readouterr().out
+    assert "away_orchestrated: enabled" in output
+    assert "away_plan_mode: plan" in output
+    assert "away_plan_budget_minutes: 60" in output
+    assert "away_plan_budget_seconds: 3600" in output
+    assert "away_plan_execution: not_started" in output
+    assert "away_plan_skip_reason: plan mode never contacts a provider" in output
+    assert "away_plan_primary_provider: ollama" in output
+    assert "away_plan_primary_model: qwen2.5-coder:14b" in output
+    assert "away_plan_auxiliary_route_policy: derived_local_cheap" in output
+    assert "away_plan_external_writes: disabled" in output
+    assert "away_plan_approval_policy: trusted_local" in output
+    assert "away_stage: prompt_review route=deterministic/local status=planned" in output
+    assert "away_stage: planning route=primary status=planned" in output
+    assert "away_stage: auxiliary_panel route=derived_local_cheap status=planned" in output
+    assert "away_stage: implementation route=primary status=planned" in output
+    assert "away_stage: validation route=deterministic/local status=planned" in output
+    assert "away_stage: scrutiny route=derived_local_cheap status=planned" in output
+    assert "away_stage: repair route=policy_bounded status=planned" in output
+    assert "away_stage: final_handoff route=deterministic/local status=planned" in output
+    assert "execution_status: planned" in output
+
+
+def test_cli_orchestrated_requires_away_minutes() -> None:
+    with pytest.raises(SystemExit):
+        main(["--mode", "plan", "Work.", "--orchestrated"])
+
+
+def test_cli_away_minutes_preserves_explicit_timeout(capsys, monkeypatch) -> None:
+    monkeypatch.setenv("CODEX_COMMAND", "codex-test")
+
+    assert (
+        main(
+            [
+                "--mode",
+                "plan",
+                "Work on the next repository task.",
+                "--privacy",
+                "external_allowed",
+                "--route-id",
+                "openai-codex-gpt-5-5",
+                "--provider",
+                "openai",
+                "--model",
+                "gpt-5.5",
+                "--skip-prompt-review",
+                "--away-minutes",
+                "60",
+                "--timeout-seconds",
+                "120",
+            ]
+        )
+        == 0
+    )
+
+    output = capsys.readouterr().out
+    assert "away_budget_seconds: 3600" in output
+    assert "away_timeout_seconds: 120" in output
+    assert "external_agent_inactivity_timeout_seconds: 120" in output
+
+
+def test_cli_rejects_invalid_away_minutes() -> None:
+    with pytest.raises(SystemExit):
+        main(["--mode", "plan", "Work.", "--away-minutes", "0"])
 
 
 def test_cli_approval_policy_read_only_maps_to_codex_sandbox(capsys, monkeypatch) -> None:

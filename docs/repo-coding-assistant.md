@@ -100,6 +100,18 @@ The CLI supports explicit modes:
 # Recommended manual live acceptance check for broad repository analysis
 .\scripts\repo-assistant-broad-analysis.ps1
 
+# Foreground unattended run with a visible one-hour budget
+.\scripts\repo-assistant.ps1 --mode implement "Implement the approved next slice." `
+  --provider ollama --model qwen2.5-coder:14b `
+  --execute --start-ollama --away-minutes 60 --orchestrated `
+  --approval-policy trusted_local
+
+# Dry-run the staged unattended workflow without contacting a provider
+.\scripts\repo-assistant.ps1 --mode plan "Implement the approved next slice." `
+  --provider ollama --model qwen2.5-coder:14b `
+  --away-minutes 60 --orchestrated `
+  --approval-policy trusted_local
+
 # Permit approved native tools or legacy actions for implementation
 .\scripts\repo-assistant.ps1 --mode implement "Implement the approved fix." `
   --execute --native-tools --start-ollama
@@ -111,6 +123,24 @@ The CLI supports explicit modes:
 `ask` is the default for backward compatibility. `plan` never contacts a
 provider. `ask` and `review` reject action flags. `implement` requires
 `--execute` plus either `--native-tools` or `--apply-actions`.
+
+Use `--away-minutes N` when starting a foreground run that should keep working
+while you are away. The flag prints `away_budget_*` fields in the transcript,
+adds explicit unattended-run guidance to the model prompt, and, unless
+`--timeout-seconds` is supplied, sets provider and external-agent timeouts to
+`N * 60` seconds. Add `--orchestrated` to plan or run the staged unattended
+workflow rather than only extending the timeout and prompt guidance.
+
+In `--mode plan`, `--away-minutes N --orchestrated` prints the intended
+foreground stages, the primary route, the local/cheap auxiliary route policy,
+and the approval boundary without contacting a provider. The stages are prompt
+review, planning, auxiliary panel, implementation, validation, scrutiny,
+bounded repair, and final handoff. This is not a background scheduler, daemon,
+or durable job queue. External Codex-style routes still report their timeout as
+an inactivity timeout because model output resets the timer. For unattended
+implementation runs, choose the approval boundary deliberately: `interactive`
+may pause for a prompt, while `trusted_local` permits local read/write/shell
+actions under the repo assistant's existing tool policies.
 
 Every run prints an `execution_status` line. It distinguishes planned runs,
 completed responses, completed runs with tool/action errors, and failed
