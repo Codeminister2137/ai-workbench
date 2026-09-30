@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import atexit
+import copy
 import json
 import re
 import shlex
@@ -597,13 +598,21 @@ def _execution_status_with_auxiliary_result(
 
 def _execution_status_with_validation_stage(
     execution_status: str,
-    validation_stage: OrchestratedStageRecord,
+    validation_stage: OrchestratedStageRecord | None,
 ) -> str:
     """Surface deterministic validation failures in the final execution status."""
 
+    if validation_stage is None:
+        return execution_status
     validation_status = str((validation_stage.details or {}).get("validation_status", ""))
     if execution_status == "completed" and validation_status in {"failed", "timeout"}:
         return "completed_with_validation_errors"
+    return execution_status
+
+
+def _execution_status_without_validation_error(execution_status: str) -> str:
+    if execution_status == "completed_with_validation_errors":
+        return "completed"
     return execution_status
 
 
@@ -746,6 +755,77 @@ def _validation_results_json(
         }
         for result in results
     ]
+
+
+def _validation_status_from_stage(stage: OrchestratedStageRecord | None) -> str:
+    if stage is None:
+        return "not_recorded"
+    return str((stage.details or {}).get("validation_status", stage.status))
+
+
+def _validation_stage_needs_repair(stage: OrchestratedStageRecord | None) -> bool:
+    return _validation_status_from_stage(stage) in {"failed", "timeout"}
+
+
+def _format_validation_failures_for_prompt(stage: OrchestratedStageRecord | None) -> str:
+    if stage is None or not stage.details:
+        return "No deterministic validation details were recorded."
+    results = stage.details.get("results")
+    if not isinstance(results, list) or not results:
+        return json.dumps(stage.details, indent=2, sort_keys=True)
+    formatted: list[str] = []
+    for index, item in enumerate(results, start=1):
+        if not isinstance(item, dict):
+            continue
+        formatted.append(f"Validation command {index}: {item.get('command', '')}")
+        formatted.append(f"Status: {item.get('status', '')}")
+        if item.get("returncode") is not None:
+            formatted.append(f"Return code: {item.get('returncode')}")
+        if item.get("failure_reason"):
+            formatted.append(f"Failure reason: {item.get('failure_reason')}")
+        if item.get("stdout_preview"):
+            formatted.append("Stdout preview:")
+            formatted.append(str(item["stdout_preview"]))
+        if item.get("stderr_preview"):
+            formatted.append("Stderr preview:")
+            formatted.append(str(item["stderr_preview"]))
+        formatted.append("")
+    return "\n".join(formatted).strip() or json.dumps(stage.details, indent=2, sort_keys=True)
+
+
+def _build_orchestrated_repair_prompt(
+    *,
+    original_prompt: str,
+    validation_stage: OrchestratedStageRecord | None,
+    assistant_response_text: str | None,
+    attempt_number: int,
+) -> str:
+    """Build a focused repair prompt from deterministic validation evidence."""
+
+    assistant_summary = assistant_response_text or "No prior assistant response was captured."
+    return (
+        "Repair the repository changes from the previous implementation attempt.\n\n"
+        "Original task:\n"
+        f"{original_prompt}\n\n"
+        "Latest assistant response:\n"
+        f"{assistant_summary}\n\n"
+        "Deterministic validation failure evidence:\n"
+        f"{_format_validation_failures_for_prompt(validation_stage)}\n\n"
+        f"Repair attempt: {attempt_number}\n\n"
+        "Make the smallest focused fix needed for the validation failure. Preserve the "
+        "original requested behavior, do not expand scope, and stop at any material "
+        "decision boundary."
+    )
+
+
+def _remaining_orchestrated_budget_seconds(
+    *,
+    deadline: float | None,
+    floor_seconds: float = 1.0,
+) -> float | None:
+    if deadline is None:
+        return None
+    return max(0.0, deadline - time.perf_counter() - floor_seconds)
 
 
 class OrchestratedRunTracker:
@@ -936,6 +1016,131 @@ class OrchestratedRunTracker:
                 "next_action": next_action,
             },
         )
+
+
+def _run_orchestrated_repair_loop(
+    *,
+    args: argparse.Namespace,
+    tracker: OrchestratedRunTracker,
+    repo_root: Path,
+    execution_status: str,
+    validation_stage: OrchestratedStageRecord | None,
+    original_prompt: str,
+    assistant_response_text: str | None,
+    deadline: float | None,
+    repair_attempt: Callable[[str, int, float], tuple[str, str | None]],
+) -> tuple[str, OrchestratedStageRecord | None, str | None]:
+    """Run bounded repair attempts until validation passes or policy stops the loop."""
+
+    validation_status = _validation_status_from_stage(validation_stage)
+    if not (
+        args.mode == "implement"
+        and args.execute
+        and execution_status.startswith("completed")
+        and _validation_stage_needs_repair(validation_stage)
+    ):
+        tracker.complete_stage(
+            "repair",
+            status="skipped",
+            details={
+                "skip_reason": "repair not needed",
+                "validation_status_before_repair": validation_status,
+            },
+        )
+        return execution_status, validation_stage, assistant_response_text
+
+    max_cycles = args.max_repair_cycles
+    if max_cycles == 0:
+        tracker.complete_stage(
+            "repair",
+            status="skipped",
+            details={
+                "skip_reason": "repair disabled by --max-repair-cycles 0",
+                "validation_status_before_repair": validation_status,
+            },
+        )
+        return execution_status, validation_stage, assistant_response_text
+
+    tracker.start_stage(
+        "repair",
+        details={
+            "max_repair_cycles": "unbounded" if max_cycles == -1 else max_cycles,
+            "validation_status_before_repair": validation_status,
+        },
+    )
+    attempts: list[dict[str, object]] = []
+    attempt_number = 0
+    repair_status = "failed"
+    while max_cycles == -1 or attempt_number < max_cycles:
+        remaining = _remaining_orchestrated_budget_seconds(deadline=deadline)
+        if remaining is not None and remaining <= 0:
+            repair_status = "timeout"
+            break
+        attempt_number += 1
+        print(f"repair_cycle: {attempt_number} status=running")
+        repair_prompt = _build_orchestrated_repair_prompt(
+            original_prompt=original_prompt,
+            validation_stage=validation_stage,
+            assistant_response_text=assistant_response_text,
+            attempt_number=attempt_number,
+        )
+        timeout_seconds = (
+            min(args.timeout_seconds, remaining) if remaining is not None else args.timeout_seconds
+        )
+        try:
+            attempt_status, attempt_response = repair_attempt(
+                repair_prompt,
+                attempt_number,
+                timeout_seconds,
+            )
+        except ProviderError as exc:
+            attempt_status = "failed"
+            attempt_response = None
+            failure_reason = str(exc)
+        else:
+            failure_reason = ""
+        if attempt_response:
+            assistant_response_text = attempt_response
+        print(f"repair_cycle: {attempt_number} status={attempt_status}")
+        attempt_details: dict[str, object] = {
+            "attempt": attempt_number,
+            "status": attempt_status,
+        }
+        if failure_reason:
+            print(f"repair_cycle_failure_reason: {failure_reason}")
+            attempt_details["failure_reason"] = failure_reason
+        if attempt_status != "completed":
+            attempts.append(attempt_details)
+            repair_status = attempt_status
+            break
+        validation_stage = tracker.record_validation_stage(
+            args=args,
+            repo_root=repo_root,
+            execution_status=execution_status,
+        )
+        validation_status = _validation_status_from_stage(validation_stage)
+        attempt_details["validation_status"] = validation_status
+        attempts.append(attempt_details)
+        if not _validation_stage_needs_repair(validation_stage):
+            repair_status = "completed"
+            execution_status = _execution_status_without_validation_error(execution_status)
+            break
+
+    if repair_status != "completed" and _validation_stage_needs_repair(validation_stage):
+        execution_status = _execution_status_with_validation_stage(
+            execution_status,
+            validation_stage,
+        )
+    tracker.complete_stage(
+        "repair",
+        status=repair_status,
+        details={
+            "attempts": attempts,
+            "attempt_count": attempt_number,
+            "validation_status_after_repair": _validation_status_from_stage(validation_stage),
+        },
+    )
+    return execution_status, validation_stage, assistant_response_text
 
 
 def _resolve_orchestrated_run_db_path(args: argparse.Namespace, repo_root: Path) -> Path:
@@ -1468,7 +1673,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             prompt = f"{prompt}\n\n## Verified local context extraction\n{delegated_summary}"
     elif args.delegate_context:
         delegation_status = "planned: requires --execute"
-    primary_system_prompt = build_default_system_prompt(args.system)
+    primary_system_prompt = build_default_system_prompt(
+        args.system,
+        actions_enabled=args.apply_actions,
+    )
     if args.away_minutes is not None:
         primary_system_prompt = _system_prompt_with_away_budget(
             primary_system_prompt,
@@ -1647,8 +1855,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             delegation_enabled=args.mode == "implement" and not args.no_native_tools,
         )
     orchestrated_tracker = None
+    orchestrated_deadline = None
     auxiliary_status = None
     if args.orchestrated:
+        assert args.away_minutes is not None
+        orchestrated_deadline = time.perf_counter() + args.away_minutes * 60
         orchestrated_tracker, stage_records = OrchestratedRunTracker.create(
             args=args,
             repo_root=repo_root,
@@ -1920,6 +2131,59 @@ def main(argv: Sequence[str] | None = None) -> int:
             execution_status,
             validation_stage,
         )
+        if args.mode == "implement":
+
+            def repair_attempt(
+                repair_prompt: str,
+                _attempt_number: int,
+                timeout_seconds: float,
+            ) -> tuple[str, str | None]:
+                repair_args = copy.copy(args)
+                repair_args.timeout_seconds = timeout_seconds
+                if repair_args.native_tools and result.config is not None:
+                    native_repair = _run_native_agent(
+                        repair_prompt,
+                        result.config,
+                        profile,
+                        repair_args,
+                        repo_root,
+                        progress_callback=print,
+                    )
+                    status = (
+                        "completed_with_tool_errors"
+                        if any(item.is_error for item in native_repair.tool_results)
+                        else "completed"
+                    )
+                    return status, native_repair.response.message.content
+                repair_result = run_coding_prompt(
+                    repair_prompt,
+                    profile,
+                    catalog,
+                    review_prompt=False,
+                    timeout_seconds=timeout_seconds,
+                    execute=True,
+                    system_prompt=primary_system_prompt,
+                    start_ollama=False,
+                    progress_callback=print,
+                    progress_prefix="repair_activity",
+                )
+                if repair_result.response is None:
+                    return "failed", None
+                return "completed", repair_result.response.message.content
+
+            execution_status, validation_stage, assistant_response_text = (
+                _run_orchestrated_repair_loop(
+                    args=args,
+                    tracker=orchestrated_tracker,
+                    repo_root=repo_root,
+                    execution_status=execution_status,
+                    validation_stage=validation_stage,
+                    original_prompt=args.prompt,
+                    assistant_response_text=assistant_response_text,
+                    deadline=orchestrated_deadline,
+                    repair_attempt=repair_attempt,
+                )
+            )
         print(f"final_execution_status: {execution_status}")
         orchestrated_tracker.record_final_handoff_stage(
             execution_status=execution_status,
@@ -2142,6 +2406,7 @@ def _run_external_agent_cli_mode(
     response_header_printed = False
     final_answer_text: str | None = None
     orchestrated_tracker = None
+    orchestrated_deadline = None
     auxiliary_status = None
     try:
         config = _external_agent_config_from_orchestration(
@@ -2179,6 +2444,8 @@ def _run_external_agent_cli_mode(
                 + json.dumps([str(path) for path in config.image_paths])
             )
         if args.orchestrated:
+            assert args.away_minutes is not None
+            orchestrated_deadline = time.perf_counter() + args.away_minutes * 60
             orchestrated_tracker, stage_records = OrchestratedRunTracker.create(
                 args=args,
                 repo_root=repo_root,
@@ -2342,6 +2609,84 @@ def _run_external_agent_cli_mode(
             execution_status,
             validation_stage,
         )
+        if args.mode == "implement":
+
+            def repair_attempt(
+                repair_prompt: str,
+                _attempt_number: int,
+                timeout_seconds: float,
+            ) -> tuple[str, str | None]:
+                repair_config = _external_agent_config_from_orchestration(
+                    orchestration,
+                    repo_root=repo_root,
+                    timeout_seconds=timeout_seconds,
+                    sandbox=_codex_sandbox_for_approval_policy(args.approval_policy),
+                    codex_persist_session=args.codex_persist_session,
+                    codex_resume=args.codex_resume,
+                    output_last_message_path=args.codex_output_last_message,
+                    output_schema_path=args.codex_output_schema,
+                    web_search=args.codex_search,
+                    image_paths=tuple(args.codex_image),
+                    codex_mcp_tools=args.codex_mcp_tools,
+                )
+                repair_external_prompt = _external_agent_prompt_with_execution_metadata(
+                    repair_prompt,
+                    system_prompt=system_prompt,
+                    approval_policy=args.approval_policy,
+                    sandbox=repair_config.sandbox,
+                    mode=args.mode,
+                )
+                repair_result = _run_external_agent(
+                    repair_external_prompt,
+                    repair_config,
+                    progress_callback=print,
+                )
+                print(f"repair_external_agent_returncode: {repair_result.returncode}")
+                parsed_failure = (
+                    repair_result.events.failure_reason
+                    if repair_result.events is not None
+                    else None
+                )
+                if repair_result.events is not None:
+                    if repair_result.events.final_answer:
+                        return (
+                            "completed"
+                            if repair_result.returncode == 0 and parsed_failure is None
+                            else "failed",
+                            repair_result.events.final_answer,
+                        )
+                    if repair_result.last_message:
+                        return (
+                            "completed"
+                            if repair_result.returncode == 0 and parsed_failure is None
+                            else "failed",
+                            repair_result.last_message,
+                        )
+                if repair_result.stdout:
+                    return (
+                        "completed"
+                        if repair_result.returncode == 0 and parsed_failure is None
+                        else "failed",
+                        repair_result.stdout,
+                    )
+                return (
+                    "completed"
+                    if repair_result.returncode == 0 and parsed_failure is None
+                    else "failed",
+                    None,
+                )
+
+            execution_status, validation_stage, final_answer_text = _run_orchestrated_repair_loop(
+                args=args,
+                tracker=orchestrated_tracker,
+                repo_root=repo_root,
+                execution_status=execution_status,
+                validation_stage=validation_stage,
+                original_prompt=args.prompt,
+                assistant_response_text=final_answer_text,
+                deadline=orchestrated_deadline,
+                repair_attempt=repair_attempt,
+            )
         print(f"final_execution_status: {execution_status}")
         orchestrated_tracker.record_final_handoff_stage(
             execution_status=execution_status,
@@ -2845,7 +3190,7 @@ def _run_native_agent(
     )
     result = agent.run(
         prompt,
-        system_prompt=build_default_system_prompt(args.system),
+        system_prompt=build_default_system_prompt(args.system, actions_enabled=False),
         model=config.model,
         privacy_class=PrivacyClass(profile.privacy_class.value),
     )
@@ -2985,7 +3330,7 @@ def _run_action_loop(
             prompt_for_review=original_prompt,
             timeout_seconds=args.timeout_seconds,
             execute=True,
-            system_prompt=build_default_system_prompt(args.system),
+            system_prompt=build_default_system_prompt(args.system, actions_enabled=True),
             start_ollama=args.start_ollama,
             ollama_command=args.ollama_command,
             ollama_startup_timeout_seconds=args.ollama_startup_timeout_seconds,

@@ -13,10 +13,27 @@ from ai_provider.repo_actions import (
 
 DEFAULT_CONTEXT_BUDGET_CHARS = 5_000
 DEFAULT_CONTEXT_FILE_BUDGET_CHARS = 2_500
-TOOL_SYSTEM_PROMPT = """
+BASE_SYSTEM_PROMPT = """
 You are a repo-aware coding assistant. Use the provided repository context,
 preserve the permission boundary, and do not claim to have edited or executed
 files unless an action result proves it.
+""".strip()
+
+ANSWER_ONLY_SYSTEM_PROMPT = (
+    BASE_SYSTEM_PROMPT
+    + "\n\n"
+    + """
+Provide the best answer you can from the supplied context. Do not emit local
+action JSON or ask the caller to run repository tools through this response.
+If more inspection or execution is needed, state the concrete next command or
+file to inspect in prose.
+""".strip()
+)
+
+TOOL_SYSTEM_PROMPT = (
+    BASE_SYSTEM_PROMPT
+    + "\n\n"
+    + """
 
 When you need local tools, emit exactly one JSON object in a fenced json block:
 
@@ -33,6 +50,7 @@ Supported action types:
 Prefer the smallest useful action set. Do not invent persistent state, background
 jobs, external actions, or hidden side effects.
 """.strip()
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,12 +75,17 @@ def find_repo_root(start: Path) -> Path:
     return current
 
 
-def build_default_system_prompt(extra_system_prompt: str | None = None) -> str:
+def build_default_system_prompt(
+    extra_system_prompt: str | None = None,
+    *,
+    actions_enabled: bool = True,
+) -> str:
     """Return the repo-aware system prompt with optional caller instructions."""
 
+    system_prompt = TOOL_SYSTEM_PROMPT if actions_enabled else ANSWER_ONLY_SYSTEM_PROMPT
     if not extra_system_prompt:
-        return TOOL_SYSTEM_PROMPT
-    return f"{TOOL_SYSTEM_PROMPT}\n\nAdditional instruction:\n{extra_system_prompt.strip()}"
+        return system_prompt
+    return f"{system_prompt}\n\nAdditional instruction:\n{extra_system_prompt.strip()}"
 
 
 def load_prompt_context(
