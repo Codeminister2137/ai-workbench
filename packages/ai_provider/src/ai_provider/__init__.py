@@ -2,6 +2,11 @@
 
 from ai_provider.adapters.ollama import OllamaChatClient
 from ai_provider.adapters.openai_compatible import OpenAICompatibleChatClient
+from ai_provider.chat_transcripts import (
+    ChatMessageRecord,
+    ChatSessionRecord,
+    SQLiteChatTranscriptStore,
+)
 from ai_provider.config import BackendConfig, ProviderKind
 from ai_provider.contracts import (
     AIMessage,
@@ -71,6 +76,8 @@ __all__ = [
     "BackendInfo",
     "BackendLocation",
     "ChatClient",
+    "ChatMessageRecord",
+    "ChatSessionRecord",
     "FinishReason",
     "LocalDiskInfo",
     "LocalGpuInfo",
@@ -91,6 +98,7 @@ __all__ = [
     "ProviderErrorCategory",
     "ProviderKind",
     "RunningOllamaModel",
+    "SQLiteChatTranscriptStore",
     "UsageMetadata",
     "UsageSource",
     "create_chat_client",

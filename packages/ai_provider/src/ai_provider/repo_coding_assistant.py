@@ -71,6 +71,13 @@ from ai_provider import (
 from ai_provider import PrivacyClass as ProviderPrivacyClass
 
 from ai_provider.coding_assist import coding_task_profile, run_coding_prompt
+from ai_provider.coding_assist import backend_config_from_execution_target
+from ai_provider.chat_transcripts import (
+    DEFAULT_CHAT_TRANSCRIPT_DB,
+    ChatSessionRecord,
+    SQLiteChatTranscriptStore,
+    messages_to_ai_messages,
+)
 from ai_provider.codex_mcp import setup_project_codex_mcp
 from ai_provider.external_agents import (
     ExternalAgentConfig as ExternalAgentConfig,  # noqa: F401 - compatibility export
@@ -133,7 +140,7 @@ from ai_provider.transcripts import (
 
 DEFAULT_DELEGATION_CONTEXT_BUDGET_CHARS = 6_000
 DEFAULT_VALIDATION_COMMAND = "python -m pytest -q"
-CLI_MODES = ("ask", "review", "implement", "plan", "diagnose")
+CLI_MODES = ("ask", "review", "implement", "plan", "diagnose", "chat")
 APPROVAL_POLICY_PRESETS = tuple(item.value for item in ApprovalPolicyPreset)
 _TIMEOUT_OPTION_NAMES = ("--timeout-seconds",)
 _ORCHESTRATED_STAGE_PLAN: tuple[tuple[str, str, str], ...] = (
@@ -1150,6 +1157,244 @@ def _resolve_orchestrated_run_db_path(args: argparse.Namespace, repo_root: Path)
     return repo_root / path
 
 
+def _resolve_chat_db_path(args: argparse.Namespace, repo_root: Path) -> Path:
+    path = Path(args.chat_db)
+    if path.is_absolute():
+        return path
+    return repo_root / path
+
+
+def _resolve_chat_session(
+    *,
+    store: SQLiteChatTranscriptStore,
+    args: argparse.Namespace,
+    repo_root: Path,
+) -> tuple[ChatSessionRecord, bool]:
+    if args.chat_session is None or args.chat_session == "new":
+        return (
+            store.create_session(
+                repo_root=repo_root,
+                title=args.chat_title or args.prompt or "Untitled chat",
+                privacy_class=args.privacy,
+            ),
+            True,
+        )
+    if args.chat_session == "last":
+        session = store.latest_session(repo_root=repo_root)
+        if session is None:
+            raise KeyError("no previous chat session exists for this repository")
+        return session, False
+    session = store.get_session(args.chat_session)
+    if session is None:
+        raise KeyError(f"chat session does not exist: {args.chat_session}")
+    return session, False
+
+
+def _print_chat_sessions(sessions: Sequence[ChatSessionRecord]) -> None:
+    print("=== Repo Assistant Chat Sessions ===")
+    if not sessions:
+        print("chat_sessions: none")
+        return
+    for session in sessions:
+        print(
+            "chat_session: "
+            f"{session.session_id} "
+            f"updated_at={session.updated_at_utc} "
+            f"privacy={session.privacy_class} "
+            f"title={session.title}"
+        )
+
+
+def _run_chat_mode(
+    *,
+    args: argparse.Namespace,
+    repo_root: Path,
+    prompt: str,
+    primary_system_prompt: str,
+    profile: Any,
+    orchestration: OrchestrationResult,
+    metrics: RunMetrics,
+    close_transcript: Callable[[], None] | None,
+) -> int:
+    """Run one persisted provider-neutral chat turn."""
+
+    store = SQLiteChatTranscriptStore(_resolve_chat_db_path(args, repo_root))
+    if args.chat_list:
+        _print_chat_sessions(store.list_sessions(limit=args.chat_list_limit))
+        if close_transcript is not None:
+            close_transcript()
+        return 0
+    if not args.execute:
+        parser_status = "planned"
+        print("=== Repo Assistant Chat ===")
+        print(f"mode: {args.mode}")
+        print(f"repo_root: {repo_root}")
+        print(f"chat_db: {store.path}")
+        print("chat_execution: not_started")
+        print("chat_skip_reason: chat mode requires --execute to call a provider")
+        print(f"execution_status: {parser_status}")
+        _print_run_metrics(
+            metrics,
+            primary_elapsed_seconds=None,
+            primary_response=None,
+            scrutiny_elapsed_seconds=None,
+            scrutiny_response=None,
+        )
+        if close_transcript is not None:
+            close_transcript()
+        return 0
+    if not orchestration.is_ready or orchestration.execution_plan is None:
+        print("=== Repo Assistant Chat ===")
+        print(f"mode: {args.mode}")
+        print(f"repo_root: {repo_root}")
+        print(f"chat_db: {store.path}")
+        print("status: failed")
+        print(f"failure_reason: {orchestration.failure_reason}")
+        print("execution_status: failed")
+        if close_transcript is not None:
+            close_transcript()
+        return 1
+    if _is_external_agent_access_method(orchestration.execution_plan.target.access_method):
+        print("=== Repo Assistant Chat ===")
+        print(f"mode: {args.mode}")
+        print(f"repo_root: {repo_root}")
+        print("status: failed")
+        print("failure_reason: chat mode currently supports provider API/local runtime routes only")
+        print("execution_status: failed")
+        if close_transcript is not None:
+            close_transcript()
+        return 1
+
+    try:
+        session, created = _resolve_chat_session(store=store, args=args, repo_root=repo_root)
+    except KeyError as exc:
+        print("=== Repo Assistant Chat ===")
+        print(f"mode: {args.mode}")
+        print(f"repo_root: {repo_root}")
+        print(f"chat_db: {store.path}")
+        print("status: failed")
+        print(f"failure_reason: {exc}")
+        print("execution_status: failed")
+        if close_transcript is not None:
+            close_transcript()
+        return 1
+
+    existing_messages = store.list_messages(session.session_id)
+    if created and primary_system_prompt:
+        store.append_message(
+            session.session_id,
+            role=MessageRole.SYSTEM,
+            content=primary_system_prompt,
+            metadata={"source": "repo_assistant_system_prompt"},
+        )
+        existing_messages = store.list_messages(session.session_id)
+    user_message = store.append_message(
+        session.session_id,
+        role=MessageRole.USER,
+        content=prompt,
+        metadata={
+            "original_prompt": args.prompt,
+            "selected_files": [str(path) for path in args.file],
+        },
+    )
+    request_messages = messages_to_ai_messages((*existing_messages, user_message))
+    config = backend_config_from_execution_target(orchestration.execution_plan.target)
+    request = AIRequest(
+        messages=request_messages,
+        model=config.model,
+        privacy_class=PrivacyClass(profile.privacy_class.value),
+        metadata={
+            "task_type": profile.task_type.value,
+            "chat_session_id": session.session_id,
+            "orchestrator_selected_provider": config.provider.value,
+            "orchestrator_selected_model": config.model,
+        },
+    )
+    if args.log_full_prompt:
+        rendered_prompt = "\n\n".join(
+            f"{message.role.value}:\n{message.content}" for message in request.messages
+        )
+        _print_model_input("Chat", system_prompt=primary_system_prompt, prompt=rendered_prompt)
+    primary_elapsed_seconds = None
+    try:
+        primary_started = time.perf_counter()
+        if args.start_ollama and config.provider is ProviderKind.OLLAMA:
+            ollama_resource_profile = (
+                get_ollama_resource_profile(args.ollama_profile)
+                if args.ollama_profile is not None
+                else None
+            )
+            ensure_ollama_server(
+                config.base_url,
+                command=args.ollama_command,
+                startup_timeout_seconds=args.ollama_startup_timeout_seconds,
+                log_path=args.ollama_log_file,
+                resource_profile=ollama_resource_profile,
+            )
+        response = create_chat_client(config).complete(request)
+        primary_elapsed_seconds = time.perf_counter() - primary_started
+    except ProviderError as exc:
+        print("=== Repo Assistant Chat ===")
+        print(f"mode: {args.mode}")
+        print(f"repo_root: {repo_root}")
+        print(f"chat_db: {store.path}")
+        print(f"chat_session_id: {session.session_id}")
+        print("status: failed")
+        print(f"failure_reason: {exc}")
+        print("execution_status: failed")
+        _print_run_metrics(
+            metrics,
+            primary_elapsed_seconds=primary_elapsed_seconds,
+            primary_response=None,
+            scrutiny_elapsed_seconds=None,
+            scrutiny_response=None,
+        )
+        if close_transcript is not None:
+            close_transcript()
+        return 1
+
+    store.append_message(
+        session.session_id,
+        role=MessageRole.ASSISTANT,
+        content=response.message.content,
+        provider=response.backend.provider,
+        model=response.backend.model,
+        metadata={
+            "finish_reason": response.finish_reason.value,
+            "usage_source": response.usage.source.value,
+            "input_tokens": response.usage.input_tokens,
+            "output_tokens": response.usage.output_tokens,
+            "total_tokens": response.usage.total_tokens,
+            "latency_ms": response.latency_ms,
+        },
+    )
+    message_count = len(store.list_messages(session.session_id))
+
+    print("=== Repo Assistant Chat ===")
+    print(f"mode: {args.mode}")
+    print(f"repo_root: {repo_root}")
+    print(f"chat_db: {store.path}")
+    print(f"chat_session_id: {session.session_id}")
+    print(f"chat_session_created: {created}")
+    print(f"chat_message_count: {message_count}")
+    print(f"provider: {response.backend.provider}")
+    print(f"model: {response.backend.model}")
+    print("\n=== Assistant response ===")
+    print(response.message.content)
+    print("status: ready")
+    print("execution_status: completed")
+    _print_run_metrics(
+        metrics,
+        primary_elapsed_seconds=primary_elapsed_seconds,
+        primary_response=response,
+        scrutiny_elapsed_seconds=None,
+        scrutiny_response=None,
+    )
+    if close_transcript is not None:
+        close_transcript()
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Run a minimal repo-aware coding assistant request."
@@ -1161,7 +1406,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         default="ask",
         help=(
             "Execution mode: ask/review answer without actions, implement permits "
-            "approved actions, plan never contacts a provider, diagnose prints capabilities."
+            "approved actions, plan never contacts a provider, diagnose prints capabilities, "
+            "chat persists a provider-neutral local transcript."
         ),
     )
     parser.add_argument(
@@ -1334,6 +1580,37 @@ def main(argv: Sequence[str] | None = None) -> int:
             "SQLite database path for durable orchestrated run and stage records. "
             "Relative paths are resolved from the repository root."
         ),
+    )
+    parser.add_argument(
+        "--chat-db",
+        type=Path,
+        default=DEFAULT_CHAT_TRANSCRIPT_DB,
+        help=(
+            "SQLite database path for local provider-neutral chat transcripts. "
+            "Relative paths are resolved from the repository root."
+        ),
+    )
+    parser.add_argument(
+        "--chat-session",
+        help=(
+            "Chat session to resume in --mode chat. Use 'new' or omit for a new "
+            "session, 'last' for the latest session in this repository, or pass a session ID."
+        ),
+    )
+    parser.add_argument(
+        "--chat-title",
+        help="Optional title for a new --mode chat transcript.",
+    )
+    parser.add_argument(
+        "--chat-list",
+        action="store_true",
+        help="List recent local chat transcript sessions and exit without contacting a provider.",
+    )
+    parser.add_argument(
+        "--chat-list-limit",
+        type=int,
+        default=20,
+        help="Maximum number of sessions printed by --chat-list.",
     )
     parser.add_argument(
         "--validation-command",
@@ -1580,7 +1857,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         snapshot = get_local_provider_capability_snapshot()
         print(json.dumps(_capability_report(snapshot), indent=2, default=str))
         return 0
-    if not args.prompt:
+    if args.chat_list and args.mode != "chat":
+        parser.error("--chat-list requires --mode chat")
+    if args.chat_list_limit <= 0:
+        parser.error("--chat-list-limit must be greater than zero")
+    if args.mode != "chat" and (
+        args.chat_session is not None
+        or args.chat_title is not None
+        or args.chat_db != DEFAULT_CHAT_TRANSCRIPT_DB
+    ):
+        parser.error("--chat-* options require --mode chat")
+    if not args.prompt and not (args.mode == "chat" and args.chat_list):
         parser.error("prompt is required unless --local-capabilities is used")
     if args.mode == "plan":
         args.execute = False
@@ -1609,6 +1896,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         args.apply_actions or args.native_tools or args.no_native_tools
     ):
         parser.error("--mode implement requires --apply-actions or native tools")
+    if args.mode == "chat" and (args.apply_actions or args.native_tools):
+        parser.error("--mode chat does not permit file or command actions")
+    if args.mode == "chat" and args.orchestrated:
+        parser.error("--mode chat cannot be combined with --orchestrated")
     if args.log_full_prompt and args.log_file is None:
         parser.error("--log-full-prompt requires --log-file")
     if args.codex_persist_session and args.codex_resume:
@@ -1632,6 +1923,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         close_transcript_func = close_transcript
         print(f"transcript_log_file: {args.log_file}")
         _print_transcript_header(args, argv)
+
+    if args.mode == "chat" and args.chat_list:
+        store = SQLiteChatTranscriptStore(_resolve_chat_db_path(args, repo_root))
+        _print_chat_sessions(store.list_sessions(limit=args.chat_list_limit))
+        if close_transcript_func is not None:
+            close_transcript_func()
+        return 0
 
     metrics = _start_run_metrics()
     context_budget_chars = None if args.context_budget_chars == 0 else args.context_budget_chars
@@ -1737,6 +2035,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         and external_orchestration.execution_plan.target.access_method is not AccessMethod.CODEX_CLI
     ):
         parser.error("--codex-image requires a Codex CLI route")
+    if args.mode == "chat":
+        return _run_chat_mode(
+            args=args,
+            repo_root=repo_root,
+            prompt=prompt,
+            primary_system_prompt=primary_system_prompt,
+            profile=profile,
+            orchestration=external_orchestration,
+            metrics=metrics,
+            close_transcript=close_transcript_func,
+        )
     if (
         external_orchestration.is_ready
         and external_orchestration.execution_plan is not None

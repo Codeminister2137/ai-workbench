@@ -298,6 +298,28 @@ text. The rest of the file mirrors the CLI output, including route metadata,
 assistant response, action-loop output, scrutiny output, normalized scrutiny
 status, and final `execution_status`.
 
+### Local Chat Transcripts
+
+`--mode chat` starts the first persistent local chat workflow. It stores ordered
+provider-neutral messages in SQLite so later turns can resume the same chat:
+
+```powershell
+.\scripts\repo-assistant.ps1 `
+  "Explain the selected module." `
+  --mode chat --execute `
+  --provider ollama --model qwen2.5-coder:14b
+```
+
+By default transcripts are stored in `data/repo-assistant-chats.sqlite3`. Use
+`--chat-db PATH` to choose another local database, `--chat-session last` to
+resume the latest chat for the repository, or `--chat-session <session-id>` to
+resume a specific session. `--chat-list` prints recent sessions without
+contacting a provider.
+
+Chat transcripts may contain the request and selected repository context because
+they preserve the provider-neutral messages that were actually sent to the
+model. Keep them local and private.
+
 For external-agent routes such as Codex CLI, `--timeout-seconds` is treated as
 an inactivity timeout. Model output resets the timer. During execution, the CLI
 prints bounded `external_agent_activity` and `external_agent_status` lines so a

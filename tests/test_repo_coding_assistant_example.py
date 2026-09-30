@@ -279,7 +279,7 @@ def test_cli_help_lists_google_provider() -> None:
 
     assert result.returncode == 0
     assert "--provider {ollama,openai,requesty,google}" in result.stdout
-    assert "--mode {ask,review,implement,plan,diagnose}" in result.stdout
+    assert "--mode {ask,review,implement,plan,diagnose,chat}" in result.stdout
     assert "--scrutinize-response" in result.stdout
     assert "--approval-policy" in result.stdout
     assert "--codex-search" in result.stdout
@@ -292,6 +292,9 @@ def test_cli_help_lists_google_provider() -> None:
     assert "--away-minutes" in result.stdout
     assert "--orchestrated" in result.stdout
     assert "--away-run-db" in result.stdout
+    assert "--chat-db" in result.stdout
+    assert "--chat-session" in result.stdout
+    assert "--chat-list" in result.stdout
 
 
 def test_repo_assistant_script_uses_stable_package_entrypoint() -> None:
@@ -588,6 +591,98 @@ def test_default_system_prompt_only_includes_action_json_when_enabled() -> None:
 def test_log_full_prompt_requires_log_file() -> None:
     with pytest.raises(SystemExit):
         main(["--mode", "plan", "Review logging.", "--log-full-prompt"])
+
+
+def test_chat_mode_persists_and_resumes_local_transcript(
+    tmp_path: Path,
+    capsys,
+    monkeypatch,
+) -> None:
+    from ai_provider import (
+        AIMessage,
+        AIRequest,
+        AIResponse,
+        BackendInfo,
+        BackendLocation,
+        MessageRole,
+        SQLiteChatTranscriptStore,
+    )
+
+    requests: list[AIRequest] = []
+
+    class FakeClient:
+        backend = BackendInfo("ollama", "qwen2.5-coder:14b", BackendLocation.LOCAL)
+
+        def complete(self, request: AIRequest) -> AIResponse:
+            requests.append(request)
+            return AIResponse(
+                message=AIMessage(MessageRole.ASSISTANT, f"answer {len(requests)}"),
+                backend=self.backend,
+            )
+
+    chat_db = tmp_path / "repo-assistant-chats.sqlite3"
+    monkeypatch.setattr(_EXAMPLE, "create_chat_client", lambda config: FakeClient())
+
+    first_args = [
+        "--repo-root",
+        str(tmp_path),
+        "--mode",
+        "chat",
+        "--execute",
+        "--provider",
+        "ollama",
+        "--model",
+        "qwen2.5-coder:14b",
+        "--skip-prompt-review",
+        "--chat-db",
+        str(chat_db),
+        "Remember this first turn.",
+    ]
+    assert main(first_args) == 0
+    first_output = capsys.readouterr().out
+    store = SQLiteChatTranscriptStore(chat_db)
+    session = store.latest_session(repo_root=tmp_path.resolve())
+    assert session is not None
+
+    second_args = [
+        "--repo-root",
+        str(tmp_path),
+        "--mode",
+        "chat",
+        "--execute",
+        "--provider",
+        "ollama",
+        "--model",
+        "qwen2.5-coder:14b",
+        "--skip-prompt-review",
+        "--chat-db",
+        str(chat_db),
+        "--chat-session",
+        "last",
+        "Use the previous turn.",
+    ]
+    assert main(second_args) == 0
+    second_output = capsys.readouterr().out
+
+    assert f"chat_session_id: {session.session_id}" in first_output
+    assert f"chat_session_id: {session.session_id}" in second_output
+    assert len(requests) == 2
+    assert [message.role for message in requests[1].messages] == [
+        MessageRole.SYSTEM,
+        MessageRole.USER,
+        MessageRole.ASSISTANT,
+        MessageRole.USER,
+    ]
+    assert "Remember this first turn." in requests[1].messages[1].content
+    assert requests[1].messages[2].content == "answer 1"
+    assert "Use the previous turn." in requests[1].messages[3].content
+    assert [message.role for message in store.list_messages(session.session_id)] == [
+        "system",
+        "user",
+        "assistant",
+        "user",
+        "assistant",
+    ]
 
 
 def test_cli_plans_codex_external_agent_route(capsys, monkeypatch) -> None:

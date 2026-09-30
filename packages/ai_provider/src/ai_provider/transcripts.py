@@ -61,8 +61,7 @@ def print_transcript_header(args: argparse.Namespace, argv: Sequence[str] | None
     print(f"cwd: {Path.cwd()}")
     print("argv_json: " + json.dumps(effective_argv, ensure_ascii=False))
     print("request:")
-    assert args.prompt is not None
-    print(args.prompt)
+    print(args.prompt or "")
     print()
 
 

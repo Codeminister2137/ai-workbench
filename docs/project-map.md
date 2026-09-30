@@ -81,9 +81,10 @@ and general chat. It should consume `ai_provider`, `ai_orchestrator`, and
 application-specific modules rather than owning provider APIs or replacing
 package boundaries.
 
-Do not implement persistence, personal memory, background job scheduling,
-web-search integrations, or autonomous external actions for this app without a
-separate decision.
+Do not implement personal memory, background job scheduling, web-search
+integrations, or autonomous external actions for this app without a separate
+decision. Persistent local provider-neutral chat transcripts are approved for
+the repo-assistant chat slice by ADR-030.
 
 ### Job Search Automation
 Location: `apps/job_search/`

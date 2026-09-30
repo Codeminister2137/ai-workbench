@@ -119,6 +119,18 @@ respects the wall-clock budget.
 
 Detailed ADR: `docs/decisions/ADR-029-orchestrated-repo-assistant-supervised-validation.md`
 
+## ADR-030 - Persistent Local Chat Transcripts
+**Status:** Accepted
+**Date:** 2026-09-30
+
+Use local SQLite-backed provider-neutral chat transcripts for the first
+interactive repo-assistant chat slice. Persist the message content sent to and
+received from providers so chats can resume locally and later support model
+switching without introducing personal memory, background jobs, queues, or
+external transcript storage.
+
+Detailed ADR: `docs/decisions/ADR-030-persistent-local-chat-transcripts.md`
+
 ## Template
 ```text
 ## ADR-NNN — Short Name
