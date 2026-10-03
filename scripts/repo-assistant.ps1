@@ -64,12 +64,16 @@ function Add-DefaultLogFile {
         return $Args
     }
 
-    $logsDirectory = Join-Path $RepoRoot "logs"
-    New-Item -ItemType Directory -Path $logsDirectory -Force | Out-Null
     $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
-    $logFile = Join-Path $logsDirectory "repo-assistant-$timestamp.log"
+    $artifactDirectory = Join-Path $RepoRoot "artifacts\repo-assistant-$timestamp"
+    New-Item -ItemType Directory -Path $artifactDirectory -Force | Out-Null
+    $logFile = Join-Path $artifactDirectory "assistant.log"
 
-    return @($Args + @("--log-file", $logFile))
+    $effectiveArgs = @($Args + @("--log-file", $logFile))
+    if ($Args -notcontains "--ollama-log-file") {
+        $effectiveArgs += @("--ollama-log-file", (Join-Path $artifactDirectory "ollama.log"))
+    }
+    return $effectiveArgs
 }
 
 $repoRoot = Get-RepoRoot

@@ -12,11 +12,12 @@ $ErrorActionPreference = "Stop"
 # Keep the canonical broad-analysis workflow here. Append future quality gates
 # or context flags to this argument list so repeated live tests evolve together.
 $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
+$artifactDirectory = "artifacts\repo-assistant-broad-analysis-$timestamp"
 if (-not $LogFile) {
-    $LogFile = "logs\repo-assistant-broad-analysis-$timestamp.log"
+    $LogFile = "$artifactDirectory\assistant.log"
 }
 if (-not $OllamaLogFile) {
-    $OllamaLogFile = "logs\ollama-broad-analysis-$timestamp.log"
+    $OllamaLogFile = "$artifactDirectory\ollama.log"
 }
 
 $cliArgs = @(

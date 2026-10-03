@@ -10,7 +10,8 @@ import subprocess
 import sys
 import time
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from io import TextIOWrapper
 from pathlib import Path
 from typing import Any
 
@@ -53,15 +54,26 @@ from ai_orchestrator import (
     prepare_execution,
 )
 from ai_orchestrator import PrivacyClass as OrchestratorPrivacyClass
+from ai_orchestrator.repair import repair_progress
+from ai_orchestrator.review import (
+    ReviewMode,
+    ReviewSettings,
+    ReviewWorkload,
+    research_review_reserve_seconds,
+    select_review_plan,
+)
+from ai_provider.repair_state import changed_paths, workspace_fingerprints
 from ai_provider import (
     AIMessage,
     AIRequest,
     BackendConfig,
     ChatClient,
+    OllamaResourceProfile,
     MessageRole,
     PrivacyClass,
     ProviderKind,
     ProviderError,
+    ProviderErrorCategory,
     create_chat_client,
     ensure_ollama_server,
     get_local_provider_capability_snapshot,
@@ -74,14 +86,18 @@ from ai_provider.coding_assist import coding_task_profile, run_coding_prompt
 from ai_provider.coding_assist import backend_config_from_execution_target
 from ai_provider.chat_transcripts import (
     DEFAULT_CHAT_TRANSCRIPT_DB,
+    ChatMessageRecord,
+    ChatRollingSummaryRecord,
     ChatSessionRecord,
     SQLiteChatTranscriptStore,
     messages_to_ai_messages,
 )
 from ai_provider.codex_mcp import setup_project_codex_mcp
+from ai_provider.execution_fallback import FallbackSession, external_usage_limit
 from ai_provider.external_agents import (
     ExternalAgentConfig as ExternalAgentConfig,  # noqa: F401 - compatibility export
     ExternalAgentEventSummary,
+    ExternalAgentResult,
     build_external_agent_command as _build_external_agent_command,
     build_codex_plugin_command,
     codex_plugin_status_by_name,
@@ -121,8 +137,10 @@ from ai_provider.orchestrated_runs import (
     SQLiteOrchestratedRunStore,
 )
 from ai_provider.scrutiny import (
+    RESEARCH_SCRUTINY_SYSTEM_PROMPT,
     RESPONSE_SCRUTINY_SYSTEM_PROMPT as _RESPONSE_SCRUTINY_SYSTEM_PROMPT,
     ResponseScrutinyReport as ResponseScrutinyReport,  # noqa: F401 - compatibility export
+    build_research_scrutiny_prompt,
     build_response_scrutiny_prompt,
     parse_response_scrutiny_report,
 )
@@ -139,8 +157,11 @@ from ai_provider.transcripts import (
 
 
 DEFAULT_DELEGATION_CONTEXT_BUDGET_CHARS = 6_000
+DEFAULT_CHAT_HISTORY_BUDGET_CHARS = 12_000
+DEFAULT_CHAT_RECENT_MESSAGE_COUNT = 8
 DEFAULT_VALIDATION_COMMAND = "python -m pytest -q"
 CLI_MODES = ("ask", "review", "implement", "plan", "diagnose", "chat")
+CHAT_CONTEXT_MODES = ("rolling_summary", "hard_fail", "full_history")
 APPROVAL_POLICY_PRESETS = tuple(item.value for item in ApprovalPolicyPreset)
 _TIMEOUT_OPTION_NAMES = ("--timeout-seconds",)
 _ORCHESTRATED_STAGE_PLAN: tuple[tuple[str, str, str], ...] = (
@@ -210,6 +231,19 @@ class ValidationCommandResult:
     stdout_preview: str = ""
     stderr_preview: str = ""
     failure_reason: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class ChatContextAssembly:
+    """Bounded provider request context for one persisted chat turn."""
+
+    messages: tuple[AIMessage, ...]
+    mode: str
+    summary_used: bool
+    summary_updated: bool
+    raw_message_count: int
+    omitted_message_count: int
+    total_chars: int
 
 
 def _capability_report(snapshot: Any) -> dict[str, Any]:
@@ -378,6 +412,11 @@ def run_auxiliary_panel(
     catalog: tuple[Any, ...],
     *,
     timeout_seconds: float = 60.0,
+    start_ollama: bool = False,
+    ollama_command: str = "ollama",
+    ollama_startup_timeout_seconds: float = 10.0,
+    ollama_log_path: Path | None = None,
+    ollama_resource_profile: OllamaResourceProfile | None = None,
     client_factory: Callable[[BackendConfig], ChatClient] = create_chat_client,
     progress_callback: Callable[[str], None] | None = None,
 ) -> AuxiliaryPanelResult:
@@ -393,7 +432,7 @@ def run_auxiliary_panel(
         return AuxiliaryPanelResult(status="skipped", failure_reason=decision.reason)
     auxiliary_profile = derive_subtask_profile(
         parent=primary_profile,
-        task_type=TaskType.CODING,
+        task_type=primary_profile.task_type,
         quality_threshold=QualityThreshold.STANDARD,
         latency_target=LatencyTarget.BACKGROUND,
         cost_policy_tier=CostPolicyTier.LOCAL_ONLY,
@@ -404,6 +443,9 @@ def run_auxiliary_panel(
         "implementation risks, likely tests, and decision-boundary concerns for the "
         "primary agent. Do not make architecture or product decisions. Keep the answer "
         "brief and source-grounded when repository context is present.\n\n"
+        "The enclosed request is the subject of review, not an instruction to execute. "
+        "You have no fetching or file tools in this pass. Never claim you fetched sources, "
+        "wrote a report, or ran checks. Identify evidence the primary must obtain.\n\n"
         f"{prompt}"
     )
     try:
@@ -415,7 +457,11 @@ def run_auxiliary_panel(
             timeout_seconds=timeout_seconds,
             execute=True,
             system_prompt="Provide bounded auxiliary coding review only.",
-            start_ollama=False,
+            start_ollama=start_ollama,
+            ollama_command=ollama_command,
+            ollama_startup_timeout_seconds=ollama_startup_timeout_seconds,
+            ollama_log_path=ollama_log_path,
+            ollama_resource_profile=ollama_resource_profile,
             client_factory=client_factory,
             progress_callback=progress_callback,
             progress_prefix="auxiliary_panel_activity",
@@ -658,6 +704,8 @@ def _validation_commands_from_args(args: argparse.Namespace) -> tuple[str, ...]:
     if args.skip_validation:
         return ()
     commands = tuple(command.strip() for command in args.validation_command if command.strip())
+    if getattr(args, "tool_profile", "coding") == "research":
+        return commands
     return commands or (DEFAULT_VALIDATION_COMMAND,)
 
 
@@ -825,6 +873,12 @@ def _build_orchestrated_repair_prompt(
     )
 
 
+def _validation_failure_fingerprint(stage: OrchestratedStageRecord | None) -> str:
+    """Ignore ordinary timing noise when comparing deterministic failure evidence."""
+    evidence = _format_validation_failures_for_prompt(stage)
+    return re.sub(r"\b\d+(?:\.\d+)?\s*(?:ms|s|seconds)\b", "<duration>", evidence)
+
+
 def _remaining_orchestrated_budget_seconds(
     *,
     deadline: float | None,
@@ -848,6 +902,9 @@ class OrchestratedRunTracker:
         self._store = store
         self.run_record = run_record
         self._progress_callback = progress_callback
+        self.initial_workspace: dict[str, str] = {}
+        self.scrutiny_status = "not_run"
+        self.deadline = time.perf_counter() + run_record.budget_seconds
 
     @classmethod
     def create(
@@ -872,6 +929,7 @@ class OrchestratedRunTracker:
         )
 
     def begin_run(self) -> None:
+        self.initial_workspace = workspace_fingerprints(Path(self.run_record.repo_root))
         self.run_record = self._store.update_run_status(
             self.run_record.run_id,
             status="running",
@@ -946,7 +1004,8 @@ class OrchestratedRunTracker:
                     "skip_reason": "primary execution failed before validation",
                 },
             )
-        if not commands:
+        research = getattr(args, "research_execution", None)
+        if not commands and research is None:
             return self.complete_stage(
                 "validation",
                 status="skipped",
@@ -955,12 +1014,50 @@ class OrchestratedRunTracker:
                     "skip_reason": "validation skipped by --skip-validation",
                 },
             )
+        remaining = _remaining_orchestrated_budget_seconds(
+            deadline=self.deadline,
+            floor_seconds=research_review_reserve_seconds(
+                self.run_record.budget_seconds,
+                enabled=(
+                    getattr(args, "research_review_policy", "legacy") == "quality_first"
+                    and getattr(args, "tool_profile", "coding") == "research"
+                ),
+            )
+            + 1.0,
+        )
+        if remaining is not None and remaining <= 0:
+            return self.complete_stage(
+                "validation",
+                status="timeout",
+                details={
+                    "validation_status": "timeout",
+                    "failure_reason": "review budget reserved before validation",
+                    "results": [],
+                },
+            )
         results = _run_validation_commands(
             commands,
             repo_root=repo_root,
-            timeout_seconds=args.validation_timeout_seconds,
+            timeout_seconds=min(args.validation_timeout_seconds, remaining / max(1, len(commands)))
+            if remaining is not None
+            else args.validation_timeout_seconds,
             progress_callback=self._progress_callback,
         )
+        if research is not None:
+            started = time.perf_counter()
+            errors = research.validate()
+            results = (
+                ValidationCommandResult(
+                    command="research report and current-run receipts",
+                    returncode=1 if errors else 0,
+                    status="failed" if errors else "passed",
+                    elapsed_seconds=time.perf_counter() - started,
+                    stdout_preview=""
+                    if errors
+                    else "Report structure and current-run receipts verified",
+                    stderr_preview="\n".join(errors),
+                ),
+            ) + results
         validation_status = _validation_status(results)
         stage_status = "completed" if validation_status == "passed" else validation_status
         return self.complete_stage(
@@ -1009,12 +1106,22 @@ class OrchestratedRunTracker:
         elif validation_status == "not_run":
             risks = "validation not run by deterministic wrapper"
             next_action = "run deterministic validation before treating the work as done"
+        if execution_status == "completed_with_refinement_errors":
+            blockers = "research refinement failed"
+            next_action = "inspect research refinement failure details in the repair stage"
+        if self.run_record.mode == "implement" and self.scrutiny_status != "pass":
+            risks = (risks + "; " if risks else "") + f"scrutiny {self.scrutiny_status}"
+            if not blockers:
+                next_action = (
+                    "inspect scrutiny details and review remaining claims before completion"
+                )
         return self.complete_stage(
             "final_handoff",
             status=handoff_status,
             details={
                 "execution_status": execution_status,
                 "validation_status": validation_status,
+                "scrutiny_status": self.scrutiny_status,
                 "changed_files": changed_files,
                 "assistant_response_available": assistant_response_text is not None,
                 "final_answer_available": final_answer_text is not None,
@@ -1078,10 +1185,22 @@ def _run_orchestrated_repair_loop(
     attempts: list[dict[str, object]] = []
     attempt_number = 0
     repair_status = "failed"
+    no_progress_count = 0
+    stop_reason = "cycle_limit"
+    reserve = research_review_reserve_seconds(
+        tracker.run_record.budget_seconds,
+        enabled=(
+            getattr(args, "research_review_policy", "legacy") == "quality_first"
+            and getattr(args, "research_execution", None) is not None
+        ),
+    )
     while max_cycles == -1 or attempt_number < max_cycles:
-        remaining = _remaining_orchestrated_budget_seconds(deadline=deadline)
+        remaining = _remaining_orchestrated_budget_seconds(
+            deadline=deadline, floor_seconds=reserve + 1.0
+        )
         if remaining is not None and remaining <= 0:
             repair_status = "timeout"
+            stop_reason = "review_budget_reserved"
             break
         attempt_number += 1
         print(f"repair_cycle: {attempt_number} status=running")
@@ -1091,8 +1210,13 @@ def _run_orchestrated_repair_loop(
             assistant_response_text=assistant_response_text,
             attempt_number=attempt_number,
         )
+        before = workspace_fingerprints(repo_root)
+        previous_failure = _validation_failure_fingerprint(validation_stage)
+        # Leave part of the repair allocation for deterministic validation.
         timeout_seconds = (
-            min(args.timeout_seconds, remaining) if remaining is not None else args.timeout_seconds
+            min(args.timeout_seconds, remaining / 2)
+            if remaining is not None
+            else args.timeout_seconds
         )
         try:
             attempt_status, attempt_response = repair_attempt(
@@ -1100,8 +1224,8 @@ def _run_orchestrated_repair_loop(
                 attempt_number,
                 timeout_seconds,
             )
-        except ProviderError as exc:
-            attempt_status = "failed"
+        except (ProviderError, subprocess.TimeoutExpired, OSError, RuntimeError) as exc:
+            attempt_status = "timeout" if isinstance(exc, subprocess.TimeoutExpired) else "failed"
             attempt_response = None
             failure_reason = str(exc)
         else:
@@ -1112,6 +1236,7 @@ def _run_orchestrated_repair_loop(
         attempt_details: dict[str, object] = {
             "attempt": attempt_number,
             "status": attempt_status,
+            **_fallback_details(args),
         }
         if failure_reason:
             print(f"repair_cycle_failure_reason: {failure_reason}")
@@ -1119,18 +1244,48 @@ def _run_orchestrated_repair_loop(
         if attempt_status != "completed":
             attempts.append(attempt_details)
             repair_status = attempt_status
+            stop_reason = "repair_execution_failed"
             break
+        validation_args = copy.copy(args)
+        validation_remaining = _remaining_orchestrated_budget_seconds(
+            deadline=deadline, floor_seconds=reserve + 1.0
+        )
+        if validation_remaining is not None and validation_remaining <= 0:
+            attempts.append(attempt_details)
+            repair_status = "timeout"
+            stop_reason = "review_budget_reserved"
+            break
+        if validation_remaining is not None:
+            command_count = max(1, len(_validation_commands_from_args(args)))
+            validation_args.validation_timeout_seconds = min(
+                args.validation_timeout_seconds, validation_remaining / command_count
+            )
+        after = workspace_fingerprints(repo_root)
         validation_stage = tracker.record_validation_stage(
-            args=args,
+            args=validation_args,
             repo_root=repo_root,
             execution_status=execution_status,
         )
         validation_status = _validation_status_from_stage(validation_stage)
         attempt_details["validation_status"] = validation_status
+        paths = changed_paths(before, after)
+        progress = repair_progress(
+            state_changed=bool(paths),
+            failure_changed=previous_failure != _validation_failure_fingerprint(validation_stage),
+        )
+        attempt_details["progress"] = progress
+        attempt_details["changed_paths"] = paths
+        no_progress_count = no_progress_count + 1 if progress == "no_progress" else 0
+        print(f"repair_progress: {progress} consecutive_no_progress={no_progress_count}")
         attempts.append(attempt_details)
         if not _validation_stage_needs_repair(validation_stage):
             repair_status = "completed"
             execution_status = _execution_status_without_validation_error(execution_status)
+            stop_reason = "validation_passed"
+            break
+        if no_progress_count >= 2:
+            repair_status = "stalled"
+            stop_reason = "repeated_no_progress"
             break
 
     if repair_status != "completed" and _validation_stage_needs_repair(validation_stage):
@@ -1144,6 +1299,8 @@ def _run_orchestrated_repair_loop(
         details={
             "attempts": attempts,
             "attempt_count": attempt_number,
+            "stop_reason": stop_reason,
+            "review_reserve_seconds": reserve,
             "validation_status_after_repair": _validation_status_from_stage(validation_stage),
         },
     )
@@ -1155,6 +1312,228 @@ def _resolve_orchestrated_run_db_path(args: argparse.Namespace, repo_root: Path)
     if path.is_absolute():
         return path
     return repo_root / path
+
+
+def _run_orchestrated_scrutiny(
+    *,
+    args: argparse.Namespace,
+    tracker: OrchestratedRunTracker,
+    repo_root: Path,
+    profile: Any,
+    catalog: tuple[Any, ...],
+    validation_stage: OrchestratedStageRecord | None,
+    assistant_response_text: str | None,
+    execution_status: str,
+    deadline: float | None,
+) -> str:
+    """Review observed implementation evidence locally after the last repair."""
+    research = getattr(args, "research_execution", None)
+    if research is not None and execution_status == "failed":
+        tracker.complete_stage(
+            "scrutiny", status="skipped", details={"skip_reason": "primary research failed"}
+        )
+        return execution_status
+    tracker.start_stage(
+        "scrutiny",
+        details={
+            "route_policy": "neutral_research_review"
+            if research is not None
+            and getattr(args, "research_review_policy", "legacy") == "quality_first"
+            else "derived_local_cheap"
+        },
+    )
+    remaining = _remaining_orchestrated_budget_seconds(deadline=deadline)
+    details: dict[str, object] = {}
+    stage_status = "failed"
+    tracker.scrutiny_status = "failed"
+    if remaining is not None and remaining <= 0:
+        tracker.scrutiny_status = "not_run"
+        stage_status = "skipped"
+        details["skip_reason"] = "wall-clock budget exhausted before scrutiny"
+    else:
+        paths = (
+            []
+            if research is not None
+            else changed_paths(tracker.initial_workspace, workspace_fingerprints(repo_root))
+        )
+        # Keep the review bounded; fingerprints establish observed changes, not correctness.
+        evidence = ["Observed changed/deleted paths:\n" + "\n".join(paths[:100])]
+        if research is not None:
+            evidence = [research.review_evidence()]
+        content_budget = 12_000
+        for name in paths:
+            path = repo_root / name
+            if path.suffix not in {".py", ".md", ".toml", ".ps1", ".txt", ".json"}:
+                continue
+            if content_budget <= 0:
+                break
+            try:
+                with path.open(encoding="utf-8", errors="replace") as stream:
+                    excerpt = stream.read(min(3_000, content_budget))
+            except OSError:
+                continue
+            content_budget -= len(excerpt)
+            evidence.append(f"File excerpt (may be incomplete): {name}\n{excerpt}")
+        scrutiny_prompt = build_response_scrutiny_prompt(
+            args.prompt,
+            (
+                (assistant_response_text or "No assistant response captured.")[:2_000]
+                if research is not None
+                else (assistant_response_text or "No assistant response captured.")
+            )
+            + "\n\nExecution status: "
+            + execution_status
+            + "\nDeterministic validation evidence:\n"
+            + _format_validation_failures_for_prompt(validation_stage)
+            + "\n\n"
+            + "\n\n".join(evidence),
+        )
+        review_options: dict[str, Any] = {}
+        context_length = 32768
+        scrutiny_system = (
+            _RESPONSE_SCRUTINY_SYSTEM_PROMPT
+            + "\nReview the implementation claims against the supplied file excerpts and "
+            "deterministic validation. Evidence is bounded: explicitly identify unverified "
+            "claims. Never override failed or skipped validation with a pass claim. "
+            "Recommend a concrete next action; do not execute actions."
+        )
+        if research is not None:
+            from ai_provider.research_execution import ResearchChatClient
+
+            scrutiny_prompt = build_research_scrutiny_prompt(
+                args.prompt,
+                assistant_response_text or "No assistant response captured.",
+                execution_status=execution_status,
+                validation_evidence=_format_validation_failures_for_prompt(validation_stage),
+                research_evidence="\n\n".join(evidence),
+            )
+            scrutiny_system = RESEARCH_SCRUTINY_SYSTEM_PROMPT
+            context_length = (
+                get_ollama_resource_profile(args.ollama_profile).context_length
+                if args.ollama_profile
+                else 32768
+            )
+
+            def research_reviewer_client(config: BackendConfig) -> ChatClient:
+                return ResearchChatClient(
+                    create_chat_client(config),
+                    {"ollama_context_length": context_length},
+                    max_output_tokens=1200,
+                )
+
+            review_options["client_factory"] = research_reviewer_client
+        scrutiny_profile = derive_subtask_profile(
+            parent=profile,
+            task_type=TaskType.CLASSIFICATION,
+            quality_threshold=QualityThreshold.STANDARD,
+            latency_target=LatencyTarget.BACKGROUND,
+            cost_policy_tier=CostPolicyTier.LOCAL_ONLY,
+            privacy_class=OrchestratorPrivacyClass.LOCAL_ONLY,
+        )
+        try:
+            if (
+                research is not None
+                and getattr(args, "research_review_policy", "legacy") == "quality_first"
+            ):
+                from ai_provider.research_review import ResearchReviewClient
+                from ai_provider.research_execution import _validate_local_runtime
+
+                review_model = getattr(args, "research_review_model", None)
+                scrutiny_profile = replace(
+                    scrutiny_profile,
+                    user_model_override=review_model,
+                )
+                selected_mode = getattr(args, "research_review_mode", "auto")
+                plan = select_review_plan(
+                    scrutiny_profile,
+                    catalog,
+                    ReviewWorkload(),
+                    mode_override=ReviewMode(selected_mode) if selected_mode != "auto" else None,
+                    primary_model=tracker.run_record.primary_model,
+                )
+                _validate_local_runtime(
+                    BackendConfig(
+                        ProviderKind(plan.candidate.backend.provider),
+                        plan.candidate.backend.model,
+                        base_url=plan.candidate.backend.base_url,
+                    )
+                )
+                scrutiny_profile = replace(
+                    scrutiny_profile,
+                    user_route_id_override=plan.candidate.backend.route_id,
+                )
+                settings = ReviewSettings(
+                    getattr(args, "research_review_output_tokens", 4096),
+                    getattr(args, "research_review_timeout_seconds", 300.0),
+                )
+                review_details: dict[str, object] = {
+                    "policy": "quality_first",
+                    "route_id": plan.candidate.backend.route_id,
+                    "model": plan.candidate.backend.model,
+                    "reasons": list(plan.reasons),
+                }
+                details["research_review"] = review_details
+
+                def planned_reviewer_client(config: BackendConfig) -> ChatClient:
+                    return ResearchReviewClient(
+                        config,
+                        plan.mode,
+                        context_length,
+                        settings,
+                        deadline,
+                        details=review_details,
+                        client_factory=create_chat_client,
+                        tokenizer_file=getattr(args, "research_review_tokenizer_file", None),
+                    )
+
+                review_options["client_factory"] = planned_reviewer_client
+            scrutiny = run_coding_prompt(
+                scrutiny_prompt,
+                scrutiny_profile,
+                catalog,
+                review_prompt=False,
+                timeout_seconds=min(args.timeout_seconds, remaining)
+                if remaining is not None
+                else args.timeout_seconds,
+                execute=True,
+                system_prompt=scrutiny_system,
+                start_ollama=args.start_ollama,
+                ollama_command=args.ollama_command,
+                ollama_startup_timeout_seconds=args.ollama_startup_timeout_seconds,
+                ollama_log_path=args.ollama_log_file,
+                ollama_resource_profile=get_ollama_resource_profile(args.ollama_profile)
+                if args.ollama_profile
+                else None,
+                progress_callback=print,
+                progress_prefix="scrutiny_activity",
+                **review_options,
+            )
+            if scrutiny.response is None:
+                raise ProviderError(scrutiny.orchestration.failure_reason or "No scrutiny response")
+            report = parse_response_scrutiny_report(scrutiny.response.message.content)
+        except (ProviderError, ValueError) as exc:
+            details["failure_reason"] = str(exc)
+            print(f"scrutiny_failure_reason: {exc}")
+        else:
+            stage_status = "completed"
+            tracker.scrutiny_status = report.verdict
+            details.update(
+                verdict=report.verdict,
+                score=report.score,
+                issues=report.issues,
+                next_action=report.recommended_next_action,
+            )
+            print(report.raw_text)
+    details["scrutiny_status"] = tracker.scrutiny_status
+    tracker.complete_stage("scrutiny", status=stage_status, details=details)
+    print(f"scrutiny_status: {tracker.scrutiny_status}")
+    if execution_status == "completed" and tracker.scrutiny_status != "pass":
+        return (
+            "completed_with_scrutiny_findings"
+            if stage_status == "completed"
+            else "completed_with_scrutiny_errors"
+        )
+    return execution_status
 
 
 def _resolve_chat_db_path(args: argparse.Namespace, repo_root: Path) -> Path:
@@ -1203,6 +1582,204 @@ def _print_chat_sessions(sessions: Sequence[ChatSessionRecord]) -> None:
             f"privacy={session.privacy_class} "
             f"title={session.title}"
         )
+
+
+def _assemble_chat_context(
+    *,
+    store: SQLiteChatTranscriptStore,
+    session: ChatSessionRecord,
+    messages: tuple[ChatMessageRecord, ...],
+    client: ChatClient,
+    config: BackendConfig,
+    privacy_class: PrivacyClass,
+    mode: str,
+    budget_chars: int,
+    recent_message_count: int,
+) -> ChatContextAssembly:
+    """Build bounded request messages for chat mode."""
+
+    if budget_chars <= 0 or mode == "full_history":
+        request_messages = messages_to_ai_messages(messages)
+        return ChatContextAssembly(
+            messages=request_messages,
+            mode=mode,
+            summary_used=False,
+            summary_updated=False,
+            raw_message_count=len(messages),
+            omitted_message_count=0,
+            total_chars=_messages_total_chars(request_messages),
+        )
+
+    full_messages = messages_to_ai_messages(messages)
+    full_chars = _messages_total_chars(full_messages)
+    if full_chars <= budget_chars:
+        return ChatContextAssembly(
+            messages=full_messages,
+            mode=mode,
+            summary_used=False,
+            summary_updated=False,
+            raw_message_count=len(messages),
+            omitted_message_count=0,
+            total_chars=full_chars,
+        )
+
+    if mode == "hard_fail":
+        raise ProviderError(
+            "chat history exceeds --chat-history-budget-chars and --chat-context-mode is hard_fail",
+            category=ProviderErrorCategory.NON_RETRYABLE,
+            provider=config.provider.value,
+        )
+
+    system_messages = tuple(
+        message for message in messages if message.role == MessageRole.SYSTEM.value
+    )
+    conversation_messages = tuple(
+        message for message in messages if message.role != MessageRole.SYSTEM.value
+    )
+    recent_count = max(1, recent_message_count)
+    recent_messages = conversation_messages[-recent_count:]
+    older_messages = conversation_messages[:-recent_count]
+    summary = store.get_rolling_summary(session.session_id)
+    summary_updated = False
+    unsummarized_older_messages = tuple(
+        message
+        for message in older_messages
+        if summary is None or message.message_order > summary.covered_message_order
+    )
+    if unsummarized_older_messages:
+        summary = _update_chat_rolling_summary(
+            store=store,
+            session=session,
+            prior_summary=summary.summary if summary is not None else "",
+            older_messages=unsummarized_older_messages,
+            client=client,
+            config=config,
+            privacy_class=privacy_class,
+        )
+        summary_updated = True
+    if summary is None:
+        raise ProviderError(
+            "chat history exceeds --chat-history-budget-chars but there are no older "
+            "messages available for rolling summarization",
+            category=ProviderErrorCategory.NON_RETRYABLE,
+            provider=config.provider.value,
+        )
+
+    included_records = [*system_messages]
+    summary_message = AIMessage(
+        MessageRole.SYSTEM,
+        "Rolling summary of earlier chat turns. Use this as compressed context; "
+        "the following messages are the recent raw transcript tail.\n\n"
+        f"{summary.summary}",
+    )
+    request_messages = (*messages_to_ai_messages(system_messages), summary_message)
+    recent_records = list(recent_messages)
+    while recent_records:
+        recent_request_messages = messages_to_ai_messages(tuple(recent_records))
+        candidate = (*request_messages, *recent_request_messages)
+        if _messages_total_chars(candidate) <= budget_chars:
+            request_messages = candidate
+            included_records.extend(recent_records)
+            break
+        recent_records = recent_records[1:]
+    else:
+        latest_record = recent_messages[-1]
+        request_messages = (*request_messages, *messages_to_ai_messages((latest_record,)))
+        included_records.append(latest_record)
+
+    total_chars = _messages_total_chars(request_messages)
+    if total_chars > budget_chars:
+        raise ProviderError(
+            "chat rolling summary plus latest message exceeds --chat-history-budget-chars",
+            category=ProviderErrorCategory.NON_RETRYABLE,
+            provider=config.provider.value,
+        )
+    included_orders = {record.message_order for record in included_records}
+    omitted_message_count = len(messages) - len(included_orders)
+    return ChatContextAssembly(
+        messages=request_messages,
+        mode=mode,
+        summary_used=True,
+        summary_updated=summary_updated,
+        raw_message_count=len(included_orders),
+        omitted_message_count=max(0, omitted_message_count),
+        total_chars=total_chars,
+    )
+
+
+def _update_chat_rolling_summary(
+    *,
+    store: SQLiteChatTranscriptStore,
+    session: ChatSessionRecord,
+    prior_summary: str,
+    older_messages: tuple[ChatMessageRecord, ...],
+    client: ChatClient,
+    config: BackendConfig,
+    privacy_class: PrivacyClass,
+) -> ChatRollingSummaryRecord:
+    highest_order = max(message.message_order for message in older_messages)
+    response = client.complete(
+        AIRequest(
+            messages=(
+                AIMessage(
+                    MessageRole.SYSTEM,
+                    "Update a rolling chat summary for a coding assistant. Preserve "
+                    "requirements, user decisions, unresolved questions, file paths, "
+                    "commands, validation outcomes, and constraints. Do not invent facts. "
+                    "Return only the updated summary.",
+                ),
+                AIMessage(
+                    MessageRole.USER,
+                    _build_chat_summary_prompt(prior_summary, older_messages),
+                ),
+            ),
+            model=config.model,
+            privacy_class=privacy_class,
+            metadata={
+                "task_type": "chat_rolling_summary",
+                "chat_session_id": session.session_id,
+                "covered_message_order": highest_order,
+            },
+        )
+    )
+    summary_text = response.message.content.strip()
+    if not summary_text:
+        raise ProviderError(
+            "chat rolling summarizer returned an empty summary",
+            category=ProviderErrorCategory.NON_RETRYABLE,
+            provider=response.backend.provider,
+        )
+    return store.upsert_rolling_summary(
+        session.session_id,
+        summary=summary_text,
+        covered_message_order=highest_order,
+        provider=response.backend.provider,
+        model=response.backend.model,
+        metadata={
+            "finish_reason": response.finish_reason.value,
+            "usage_source": response.usage.source.value,
+            "input_tokens": response.usage.input_tokens,
+            "output_tokens": response.usage.output_tokens,
+            "total_tokens": response.usage.total_tokens,
+            "latency_ms": response.latency_ms,
+        },
+    )
+
+
+def _build_chat_summary_prompt(prior_summary: str, messages: tuple[ChatMessageRecord, ...]) -> str:
+    rendered_messages = "\n\n".join(
+        f"[{message.message_order}] {message.role}:\n{message.content}" for message in messages
+    )
+    return (
+        "# Existing rolling summary\n"
+        f"{prior_summary or '(none)'}\n\n"
+        "# New raw messages to fold into the summary\n"
+        f"{rendered_messages}"
+    )
+
+
+def _messages_total_chars(messages: Sequence[AIMessage]) -> int:
+    return sum(len(message.role.value) + len(message.content) for message in messages)
 
 
 def _run_chat_mode(
@@ -1297,12 +1874,13 @@ def _run_chat_mode(
             "selected_files": [str(path) for path in args.file],
         },
     )
-    request_messages = messages_to_ai_messages((*existing_messages, user_message))
     config = backend_config_from_execution_target(orchestration.execution_plan.target)
+    privacy_class = PrivacyClass(profile.privacy_class.value)
+    primary_elapsed_seconds = None
     request = AIRequest(
-        messages=request_messages,
+        messages=(),
         model=config.model,
-        privacy_class=PrivacyClass(profile.privacy_class.value),
+        privacy_class=privacy_class,
         metadata={
             "task_type": profile.task_type.value,
             "chat_session_id": session.session_id,
@@ -1310,12 +1888,6 @@ def _run_chat_mode(
             "orchestrator_selected_model": config.model,
         },
     )
-    if args.log_full_prompt:
-        rendered_prompt = "\n\n".join(
-            f"{message.role.value}:\n{message.content}" for message in request.messages
-        )
-        _print_model_input("Chat", system_prompt=primary_system_prompt, prompt=rendered_prompt)
-    primary_elapsed_seconds = None
     try:
         primary_started = time.perf_counter()
         if args.start_ollama and config.provider is ProviderKind.OLLAMA:
@@ -1331,7 +1903,38 @@ def _run_chat_mode(
                 log_path=args.ollama_log_file,
                 resource_profile=ollama_resource_profile,
             )
-        response = create_chat_client(config).complete(request)
+        client = create_chat_client(config)
+        context = _assemble_chat_context(
+            store=store,
+            session=session,
+            messages=(*existing_messages, user_message),
+            client=client,
+            config=config,
+            privacy_class=privacy_class,
+            mode=args.chat_context_mode,
+            budget_chars=args.chat_history_budget_chars,
+            recent_message_count=args.chat_recent_message_count,
+        )
+        request = AIRequest(
+            messages=context.messages,
+            model=config.model,
+            privacy_class=privacy_class,
+            metadata={
+                **request.metadata,
+                "chat_context_mode": context.mode,
+                "chat_context_summary_used": context.summary_used,
+                "chat_context_summary_updated": context.summary_updated,
+                "chat_context_raw_message_count": context.raw_message_count,
+                "chat_context_omitted_message_count": context.omitted_message_count,
+                "chat_context_total_chars": context.total_chars,
+            },
+        )
+        if args.log_full_prompt:
+            rendered_prompt = "\n\n".join(
+                f"{message.role.value}:\n{message.content}" for message in request.messages
+            )
+            _print_model_input("Chat", system_prompt=primary_system_prompt, prompt=rendered_prompt)
+        response = client.complete(request)
         primary_elapsed_seconds = time.perf_counter() - primary_started
     except ProviderError as exc:
         print("=== Repo Assistant Chat ===")
@@ -1377,6 +1980,12 @@ def _run_chat_mode(
     print(f"chat_session_id: {session.session_id}")
     print(f"chat_session_created: {created}")
     print(f"chat_message_count: {message_count}")
+    print(f"chat_context_mode: {context.mode}")
+    print(f"chat_context_summary_used: {context.summary_used}")
+    print(f"chat_context_summary_updated: {context.summary_updated}")
+    print(f"chat_context_raw_message_count: {context.raw_message_count}")
+    print(f"chat_context_omitted_message_count: {context.omitted_message_count}")
+    print(f"chat_context_total_chars: {context.total_chars}")
     print(f"provider: {response.backend.provider}")
     print(f"model: {response.backend.model}")
     print("\n=== Assistant response ===")
@@ -1396,6 +2005,10 @@ def _run_chat_mode(
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    for stream in (sys.stdout, sys.stderr):
+        if isinstance(stream, TextIOWrapper):
+            stream.reconfigure(encoding="utf-8", errors="replace")
+
     parser = argparse.ArgumentParser(
         description="Run a minimal repo-aware coding assistant request."
     )
@@ -1528,7 +2141,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--cost-policy",
         choices=[item.value for item in CostPolicyTier],
-        default=CostPolicyTier.ALLOWANCES_ALLOWED.value,
+        default=None,
         help="Maximum billing boundary this task may cross.",
     )
     parser.add_argument(
@@ -1613,6 +2226,26 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="Maximum number of sessions printed by --chat-list.",
     )
     parser.add_argument(
+        "--chat-context-mode",
+        choices=CHAT_CONTEXT_MODES,
+        default="rolling_summary",
+        help=(
+            "How --mode chat handles transcript history that exceeds --chat-history-budget-chars."
+        ),
+    )
+    parser.add_argument(
+        "--chat-history-budget-chars",
+        type=int,
+        default=DEFAULT_CHAT_HISTORY_BUDGET_CHARS,
+        help=("Maximum characters sent as assembled chat history. Use 0 to send full history."),
+    )
+    parser.add_argument(
+        "--chat-recent-message-count",
+        type=int,
+        default=DEFAULT_CHAT_RECENT_MESSAGE_COUNT,
+        help="Recent non-system transcript messages kept raw when rolling summaries are used.",
+    )
+    parser.add_argument(
         "--validation-command",
         action="append",
         default=[],
@@ -1662,7 +2295,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--ollama-log-file",
         type=Path,
-        default=Path("logs/ollama-serve.log"),
+        default=Path("artifacts/ollama-runtime/ollama-serve.log"),
         help=(
             "File for Ollama serve output when --start-ollama is used. "
             "Use an empty value only by calling the Python CLI directly."
@@ -1819,9 +2452,27 @@ def main(argv: Sequence[str] | None = None) -> int:
         default=60.0,
         help="Timeout for assistant-proposed local commands.",
     )
+    parser.add_argument(
+        "--user-config",
+        type=Path,
+        help="Private TOML preferences (default: <repo>/user-config.toml).",
+    )
+    from ai_provider.research_execution import add_research_arguments, validate_research_arguments
+
+    add_research_arguments(parser)
     args = parser.parse_args(argv)
 
     repo_root = (args.repo_root or find_repo_root(Path.cwd())).resolve()
+    from ai_provider.user_config import load_user_config
+
+    config_path = args.user_config or repo_root / "user-config.toml"
+    try:
+        user_config = load_user_config(config_path, required=args.user_config is not None)
+    except (OSError, ValueError, TypeError) as exc:
+        parser.error(f"Invalid user config {config_path}: {exc}")
+    if args.cost_policy is None:
+        args.cost_policy = user_config.cost_policy.value
+    args.fallback_enabled = user_config.fallback_enabled
     if args.codex_login or args.codex_login_device:
         return _run_codex_login(args=args, repo_root=repo_root, parser=parser)
     if args.codex_plugin_install or args.codex_plugin_remove:
@@ -1861,10 +2512,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         parser.error("--chat-list requires --mode chat")
     if args.chat_list_limit <= 0:
         parser.error("--chat-list-limit must be greater than zero")
+    if args.chat_history_budget_chars < 0:
+        parser.error("--chat-history-budget-chars must be zero or greater")
+    if args.chat_recent_message_count <= 0:
+        parser.error("--chat-recent-message-count must be greater than zero")
     if args.mode != "chat" and (
         args.chat_session is not None
         or args.chat_title is not None
         or args.chat_db != DEFAULT_CHAT_TRANSCRIPT_DB
+        or args.chat_context_mode != "rolling_summary"
+        or args.chat_history_budget_chars != DEFAULT_CHAT_HISTORY_BUDGET_CHARS
+        or args.chat_recent_message_count != DEFAULT_CHAT_RECENT_MESSAGE_COUNT
     ):
         parser.error("--chat-* options require --mode chat")
     if not args.prompt and not (args.mode == "chat" and args.chat_list):
@@ -1884,6 +2542,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         args.mode == "implement" and args.execute and not args.no_native_tools
     )
     args.native_tools = use_native_tools
+    validate_research_arguments(args, repo_root, parser)
     if args.mode in {"ask", "review"} and (args.apply_actions or args.native_tools):
         parser.error(f"--mode {args.mode} does not permit file or command actions")
     if args.scrutinize_response and not args.execute:
@@ -1958,23 +2617,21 @@ def main(argv: Sequence[str] | None = None) -> int:
         model_override=args.model,
     )
     delegated_summary = None
-    delegation_status = "disabled"
-    if args.delegate_context and args.execute:
-        delegated_summary, delegation_status = run_local_context_delegation(
-            context_files,
+    if args.tool_profile == "research":
+        profile = replace(
             profile,
-            catalog,
-            max_chars=args.delegation_context_budget_chars,
-            progress_callback=print,
+            task_type=TaskType.GENERAL,
+            required_capabilities=frozenset({TaskCapability.CHAT, TaskCapability.TOOLS}),
         )
-        if delegated_summary is not None:
-            prompt = f"{prompt}\n\n## Verified local context extraction\n{delegated_summary}"
-    elif args.delegate_context:
-        delegation_status = "planned: requires --execute"
+    delegation_status = "disabled"
     primary_system_prompt = build_default_system_prompt(
         args.system,
         actions_enabled=args.apply_actions,
     )
+    if args.tool_profile == "research":
+        from ai_provider.research_execution import RESEARCH_SYSTEM_PROMPT
+
+        primary_system_prompt = RESEARCH_SYSTEM_PROMPT + ("\n" + args.system if args.system else "")
     if args.away_minutes is not None:
         primary_system_prompt = _system_prompt_with_away_budget(
             primary_system_prompt,
@@ -1993,6 +2650,51 @@ def main(argv: Sequence[str] | None = None) -> int:
         prompt_for_review=args.prompt,
         timeout_seconds=args.timeout_seconds,
     )
+    args.fallback_session = None
+    if (
+        args.tool_profile == "research"
+        and external_orchestration.execution_plan is not None
+        and _is_external_agent_access_method(
+            external_orchestration.execution_plan.target.access_method
+        )
+    ):
+        parser.error(
+            "research tools require a provider-native executor; external clients own their tools"
+        )
+    if (
+        args.execute
+        and args.mode != "plan"
+        and args.mode != "chat"
+        and external_orchestration.execution_plan is not None
+    ):
+        args.fallback_session = FallbackSession(
+            profile,
+            catalog,
+            external_orchestration.execution_plan.target,
+            compatible=lambda target: _fallback_target_compatible(target, args, repo_root),
+            enabled=args.fallback_enabled,
+        )
+        if args.away_minutes:
+            args.fallback_session.deadline = time.perf_counter() + args.away_minutes * 60
+        if not args.fallback_session.primary_ready:
+            print("failure_reason: Sign into the primary client before execution; no task started.")
+            print("execution_status: failed")
+            if close_transcript_func is not None:
+                close_transcript_func()
+            return 1
+    if args.delegate_context and args.execute:
+        delegated_summary, delegation_status = run_local_context_delegation(
+            context_files,
+            profile,
+            catalog,
+            max_chars=args.delegation_context_budget_chars,
+            progress_callback=print,
+        )
+        if delegated_summary is not None:
+            prompt = f"{prompt}\n\n## Verified local context extraction\n{delegated_summary}"
+            external_orchestration = replace(external_orchestration, original_prompt=prompt)
+    elif args.delegate_context:
+        delegation_status = "planned: requires --execute"
     if (
         (args.codex_persist_session or args.codex_resume)
         and external_orchestration.is_ready
@@ -2083,10 +2785,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     primary_elapsed_seconds = None
     try:
         primary_started = time.perf_counter()
-        result = run_coding_prompt(
+        result = _run_coding_prompt_with_fallback(
             prompt,
             profile,
             catalog,
+            args=args,
+            repo_root=repo_root,
             review_prompt=not args.skip_prompt_review,
             prompt_for_review=args.prompt,
             timeout_seconds=args.timeout_seconds,
@@ -2161,7 +2865,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.native_tools:
         _print_provider_native_policy_diagnostics(
             args.approval_policy,
-            delegation_enabled=args.mode == "implement" and not args.no_native_tools,
+            delegation_enabled=(
+                args.mode == "implement"
+                and not args.no_native_tools
+                and args.tool_profile == "coding"
+            ),
         )
     orchestrated_tracker = None
     orchestrated_deadline = None
@@ -2183,16 +2891,41 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         if args.mode == "implement" and args.execute:
             orchestrated_tracker.begin_run()
+            if args.tool_profile == "research":
+                from ai_provider.research_execution import prepare_research_run
+
+                if not prepare_research_run(
+                    args, orchestrated_tracker, result.orchestration, result.config, repo_root
+                ):
+                    if close_transcript_func is not None:
+                        close_transcript_func()
+                    return 1
             orchestrated_tracker.start_stage(
                 "auxiliary_panel",
                 details={"route_policy": "derived_local_cheap"},
             )
             print("\n=== Auxiliary panel ===")
             auxiliary_result = run_auxiliary_panel(
-                prompt,
+                prompt
+                + (
+                    "\nResearch preflight reviewer: you have no search/fetch tools. "
+                    "Propose checks only; never claim sources were retrieved "
+                    "or invent access dates."
+                    if args.tool_profile == "research"
+                    else ""
+                ),
                 profile,
                 catalog,
                 timeout_seconds=args.timeout_seconds,
+                start_ollama=args.start_ollama,
+                ollama_command=args.ollama_command,
+                ollama_startup_timeout_seconds=args.ollama_startup_timeout_seconds,
+                ollama_log_path=args.ollama_log_file,
+                ollama_resource_profile=(
+                    get_ollama_resource_profile(args.ollama_profile)
+                    if args.ollama_profile is not None
+                    else None
+                ),
                 progress_callback=print,
             )
             if auxiliary_result.route_id is not None:
@@ -2232,7 +2965,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 },
             )
         try:
-            native_result = _run_native_agent(
+            native_result = _run_native_agent_with_fallback(
                 prompt,
                 result.config,
                 profile,
@@ -2248,12 +2981,28 @@ def main(argv: Sequence[str] | None = None) -> int:
                 orchestrated_tracker.complete_stage(
                     "implementation",
                     status="failed",
-                    details={"failure_reason": str(exc)},
+                    details={"failure_reason": str(exc), **_fallback_details(args)},
                 )
                 validation_stage = orchestrated_tracker.record_validation_stage(
                     args=args,
                     repo_root=repo_root,
                     execution_status=execution_status,
+                )
+                execution_status = _run_orchestrated_scrutiny(
+                    args=args,
+                    tracker=orchestrated_tracker,
+                    repo_root=repo_root,
+                    profile=profile,
+                    catalog=catalog,
+                    validation_stage=validation_stage,
+                    assistant_response_text=assistant_response_text,
+                    execution_status=execution_status,
+                    deadline=orchestrated_deadline,
+                )
+                orchestrated_tracker.complete_stage(
+                    "repair",
+                    status="skipped",
+                    details={"skip_reason": "primary execution failed before repair"},
                 )
                 execution_status = _execution_status_with_validation_stage(
                     execution_status,
@@ -2297,6 +3046,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 details={
                     "tool_results": len(native_result.tool_results),
                     "tool_errors": sum(1 for item in native_result.tool_results if item.is_error),
+                    **_fallback_details(args),
                 },
             )
     elif result.response is not None:
@@ -2339,7 +3089,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         execution_status = "failed"
     scrutiny_result = None
     scrutiny_elapsed_seconds = None
-    if args.scrutinize_response and assistant_response_text is not None:
+    if (
+        args.scrutinize_response
+        and assistant_response_text is not None
+        and args.tool_profile != "research"
+    ):
         print("\n=== Response scrutiny ===")
         scrutiny_failed = False
         scrutiny_stage_status = "completed"
@@ -2449,8 +3203,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             ) -> tuple[str, str | None]:
                 repair_args = copy.copy(args)
                 repair_args.timeout_seconds = timeout_seconds
+                if args.tool_profile == "research":
+                    repair_args.research_attempt_deadline = time.perf_counter() + timeout_seconds
                 if repair_args.native_tools and result.config is not None:
-                    native_repair = _run_native_agent(
+                    native_repair = _run_native_agent_with_fallback(
                         repair_prompt,
                         result.config,
                         profile,
@@ -2464,10 +3220,12 @@ def main(argv: Sequence[str] | None = None) -> int:
                         else "completed"
                     )
                     return status, native_repair.response.message.content
-                repair_result = run_coding_prompt(
+                repair_result = _run_coding_prompt_with_fallback(
                     repair_prompt,
                     profile,
                     catalog,
+                    args=repair_args,
+                    repo_root=repo_root,
                     review_prompt=False,
                     timeout_seconds=timeout_seconds,
                     execute=True,
@@ -2487,12 +3245,62 @@ def main(argv: Sequence[str] | None = None) -> int:
                     repo_root=repo_root,
                     execution_status=execution_status,
                     validation_stage=validation_stage,
-                    original_prompt=args.prompt,
+                    original_prompt=args.prompt
+                    + (
+                        "\n\nReport-only structural repair: preserve correct saved content "
+                        "and source declarations. Length alone never requires repair; "
+                        "improve substantive analysis "
+                        "in the requested sections instead of shortening/recreating the draft. "
+                        "Read the full report before replacement if the excerpt is truncated.\n"
+                        + args.research_execution.review_evidence()
+                        if args.tool_profile == "research"
+                        else ""
+                    ),
                     assistant_response_text=assistant_response_text,
                     deadline=orchestrated_deadline,
                     repair_attempt=repair_attempt,
                 )
             )
+            if (
+                args.tool_profile == "research"
+                and execution_status == "completed_with_tool_errors"
+                and _validation_status_from_stage(validation_stage) == "passed"
+            ):
+                print(
+                    "research_recovered_tool_errors: report passed validation; "
+                    "earlier tool errors remain recorded"
+                )
+                execution_status = "completed"
+            if args.tool_profile == "research":
+                from ai_provider.research_refinement import run_research_refinement
+
+                execution_status, validation_stage, assistant_response_text = (
+                    run_research_refinement(
+                        args=args,
+                        tracker=orchestrated_tracker,
+                        repo_root=repo_root,
+                        profile=profile,
+                        catalog=catalog,
+                        validation_stage=validation_stage,
+                        assistant_response_text=assistant_response_text,
+                        execution_status=execution_status,
+                        deadline=orchestrated_deadline,
+                        repair_attempt=repair_attempt,
+                        review=_run_orchestrated_scrutiny,
+                    )
+                )
+            else:
+                execution_status = _run_orchestrated_scrutiny(
+                    args=args,
+                    tracker=orchestrated_tracker,
+                    repo_root=repo_root,
+                    profile=profile,
+                    catalog=catalog,
+                    validation_stage=validation_stage,
+                    assistant_response_text=assistant_response_text,
+                    execution_status=execution_status,
+                    deadline=orchestrated_deadline,
+                )
         print(f"final_execution_status: {execution_status}")
         orchestrated_tracker.record_final_handoff_stage(
             execution_status=execution_status,
@@ -2510,6 +3318,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     if close_transcript_func is not None:
         close_transcript_func()
+    if args.tool_profile == "research" and args.execute and execution_status != "completed":
+        return 1
     return 0
 
 
@@ -2663,6 +3473,282 @@ def _run_codex_login(
     return 0 if execution_status == "completed" else result.returncode or 1
 
 
+def _run_coding_prompt_with_fallback(
+    prompt: str,
+    profile: Any,
+    catalog: tuple,
+    *,
+    args: argparse.Namespace,
+    repo_root: Path,
+    **kwargs: Any,
+) -> Any:
+    session = getattr(args, "fallback_session", None)
+    if not kwargs.get("execute") or session is None or not session.enabled:
+        return run_coding_prompt(prompt, profile, catalog, **kwargs)
+
+    def execute(target: Any, payload: str) -> Any:
+        if target.route_id == session.initial.route_id:
+            return run_coding_prompt(payload, profile, catalog, **kwargs)
+        return _execute_fallback_route(
+            target,
+            payload,
+            args=args,
+            profile=profile,
+            repo_root=repo_root,
+            progress_callback=print,
+        )
+
+    result = session.run(prompt, execute, _fallback_limited, observe=_fallback_observed)
+    print(f"effective_route_id: {session.current.route_id}")
+    if hasattr(result, "orchestration"):
+        return result
+    from ai_provider.coding_assist import CodingAssistResult
+    from ai_orchestrator import ExecutionPlan
+
+    if isinstance(result, ExternalAgentResult):
+        response = _external_fallback_response(result, session.current)
+        config = None
+    else:
+        response = result.response
+        config = backend_config_from_execution_target(session.current)
+    effective_profile = replace(
+        profile,
+        user_route_id_override=session.current.route_id,
+        user_access_method_override=None,
+        user_backend_override=None,
+        user_model_override=None,
+    )
+    orchestration = prepare_execution(prompt, effective_profile, catalog, review_prompt=False)
+    orchestration = replace(
+        orchestration,
+        execution_plan=ExecutionPlan(
+            target=session.current, reasons=("Continued after usage exhaustion.",)
+        ),
+    )
+    return CodingAssistResult(orchestration=orchestration, config=config, response=response)
+
+
+def _external_fallback_response(result: ExternalAgentResult, target: Any) -> Any:
+    from ai_provider.contracts import AIResponse, BackendInfo, BackendLocation
+
+    failure = result.events.failure_reason if result.events else None
+    if result.returncode or failure:
+        raise ProviderError(f"Fallback client failed: {failure or result.returncode}")
+    text = result.events.final_answer if result.events else result.stdout
+    return AIResponse(
+        message=AIMessage(MessageRole.ASSISTANT, text or result.last_message or ""),
+        backend=BackendInfo(
+            provider=target.provider, model=target.model, location=BackendLocation.EXTERNAL
+        ),
+        raw_metadata={"route_id": target.route_id, "external_agent": True},
+    )
+
+
+def _fallback_config(target: Any, args: argparse.Namespace, repo_root: Path) -> ExternalAgentConfig:
+    from ai_orchestrator import ExecutionPlan, OrchestrationStatus, TaskProfile
+
+    orchestration = OrchestrationResult(
+        original_prompt="",
+        profile=TaskProfile(),
+        status=OrchestrationStatus.READY,
+        prompt_judge=None,
+        recommendation=None,
+        execution_plan=ExecutionPlan(target=target, reasons=()),
+    )
+    return _external_agent_config_from_orchestration(
+        orchestration,
+        repo_root=repo_root,
+        timeout_seconds=target.timeout_seconds,
+        sandbox=_codex_sandbox_for_approval_policy(args.approval_policy),
+        approval_policy=args.approval_policy
+        if target.access_method is not AccessMethod.CODEX_CLI
+        else "never",
+        codex_persist_session=args.codex_persist_session,
+        codex_resume=args.codex_resume,
+        output_last_message_path=args.codex_output_last_message,
+        output_schema_path=args.codex_output_schema,
+        web_search=args.codex_search,
+        image_paths=tuple(args.codex_image),
+        codex_mcp_tools=args.codex_mcp_tools,
+    )
+
+
+def _fallback_target_compatible(target: Any, args: argparse.Namespace, repo_root: Path) -> bool:
+    """Preserve tool/approval constraints and verify provider credentials without inference."""
+    if _is_external_agent_access_method(target.access_method):
+        if getattr(args, "tool_profile", "coding") == "research":
+            return False
+        if args.no_native_tools or args.apply_actions:
+            return False
+        try:
+            _build_external_agent_command(_fallback_config(target, args, repo_root))
+            return True
+        except (FileNotFoundError, NotImplementedError, ValueError):
+            return False
+    if any(
+        (
+            args.codex_resume,
+            args.codex_persist_session,
+            args.codex_search,
+            args.codex_image,
+            args.codex_output_schema,
+            args.codex_mcp_tools,
+            args.codex_output_last_message,
+        )
+    ):
+        return False
+    if args.mode == "implement" and args.no_native_tools:
+        return False
+    try:
+        config = backend_config_from_execution_target(target)
+        if config.provider is ProviderKind.OLLAMA:
+            return is_ollama_server_available(config.base_url)
+        from ai_provider.adapters.openai_compatible import OpenAICompatibleChatClient
+        from urllib.request import Request, urlopen
+
+        client = OpenAICompatibleChatClient(config)
+        request = Request(f"{client.base_url}/models", headers=client._headers())
+        with urlopen(request, timeout=10) as response:
+            models = json.loads(response.read().decode("utf-8"))
+        return any(
+            row.get("id") == target.model for row in models.get("data", []) if isinstance(row, dict)
+        )
+    except (ProviderError, ValueError, OSError):
+        return False
+
+
+def _execute_fallback_route(
+    target: Any,
+    prompt: str,
+    *,
+    args: argparse.Namespace,
+    profile: Any,
+    repo_root: Path,
+    progress_callback: Any,
+) -> Any:
+    if _is_external_agent_access_method(target.access_method):
+        config = _fallback_config(target, args, repo_root)
+        external_prompt = _external_agent_prompt_with_execution_metadata(
+            prompt,
+            system_prompt=build_default_system_prompt(args.system, actions_enabled=False),
+            approval_policy=args.approval_policy,
+            sandbox=config.sandbox,
+            mode=args.mode,
+        )
+        return _run_external_agent(external_prompt, config, progress_callback=progress_callback)
+    config = backend_config_from_execution_target(target)
+    if args.mode == "implement":
+        return _run_native_agent(
+            prompt, config, profile, args, repo_root, progress_callback=progress_callback
+        )
+    from ai_agent.loop import AgentResult
+    from ai_provider.coding_assist import coding_request_from_prompt
+
+    response = create_chat_client(config).complete(
+        coding_request_from_prompt(prompt, profile, config)
+    )
+    return AgentResult(response=response)
+
+
+def _fallback_limited(result: Any) -> bool:
+    return isinstance(result, ExternalAgentResult) and external_usage_limit(result)
+
+
+def _fallback_observed(result: Any) -> str:
+    if isinstance(result, ExternalAgentResult):
+        events = result.events
+        if events is not None:
+            return (
+                f"Observed {len(events.tool_events)} tool events, "
+                f"{len(events.file_change_events)} file-change events, and "
+                f"{len(events.command_events)} command events. "
+                "Raw arguments and outputs are omitted; inspect current files."
+            )
+        return "Client reported a usage limit; inspect current files for partial work."
+    return "Provider reported a usage limit; inspect current files for partial work."
+
+
+def _run_external_agent_with_fallback(
+    prompt: str,
+    config: ExternalAgentConfig,
+    *,
+    args: argparse.Namespace,
+    profile: Any,
+    repo_root: Path,
+    progress_callback: Any = None,
+) -> ExternalAgentResult:
+    session = getattr(args, "fallback_session", None)
+    if session is None or not session.enabled:
+        return _run_external_agent(prompt, config, progress_callback=progress_callback)
+
+    def execute(target: Any, payload: str) -> Any:
+        if target.route_id == session.initial.route_id:
+            return _run_external_agent(payload, config, progress_callback=progress_callback)
+        return _execute_fallback_route(
+            target,
+            payload,
+            args=args,
+            profile=profile,
+            repo_root=repo_root,
+            progress_callback=progress_callback,
+        )
+
+    result = session.run(prompt, execute, _fallback_limited, observe=_fallback_observed)
+    print(f"effective_route_id: {session.current.route_id}")
+    if isinstance(result, ExternalAgentResult):
+        return result
+    return ExternalAgentResult(
+        command=(), returncode=0, stdout=result.response.message.content, stderr=""
+    )
+
+
+def _run_native_agent_with_fallback(
+    prompt: str,
+    config: BackendConfig,
+    profile: Any,
+    args: argparse.Namespace,
+    repo_root: Path,
+    progress_callback: Any = None,
+) -> Any:
+    session = getattr(args, "fallback_session", None)
+    if session is None or not session.enabled:
+        return _run_native_agent(
+            prompt, config, profile, args, repo_root, progress_callback=progress_callback
+        )
+
+    def execute(target: Any, payload: str) -> Any:
+        if target.route_id == session.initial.route_id:
+            return _run_native_agent(
+                payload, config, profile, args, repo_root, progress_callback=progress_callback
+            )
+        return _execute_fallback_route(
+            target,
+            payload,
+            args=args,
+            profile=profile,
+            repo_root=repo_root,
+            progress_callback=progress_callback,
+        )
+
+    result = session.run(prompt, execute, _fallback_limited, observe=_fallback_observed)
+    print(f"effective_route_id: {session.current.route_id}")
+    if not isinstance(result, ExternalAgentResult):
+        return result
+    from ai_agent.loop import AgentResult
+
+    return AgentResult(response=_external_fallback_response(result, session.current))
+
+
+def _fallback_details(args: argparse.Namespace) -> dict[str, Any]:
+    session = getattr(args, "fallback_session", None)
+    if session is None:
+        return {}
+    return {
+        "effective_route_id": session.current.route_id,
+        "fallback_attempts": list(session.attempts),
+    }
+
+
 def _run_external_agent_cli_mode(
     *,
     prompt: str,
@@ -2723,6 +3809,11 @@ def _run_external_agent_cli_mode(
             repo_root=repo_root,
             timeout_seconds=args.timeout_seconds,
             sandbox=_codex_sandbox_for_approval_policy(args.approval_policy),
+            approval_policy=(
+                args.approval_policy
+                if target.access_method is not AccessMethod.CODEX_CLI
+                else "never"
+            ),
             codex_persist_session=args.codex_persist_session,
             codex_resume=args.codex_resume,
             output_last_message_path=args.codex_output_last_message,
@@ -2779,6 +3870,15 @@ def _run_external_agent_cli_mode(
                     profile,
                     catalog,
                     timeout_seconds=args.timeout_seconds,
+                    start_ollama=args.start_ollama,
+                    ollama_command=args.ollama_command,
+                    ollama_startup_timeout_seconds=args.ollama_startup_timeout_seconds,
+                    ollama_log_path=args.ollama_log_file,
+                    ollama_resource_profile=(
+                        get_ollama_resource_profile(args.ollama_profile)
+                        if args.ollama_profile is not None
+                        else None
+                    ),
                     progress_callback=print,
                 )
                 if auxiliary_result.route_id is not None:
@@ -2821,9 +3921,12 @@ def _run_external_agent_cli_mode(
                 mode=args.mode,
             )
             primary_started = time.perf_counter()
-            external_result = _run_external_agent(
+            external_result = _run_external_agent_with_fallback(
                 external_prompt,
                 config,
+                args=args,
+                profile=profile,
+                repo_root=repo_root,
                 progress_callback=print,
             )
             primary_elapsed_seconds = time.perf_counter() - primary_started
@@ -2878,6 +3981,7 @@ def _run_external_agent_cli_mode(
                     details={
                         "returncode": external_result.returncode,
                         "failure_reason": parsed_failure or "",
+                        **_fallback_details(args),
                     },
                 )
             exit_code = 0 if execution_status == "completed" else external_result.returncode or 1
@@ -2885,7 +3989,12 @@ def _run_external_agent_cli_mode(
             print("\n=== Assistant response ===")
             response_header_printed = True
             print("execution: skipped")
-    except (FileNotFoundError, NotImplementedError, subprocess.TimeoutExpired) as exc:
+    except (
+        FileNotFoundError,
+        NotImplementedError,
+        subprocess.TimeoutExpired,
+        ProviderError,
+    ) as exc:
         if not response_header_printed:
             print("\n=== Assistant response ===")
         print(f"failure_reason: {exc}")
@@ -2899,7 +4008,7 @@ def _run_external_agent_cli_mode(
             orchestrated_tracker.complete_stage(
                 "implementation",
                 status="failed",
-                details={"failure_reason": str(exc)},
+                details={"failure_reason": str(exc), **_fallback_details(args)},
             )
         exit_code = 1
 
@@ -2930,6 +4039,11 @@ def _run_external_agent_cli_mode(
                     repo_root=repo_root,
                     timeout_seconds=timeout_seconds,
                     sandbox=_codex_sandbox_for_approval_policy(args.approval_policy),
+                    approval_policy=(
+                        args.approval_policy
+                        if target.access_method is not AccessMethod.CODEX_CLI
+                        else "never"
+                    ),
                     codex_persist_session=args.codex_persist_session,
                     codex_resume=args.codex_resume,
                     output_last_message_path=args.codex_output_last_message,
@@ -2945,9 +4059,12 @@ def _run_external_agent_cli_mode(
                     sandbox=repair_config.sandbox,
                     mode=args.mode,
                 )
-                repair_result = _run_external_agent(
+                repair_result = _run_external_agent_with_fallback(
                     repair_external_prompt,
                     repair_config,
+                    args=args,
+                    profile=profile,
+                    repo_root=repo_root,
                     progress_callback=print,
                 )
                 print(f"repair_external_agent_returncode: {repair_result.returncode}")
@@ -2995,6 +4112,17 @@ def _run_external_agent_cli_mode(
                 assistant_response_text=final_answer_text,
                 deadline=orchestrated_deadline,
                 repair_attempt=repair_attempt,
+            )
+            execution_status = _run_orchestrated_scrutiny(
+                args=args,
+                tracker=orchestrated_tracker,
+                repo_root=repo_root,
+                profile=profile,
+                catalog=catalog,
+                validation_stage=validation_stage,
+                assistant_response_text=final_answer_text,
+                execution_status=execution_status,
+                deadline=orchestrated_deadline,
             )
         print(f"final_execution_status: {execution_status}")
         orchestrated_tracker.record_final_handoff_stage(
@@ -3351,6 +4479,12 @@ def _run_native_agent(
     progress_callback: Callable[[str], None] | None = None,
 ) -> Any:
     """Run the provider-native agent loop inside the repository boundary."""
+    config = replace(
+        config,
+        timeout_seconds=min(
+            config.timeout_seconds, getattr(args, "timeout_seconds", config.timeout_seconds)
+        ),
+    )
     if progress_callback is not None:
         progress_callback(
             f"local_agent_activity: model_request - provider={config.provider.value} "
@@ -3487,6 +4621,34 @@ def _run_native_agent(
         if child_depth >= 1
         else coding_tools_with_delegation(run_delegated_task)
     )
+    research = getattr(args, "research_execution", None)
+    if research is not None:
+        from ai_provider.research_execution import (
+            RESEARCH_SYSTEM_PROMPT,
+            ResearchChatClient,
+            research_runtime_options,
+        )
+
+        registry = research.registry
+        resource_profile = getattr(args, "ollama_profile", None)
+        research_context = (
+            get_ollama_resource_profile(resource_profile).context_length
+            if resource_profile
+            else 32768
+        )
+        options = getattr(args, "research_runtime_options", None)
+        client = ResearchChatClient(
+            client,
+            options
+            if options is not None
+            else research_runtime_options(config, context_length=research_context),
+            deadline=getattr(args, "research_attempt_deadline", None),
+            config=config,
+            client_factory=create_chat_client,
+        )
+        system_prompt = RESEARCH_SYSTEM_PROMPT + ("\n" + args.system if args.system else "")
+    else:
+        system_prompt = build_default_system_prompt(args.system, actions_enabled=False)
     agent = AgentLoop(
         client,
         registry,
@@ -3499,10 +4661,20 @@ def _run_native_agent(
     )
     result = agent.run(
         prompt,
-        system_prompt=build_default_system_prompt(args.system, actions_enabled=False),
+        system_prompt=system_prompt,
         model=config.model,
         privacy_class=PrivacyClass(profile.privacy_class.value),
     )
+    if not result.tool_results and _contains_textual_tool_request(
+        result.response.message.content,
+        {definition.name for definition in registry.list_definitions()},
+    ):
+        raise ProviderError(
+            "Native agent returned a textual tool request without executing any tools. "
+            "No action was performed; this response cannot count as completed implementation.",
+            category=ProviderErrorCategory.NON_RETRYABLE,
+            provider=config.provider.value,
+        )
     if progress_callback is not None:
         progress_callback(
             f"local_agent_activity: completed - iterations={result.iterations} "
@@ -3515,6 +4687,26 @@ def _run_native_agent(
                 f"{_activity_preview(tool_result.output)}"
             )
     return result
+
+
+def _contains_textual_tool_request(content: str, tool_names: set[str]) -> bool:
+    """Recognize legacy JSON tool requests without executing model-authored text."""
+    candidates = [content.strip(), *re.findall(r"```(?:json)?\s*(.*?)```", content, re.DOTALL)]
+    for candidate in candidates:
+        try:
+            value = json.loads(candidate)
+        except (ValueError, TypeError):
+            continue
+        items = value if isinstance(value, list) else [value]
+        for item in items:
+            if (
+                isinstance(item, dict)
+                and isinstance(item.get("name"), str)
+                and item.get("name") in tool_names
+                and isinstance(item.get("arguments"), dict)
+            ):
+                return True
+    return False
 
 
 def _activity_preview(value: str, *, limit: int = 160) -> str:

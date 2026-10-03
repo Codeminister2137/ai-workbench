@@ -33,6 +33,8 @@ class TeeOutput(TextIOBase):
 
     def write(self, text: str) -> int:
         self._transcript.write(text)
+        if "\n" in text:
+            self._transcript.flush()
         try:
             self._terminal.write(text)
         except UnicodeEncodeError:

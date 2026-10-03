@@ -11,6 +11,18 @@ import pytest
 from ai_provider.codex_mcp import CodexMcpSetupResult
 from ai_provider.orchestrated_runs import SQLiteOrchestratedRunStore
 
+
+@pytest.fixture(autouse=True)
+def mock_fallback_account_checks(monkeypatch):
+    """Existing CLI regression tests never contact installed native client accounts."""
+    from ai_provider.agent_readiness import AgentReadiness
+
+    monkeypatch.setattr(
+        "ai_provider.execution_fallback.check_agent_readiness",
+        lambda method: AgentReadiness(method.value == "codex_cli", "mocked account check"),
+    )
+
+
 _EXAMPLE_PATH = (
     Path(__file__).resolve().parents[1]
     / "packages"
@@ -47,6 +59,19 @@ class _AsciiTerminal(StringIO):
         return super().write(text)
 
 
+def _implementation_scrutiny_result():
+    return SimpleNamespace(
+        response=SimpleNamespace(
+            message=SimpleNamespace(
+                content=(
+                    "VERDICT: pass\nSCORE: 8\nSTRENGTHS: validated\nISSUES: none\n"
+                    "RECOMMENDED_NEXT_ACTION: review\nREVISED_RESPONSE: work validated"
+                )
+            )
+        )
+    )
+
+
 def test_tee_output_preserves_utf8_transcript_when_terminal_replaces_unicode() -> None:
     terminal = _AsciiTerminal()
     transcript = StringIO()
@@ -56,6 +81,36 @@ def test_tee_output_preserves_utf8_transcript_when_terminal_replaces_unicode() -
 
     assert transcript.getvalue() == "Understand ↓ Inspect"
     assert terminal.getvalue() == "Understand ? Inspect"
+
+
+def test_tee_output_flushes_progress_to_disk(tmp_path):
+    path = tmp_path / "transcript.log"
+    with path.open("w", encoding="utf-8") as transcript:
+        tee = _TeeOutput(StringIO(), transcript)
+        tee.write("started research\n")
+        assert path.read_text() == "started research\n"
+
+
+@pytest.mark.parametrize(
+    "verdict,score", [("**pass**", "**8**"), ("`pass`", "`8`"), ("pass**", "8**"), ("pass", "8/10")]
+)
+def test_scrutiny_accepts_markdown_emphasis_on_control_values(verdict, score):
+    text = (
+        f"VERDICT: {verdict}\nSCORE: {score}\nSTRENGTHS: validated\nISSUES: none\n"
+        "RECOMMENDED_NEXT_ACTION: review\nREVISED_RESPONSE: report validated"
+    )
+    result = parse_response_scrutiny_report(text)
+    assert result.verdict == "pass" and result.score == 8
+
+
+@pytest.mark.parametrize("score", ["8/100", "11/10", "8.5/10", "8/10 extra"])
+def test_scrutiny_rejects_invalid_score_scales(score):
+    text = (
+        f"VERDICT: pass\nSCORE: {score}\nSTRENGTHS: validated\nISSUES: none\n"
+        "RECOMMENDED_NEXT_ACTION: review\nREVISED_RESPONSE: report validated"
+    )
+    with pytest.raises(ValueError):
+        parse_response_scrutiny_report(text)
 
 
 def test_load_prompt_context_loads_default_and_selected_repo_files(tmp_path: Path) -> None:
@@ -295,6 +350,9 @@ def test_cli_help_lists_google_provider() -> None:
     assert "--chat-db" in result.stdout
     assert "--chat-session" in result.stdout
     assert "--chat-list" in result.stdout
+    assert "--chat-context-mode" in result.stdout
+    assert "--chat-history-budget-chars" in result.stdout
+    assert "--chat-recent-message-count" in result.stdout
 
 
 def test_repo_assistant_script_uses_stable_package_entrypoint() -> None:
@@ -304,7 +362,9 @@ def test_repo_assistant_script_uses_stable_package_entrypoint() -> None:
     assert "python -m uv run ai-assistant" in text
     assert "examples\\repo_coding_assistant.py" not in text
     assert "Add-DefaultLogFile" in text
-    assert "repo-assistant-$timestamp.log" in text
+    assert "artifacts\\repo-assistant-$timestamp" in text
+    assert '"assistant.log"' in text
+    assert '"--ollama-log-file"' in text
     assert '--codex-login"' in text
     assert '--codex-login-device"' in text
 
@@ -318,11 +378,37 @@ def test_broad_analysis_script_keeps_canonical_manual_workflow() -> None:
     assert '"--start-ollama"' in text
     assert '"--scrutinize-response"' in text
     assert '"--log-full-prompt"' in text
-    assert "repo-assistant-broad-analysis-$timestamp.log" in text
-    assert "ollama-broad-analysis-$timestamp.log" in text
+    assert "artifacts\\repo-assistant-broad-analysis-$timestamp" in text
+    assert "$artifactDirectory\\assistant.log" in text
+    assert "$artifactDirectory\\ollama.log" in text
     assert '"--log-file", $LogFile' in text
     assert '"--ollama-log-file", $OllamaLogFile' in text
     assert 'repo-assistant.ps1") @cliArgs' in text
+
+
+def test_research_script_keeps_local_unattended_defaults() -> None:
+    script = Path(__file__).resolve().parents[1] / "scripts" / "repo-assistant-research.ps1"
+    text = script.read_text(encoding="utf-8")
+
+    assert '[string] $Model = "gpt-oss:20b"' in text
+    assert "[double] $AwayMinutes = 110" in text
+    assert "artifacts\\research-${safeTopic}-${timestamp}" in text
+    assert "$artifactDirectory\\report.md" in text
+    assert '"--away-run-db", "$artifactDirectory\\runs.sqlite3"' in text
+    assert '"--privacy", "local_only"' in text
+    assert '"--cost-policy", "local_only"' in text
+    assert '"--approval-policy", "trusted_local"' in text
+    assert '"--orchestrated"' in text
+    assert '"--max-repair-cycles", "-1"' in text
+    assert '"--tool-profile", "research"' in text
+    assert '"--research-report", $OutputFile' in text
+    assert '$effectiveArgs += @($CliArgs | Where-Object { $_ -ne "" })' in text
+    assert '"--env-file", ".env"' in text
+    assert '"python", "-m", "ai_provider.research_runner"' in text
+    assert '$nativeArgs = @("-m", "uv") + $uvArgs + $effectiveArgs' in text
+    assert "python @nativeArgs" in text
+    assert '"--search-provider", $SearchProvider' in text
+    assert '"--search-privacy", $SearchPrivacy' in text
 
 
 def test_cli_modes_enforce_action_boundaries(capsys) -> None:
@@ -685,6 +771,110 @@ def test_chat_mode_persists_and_resumes_local_transcript(
     ]
 
 
+def test_chat_mode_uses_rolling_summary_when_history_exceeds_budget(
+    tmp_path: Path,
+    capsys,
+    monkeypatch,
+) -> None:
+    from ai_provider import (
+        AIMessage,
+        AIRequest,
+        AIResponse,
+        BackendInfo,
+        BackendLocation,
+        MessageRole,
+        SQLiteChatTranscriptStore,
+    )
+
+    requests: list[AIRequest] = []
+
+    class FakeClient:
+        backend = BackendInfo("ollama", "qwen2.5-coder:14b", BackendLocation.LOCAL)
+
+        def complete(self, request: AIRequest) -> AIResponse:
+            requests.append(request)
+            if request.metadata.get("task_type") == "chat_rolling_summary":
+                return AIResponse(
+                    message=AIMessage(
+                        MessageRole.ASSISTANT,
+                        "Earlier turns captured a long requirement.",
+                    ),
+                    backend=self.backend,
+                )
+            return AIResponse(
+                message=AIMessage(MessageRole.ASSISTANT, "bounded answer"),
+                backend=self.backend,
+            )
+
+    repo_root = tmp_path.resolve()
+    chat_db = tmp_path / "repo-assistant-chats.sqlite3"
+    store = SQLiteChatTranscriptStore(chat_db)
+    session = store.create_session(
+        repo_root=repo_root,
+        title="Long chat",
+        privacy_class="local_only",
+    )
+    store.append_message(session.session_id, role=MessageRole.SYSTEM, content="system")
+    store.append_message(
+        session.session_id,
+        role=MessageRole.USER,
+        content="old user " + ("x" * 3000),
+    )
+    store.append_message(
+        session.session_id,
+        role=MessageRole.ASSISTANT,
+        content="old answer " + ("y" * 3000),
+    )
+    monkeypatch.setattr(_EXAMPLE, "create_chat_client", lambda config: FakeClient())
+
+    assert (
+        main(
+            [
+                "--repo-root",
+                str(repo_root),
+                "--mode",
+                "chat",
+                "--execute",
+                "--provider",
+                "ollama",
+                "--model",
+                "qwen2.5-coder:14b",
+                "--skip-prompt-review",
+                "--chat-db",
+                str(chat_db),
+                "--chat-session",
+                session.session_id,
+                "--chat-history-budget-chars",
+                "5000",
+                "--chat-recent-message-count",
+                "1",
+                "Use the current request.",
+            ]
+        )
+        == 0
+    )
+    output = capsys.readouterr().out
+
+    assert len(requests) == 2
+    assert requests[0].metadata["task_type"] == "chat_rolling_summary"
+    final_messages = requests[1].messages
+    assert [message.role for message in final_messages] == [
+        MessageRole.SYSTEM,
+        MessageRole.SYSTEM,
+        MessageRole.USER,
+    ]
+    assert final_messages[1].content.startswith("Rolling summary of earlier chat turns.")
+    assert "Earlier turns captured a long requirement." in final_messages[1].content
+    assert "Use the current request." in final_messages[2].content
+    assert all("old user" not in message.content for message in final_messages)
+    assert "chat_context_summary_used: True" in output
+    assert "chat_context_summary_updated: True" in output
+    assert "chat_context_omitted_message_count: 2" in output
+    summary = store.get_rolling_summary(session.session_id)
+    assert summary is not None
+    assert summary.covered_message_order == 3
+
+
 def test_cli_plans_codex_external_agent_route(capsys, monkeypatch) -> None:
     monkeypatch.setenv("CODEX_COMMAND", "codex-test")
 
@@ -842,10 +1032,15 @@ def test_cli_orchestrated_plan_prints_stage_plan_without_provider(
     assert all(record.status == "planned" for record in stage_records)
 
 
-def test_auxiliary_panel_uses_local_cheap_route_with_fake_client() -> None:
+def test_auxiliary_panel_uses_local_cheap_route_with_fake_client(monkeypatch) -> None:
     from ai_provider import AIMessage, AIResponse, BackendInfo, BackendLocation, MessageRole
 
     captured = {}
+
+    def start_server(base_url, **kwargs):
+        captured["startup"] = kwargs
+
+    monkeypatch.setattr("ai_provider.coding_assist.ensure_ollama_server", start_server)
 
     class FakeClient:
         def __init__(self, config) -> None:
@@ -880,10 +1075,17 @@ def test_auxiliary_panel_uses_local_cheap_route_with_fake_client() -> None:
         parent_profile,
         catalog,
         client_factory=FakeClient,
+        start_ollama=True,
+        ollama_command="custom-ollama",
+        ollama_startup_timeout_seconds=7.0,
+        ollama_log_path=Path("auxiliary-ollama.log"),
         progress_callback=events.append,
     )
 
     assert result.status == "completed"
+    assert captured["startup"]["command"] == "custom-ollama"
+    assert captured["startup"]["startup_timeout_seconds"] == 7.0
+    assert captured["startup"]["log_path"] == Path("auxiliary-ollama.log")
     assert result.provider == "ollama"
     assert result.model is not None
     assert result.response_text == "check tests and decision boundaries"
@@ -923,7 +1125,13 @@ def test_cli_orchestrated_implement_updates_stage_statuses(
     )
     run_db = tmp_path / "repo-assistant-runs.sqlite3"
 
-    monkeypatch.setattr(_EXAMPLE, "run_coding_prompt", lambda *args, **kwargs: prepared)
+    monkeypatch.setattr(
+        _EXAMPLE,
+        "run_coding_prompt",
+        lambda *args, **kwargs: _implementation_scrutiny_result()
+        if kwargs.get("progress_prefix") == "scrutiny_activity"
+        else prepared,
+    )
     monkeypatch.setattr(
         _EXAMPLE,
         "run_auxiliary_panel",
@@ -1003,6 +1211,9 @@ def test_cli_orchestrated_implement_updates_stage_statuses(
         "route_policy": "derived_local_cheap",
     }
     assert stage_by_name["implementation"].status == "completed"
+    assert stage_by_name["scrutiny"].status == "completed"
+    scrutiny_details = stage_by_name["scrutiny"].details
+    assert scrutiny_details is not None and scrutiny_details["verdict"] == "pass"
     assert stage_by_name["implementation"].started_at_utc is not None
     assert stage_by_name["implementation"].completed_at_utc is not None
     assert stage_by_name["validation"].status == "completed"
@@ -1281,7 +1492,13 @@ def test_cli_orchestrated_repair_reruns_validation_until_passed(
     repair_prompts: list[str] = []
     run_db = tmp_path / "repo-assistant-runs.sqlite3"
 
-    monkeypatch.setattr(_EXAMPLE, "run_coding_prompt", lambda *args, **kwargs: prepared)
+    monkeypatch.setattr(
+        _EXAMPLE,
+        "run_coding_prompt",
+        lambda *args, **kwargs: _implementation_scrutiny_result()
+        if kwargs.get("progress_prefix") == "scrutiny_activity"
+        else prepared,
+    )
     monkeypatch.setattr(
         _EXAMPLE,
         "run_auxiliary_panel",
@@ -1347,7 +1564,18 @@ def test_cli_orchestrated_repair_reruns_validation_until_passed(
     assert repair_details["attempt_count"] == 1
     assert repair_details["validation_status_after_repair"] == "passed"
     assert repair_details["attempts"] == [
-        {"attempt": 1, "status": "completed", "validation_status": "passed"}
+        {
+            "attempt": 1,
+            "status": "completed",
+            "validation_status": "passed",
+            "progress": "failure_changed",
+            "changed_paths": [],
+            "effective_route_id": "ollama-qwen2-5-coder-14b",
+            "fallback_attempts": [
+                {"route_id": "ollama-qwen2-5-coder-14b", "status": "finished"},
+                {"route_id": "ollama-qwen2-5-coder-14b", "status": "finished"},
+            ],
+        }
     ]
     final_handoff_details = stage_by_name["final_handoff"].details
     assert final_handoff_details is not None
@@ -1650,6 +1878,14 @@ def test_cli_orchestrated_external_agent_repair_reruns_validation_until_passed(
         ),
     ]
     run_db = tmp_path / "repo-assistant-runs.sqlite3"
+    original_coding_prompt = _EXAMPLE.run_coding_prompt
+    monkeypatch.setattr(
+        _EXAMPLE,
+        "run_coding_prompt",
+        lambda *args, **kwargs: _implementation_scrutiny_result()
+        if kwargs.get("progress_prefix") == "scrutiny_activity"
+        else original_coding_prompt(*args, **kwargs),
+    )
 
     def fake_run(*args, **kwargs):
         calls.append({"args": args, "kwargs": kwargs})
@@ -1798,7 +2034,10 @@ def test_cli_can_plan_codex_resume_last(capsys, monkeypatch) -> None:
 
     output = capsys.readouterr().out
     assert "external_agent_resume: last" in output
-    assert '"resume", "--model", "gpt-5.5", "--json", "--last", "-"' in output
+    assert '"exec", "--cd", ' in output
+    assert (
+        '"--model", "gpt-5.5", "--sandbox", "workspace-write", "resume", "--json", "--last", "-"'
+    ) in output
     assert "--ephemeral" not in output
 
 
@@ -3162,6 +3401,52 @@ def test_native_agent_mode_executes_provider_tool_calls(tmp_path: Path, monkeypa
     assert events[0] == "local_agent_activity: model_request - provider=ollama model=test"
     assert "local_agent_activity: completed - iterations=2 tool_results=1" in events
     assert any(event.startswith("local_tool_activity: ok - create_file:") for event in events)
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        '```json\n{"name":"run_command","arguments":{"command":"echo done"}}\n```',
+        '{"name":"create_file","arguments":{"path":"report.md","content":"done"}}',
+    ],
+)
+def test_native_agent_rejects_textual_actions_without_execution(
+    content: str, tmp_path: Path, monkeypatch
+) -> None:
+    from argparse import Namespace
+
+    from ai_orchestrator import PrivacyClass as OrchestratorPrivacyClass
+    from ai_provider import AIMessage, AIResponse, BackendConfig, MessageRole, ProviderError
+
+    client = _NativeFakeClient()
+    monkeypatch.setattr(
+        client,
+        "complete",
+        lambda request: AIResponse(
+            message=AIMessage(MessageRole.ASSISTANT, content), backend=client.backend
+        ),
+    )
+    monkeypatch.setattr(_EXAMPLE, "create_chat_client", lambda config: client)
+    args = Namespace(
+        start_ollama=False, system=None, max_action_rounds=3, approval_policy="trusted_local"
+    )
+    with pytest.raises(ProviderError, match="without executing any tools"):
+        _run_native_agent(
+            "Write a report",
+            BackendConfig(provider=_EXAMPLE.ProviderKind.OLLAMA, model="test"),
+            _EXAMPLE.coding_task_profile(privacy_class=OrchestratorPrivacyClass.LOCAL_ONLY),
+            args,
+            tmp_path,
+        )
+    assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.parametrize(
+    "content",
+    ["No change needed.", '{"name":[],"arguments":{}}', '{"name":"example","arguments":{}}'],
+)
+def test_native_textual_action_guard_allows_ordinary_responses(content: str) -> None:
+    assert not _EXAMPLE._contains_textual_tool_request(content, {"run_command"})
 
 
 def test_implement_mode_defaults_to_native_tools(capsys, monkeypatch) -> None:
