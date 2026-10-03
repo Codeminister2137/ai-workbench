@@ -41,6 +41,18 @@ class ChatMessageRecord:
     metadata: dict[str, object] | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class ChatRollingSummaryRecord:
+    """Durable rolling-summary state for one local chat transcript."""
+
+    session_id: str
+    summary: str
+    covered_message_order: int
+    updated_at_utc: str
+    provider: str | None = None
+    model: str | None = None
+
+
 class SQLiteChatTranscriptStore:
     """SQLite-backed repository for local chat sessions and ordered messages."""
 
@@ -94,6 +106,21 @@ class SQLiteChatTranscriptStore:
                 """
                 CREATE INDEX IF NOT EXISTS idx_chat_sessions_updated_at
                 ON chat_sessions(updated_at_utc)
+                """
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS chat_rolling_summaries (
+                    session_id TEXT PRIMARY KEY,
+                    summary TEXT NOT NULL,
+                    covered_message_order INTEGER NOT NULL,
+                    updated_at_utc TEXT NOT NULL,
+                    provider TEXT,
+                    model TEXT,
+                    metadata_json TEXT NOT NULL,
+                    FOREIGN KEY (session_id) REFERENCES chat_sessions(session_id)
+                        ON DELETE CASCADE
+                )
                 """
             )
 
@@ -301,6 +328,83 @@ class SQLiteChatTranscriptStore:
             ).fetchall()
         return tuple(_message_from_row(row) for row in rows)
 
+    def get_rolling_summary(self, session_id: str) -> ChatRollingSummaryRecord | None:
+        """Return the current rolling summary for a session, if one exists."""
+
+        self.initialize()
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT session_id, summary, covered_message_order, updated_at_utc,
+                       provider, model
+                FROM chat_rolling_summaries
+                WHERE session_id = ?
+                """,
+                (session_id,),
+            ).fetchone()
+        return None if row is None else _rolling_summary_from_row(row)
+
+    def upsert_rolling_summary(
+        self,
+        session_id: str,
+        *,
+        summary: str,
+        covered_message_order: int,
+        provider: str | None = None,
+        model: str | None = None,
+        metadata: dict[str, object] | None = None,
+    ) -> ChatRollingSummaryRecord:
+        """Create or replace rolling-summary state for a session."""
+
+        self.initialize()
+        now = _utc_now()
+        record = ChatRollingSummaryRecord(
+            session_id=session_id,
+            summary=summary,
+            covered_message_order=covered_message_order,
+            updated_at_utc=now,
+            provider=provider,
+            model=model,
+        )
+        with self._connect() as connection:
+            session_exists = connection.execute(
+                "SELECT 1 FROM chat_sessions WHERE session_id = ?",
+                (session_id,),
+            ).fetchone()
+            if session_exists is None:
+                raise KeyError(f"chat session does not exist: {session_id}")
+            connection.execute(
+                """
+                INSERT INTO chat_rolling_summaries (
+                    session_id,
+                    summary,
+                    covered_message_order,
+                    updated_at_utc,
+                    provider,
+                    model,
+                    metadata_json
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(session_id) DO UPDATE SET
+                    summary = excluded.summary,
+                    covered_message_order = excluded.covered_message_order,
+                    updated_at_utc = excluded.updated_at_utc,
+                    provider = excluded.provider,
+                    model = excluded.model,
+                    metadata_json = excluded.metadata_json
+                """,
+                (
+                    record.session_id,
+                    record.summary,
+                    record.covered_message_order,
+                    record.updated_at_utc,
+                    record.provider,
+                    record.model,
+                    json.dumps(metadata or {}, sort_keys=True),
+                ),
+            )
+        return record
+
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.path)
         connection.row_factory = sqlite3.Row
@@ -338,6 +442,17 @@ def _message_from_row(row: sqlite3.Row) -> ChatMessageRecord:
         provider=row["provider"],
         model=row["model"],
         metadata=metadata if isinstance(metadata, dict) else {},
+    )
+
+
+def _rolling_summary_from_row(row: sqlite3.Row) -> ChatRollingSummaryRecord:
+    return ChatRollingSummaryRecord(
+        session_id=str(row["session_id"]),
+        summary=str(row["summary"]),
+        covered_message_order=int(row["covered_message_order"]),
+        updated_at_utc=str(row["updated_at_utc"]),
+        provider=row["provider"],
+        model=row["model"],
     )
 
 

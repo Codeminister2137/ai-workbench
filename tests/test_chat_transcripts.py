@@ -54,3 +54,40 @@ def test_sqlite_chat_transcript_store_can_find_latest_repo_session(tmp_path: Pat
         second.session_id,
         first.session_id,
     ]
+
+
+def test_sqlite_chat_transcript_store_persists_rolling_summary(tmp_path: Path) -> None:
+    store = SQLiteChatTranscriptStore(tmp_path / "chats.sqlite3")
+    session = store.create_session(
+        repo_root=tmp_path,
+        title="Summarize chat.",
+        privacy_class="local_only",
+    )
+
+    summary = store.upsert_rolling_summary(
+        session.session_id,
+        summary="Earlier turns established the repo assistant context.",
+        covered_message_order=4,
+        provider="ollama",
+        model="qwen2.5-coder:14b",
+        metadata={"total_tokens": 42},
+    )
+
+    assert summary.session_id == session.session_id
+    assert summary.covered_message_order == 4
+    persisted = store.get_rolling_summary(session.session_id)
+    assert persisted is not None
+    assert persisted.summary == "Earlier turns established the repo assistant context."
+    assert persisted.provider == "ollama"
+    assert persisted.model == "qwen2.5-coder:14b"
+
+    replacement = store.upsert_rolling_summary(
+        session.session_id,
+        summary="Updated summary.",
+        covered_message_order=8,
+    )
+
+    assert replacement.covered_message_order == 8
+    updated = store.get_rolling_summary(session.session_id)
+    assert updated is not None
+    assert updated.summary == "Updated summary."

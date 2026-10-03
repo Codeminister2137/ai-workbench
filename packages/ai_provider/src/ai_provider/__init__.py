@@ -4,6 +4,7 @@ from ai_provider.adapters.ollama import OllamaChatClient
 from ai_provider.adapters.openai_compatible import OpenAICompatibleChatClient
 from ai_provider.chat_transcripts import (
     ChatMessageRecord,
+    ChatRollingSummaryRecord,
     ChatSessionRecord,
     SQLiteChatTranscriptStore,
 )
@@ -77,6 +78,7 @@ __all__ = [
     "BackendLocation",
     "ChatClient",
     "ChatMessageRecord",
+    "ChatRollingSummaryRecord",
     "ChatSessionRecord",
     "FinishReason",
     "LocalDiskInfo",
