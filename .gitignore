@@ -45,3 +45,10 @@ env/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Private plans and local Council preferences
+/docs/plans/
+*.docx
+/apps/ai_council/council.json
+/artifacts/
+/user-config.toml
