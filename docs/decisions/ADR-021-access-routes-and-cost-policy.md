@@ -4,6 +4,10 @@
 
 **Date:** 2026-09-21
 
+**Amendment:** ADR-031 supersedes the default task ceiling below with
+`PREPAID_CREDITS_ALLOWED` and separates private user preferences. All other
+route, authentication, and financial boundary decisions remain accepted.
+
 ## Context
 
 The repository originally described execution mostly as provider/model selection.

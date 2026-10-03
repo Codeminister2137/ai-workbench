@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ai_provider.contracts import AIMessage
 
 
 class ProviderErrorCategory(StrEnum):
@@ -11,6 +15,7 @@ class ProviderErrorCategory(StrEnum):
     CONFIGURATION = "configuration"
     AUTHENTICATION = "authentication"
     RATE_LIMIT = "rate_limit"
+    USAGE_LIMIT = "usage_limit"
     TIMEOUT = "timeout"
     RETRYABLE = "retryable"
     NON_RETRYABLE = "non_retryable"
@@ -35,3 +40,4 @@ class ProviderError(RuntimeError):
         self.retryable = retryable
         self.provider = provider
         self.raw_error = raw_error
+        self.partial_messages: tuple[AIMessage, ...] = ()

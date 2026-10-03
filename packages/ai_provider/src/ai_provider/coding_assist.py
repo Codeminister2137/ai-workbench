@@ -75,6 +75,10 @@ def backend_config_from_execution_target(target: ExecutionTarget) -> BackendConf
         model=target.model,
         base_url=target.base_url,
         timeout_seconds=target.timeout_seconds,
+        require_free_model=(
+            provider is ProviderKind.REQUESTY
+            and target.cost_policy_tier is CostPolicyTier.FREE_ONLY
+        ),
     )
 
 
@@ -216,7 +220,7 @@ def coding_task_profile(
     quality_threshold: QualityThreshold = QualityThreshold.STANDARD,
     latency_target: LatencyTarget = LatencyTarget.INTERACTIVE,
     max_expected_latency_seconds: float | None = None,
-    cost_policy_tier: CostPolicyTier = CostPolicyTier.ALLOWANCES_ALLOWED,
+    cost_policy_tier: CostPolicyTier = CostPolicyTier.PREPAID_CREDITS_ALLOWED,
     route_id_override: str | None = None,
     access_method_override: AccessMethod | None = None,
     provider_override: str | None = None,
@@ -274,7 +278,7 @@ def main() -> None:
     parser.add_argument(
         "--cost-policy",
         choices=[item.value for item in CostPolicyTier],
-        default=CostPolicyTier.ALLOWANCES_ALLOWED.value,
+        default=CostPolicyTier.PREPAID_CREDITS_ALLOWED.value,
         help="Maximum billing boundary this task may cross.",
     )
     parser.add_argument(

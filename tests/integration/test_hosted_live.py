@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from dataclasses import replace
 
 import pytest
 from ai_provider import (
@@ -25,6 +26,8 @@ def _hosted_config_from_env() -> BackendConfig:
     config = BackendConfig.from_env()
     if config.provider is ProviderKind.OLLAMA:
         pytest.skip("Set AI_PROVIDER_KIND to openai or requesty for live hosted integration tests.")
+    if config.provider is ProviderKind.REQUESTY:
+        config = replace(config, require_free_model=True)
     return config
 
 

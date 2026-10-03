@@ -27,8 +27,15 @@ class BackendConfig:
     base_url: str | None = None
     api_key: str | None = None
     timeout_seconds: float = 60.0
+    require_free_model: bool = False
 
     def __post_init__(self) -> None:
+        if self.require_free_model and self.provider is not ProviderKind.REQUESTY:
+            raise ProviderError(
+                "Live free-model verification is currently supported only for Requesty.",
+                category=ProviderErrorCategory.CONFIGURATION,
+                provider=self.provider.value,
+            )
         if not self.model.strip():
             raise ProviderError(
                 "Backend model must not be empty.",

@@ -10,6 +10,7 @@ from ai_provider.external_agents import (
     build_codex_plugin_command,
     build_external_agent_command,
     codex_plugin_status_by_name,
+    external_agent_command,
     parse_codex_plugin_list,
     parse_external_agent_jsonl,
     validate_codex_plugin_selector,
@@ -86,6 +87,40 @@ def test_build_external_agent_command_maps_interactive_approval(tmp_path: Path) 
     assert command[:4] == ("codex", "--ask-for-approval", "on-request", "exec")
 
 
+def test_build_external_agent_command_resume_preserves_repo_root_and_sandbox(
+    tmp_path: Path,
+) -> None:
+    config = ExternalAgentConfig(
+        access_method=AccessMethod.CODEX_CLI,
+        command="codex",
+        model="gpt-5.5",
+        cwd=tmp_path,
+        timeout_seconds=60.0,
+        sandbox="danger-full-access",
+        approval_policy="never",
+        resume="last",
+    )
+
+    command = build_external_agent_command(config)
+
+    assert command == (
+        "codex",
+        "--ask-for-approval",
+        "never",
+        "exec",
+        "--cd",
+        str(tmp_path),
+        "--model",
+        "gpt-5.5",
+        "--sandbox",
+        "danger-full-access",
+        "resume",
+        "--json",
+        "--last",
+        "-",
+    )
+
+
 def test_build_external_agent_command_can_attach_codex_images(tmp_path: Path) -> None:
     first_image = tmp_path / "before.png"
     second_image = tmp_path / "after.jpg"
@@ -104,6 +139,28 @@ def test_build_external_agent_command_can_attach_codex_images(tmp_path: Path) ->
     assert str(first_image) in command
     assert str(second_image) in command
     assert command[-1] == "-"
+
+
+def test_external_agent_command_discovers_antigravity_agy_alias(monkeypatch) -> None:
+    monkeypatch.delenv("ANTIGRAVITY_COMMAND", raising=False)
+
+    def fake_which(command: str) -> str | None:
+        return "C:/tools/agy.exe" if command == "agy" else None
+
+    monkeypatch.setattr("ai_provider.external_agents.shutil.which", fake_which)
+
+    assert external_agent_command(AccessMethod.ANTIGRAVITY_CLI) == "C:/tools/agy.exe"
+
+
+def test_external_agent_command_discovers_kiro_cli_alias(monkeypatch) -> None:
+    monkeypatch.delenv("KIRO_COMMAND", raising=False)
+
+    def fake_which(command: str) -> str | None:
+        return "C:/tools/kiro-cli.exe" if command == "kiro-cli" else None
+
+    monkeypatch.setattr("ai_provider.external_agents.shutil.which", fake_which)
+
+    assert external_agent_command(AccessMethod.KIRO_CLI) == "C:/tools/kiro-cli.exe"
 
 
 def test_parse_external_agent_jsonl_counts_web_search_events() -> None:

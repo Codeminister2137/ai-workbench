@@ -51,10 +51,18 @@ treated as ordinary provider API adapters. An `ai_provider` adapter should only
 accept targets whose `access_method` matches provider execution; other access
 methods need dedicated executors.
 
-Task profiles default to `CostPolicyTier.ALLOWANCES_ALLOWED`. That allows local,
-free, and included subscription/allowance routes, but rejects prepaid-credit and
-metered-billing routes unless the caller explicitly raises the policy. This
-prevents silent fallback across billing boundaries.
+Task profiles default to `CostPolicyTier.PREPAID_CREDITS_ALLOWED`. That allows
+local, free, included allowances, and prepaid-credit routes, but rejects metered
+billing. The repo assistant can apply a private `allowances_allowed` preference
+through `user-config.toml`; that ceiling also rejects Requesty prepaid routes.
+
+`fallback_candidates(profile, catalog, initial_target)` in
+`ai_orchestrator.fallback` ranks same-tier replacements after usage exhaustion.
+It releases initial route/model overrides while preserving task requirements,
+privacy and cost constraints, and excludes exhausted billing sources. Quality
+grades influence ranking; a replacement need not match the initial grade if
+it meets the task's minimum. The composing CLI preflights authentication and
+continues partial work by default; see ADR-032 and the CLI runbook.
 
 ## Model Catalog
 

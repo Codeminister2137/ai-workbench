@@ -62,6 +62,9 @@ input_cost_per_million_tokens = 0
 output_cost_per_million_tokens = 0
 source = "local benchmark: 3 runs, 1 warmup, median latency for gpt-oss:20b"
 
+[models.metadata]
+review_deliberative = true
+
 [[models]]
 route_id = "ollama-qwen2-5-coder-14b"
 provider = "ollama"
@@ -125,6 +128,10 @@ typical_latency_seconds = 8.644
 input_cost_per_million_tokens = 0
 output_cost_per_million_tokens = 0
 source = "local benchmark: 3 runs, 1 warmup, median latency for qwen3:14b"
+
+[models.metadata]
+review_deliberative = true
+review_direct = true
 
 [[models]]
 route_id = "openai-codex-gpt-5-5"
@@ -213,7 +220,7 @@ source_url = "https://ai.google.dev/pricing"
 route_id = "google-antigravity-gemini-3-1-pro"
 provider = "google"
 product = "antigravity"
-model = "gemini-3.1-pro"
+model = "gemini-3.1-pro-high"
 location = "external"
 access_method = "antigravity_cli"
 auth_method = "google_account_sign_in"
@@ -235,7 +242,7 @@ embeddings = false
 route_id = "google-antigravity-gemini-3-8-flash"
 provider = "google"
 product = "antigravity"
-model = "gemini-3.8-flash"
+model = "gemini-3.8-flash-high"
 location = "external"
 access_method = "antigravity_cli"
 auth_method = "google_account_sign_in"
@@ -257,7 +264,7 @@ embeddings = false
 route_id = "github-copilot-cli-default"
 provider = "github"
 product = "github_copilot"
-model = "copilot"
+model = "auto"
 location = "external"
 access_method = "copilot_cli"
 auth_method = "github_account_sign_in"
@@ -265,7 +272,7 @@ billing_source = "github_copilot_subscription_allowance"
 cost_policy_tier = "allowances_allowed"
 quality = "standard"
 latency = "interactive"
-notes = "GitHub Copilot CLI/editor-agent route placeholder. Execution is disabled until the official noninteractive command contract is confirmed."
+notes = "Official Copilot CLI auto-model route; only trusted_local approval is mapped."
 
 [models.capabilities]
 chat = true
@@ -279,7 +286,7 @@ embeddings = false
 route_id = "kiro-cli-default"
 provider = "kiro"
 product = "kiro"
-model = "kiro"
+model = "auto"
 location = "external"
 access_method = "kiro_cli"
 auth_method = "kiro_sign_in"
@@ -287,7 +294,7 @@ billing_source = "kiro_subscription_allowance"
 cost_policy_tier = "allowances_allowed"
 quality = "standard"
 latency = "interactive"
-notes = "Kiro CLI candidate route placeholder. Execution is disabled until the installed client path and noninteractive command contract are confirmed."
+notes = "Official Kiro CLI auto-model route; only trusted_local approval is mapped. Headless credentials must be configured."
 
 [models.capabilities]
 chat = true
@@ -354,6 +361,37 @@ source = "OpenAI model docs, checked 2026-09-20"
 source_url = "https://developers.openai.com/api/docs/models/gpt-5-mini"
 
 [[models]]
+route_id = "requesty-free-gemma-4-31b"
+provider = "requesty"
+product = "requesty_free"
+model = "google/gemma-4-31b-it"
+location = "external"
+access_method = "provider_api"
+auth_method = "api_key"
+billing_source = "requesty_billing"
+cost_policy_tier = "free_only"
+quality = "standard"
+latency = "interactive"
+notes = "Requesty free-plan route. Live price verification before every request. Quality is provisional, not evaluated. API metadata checked 2026-10-01 reports no training use and 30-day retention; live tests use synthetic data."
+
+[models.capabilities]
+chat = true
+streaming = true
+tools = true
+structured_output = false
+multimodal_input = false
+embeddings = false
+
+[models.context_limits]
+context_window_tokens = 262144
+
+[models.estimate]
+input_cost_per_million_tokens = 0
+output_cost_per_million_tokens = 0
+source = "Requesty live models API checked 2026-10-01; runtime prices rechecked before inference"
+source_url = "https://router.requesty.ai/v1/models"
+
+[[models]]
 route_id = "requesty-openai-gpt-5-1"
 provider = "requesty"
 product = "requesty"
@@ -362,7 +400,7 @@ location = "external"
 access_method = "provider_api"
 auth_method = "api_key"
 billing_source = "requesty_billing"
-cost_policy_tier = "allowances_allowed"
+cost_policy_tier = "prepaid_credits_allowed"
 quality = "high"
 latency = "interactive"
 notes = "Requesty-routed OpenAI model. Requesty reports usage cost on non-streaming responses."
@@ -390,7 +428,7 @@ location = "external"
 access_method = "provider_api"
 auth_method = "api_key"
 billing_source = "requesty_billing"
-cost_policy_tier = "allowances_allowed"
+cost_policy_tier = "prepaid_credits_allowed"
 quality = "standard"
 latency = "interactive"
 notes = "Lower-cost Requesty-routed OpenAI model for well-defined coding tasks."

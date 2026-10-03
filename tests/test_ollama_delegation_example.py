@@ -41,7 +41,7 @@ def test_ollama_delegation_parser_defaults() -> None:
 
     assert args.catalog == default_catalog_path()
     assert args.privacy == PrivacyClass.EXTERNAL_ALLOWED.value
-    assert args.cost_policy == CostPolicyTier.ALLOWANCES_ALLOWED.value
+    assert args.cost_policy == CostPolicyTier.PREPAID_CREDITS_ALLOWED.value
 
 
 def test_plan_delegated_workflow_creates_primary_and_subtask_plans() -> None:

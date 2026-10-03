@@ -14,6 +14,7 @@ from ai_provider import (
     ChatClient,
     MessageRole,
     PrivacyClass,
+    ProviderError,
 )
 
 from ai_agent.contracts import ToolCall, ToolResult
@@ -66,16 +67,20 @@ class AgentLoop:
         tool_results: list[ToolResult] = []
 
         for iteration in range(1, self.max_iterations + 1):
-            response = self.client.complete(
-                AIRequest(
-                    messages=tuple(messages),
-                    model=model,
-                    privacy_class=privacy_class,
-                    tools=tuple(
-                        _tool_definition(tool) for tool in self.registry.list_definitions()
-                    ),
+            try:
+                response = self.client.complete(
+                    AIRequest(
+                        messages=tuple(messages),
+                        model=model,
+                        privacy_class=privacy_class,
+                        tools=tuple(
+                            _tool_definition(tool) for tool in self.registry.list_definitions()
+                        ),
+                    )
                 )
-            )
+            except ProviderError as exc:
+                exc.partial_messages = tuple(messages)
+                raise
             messages.append(response.message)
             tool_calls = response.tool_calls or response.message.tool_calls
             if not tool_calls:

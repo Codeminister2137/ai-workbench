@@ -2,6 +2,7 @@
 
 from ai_orchestrator.catalog import load_model_catalog
 from ai_orchestrator.delegation import DelegationDecision, assess_delegation
+from ai_orchestrator.fallback import fallback_candidates
 from ai_orchestrator.models import (
     AccessMethod,
     AccessRoute,
@@ -80,6 +81,7 @@ __all__ = [
     "TaskProfile",
     "TaskType",
     "cost_policy_allows",
+    "fallback_candidates",
     "derive_subtask_profile",
     "assess_delegation",
     "judge_prompt",

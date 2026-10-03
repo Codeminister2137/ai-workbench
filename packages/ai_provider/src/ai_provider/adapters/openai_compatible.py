@@ -13,6 +13,7 @@ import socket
 import time
 from collections.abc import Iterator
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -143,6 +144,8 @@ class OpenAICompatibleChatClient:
         )
 
     def _chat_payload(self, request: AIRequest, *, stream: bool) -> dict[str, Any]:
+        if self.config.require_free_model:
+            self._verify_free_model(request.model or self.config.model)
         payload: dict[str, Any] = {
             "model": request.model or self.config.model,
             "messages": [_message_to_payload(message) for message in request.messages],
@@ -155,6 +158,39 @@ class OpenAICompatibleChatClient:
         if request.tools:
             payload["tools"] = [tool.to_json_schema() for tool in request.tools]
         return payload
+
+    def _verify_free_model(self, model: str) -> None:
+        """Fail closed if the exact Requesty model is absent or no longer zero-priced.
+
+        Refresh before every completion/stream, including agent-loop turns. Never
+        resolve routing policies or fall back to paid models. This verifies current
+        published prices; service account restrictions remain the billing backstop.
+        """
+
+        request = Request(f"{self.base_url}/models", headers=self._headers(), method="GET")
+        try:
+            with urlopen(request, timeout=self.config.timeout_seconds) as response:
+                catalog = json.loads(response.read().decode("utf-8"))
+        except HTTPError as exc:
+            raise self._http_error(exc) from exc
+        except (URLError, TimeoutError, json.JSONDecodeError) as exc:
+            raise ProviderError(
+                "Could not verify Requesty free-model prices; inference was not sent.",
+                category=ProviderErrorCategory.CONFIGURATION,
+                provider=self.config.provider.value,
+            ) from exc
+        rows = catalog.get("data") if isinstance(catalog, dict) else None
+        match = (
+            next((row for row in rows if isinstance(row, dict) and row.get("id") == model), None)
+            if isinstance(rows, list)
+            else None
+        )
+        if not isinstance(match, dict) or not _zero_price_row(match):
+            raise ProviderError(
+                f"Requesty model {model!r} is not verified free; inference was not sent.",
+                category=ProviderErrorCategory.CONFIGURATION,
+                provider=self.config.provider.value,
+            )
 
     def _response_from_raw(
         self,
@@ -391,6 +427,30 @@ def _tool_calls_from_raw(raw_calls: object) -> tuple[AIToolCall, ...]:
             )
         )
     return tuple(calls)
+
+
+def _zero_price_row(row: dict[str, Any]) -> bool:
+    """Validate all published token-price tiers without treating missing data as zero."""
+
+    def zero(value: object) -> bool:
+        if value is None or isinstance(value, bool):
+            return False
+        try:
+            return Decimal(str(value)) == 0
+        except InvalidOperation:
+            return False
+
+    tiers = row.get("pricing", [])
+    if not isinstance(tiers, list) or row.get("api") != "chat":
+        return False
+    for prices in [row, *tiers]:
+        if not isinstance(prices, dict):
+            return False
+        if not zero(prices.get("input_price")) or not zero(prices.get("output_price")):
+            return False
+        if "cached_price" in prices and not zero(prices["cached_price"]):
+            return False
+    return True
 
 
 def _first_choice(raw_response: dict[str, Any], *, provider: str) -> dict[str, Any]:

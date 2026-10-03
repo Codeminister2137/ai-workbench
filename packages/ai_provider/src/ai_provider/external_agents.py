@@ -186,11 +186,22 @@ def external_agent_command(access_method: AccessMethod) -> str | None:
     if access_method is AccessMethod.CODEX_CLI:
         return default_codex_command()
     if access_method is AccessMethod.ANTIGRAVITY_CLI:
-        return os.environ.get("ANTIGRAVITY_COMMAND") or shutil.which("antigravity")
+        return (
+            os.environ.get("ANTIGRAVITY_COMMAND")
+            or shutil.which("agy")
+            or shutil.which("antigravity")
+        )
     if access_method is AccessMethod.COPILOT_CLI:
         return os.environ.get("GITHUB_COPILOT_COMMAND") or shutil.which("copilot")
     if access_method is AccessMethod.KIRO_CLI:
-        return os.environ.get("KIRO_COMMAND") or shutil.which("kiro")
+        command = os.environ.get("KIRO_COMMAND") or shutil.which("kiro-cli") or shutil.which("kiro")
+        if command:
+            return command
+        local_app_data = os.environ.get("LOCALAPPDATA")
+        if local_app_data:
+            installed = Path(local_app_data) / "Kiro-Cli" / "kiro-cli.exe"
+            if installed.is_file():
+                return str(installed)
     return None
 
 
@@ -198,16 +209,34 @@ def external_agent_status() -> dict[str, Any]:
     """Return local discovery status for configured external coding-agent clients."""
 
     codex_command = external_agent_command(AccessMethod.CODEX_CLI)
+    antigravity_command = external_agent_command(AccessMethod.ANTIGRAVITY_CLI)
+    copilot_command = external_agent_command(AccessMethod.COPILOT_CLI)
+    kiro_command = external_agent_command(AccessMethod.KIRO_CLI)
     return {
         "codex_available": codex_command is not None,
         "codex_command": codex_command,
         "codex": codex_capability_status(codex_command),
-        "antigravity_available": external_agent_command(AccessMethod.ANTIGRAVITY_CLI) is not None,
-        "antigravity_command": external_agent_command(AccessMethod.ANTIGRAVITY_CLI),
-        "copilot_available": external_agent_command(AccessMethod.COPILOT_CLI) is not None,
-        "copilot_command": external_agent_command(AccessMethod.COPILOT_CLI),
-        "kiro_available": external_agent_command(AccessMethod.KIRO_CLI) is not None,
-        "kiro_command": external_agent_command(AccessMethod.KIRO_CLI),
+        "antigravity_available": antigravity_command is not None,
+        "antigravity_command": antigravity_command,
+        "antigravity": external_agent_capability_status(
+            antigravity_command,
+            help_args=("--help",),
+            expected_flags=("-p", "--prompt", "--output-format", "--model"),
+        ),
+        "copilot_available": copilot_command is not None,
+        "copilot_command": copilot_command,
+        "copilot": external_agent_capability_status(
+            copilot_command,
+            help_args=("--help",),
+            expected_flags=("-p", "--prompt", "--output-format", "--allow-tool"),
+        ),
+        "kiro_available": kiro_command is not None,
+        "kiro_command": kiro_command,
+        "kiro": external_agent_capability_status(
+            kiro_command,
+            help_args=("chat", "--help"),
+            expected_flags=("--no-interactive", "--output-format", "--trust-tools"),
+        ),
     }
 
 
@@ -297,6 +326,36 @@ def diagnostic_text_result(result: dict[str, Any]) -> dict[str, Any]:
         "returncode": result["returncode"],
         "stdout": result["stdout"],
         "stderr": result["stderr"],
+    }
+
+
+def external_agent_capability_status(
+    command: str | None,
+    *,
+    help_args: tuple[str, ...],
+    expected_flags: tuple[str, ...],
+    version_args: tuple[str, ...] = ("--version",),
+) -> dict[str, Any]:
+    """Return secret-free diagnostics for a non-Codex external agent command."""
+
+    if command is None:
+        return {
+            "available": False,
+            "command": None,
+            "version": None,
+            "help": None,
+            "expected_flags_supported": {flag: False for flag in expected_flags},
+        }
+
+    version = run_diagnostic_command(command, *version_args)
+    help_result = run_diagnostic_command(command, *help_args)
+    help_text = f"{help_result['stdout']}\n{help_result['stderr']}"
+    return {
+        "available": True,
+        "command": command,
+        "version": version["stdout"] or version["stderr"] or None,
+        "help": diagnostic_text_result(help_result),
+        "expected_flags_supported": {flag: flag in help_text for flag in expected_flags},
     }
 
 
@@ -448,7 +507,9 @@ def external_agent_config_from_orchestration(
 
     assert orchestration.execution_plan is not None
     target = orchestration.execution_plan.target
-    if target.access_method is not AccessMethod.CODEX_CLI:
+    if target.access_method is not AccessMethod.CODEX_CLI and codex_persist_session:
+        raise NotImplementedError("Codex session persistence is not mapped for alternate clients")
+    if not is_external_agent_access_method(target.access_method):
         raise NotImplementedError(
             f"{target.access_method.value} execution is not implemented yet. "
             "Configure the official command first, then add an executor adapter."
@@ -456,7 +517,8 @@ def external_agent_config_from_orchestration(
     command = external_agent_command(target.access_method)
     if command is None:
         raise FileNotFoundError(
-            "Could not find Codex CLI. Set CODEX_COMMAND or install/configure Codex CLI."
+            f"Could not find {target.access_method.value}. Install the official client "
+            "or configure its command environment variable."
         )
     return ExternalAgentConfig(
         access_method=target.access_method,
@@ -466,7 +528,11 @@ def external_agent_config_from_orchestration(
         timeout_seconds=timeout_seconds,
         sandbox=sandbox,
         approval_policy=approval_policy,
-        ephemeral=not codex_persist_session and codex_resume is None,
+        ephemeral=(
+            target.access_method is AccessMethod.CODEX_CLI
+            and not codex_persist_session
+            and codex_resume is None
+        ),
         resume=codex_resume,
         output_last_message_path=output_last_message_path,
         output_schema_path=output_schema_path,
@@ -477,7 +543,7 @@ def external_agent_config_from_orchestration(
 
 
 def parse_external_agent_jsonl(text: str) -> ExternalAgentEventSummary:
-    """Parse Codex-style JSONL events into the stable fields this CLI reports."""
+    """Normalize Codex, Antigravity, Copilot, and Kiro JSONL output."""
 
     final_answer = None
     command_events: list[dict[str, Any]] = []
@@ -486,6 +552,7 @@ def parse_external_agent_jsonl(text: str) -> ExternalAgentEventSummary:
     file_change_events: list[dict[str, Any]] = []
     usage = None
     failure_reason = None
+    answer_chunks: list[str] = []
     parse_errors: list[str] = []
     for line_number, line in enumerate(text.splitlines(), start=1):
         stripped = line.strip()
@@ -500,6 +567,31 @@ def parse_external_agent_jsonl(text: str) -> ExternalAgentEventSummary:
             parse_errors.append(f"line {line_number}: expected JSON object")
             continue
         event_type = _event_type(event)
+        data = event.get("data")
+        if isinstance(data, dict):
+            event = {**event, **data}
+            update = data.get("update")
+            if isinstance(update, dict):
+                if update.get("sessionUpdate") == "agent_message_chunk":
+                    chunk = _find_text_payload(update.get("content"))
+                    if chunk:
+                        answer_chunks.append(chunk)
+                elif update.get("sessionUpdate") in {"tool_call", "tool_call_update"}:
+                    tool_events.append(event)
+            if event_type == "runfinished":
+                final_text = data.get("finalText")
+                if isinstance(final_text, str) and final_text.strip():
+                    final_answer = final_text.strip()
+                elif answer_chunks:
+                    final_answer = "".join(answer_chunks)
+                if data.get("status") not in {"success", "completed"}:
+                    failure_reason = str(data.get("stopReason") or data.get("status"))
+            metering = data.get("meteringUsage")
+            if isinstance(metering, list):
+                usage = {"metering_usage": metering}
+        nested_result = event.get("result")
+        if isinstance(nested_result, dict):
+            event = {**event, **nested_result}
         if _is_command_event(event, event_type):
             command_events.append(event)
         if _is_tool_event(event, event_type):
@@ -529,11 +621,15 @@ def parse_external_agent_jsonl(text: str) -> ExternalAgentEventSummary:
     )
 
 
-def build_external_agent_command(config: ExternalAgentConfig) -> tuple[str, ...]:
+def build_external_agent_command(
+    config: ExternalAgentConfig,
+    *,
+    prompt: str | None = None,
+) -> tuple[str, ...]:
     """Build the noninteractive command for an external coding-agent client."""
 
     if config.access_method is not AccessMethod.CODEX_CLI:
-        raise NotImplementedError(f"{config.access_method.value} execution is not implemented.")
+        return _build_alternate_agent_command(config, prompt=prompt)
 
     command = [config.command]
     if config.web_search:
@@ -548,7 +644,18 @@ def build_external_agent_command(config: ExternalAgentConfig) -> tuple[str, ...]
             ]
         )
     if config.resume is not None:
-        command.extend(["exec", "resume", "--model", config.model])
+        command.extend(
+            [
+                "exec",
+                "--cd",
+                str(config.cwd),
+                "--model",
+                config.model,
+                "--sandbox",
+                config.sandbox,
+                "resume",
+            ]
+        )
         if config.json_output:
             command.append("--json")
         if config.output_last_message_path is not None:
@@ -587,6 +694,65 @@ def build_external_agent_command(config: ExternalAgentConfig) -> tuple[str, ...]
         command.extend(["--image", str(image_path)])
     command.append("-")
     return tuple(command)
+
+
+def _build_alternate_agent_command(
+    config: ExternalAgentConfig,
+    *,
+    prompt: str | None,
+) -> tuple[str, ...]:
+    """Map only the approved trusted-local preset; reject unsupported options."""
+
+    if config.approval_policy != "trusted_local":
+        raise NotImplementedError(
+            f"{config.access_method.value}: only trusted_local is mapped; "
+            "other approval modes are not mapped yet."
+        )
+    if config.sandbox != "danger-full-access":
+        raise ValueError("trusted_local requires danger-full-access for alternate clients")
+    if (
+        config.resume is not None
+        or config.output_last_message_path is not None
+        or config.output_schema_path is not None
+        or config.web_search
+        or config.image_paths
+        or config.codex_mcp_tools
+    ):
+        raise NotImplementedError("Codex-specific options are not mapped for alternate clients")
+    if config.access_method is AccessMethod.ANTIGRAVITY_CLI:
+        if not config.json_output:
+            raise ValueError("Antigravity stream input requires JSON output")
+        return (
+            config.command,
+            "--input-format",
+            "stream-json",
+            "--output-format",
+            "stream-json",
+            "--model",
+            config.model,
+            "--dangerously-skip-permissions",
+        )
+    if config.access_method is AccessMethod.KIRO_CLI:
+        command = [config.command, "chat", "--no-interactive", "--trust-all-tools"]
+        if config.model != "auto":
+            command.extend(["--model", config.model])
+        if config.json_output:
+            command.extend(["--output-format", "stream-json"])
+        return tuple(command)
+    if config.access_method is AccessMethod.COPILOT_CLI:
+        command = [
+            config.command,
+            "--allow-all",
+            "--no-ask-user",
+            "--model",
+            config.model,
+            "-p",
+            prompt if prompt is not None else "<prompt supplied at execution>",
+        ]
+        if config.json_output:
+            command.append("--output-format=json")
+        return tuple(command)
+    raise NotImplementedError(f"{config.access_method.value} execution is not implemented")
 
 
 def _codex_mcp_config_overrides(repo_root: Path) -> list[str]:
@@ -651,15 +817,20 @@ def run_external_agent(
     progress_callback: Callable[[str], None] | None = None,
     progress_interval_seconds: float = 15.0,
 ) -> ExternalAgentResult:
-    """Run an external coding-agent process with the prompt on stdin."""
+    """Run an official coding client using its native prompt transport."""
 
-    command = build_external_agent_command(config)
+    command = build_external_agent_command(config, prompt=prompt)
+    process_input = prompt
+    if config.access_method is AccessMethod.ANTIGRAVITY_CLI:
+        process_input = json.dumps({"event": "user", "message": {"content": prompt}}) + "\n"
+    elif config.access_method is AccessMethod.COPILOT_CLI:
+        process_input = ""
     if config.output_last_message_path is not None:
         config.output_last_message_path.parent.mkdir(parents=True, exist_ok=True)
     if runner is not subprocess.run:
         completed = runner(
             command,
-            input=prompt,
+            input=process_input,
             text=True,
             encoding="utf-8",
             errors="replace",
@@ -697,7 +868,7 @@ def run_external_agent(
 
     try:
         if process.stdin is not None:
-            process.stdin.write(prompt)
+            process.stdin.write(process_input)
             process.stdin.close()
     except (BrokenPipeError, OSError):
         pass
@@ -967,6 +1138,8 @@ def _is_command_event(event: dict[str, Any], event_type: str) -> bool:
 def _is_tool_event(event: dict[str, Any], event_type: str) -> bool:
     """Return whether an event appears to describe a tool call."""
 
+    if event_type == "session.tools_updated":
+        return False
     haystack = _event_haystack(event, event_type)
     return "tool" in haystack or "function_call" in haystack
 
@@ -1077,11 +1250,21 @@ def _find_final_answer(event: dict[str, Any], event_type: str) -> str | None:
     explicit = event.get("final_answer")
     if isinstance(explicit, str) and explicit.strip():
         return explicit.strip()
+    if event_type == "result":
+        response = event.get("response")
+        if isinstance(response, str) and response.strip():
+            return response.strip()
     if "final" in event_type or event.get("role") == "assistant":
         text = _find_text_payload(event)
         if text:
             return text
-    if event_type in {"assistant_message", "agent_message", "message", "response"}:
+    if event_type in {
+        "assistant_message",
+        "assistant.message",
+        "agent_message",
+        "message",
+        "response",
+    }:
         text = _find_text_payload(event)
         if text:
             return text
@@ -1097,7 +1280,7 @@ def _find_text_payload(value: Any) -> str | None:
     if isinstance(value, str):
         return value.strip() or None
     if isinstance(value, dict):
-        for key in ("text", "content", "message", "answer", "output"):
+        for key in ("text", "content", "message", "answer", "output", "response"):
             nested = value.get(key)
             if isinstance(nested, str) and nested.strip():
                 return nested.strip()

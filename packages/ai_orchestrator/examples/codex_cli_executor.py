@@ -457,7 +457,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--cost-policy",
         choices=[item.value for item in CostPolicyTier],
-        default=CostPolicyTier.ALLOWANCES_ALLOWED.value,
+        default=CostPolicyTier.PREPAID_CREDITS_ALLOWED.value,
         help="Maximum billing boundary this task may cross.",
     )
     parser.add_argument(

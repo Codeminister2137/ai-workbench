@@ -147,7 +147,7 @@ class TaskProfile:
     quality_threshold: QualityThreshold = QualityThreshold.STANDARD
     latency_target: LatencyTarget = LatencyTarget.INTERACTIVE
     max_expected_latency_seconds: float | None = None
-    cost_policy_tier: CostPolicyTier = CostPolicyTier.ALLOWANCES_ALLOWED
+    cost_policy_tier: CostPolicyTier = CostPolicyTier.PREPAID_CREDITS_ALLOWED
     user_route_id_override: str | None = None
     user_access_method_override: AccessMethod | None = None
     user_backend_override: str | None = None

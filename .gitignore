@@ -3,8 +3,10 @@
 .env.*
 !.env.example
 CURRENT_CONTEXT.md
+user-config.toml
 
 # Local runtime data
+artifacts/
 data/
 logs/
 *.log
@@ -13,6 +15,7 @@ logs/
 *.sqlite3-*
 
 # Private documents and generated artifacts
+RESEARCH_*.md
 *.pdf
 sent_emails.txt
 docs/plans/
@@ -40,6 +43,7 @@ env/
 
 # Tooling
 .uv-cache/
+.tools/
 .codex/
 
 # IDE and OS files

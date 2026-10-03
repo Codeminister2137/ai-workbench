@@ -123,7 +123,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--cost-policy",
         choices=[c.value for c in CostPolicyTier],
-        default=CostPolicyTier.ALLOWANCES_ALLOWED.value,
+        default=CostPolicyTier.PREPAID_CREDITS_ALLOWED.value,
         help="Primary task cost policy tier",
     )
     parser.add_argument(

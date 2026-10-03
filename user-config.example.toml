@@ -1,0 +1,7 @@
+# Copy to user-config.toml for private preferences. CLI flags override these values.
+[defaults]
+cost_policy = "prepaid_credits_allowed"
+
+# Automatic same-tier fallback on usage limits is on by default.
+[fallback]
+enabled = true
