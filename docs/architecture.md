@@ -1,5 +1,9 @@
 # Architecture
 
+For package responsibilities, start with the [project map](project-map.md).
+The repo assistant's [workflow guides](repo-coding-assistant.md) describe current
+execution surfaces; [publication](publication.md) covers source/history privacy.
+
 ## 1. Overall direction
 The projects form a small ecosystem:
 

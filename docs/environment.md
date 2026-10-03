@@ -26,7 +26,7 @@ Use either the PyCharm Terminal tab or a normal Windows PowerShell window.
 Run commands from the repository root:
 
 ```powershell
-cd C:\Users\Jakub\PycharmProjects\AI-projects
+cd C:\path\to\ai-workbench
 ```
 
 Confirm the directory:
@@ -53,7 +53,7 @@ The wrapper script:
 
 1. finds the repository root;
 2. loads `.env` into the script process if `.env` exists;
-3. starts `packages\ai_provider\examples\repo_coding_assistant.py`;
+3. invokes the stable `ai-assistant` workspace entry point through `uv`;
 4. passes the rest of your command arguments through to the Python CLI.
 
 This means you normally do not need to manually run separate `.env` loading
@@ -79,6 +79,12 @@ This affects only the current terminal session. Opening a new terminal requires
 loading `.env` again, unless you use `.\scripts\repo-assistant.ps1`.
 
 ## Current Variables
+
+Public research discovery additionally uses `TAVILY_API_KEY`,
+`BRAVE_SEARCH_API_KEY`, `BRAVE_SEARCH_FREE_ONLY_CONFIRMED` and
+`BRAVE_SEARCH_STORAGE_ALLOWED`. Copy only the empty placeholders in `.env.example`.
+Confirmations must reflect actual account settings; they do not replace
+provider-side billing controls.
 
 Provider defaults:
 
@@ -110,7 +116,7 @@ Prefer `GEMINI_API_KEY` when using Google AI Studio style Gemini credentials.
 Local Ollama model location:
 
 ```text
-OLLAMA_MODELS=D:\AI\Ollama\models
+OLLAMA_MODELS='D:\AI\Ollama\models'
 ```
 
 Optional external-agent command overrides:
@@ -157,6 +163,8 @@ falls back to `OPENAI_API_KEY` for OpenAI, `REQUESTY_API_KEY` for Requesty, and
 - Do not add real values to `.env.example`.
 - Review `git diff` and `git status --short` before committing after touching
   configuration.
+- Ignored paths can remain in earlier commits. Review reachable history before
+  publishing; see [publication and privacy](publication.md).
 
 ## Hosted Provider Setup
 

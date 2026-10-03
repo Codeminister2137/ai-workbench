@@ -31,10 +31,12 @@ Use this file to decide where a change belongs before adding new abstractions.
 - `project-map.md` — this navigation index.
 - `definition-of-done.md` — completion checklist.
 - `api-docs.md` — generated Python API documentation workflow using `pdoc`.
-- `repo-coding-assistant.md` — practical runbook for the repo-aware coding
-  assistant CLI, including setup, commands, provider selection, and precautions.
-- `plans/` — ignored private local project plans, when present. They are not
-  part of the public repository.
+- `repo-coding-assistant.md` — entry point for the repo-aware CLI workflow guides.
+- `repo-assistant/` — focused CLI workflow guides for execution, research,
+  review, chat, native clients, permissions and scheduling.
+- `publication.md` — source/history privacy checks and safe branch publication.
+- `plans/` — ignored private local project plans, when present. They are excluded
+  from the current tracked tree; publication still requires a history review.
 
 ## Layout
 

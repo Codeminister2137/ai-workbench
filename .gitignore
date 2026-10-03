@@ -4,6 +4,7 @@
 !.env.example
 CURRENT_CONTEXT.md
 user-config.toml
+/apps/ai_council/council.json
 
 # Local runtime data
 artifacts/
@@ -17,6 +18,7 @@ logs/
 # Private documents and generated artifacts
 RESEARCH_*.md
 *.pdf
+*.docx
 sent_emails.txt
 docs/plans/
 docs/api-reference/

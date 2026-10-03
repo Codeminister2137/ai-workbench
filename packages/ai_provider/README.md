@@ -19,9 +19,15 @@ answers, or implement job-search logic.
 - Provider factory for configured chat clients.
 - Local Ollama inventory, pull, runtime, and capability helpers.
 - Repo-aware coding assistant CLI support.
-- Codex CLI executor integration for approved external-agent routes.
+- Native Codex, Copilot, Antigravity and Kiro executors for approved routes.
+- Same-tier usage fallback and explicit private configuration at the CLI boundary.
+- Local chat transcripts, supervised research workers and foreground scheduling.
 
-See `docs/interface.md` for the one-page interface spec and capability matrix.
+The adapters implement provider behavior. The repo-assistant modules compose
+orchestrator policy and agent tools at an application boundary; they do not make
+provider contracts responsible for routing or report quality.
+
+See the [interface specification](docs/interface.md) for the capability matrix.
 
 ## Minimal Usage
 
@@ -92,9 +98,16 @@ The Windows convenience wrapper is:
 .\scripts\repo-assistant.ps1 "Explain this repository structure."
 ```
 
-See `docs/repo-coding-assistant.md` for modes, provider selection, local Ollama
-startup, Codex CLI routes, transcript logging, approval policies, and native
-tool execution.
+See the [CLI guide](../../docs/repo-coding-assistant.md) for modes, provider
+selection, local runtime startup, external agents, chat, research and permissions.
+Argument registration lives in `repo_assistant_args.py`; execution composition
+remains in `repo_coding_assistant.py`. Neither a planned request nor an acceptance
+`--plan` requires inference.
+
+Research review supports an optional local tokenizer file with verified profile
+checks and conservative fallback. The optional `research-token-count` dependency
+group is needed for exact counting; tokenizer assets are not bundled or downloaded
+automatically. See [review settings](../../docs/repo-assistant/research-review.md).
 
 ## Orchestrator Composition
 

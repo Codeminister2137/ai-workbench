@@ -86,6 +86,11 @@ List stored conversations:
 
 Answers are saved to `data/council.sqlite3`.
 
+Configuration, conversation history and logs are private local state. Local
+inference does not make saved prompts anonymous; inspect outputs before sharing.
+The private `council.json`, databases and logs are ignored. See the
+[publication and privacy guide](../../docs/publication.md) before publishing.
+
 ## Checks
 
 ```powershell

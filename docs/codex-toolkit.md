@@ -1,74 +1,51 @@
-# Codex Toolkit Notes
+﻿# Local development toolkit
 
-This file records reusable Codex/PyCharm setup that may later be transferred to
-other projects. It is operational tooling context, not an architecture decision.
+Portable repository tooling notes. Machine-specific IDE settings, runtime paths,
+account state and immediate agent handoffs belong in ignored local files.
 
-## PyCharm Codex Approval Watcher
+## Workspace commands
 
-Purpose: keep JetBrains PyCharm's integrated Codex agent on workspace-write
-execution without repeated file-edit approval prompts.
-
-Observed issue:
-
-- PyCharm 2025.3 can rewrite
-  `C:\Users\Jakub\AppData\Local\JetBrains\PyCharm2025.3\aia\codex\config.toml`
-  back to `approval_policy = "on-request"` during Codex startup.
-- Setting the file to read-only prevents PyCharm from initializing the ACP
-  process, so read-only config is not viable.
-- The desired behavior is:
-
-```toml
-approval_policy = "never"
-sandbox_mode = "workspace-write"
-```
-
-Current workaround:
-
-- A user-startup watcher rewrites `config.toml` back to `approval_policy =
-  "never"` if PyCharm changes it.
-- SQLite triggers in Codex's `state_5.sqlite` force AI-projects thread rows to
-  `approval_mode = "never"`.
-- This does not replace product/architecture/security decision approvals in
-  `AGENTS.md`; it only removes repeated runtime file-permission prompts.
-
-Installed paths:
-
-```text
-C:\Users\Jakub\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\CodexApprovalNeverWatcher.cmd
-C:\Users\Jakub\AppData\Local\JetBrains\PyCharm2025.3\aia\codex\approval-workaround-backups\codex_approval_never_watcher.ps1
-C:\Users\Jakub\AppData\Local\JetBrains\PyCharm2025.3\aia\codex\approval-workaround-backups\revert_ai_projects_approval_workaround.ps1
-```
-
-Verification:
+Run these from the repository root after configuring the project interpreter:
 
 ```powershell
-Get-Content "$env:LOCALAPPDATA\JetBrains\PyCharm2025.3\aia\codex\config.toml" -Raw
-& "$env:LOCALAPPDATA\JetBrains\PyCharm2025.3\aia\codex\bin\codex-x86_64-pc-windows-msvc.exe" doctor
+uv run --no-sync ai-assistant --mode plan "Explain the repository structure."
+uv run --no-sync pytest
+uv run --no-sync ruff check .
+uv run --no-sync ruff format --check .
+uv run --no-sync pyright
 ```
 
-Expected `doctor` output includes:
+Planning does not contact an inference provider. Live integration tests are
+separately enabled through explicit environment switches; keep them disabled
+when only validating software or when local compute is unavailable.
 
-```text
-approval policy Never
-filesystem sandbox restricted
-network sandbox restricted
-```
+## IDE and agent context
 
-Revert:
+Use the SDK configured for the project. Follow [AGENTS.md](../AGENTS.md) for
+implementation boundaries and [the workflow](workflow.md) for validation.
+The [prompt library](prompt-library.md) is the canonical repository source for
+named Codex prompts. Local copies and IDE configuration can differ by machine.
+
+`CURRENT_CONTEXT.md` is an ignored immediate handoff. Keep it short: active task,
+current permissions, verified results, unresolved decisions and an imperative
+next action. Archive historical detail locally and link to durable ADRs rather
+than accumulating superseded instructions in the current handoff.
+
+Use the existing session-boundary helper when context pressure becomes material:
 
 ```powershell
-python "$env:LOCALAPPDATA\JetBrains\PyCharm2025.3\aia\codex\approval-workaround-backups\revert_ai_projects_approval_workaround.py"
+.\scripts\session-boundary.ps1
 ```
 
-If the PowerShell revert script exists and is newer, prefer:
+A tooling permission setting does not authorize architectural changes, credential
+transmission, paid inference or publication. Those remain explicit task boundaries.
+This public guide does not prescribe changing IDE approval policies or editing
+private tool databases.
 
-```powershell
-& "$env:LOCALAPPDATA\JetBrains\PyCharm2025.3\aia\codex\approval-workaround-backups\revert_ai_projects_approval_workaround.ps1"
-```
+## Sharing and publication
 
-Transfer note:
-
-- Treat this as a local JetBrains/Codex integration workaround.
-- Re-check the target IDE version and Codex paths before transferring.
-- Prefer an official PyCharm/Codex setting if JetBrains later exposes a
-  workspace-write/no-approval mode.
+Do not publish private machine paths, account status, runtime configuration,
+transcripts or handoffs merely to demonstrate that a local tool works. Use neutral
+placeholders in examples and inspect reachable Git history before publishing.
+See [publication and privacy](publication.md), [environment](environment.md) and
+[Git workflow](git-workflow.md).

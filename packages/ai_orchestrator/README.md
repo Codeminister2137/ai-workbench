@@ -66,6 +66,17 @@ continues partial work by default; see ADR-032 and the CLI runbook.
 
 ## Model Catalog
 
+Research-specific neutral contracts also live here:
+
+- `review.py`: reviewer/model-mode selection and bounded output/deadline allocation;
+- `scheduling.py`: full-allocation time admission without execution or persistence;
+- `repair.py`: progress classification and final-review reserve;
+- `search_policy.py` and `tool_profiles.py`: explicit route and tool-surface policy.
+
+Application composition owns runtime inspection, SQLite records and process
+supervision. See the [CLI guides](../../docs/repo-coding-assistant.md) and
+[architecture](../../docs/architecture.md).
+
 Use a TOML catalog with `[[models]]` entries. See `examples/model_catalog.toml`.
 Catalog entries may include optional source-labelled numeric estimates under
 `[models.estimate]`, such as typical latency and input/output cost per million

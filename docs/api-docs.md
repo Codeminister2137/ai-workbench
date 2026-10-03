@@ -18,7 +18,7 @@ formats.
 From the repository root:
 
 ```powershell
-python -m uv run pdoc -o docs\api-reference ai_provider ai_orchestrator
+python -m uv run pdoc -o docs\api-reference ai_provider ai_orchestrator ai_agent
 ```
 
 The generated `docs/api-reference/` directory is ignored by Git. Commit source

@@ -10,11 +10,11 @@ The repository is organized as a modular monorepo. Reusable libraries live under
 
 | Area | Location | Status |
 | --- | --- | --- |
-| Provider layer | `packages/ai_provider/` | Working local Ollama, OpenAI-compatible, Requesty, streaming, usage metadata, local capability, and repo-assistant support. |
-| Orchestrator | `packages/ai_orchestrator/` | Working prompt review, model catalog, route recommendation, execution planning, prompt refinement, and delegation planning primitives. |
-| Agent tooling | `packages/ai_agent/` | Working provider-neutral tool contracts, permission policies, coding tools, authorization diagnostics, and multi-turn tool loop. |
+| Provider layer | [ai-provider](packages/ai_provider/README.md) | Local and hosted adapters, streaming, native-client executors, persistent chat, and CLI composition. |
+| Orchestrator | [ai-orchestrator](packages/ai_orchestrator/README.md) | Neutral routing, same-tier fallback, reviewer selection, repair progress and time-admission contracts. |
+| Agent tooling | [ai-agent](packages/ai_agent/README.md) | Permission-controlled coding tools, protected public research, report validation and source evidence. |
 | AI Council | `apps/ai_council/` | Local prototype using Ollama through the provider layer, with browser and CLI entry points. |
-| Job search automation | `apps/job_search/` | Early prototype code only. Broader automation is not production-ready. |
+| Job search automation | [Job-search prototypes](apps/job_search/README.md) | Early email prototype only; broader automation is not production-ready. |
 
 ## What Works Today
 
@@ -28,10 +28,18 @@ The repository is organized as a modular monorepo. Reusable libraries live under
 ```
 
 - Run deterministic orchestration passes without contacting a provider.
+- Produce public-source research reports using local inference, retrieval receipts
+  and bounded advisory review.
+- Plan research jobs offline and explicitly start a foreground sequence only when
+  each task fits its full allocation.
 - Run a local AI Council prototype with Ollama.
 
 Most hosted or external-provider paths are opt-in and require explicit privacy,
 cost-policy, and credential configuration.
+
+Research quality-first review remains opt-in. Deterministic validation establishes
+structure and executed receipts, not factual accuracy. Sustained live acceptance
+is still incomplete; the software tests and model-quality evaluation are separate.
 
 ## Quick Start
 
@@ -53,7 +61,13 @@ python -m uv run pyright
 Run a dry repo-assistant request:
 
 ```powershell
-.\scripts\repo-assistant.ps1 "Summarize this repository structure."
+uv run --no-sync ai-assistant --mode plan "Summarize this repository structure."
+```
+
+Inspect a research acceptance plan without loading models or creating run state:
+
+```powershell
+uv run --no-sync python scripts/research-acceptance.py --plan --model gpt-oss:20b
 ```
 
 Run the AI Council prototype:
@@ -92,15 +106,17 @@ understandable.
 
 Key docs:
 
-- `docs/architecture.md` - architecture and boundaries
-- `docs/decisions.md` - decision index and ADR links
-- `docs/environment.md` - environment variables and secret handling
-- `docs/repo-coding-assistant.md` - repo-aware coding assistant guide
-- `docs/project-map.md` - where responsibilities belong
-- `docs/definition-of-done.md` - validation checklist
+- [Architecture](docs/architecture.md) and package boundaries
+- [Decision index](docs/decisions.md) and ADRs
+- [Environment](docs/environment.md) and secret handling
+- [Repo assistant](docs/repo-coding-assistant.md) workflow guides
+- [Project map](docs/project-map.md) and responsibility ownership
+- [Definition of done](docs/definition-of-done.md)
+- [Publication and privacy review](docs/publication.md)
 
 Private planning notes may exist locally under `docs/plans/`, but that
-directory is ignored and is not part of the public repository.
+directory is ignored in the current source tree. Ignoring a file does not remove
+previously committed copies from Git history; publication requires a history review.
 
 ## Repository Layout
 
