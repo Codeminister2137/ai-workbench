@@ -157,6 +157,22 @@ class OllamaChatClient:
                     "role": message.role.value,
                     "content": message.content,
                     **(
+                        {
+                            "tool_calls": [
+                                {
+                                    "type": "function",
+                                    "function": {
+                                        "name": call.name,
+                                        "arguments": call.arguments,
+                                    },
+                                }
+                                for call in message.tool_calls
+                            ]
+                        }
+                        if message.tool_calls
+                        else {}
+                    ),
+                    **(
                         {"tool_name": message.name}
                         if message.role.value == "tool" and message.name
                         else {}
@@ -171,6 +187,20 @@ class OllamaChatClient:
             options["temperature"] = request.temperature
         if request.max_output_tokens is not None:
             options["num_predict"] = request.max_output_tokens
+        context_length = request.metadata.get("ollama_context_length")
+        if context_length is not None:
+            if (
+                not isinstance(context_length, int)
+                or isinstance(context_length, bool)
+                or context_length < 1
+            ):
+                raise ValueError("ollama_context_length must be a positive integer")
+            options["num_ctx"] = context_length
+        thinking = request.metadata.get("ollama_thinking")
+        if thinking is not None:
+            if not isinstance(thinking, (bool, str)):
+                raise ValueError("ollama_thinking must be a boolean or supported level")
+            payload["think"] = thinking
         if options:
             payload["options"] = options
         if request.tools:

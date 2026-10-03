@@ -17,6 +17,9 @@ dev = [
     "pre-commit>=4.0,<5.0",
     "pdoc>=16.0.0",
 ]
+research-token-count = [
+    "tokenizers==0.23.2",
+]
 
 [tool.uv.workspace]
 members = [

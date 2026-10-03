@@ -9,6 +9,7 @@ from ai_provider import (
     AIRequest,
     AIStreamDelta,
     AIStreamFinal,
+    AIToolCall,
     BackendLocation,
     FinishReason,
     MessageRole,
@@ -47,6 +48,51 @@ class FakeStreamingHttpResponse:
     def __iter__(self):
         for payload in self.payloads:
             yield json.dumps(payload).encode("utf-8") + b"\n"
+
+
+def test_ollama_preserves_assistant_tool_calls_before_tool_results():
+    client = OllamaChatClient(BackendConfig(provider=ProviderKind.OLLAMA, model="test"))
+    payload = client._chat_payload(
+        AIRequest(
+            messages=(
+                AIMessage(MessageRole.USER, "Fetch evidence"),
+                AIMessage(
+                    MessageRole.ASSISTANT,
+                    "",
+                    tool_calls=(
+                        AIToolCall("fetch-1", "fetch_url", {"url": "https://example.com"}),
+                    ),
+                ),
+                AIMessage(MessageRole.TOOL, "Evidence", name="fetch_url", tool_call_id="fetch-1"),
+            )
+        ),
+        stream=False,
+    )
+    assert payload["messages"][1]["tool_calls"] == [
+        {
+            "type": "function",
+            "function": {"name": "fetch_url", "arguments": {"url": "https://example.com"}},
+        }
+    ]
+    assert payload["messages"][2] == {
+        "role": "tool",
+        "content": "Evidence",
+        "tool_name": "fetch_url",
+    }
+
+
+def test_ollama_applies_explicit_research_runtime_options():
+    client = OllamaChatClient(BackendConfig(provider=ProviderKind.OLLAMA, model="gpt-oss:20b"))
+    payload = client._chat_payload(
+        AIRequest(
+            messages=(AIMessage(MessageRole.USER, "research"),),
+            max_output_tokens=8000,
+            metadata={"ollama_context_length": 32768, "ollama_thinking": "low"},
+        ),
+        stream=False,
+    )
+    assert payload["options"] == {"num_ctx": 32768, "num_predict": 8000}
+    assert payload["think"] == "low"
 
 
 def test_ollama_adapter_posts_neutral_request_and_normalizes_response(
