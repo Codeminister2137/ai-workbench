@@ -112,6 +112,25 @@ class SQLiteOrchestratedRunStore:
                 """
             )
 
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS scheduled_research_tasks (
+                    task_id TEXT PRIMARY KEY,
+                    created_at_utc TEXT NOT NULL,
+                    updated_at_utc TEXT NOT NULL,
+                    repo_root TEXT NOT NULL,
+                    prompt TEXT NOT NULL,
+                    model TEXT NOT NULL,
+                    required_seconds REAL NOT NULL CHECK(required_seconds > 0),
+                    status TEXT NOT NULL CHECK(status IN
+                        ('planned', 'running', 'completed', 'failed', 'deferred')),
+                    exit_code INTEGER,
+                    reason TEXT,
+                    schema_version INTEGER NOT NULL DEFAULT 1
+                )
+                """
+            )
+
     def create_run(
         self,
         *,
