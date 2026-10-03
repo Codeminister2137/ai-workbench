@@ -127,7 +127,49 @@ explicitly needs that escalation and the route/cost boundary is reported.
 
 Evolution should be incremental: manual model choice → static rules → capability-aware selector → quota-aware selector → adaptive selector.
 
+The opt-in research policy uses `ai_orchestrator.review` for explainable neutral
+reviewer/mode plans and resource admission. `ai_provider.research_review` checks
+installed native controls and maps boolean thinking separately from named effort.
+It preserves full evidence, clamps generation/time, and permits one stronger
+output-truncation retry. Legacy selection remains the default. Representative
+evaluation precedes conditional research-only default activation;
+public-source excerpt persistence is permitted only for local evaluation artifacts.
+Production excerpts remain process-local. See ADR-038 for accepted limits and gates.
+
+The optional provider-owned local tokenizer file supplies complete research-review
+input counts only for fingerprint-verified framing. The renderer is shared with
+the offline diagnostic. Unsupported or unavailable profiles retain conservative
+byte admission; assets are never automatically downloaded and no private runner
+endpoint is required. See the research runbook for the intentionally bounded scope.
+
+`ai_orchestrator.scheduling` implements pure foreground time-admission contracts:
+tasks stay planned
+until an explicit command supplies an execution window, then sequential time
+admission checks each required allocation against remaining time. No background
+daemon or distributed service is approved. `ai_provider.task_scheduler` persists
+immutable executable research definitions and lifecycle state in an additive table
+in the existing run SQLite database. Its foreground CLI starts explicitly selected
+tasks through the existing research supervisor and stops at the first refusal or
+failure, preserving waiting tasks. Local-only/free-only research controls apply;
+planning/listing load no models. Per-definition claims prevent duplicate starts,
+but independent foreground invocations are not a global queue. Generic executor
+cancellation remains unsupported. See ADR-039.
+
 ## 4.1 Authorization and approval policy
+
+Task profiles default to `PREPAID_CREDITS_ALLOWED`. The repo assistant overlays
+private TOML user preferences before routing; explicit CLI flags take precedence.
+Paid Requesty catalog routes require prepaid authorization; the separate free
+route checks live zero prices before each inference request. See ADR-031 for the
+user-preference format and alternate official CLI adapters.
+
+Default usage-limit fallback policy belongs to `ai_orchestrator.fallback`.
+The CLI preflights eligible executors, preserves the working tree, and supplies
+an observed-state handoff. Replacement routes stay on the same billing tier,
+retain task/privacy/approval constraints, and may have a lower quality grade
+when task requirements are met. Exhausted billing buckets are excluded for the
+run; no persistent quota registry is introduced. See ADR-032.
+
 External user authorization is a shared infrastructure concern, not a per-tool
 implementation detail. GitHub, Codex plugins/apps, cloud deployment targets,
 document/control tools, issue trackers, and similar services should use one
@@ -217,6 +259,36 @@ workflow. Add the dependency only when the dependent package cannot usefully exi
 without the other package's contract.
 
 ## 11. Architecture decision boundary
+Generated run output is grouped under ignored `artifacts/<run>/`, including
+reports, logs, acceptance workspaces, and dedicated run databases. Shared ongoing
+application state stays in `data/`. Authorized artifact relocations preserve
+original write receipts and add digest-bound path mappings in existing stage
+metadata; see ADR-035.
+
+The explicit research tool profile uses neutral selection in `ai_orchestrator`,
+public fetching/report tools and deterministic report checks in `ai_agent`, and
+CLI/run-store composition in `ai_provider`. Actual tool receipts reuse existing
+SQLite implementation-stage metadata. Research requires local provider-native
+execution; external clients own their registries and cannot preserve this
+restricted surface. See ADR-033 for fetching, permission, and evidence boundaries.
+`ai_provider.research_runner` supervises one foreground research worker, enforces
+its elapsed budget, and records timeout handoffs without a daemon or new store.
+`ai_provider.research_refinement` composes repeated report review, native execution,
+and validation through existing stages after structural success. It shares repair
+limits, reserves final-review time, and detects repeated report/source no-progress.
+Research model requests also respect the remaining attempt allocation.
+ADR-036 composes Tavily, Brave, and SearXNG discovery with bounded free-only
+fallback. Neutral route eligibility belongs to `ai_orchestrator.search_policy`,
+HTTP adapters/tool execution to `ai_agent.tools.research_search`, and CLI/run
+evidence composition to `ai_provider.research_execution`. Reduced tracking stays
+on SearXNG; local inference is independent of public search transmission.
+Full query/attempt receipts remain separate from source-fetch evidence.
+ADR-037 adds process-local source excerpt retention in `ai_agent.research_evidence`,
+composed by `ai_provider.research_execution` for advisory local review. An optional
+run-wide successful-final-URL maximum is checked by the HTTP fetcher before body
+reads. Receipts and the configured maximum reuse existing stage metadata; source
+text does not receive a new persistent store or reviewer retrieval tools.
+
 Codex must ask before making material decisions involving new services, persistent storage, major dependencies, microservice extraction, public API/schema changes, provider policy, privacy/data routing, automatic external actions, autonomous AI optimization, or significant shared-interface changes.
 
 ## 12. Architecture change process

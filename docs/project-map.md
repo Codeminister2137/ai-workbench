@@ -3,8 +3,12 @@
 Use this file to decide where a change belongs before adding new abstractions.
 
 ## Root
+- `artifacts/<run>/` — ignored generated reports, logs, acceptance workspaces,
+  and dedicated run databases; shared ongoing state remains in `data/`.
 - `AGENTS.md` — general Codex rules; especially the requirement to ask the user at material decision boundaries.
 - `CURRENT_CONTEXT.md` — local ignored immediate handoff, when present: last completed work, open conflicts/risks, validation status, and next plan.
+- `user-config.example.toml` — shared preference example; ignored
+  `user-config.toml` contains private repo-assistant defaults.
 - `pyproject.toml` — uv workspace and shared validation configuration.
 - `uv.lock` — workspace dependency lockfile.
 - `scripts/repo-assistant.ps1` — one-command launcher that loads `.env` and

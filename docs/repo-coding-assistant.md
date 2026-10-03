@@ -1,5 +1,73 @@
 # Repo Coding Assistant CLI
 
+## Private preferences and alternate agents
+
+Copy `user-config.example.toml` to ignored `user-config.toml` in the repo root,
+or use `--user-config <path>`. Explicit CLI flags override user preferences,
+which override shipped defaults. Explicitly named missing or invalid config
+files fail before routing. The shipped cost ceiling is `prepaid_credits_allowed`;
+the owner's local file uses `allowances_allowed`:
+
+```toml
+[defaults]
+cost_policy = "allowances_allowed"
+```
+
+Enum members use uppercase names such as `CostPolicyTier.ALLOWANCES_ALLOWED`;
+serialized values and variables use lowercase snake_case for both cost tiers.
+Requesty remains a provider API route using `REQUESTY_API_KEY`. Paid catalog
+routes require `prepaid_credits_allowed`. The separate
+`requesty-free-gemma-4-31b` route uses `free_only` and verifies live zero pricing
+before every inference request, including tool-loop turns and model overrides.
+Missing or changed prices block inference; there is no paid fallback. Requesty
+currently advertises 200 free requests per day for free models. This pricing
+preflight is not an atomic service-side billing guarantee.
+
+Run opt-in synthetic coding acceptance with
+`uv run python scripts/alternate-agent-acceptance.py`. Select only the free
+Requesty route with `--routes requesty-free-gemma-4-31b`. Live completion/tool
+tests require `AI_PROVIDER_RUN_REQUESTY_FREE_INTEGRATION=1`; they assert reported
+zero cost. Ordinary tests mock the API and do not spend requests. The tested
+Gemma route reports no training but 30-day retention; acceptance sends only
+synthetic fixtures. An inference key needs no Requesty admin permissions.
+
+Antigravity, Copilot, and Kiro use official clients and native tools/sign-in.
+Set `ANTIGRAVITY_COMMAND`, `GITHUB_COPILOT_COMMAND`, or `KIRO_COMMAND` to an
+executable path, or install the client on PATH. Windows Kiro discovery also
+checks `%LOCALAPPDATA%/Kiro-Cli/kiro-cli.exe`.
+Only `--approval-policy trusted_local` is mapped for these three clients:
+
+| Client | Native automatic approval |
+| --- | --- |
+| Antigravity | `--dangerously-skip-permissions` |
+| Copilot | `--allow-all` |
+| Kiro | `--trust-all-tools` |
+
+Other approval modes are not mapped yet and fail before execution. These modes
+grant broad native tool access without a project workspace sandbox; native
+hooks/MCP servers and account permissions apply. Codex-specific image, search,
+schema, MCP, output-file, and resume flags are rejected on alternate routes.
+Native session retention remains client-owned; alternate ephemeral/resume
+controls are not mapped yet.
+
+```powershell
+.\scripts\repo-assistant.ps1 --mode ask "Reply CONNECTED; do not call tools." `
+  --execute --privacy external_allowed --route-id kiro-cli-default `
+  --approval-policy trusted_local --skip-prompt-review
+```
+
+Other route IDs: `github-copilot-cli-default`,
+`google-antigravity-gemini-3-1-pro`, and `requesty-openai-gpt-5-mini`.
+Model slugs/entitlement may change: inspect the client's model list or use
+`--model`. Kiro and Copilot default routes use native automatic selection.
+Antigravity uses stream JSON input/output; Kiro uses ACP JSONL. Copilot supplies
+the prompt through `-p` without shell interpolation. Its prompt appears in
+process arguments but is omitted from command previews. Installed Kiro was
+verified with existing sign-in; current headless docs describe `KIRO_API_KEY`.
+Authentication and credits are separate from command availability. The catalog
+ceiling does not enforce service-side overage settings. Live quota discovery
+and automatic continuation remain follow-up work. See ADR-031 for sources.
+
 This is a practical guide for using the local repo-aware coding assistant CLI
 when the PyCharm AI Assistant / Codex quota is unavailable.
 
@@ -80,7 +148,7 @@ python -m uv run ai-assistant --mode plan "Review this module."
 
 On Windows, `scripts\repo-assistant.ps1` remains the convenient wrapper because
 it loads `.env`, starts the command from the repository root, and adds a
-timestamped transcript log under `logs\` when `--log-file` is not supplied.
+timestamped transcript under `artifacts/repo-assistant-<timestamp>/` when `--log-file` is not supplied.
 
 The CLI supports explicit modes:
 
@@ -168,6 +236,478 @@ The staged workflow exposes a default repair policy of three repair cycles. Use
 of the run, the final handoff is responsible for preserving the validation
 details, blockers, and next action for the returning user.
 
+Implementation repairs stop with `repair status=stalled` after two consecutive
+attempts leave both workspace content and validation failure evidence unchanged.
+This guard also applies to `--max-repair-cycles -1`. File additions, deletions,
+and content edits count, including ignored `RESEARCH_*.md` reports. Changed
+validation evidence resets the counter; ordinary duration changes do not.
+Assistant claims and tool-call counts alone do not establish progress. Content
+fingerprints are local, and logs, databases, caches, virtual environments, and
+IDE bookkeeping are excluded so run tracking cannot sustain an ineffective loop.
+Progress means observed change, not proof that the change is useful or correct.
+Repair stage details record each classification, changed paths, and stop reason.
+
+Repair and deterministic validation reserve ten percent of the away budget,
+capped at 120 seconds, for local scrutiny and final handoff. Validation command
+timeouts share the available allocation. Repair requests use at most half the
+remaining repair allocation, leaving time for validation. These are scheduling
+and request-timeout limits: native multi-turn execution, running tools, Ollama
+startup, and external clients with inactivity timeouts can still overrun them.
+This slice does not add process-wide hard cancellation. If time is exhausted,
+scrutiny is explicitly recorded as skipped and clean completion is withheld.
+
+Executed orchestrated implementations run local-only scrutiny after the last
+validation/repair attempt, for both provider-native and external CLI routes.
+The reviewer receives the original task, latest response, deterministic
+validation evidence, observed changed paths, and bounded text excerpts from
+changed files, including ignored reports. It uses the existing structured
+scrutiny report format and honors the configured Ollama startup settings. It
+does not run tools or silently escalate to a paid reviewer. Its findings cannot
+override deterministic validation failure. Failed, invalid, skipped, or non-pass
+review is visible in stage details and final handoff risks; a previously clean
+status becomes `completed_with_scrutiny_errors` or
+`completed_with_scrutiny_findings`. This is a bounded claims review, not a full
+code audit, model-quality evaluation, or research-source verifier.
+
+### Disposable research reports
+
+`scripts/repo-assistant-research.ps1` selects `--tool-profile research` and
+`--research-report PATH` for local provider-native orchestrated implementation.
+The profile exposes only `fetch_url`, `read_research_report`, and
+`write_research_report`; shell, generic editing, and delegation are unavailable.
+The wrapper allows 40 native tool rounds per attempt and a 300-second request
+timeout. Research requires a loopback Ollama server and an installed model whose
+runtime and catalog both support tools. A model's availability does not establish
+quality. The wrapper defaults to `gpt-oss:20b`, which passed the earlier local
+native-tool plumbing acceptance. `-Model` can override it; catalog routing and
+the installed runtime's tool capability must both pass preflight before auxiliary
+inference or primary research starts. A rejected primary records a failed handoff
+and skips auxiliary work, repair, and scrutiny.
+
+Research requests use a 32,768-token context unless an explicit `--ollama-profile`
+selects another size. Older tool excerpts/report drafts are compacted when the
+serialized history grows beyond a byte guard; task instructions, receipts, tool
+identifiers, and the latest exchange are preserved. This is an approximate size
+guard, not a tokenizer guarantee. The model can refetch sources or read its report.
+Transient provider response errors retry at most twice, without replaying tools.
+Progress is flushed to the UTF-8 transcript throughout execution.
+
+After structural repair succeeds, `ai_provider.research_refinement` repeatedly
+reviews the configured report, sends findings to the tool-capable primary agent,
+and validates each revision. A reviewer pass does not end improvement by itself.
+Structural repair also receives the saved report and actual receipts, with
+instructions to preserve correct content and source grounding while correcting
+mandatory validation failures. Length alone never triggers structural repair.
+The controller shares `--max-repair-cycles` with structural repairs (`-1` is
+budget-bounded), reserves ten percent of the budget (at most two minutes) for
+final review/handoff, and stops on errors or two consecutive attempts without
+changed report bytes or new source URL/content-digest evidence. Identical
+rewrites and repeated fetches with new timestamps do not count as progress.
+Changed bytes or source digests do not establish semantic improvement; superficial
+revisions can therefore continue until another guard or the budget stops the run.
+It attempts improvement throughout the available budget rather than sleeping
+to fill the requested duration.
+The supervisor remains the hard elapsed-time guard for blocking calls; scheduling
+and request bounds cannot guarantee that a blocked attempt leaves its reserve.
+Research attempts also check an absolute deadline before every model turn/retry
+and clamp each request timeout to the remaining attempt allocation. The initial
+attempt leaves the review reserve; subsequent attempts use their repair allocation.
+Refinement attempts and their preceding review findings persist under the
+existing repair stage's `research_refinement` metadata, including in-flight state.
+
+Research scrutiny receives the configured report excerpt and actual current-run
+fetch receipts, without unrelated workspace files. Report/excerpt truncation is
+explicit. Auxiliary reviewers have no retrieval tools: their URLs, dates, and
+suggestions never become fetch receipts. Review still cannot establish claim
+entailment without independently retrieved source bodies, so a pass is not a
+factual-quality certificate.
+
+Fetching uses existing CUSTOM permissions: `trusted_local` allows,
+`read_only` denies, and `interactive`/`workspace_write` ask. Writes use WRITE
+permissions. The profile requires `--privacy local_only --cost-policy local_only`
+and rejects legacy actions, context delegation, outside-workspace files, skipped
+validation, and external executors/fallback. Coding remains the default profile.
+
+Public HTTP(S) GETs validate every DNS result and redirect destination, connect
+to the validated address, and verify TLS. No credentials, cookies, ambient
+proxies, or custom headers are supplied. Requested sites receive URLs/query
+strings and ordinary request metadata; bounded source excerpts go to the local
+model. Ports 80/443, text/JSON/XHTML, five redirects, 512 KB retained bytes,
+12,000 returned text characters, and 40 links are supported. PDF, compressed,
+authenticated, and JavaScript-rendered sources are unsupported. Report writes
+are limited to the configured workspace Markdown target and 1 MB per write.
+
+The built-in deterministic gate reads the report locally without network or
+AI calls. Every report write returns actionable completion-check feedback to the
+model, and the final gate runs again before review and handoff.
+It requires all eight report sections promised by the wrapper and nonempty
+section content. Headings and source declarations inside code examples or HTML
+comments do not count as evidence or toward the advisory length guideline.
+Here, "visible" means report text after removing HTML comments, fenced code
+blocks, and horizontal rules, then trimming outer whitespace; it is not a rendered
+Markdown character count. The 7,000-character guideline is advisory: tool feedback
+and the standalone validator suggest reviewing substantive coverage below it,
+but length alone never fails completion or forces repair. Do not add filler.
+It is a completeness heuristic, not a factual-quality measurement. The standalone
+validator's `--min-chars N` customizes its advisory guideline; both validation paths
+enforce mandatory section, source, and receipt checks independently of length.
+
+Research exposes `search_web` with free-only Tavily, Brave, and SearXNG fallback
+(ADR-036). Standard `--search-provider auto` tries eligible routes in that order;
+missing credentials and setup requirements are recorded as skipped. The successful
+route persists through repairs. Each provider is tried at most once per query;
+quota/auth failures disable it for the run. Genuine empty results do not trigger
+fallback. `--no-search-fallback` or `[fallback] enabled=false` disables switching.
+Full submitted queries, skips/failures, provider, UTC time, response digest when
+available, and discovered URLs persist in `search_receipts`. These records and
+snippets cannot substitute for fetching linked sources with `fetch_url`.
+Research search options cannot be applied to the coding profile; incompatible
+options fail before execution rather than silently ignoring a tracking preference.
+
+`--search-privacy reduced_tracking` (wrapper `-SearchPrivacy reduced_tracking`)
+restricts discovery to SearXNG, including on failure. Its default endpoint is
+`https://search.mectov.my.id/search`, configurable via `--searxng-endpoint`.
+Public SearXNG reduces upstream identity tracking but its operator still receives
+query text and IP. `--search-privacy disabled` or `--search-provider none` removes
+discovery; explicit source fetching remains available. Search preferences are
+independent of local-only inference. Never submit secrets or private workspace
+content to any search provider.
+
+Set `TAVILY_API_KEY` for a free Researcher account. Usage is checked before every
+Basic query; unknown/paid plans, pay-as-you-go allowances, and exhausted credits
+are rejected. No provider-generated answers or raw extraction are requested.
+For Brave, set `BRAVE_SEARCH_API_KEY` only alongside confirmed account setup:
+`BRAVE_SEARCH_FREE_ONLY_CONFIRMED=1` means zero paid monthly usage allowance and
+auto-reload disabled; `BRAVE_SEARCH_STORAGE_ALLOWED=1` means the account permits
+saving returned data in transcripts. The standard Brave API terms restrict result
+retention; do not set this confirmation without applicable rights. The API cannot
+verify these declarations. Unconfigured Brave is skipped, not charged.
+See [Brave's billing and retention FAQ](https://api-dashboard.search.brave.com/documentation/resources/help-feedback).
+The research wrapper loads an existing ignored `.env` through uv; direct Python
+invocations use process environment. Keys never appear in receipts or tool output.
+
+The source map accepts Markdown tables, numbered lists, bullets with continuation lines, source
+subsections, or separate prose entries. Declare an HTTP(S) URL for each source,
+retrieval as `fetched` or `not fetched`, and an ISO `YYYY-MM-DD` access date for
+fetched sources. Dates must exist on the calendar and cannot be in the future.
+Sources not fetched may state `not accessed` instead of inventing a date.
+Optional source IDs use unique `S1`, `S2`, etc.; cite these as `[S1]`, or cite the
+declared URL directly. For example:
+
+```markdown
+| ID | URL | Accessed | Retrieval |
+| --- | --- | --- | --- |
+| S1 | https://provider.example/docs | YYYY-MM-DD | fetched |
+```
+
+Replace the example URL/date with actual source metadata. Candidate facts use
+`verified`, `inferred`, `unknown`, or `stale-risk` labels. Each candidate entry
+must cite a declared source unless it is explicitly `unknown`; `verified`
+requires a supporting source declared fetched. The verifier checks each candidate
+table row, numbered/bulleted list entry, subsection, or prose entry and rejects unresolved
+source IDs and URLs cited outside the source map. The risks section must state
+unknowns or uncertainties explicitly, including when none remain.
+
+The built-in gate additionally checks every claimed fetched URL/access date
+against successful fetch receipts from this run and requires the current report
+digest to match a report-write receipt. Receipts persist immediately in existing
+implementation-stage SQLite metadata and survive provider failure and repairs.
+They contain URLs, time, status, byte digest/length/truncation, and report-write
+metadata, rather than fetched page bodies. Retrieval evidence does not establish
+source authority, citation entailment, factual truth, or model quality.
+Use `--research-max-sources N` (wrapper `-MaxSources N`) for a tool-enforced per-run
+maximum. It is unset by default. Distinct successfully fetched final URLs count;
+failed requests and repeated reads do not consume new slots. Redirect aliases
+resolve before enforcement; at capacity a new final URL is rejected before its
+body is read. Resolving redirects can still make HTTP requests, so this is not a
+network-request maximum. The same policy/accounting applies across repairs and
+refinements. Natural-language limits alone remain model instructions.
+
+Local reviews also receive bounded in-memory source excerpts matched to their
+latest receipts. The latest thirty sources retain at most 12,000 UTF-8 bytes each;
+review text shares a balanced budget of up to 16,000 bytes, redistributing space
+left by short sources. JSON escaping and framing can reduce this budget to fit
+the existing request-byte bound without shrinking the report/receipt windows.
+Extraction/body truncation, omitted URLs, and unavailable text are
+explicit. HTML scripts/styles are excluded by the existing extractor. Excerpts
+are untrusted source data, and missing coverage cannot establish falsity. Findings
+remain advisory and guide refinement; there is no new semantic completion gate.
+Existing review outcomes and structural/receipt checks retain their behavior.
+
+Research uses a dedicated review prompt that separates source evidence from report
+claims and the completion summary. Quoted source passages precede the candidate
+report, with explicit coverage flags and unavailable-source URLs. Calibration
+examples distinguish verified assertions from tentative inferences and honest
+unknowns. A forty-case fictional DeepSeek prompt evaluation found more consistent
+acceptance of honest unknowns, but no reduction in false factual approvals. Reviews still
+invented supporting quotations and approved contradictions. Treat their grounding
+judgments as fallible advisory findings requiring human verification; this is not
+a demonstrated factual-accuracy improvement. The reviewer and its settings remain
+unchanged. Evaluation details are recorded in ADR-037.
+
+A subsequent local reviewer comparison used the same forty cases across four
+installed models plus a Qwen 3 thinking-disabled variant, then twenty fresh cases
+for the finalists. Qwen 3 14B with thinking disabled had the best observed
+verdict/format consistency and short-review latency within the existing budget;
+GPT-OSS 20B was the stronger alternative for source explanations and corrected
+claim wording. Both handled the four/thirty-source full-report capacity fixtures.
+These are task-specific recommendations from synthetic evidence, not accepted
+defaults or a universal model ranking. Production selection and advisory policy
+remain unchanged. Autonomous search/report-writing quality was not compared;
+native research execution separately requires a tool-capable model. See ADR-037
+for results, remaining explanation errors and the bounds of the comparison.
+
+ADR-038 review contracts are available as an explicit research-only opt-in:
+`--research-review-policy quality_first`. The legacy reviewer/settings remain the
+default while the representative evaluation and held-out activation gates are
+incomplete. Auto selects a supported deliberative preset for final grounding;
+direct mode requires workload-specific evaluation evidence in the neutral policy,
+or an explicit mode override. Short report length does not establish simplicity.
+When eligible peers have equal catalog quality, selection prefers a reviewer
+different from the primary model; same-model review is identified in the reasons.
+This is a conservative capability rule, not a new measured model-quality ranking.
+
+Use `--research-review-model MODEL` and `--research-review-mode
+auto|default|direct|deliberative` to override the reviewer. Overrides require the
+opt-in policy and never bypass local/free route checks. `default` explicitly
+retains the model's native mode, including models without declared reasoning
+controls. Catalog `metadata.review_deliberative` / `review_direct` booleans
+declare preset eligibility, and the provider verifies installed capabilities
+before inference. Missing metadata never invents support. The current mappings
+support Qwen3 thinking true/false and GPT-OSS deliberative high effort; GPT-OSS
+direct mode is unsupported and produces a clear error. There is no cloud fallback.
+When `/api/show` advertises `thinking.values`, the requested explicit value must
+appear with the same type; an unsupported value cannot silently use the runtime
+default. Installed runtimes without that field retain the capability and
+architecture checks.
+
+`--research-review-output-tokens` defaults to 4096 and accepts 2048–8192;
+`--research-review-timeout-seconds` defaults to 300 and accepts positive finite
+values up to 300. Each call also respects `--timeout-seconds` and the actual run
+deadline. The whole review, including capability inspection and at most one
+stronger length retry, shares a deadline no later than 300 seconds. A retry can
+double the generation allowance up to 8192 with the same mode and unchanged
+evidence if time/context remain. Truncation, an empty visible answer, a late
+response or failed format parsing never becomes a pass or a weaker-mode fallback.
+Sampling remains matched at temperature 0.2 pending controlled tuning.
+
+The opt-in final reserve is ten percent of the run capped at 300 seconds;
+legacy/non-research retains the 120-second cap. Context remains 32768 unless
+an explicit Ollama resource profile supplies it. The adapter reserves framing
+and bounds input tokens conservatively by UTF-8 bytes by default. Optional
+`--research-review-tokenizer-file` supplies one explicit local tokenizer JSON for
+the selected quality-first reviewer. Compatible Qwen on/off profiles use the
+complete rendered input count; unsupported combinations retain the byte bound.
+The conservative bound can reject large evidence that an exact tokenizer could fit;
+it never shrinks source/report evidence or enlarges an explicit context to force
+admission. Mode, route, decision reasons, effective allowances and retry outcomes
+reuse existing scrutiny-stage metadata; source bodies and prepared prompts gain
+no new production persistence. A small pilot cannot satisfy the rollout gates.
+
+The pure `ai_orchestrator.scheduling.admit_task` contract checks explicit start,
+positive required allocation, remaining monotonic time, planned status and
+caller-validated execution constraints. It neither runs nor changes a task's
+status. Non-fitting tasks remain planned. The application-owned SQLite scheduler
+and strict selected ordering are implemented under ADR-039; generic cancellation
+remains outside its scope. Long tasks require an explicit start.
+
+`scripts/research-review-evaluation.py` plans the approved local comparison from
+an evaluation-only public-source corpus. It requires 24 cases across at least
+six topic families, eight held out by whole family, and matching context/sampling
+settings. Source excerpt digests are checked before execution. Expected findings
+are kept out of reviewer requests. Corpus excerpts and results stay in ignored
+local artifacts under ADR-038; private documents cannot be benchmark fixtures.
+Preflight validates every case/source field consumed by execution, including audit
+findings and complexity, so a malformed late case cannot waste earlier model calls.
+Case IDs use 1–64 letters/digits/underscores/hyphens and are unique ignoring case
+to protect Windows output files. Source IDs are unique within a case. Explicit
+missing coverage remains valid through an empty segment list and coverage description;
+its retrieval receipt cannot supply missing source text.
+
+Plan without starting inference:
+
+```powershell
+python -m uv run --no-sync python scripts/research-review-evaluation.py `
+  artifacts\research-review-preparation-20261003\corpus.json
+```
+
+To explicitly start that selected task in a sufficiently long window, add
+`--execute --available-minutes 110`. The runner reserves ten minutes for handoff
+by default, counts preparation against the window, and requires the full
+90-minute task allocation. A 90-minute overall window with that reserve is
+refused without starting models. Each serial review rechecks its full configured
+call allocation; a non-fitting next call stops this experiment with an incomplete
+summary. This fixed experiment runner does not implement a general scheduler queue,
+storage contract, skip policy or hard cancellation for arbitrary jobs.
+
+The three variants are Qwen3 deliberative/direct and GPT-OSS native-default.
+Variant order rotates by case, and development calls precede holdout. A fresh
+output directory protects previous evidence. The runner records prepared requests
+and raw local responses before parsing, including malformed responses and bounded
+retries. `CALLS_COMPLETE` means all planned calls were attempted; format failures
+still give a nonzero exit, and visible-answer quality audit remains pending.
+Source attribution, claim scope, corrected confidence labels, critical false
+approvals, baseline regressions and latency must be audited before considering
+D4 activation. Software checks or shorter development pilots cannot satisfy it.
+
+The prepared October 3 corpus uses correlated variants of six public-source
+families and reports shorter than the production length guideline. A separate
+22.6k-character report with 16.8k excerpt characters was refused at 32k context
+under conservative byte admission. The approved tokenizer diagnostic subsequently
+counted the same full-evidence requests at 11,304-11,889 input tokens and matched
+all 72 matrix runtime input counts for the inspected templates. The opt-in production
+counter is now implemented and replayed offline against recorded Qwen capacity
+requests. Live acceptance of the integration remains deferred.
+
+The October 3 matrix attempted all 72 cells; 71 parsed and one GPT baseline format
+failed. Deliberative/direct/GPT focal agreement was 24/24, 23/24 and 21/24 including
+that failure. Direct made a critical false approval on a heldout transaction-scope
+claim. Citation/confidence/correction defects remain, so D4 keeps the policy opt-in.
+These correlated short reports do not establish general factual reliability.
+
+An isolated offline counter is available with the approved optional dependency:
+
+```powershell
+uv sync --group research-token-count
+uv run --no-sync --group research-token-count python scripts/research-token-count-prototype.py `
+  --tokenizer-file artifacts\research-token-count-20261003\Qwen--Qwen3-14B\tokenizer.json `
+  --request-file artifacts\research-token-count-20261003\capacity-qwen3_deliberative-request.json `
+  --template-file artifacts\research-token-count-20261003\qwen3-14b-template.txt
+```
+
+Diagnostic assets are local ignored artifacts, not bundled model data. The script
+downloads nothing and performs no inference. Request counting accepts only the
+inspected two-message model/template/tokenizer fingerprints and supported thinking
+controls; Qwen requires an explicit boolean (native-default probes mismatched),
+and GPT additionally requires `--runtime-date YYYY-MM-DD`. Arbitrary rendered
+UTF-8 input can instead use `--rendered-prompt-file`. Padding/truncation are disabled,
+complete input digests are recorded, and the output remains `PROTOTYPE_ONLY` with
+runtime compatibility unverified by the script itself. Separate recorded runtime
+comparisons supply the evidence; a diagnostic count alone cannot admit production input.
+
+Production exact counting additionally requires Ollama 0.32.5, tokenizers 0.23.2,
+the inspected GGUF blob and template digest, the pinned tokenizer digest, two plain
+system/user messages and explicit Qwen on/off. Unknown versions/assets/templates,
+extra model history/system instructions/adapters, missing dependency/file and
+Qwen native default use the conservative bound. GPT remains conservative because
+its runtime date/timezone agreement is unverified outside the recorded session.
+The diagnostic can still count GPT with a supplied date. No private runner endpoint
+or automatic download is a production dependency.
+
+The tokenizer path is relative to the invoking working directory unless absolute.
+The option requires `--tool-profile research --research-review-policy quality_first`.
+For a future explicitly started Qwen-deliberative run, append
+`--research-review-tokenizer-file artifacts/research-token-count-20261003/Qwen--Qwen3-14B/tokenizer.json`.
+The wrapper forwards this through its existing extra CLI arguments. Stage metadata
+records `input_bound_method` and any `tokenizer_fallback_reason` without saving
+prompt/source bodies. Version inspection, counting and retries share the review
+deadline; fallback never trims evidence or increases context. Software replay is
+not live acceptance, and runs remain planned while local compute is unavailable.
+
+No new source-body persistence is added. Excerpts disappear when the run object
+or process ends; receipts do not reconstruct text. Existing logs print bounded
+tool-result previews and model replies, while review findings persist in stage
+metadata. These existing outputs can contain model-selected quotations; memory-only
+retention does not promise quotation-free logs or reports. Reviewer prompts and
+the excerpt cache are not newly saved. See ADR-037 for the accepted boundary.
+
+Standalone `scripts/validate_research_report.py PATH` checks structure and
+declarations only. Add `--run-db PATH --run-id ID` to check current-run receipts
+as well. Failed checks produce repair diagnostics; unsuccessful executed research
+runs return nonzero. Honest not-fetched/unknown entries remain accepted.
+The PowerShell wrapper runs a foreground supervisor that enforces `-AwayMinutes`
+across startup, model/tool calls, validation, repair, and review. At the deadline
+it stops its worker and owned descendants, preserves the saved report and receipts,
+and records a timeout handoff in the existing database. Timeout returns exit code
+124; other failures remain nonzero. An independently running Ollama server stays
+running. This guarantee applies to the wrapper / `ai_provider.research_runner`,
+not direct `ai-assistant` invocations or general coding runs. Keep the PC awake
+for the desired run duration.
+
+If the worker exits unexpectedly before durable finalization, the supervisor
+marks its unfinished stages/run as failed, skips unstarted stages, and records a
+failure handoff and transcript marker. Saved report bytes and receipts survive.
+A zero worker exit cannot count as success while the recorded run is unfinished.
+An existing terminal handoff is preserved. Interrupting the supervisor stops its
+worker and records failure rather than claiming a budget timeout. If no run was
+created, the supervisor does not invent a database or run record.
+If review fails before another artifact change, the controller preserves that
+failure and stops refinement; it does not repeat the same failed review as a
+final pass. A structurally valid saved report can still have a failed overall run
+when its model review did not complete.
+
+From the repository root, with `uv` available and the model installed:
+
+```powershell
+.\scripts\repo-assistant-research.ps1 `
+  -Model gpt-oss:20b -AwayMinutes 110 -Topic model_catalog_metrics `
+  -SourceUrl 'https://docs.ollama.com/capabilities/tool-calling','https://docs.ollama.com/capabilities/thinking' `
+  -Request 'Research model catalog capabilities and useful comparison metrics. Follow relevant primary-source links, distinguish verified facts from inference and unknowns, and propose the smallest useful catalog update.'
+```
+
+`-SourceUrl` supplies starting pages; the model can discover sources with
+`search_web` and follow fetched links. `-SearchProvider` selects the primary
+(`auto`, `tavily`, `brave`, `searxng`, `none`); tracking preference uses `-SearchPrivacy`.
+The wrapper prints its report path, transcript path, and run ID. Default outputs
+are grouped under ignored `artifacts/research-<topic>-<timestamp>/`: `report.md`,
+`assistant.log`, `ollama.log`, and the run's `runs.sqlite3`. Custom report/log paths
+remain supported. Shared chat/run state stays in `data/` when a per-run database
+is not explicitly selected. The general launcher also groups transcript and
+Ollama logs under `artifacts/repo-assistant-<timestamp>/`.
+The wrapper uses local inference and does not require loading cloud credentials.
+
+Acceptance scripts preserve their synthetic workspaces and results under
+`artifacts/<acceptance-run>/`; these directories contain fixture source/tests,
+configuration, and result metadata as well as logs. They are generated evidence,
+not application source or accepted architecture. Historical files were moved with
+a manifest and database backups under `artifacts/artifact-migration-20261002-165323/`.
+Original report-write receipts remain unchanged. Recorded `report_relocations`
+map original paths to moved reports with the same digest; receipt validation
+requires both that mapping and the original matching write receipt. Historical
+transcripts retain their original paths. One open legacy `logs/ollama-serve.log`
+remains until its running Ollama process releases it; no server was stopped.
+
+An opt-in plumbing acceptance run is available:
+
+```powershell
+uv run python scripts/research-acceptance.py --model gpt-oss:20b --away-minutes 10
+```
+
+Acceptance additionally requires at least one executed refinement after structural
+validation. Increase `--away-minutes` when local reviewer/model latency prevents
+that sequence fitting the budget. This remains a two-source plumbing check.
+
+Use `--plan` to inspect a future acceptance without starting Ollama, calling
+providers, reading tokenizer assets, or creating artifact directories/run records.
+Reviewer flags share the research CLI's policy and bounded-setting validation.
+The short-run defaults remain legacy review, ten minutes, and three repair cycles.
+For the approved sustained acceptance, plan the explicit reviewer/tokenizer settings
+and use `--max-repair-cycles -1` to permit refinement within the full time budget:
+
+```powershell
+uv run --no-sync python scripts/research-acceptance.py --plan `
+  --model gpt-oss:20b --away-minutes 110 --max-repair-cycles -1 `
+  --research-review-policy quality_first --research-review-model qwen3:14b `
+  --research-review-mode deliberative `
+  --research-review-tokenizer-file artifacts/research-token-count-20261003/Qwen--Qwen3-14B/tokenizer.json
+```
+
+This emits `PLANNED` JSON with prospective paths and worker arguments, including
+the unchanged public research prompt. It validates configuration, not installed
+model compatibility or tokenizer availability. Run paths are regenerated at execution.
+Keep this long run planned while PC resources are unavailable. A later explicit
+start requires the complete 110-minute allocation plus separate handoff time;
+do not reduce its budget to fit. Execution uses the installed optional
+`research-token-count` dependency group for verified token counting; incompatible
+or missing assets retain conservative admission.
+
+It fetches two official pages, writes a report, and checks persisted receipts.
+A successful short run establishes usable execution plumbing, not model quality
+or success on arbitrary requests. The representative comparison is now audited.
+A fully allocated 110-minute acceptance was explicitly started on October 3 but
+stopped early on conservative review admission after saving a structurally valid
+report. No refinement occurred; sustained acceptance remains incomplete.
+
 Every run prints an `execution_status` line. It distinguishes planned runs,
 completed responses, completed runs with tool/action errors, and failed
 orchestration. A response is not reported as a fully successful implementation
@@ -231,6 +771,13 @@ compatibility. Use `--no-native-tools` to opt into the older text-only provider
 response path. Use
 `--approval-policy read_only|interactive|workspace_write|trusted_local` to
 choose the model-neutral local action policy. The default is `interactive`.
+
+Native execution rejects a legacy JSON tool request returned as plain text when
+no tools were executed. Such a response is a failed implementation, rather than
+evidence that a command ran or a file was created. Text is never promoted to a
+native tool call. In orchestrated runs, `--start-ollama` also applies to the
+auxiliary review before implementation, using the configured startup command,
+timeout, resource profile, and log path.
 
 - `read_only`: allow read/search tools, deny local writes and shell commands.
 - `interactive`: allow read/search tools, ask before local writes and shell
@@ -316,6 +863,16 @@ resume the latest chat for the repository, or `--chat-session <session-id>` to
 resume a specific session. `--chat-list` prints recent sessions without
 contacting a provider.
 
+When a resumed chat grows beyond `--chat-history-budget-chars`, the default
+`--chat-context-mode rolling_summary` stores a local rolling summary for older
+turns and sends that summary plus the recent raw transcript tail. The CLI prints
+whether a summary was used or updated, how many raw messages were sent, how many
+were omitted, and the assembled character count. Use
+`--chat-context-mode hard_fail` to fail instead of summarizing when the budget is
+exceeded, `--chat-context-mode full_history` or `--chat-history-budget-chars 0`
+to send the full local transcript, and `--chat-recent-message-count N` to choose
+how many recent non-system messages are kept raw.
+
 Chat transcripts may contain the request and selected repository context because
 they preserve the provider-neutral messages that were actually sent to the
 model. Keep them local and private.
@@ -331,9 +888,12 @@ CLI prints the exact
 `external_agent_command_line_json` before execution and adds the effective
 approval policy and Codex sandbox to the prompt so the external agent does not
 infer a read-only environment when the requested sandbox is `workspace-write` or
-stronger. It also includes the repo-assistant system prompt in the external
-agent stdin prompt so external routes receive the same high-level repo-aware
-contract as provider-native routes. If a timeout or process error occurs after
+stronger. Fresh and resumed Codex exec commands both forward the repository root
+with `--cd` and the selected sandbox with `--sandbox` as `codex exec` options
+before any resume subcommand. It also includes the repo-assistant system prompt
+in the external agent stdin prompt so external routes receive the same
+high-level repo-aware contract as provider-native routes. If a timeout or
+process error occurs after
 partial output, the CLI
 summarizes parsed JSONL events and keeps raw JSONL in the transcript-only
 section rather than dumping it to the console. Known noisy Codex model-refresh
@@ -371,15 +931,17 @@ the CLI, not total GPU, Ollama server, IDE, or external-provider resource use.
 
 When using `scripts\repo-assistant.ps1`, transcript logging is on by default.
 Each run without an explicit `--log-file` writes to
-`logs\repo-assistant-YYYYMMDD-HHMMSS.log`. The canonical broad-analysis script
-uses timestamped `logs\repo-assistant-broad-analysis-YYYYMMDD-HHMMSS.log` and
-`logs\ollama-broad-analysis-YYYYMMDD-HHMMSS.log` paths by default. Pass
+`artifacts/repo-assistant-YYYYMMDD-HHMMSS/assistant.log`. The canonical broad-analysis
+script groups `assistant.log` and `ollama.log` under
+`artifacts/repo-assistant-broad-analysis-YYYYMMDD-HHMMSS/` by default. Pass
 `--log-file` or `-LogFile` when you intentionally want a fixed path.
 
 When `--start-ollama` is used, Ollama server output is written to
-`logs\ollama-serve.log` by default. Change it with `--ollama-log-file`.
+`artifacts/ollama-runtime/ollama-serve.log` by default when calling the Python CLI
+directly; the PowerShell launchers supply their run's `ollama.log`.
+Change it with `--ollama-log-file`.
 The CLI also reports whether the Ollama API is reachable after startup. The
-`logs/` directory is ignored by Git.
+`artifacts/` directory is ignored by Git; legacy/custom `logs/` is also ignored.
 
 To collect a local machine/provider report without sending anything to a model:
 
@@ -525,6 +1087,14 @@ files to the initial Codex prompt. This is useful for screenshots, diagrams, or
 visual regressions; the prompt should still state what Codex should inspect and
 what output you want.
 
+Non-Codex external-agent routes are discovered but not executed yet. Diagnostic
+mode checks common command names without reading tokens or config contents:
+Antigravity via `ANTIGRAVITY_COMMAND`, `agy`, or `antigravity`; GitHub Copilot
+via `GITHUB_COPILOT_COMMAND` or `copilot`; and Kiro via `KIRO_COMMAND`,
+`kiro-cli`, or `kiro`. Execution adapters for those routes must map each
+client's native permission, session, output, and capability behavior before they
+can be enabled safely.
+
 `--mode diagnose` and `--local-capabilities` include Codex diagnostics when a
 Codex command is discoverable: command path, version, login-status text,
 `exec --json` support, MCP list output, plugin list output, a structured plugin
@@ -662,7 +1232,7 @@ alternate executors can use the same policy.
 | Repository instructions | Root `AGENTS.md` and runtime instructions are loaded by this session. | The repo assistant includes bounded `AGENTS.md`/`CURRENT_CONTEXT.md` context in the stdin prompt; Codex CLI also has its own `AGENTS.md`/config behavior. | Implemented, with bounded prompt context. |
 | Shell/file coding work | Managed tools can inspect and edit the shared workspace. | `codex --ask-for-approval never exec --json --sandbox workspace-write --ephemeral -` runs inside the repo root for noninteractive workspace-write runs. | Implemented for Codex route. |
 | Machine-readable execution events | Tool calls are available to this runtime. | JSONL stdout is parsed for final answer, command/tool/file-change events, failures, and usage. | Implemented with tolerant parsing. |
-| Raw transcripts/event logs | Conversation and tool output exist in the managed session. | CLI transcript logs preserve invocation metadata, full prompts when requested, run metrics, and raw Codex JSONL. | Implemented as local files under `logs\`. |
+| Raw transcripts/event logs | Conversation and tool output exist in the managed session. | CLI transcript logs preserve invocation metadata, full prompts when requested, run metrics, and raw Codex JSONL. | Implemented as local files under `artifacts/<run>/` by default. |
 | Final-answer artifact | The managed session displays the final answer in chat. | `--codex-output-last-message` writes Codex's last assistant message to an explicit local file and uses it as a JSONL fallback. | Implemented as opt-in local file output. |
 | Structured final response | This runtime can constrain some outputs through tool/runtime mechanisms. | `--codex-output-schema` passes an explicit JSON Schema file to `codex exec`. | Implemented as opt-in schema file input. |
 | Approval/sandbox policy | Managed by the active ChatGPT/Codex runtime. | `--approval-policy` selects model-neutral presets for native tools and legacy actions. Codex routes map `read_only` to `--sandbox read-only`, `interactive`/`workspace_write` to `--sandbox workspace-write`, and `trusted_local` to `--sandbox danger-full-access` for commit-capable local runs. Codex approval is forwarded as top-level `--ask-for-approval`. | Implemented first preset slice; Codex CLI still lacks exact managed approval UI parity. |
@@ -835,6 +1405,50 @@ Notes:
 - Do not commit API keys.
 - The wrapper script loads `.env` for the run.
 
+## Automatic Usage-Limit Continuation
+
+Coding runs automatically try an authenticated, compatible route on the same
+billing tier after an allowance/quota limit. An explicit Codex route/model
+selects the first attempt; fallback may change it. Task privacy, required tools,
+minimum quality and latency remain constraints. Higher quality grades are
+preferred, but a standard-grade route can replace a high-grade route when the
+task only requires standard quality. No paid escalation or lower-tier switch
+occurs automatically. Exhausted billing buckets are skipped for that run.
+
+Before the primary run, primary and eligible fallback native clients receive
+non-inference authentication checks. An interactive terminal offers sign-in for missing accounts. In a
+noninteractive terminal, sign-in instructions are printed and those routes are
+excluded. Available fallbacks are reported before execution. An unverified
+primary login stops startup before task execution. A stored login or
+successful preflight does not guarantee future entitlement or remaining quota.
+
+Continuation preserves existing edits and uses the original objective plus
+observed progress counts. The replacement inspects current files and validates
+the final artifacts. Raw tool arguments/outputs and private native session state
+are not transferred. A replacement remains selected for repair attempts.
+Orchestrated implementation records include its route and attempt history.
+Other errors retain existing failure handling. If no ready comparable route
+remains, the CLI reports `fallback_exhausted`, preserves edits, and returns
+failure without prompting during execution.
+
+Only `trusted_local` currently permits cross-client fallback to Copilot,
+Antigravity, and Kiro; their other approval mappings remain unavailable.
+Required client-specific capabilities/options also restrict eligibility.
+Provider-native coding and one-shot coding modes participate; external-client
+chat and recovery after process restart remain deferred.
+
+The default can be disabled in private `user-config.toml`:
+
+```toml
+[fallback]
+enabled = false
+```
+
+Run `uv run python scripts/fallback-acceptance.py` for a synthetic Codex-limit
+simulation followed by a real Copilot continuation. This consumes a Copilot
+allowance request; it does not deliberately exhaust Codex or use paid APIs.
+See ADR-032 for the policy and known continuation limits.
+
 ## Requesty Use
 
 Requesty is also not automatically authorized by the repository. You need a
@@ -953,3 +1567,47 @@ Requesty with file/command actions:
   --provider requesty --model openai/gpt-5.1 `
   --execute --apply-actions
 ```
+## User-started research task scheduling
+
+The foreground scheduler reuses the orchestrated run SQLite database. Planning
+and listing contact no provider and load no model. Definitions store their full
+prompt locally; list output shows only IDs, state and allocations.
+
+```powershell
+uv run --no-sync python -m ai_provider.task_scheduler plan public-python --prompt "Research public Python cancellation contracts" --model qwen3:8b --required-minutes 90
+uv run --no-sync python -m ai_provider.task_scheduler list
+```
+
+When local compute is explicitly available, a selected sequence can be started:
+
+```powershell
+uv run --no-sync python -m ai_provider.task_scheduler run public-python --start --local-compute-available --available-minutes 110 --handoff-minutes 10
+```
+
+The example is an execution command, not authorization to start it during a
+model-free implementation session. Put `--database PATH` before the subcommand
+to select another application database. Tasks run sequentially in supplied order;
+the first non-fitting task or failed worker stops the sequence. No waiting task
+is shortened, reordered or started automatically. Each allocation includes
+preparation; the supervisor receives its remaining task deadline. The ten-minute
+default handoff reserve is outside the execution window.
+
+Only existing supervised research workers are supported, with local-only Ollama,
+free-only billing and trusted-local research tool controls. The scheduler does
+not start an Ollama service. Existing public retrieval/search permissions and
+receipt controls still apply. Stopping the owned worker tree does not guarantee
+an independent Ollama server stops computing. Distinct concurrent scheduler
+invocations are not a global queue; claims protect each definition from duplicate
+execution. Task completion is execution status, not a factual-quality certificate.
+
+Use `defer TASK --reason TEXT` for a planned task. After verifying a stale running
+worker has stopped, use `fail-interrupted TASK --reason TEXT` to record failure;
+that command does not kill processes. Terminal definitions are not automatically
+retried or resumed; plan a new ID for another attempt. Historical run/stage records
+are preserved when the additive task table is initialized.
+
+Research supervisor failure finalization also survives a broken progress-output
+consumer: queued run IDs are still parsed, durable handoff state is recorded, and
+the original exception is preserved. An optional final status log is written
+before attempting to display it. This does not turn an interrupted worker into a
+successful research result.

@@ -69,6 +69,11 @@ pyright
 Do not claim a check was run if it was not.
 
 ## 6. AI evaluation workflow
+Before starting live performance tests, tell the owner so they can defer the
+tests or close games and other competing workloads. Proceed within an explicitly
+authorized unattended testing window. Record known CPU/GPU contention alongside
+results; do not use a contended run to justify routing or hardware changes.
+
 For prompt/model/orchestration changes:
 1. Define the task.
 2. Select representative examples.

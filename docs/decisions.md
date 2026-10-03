@@ -131,6 +131,145 @@ external transcript storage.
 
 Detailed ADR: `docs/decisions/ADR-030-persistent-local-chat-transcripts.md`
 
+## ADR-031 - User Preferences And Alternate CLI Agents
+**Status:** Accepted
+**Date:** 2026-10-01
+
+Separate private user preferences from shipped defaults; default tasks allow
+prepaid credits while the owner's local preference allows allowances only.
+Enable official Antigravity, Copilot, and Kiro execution with only `trusted_local`
+mapped. Requesty remains a prepaid provider API route.
+
+Detailed ADR: `docs/decisions/ADR-031-user-preferences-and-alternate-cli-agents.md`
+
+## ADR-032 - Automatic Usage-Limit Fallback
+**Status:** Accepted
+**Date:** 2026-10-01
+
+Default coding-run fallback stays on the same billing tier and meets task
+requirements, with quality grades influencing preference. Authenticate eligible
+fallback clients before execution and continue from observed partial work without
+mid-run user input. Exhaustion reports failure while preserving edits.
+
+Detailed ADR: `docs/decisions/ADR-032-automatic-usage-limit-fallback.md`
+
+## ADR-033 - Native Research Tools And Run Evidence
+**Status:** Accepted
+**Date:** 2026-10-01
+
+Use an explicit local provider-native research profile with public HTTP(S)
+fetching under existing CUSTOM permissions, report-target-only writes, and
+current-run fetch/write receipts in existing SQLite stage metadata. External
+clients are excluded because they own their tool registries.
+
+Detailed ADR: `docs/decisions/ADR-033-native-research-tools-and-run-evidence.md`
+
+## ADR-034 - SearXNG Research Discovery
+**Status:** Accepted; routing/default superseded by ADR-036
+**Date:** 2026-10-02
+
+Originally approved configurable public SearXNG for free-default discovery.
+Queries leave to the operator/upstream engines; inference remains local.
+Endpoint is approved and live tested; ADR-036 records implemented provider fallback.
+ADR-033's dated amendment records the approved model, sustained-review, and
+free-default cost decisions without replacing its historical fetching slice.
+
+Detailed ADR: `docs/decisions/ADR-034-searxng-research-discovery.md`
+
+## ADR-035 - Run Artifact Layout
+**Status:** Accepted
+**Date:** 2026-10-02
+
+Group generated reports, logs, acceptance fixtures, and dedicated run databases
+under ignored `artifacts/<run>/`. Move historical artifacts while preserving
+original write receipts, digest-bound relocation records, and database backups.
+Shared ongoing application state remains in `data/`.
+
+Detailed ADR: `docs/decisions/ADR-035-run-artifact-layout.md`
+
+## ADR-036 - Research Search Routing and Fallback
+**Status:** Accepted
+**Date:** 2026-10-02
+
+The owner approved Tavily, Brave, and SearXNG with bounded free-only fallback.
+Ordinary research uses eligible APIs; requested reduced tracking stays on SearXNG.
+Full local query receipts remain approved. ADR-034's original default/no-switch
+policy is superseded; source-fetch evidence and local inference remain separate.
+
+Detailed ADR: `docs/decisions/ADR-036-research-search-routing-and-fallback.md`
+
+## ADR-037 - Source Evidence for Research Review
+**Status:** Accepted; implemented
+**Date:** 2026-10-02
+
+The owner approved bounded in-memory fetched excerpts for local research review
+after report/receipt-only reviews missed unsupported claims. Implementation
+resumed on 2026-10-03 under the owner's unattended-work instruction. The owner also
+approved bounded coverage across sources, advisory findings plus evaluation, an
+optional enforced source limit unset by default, and counting distinct successfully
+fetched final URLs. A blocking grounding gate requires a later decision after
+evaluation. Implemented excerpts and source limits preserve existing completion
+checks; the paired synthetic evaluation found substantial reviewer errors and
+does not establish factual reliability. The ADR preserves policy trade-offs.
+
+Detailed ADR: `docs/decisions/ADR-037-source-evidence-for-research-review.md`
+
+## ADR-038 - Quality-First Research Review Presets
+**Status:** Accepted; representative audit complete; opt-in policy; sustained acceptance incomplete
+**Date:** 2026-10-03
+
+Approve explainable capability-aware research reviewer/mode presets, bounded
+2048-8192-token tuning, a larger final-review reserve, representative public-source
+evaluation with local evaluation-only excerpt retention, and conditional research
+activation after quality/software gates. Quality comes first; no charged calls
+are authorized. The resumed implementation window was at most two hours, followed
+by an explicitly allotted 90-minute continuation; longer testing remains planned
+until selected and explicitly started with sufficient time. The 24-case corpus
+and local experiment runner were executed in a subsequent explicitly authorized
+three-hour local-compute session. All 72 cells were attempted and audited; direct
+made a critical false approval, so D4 keeps opt-in. Isolated full-size tokenizer
+capacity calls completed, but production admission remains conservative and the
+fully allocated sustained acceptance stopped before refinement on that bound.
+The owner subsequently approved optional explicit local-file configuration. Guarded
+Qwen counting is implemented with conservative fallback; live integrated acceptance
+is deferred while the owner needs PC capacity. See ADR-038 for supported scope.
+
+Detailed ADR: `docs/decisions/ADR-038-quality-first-research-review-presets.md`
+
+## ADR-039 - User-Started Budgeted Task Scheduling
+**Status:** Accepted; SQLite, strict ordering and supervised research scope resolved
+**Date:** 2026-10-03
+
+Scheduled tasks remain planned until an explicit user command selects a sequential
+execution window. Each task declares required time and is admitted only if it fits
+the remaining allowance. No daemon/service is approved. The owner accepted existing
+application SQLite storage, stopping at the first non-fitting task and initial
+reuse of supervised research workers. Generic executor cancellation is deferred.
+
+Pure task/time-admission contracts are implemented in `ai_orchestrator.scheduling`.
+They do not start jobs or persist/mutate task state. The application-owned
+`ai_provider.task_scheduler` implements durable definitions and explicit foreground
+execution with a handoff reserve, atomic per-task claims and no automatic restart.
+
+Detailed ADR: `docs/decisions/ADR-039-user-started-budgeted-task-scheduling.md`
+
+## Research Review Execution Preference
+**Status:** Accepted conditional authorization; current execution unchanged
+**Date:** 2026-10-02
+
+The owner permits CPU research reviews only if controlled retesting shows a
+substantial performance advantage without reducing review quality. Quality takes
+priority over speed. Retain the existing local reviewer/model and evidence
+capacity while that condition is unproven. Contended measurements, such as tests
+run alongside a game, do not justify switching execution. Notify the owner before
+performance tests, as described in `docs/workflow.md`.
+
+CPU execution avoids direct GPU contention but has slower cold prompt processing
+and consumes CPU/RAM. GPU execution has faster measured cold review completion
+in the owner's game-closed comparison, but competing workloads can affect it.
+This preference does not approve smaller evidence windows or reduced output
+capacity as a quality trade-off, and does not assert CPU/GPU quality equivalence.
+
 ## Template
 ```text
 ## ADR-NNN — Short Name
