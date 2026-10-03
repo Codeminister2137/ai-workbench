@@ -171,5 +171,3 @@ records `input_bound_method` and any `tokenizer_fallback_reason` without saving
 prompt/source bodies. Version inspection, counting and retries share the review
 deadline; fallback never trims evidence or increases context. Software replay is
 not live acceptance, and runs remain planned while local compute is unavailable.
-
-
