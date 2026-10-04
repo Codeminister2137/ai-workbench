@@ -884,7 +884,50 @@ def run_external_agent(
     progress_interval_seconds: float = 15.0,
 ) -> ExternalAgentResult:
     """Run an official coding client using its native prompt transport."""
+    from ai_provider.coding_sessions import ACTIVE_SESSION
 
+    session = ACTIVE_SESSION.get()
+    receipt = session.begin("external_client:" + config.access_method.value) if session else None
+    try:
+        result = _run_external_agent_owned(
+            prompt,
+            config,
+            runner=runner,
+            popen_factory=popen_factory,
+            progress_callback=progress_callback,
+            progress_interval_seconds=progress_interval_seconds,
+        )
+    except BaseException:
+        if session and receipt:
+            session.finish(receipt, status="interrupted")
+        raise
+    if session and receipt:
+        events = result.events
+        session.finish(
+            receipt,
+            status="completed"
+            if result.returncode == 0 and not (events and events.failure_reason)
+            else "failed",
+            output=json.dumps(
+                {
+                    "returncode": result.returncode,
+                    "tool_events": len(events.tool_events) if events else None,
+                    "file_change_events": len(events.file_change_events) if events else None,
+                }
+            ),
+        )
+    return result
+
+
+def _run_external_agent_owned(
+    prompt: str,
+    config: ExternalAgentConfig,
+    *,
+    runner: Callable[..., subprocess.CompletedProcess[str]],
+    popen_factory: Callable[..., subprocess.Popen[str]],
+    progress_callback: Callable[[str], None] | None,
+    progress_interval_seconds: float,
+) -> ExternalAgentResult:
     if config.shared_tool_profile and config.access_method is AccessMethod.KIRO_CLI:
         from ai_provider.shared_client_tools import kiro_inspection_agent
 

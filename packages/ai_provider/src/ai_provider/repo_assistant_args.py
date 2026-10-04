@@ -135,6 +135,28 @@ def build_argument_parser() -> argparse.ArgumentParser:
         help="Explicit skill directory; otherwise use project .agents/skills and package skills.",
     )
     parser.add_argument(
+        "--coding-session",
+        metavar="ID_OR_NEW",
+        help="Opt into durable coding handoffs; use 'new' or a prior session ID.",
+    )
+    parser.add_argument(
+        "--coding-session-db",
+        type=Path,
+        default=DEFAULT_CHAT_TRANSCRIPT_DB,
+        help="Existing application SQLite database for coding-session records.",
+    )
+    parser.add_argument(
+        "--session-decision",
+        action="append",
+        default=[],
+        help="Explicit human decision to retain in this coding session; do not include secrets.",
+    )
+    parser.add_argument(
+        "--coding-session-reconciled",
+        action="store_true",
+        help="Acknowledge effect inspection and confirm this session has no other owner.",
+    )
+    parser.add_argument(
         "--instruction-budget-chars",
         type=int,
         default=DEFAULT_INSTRUCTION_BUDGET_CHARS,

@@ -2009,6 +2009,67 @@ def _run_chat_mode(
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    """Optionally bind a durable session to this foreground invocation."""
+    for stream in (sys.stdout, sys.stderr):
+        if isinstance(stream, TextIOWrapper):
+            stream.reconfigure(encoding="utf-8", errors="replace")
+
+    from ai_provider.coding_sessions import ACTIVE_SESSION, CodingSession
+
+    parser = build_argument_parser()
+    parsed = parser.parse_args(argv)
+    if not parsed.coding_session:
+        if parsed.session_decision or parsed.coding_session_reconciled:
+            parser.error("Session decisions/reconciliation require --coding-session")
+        return _main(argv)
+    if not parsed.execute or parsed.mode not in {"ask", "review", "implement"}:
+        parser.error("--coding-session requires an executed ask/review/implement request")
+    root = parsed.repo_root.resolve() if parsed.repo_root else find_repo_root(Path.cwd())
+    from ai_provider.user_config import load_user_config
+
+    config_path = parsed.user_config or root / "user-config.toml"
+    try:
+        user_config = load_user_config(config_path, required=parsed.user_config is not None)
+    except (OSError, ValueError, TypeError) as exc:
+        parser.error(f"Invalid user config {config_path}: {exc}")
+    effective_cost_policy = parsed.cost_policy or user_config.cost_policy.value
+    database = parsed.coding_session_db
+    if not database.is_absolute():
+        database = root / database
+    try:
+        session = CodingSession.open(
+            database,
+            parsed.coding_session,
+            root,
+            parsed.prompt or "",
+            parsed.session_decision,
+            reconciled=parsed.coding_session_reconciled,
+            privacy_class=parsed.privacy,
+            cost_policy=effective_cost_policy,
+        )
+    except (ValueError, OSError) as exc:
+        print(f"failure_reason: {exc}")
+        return 1
+    print(f"coding_session_id: {session.session_id}")
+    token = ACTIVE_SESSION.set(session)
+    finished = False
+    try:
+        status = _main(argv)
+        finished = True
+        session.status("completed" if status == 0 else "failed")
+        return status
+    finally:
+        try:
+            session.supervisor.close()
+            for handle in session.supervisor.processes:
+                session.observe_process(session.supervisor.status(handle))
+        finally:
+            if not finished:
+                session.status("interrupted")
+            ACTIVE_SESSION.reset(token)
+
+
+def _main(argv: Sequence[str] | None = None) -> int:
     for stream in (sys.stdout, sys.stderr):
         if isinstance(stream, TextIOWrapper):
             stream.reconfigure(encoding="utf-8", errors="replace")
@@ -2194,6 +2255,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             close_transcript_func()
         return 1
     prompt = build_repo_prompt(args.prompt, context_files)
+    from ai_provider.coding_sessions import ACTIVE_SESSION
+
+    active_session = ACTIVE_SESSION.get()
+    if active_session is not None:
+        prompt += "\n\n" + active_session.handoff()
     required_files = tuple(item for item in context_files if item.required_instruction)
     args.required_context = (
         build_repo_prompt("", required_files).partition("# Repository context\n")[2]
@@ -4226,7 +4292,18 @@ def _run_native_agent(
         )
 
     def approve(call: Any, category: Any) -> bool:
-        answer = input(f"Allow {category.value} tool '{call.name}'? [y/N]: ")
+        from ai_provider.coding_sessions import ACTIVE_SESSION
+
+        session = ACTIVE_SESSION.get()
+        task = session.session_id if session else "current foreground task"
+        operation = json.dumps(call.arguments, ensure_ascii=True)
+        try:
+            answer = input(
+                f"Task: {task}\nWorkspace: {repo_root.resolve()}\n"
+                f"Allow {category.value} tool '{call.name}' {operation}? [y/N]: "
+            )
+        except (EOFError, OSError):
+            return False
         return answer.strip().lower() in {"y", "yes"}
 
     approval_policy = ApprovalPolicyPreset(
@@ -4379,6 +4456,16 @@ def _run_native_agent(
                 system_prompt,
                 away_minutes=away_minutes,
             )
+    from ai_provider.coding_sessions import ACTIVE_SESSION
+
+    active_session = ACTIVE_SESSION.get()
+    if active_session is not None:
+        if research is None and not getattr(args, "shared_tools", None):
+            from ai_agent.processes import ProcessTool
+
+            for operation in ("start", "status", "stop"):
+                registry.register(ProcessTool(active_session.supervisor, operation))
+        registry = active_session.observe_registry(registry)
     agent = AgentLoop(
         client,
         registry,
