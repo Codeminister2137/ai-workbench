@@ -13,6 +13,7 @@ from ai_provider.repo_actions import (
 
 DEFAULT_CONTEXT_BUDGET_CHARS = 5_000
 DEFAULT_CONTEXT_FILE_BUDGET_CHARS = 2_500
+DEFAULT_INSTRUCTION_BUDGET_CHARS = 64_000
 BASE_SYSTEM_PROMPT = """
 You are a repo-aware coding assistant. Use the provided repository context,
 preserve the permission boundary, and do not claim to have edited or executed
@@ -74,6 +75,7 @@ class RepoContextFile:
     display_path: str
     content: str
     inside_repo: bool
+    required_instruction: bool = False
 
 
 def find_repo_root(start: Path) -> Path:
@@ -116,14 +118,19 @@ def load_prompt_context(
     allow_outside_files: bool = False,
     context_budget_chars: int | None = DEFAULT_CONTEXT_BUDGET_CHARS,
     context_file_budget_chars: int = DEFAULT_CONTEXT_FILE_BUDGET_CHARS,
+    instruction_budget_chars: int = DEFAULT_INSTRUCTION_BUDGET_CHARS,
     diagnostic: Callable[[str], None] | None = None,
 ) -> tuple[RepoContextFile, ...]:
-    """Load approved context files within deterministic size budgets."""
+    """Keep required instructions intact, budgeting optional snippets separately."""
 
     if context_budget_chars is not None and context_budget_chars <= 0:
         raise ValueError("context_budget_chars must be greater than zero or None.")
     if context_file_budget_chars <= 0:
         raise ValueError("context_file_budget_chars must be greater than zero.")
+    if instruction_budget_chars <= 0:
+        raise ValueError("instruction_budget_chars must be greater than zero.")
+
+    repo_root = repo_root.resolve()
 
     nested_instructions: list[Path] = []
     for selected in selected_paths:
@@ -136,10 +143,11 @@ def load_prompt_context(
             ancestors.append(directory / "AGENTS.md")
             directory = directory.parent
         nested_instructions.extend(reversed(ancestors))
+    instruction_paths = [repo_root / "AGENTS.md", *nested_instructions]
+    required_paths = {path.resolve() for path in instruction_paths if path.is_file()}
     context_paths = [
-        repo_root / "AGENTS.md",
+        *instruction_paths,
         repo_root / "CURRENT_CONTEXT.md",
-        *nested_instructions,
         *selected_paths,
     ]
     loaded: list[RepoContextFile] = []
@@ -150,13 +158,36 @@ def load_prompt_context(
             continue
         seen.add(resolved)
         inside_repo = is_relative_to(resolved, repo_root)
+        required = resolved in required_paths
         if not inside_repo and not allow_outside_files:
             if not confirm_outside_read(resolved, input_func=input_func):
+                if required:
+                    raise ValueError("Required instructions were not approved: " + str(resolved))
                 continue
+        if required:
+            used = sum(len(item.content) for item in loaded if item.required_instruction)
+            with resolved.open(encoding="utf-8") as instruction_file:
+                raw_content = instruction_file.read(instruction_budget_chars - used + 1)
+            if used + len(raw_content) > instruction_budget_chars:
+                raise ValueError(
+                    f"Required instructions exceed instruction_budget_chars="
+                    f"{instruction_budget_chars}: {display_path(repo_root, resolved)}. "
+                    "Increase --instruction-budget-chars; instructions were not truncated."
+                )
+            loaded.append(
+                RepoContextFile(
+                    resolved, display_path(repo_root, resolved), raw_content, inside_repo, True
+                )
+            )
+            continue
         remaining_budget = (
             None
             if context_budget_chars is None
-            else max(context_budget_chars - sum(len(item.content) for item in loaded), 0)
+            else max(
+                context_budget_chars
+                - sum(len(item.content) for item in loaded if not item.required_instruction),
+                0,
+            )
         )
         if remaining_budget == 0:
             if diagnostic is not None:

@@ -27,10 +27,9 @@ from ai_provider import BackendConfig, PrivacyClass, ProviderKind, create_chat_c
 
 from ai_agent.contracts import ToolCall, ToolCategory, ToolDefinition, ToolResult
 from ai_agent.loop import AgentLoop
+from ai_agent.tool_profiles import shared_tool_registry
 from ai_agent.tools import (
     FindFilesTool,
-    GitDiffTool,
-    GitStatusTool,
     GrepSearchTool,
     ListDirTool,
     ReadFileTool,
@@ -62,10 +61,7 @@ def read_search_tool_registry() -> ToolRegistry:
 
 def repo_inspection_tool_registry() -> ToolRegistry:
     """Extend read/search with bounded local Git status and diff inspection."""
-    registry = read_search_tool_registry()
-    registry.register(GitStatusTool())
-    registry.register(GitDiffTool())
-    return registry
+    return shared_tool_registry("inspection")
 
 
 def codex_mcp_tool_registry(

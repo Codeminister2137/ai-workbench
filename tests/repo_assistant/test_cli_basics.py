@@ -71,6 +71,16 @@ def test_cli_help_lists_google_provider() -> None:
     assert "--chat-recent-message-count" in result.stdout
 
 
+def test_instruction_overflow_refuses_before_route_preparation(tmp_path, monkeypatch, capsys):
+    (tmp_path / "AGENTS.md").write_text("required rules" * 10)
+    monkeypatch.setattr(
+        _EXAMPLE, "prepare_execution", lambda *a, **kw: pytest.fail("must not prepare a route")
+    )
+    status = main(["Review", "--repo-root", str(tmp_path), "--instruction-budget-chars", "10"])
+    assert status == 1
+    assert "instructions were not truncated" in capsys.readouterr().out
+
+
 def test_repo_assistant_script_uses_stable_package_entrypoint() -> None:
     script = Path(__file__).resolve().parents[2] / "scripts" / "repo-assistant.ps1"
     text = script.read_text(encoding="utf-8")

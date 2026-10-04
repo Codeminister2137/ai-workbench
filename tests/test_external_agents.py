@@ -293,10 +293,7 @@ def test_parse_external_agent_jsonl_reports_explicit_failed_status() -> None:
 
 
 def test_external_agent_progress_line_summarizes_json_events() -> None:
-    assert (
-        _external_agent_progress_line('{"type":"response.reasoning_summary.delta"}\n')
-        == "external_agent_activity: response.reasoning_summary.delta"
-    )
+    assert _external_agent_progress_line('{"type":"response.reasoning_summary.delta"}\n') is None
     assert (
         _external_agent_progress_line('{"type":"final_answer","content":"done"}\n')
         == "external_agent_activity: final_answer - done"

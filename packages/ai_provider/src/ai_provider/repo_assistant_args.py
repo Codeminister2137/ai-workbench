@@ -11,7 +11,11 @@ from ai_orchestrator import PrivacyClass as OrchestratorPrivacyClass
 
 from ai_provider.chat_transcripts import DEFAULT_CHAT_TRANSCRIPT_DB
 from ai_provider.orchestrated_runs import DEFAULT_ORCHESTRATED_RUN_DB
-from ai_provider.repo_context import DEFAULT_CONTEXT_BUDGET_CHARS, DEFAULT_CONTEXT_FILE_BUDGET_CHARS
+from ai_provider.repo_context import (
+    DEFAULT_CONTEXT_BUDGET_CHARS,
+    DEFAULT_CONTEXT_FILE_BUDGET_CHARS,
+    DEFAULT_INSTRUCTION_BUDGET_CHARS,
+)
 
 DEFAULT_DELEGATION_CONTEXT_BUDGET_CHARS = 6_000
 DEFAULT_CHAT_HISTORY_BUDGET_CHARS = 12_000
@@ -100,14 +104,41 @@ def build_argument_parser() -> argparse.ArgumentParser:
         type=int,
         default=DEFAULT_CONTEXT_BUDGET_CHARS,
         help=(
-            "Maximum characters reserved for all repository context. Use 0 to disable the budget."
+            "Maximum optional context characters, excluding required instructions. "
+            "Use 0 to disable the optional budget."
         ),
     )
     parser.add_argument(
         "--context-file-budget-chars",
         type=int,
         default=DEFAULT_CONTEXT_FILE_BUDGET_CHARS,
-        help="Maximum characters included from any one context file.",
+        help="Maximum characters from one optional context file; AGENTS.md stays complete.",
+    )
+    parser.add_argument(
+        "--shared-tools",
+        choices=["inspection"],
+        help="Require the same project-owned inspection tools on primary and fallback routes.",
+    )
+    parser.add_argument(
+        "--skill",
+        action="append",
+        default=[],
+        metavar="NAME",
+        help="Select a supported project-local development skill; repeat to select several.",
+    )
+    parser.add_argument(
+        "--skill-dir",
+        action="append",
+        default=[],
+        type=Path,
+        metavar="PATH",
+        help="Explicit skill directory; otherwise use project .agents/skills and package skills.",
+    )
+    parser.add_argument(
+        "--instruction-budget-chars",
+        type=int,
+        default=DEFAULT_INSTRUCTION_BUDGET_CHARS,
+        help="Separate limit for complete applicable AGENTS.md files; overflow refuses execution.",
     )
     parser.add_argument(
         "--delegate-context",

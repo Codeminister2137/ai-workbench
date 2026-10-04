@@ -2050,7 +2050,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _run_codex_plugin_management(args=args, repo_root=repo_root, parser=parser)
     if args.codex_mcp_setup:
         try:
-            result = setup_project_codex_mcp(
+            setup_result = setup_project_codex_mcp(
                 repo_root,
                 register_global=args.codex_mcp_register_global,
             )
@@ -2062,18 +2062,18 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 1
         print("=== Codex MCP setup ===")
         print(f"repo_root: {repo_root}")
-        print(f"codex_mcp_config: {result.config_path}")
-        print(f"codex_mcp_server: {result.server_name}")
-        print(f"codex_mcp_command: {result.command}")
-        print("codex_mcp_args_json: " + json.dumps(list(result.args)))
-        print("codex_mcp_enabled_tools_json: " + json.dumps(list(result.enabled_tools)))
-        print(f"codex_mcp_config_created: {result.created}")
+        print(f"codex_mcp_config: {setup_result.config_path}")
+        print(f"codex_mcp_server: {setup_result.server_name}")
+        print(f"codex_mcp_command: {setup_result.command}")
+        print("codex_mcp_args_json: " + json.dumps(list(setup_result.args)))
+        print("codex_mcp_enabled_tools_json: " + json.dumps(list(setup_result.enabled_tools)))
+        print(f"codex_mcp_config_created: {setup_result.created}")
         print("codex_mcp_scope: project")
-        print(f"codex_mcp_global_registered: {result.global_registered}")
-        if result.global_add_stdout:
-            print(f"codex_mcp_add_stdout: {result.global_add_stdout}")
-        if result.global_add_stderr:
-            print(f"codex_mcp_add_stderr: {result.global_add_stderr}")
+        print(f"codex_mcp_global_registered: {setup_result.global_registered}")
+        if setup_result.global_add_stdout:
+            print(f"codex_mcp_add_stdout: {setup_result.global_add_stdout}")
+        if setup_result.global_add_stderr:
+            print(f"codex_mcp_add_stderr: {setup_result.global_add_stderr}")
         return 0
     if args.mode == "diagnose" or args.local_capabilities:
         snapshot = get_local_provider_capability_snapshot()
@@ -2109,12 +2109,26 @@ def main(argv: Sequence[str] | None = None) -> int:
         parser.error("--max-repair-cycles must be -1 or greater")
     if args.native_tools and args.no_native_tools:
         parser.error("--native-tools cannot be combined with --no-native-tools")
-    use_native_tools = args.native_tools or (
-        args.mode == "implement" and args.execute and not args.no_native_tools
+    if args.skill and not args.shared_tools:
+        args.shared_tools = "inspection"
+    if args.shared_tools:
+        if args.apply_actions or args.no_native_tools or args.codex_mcp_tools:
+            parser.error("--shared-tools conflicts with legacy action or Codex MCP settings")
+        if args.tool_profile != "coding":
+            parser.error("--shared-tools inspection cannot be combined with research tools")
+        args.approval_policy = "read_only"
+    use_native_tools = (
+        args.native_tools
+        or bool(args.shared_tools)
+        or (args.mode == "implement" and args.execute and not args.no_native_tools)
     )
     args.native_tools = use_native_tools
     validate_research_arguments(args, repo_root, parser)
-    if args.mode in {"ask", "review"} and (args.apply_actions or args.native_tools):
+    if (
+        args.mode in {"ask", "review"}
+        and (args.apply_actions or args.native_tools)
+        and not args.shared_tools
+    ):
         parser.error(f"--mode {args.mode} does not permit file or command actions")
     if args.scrutinize_response and not args.execute:
         parser.error("--scrutinize-response requires --execute")
@@ -2163,15 +2177,52 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     metrics = _start_run_metrics()
     context_budget_chars = None if args.context_budget_chars == 0 else args.context_budget_chars
-    context_files = load_prompt_context(
-        repo_root,
-        args.file,
-        allow_outside_files=args.allow_outside_files,
-        context_budget_chars=context_budget_chars,
-        context_file_budget_chars=args.context_file_budget_chars,
-        diagnostic=print,
-    )
+    try:
+        context_files = load_prompt_context(
+            repo_root,
+            args.file,
+            allow_outside_files=args.allow_outside_files,
+            context_budget_chars=context_budget_chars,
+            context_file_budget_chars=args.context_file_budget_chars,
+            instruction_budget_chars=args.instruction_budget_chars,
+            diagnostic=print,
+        )
+    except (ValueError, OSError) as exc:
+        print(f"failure_reason: {exc}")
+        print("execution_status: failed")
+        if close_transcript_func is not None:
+            close_transcript_func()
+        return 1
     prompt = build_repo_prompt(args.prompt, context_files)
+    required_files = tuple(item for item in context_files if item.required_instruction)
+    args.required_context = (
+        build_repo_prompt("", required_files).partition("# Repository context\n")[2]
+        if required_files
+        else ""
+    )
+    args.skill_instructions = ""
+    if args.shared_tools:
+        from ai_agent.skills import load_development_skills, skill_prompt
+        from ai_agent.tool_profiles import shared_tool_profile
+
+        try:
+            skills = load_development_skills(
+                args.skill,
+                [path if path.is_absolute() else repo_root / path for path in args.skill_dir]
+                if args.skill_dir
+                else [repo_root / ".agents/skills", repo_root / "packages/ai_agent/skills"],
+                available_tools=frozenset(shared_tool_profile(args.shared_tools).tool_names),
+            )
+        except (ValueError, OSError) as exc:
+            print(f"failure_reason: {exc}")
+            if close_transcript_func is not None:
+                close_transcript_func()
+            return 1
+        if skills:
+            args.skill_instructions = skill_prompt(skills)
+            prompt += "\n\n" + args.skill_instructions
+        print(f"shared_tool_profile: {args.shared_tools}")
+        print("selected_skills: " + (", ".join(skill.name for skill in skills) or "none"))
     if args.away_minutes is not None:
         prompt = _prompt_with_away_budget(prompt, away_minutes=args.away_minutes)
     catalog = load_model_catalog(args.catalog)
@@ -2412,10 +2463,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"away_budget_minutes: {args.away_minutes:g}")
         print(f"away_budget_seconds: {args.away_minutes * 60:g}")
         print(f"away_timeout_seconds: {args.timeout_seconds:g}")
+    optional_chars = sum(
+        len(item.content) for item in context_files if not item.required_instruction
+    )
+    required_chars = sum(len(item.content) for item in context_files if item.required_instruction)
     print(
-        f"context_chars: {sum(len(item.content) for item in context_files)}"
+        f"context_chars: {optional_chars}"
         + (f"/{args.context_budget_chars}" if context_budget_chars is not None else "/unlimited")
     )
+    print(f"instruction_chars: {required_chars}/{args.instruction_budget_chars}")
     for context_file in context_files:
         print(f"context: {context_file.display_path}")
     final_status = result.orchestration.status.value
@@ -3137,14 +3193,13 @@ def _fallback_config(target: Any, args: argparse.Namespace, repo_root: Path) -> 
         recommendation=None,
         execution_plan=ExecutionPlan(target=target, reasons=()),
     )
+    preset = "read_only" if getattr(args, "shared_tools", None) else args.approval_policy
     return _external_agent_config_from_orchestration(
         orchestration,
         repo_root=repo_root,
         timeout_seconds=target.timeout_seconds,
-        sandbox=_codex_sandbox_for_approval_policy(args.approval_policy),
-        approval_policy=args.approval_policy
-        if target.access_method is not AccessMethod.CODEX_CLI
-        else "never",
+        sandbox=_codex_sandbox_for_approval_policy(preset),
+        approval_policy=preset if target.access_method is not AccessMethod.CODEX_CLI else "never",
         codex_persist_session=args.codex_persist_session,
         codex_resume=args.codex_resume,
         output_last_message_path=args.codex_output_last_message,
@@ -3152,6 +3207,7 @@ def _fallback_config(target: Any, args: argparse.Namespace, repo_root: Path) -> 
         web_search=args.codex_search,
         image_paths=tuple(args.codex_image),
         codex_mcp_tools=args.codex_mcp_tools,
+        shared_tool_profile=getattr(args, "shared_tools", None),
     )
 
 
@@ -3178,6 +3234,9 @@ def _fallback_target_incompatibility(
             return None
         except (FileNotFoundError, NotImplementedError, ValueError) as exc:
             return str(exc)
+    if getattr(args, "shared_tools", None) and target.access_method is AccessMethod.LOCAL_RUNTIME:
+        if target.model == "qwen2.5-coder:14b":
+            return "Qwen2.5-Coder native tool execution failed the runtime compatibility probe"
     requested = [
         flag
         for flag, value in (
@@ -3286,7 +3345,7 @@ def _execute_fallback_route(
         )
         return _run_external_agent(external_prompt, config, progress_callback=progress_callback)
     config = backend_config_from_execution_target(target)
-    if args.mode == "implement":
+    if args.mode == "implement" or getattr(args, "shared_tools", None):
         return _run_native_agent(
             prompt, config, profile, args, repo_root, progress_callback=progress_callback
         )
@@ -3426,10 +3485,15 @@ def _run_external_agent_cli_mode(
         print(f"away_budget_minutes: {args.away_minutes:g}")
         print(f"away_budget_seconds: {args.away_minutes * 60:g}")
         print(f"away_timeout_seconds: {args.timeout_seconds:g}")
+    optional_chars = sum(
+        len(item.content) for item in context_files if not item.required_instruction
+    )
+    required_chars = sum(len(item.content) for item in context_files if item.required_instruction)
     print(
-        f"context_chars: {sum(len(item.content) for item in context_files)}"
+        f"context_chars: {optional_chars}"
         + (f"/{args.context_budget_chars}" if context_budget_chars is not None else "/unlimited")
     )
+    print(f"instruction_chars: {required_chars}/{args.instruction_budget_chars}")
     for context_file in context_files:
         print(f"context: {context_file.display_path}")
     print(f"status: {orchestration.status.value}")
@@ -3470,6 +3534,7 @@ def _run_external_agent_cli_mode(
             web_search=args.codex_search,
             image_paths=tuple(args.codex_image),
             codex_mcp_tools=args.codex_mcp_tools,
+            shared_tool_profile=getattr(args, "shared_tools", None),
         )
         print(f"external_agent_command: {config.command}")
         print(f"approval_policy: {args.approval_policy}")
@@ -4128,6 +4193,12 @@ def _run_native_agent(
     progress_callback: Callable[[str], None] | None = None,
 ) -> Any:
     """Run the provider-native agent loop inside the repository boundary."""
+    for instructions in (
+        getattr(args, "required_context", ""),
+        getattr(args, "skill_instructions", ""),
+    ):
+        if instructions and instructions not in prompt:
+            prompt += "\n\n" + instructions
     config = replace(
         config,
         timeout_seconds=min(
@@ -4270,6 +4341,10 @@ def _run_native_agent(
         if child_depth >= 1
         else coding_tools_with_delegation(run_delegated_task)
     )
+    if getattr(args, "shared_tools", None):
+        from ai_agent.tool_profiles import shared_tool_registry
+
+        registry = shared_tool_registry(args.shared_tools)
     research = getattr(args, "research_execution", None)
     if research is not None:
         from ai_provider.research_execution import (

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from .support import (
     _EXAMPLE,
     AssistantAction,
@@ -80,9 +82,9 @@ def test_load_prompt_context_applies_total_and_per_file_budgets(tmp_path: Path) 
         context_file_budget_chars=50,
     )
 
-    assert sum(len(item.content) for item in context) <= 80
-    assert len(context[0].content) <= 50
-    assert "context truncated" in context[0].content
+    assert sum(len(item.content) for item in context if not item.required_instruction) <= 80
+    assert context[0].content == "A" * 100
+    assert "context truncated" in context[1].content
 
 
 def test_limit_context_content_preserves_file_edges() -> None:
@@ -95,20 +97,49 @@ def test_limit_context_content_preserves_file_edges() -> None:
     assert "context truncated" in limited
 
 
-def test_context_reports_instruction_truncation_and_budget_omissions(tmp_path: Path) -> None:
+def test_required_instructions_have_a_cumulative_limit(tmp_path: Path) -> None:
+    (tmp_path / "AGENTS.md").write_text("root rules")
+    nested = tmp_path / "package"
+    nested.mkdir()
+    (nested / "AGENTS.md").write_text("nested rules")
+    with pytest.raises(ValueError, match="instructions were not truncated"):
+        load_prompt_context(tmp_path, [nested], instruction_budget_chars=15)
+    loaded = load_prompt_context(tmp_path, [nested], instruction_budget_chars=22)
+    assert [item.content for item in loaded] == ["root rules", "nested rules"]
+    assert all(item.required_instruction for item in loaded)
+
+
+def test_root_instructions_are_complete_under_tiny_optional_budget(tmp_path: Path) -> None:
+    rules = "REQUIRED\n" * 4000
+    (tmp_path / "AGENTS.md").write_text(rules, encoding="utf-8")
+    (tmp_path / "CURRENT_CONTEXT.md").write_text("optional handoff", encoding="utf-8")
+    loaded = load_prompt_context(tmp_path, [], context_budget_chars=5)
+    assert loaded[0].content == rules
+    assert len(loaded[1].content) <= 5
+
+
+def test_invalid_instruction_encoding_refuses_instead_of_replacing_rules(tmp_path: Path) -> None:
+    (tmp_path / "AGENTS.md").write_bytes(b"required\xffrule")
+    with pytest.raises(UnicodeDecodeError):
+        load_prompt_context(tmp_path, [])
+
+
+def test_context_preserves_instructions_and_reports_optional_truncation(tmp_path: Path) -> None:
     (tmp_path / "AGENTS.md").write_text("required rule\n" * 20)
-    (tmp_path / "CURRENT_CONTEXT.md").write_text("handoff")
+    (tmp_path / "CURRENT_CONTEXT.md").write_text("handoff" * 20)
+    (tmp_path / "optional.txt").write_text("optional")
     warnings: list[str] = []
     loaded = load_prompt_context(
         tmp_path,
-        [],
+        [Path("optional.txt")],
         context_budget_chars=40,
         context_file_budget_chars=40,
         diagnostic=warnings.append,
     )
-    assert len(loaded) == 1
-    assert warnings[0].startswith("context_file_truncated: AGENTS.md")
-    assert warnings[1] == "context_budget_omitted: CURRENT_CONTEXT.md"
+    assert len(loaded) == 2
+    assert loaded[0].content == "required rule\n" * 20
+    assert warnings[0].startswith("context_file_truncated: CURRENT_CONTEXT.md")
+    assert warnings[1] == "context_budget_omitted: optional.txt"
 
 
 def test_selected_file_loads_nested_instructions_in_scope_order(tmp_path: Path) -> None:

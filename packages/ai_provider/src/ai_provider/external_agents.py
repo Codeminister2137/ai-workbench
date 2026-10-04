@@ -8,6 +8,7 @@ import subprocess
 import sys
 import threading
 import time
+import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -35,6 +36,8 @@ class ExternalAgentConfig:
     web_search: bool = False
     image_paths: tuple[Path, ...] = ()
     codex_mcp_tools: bool = False
+    shared_tool_profile: str | None = None
+    shared_agent_name: str | None = None
 
 
 @dataclass(frozen=True)
@@ -502,6 +505,7 @@ def external_agent_config_from_orchestration(
     web_search: bool = False,
     image_paths: tuple[Path, ...] = (),
     codex_mcp_tools: bool = False,
+    shared_tool_profile: str | None = None,
 ) -> ExternalAgentConfig:
     """Adapt a ready orchestration result to an external-agent runtime config."""
 
@@ -539,6 +543,7 @@ def external_agent_config_from_orchestration(
         web_search=web_search,
         image_paths=image_paths,
         codex_mcp_tools=codex_mcp_tools,
+        shared_tool_profile=shared_tool_profile,
     )
 
 
@@ -636,6 +641,14 @@ def build_external_agent_command(
         command.append("--search")
     if config.codex_mcp_tools:
         command.extend(_codex_mcp_config_overrides(config.cwd))
+    if config.shared_tool_profile:
+        if config.shared_tool_profile != "inspection" or config.codex_mcp_tools:
+            raise ValueError("Shared inspection cannot be combined with legacy Codex MCP tools")
+        if config.sandbox != "read-only":
+            raise ValueError("Shared inspection requires a read-only sandbox")
+        from ai_provider.shared_client_tools import codex_inspection_overrides
+
+        command.extend(codex_inspection_overrides(config.cwd))
     if config.approval_policy:
         command.extend(
             [
@@ -703,6 +716,8 @@ def _build_alternate_agent_command(
 ) -> tuple[str, ...]:
     """Map only the approved trusted-local preset; reject unsupported options."""
 
+    if config.shared_tool_profile:
+        return _build_shared_inspection_command(config, prompt=prompt)
     if config.approval_policy != "trusted_local":
         raise NotImplementedError(
             f"{config.access_method.value}: only trusted_local is mapped; "
@@ -753,6 +768,57 @@ def _build_alternate_agent_command(
             command.append("--output-format=json")
         return tuple(command)
     raise NotImplementedError(f"{config.access_method.value} execution is not implemented")
+
+
+def _build_shared_inspection_command(
+    config: ExternalAgentConfig, *, prompt: str | None
+) -> tuple[str, ...]:
+    from ai_provider.shared_client_tools import copilot_inspection_options
+
+    if config.shared_tool_profile != "inspection" or config.approval_policy != "read_only":
+        raise ValueError("Common inspection requires the read_only preset")
+    if config.sandbox != "read-only":
+        raise ValueError("Common inspection requires a read-only sandbox")
+    if (
+        config.resume
+        or config.output_last_message_path
+        or config.output_schema_path
+        or config.web_search
+        or config.image_paths
+        or config.codex_mcp_tools
+    ):
+        raise NotImplementedError("Codex-specific options are not mapped for common inspection")
+    if config.access_method is AccessMethod.ANTIGRAVITY_CLI:
+        raise NotImplementedError("Antigravity scoped shared-tool permissions are not verified")
+    if config.access_method is AccessMethod.COPILOT_CLI:
+        command = [
+            config.command,
+            *copilot_inspection_options(config.cwd),
+            "--no-ask-user",
+            "--model",
+            config.model,
+            "-p",
+            prompt if prompt is not None else "<prompt supplied at execution>",
+        ]
+        if config.json_output:
+            command.append("--output-format=json")
+        return tuple(command)
+    if config.access_method is AccessMethod.KIRO_CLI:
+        command = [
+            config.command,
+            "chat",
+            "--agent",
+            config.shared_agent_name or "repo-shared-inspection",
+            "--no-interactive",
+            "--require-mcp-startup",
+        ]
+        if config.model != "auto":
+            command.extend(["--model", config.model])
+        if config.json_output:
+            command.extend(["--output-format", "stream-json"])
+        command.append(prompt if prompt is not None else "<prompt supplied at execution>")
+        return tuple(command)
+    raise NotImplementedError(f"Shared inspection is not mapped for {config.access_method.value}")
 
 
 def _codex_mcp_config_overrides(repo_root: Path) -> list[str]:
@@ -819,11 +885,70 @@ def run_external_agent(
 ) -> ExternalAgentResult:
     """Run an official coding client using its native prompt transport."""
 
+    if config.shared_tool_profile and config.access_method is AccessMethod.KIRO_CLI:
+        from ai_provider.shared_client_tools import kiro_inspection_agent
+
+        name = "repo-shared-" + uuid.uuid4().hex
+        directory = config.cwd / ".kiro" / "agents"
+        if not directory.resolve().is_relative_to(config.cwd.resolve()):
+            raise ValueError("Kiro project agent directory leaves the workspace")
+        directory_existed = directory.exists()
+        parent_existed = directory.parent.exists()
+        directory.mkdir(parents=True, exist_ok=True)
+        path = directory / (name + ".json")
+        content = json.dumps(kiro_inspection_agent(config.cwd, name))
+        created = False
+        try:
+            with path.open("x", encoding="utf-8") as file:
+                file.write(content)
+            created = True
+            return _run_external_agent_process(
+                prompt,
+                replace(config, shared_agent_name=name),
+                runner=runner,
+                popen_factory=popen_factory,
+                progress_callback=progress_callback,
+                progress_interval_seconds=progress_interval_seconds,
+            )
+        finally:
+            # Delete only our unchanged generated file, never client/user edits.
+            if created and path.is_file() and path.read_text(encoding="utf-8") == content:
+                path.unlink()
+            for candidate, existed in (
+                (directory, directory_existed),
+                (directory.parent, parent_existed),
+            ):
+                if not existed:
+                    try:
+                        candidate.rmdir()
+                    except OSError:
+                        pass
+    return _run_external_agent_process(
+        prompt,
+        config,
+        runner=runner,
+        popen_factory=popen_factory,
+        progress_callback=progress_callback,
+        progress_interval_seconds=progress_interval_seconds,
+    )
+
+
+def _run_external_agent_process(
+    prompt: str,
+    config: ExternalAgentConfig,
+    *,
+    runner: Callable[..., subprocess.CompletedProcess[str]],
+    popen_factory: Callable[..., subprocess.Popen[str]],
+    progress_callback: Callable[[str], None] | None,
+    progress_interval_seconds: float,
+) -> ExternalAgentResult:
     command = build_external_agent_command(config, prompt=prompt)
     process_input = prompt
     if config.access_method is AccessMethod.ANTIGRAVITY_CLI:
         process_input = json.dumps({"event": "user", "message": {"content": prompt}}) + "\n"
     elif config.access_method is AccessMethod.COPILOT_CLI:
+        process_input = ""
+    elif config.access_method is AccessMethod.KIRO_CLI and config.shared_tool_profile:
         process_input = ""
     if config.output_last_message_path is not None:
         config.output_last_message_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1024,8 +1149,10 @@ def _external_agent_progress_line(line: str) -> str | None:
     if not isinstance(event, dict):
         return "external_agent_activity: stdout"
     event_type = _event_type(event) or "json_event"
-    if "reasoning" in event_type:
-        return f"external_agent_activity: {event_type}"
+    if "reasoning" in event_type or event_type.endswith(("_delta", ".delta")):
+        # Retain raw events in the result, but don't print every streamed fragment.
+        # Process activity/deadlines still advance when a fragment is received.
+        return None
 
     command = _find_string_payload(event, ("command",))
     if command:
