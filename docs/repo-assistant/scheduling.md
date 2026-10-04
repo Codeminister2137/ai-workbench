@@ -45,12 +45,39 @@ that command does not kill processes. Terminal definitions are not automatically
 retried or resumed; plan a new ID for another attempt. Historical run/stage records
 are preserved when the additive task table is initialized.
 
-The initial task definition stores only the prompt, primary model, repository and
-allocation. It cannot preserve explicit reviewer/tokenizer settings or launch the
-acceptance/evaluation scripts. Keep a task requiring those settings deferred until
-the definition contract is extended through an approved decision. Putting settings
-in its prompt does not configure the worker. The PowerShell research launcher runs
-immediately; it does not enqueue its arguments.
+Task definitions preserve typed reviewer policy/model/mode, output and timeout
+bounds, an optional local tokenizer path, and the repair-cycle limit. Invalid
+settings are rejected before planning creates a database. Relative tokenizer paths
+are resolved against `--repo-root` when planned; planning does not read the asset.
+An additive version-two migration preserves old task definitions and states with
+their legacy defaults. Unknown versions or settings are refused before execution.
+
+Use `--acceptance` to plan the existing fixed public-source acceptance task:
+
+```powershell
+uv run --no-sync python -m ai_provider.task_scheduler plan sustained-acceptance `
+  --acceptance --model gpt-oss:20b --required-minutes 110 --max-repair-cycles -1 `
+  --research-review-policy quality_first --research-review-model qwen3:14b `
+  --research-review-mode deliberative `
+  --research-review-tokenizer-file C:\path\to\qwen-tokenizer.json
+```
+
+Acceptance uses its fixed prompt, so omit `--prompt`. Its dedicated database,
+report and transcript live in the task artifact directory. A successful worker
+must also pass shared acceptance postchecks: successful durable execution and
+final handoff, a surviving report, search/fetch/write receipts and an executed
+refinement. A failed postcheck fails the task and stops the selected sequence.
+These checks establish execution plumbing, not factual truth. The standalone
+`scripts/research-acceptance.py` uses the same prompt and postchecks.
+
+When compute is available, explicitly select the planned task with the existing
+`run` command. Allow the full allocation plus handoff and preparation slack; for
+example, 130 available minutes with a 15-minute handoff reserve. A window exactly
+equal to allocation plus reserve can refuse admission after preparation elapsed.
+Planning never starts the run. The scheduler requires an already available Ollama
+service and does not start one. Generic commands and evaluation-script execution
+remain outside this adapter. The PowerShell research launcher runs immediately;
+it does not enqueue its arguments.
 
 Research supervisor failure finalization also survives a broken progress-output
 consumer: queued run IDs are still parsed, durable handoff state is recorded, and

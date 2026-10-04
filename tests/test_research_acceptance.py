@@ -22,7 +22,7 @@ def offline_only(monkeypatch, tmp_path):
         pytest.fail("Planning/validation started execution or created run state")
 
     monkeypatch.setattr(acceptance, "run_research", forbidden)
-    monkeypatch.setattr(acceptance, "SQLiteOrchestratedRunStore", forbidden)
+    monkeypatch.setattr(acceptance, "check_acceptance", forbidden)
     monkeypatch.setattr(sqlite3, "connect", forbidden)
     monkeypatch.setattr(Path, "mkdir", forbidden)
     return tmp_path

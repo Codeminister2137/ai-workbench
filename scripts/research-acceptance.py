@@ -8,7 +8,7 @@ import math
 from datetime import UTC, datetime
 from pathlib import Path
 
-from ai_provider.orchestrated_runs import SQLiteOrchestratedRunStore
+from ai_provider.research_acceptance import RESEARCH_ACCEPTANCE_PROMPT, check_acceptance
 from ai_provider.research_execution import (
     add_research_review_arguments,
     validate_research_review_arguments,
@@ -38,32 +38,7 @@ def main(argv: list[str] | None = None) -> int:
     report = artifact / "report.md"
     database = artifact / "runs.sqlite3"
     log = artifact / "assistant.log"
-    prompt = """Research Ollama's public tool-calling and thinking contracts for a provider-neutral
-research runner. First call search_web with the public query "Ollama tool calling documentation".
-Record discovery limits honestly if it fails or finds nothing. Search snippets do not prove
-source retrieval. Fetch these two primary sources using fetch_url:
-https://docs.ollama.com/capabilities/tool-calling
-https://docs.ollama.com/capabilities/thinking
-Then write a source-grounded Markdown report using write_research_report. Give the requested
-sections substantive coverage; length is advisory and alone never requires repair or filler.
-Write an initial report early and repair mandatory validation errors.
-Do not fetch more than four sources. After the first valid report, scrutinize it and refine
-concrete weaknesses when the controller requests another pass. Avoid filler and repeated fetches.
-Use these eight Markdown sections, each nonempty:
-1. Executive summary
-2. Source map
-3. Candidate models, practices, or facts to add/revisit
-4. Recommended fields, metrics, or decision criteria
-5. Provider/source-specific notes
-6. Risks, stale-data warnings, and unknowns
-7. Suggested next implementation slice
-8. Repair checks performed
-Declare every URL in a Source map table with IDs S1/S2, retrieval status fetched/not fetched, and
-the actual UTC access date from its fetch receipt. Every candidate entry must have its own
-verified/inferred/unknown/stale-risk label and [S1]/[S2] citation, unless explicitly unknown.
-Discuss what remains unknown. Report only executed checks; do not claim the validator proves truth.
-Do not edit source files or use shell/delegation. Save progress before finishing each attempt.
-"""
+    prompt = RESEARCH_ACCEPTANCE_PROMPT
     worker_arguments = [
         prompt,
         "--repo-root",
@@ -130,34 +105,7 @@ Do not edit source files or use shell/delegation. Save progress before finishing
     if code:
         print(f"Acceptance incomplete: exit={code}; inspect {log}")
         return code
-    # The acceptance database is private to this invocation, not the normal run database.
-    import sqlite3
-
-    with sqlite3.connect(database) as connection:
-        run_id = connection.execute("SELECT run_id FROM orchestrated_runs").fetchone()[0]
-    stages = {
-        stage.name: stage for stage in SQLiteOrchestratedRunStore(database).list_stages(run_id)
-    }
-    evidence = stages["implementation"].details or {}
-    receipts = evidence.get("fetch_receipts", [])
-    searches = evidence.get("search_receipts", [])
-    if not isinstance(searches, list) or not any(s.get("query_transmitted") for s in searches):
-        print("Acceptance incomplete: no actual search query attempt")
-        return 1
-    if not isinstance(receipts, list) or len(receipts) < 2 or not evidence.get("report_receipts"):
-        print("Acceptance failed: missing actual fetch/write receipts")
-        return 1
-    refinement = (stages["repair"].details or {}).get("research_refinement", {})
-    if not isinstance(refinement, dict) or not refinement.get("attempt_count"):
-        print("Acceptance incomplete: no executed refinement after structural validation")
-        return 1
-    print(
-        f"Executed refinement cycles: {refinement['attempt_count']}; "
-        f"stop_reason={refinement.get('stop_reason')}"
-    )
-    print(f"Acceptance passed: report={report}; run_id={run_id}; database={database}")
-    print("This verifies plumbing and report acceptance; it is not a model-quality evaluation.")
-    return 0
+    return check_acceptance(database, report)
 
 
 if __name__ == "__main__":

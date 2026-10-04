@@ -277,6 +277,11 @@ execution; external clients own their registries and cannot preserve this
 restricted surface. See ADR-033 for fetching, permission, and evidence boundaries.
 `ai_provider.research_runner` supervises one foreground research worker, enforces
 its elapsed budget, and records timeout handoffs without a daemon or new store.
+The foreground scheduler persists typed research settings in the existing
+application SQLite store and admits explicitly selected jobs sequentially. Its fixed
+acceptance adapter reuses this supervisor and the standalone harness's public prompt
+and postchecks, with dedicated task artifacts; it exposes no arbitrary command
+executor. Old task states/defaults survive the additive migration. See ADR-039.
 `ai_provider.research_refinement` composes repeated report review, native execution,
 and validation through existing stages after structural success. It shares repair
 limits, reserves final-review time, and detects repeated report/source no-progress.

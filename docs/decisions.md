@@ -250,6 +250,9 @@ Pure task/time-admission contracts are implemented in `ai_orchestrator.schedulin
 They do not start jobs or persist/mutate task state. The application-owned
 `ai_provider.task_scheduler` implements durable definitions and explicit foreground
 execution with a handoff reserve, atomic per-task claims and no automatic restart.
+The owner-approved 2026-10-04 extension adds typed persisted reviewer/tokenizer and
+repair settings plus a fixed supervised acceptance adapter with shared postchecks.
+The additive task migration preserves existing definitions and lifecycle states.
 
 Detailed ADR: `docs/decisions/ADR-039-user-started-budgeted-task-scheduling.md`
 

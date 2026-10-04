@@ -294,6 +294,7 @@ def test_adapter_passes_remaining_allocation_to_existing_supervisor(store, monke
                 "root": task.repo_root,
                 "database": store.path,
                 "budget_seconds": 59.5,
+                "log_path": None,
             },
         )
     ]

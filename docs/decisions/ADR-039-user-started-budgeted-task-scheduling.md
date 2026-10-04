@@ -118,3 +118,39 @@ independent foreground invocations. Worker failure or interruption stops the
 sequence and preserves waiting tasks. Completion denotes software execution,
 not independently certified research quality. No task was started while the
 owner's local-model prohibition was active.
+
+## Typed research settings and acceptance adapter (2026-10-04)
+
+The owner accepted the recommendation to extend typed research settings and add
+a fixed supervised acceptance adapter after the scheduler could not preserve the
+already approved reviewer/tokenizer settings and acceptance postchecks. The brief
+compared this focused extension with a general command executor (broader execution
+and cancellation responsibilities) and separate harness execution (bypassing queue
+admission/lifecycle). The owner replied "Agree with recommendation"; no additional
+personal rationale was supplied. The accepted technical rationale is reuse of
+existing research supervision while keeping the approved execution boundary small.
+
+The additive version-two task contract stores validated reviewer policy/model/mode,
+output/timeout bounds, an explicit optional local tokenizer path and repair limit,
+plus research/acceptance task kind. Existing prompts, allocations, IDs, states and
+run/stage records are retained; old definitions receive unchanged legacy defaults.
+Unknown versions/settings fail closed. Definitions remain immutable, and deferred
+definitions are not revived: a fresh configured task is planned for the acceptance.
+Tokenizer paths resolve against the repository during planning without reading the
+file or contacting a runtime. The optional counting compatibility/fallback contract
+from ADR-038 remains unchanged.
+
+Acceptance reuses the fixed existing public prompt, the native research worker and
+its elapsed supervisor, and shared harness postchecks. It has a dedicated artifact
+database, report and transcript. Worker success alone cannot complete the task:
+successful durable execution/final handoff, a surviving report, search/fetch/write
+receipts and executed refinement are required. Failure stops the selected sequence.
+These checks are software acceptance, not a factual grounding gate or quality claim.
+
+The earlier free_only worker argument was found incompatible with the research CLI
+and corrected to local_only, with its required report target, in f71477a. The
+historical implementation checkpoint above is preserved; current commands enforce
+Ollama/local_only and the trusted-local research surface. No arbitrary command
+executor, automatic model/service start, dependency or external processor is added.
+Long runs still require explicit selected execution and sufficient time; the owner's
+approval of implementation does not start the sustained live acceptance.
