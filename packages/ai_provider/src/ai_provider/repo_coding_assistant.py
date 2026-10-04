@@ -4106,6 +4106,14 @@ def _external_agent_failure_hint(failure_reason: str) -> str | None:
     """Return an actionable hint for known external-agent failure modes."""
 
     normalized = failure_reason.lower()
+    from ai_provider.execution_fallback import explicit_model_overload
+
+    if explicit_model_overload(failure_reason):
+        return (
+            "The hosted model is temporarily overloaded; this is not an account allowance "
+            "exhaustion receipt. Preserve partial work and inspect effects before continuing "
+            "with a compatible route. This CLI cannot control the hosted PyCharm assistant."
+        )
     if "collab_tool_call" in normalized:
         return (
             "The external Codex CLI failed while using its own multi-agent/collab tool. "

@@ -99,7 +99,9 @@ def bounded_research_messages(
             return tuple(result)
     raise ProviderError(
         "Research context remains too large after compacting old excerpts. "
-        "Narrow the request or start a fresh run from the saved report.",
+        f"Serialized messages require {size()} bytes; the input budget is {byte_limit} bytes. "
+        "Required instructions and the latest tool exchange were preserved. "
+        "Narrow optional context or continue from the saved report; no model request was sent.",
         category=ProviderErrorCategory.CONFIGURATION,
     )
 
@@ -258,15 +260,45 @@ class ResearchChatClient:
 
     def _request(self, request: AIRequest) -> AIRequest:
         context_length = self.options.get("ollama_context_length", 32768)
-        assert isinstance(context_length, int)
+        output_tokens = (
+            self.max_output_tokens
+            if request.max_output_tokens is None
+            else request.max_output_tokens
+        )
+        if (
+            isinstance(context_length, bool)
+            or not isinstance(context_length, int)
+            or context_length <= 0
+            or isinstance(output_tokens, bool)
+            or not isinstance(output_tokens, int)
+            or output_tokens <= 0
+        ):
+            raise ProviderError(
+                "Invalid research context/output budget",
+                category=ProviderErrorCategory.CONFIGURATION,
+            )
+        # Retain the existing byte estimate; reserve output/framing and include schemas.
+        # This estimate is not a fingerprint-verified native tokenizer count.
+        schema_bytes = len(
+            json.dumps(
+                [tool.to_json_schema() for tool in request.tools], ensure_ascii=False
+            ).encode("utf-8")
+        )
+        input_bytes = min(_HISTORY_BYTES, (context_length - output_tokens - 256) * 2) - schema_bytes
+        if input_bytes <= 0:
+            raise ProviderError(
+                "Research output/framing/tool schemas leave no input budget; "
+                "no model request was sent.",
+                category=ProviderErrorCategory.CONFIGURATION,
+            )
         return replace(
             request,
             messages=bounded_research_messages(
                 request.messages,
-                byte_limit=min(_HISTORY_BYTES, context_length * 2),
+                byte_limit=input_bytes,
             ),
             metadata={**request.metadata, **self.options},
-            max_output_tokens=request.max_output_tokens or self.max_output_tokens,
+            max_output_tokens=output_tokens,
             temperature=request.temperature if request.temperature is not None else 0.2,
         )
 

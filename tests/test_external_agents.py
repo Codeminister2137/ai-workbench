@@ -19,6 +19,20 @@ from ai_provider.external_agents import (
 )
 
 
+def test_completed_event_with_structured_overload_error_is_failure():
+    from ai_provider.external_agents import parse_external_agent_jsonl
+
+    event = {
+        "type": "task_complete",
+        "error": {
+            "message": "Selected model is at capacity. Please try a different model.",
+            "codex_error_info": "server_overloaded",
+        },
+    }
+    summary = parse_external_agent_jsonl(json.dumps(event))
+    assert summary.failure_reason == event["error"]["message"]
+
+
 def test_antigravity_zero_exit_permission_refusal_is_a_failure(tmp_path: Path) -> None:
     config = ExternalAgentConfig(
         access_method=AccessMethod.ANTIGRAVITY_CLI,

@@ -47,6 +47,27 @@ def explicit_usage_limit(text: str) -> bool:
     )
 
 
+def explicit_model_overload(text: str) -> bool:
+    """Recognize temporary availability markers separately from account exhaustion."""
+    return any(
+        marker in text.lower()
+        for marker in (
+            "server_overloaded",
+            "selected model is at capacity",
+            "model is overloaded",
+            "server is overloaded",
+        )
+    )
+
+
+def external_model_overload(result: ExternalAgentResult) -> bool:
+    """Only failed error channels can trigger overload handling, never tool/answer text."""
+    failure = result.events.failure_reason if result.events else None
+    if result.returncode == 0 and not failure:
+        return False
+    return explicit_model_overload((failure or "") + "\n" + result.stderr)
+
+
 class FallbackSession:
     """Bound attempts to preflighted routes and preserve exhaustion across repairs."""
 

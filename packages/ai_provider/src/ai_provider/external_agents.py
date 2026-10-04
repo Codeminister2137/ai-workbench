@@ -1414,6 +1414,9 @@ def _find_failure_reason(event: dict[str, Any], event_type: str) -> str | None:
 def _has_failure_marker(event: dict[str, Any], event_type: str) -> bool:
     """Return whether event labels explicitly report a failure."""
 
+    if event_type in {"task_complete", "turn.completed"} and event.get("error"):
+        return True
+
     labels = [event_type]
     for key in ("type", "event", "kind", "name", "subtype", "status"):
         value = event.get(key)

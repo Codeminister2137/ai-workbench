@@ -496,6 +496,44 @@ def test_large_research_history_compacts_excerpts_but_keeps_task_and_receipts():
     assert len(json.loads(original[3].content)["text"]) > 12000
 
 
+def test_research_input_budget_reserves_output_and_tool_schema_before_inference():
+    from dataclasses import replace
+
+    from ai_provider import (
+        AIMessage,
+        AIRequest,
+        AIToolDefinition,
+        BackendInfo,
+        BackendLocation,
+        MessageRole,
+        ProviderError,
+    )
+    from ai_provider.research_execution import ResearchChatClient
+
+    class Client:
+        calls = 0
+        backend = BackendInfo("ollama", "test", BackendLocation.LOCAL)
+
+        def complete(self, request):
+            self.calls += 1
+            raise AssertionError("Over-budget request reached inference")
+
+        def stream(self, request):
+            raise NotImplementedError
+
+    client = Client()
+    wrapper = ResearchChatClient(client, {"ollama_context_length": 2048}, max_output_tokens=1000)
+    request = AIRequest(messages=(AIMessage(MessageRole.USER, "Required task " * 100),))
+    assert wrapper._request(request).messages == request.messages
+    oversized = replace(request, tools=(AIToolDefinition("large_tool", "schema " * 300),))
+    with pytest.raises(ProviderError, match="no input budget"):
+        wrapper.complete(oversized)
+    with pytest.raises(ProviderError, match="no input budget"):
+        wrapper.complete(replace(request, max_output_tokens=2048))
+    assert client.calls == 0
+    assert request.messages[0].content.endswith("Required task ")
+
+
 def test_research_retries_only_the_provider_response():
     from ai_provider import (
         AIMessage,

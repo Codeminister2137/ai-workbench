@@ -32,6 +32,20 @@ from ai_provider.external_agents import ExternalAgentResult, parse_external_agen
 from ai_provider.user_config import load_user_config
 
 
+def test_overload_is_availability_not_allowance_and_ignores_successful_output():
+    from ai_provider.execution_fallback import external_model_overload
+
+    result = ExternalAgentResult(
+        ("client",), 1, "", "Selected model is at capacity. Please try a different model."
+    )
+    assert external_model_overload(result)
+    assert not external_usage_limit(result)
+    assert not external_model_overload(replace(result, returncode=0))
+    assert not external_model_overload(
+        replace(result, stdout=result.stderr, stderr="unrelated error")
+    )
+
+
 def entry(
     route,
     method,

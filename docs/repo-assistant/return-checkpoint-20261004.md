@@ -52,7 +52,8 @@ endpoint selection explicit and follows the approved temporary IDE-host directio
 Alternative: defer connection activation and continue ordinary filesystem/terminal
 tools; semantic IDE parity would remain unavailable to the CLI.
 
-Owner input: enable/configure the local endpoint now, or defer its activation?
+Owner accepted local HTTP-stream activation and read-only wrappers in the next turn.
+The actual connection URL/configuration is still missing; activation was not verified.
 Connection configuration must omit credentials in chat and repository files.
 
 ### Research search configuration
@@ -72,7 +73,26 @@ Recommendation: use supplied URLs for the next bounded baseline while diagnosing
 the existing SearXNG connection. Select an account-backed provider only if that
 operational/privacy trade-off is desired. No provider or global setting was changed.
 
-Owner choice: which search path should the next live acceptance use?
+Owner accepted diagnosing/repairing the existing SearXNG path. An additional
+model-free probe returned HTTP 200 JSON with no results and Google suspended
+for access denied. An explicit Bing query also returned no results. The instance's
+upstream behavior cannot be repaired in this repository; selecting another operator
+or account remains a separate privacy/configuration choice if repair proves impossible.
+
+## Added reliability work approved by the owner
+
+The owner also requested handling model overload and context-budget failures.
+Temporary overload must remain distinct from exhausted allowance. Error parsing
+now recognizes completion events with structured errors, and the CLI explains
+capacity failures as hosted availability rather than an account-limit receipt.
+Automatic overload continuation versus a saved handoff is awaiting the specific
+behavior selection requested during implementation; no repeated live calls were made.
+
+Research request sizing now reserves output and framing space and includes tool
+schemas in its existing byte estimate. Oversize messages produce a diagnostic with
+required bytes and available budget before inference, preserving instructions and
+the latest exchange. This is estimated sizing, not verified tokenizer counting;
+tool-capable primary exact counts and successful live acceptance remain unfinished.
 
 ## Remaining implementation and live checks
 

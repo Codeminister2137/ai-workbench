@@ -285,6 +285,17 @@ access. No daemon, global grant changes or generic scheduler are approved.
 
 Detailed ADR: [ADR-041](decisions/ADR-041-cli-foundation-contracts-and-local-supervision.md)
 
+### Owner return selections — 2026-10-04
+
+The owner accepted the recommended local PyCharm HTTP-stream connection with
+unrestricted execution disabled and initial read-only wrappers, and investigation
+of the existing SearXNG search path. The concrete IDE connection configuration
+remains unavailable. The owner additionally prioritizes model-overload recovery
+and prevention/diagnosis of context-budget failures. This does not grant control
+over the hosted PyCharm assistant or approve a new search operator/service.
+Detailed checkpoint and remaining behavior choice:
+[return checkpoint](repo-assistant/return-checkpoint-20261004.md).
+
 ## Research Review Execution Preference
 **Status:** Accepted conditional authorization; current execution unchanged
 **Date:** 2026-10-02
