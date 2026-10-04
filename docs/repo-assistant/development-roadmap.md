@@ -1,0 +1,123 @@
+# CLI Development Foundation Roadmap
+
+[CLI guide](../repo-coding-assistant.md) ·
+[Accepted scope: ADR-040](../decisions/ADR-040-shared-agent-tools-and-cli-development-foundation.md)
+
+## Status and outcome
+
+**INCOMPLETE — approved roadmap, implementation milestones pending.**
+Decision and milestone recording is complete as of 2026-10-04. Existing tools and
+fallback are foundations; they do not constitute completed cross-agent parity.
+
+The goal is to perform inspect/plan/edit/test/review workflows from the project
+CLI, invoke the required skills, resume work and recover from allowance exhaustion
+with the common tools still available. PyCharm may host tools initially; eventually
+it should only be the human editor/viewer. Different model performance is allowed.
+
+## Approved capability set
+
+| ID | Capability | Required outcome |
+| --- | --- | --- |
+| C1 | Repository tools and local Git | Inspect, search, edit and review changes under the selected permissions |
+| C2 | Portable skills/instructions | Discover and invoke development skills with checked dependencies and applicable repository instructions |
+| C3 | Python environment/validation | Select the correct interpreter and run tests, lint and type checks with useful diagnostics |
+| C4 | Documentation/public research | Retrieve permitted sources and preserve provenance |
+| C5 | Semantic code tools | Navigate symbols/references and perform supported safe refactoring |
+| C6 | Process/session continuity | Poll/interrupt operations and continue coding through turns and route switches |
+
+## Milestones
+
+| ID | Milestone | Status | Completion condition |
+| --- | --- | --- | --- |
+| M1 | Readiness and adapter contracts | NEXT; incomplete | Deterministic route/tool/skill/approval checks explain eligibility and exclusions; forced-limit coverage preserves tier and task constraints |
+| M2 | Common tools and portable skills | Pending | C1-C4 work through common contracts on selected routes; explicit skills resolve dependencies; required instructions are available or omissions cause a clear refusal |
+| M3 | Semantic tooling with temporary IDE host | Pending | Selected C5 operations work through a verified PyCharm bridge with defined semantics and permissions |
+| M4 | Coding and process continuity | Pending; design choices open | Agreed session/process model preserves objective, decisions, scoped approvals, receipts and handles across turns and fallback; uncertain effects are reconciled |
+| M5 | Independence from the IDE tool host | Pending | Approved C1-C6 workflows remain usable with PyCharm tool hosting unavailable; PyCharm can serve only as editor/viewer |
+
+Each milestone has deterministic correctness checks and separately recorded live
+acceptance where necessary. A milestone cannot be reported fully accepted on
+synthetic evidence alone when it requires an installed client or IDE bridge.
+Deferred live checks must not prevent independent offline implementation.
+
+### M1: imperative next action
+
+Inspect the current fallback compatibility predicate, official-client command
+builders, tool registry and relevant tests. Implement the smallest deterministic
+readiness slice that explains required-tool and approval incompatibility using
+existing contracts. Add focused same-tier and incompatible-feature tests; do not
+infer new state formats or automatically probe credentials/models.
+
+Inspect these existing components first:
+
+- `packages/ai_provider/src/ai_provider/repo_coding_assistant.py`;
+- `packages/ai_provider/src/ai_provider/external_agents.py`;
+- `packages/ai_provider/src/ai_provider/execution_fallback.py`;
+- `packages/ai_orchestrator/src/ai_orchestrator/fallback.py`;
+- `packages/ai_agent/src/ai_agent/contracts.py` and `mcp_server.py`;
+- `tests/test_execution_fallback.py`, `test_alternate_agent_routes.py`,
+  `test_external_agents.py` and `test_ai_agent_mcp_server.py`.
+
+Distinguish declared support, installed executable, tool connection, authorization
+and actual live availability. Explain unknown status honestly. An auth check is
+not proof of remaining allowance. Decide whether a new shared capability contract
+is necessary only after inspecting existing contracts; defer a material public
+contract change for an explicit decision and continue independent tests/diagnostics.
+
+### Cross-agent acceptance
+
+Synthetic clients must perform a representative inspect/edit/test/review fixture,
+exhaust a route after a partial effect, continue using the common tools without
+replaying that effect, and produce a resumable handoff. Incompatible routes refuse
+before execution with the missing capability or policy named.
+
+After the process/session design is agreed, add equivalent synthetic coverage for
+an in-flight operation and handle recovery. Start with bounded operations rather
+than introducing a general service or queue.
+
+Later short live checks verify actual client tool discovery, permission behavior,
+an explicitly invoked skill and forced-exhaustion continuation. Naturally burning
+through an account allowance is not required. Record client versions, tested
+capabilities and limitations. Model-quality comparisons are a separate evaluation.
+
+## Open design decisions
+
+- Minimal project-owned coding-session state and native-session interaction.
+- Process ownership, handle lifetime and recovery after client or host shutdown.
+- Any persistence/schema change required by those designs.
+- Shared-tool approval channel and equivalent native-client restrictions.
+- Concrete independent semantic tooling, dependencies and runtime integrations.
+
+These are unresolved implementations within an approved direction. Do not ask
+again whether shared tools or a temporary IDE host are wanted. Investigate each
+decision when its milestone requires it, recommend options and defer only that
+part until the owner chooses.
+
+## Optional capabilities: unselected
+
+Browser/UI testing, notebooks, debugger control, GitHub issues/PR/CI, visual
+document analysis, image generation and broader delegation/scheduling remain
+outside the selected foundation. Present a concrete need and bounded integration
+before adding one. Their research options are preserved in private local plans,
+when available; this public roadmap is sufficient to resume the approved work.
+
+## Resource and scheduling constraints
+
+The owner cannot run live acceptance now. Do not start inference, clients for
+model work, runtimes or sustained local workloads merely because this roadmap
+was approved. Prefer offline validation and synthetic clients.
+
+The existing supervised research acceptance remains planned and deferred in the
+research scheduler. Long local model work must wait for an explicitly selected
+compute window and a supported queued task. ADR-039 does not authorize inserting
+arbitrary coding or acceptance commands into that queue. Record unsupported live
+cases as pending work, rather than presenting them as executable queue entries.
+
+## Session handoff and milestone updates
+
+This file is the tracked milestone source; ADR-040 preserves the decision.
+Update milestone status only with implementation and acceptance evidence, naming
+any deferred live checks. Keep the ignored `CURRENT_CONTEXT.md` current with the
+latest checkpoint, active milestone, imperative next action and completion test.
+Private research plans supplement these documents but must not be required to
+recover the approved scope in a new session.

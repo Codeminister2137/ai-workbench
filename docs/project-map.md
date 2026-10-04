@@ -32,6 +32,8 @@ Use this file to decide where a change belongs before adding new abstractions.
 - `definition-of-done.md` — completion checklist.
 - `api-docs.md` — generated Python API documentation workflow using `pdoc`.
 - `repo-coding-assistant.md` — entry point for the repo-aware CLI workflow guides.
+- `repo-assistant/development-roadmap.md` — approved CLI foundation milestones,
+  acceptance criteria and the imperative next implementation action (ADR-040).
 - `repo-assistant/` — focused CLI workflow guides for execution, research,
   review, chat, native clients, permissions and scheduling.
 - `publication.md` — source/history privacy checks and safe branch publication.

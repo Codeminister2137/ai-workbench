@@ -38,6 +38,11 @@ key authorizes transmitting repository contents or spending credits.
 
 ## Current limits
 
+The accepted shared-tools and daily-development direction is tracked in the
+[development roadmap](repo-assistant/development-roadmap.md) and ADR-040.
+Cross-agent skills, permission mappings and coding/process continuity remain
+incomplete; roadmap approval does not establish current capability parity.
+
 Research inference is local-only; public fetching and search still transmit public
 URLs and queries outside the machine. Receipts prove retrieval and writes, not
 factual truth. Quality-first review remains opt-in: the representative evaluation

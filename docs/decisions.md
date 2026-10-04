@@ -256,6 +256,21 @@ The additive task migration preserves existing definitions and lifecycle states.
 
 Detailed ADR: `docs/decisions/ADR-039-user-started-budgeted-task-scheduling.md`
 
+## ADR-040 - Shared Agent Tools And CLI Development Foundation
+**Status:** Accepted direction and scope; implementation incomplete
+**Date:** 2026-10-04
+
+Share project-owned tools through MCP/native adapters while retaining official
+allowance clients. Approve repository/Git tools, portable skills/instructions,
+Python validation, documentation/public research, semantic code tools and
+process/session continuity. PyCharm may host tools temporarily; eventually it
+should only be the human editor/viewer. Preserve existing cost/privacy/approval
+boundaries. Concrete persistence, process-host and dependency choices remain open;
+optional capabilities and live execution are not included in this approval.
+
+Detailed ADR: [ADR-040](decisions/ADR-040-shared-agent-tools-and-cli-development-foundation.md)
+Milestones: [CLI development roadmap](repo-assistant/development-roadmap.md)
+
 ## Research Review Execution Preference
 **Status:** Accepted conditional authorization; current execution unchanged
 **Date:** 2026-10-02

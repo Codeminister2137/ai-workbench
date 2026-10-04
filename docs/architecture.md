@@ -192,6 +192,27 @@ providers, direct provider APIs, and future executors. Tool contracts should
 model read and write capabilities together when writes are foreseeable, even
 when write actions are disabled by default or require a stricter approval mode.
 
+## 4.2 Shared agent tools and development continuity
+
+ADR-040 approves common project-owned tools exposed through MCP and native
+adapters while retaining official clients and allowance routes. The initial
+foundation covers repository/local Git operations, portable skills/instructions,
+Python validation, documentation/public research, semantic code tools and
+process/session continuity. This is an accepted target, not implemented parity.
+
+Reuse `ai_agent` contracts and execution boundaries; keep route selection in
+`ai_orchestrator` and provider/client translation in execution adapters. PyCharm
+may initially host semantic tools, but the eventual target is independent tooling
+with PyCharm serving only as human editor/viewer. Fallback should preserve access
+to the required common tools and observed task progress without broadening
+permissions or replaying uncertain effects.
+
+Concrete session/process persistence, host lifecycle, approval transport and
+dependencies remain open decisions. No new daemon, connector, paid escalation or
+general scheduler is implicitly authorized. See the tracked
+[development roadmap](repo-assistant/development-roadmap.md) for milestones,
+acceptance conditions and the next implementation action.
+
 ## 5. Prompt evaluation vs optimization
 A prompt evaluator judges whether a request is adequate and identifies ambiguity/missing context. A prompt optimizer produces improved wording or variants.
 
