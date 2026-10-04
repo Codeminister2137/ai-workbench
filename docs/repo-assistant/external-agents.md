@@ -285,6 +285,29 @@ alternate executors can use the same policy.
 
 ## Automatic Usage-Limit Continuation
 
+Inspect catalog eligibility and executor-option compatibility without inference,
+authentication checks, tool connections or provider probes:
+
+```powershell
+uv run --no-sync ai-assistant --fallback-readiness `
+  --route-id openai-codex-gpt-5-5 --privacy public_or_low_risk `
+  --cost-policy allowances_allowed
+```
+
+The JSON report separates policy exclusions (different tiers, shared billing
+sources or task constraints) from executor incompatibility. It explains unsupported
+approval and option mappings. Authentication and tool connections remain
+`not_checked`, allowance remains `unknown`, and no candidate is asserted
+`execution_ready`. Even a declared compatible executor still needs live checks.
+The report respects private preferences; disabled fallback stays disabled.
+Execution, runtime startup and setup/sign-in actions cannot be combined with this
+offline flag. The PowerShell launcher may still create its usual transcript
+directory; the diagnostic itself does not load repository context or write state.
+
+During normal execution, incompatible fallback routes now retain their specific
+option/approval reason. The existing compatibility gate and authentication checks
+still decide whether execution is permitted; explanations do not authorize routes.
+
 Coding runs automatically try an authenticated, compatible route on the same
 billing tier after an allowance/quota limit. An explicit Codex route/model
 selects the first attempt; fallback may change it. Task privacy, required tools,

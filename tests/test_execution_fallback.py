@@ -273,6 +273,65 @@ def test_disabled_fallback_has_no_preflight(monkeypatch, routes, tmp_path):
     assert load_user_config(tmp_path / "missing").fallback_enabled
 
 
+def test_incompatibility_explanation_never_authorizes_or_authenticates_route(monkeypatch, routes):
+    checked = []
+    monkeypatch.setattr(
+        "ai_provider.execution_fallback.check_agent_readiness",
+        lambda method: checked.append(method) or AgentReadiness(True, "authenticated"),
+    )
+    run = FallbackSession(
+        profile(),
+        routes,
+        initial(routes),
+        compatible=lambda target: False,
+        incompatibility_reason=lambda target: "interactive approvals are not mapped",
+    )
+    assert run.ready == {}
+    assert checked == [AccessMethod.CODEX_CLI]
+    assert set(run.unavailable.values()) == {"interactive approvals are not mapped"}
+
+
+@pytest.mark.parametrize("tier", tuple(CostPolicyTier))
+def test_fallback_policy_enforces_same_tier_for_every_cost_ceiling(tier):
+    # Synthetic route metadata isolates the tier/bucket policy from client entitlement.
+    primary_entry = entry(
+        "first", AccessMethod.PROVIDER_API, BillingSource.OPENAI_API_BILLING, tier=tier
+    )
+    alternative = entry(
+        "second", AccessMethod.PROVIDER_API, BillingSource.REQUESTY_BILLING, tier=tier
+    )
+    same_bucket = replace(
+        alternative,
+        backend=replace(
+            alternative.backend,
+            route=replace(
+                alternative.backend.route, billing_source=BillingSource.OPENAI_API_BILLING
+            ),
+        ),
+    )
+    task = TaskProfile(
+        privacy_class=PrivacyClass.PUBLIC_OR_LOW_RISK,
+        cost_policy_tier=tier,
+        required_capabilities=frozenset({TaskCapability.CHAT, TaskCapability.TOOLS}),
+        user_route_id_override="first",
+    )
+    plan = prepare_execution("Inspect", task, (primary_entry,), review_prompt=False).execution_plan
+    assert plan is not None
+    assert fallback_candidates(task, (primary_entry, alternative), plan.target) == (alternative,)
+    assert fallback_candidates(task, (primary_entry, same_bucket), plan.target) == ()
+    for other_tier in CostPolicyTier:
+        if other_tier is tier:
+            continue
+        other = replace(
+            alternative,
+            backend=replace(
+                alternative.backend,
+                route=replace(alternative.backend.route, cost_policy_tier=other_tier),
+            ),
+        )
+        assert fallback_candidates(task, (primary_entry, other), plan.target) == ()
+
+
 def test_quota_words_in_success_or_tool_output_do_not_trigger_switch():
     result = ExternalAgentResult((), 0, "Explain usage limit", "usage limit")
     assert not external_usage_limit(result)

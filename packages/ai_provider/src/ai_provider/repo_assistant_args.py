@@ -29,6 +29,14 @@ def build_argument_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("prompt", nargs="?", help="Coding prompt to prepare or execute.")
     parser.add_argument(
+        "--fallback-readiness",
+        action="store_true",
+        help=(
+            "Explain fallback eligibility and executor compatibility offline; "
+            "does not authenticate clients, connect tools, or contact providers."
+        ),
+    )
+    parser.add_argument(
         "--mode",
         choices=CLI_MODES,
         default="ask",

@@ -29,7 +29,7 @@ it should only be the human editor/viewer. Different model performance is allowe
 
 | ID | Milestone | Status | Completion condition |
 | --- | --- | --- | --- |
-| M1 | Readiness and adapter contracts | NEXT; incomplete | Deterministic route/tool/skill/approval checks explain eligibility and exclusions; forced-limit coverage preserves tier and task constraints |
+| M1 | Readiness and adapter contracts | In progress; offline fallback diagnostic slice verified | Deterministic route/tool/skill/approval checks explain eligibility and exclusions; forced-limit coverage preserves tier and task constraints |
 | M2 | Common tools and portable skills | Pending | C1-C4 work through common contracts on selected routes; explicit skills resolve dependencies; required instructions are available or omissions cause a clear refusal |
 | M3 | Semantic tooling with temporary IDE host | Pending | Selected C5 operations work through a verified PyCharm bridge with defined semantics and permissions |
 | M4 | Coding and process continuity | Pending; design choices open | Agreed session/process model preserves objective, decisions, scoped approvals, receipts and handles across turns and fallback; uncertain effects are reconciled |
@@ -41,6 +41,19 @@ synthetic evidence alone when it requires an installed client or IDE bridge.
 Deferred live checks must not prevent independent offline implementation.
 
 ### M1: imperative next action
+
+First slice implemented on 2026-10-04: `--fallback-readiness` reports static
+policy and executor exclusions without authentication/tool/provider probes;
+execution preflight retains precise incompatibility reasons. Same-tier and
+different-bucket policy tests now cover every cost ceiling. Full offline suite:
+828 passed, seven live tests skipped; Pyright clean. Fresh synthetic-exhaustion
+acceptance continued a partial edit through real Copilot and passed its fixture.
+These results do not prove canonical tool/skill parity or alternate approval modes.
+
+Next, investigate per-tool/skill readiness using existing tool contracts. A new
+shared capability manifest or materially different client configuration contract
+needs a decision brief before implementation. Continue independent context
+integrity and existing-tool validation while that choice is deferred.
 
 Inspect the current fallback compatibility predicate, official-client command
 builders, tool registry and relevant tests. Implement the smallest deterministic
@@ -103,12 +116,16 @@ when available; this public roadmap is sufficient to resume the approved work.
 
 ## Resource and scheduling constraints
 
-The owner cannot run live acceptance now. Do not start inference, clients for
-model work, runtimes or sustained local workloads merely because this roadmap
-was approved. Prefer offline validation and synthetic clients.
+Live acceptance requires an explicitly selected compute window. Do not start
+inference, clients for model work, runtimes or sustained local workloads merely
+because this roadmap was approved. Prefer offline validation and synthetic clients.
 
-The existing supervised research acceptance remains planned and deferred in the
-research scheduler. Long local model work must wait for an explicitly selected
+The configured supervised research acceptance passed through the scheduler in
+an owner-selected window on 2026-10-04, including verified tokenizer admission,
+report receipts and durable final handoff. Its refinement attempts made no report
+progress, and search failure remained recorded. This establishes plumbing, not
+model-quality improvement or continuous use of the full allocated budget.
+Long local model work must wait for an explicitly selected
 compute window and a supported queued task. ADR-039 does not authorize inserting
 arbitrary coding or acceptance commands into that queue. Record unsupported live
 cases as pending work, rather than presenting them as executable queue entries.

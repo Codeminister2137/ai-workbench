@@ -2028,6 +2028,21 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.cost_policy is None:
         args.cost_policy = user_config.cost_policy.value
     args.fallback_enabled = user_config.fallback_enabled
+    if args.fallback_readiness:
+        if any(
+            (
+                args.execute,
+                args.start_ollama,
+                args.codex_login,
+                args.codex_login_device,
+                args.codex_plugin_install,
+                args.codex_plugin_remove,
+                args.codex_mcp_setup,
+                args.codex_mcp_register_global,
+            )
+        ):
+            parser.error("--fallback-readiness cannot be combined with execution or setup actions")
+        return _print_fallback_readiness(args, repo_root)
     if args.codex_login or args.codex_login_device:
         return _run_codex_login(args=args, repo_root=repo_root, parser=parser)
     if args.codex_plugin_install or args.codex_plugin_remove:
@@ -2227,6 +2242,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             catalog,
             external_orchestration.execution_plan.target,
             compatible=lambda target: _fallback_target_compatible(target, args, repo_root),
+            incompatibility_reason=lambda target: _fallback_target_incompatibility(
+                target, args, repo_root, probe_provider=False
+            ),
             enabled=args.fallback_enabled,
         )
         if args.away_minutes:
@@ -3130,34 +3148,54 @@ def _fallback_config(target: Any, args: argparse.Namespace, repo_root: Path) -> 
 
 def _fallback_target_compatible(target: Any, args: argparse.Namespace, repo_root: Path) -> bool:
     """Preserve tool/approval constraints and verify provider credentials without inference."""
+    return _fallback_target_incompatibility(target, args, repo_root) is None
+
+
+def _fallback_target_incompatibility(
+    target: Any,
+    args: argparse.Namespace,
+    repo_root: Path,
+    *,
+    probe_provider: bool = True,
+) -> str | None:
+    """Explain a refusal; offline declarations never establish authenticated readiness."""
     if _is_external_agent_access_method(target.access_method):
         if getattr(args, "tool_profile", "coding") == "research":
-            return False
+            return "research tools require provider-native execution"
         if args.no_native_tools or args.apply_actions:
-            return False
+            return "external fallback cannot preserve legacy action/native-tool settings"
         try:
             _build_external_agent_command(_fallback_config(target, args, repo_root))
-            return True
-        except (FileNotFoundError, NotImplementedError, ValueError):
-            return False
-    if any(
-        (
-            args.codex_resume,
-            args.codex_persist_session,
-            args.codex_search,
-            args.codex_image,
-            args.codex_output_schema,
-            args.codex_mcp_tools,
-            args.codex_output_last_message,
+            return None
+        except (FileNotFoundError, NotImplementedError, ValueError) as exc:
+            return str(exc)
+    requested = [
+        flag
+        for flag, value in (
+            ("--codex-resume", args.codex_resume),
+            ("--codex-persist-session", args.codex_persist_session),
+            ("--codex-search", args.codex_search),
+            ("--codex-image", args.codex_image),
+            ("--codex-output-schema", args.codex_output_schema),
+            ("--codex-mcp-tools", args.codex_mcp_tools),
+            ("--codex-output-last-message", args.codex_output_last_message),
         )
-    ):
-        return False
+        if value
+    ]
+    if requested:
+        return "provider executor cannot preserve requested options: " + ", ".join(requested)
     if args.mode == "implement" and args.no_native_tools:
-        return False
+        return "provider implement fallback requires native tools"
     try:
         config = backend_config_from_execution_target(target)
+        if not probe_provider:
+            return None
         if config.provider is ProviderKind.OLLAMA:
-            return is_ollama_server_available(config.base_url)
+            return (
+                None
+                if is_ollama_server_available(config.base_url)
+                else "local Ollama service could not be reached"
+            )
         from ai_provider.adapters.openai_compatible import OpenAICompatibleChatClient
         from urllib.request import Request, urlopen
 
@@ -3165,11 +3203,58 @@ def _fallback_target_compatible(target: Any, args: argparse.Namespace, repo_root
         request = Request(f"{client.base_url}/models", headers=client._headers())
         with urlopen(request, timeout=10) as response:
             models = json.loads(response.read().decode("utf-8"))
-        return any(
+        if any(
             row.get("id") == target.model for row in models.get("data", []) if isinstance(row, dict)
-        )
+        ):
+            return None
+        return "configured model was not found in the provider model list"
     except (ProviderError, ValueError, OSError):
-        return False
+        return "provider configuration or model availability could not be verified"
+
+
+def _print_fallback_readiness(args: argparse.Namespace, repo_root: Path) -> int:
+    """Report static eligibility without loading context or starting account/tool probes."""
+    from ai_provider.fallback_diagnostics import fallback_readiness_report
+
+    catalog = load_model_catalog(args.catalog)
+    profile = coding_task_profile(
+        privacy_class=OrchestratorPrivacyClass(args.privacy),
+        quality_threshold=QualityThreshold(args.quality),
+        latency_target=LatencyTarget.INTERACTIVE,
+        max_expected_latency_seconds=args.max_latency_seconds,
+        cost_policy_tier=CostPolicyTier(args.cost_policy),
+        route_id_override=args.route_id,
+        access_method_override=AccessMethod(args.access_method) if args.access_method else None,
+        provider_override=args.provider,
+        model_override=args.model,
+    )
+    if args.tool_profile == "research":
+        profile = replace(
+            profile,
+            task_type=TaskType.GENERAL,
+            required_capabilities=frozenset({TaskCapability.CHAT, TaskCapability.TOOLS}),
+        )
+    result = prepare_execution(
+        args.prompt or "Inspect fallback readiness",
+        profile,
+        catalog,
+        review_prompt=False,
+        timeout_seconds=args.timeout_seconds,
+    )
+    if result.execution_plan is None:
+        print(json.dumps({"status": "blocked", "reason": result.failure_reason}))
+        return 1
+    report = fallback_readiness_report(
+        profile,
+        catalog,
+        result.execution_plan.target,
+        incompatibility=lambda target: _fallback_target_incompatibility(
+            target, args, repo_root, probe_provider=False
+        ),
+        enabled=args.fallback_enabled,
+    )
+    print(json.dumps(report, indent=2))
+    return 0
 
 
 def _execute_fallback_route(

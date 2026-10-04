@@ -57,6 +57,7 @@ class FallbackSession:
         initial: ExecutionTarget,
         *,
         compatible: Callable[[ExecutionTarget], bool],
+        incompatibility_reason: Callable[[ExecutionTarget], str | None] | None = None,
         enabled: bool = True,
         progress: Callable[[str], None] = print,
         deadline: float | None = None,
@@ -97,8 +98,8 @@ class FallbackSession:
             target = plan.target
             if not compatible(target):
                 self.unavailable[target.route_id] = (
-                    "executor cannot preserve requested tools/permissions/options"
-                )
+                    incompatibility_reason(target) if incompatibility_reason is not None else None
+                ) or ("executor cannot preserve requested tools/permissions/options")
                 continue
             if not is_external_agent_access_method(target.access_method):
                 # Provider readiness is supplied by the composing CLI, without inference.
