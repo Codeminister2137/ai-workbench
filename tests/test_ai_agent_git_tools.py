@@ -69,6 +69,108 @@ def test_git_ignores_inherited_repository_override(working_tree: Path, monkeypat
     assert not GitStatusTool().execute({}, ToolContext(working_tree)).is_error
 
 
+@pytest.mark.parametrize("tool", [GitStatusTool(), GitDiffTool()])
+@pytest.mark.parametrize("helper_kind", ["clean", "process"])
+def test_git_inspection_does_not_execute_content_filters(
+    working_tree: Path, tool, helper_kind: str
+) -> None:
+    marker = working_tree / "filter-executed.txt"
+    (working_tree / ".gitattributes").write_text("source.txt filter=fixture\n")
+    git(
+        working_tree,
+        "config",
+        f"filter.fixture.{helper_kind}",
+        f'echo executed > "{marker.as_posix()}"',
+    )
+    git(working_tree, "config", "filter.fixture.required", "true")
+    (working_tree / "source.txt").write_text("new\n")
+    index_before = (working_tree / ".git/index").read_bytes()
+
+    result = tool.execute({}, ToolContext(working_tree))
+
+    assert not marker.exists(), "Git inspection executed a configured content helper"
+    assert not result.is_error
+    assert "source.txt" in result.output
+    assert (working_tree / ".git/index").read_bytes() == index_before
+    assert result.metadata["content_filters_disabled"]
+    assert "comparing raw worktree content" in result.output
+    assert git(working_tree, "config", "filter.fixture.required").strip() == "true"
+
+
+def test_git_refuses_filter_names_that_cannot_be_overridden(working_tree: Path) -> None:
+    marker = working_tree / "filter-executed.txt"
+    (working_tree / ".gitattributes").write_text("source.txt filter=fixture=value\n")
+    git(
+        working_tree,
+        "config",
+        "filter.fixture=value.clean",
+        f'echo executed > "{marker.as_posix()}"',
+    )
+    (working_tree / "source.txt").write_text("changed\n")
+
+    result = GitDiffTool().execute({}, ToolContext(working_tree))
+
+    assert result.is_error
+    assert "cannot be safely overridden" in result.output
+    assert not marker.exists()
+
+
+@pytest.mark.parametrize("tool", [GitStatusTool(), GitDiffTool()])
+def test_git_inspection_does_not_enter_submodule_content(working_tree: Path, tool) -> None:
+    module = working_tree.parent / (working_tree.name + "-module")
+    module.mkdir()
+    git(module, "init", "--quiet", "--template=")
+    (module / "tracked.txt").write_text("original\n")
+    git(module, "add", "tracked.txt")
+    commit_options = (
+        "-c",
+        "user.name=Fixture",
+        "-c",
+        "user.email=fixture@example.invalid",
+        "-c",
+        "commit.gpgsign=false",
+        "-c",
+        "core.hooksPath=missing-hooks",
+    )
+    git(module, *commit_options, "commit", "--quiet", "-m", "Fixture baseline")
+    git(
+        working_tree,
+        "-c",
+        "protocol.file.allow=always",
+        "submodule",
+        "add",
+        "--quiet",
+        str(module),
+        "module",
+    )
+    nested = working_tree / "module"
+    marker = working_tree / "nested-filter-executed.txt"
+    (nested / ".gitattributes").write_text("tracked.txt filter=nested-fixture\n")
+    git(nested, "config", "filter.nested-fixture.clean", f'echo executed > "{marker.as_posix()}"')
+    (nested / "tracked.txt").write_text("modified\n")
+    git(
+        nested,
+        *commit_options,
+        "-c",
+        "filter.nested-fixture.clean=",
+        "commit",
+        "--allow-empty",
+        "--quiet",
+        "-m",
+        "Fixture pointer change",
+    )
+    git(working_tree, "config", "diff.submodule", "diff")
+    git(working_tree, "config", "status.submoduleSummary", "true")
+
+    result = tool.execute({}, ToolContext(working_tree))
+
+    assert not result.is_error
+    assert not marker.exists()
+    assert "module" in result.output
+    if isinstance(tool, GitDiffTool):
+        assert "+Subproject commit" in result.output
+
+
 def test_git_missing_repository_is_actionable(tmp_path: Path) -> None:
     result = GitStatusTool().execute({}, ToolContext(tmp_path))
     assert result.is_error and "not a Git working tree" in result.output

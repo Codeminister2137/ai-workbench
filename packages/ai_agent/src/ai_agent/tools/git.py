@@ -24,6 +24,10 @@ def _git_inspect(name: str, arguments: tuple[str, ...], context: ToolContext) ->
         "core.fsmonitor=false",
         "-c",
         "core.untrackedCache=false",
+        "-c",
+        "status.submoduleSummary=false",
+        "-c",
+        "diff.submodule=short",
         "-C",
         str(context.workspace_root.resolve()),
     )
@@ -55,6 +59,37 @@ def _git_inspect(name: str, arguments: tuple[str, ...], context: ToolContext) ->
                     "Select its root explicitly."
                 ),
             )
+        configured_filters = run(
+            ("config", "--null", "--name-only", "--get-regexp", r"^filter\..*\.(clean|process)$")
+        )
+        if configured_filters.returncode not in (0, 1):
+            return ToolResult(
+                name=name,
+                output="Error: Git content filters could not be inspected.",
+                is_error=True,
+            )
+        drivers = {key.rsplit(".", 1)[0] for key in configured_filters.stdout.split("\0") if key}
+        if any("=" in driver for driver in drivers):
+            return ToolResult(
+                name=name,
+                output="Error: Git filter names cannot be safely overridden for inspection.",
+                is_error=True,
+            )
+        # Status/diff can run clean/process filters to compare worktree content.
+        # Disable their commands for this invocation, without changing configuration.
+        filter_options = tuple(
+            argument
+            for driver in sorted(drivers)
+            for setting in ("clean=", "process=", "required=false")
+            for argument in ("-c", f"{driver}.{setting}")
+        )
+        if sum(len(part) + 3 for part in (*prefix, *filter_options, *arguments)) > 30_000:
+            return ToolResult(
+                name=name,
+                output="Error: Git filter overrides exceed the bounded command size.",
+                is_error=True,
+            )
+        prefix = (*prefix, *filter_options)
         completed = run(arguments)
     except FileNotFoundError:
         return ToolResult(name=name, output="Error: Git executable was not found.", is_error=True)
@@ -65,11 +100,17 @@ def _git_inspect(name: str, arguments: tuple[str, ...], context: ToolContext) ->
     output = raw[:MAX_OUTPUT_CHARS].strip() or "(No changes)"
     if truncated:
         output += "\n[Git output truncated; narrow the diff path.]"
+    if drivers:
+        output = "[Content filters disabled; comparing raw worktree content.]\n" + output
     return ToolResult(
         name=name,
         output=output,
         is_error=completed.returncode != 0,
-        metadata={"exit_code": completed.returncode, "truncated": truncated},
+        metadata={
+            "exit_code": completed.returncode,
+            "truncated": truncated,
+            "content_filters_disabled": bool(drivers),
+        },
     )
 
 
@@ -86,7 +127,9 @@ class GitStatusTool(BaseTool):
 
     def execute(self, arguments: dict[str, Any], context: ToolContext) -> ToolResult:
         return _git_inspect(
-            "git_status", ("status", "--porcelain=v1", "--untracked-files=normal"), context
+            "git_status",
+            ("status", "--porcelain=v1", "--untracked-files=normal", "--ignore-submodules=dirty"),
+            context,
         )
 
 
@@ -139,6 +182,7 @@ class GitDiffTool(BaseTool):
                 "--no-ext-diff",
                 "--no-textconv",
                 "--no-color",
+                "--ignore-submodules=dirty",
                 *(("--cached",) if staged else ()),
                 "--",
                 *path_args,

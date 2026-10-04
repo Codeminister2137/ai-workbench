@@ -21,6 +21,12 @@ working directory but does not sandbox the command's effects; a shell grant is
 broader than a workspace-file grant. External clients have their own restrictions
 and only supported policy mappings are accepted. Read-only Git status/diff tools
 use fixed commands under READ permissions; they do not grant general shell access.
+These calls disable configured clean/process content filters as well as external
+diff and text-conversion helpers. Filtered repositories receive a visible notice:
+the comparison uses raw worktree content and can differ from ordinary Git output.
+Unsafe filter override names are refused; repository configuration is unchanged.
+Submodule content is not traversed; Git pointer changes remain visible. Inspect a
+submodule's content by selecting its own workspace explicitly.
 
 Avoid `--allow-outside-files` unless you deliberately want to allow outside-repo
 paths without a prompt.
