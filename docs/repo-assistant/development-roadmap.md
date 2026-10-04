@@ -161,7 +161,12 @@ Default `preserve_quality` requires the original declared grade; explicit
 `task_minimum` permits task-qualified weaker routes. Failed continuation saves a
 local handoff without a weaker model call. Remaining balances and actual model
 quality are not guaranteed by these deterministic checks. Full current validation:
-892 passed, seven live tests skipped; live overload/quality-gate acceptance deferred.
+933 passed, seven live tests skipped; live overload/quality-gate acceptance deferred.
+
+Owner-approved task quality, context/instruction limits, request/validation
+timeouts and repair caps are now typed private user defaults. Explicit CLI flags
+win; shipped values, instruction overflow refusal and scheduler deadline admission
+are preserved. Privacy and approval defaults await specific selections.
 
 - Common inspection, checked project-local skill selection and complete required
   instructions are implemented. Forced Codex-limit fallback through real Copilot

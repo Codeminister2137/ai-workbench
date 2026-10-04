@@ -17,6 +17,17 @@ cost_policy = "allowances_allowed"
 
 Enum members use uppercase names such as `CostPolicyTier.ALLOWANCES_ALLOWED`;
 serialized values and variables use lowercase snake_case for both cost tiers.
+The same `[defaults]` section accepts `quality`, `context_budget_chars`,
+`context_file_budget_chars`, `instruction_budget_chars`, `timeout_seconds`,
+`validation_timeout_seconds`, and `max_repair_cycles`. See the checked-in example
+for shipped values and bounds. Explicit CLI flags win, including abbreviated
+options and values equal to shipped defaults. Required instructions refuse
+overflow; they are never truncated. An explicitly configured request timeout
+also wins over the automatic `--away-minutes` request timeout. If the key is
+absent, away runs retain their existing automatic timeout. Scheduler deadlines
+and admission checks remain independent limits. Privacy and approval defaults
+retain their existing behavior.
+
 Requesty remains a provider API route using `REQUESTY_API_KEY`. Paid catalog
 routes require `prepaid_credits_allowed`. The separate
 `requesty-free-gemma-4-31b` route uses `free_only` and verifies live zero pricing

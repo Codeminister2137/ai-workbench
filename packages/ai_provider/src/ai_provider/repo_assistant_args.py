@@ -26,6 +26,15 @@ CHAT_CONTEXT_MODES = ("rolling_summary", "hard_fail", "full_history")
 APPROVAL_POLICY_PRESETS = tuple(item.value for item in ApprovalPolicyPreset)
 
 
+class UserDefaultAction(argparse.Action):
+    """Remember explicit options, including argparse abbreviations and equals syntax."""
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        setattr(namespace, self.dest, values)
+        provided = getattr(namespace, "_provided_user_defaults", frozenset())
+        namespace._provided_user_defaults = provided | {self.dest}
+
+
 def build_argument_parser() -> argparse.ArgumentParser:
     """Build the existing CLI surface without resolving config or contacting providers."""
     parser = argparse.ArgumentParser(
@@ -106,6 +115,7 @@ def build_argument_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--context-budget-chars",
+        action=UserDefaultAction,
         type=int,
         default=DEFAULT_CONTEXT_BUDGET_CHARS,
         help=(
@@ -115,6 +125,7 @@ def build_argument_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--context-file-budget-chars",
+        action=UserDefaultAction,
         type=int,
         default=DEFAULT_CONTEXT_FILE_BUDGET_CHARS,
         help="Maximum characters from one optional context file; AGENTS.md stays complete.",
@@ -163,6 +174,7 @@ def build_argument_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--instruction-budget-chars",
+        action=UserDefaultAction,
         type=int,
         default=DEFAULT_INSTRUCTION_BUDGET_CHARS,
         help="Separate limit for complete applicable AGENTS.md files; overflow refuses execution.",
@@ -203,6 +215,7 @@ def build_argument_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--quality",
+        action=UserDefaultAction,
         choices=[item.value for item in QualityThreshold],
         default=QualityThreshold.STANDARD.value,
         help="Minimum quality threshold.",
@@ -242,6 +255,7 @@ def build_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-latency-seconds", type=float, help="Hard latency constraint.")
     parser.add_argument(
         "--timeout-seconds",
+        action=UserDefaultAction,
         type=float,
         default=180.0,
         help=(
@@ -343,12 +357,14 @@ def build_argument_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--validation-timeout-seconds",
+        action=UserDefaultAction,
         type=float,
         default=300.0,
         help="Timeout for each deterministic validation command.",
     )
     parser.add_argument(
         "--max-repair-cycles",
+        action=UserDefaultAction,
         type=int,
         default=3,
         help=(

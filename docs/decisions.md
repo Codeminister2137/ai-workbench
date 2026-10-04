@@ -326,6 +326,16 @@ in the owner's game-closed comparison, but competing workloads can affect it.
 This preference does not approve smaller evidence windows or reduced output
 capacity as a quality trade-off, and does not assert CPU/GPU quality equivalence.
 
+## User execution defaults — accepted 2026-10-04
+
+Owner approved exposing task quality, optional context/instruction limits,
+request/validation timeouts and repair caps in the existing private `[defaults]`
+configuration to avoid repeatedly specifying personal execution preferences.
+Explicit CLI values win; shipped values and scheduler safety checks are preserved.
+An explicit config timeout wins over away-mode automatic request sizing; an absent
+key retains that sizing. Privacy and approval choices still require specific owner
+selections. No new settings service or persistence mechanism is introduced.
+
 ## Template
 ```text
 ## ADR-NNN — Short Name

@@ -511,7 +511,11 @@ def _configure_away_mode(
         return
     if args.away_minutes <= 0:
         parser.error("--away-minutes must be greater than zero")
-    if not _argv_has_option(argv, _TIMEOUT_OPTION_NAMES):
+    timeout_selected = "timeout_seconds" in (
+        getattr(args, "_provided_user_defaults", frozenset())
+        | getattr(args, "_configured_user_defaults", frozenset())
+    )
+    if not timeout_selected and not _argv_has_option(argv, _TIMEOUT_OPTION_NAMES):
         args.timeout_seconds = args.away_minutes * 60
 
 
@@ -2092,6 +2096,9 @@ def _main(argv: Sequence[str] | None = None) -> int:
         user_config = load_user_config(config_path, required=args.user_config is not None)
     except (OSError, ValueError, TypeError) as exc:
         parser.error(f"Invalid user config {config_path}: {exc}")
+    from ai_provider.user_config import apply_user_defaults
+
+    apply_user_defaults(args, user_config)
     if args.cost_policy is None:
         args.cost_policy = user_config.cost_policy.value
     args.fallback_enabled = user_config.fallback_enabled

@@ -32,22 +32,28 @@ usage/credits are unknown unless reliably reported; preflight is not a balance c
 Only the overload/usage policy is expanded here. Generic retries, automatic login,
 automatic mutation replay, background resume and new services are not enabled.
 
-## Further configuration recommendations — not yet approved
+## Accepted execution defaults
 
-The current user config has a cost ceiling, fallback enablement and quality policy.
-Most execution controls already exist as CLI flags. Prefer exposing selected flags
-as defaults through that same config rather than adding another settings system.
+Owner approved task quality, context/instruction limits, request/validation
+timeouts and repair caps in the existing private `[defaults]` section. The
+example config documents shipped values, which remain unchanged. CLI flags
+always win, including abbreviated options. Invalid types, non-finite/non-positive
+timeouts and out-of-range budgets fail before routing. Required instructions
+refuse overflow rather than being truncated. `context_budget_chars = 0` removes
+the optional context cap; `max_repair_cycles = -1` removes the cycle cap while
+retaining the time budget. An explicitly configured request timeout wins over
+away-mode automatic request sizing; omit it to retain automatic sizing.
+Scheduler deadline admission is unchanged.
+
+## Remaining configuration recommendations — not yet selected
 
 | Setting | Recommendation and reason |
 | --- | --- |
-| Default task quality | Add next: common personal preference, with CLI override; keep separate from fallback continuity quality. |
-| Optional context and instruction limits | Add next: useful workstation/task preferences; instructions must still refuse overflow rather than truncate. |
-| Request/validation timeouts and repair cap | Add next after validating combinations: useful bounded execution preferences; must not weaken scheduler deadline admission. |
-| Privacy default | Worth adding only after explicit selection: it determines which data may leave the PC. Keep current local-only default meanwhile. |
-| Approval preset | Worth adding only after explicit selection: it changes command/write authority. Preserve current interactive behavior meanwhile. |
+| Privacy default | Add only after explicit selection: it determines which data may leave the PC. Keep current local-only default meanwhile. |
+| Approval preset | Add only after explicit selection: it changes command/write authority. Preserve current interactive behavior meanwhile. |
 | IDE endpoint and search operator | Use explicit local config once connection/operator is selected; never discover a service and silently send data to it. |
 | Persistent quota balances, reset guesses, cross-tier fallback | Defer: account-specific reliable evidence is needed; local guesses cannot guarantee allowance or spending limits. |
 
 Avoid making every internal retry, heuristic, buffer or tool setting configurable.
 Add a default when it solves a repeated user choice; retain typed validation and
-clear CLI precedence. No further defaults were implemented in this slice.
+clear CLI precedence.

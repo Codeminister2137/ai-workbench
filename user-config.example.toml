@@ -1,6 +1,15 @@
 # Copy to user-config.toml for private preferences. CLI flags override these values.
 [defaults]
 cost_policy = "prepaid_credits_allowed"
+quality = "standard" # low, standard, high; separate from fallback quality policy
+context_budget_chars = 5000 # 0 means unlimited optional context
+context_file_budget_chars = 2500 # positive
+instruction_budget_chars = 64000 # positive; overflow refuses, never truncates instructions
+# An explicit timeout also wins over --away-minutes' automatic request timeout.
+# Omit this key to retain the automatic timeout for away runs.
+timeout_seconds = 180.0
+validation_timeout_seconds = 300.0
+max_repair_cycles = 3 # 0 disables repairs; -1 removes cycle cap, retaining time budget
 
 # Automatic same-tier fallback on usage limits and model overload is on by default.
 [fallback]
