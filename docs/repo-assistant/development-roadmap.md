@@ -70,7 +70,8 @@ Antigravity inspection fixture returned exit zero with no answer or tool receipt
 headless MCP permission was auto-denied. The adapter now reports that explicit
 diagnostic as failure while preserving the process status. Narrow native grants
 and common approval mapping remain unresolved; no global permission settings
-were changed for this fixture.
+were changed for this fixture. A separate short tool-free Antigravity request
+returned the expected answer; basic execution works despite the MCP refusal.
 
 Native coding and the opt-in inspection MCP profile now share bounded local Git
 status/diff tools under READ permissions; the default Codex delegation profile
@@ -143,6 +144,10 @@ through an account allowance is not required. Record client versions, tested
 capabilities and limitations. Model-quality comparisons are a separate evaluation.
 
 ## Open design decisions
+
+The investigated options and recommendations are in
+[foundation decisions](foundation-decisions.md). They remain proposals pending
+owner selection; ADR-040's direction and scope are already accepted.
 
 - Minimal project-owned coding-session state and native-session interaction.
 - Process ownership, handle lifetime and recovery after client or host shutdown.
