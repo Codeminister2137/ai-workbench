@@ -52,7 +52,14 @@ def test_read_search_only_entrypoint_omits_model_backed_delegation(monkeypatch, 
         lambda **kwargs: (_ for _ in ()).throw(AssertionError("delegation registry created")),
     )
     assert _MCP_SERVER.main(["--workspace-root", str(tmp_path), "--read-search-only"]) == 0
-    assert captured == ["read_file", "list_dir", "find_files", "grep_search"]
+    assert captured == [
+        "read_file",
+        "list_dir",
+        "find_files",
+        "grep_search",
+        "git_status",
+        "git_diff",
+    ]
 
 
 def test_codex_mcp_registry_includes_bounded_delegate_task(tmp_path: Path) -> None:

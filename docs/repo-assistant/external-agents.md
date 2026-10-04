@@ -223,7 +223,8 @@ and no MCP write or shell capability.
 
 For a model-free inspection surface, start the same stdio server with
 `--read-search-only`. It exposes `read_file`, `list_dir`, `find_files` and
-`grep_search` without constructing the delegation runner:
+`grep_search`, plus bounded local `git_status` and `git_diff`, without constructing
+the delegation runner:
 
 ```powershell
 python -m uv run --no-sync python -m ai_agent.mcp_server `
@@ -234,6 +235,13 @@ An MCP client launches this command and owns its stdio connection; it is not a
 background service. This opt-in profile does not change the existing Codex
 injection defaults or register another client. Client discovery and permissions
 still need independent verification.
+
+The Git tools use fixed arguments, require the repository root inside the selected
+workspace, disable external diff/text-conversion helpers and trim output at 30,000
+characters with a truncation notice. They do not offer arbitrary Git commands,
+commits or remote operations. Native provider coding tools expose the same Git
+implementations under the existing READ permission category. The default Codex
+MCP/delegation profile keeps its original tool set.
 
 The PyCharm-bundled Codex CLI verified in this repository is `codex-cli
 0.137.0`. On 2026-09-26, `gpt-5.5` completed a low-risk JSONL execution through

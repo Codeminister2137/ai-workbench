@@ -143,4 +143,6 @@ def test_default_coding_tools_and_json_schemas() -> None:
     assert "list_dir" in names
     assert "find_files" in names
     assert "grep_search" in names
+    assert "git_status" in names
+    assert "git_diff" in names
     assert "run_command" in names

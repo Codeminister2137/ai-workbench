@@ -53,11 +53,16 @@ These results do not prove canonical tool/skill parity or alternate approval mod
 The next independent slices include nested repository instructions for selected
 paths and visible context truncation/omission diagnostics. Existing budgets still
 apply; enforcing complete required instructions remains a decision. A model-free
-`--read-search-only` MCP profile exposes the four existing inspection tools. A
+`--read-search-only` MCP profile exposes repository inspection tools. A
 bounded real Copilot acceptance discovered and called `find_files`, `list_dir`
 and `read_file` with explicit read/search grants, returned the fixture marker and
 left the fixture unchanged. This confirms one client connection, not write/shell,
 skill activation, all-client parity or fallback with common MCP configuration.
+
+Native coding and the opt-in inspection MCP profile now share bounded local Git
+status/diff tools under READ permissions; the default Codex delegation profile
+is unchanged. Focused fixtures verify index preservation, staged/unstaged diffs,
+literal paths, outside-root refusal and disabled external diff helpers.
 
 Next, investigate per-tool/skill readiness using existing tool contracts. A new
 shared capability manifest or materially different client configuration contract

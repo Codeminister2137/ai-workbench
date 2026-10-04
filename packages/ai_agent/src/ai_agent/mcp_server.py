@@ -27,7 +27,15 @@ from ai_provider import BackendConfig, PrivacyClass, ProviderKind, create_chat_c
 
 from ai_agent.contracts import ToolCall, ToolDefinition, ToolResult
 from ai_agent.loop import AgentLoop
-from ai_agent.tools import FindFilesTool, GrepSearchTool, ListDirTool, ReadFileTool, ToolContext
+from ai_agent.tools import (
+    FindFilesTool,
+    GitDiffTool,
+    GitStatusTool,
+    GrepSearchTool,
+    ListDirTool,
+    ReadFileTool,
+    ToolContext,
+)
 from ai_agent.tools.base import BaseTool, ToolRegistry
 from ai_agent.tools.delegation import DelegateTaskTool
 
@@ -50,6 +58,14 @@ def read_search_tool_registry() -> ToolRegistry:
             GrepSearchTool(),
         )
     )
+
+
+def repo_inspection_tool_registry() -> ToolRegistry:
+    """Extend read/search with bounded local Git status and diff inspection."""
+    registry = read_search_tool_registry()
+    registry.register(GitStatusTool())
+    registry.register(GitDiffTool())
+    return registry
 
 
 def codex_mcp_tool_registry(
@@ -327,7 +343,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     return run_stdio_server(
         workspace_root=workspace_root,
         registry=(
-            read_search_tool_registry()
+            repo_inspection_tool_registry()
             if args.read_search_only
             else codex_mcp_tool_registry(
                 catalog_path=catalog_path,

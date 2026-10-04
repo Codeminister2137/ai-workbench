@@ -10,6 +10,7 @@ from ai_agent.tools.filesystem import (
     ListDirTool,
     ReadFileTool,
 )
+from ai_agent.tools.git import GitDiffTool, GitStatusTool
 from ai_agent.tools.search import FindFilesTool, GrepSearchTool
 from ai_agent.tools.shell import RunCommandTool
 
@@ -24,6 +25,8 @@ def default_coding_tools() -> ToolRegistry:
             ListDirTool(),
             FindFilesTool(),
             GrepSearchTool(),
+            GitStatusTool(),
+            GitDiffTool(),
             RunCommandTool(),
         )
     )
@@ -36,6 +39,8 @@ __all__ = [
     "EditFileTool",
     "FindFilesTool",
     "GrepSearchTool",
+    "GitDiffTool",
+    "GitStatusTool",
     "ListDirTool",
     "ReadFileTool",
     "RunCommandTool",
