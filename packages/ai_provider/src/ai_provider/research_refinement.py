@@ -135,6 +135,10 @@ def run_research_refinement(
         prompt = (
             f"Original research request:\n{args.prompt}\n\n"
             f"Research refinement cycle {number}. Structural validation is not a quality verdict.\n"
+            "First call read_research_report to inspect the saved draft. Then assess a concrete "
+            "reviewer issue against the fetched evidence. Correct supported weaknesses in the "
+            "saved report with write_research_report, or explain specifically why the advice "
+            "does not justify a change. Do not merely summarize proposed edits.\n"
             "Read the saved report, scrutinize its claims, "
             "cross-check primary sources where useful, "
             "and improve concrete weaknesses or coverage within the supplied request. "
@@ -152,7 +156,7 @@ def run_research_refinement(
             f"Issues: {review_details.get('issues', '')}\n"
             f"Next action: {review_details.get('next_action', '')}\n"
             "Use actual fetch_url calls before claiming new retrieval; preserve source grounding."
-            "\n\n" + research.review_evidence()
+            "\n\n" + research.repair_context()
         )
         try:
             attempt_status, response = repair_attempt(
@@ -163,6 +167,8 @@ def run_research_refinement(
             attempt["failure_reason"] = str(error)
         if response:
             assistant_response_text = response
+            # Final response only, not private reasoning; retain why an attempt did no work.
+            attempt["response_summary"] = response[:2000]
         attempt["status"] = attempt_status
         if attempt_status not in {"completed", "completed_with_tool_errors"}:
             # Tools may have replaced the report before the provider failed.

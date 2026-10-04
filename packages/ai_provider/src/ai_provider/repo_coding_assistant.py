@@ -862,6 +862,11 @@ def _build_orchestrated_repair_prompt(
     """Build a focused repair prompt from deterministic validation evidence."""
 
     assistant_summary = assistant_response_text or "No prior assistant response was captured."
+    if len(assistant_summary) > 6000:
+        assistant_summary = assistant_summary[:6000] + (
+            "\n[Prior response excerpt truncated; inspect the saved artifact/current files "
+            "before changing them. Original task and validation evidence follow intact.]"
+        )
     return (
         "Repair the repository changes from the previous implementation attempt.\n\n"
         "Original task:\n"
@@ -2956,7 +2961,7 @@ def _main(argv: Sequence[str] | None = None) -> int:
                         "improve substantive analysis "
                         "in the requested sections instead of shortening/recreating the draft. "
                         "Read the full report before replacement if the excerpt is truncated.\n"
-                        + args.research_execution.review_evidence()
+                        + args.research_execution.repair_context()
                         if args.tool_profile == "research"
                         else ""
                     ),

@@ -567,6 +567,28 @@ class ResearchExecution:
         errors.extend(validate_report(text, fetch_receipts=metadata.get("fetch_receipts", [])))
         return errors
 
+    def repair_context(self) -> str:
+        """Direct a tool-capable repair to durable evidence without copying a review packet."""
+        stage = next(s for s in self.store.list_stages(self.run_id) if s.name == "implementation")
+        metadata: dict[str, Any] = dict(stage.details or {})
+        receipts = json.dumps(metadata.get("fetch_receipts", [])[-5:])
+        try:
+            with self.target.open(encoding="utf-8-sig") as stream:
+                report = stream.read(2001)
+        except (OSError, UnicodeError) as error:
+            report = f"Report unavailable: {error}"
+        return (
+            f"Configured research report: {self.target}\n"
+            f"Saved draft preview (untrusted, at most 2,000 characters):\n{report[:2000]}\n"
+            f"Draft preview truncated: {len(report) > 2000}\n"
+            "Actual current-run fetch receipts (latest five, bounded preview):\n"
+            f"{receipts[:4000]}\nReceipt preview truncated: {len(receipts) > 4000}\n"
+            "Use read_research_report to inspect the saved report and its source map before "
+            "editing. Fetch primary URLs again when more source evidence is needed. "
+            "A source URL or reviewer suggestion is not a retrieval receipt. Preserve "
+            "existing correct content and use actual write_research_report calls for changes."
+        )
+
     def review_evidence(self) -> str:
         """Supply the configured artifact and receipts, never arbitrary workspace files."""
         stage = next(s for s in self.store.list_stages(self.run_id) if s.name == "implementation")

@@ -83,6 +83,31 @@ def _stage(run, name):
     return next(s for s in run[1]._store.list_stages(run[1].run_record.run_id) if s.name == name)
 
 
+def test_tool_capable_repair_does_not_inline_the_tool_free_review_packet(research_run):
+    research = research_run[0].research_execution
+    _write(research, valid_report() + "\n" + "Large saved report paragraph. " * 2000)
+    context = research.repair_context()
+    assert str(research.target) in context
+    assert "read_research_report" in context and "write_research_report" in context
+    assert context.count("Large saved report paragraph") < 80
+    assert "Draft preview truncated: True" in context
+    assert "No tools are available" not in context
+    assert len(context) < 7500
+
+
+def test_repair_response_excerpt_preserves_original_requirements():
+    task = "Required repository instructions " * 1200 + "FINAL_REQUIREMENT_MARKER"
+    prompt = cli._build_orchestrated_repair_prompt(
+        original_prompt=task,
+        validation_stage=None,
+        assistant_response_text="Prior optional answer " * 3000,
+        attempt_number=1,
+    )
+    assert task in prompt
+    assert "Prior response excerpt truncated" in prompt
+    assert len(prompt) < len(task) + 7500
+
+
 def _run(run, repair, review=None, deadline=None):
     def passing_review(**kwargs):
         kwargs["tracker"].scrutiny_status = "pass"
@@ -120,6 +145,8 @@ def test_passing_structure_and_review_still_trigger_repeated_refinement(research
         assert "Reviewer advice" in prompt
         assert "Executive summary" in prompt
         assert "Actual current-run fetch receipts" in prompt
+        assert "First call read_research_report" in prompt
+        assert "Do not merely summarize proposed edits" in prompt
         assert 0 < timeout <= 60
         seen.append(number)
         _write(
@@ -135,6 +162,7 @@ def test_passing_structure_and_review_still_trigger_repeated_refinement(research
     history = _stage(research_run, "repair").details["research_refinement"]
     assert history["stop_reason"] == "cycle_limit"
     assert all(a["progress"] == "evidence_changed" for a in history["attempts"])
+    assert all(a["response_summary"] == "updated" for a in history["attempts"])
 
 
 def test_identical_rewrites_and_repeated_fetches_do_not_fill_budget(research_run):
