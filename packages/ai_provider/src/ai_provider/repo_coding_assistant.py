@@ -84,6 +84,13 @@ from ai_provider import PrivacyClass as ProviderPrivacyClass
 
 from ai_provider.coding_assist import coding_task_profile, run_coding_prompt
 from ai_provider.coding_assist import backend_config_from_execution_target
+from ai_provider.native_admission import (
+    NATIVE_TOOL_EVIDENCE,
+    installed_native_identity,
+    native_coding_catalog,
+    native_tool_incompatibility,
+    prepare_native_coding_client,
+)
 from ai_provider.chat_transcripts import (
     DEFAULT_CHAT_TRANSCRIPT_DB,
     ChatMessageRecord,
@@ -2329,6 +2336,8 @@ def _main(argv: Sequence[str] | None = None) -> int:
             task_type=TaskType.GENERAL,
             required_capabilities=frozenset({TaskCapability.CHAT, TaskCapability.TOOLS}),
         )
+    elif args.native_tools:
+        catalog = native_coding_catalog(catalog, profile)
     delegation_status = "disabled"
     primary_system_prompt = build_default_system_prompt(
         args.system,
@@ -3321,9 +3330,28 @@ def _fallback_target_incompatibility(
             return None
         except (FileNotFoundError, NotImplementedError, ValueError) as exc:
             return str(exc)
-    if getattr(args, "shared_tools", None) and target.access_method is AccessMethod.LOCAL_RUNTIME:
-        if target.model == "qwen2.5-coder:14b":
-            return "Qwen2.5-Coder native tool execution failed the runtime compatibility probe"
+    if (
+        (getattr(args, "shared_tools", None) or getattr(args, "native_tools", False))
+        and getattr(args, "tool_profile", "coding") != "research"
+        and target.provider == "ollama"
+    ):
+        evidence = next((item for item in NATIVE_TOOL_EVIDENCE if item.model == target.model), None)
+        if evidence is None:
+            return f"Native tool compatibility is unknown for {target.model}"
+        if probe_provider:
+            try:
+                identity = installed_native_identity(backend_config_from_execution_target(target))
+            except ProviderError as exc:
+                return str(exc)
+            reason = native_tool_incompatibility(
+                target.model, model_digest=identity[0], runtime_version=identity[1]
+            )
+            if reason:
+                return reason
+        elif not evidence.supported:
+            return (
+                f"Native tool execution failed the runtime compatibility probe for {target.model}"
+            )
     requested = [
         flag
         for flag, value in (
@@ -3389,6 +3417,8 @@ def _print_fallback_readiness(args: argparse.Namespace, repo_root: Path) -> int:
             task_type=TaskType.GENERAL,
             required_capabilities=frozenset({TaskCapability.CHAT, TaskCapability.TOOLS}),
         )
+    elif getattr(args, "native_tools", False) or getattr(args, "shared_tools", None):
+        catalog = native_coding_catalog(catalog, profile)
     result = prepare_execution(
         args.prompt or "Inspect fallback readiness",
         profile,
@@ -4406,12 +4436,15 @@ def _run_native_agent(
             child_orchestration = prepare_execution(
                 task,
                 child_profile,
-                load_model_catalog(
-                    getattr(
-                        args,
-                        "catalog",
-                        Path("packages/ai_orchestrator/examples/model_catalog.toml"),
-                    )
+                native_coding_catalog(
+                    load_model_catalog(
+                        getattr(
+                            args,
+                            "catalog",
+                            Path("packages/ai_orchestrator/examples/model_catalog.toml"),
+                        )
+                    ),
+                    child_profile,
                 ),
                 review_prompt=False,
                 timeout_seconds=getattr(args, "timeout_seconds", 180.0),
@@ -4511,6 +4544,7 @@ def _run_native_agent(
         system_prompt = RESEARCH_SYSTEM_PROMPT + ("\n" + args.system if args.system else "")
     else:
         system_prompt = build_native_tool_system_prompt(args.system)
+        client = prepare_native_coding_client(client, config, args, progress_callback or print)
         away_minutes = getattr(args, "away_minutes", None)
         if away_minutes is not None:
             system_prompt = _system_prompt_with_away_budget(

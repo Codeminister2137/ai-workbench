@@ -13,8 +13,8 @@ The current [next-session plan and approved directions](next-session-decisions.m
 records D1-D3 approval: conservative configurable privacy/approval defaults,
 replacement SearXNG investigation, and bounded typed acceptance-job design.
 Specific operator selection and scheduler contract review remain future boundaries.
-Historical checkpoints below retain their original validation counts; the latest
-full offline checkpoint is 933 passed, seven live tests skipped, Ruff/Pyright clean.
+Historical checkpoints below retain their original validation counts. The latest
+full offline checkpoint is 965 passed, seven live tests skipped, Ruff/Pyright clean.
 
 The goal is to perform inspect/plan/edit/test/review workflows from the project
 CLI, invoke the required skills, resume work and recover from allowance exhaustion
@@ -183,9 +183,11 @@ with shipped `local_only`/`interactive`; implementation remains pending.
   in existing application SQLite storage. Native process tools inspect direct
   children without AI calls; cleanup stops owned children. Restart requires human
   reconciliation of uncertain effects and never restores old approvals or pipes.
-- Shared mutation approval across external clients, versioned native compatibility
-  evidence and effective model-input admission remain incomplete. Native approval
-  requests now show task, workspace and complete operation; no-human requests deny.
+- Shared mutation approval across external clients remains incomplete. Versioned
+  native coding compatibility and estimated model-input admission are implemented
+  offline; exact tool-bearing counts and fresh live acceptance remain deferred.
+  Native approval requests now show task, workspace and complete operation;
+  no-human requests deny.
 - The official MCP SDK is approved but not installed or declared yet: an explicit
   local PyCharm MCP endpoint is still needed before implementing the CLI bridge.
 - The scheduled full-instruction acceptance ended failed at 14:05:08 UTC. The repair
@@ -212,6 +214,26 @@ queue behavior or global power configuration.
 Shared terminal approvals and native foreground recovery are accepted directions,
 with implementation/acceptance still outstanding. Additional architecture choices
 must be investigated separately; they are not automatically new approval gates.
+
+### Native compatibility/input slice: COMPLETE offline
+
+[Native admission contracts and bounded live checks](native-admission.md) document
+the implementation. Automatic native coding retains positive GPT-OSS evidence;
+explicit models/routes remain hard constraints. Model manifest, Ollama runtime and
+native contract changes invalidate receipts. Every coding turn reserves generation
+and framing capacity and includes complete instructions, skills, schemas and history.
+Ollama requests pin the admitted runtime context. Overflow refuses before inference
+and preserves earlier receipts. Byte-derived counts are explicitly estimated;
+verified tool-bearing token counting is still incomplete.
+
+Deterministic invalidation/refusal tests and native loop/fallback regressions passed.
+No model inference, live client acceptance, new service or workstation sleep ran.
+Final full offline suite: 965 passed, seven live tests skipped; Ruff lint/format and
+Pyright clean. Foundation M1/M2
+remain in progress; synthetic checks do not complete live acceptance or tool parity.
+D1-D3 owner answers remain approved. Next implement D1 with CLI precedence tests;
+then prepare D2 operator options and D3 concrete typed-job contract for review.
+Shared external mutation approvals also remain an approved foundation follow-up.
 
 ## Optional capabilities: unselected
 

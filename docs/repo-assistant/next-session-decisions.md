@@ -23,6 +23,13 @@ endpoint and a compute window remain separate boundaries/inputs.
 
 ## Approved next implementation
 
+The versioned native coding compatibility/estimated input-admission slice is now
+**COMPLETE offline**; see [implementation and deferred checks](native-admission.md).
+CLI foundation remains **INCOMPLETE**. The requirements below are retained as the
+slice's acceptance contract, not a request to repeat completed implementation.
+Next implement approved D1, then investigate D2 and design D3 for concrete review.
+Shared external mutation approvals remain an approved foundation follow-up.
+
 Implement versioned native tool-compatibility evidence and effective model-input
 admission using existing routing/context contracts (ADR-041). Respect explicit
 model selection; prefer verified GPT-OSS for automatic native tool routes.
@@ -31,7 +38,7 @@ complete required instructions and refuse requests that cannot fit; distinguish
 estimated byte admission from verified token counts. Use offline fixtures first.
 Then continue shared terminal mutation approvals and external-client receipts.
 
-Completion condition for the next slice: deterministic compatibility/invalidation
+Completion condition for the compatibility slice: deterministic compatibility/invalidation
 and input-fit refusal tests, reviewed focused commit, updated roadmap/handoff and
 specified bounded live checks. No new compute window is currently authorized.
 The PyCharm bridge can proceed after the explicit local endpoint is supplied;
