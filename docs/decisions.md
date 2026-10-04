@@ -271,6 +271,20 @@ optional capabilities and live execution are not included in this approval.
 Detailed ADR: [ADR-040](decisions/ADR-040-shared-agent-tools-and-cli-development-foundation.md)
 Milestones: [CLI development roadmap](repo-assistant/development-roadmap.md)
 
+## ADR-041 - CLI Foundation Contracts And Local Supervision
+**Status:** Accepted; implementation in progress
+**Date:** 2026-10-04
+
+Approve built-in common profiles/project-local skills, complete instructions with
+a separate 64,000-character limit, scoped terminal mutation approval, temporary
+project-owned IDE wrappers and optional official MCP SDK, foreground continuity
+with existing SQLite storage, and verified native coding route preference.
+Investigate bounded local interpretation of live results; deterministic process
+waiting needs no model. Antigravity tool fallback stays excluded pending scoped
+access. No daemon, global grant changes or generic scheduler are approved.
+
+Detailed ADR: [ADR-041](decisions/ADR-041-cli-foundation-contracts-and-local-supervision.md)
+
 ## Research Review Execution Preference
 **Status:** Accepted conditional authorization; current execution unchanged
 **Date:** 2026-10-02

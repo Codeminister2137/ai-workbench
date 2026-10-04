@@ -1,6 +1,9 @@
 # CLI foundation: decisions awaiting the owner
 
-**INCOMPLETE — investigated proposals, not accepted architecture.**
+**ACCEPTED package; implementation INCOMPLETE.** The owner approved the concrete
+six-recommendation package on 2026-10-04. [ADR-041](../decisions/ADR-041-cli-foundation-contracts-and-local-supervision.md)
+records the authoritative selections. Pending labels below describe the earlier
+investigation and are superseded by that decision.
 
 Prepared during the owner-selected 2026-10-04 implementation and acceptance window.
 [ADR-040](../decisions/ADR-040-shared-agent-tools-and-cli-development-foundation.md)
