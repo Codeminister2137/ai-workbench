@@ -70,3 +70,20 @@ client permissions, fallback parity, IDE access or recovery already work. Existi
 privacy/cost rules continue to apply. The scheduler remains research-only; generic
 coding/evaluation jobs, optional capabilities and new external services still need
 separate decisions. Hosted account limits can interrupt the supervisor itself.
+
+## Shared mutation implementation checkpoint (2026-10-05)
+
+The approved terminal-approval slice now has an opt-in built-in coding profile
+using the existing read/Git/file/shell tools and permission presets. Shared
+inspection retains read-only authority. Official-client mappings stay per-run;
+Antigravity remains excluded and native restrictions remain additional boundaries.
+Interactive approval uses the controlling terminal separately from model/MCP
+stdio, identifies task/run/workspace and the complete operation, and expires
+after that one call. No available terminal means denial. Foreground PID/birth
+identity is checked before and after approval, refusing expired owners.
+
+The existing optional coding-session SQLite receipts capture task/run/tool and
+argument/output digests without introducing a new store or saved grants. Offline
+tests cover authorization, denial, restart/owner expiry, scoped mappings, receipt
+reuse and transport isolation. Live client/terminal mutation acceptance remains
+deferred; this checkpoint is not a claim of complete cross-agent parity.

@@ -27,6 +27,8 @@ from ai_provider import BackendConfig, PrivacyClass, ProviderKind, create_chat_c
 
 from ai_agent.contracts import ToolCall, ToolCategory, ToolDefinition, ToolResult
 from ai_agent.loop import AgentLoop
+from ai_agent.permissions import PermissionManager, PermissionPolicy
+from ai_agent.shared_approvals import TerminalApproval, scoped_registry
 from ai_agent.tool_profiles import shared_tool_registry
 from ai_agent.tools import (
     FindFilesTool,
@@ -209,8 +211,8 @@ def tool_definition_to_mcp_tool(definition: ToolDefinition) -> dict[str, Any]:
         },
         "annotations": {
             "readOnlyHint": definition.category in {ToolCategory.READ, ToolCategory.SEARCH},
-            "openWorldHint": False,
-            "destructiveHint": False,
+            "openWorldHint": definition.category is ToolCategory.SHELL,
+            "destructiveHint": definition.category in {ToolCategory.WRITE, ToolCategory.SHELL},
         },
     }
 
@@ -236,6 +238,13 @@ def handle_mcp_message(
             "workspace. Paths outside the workspace are rejected. "
             "No write or shell tools are exposed by this MCP server."
         )
+        if registry.get("edit_file") is not None:
+            instructions = (
+                "Use project-owned tools within the configured workspace and approval preset. "
+                "Write/shell requests may require a human terminal approval; unavailable humans "
+                "cause denial. Approvals apply once and expire on restart. Shell cwd containment "
+                "is not an operating-system sandbox. Tool receipts describe observed effects."
+            )
         if registry.get("delegate_task") is not None:
             instructions += (
                 " The delegate_task tool provides bounded delegation to a "
@@ -337,8 +346,70 @@ def main(argv: Sequence[str] | None = None) -> int:
         default=DEFAULT_DELEGATION_MAX_ITERATIONS,
         help="Maximum child-agent tool iterations for delegated subtasks.",
     )
+    parser.add_argument("--shared-profile", choices=("inspection", "coding"))
+    parser.add_argument(
+        "--approval-policy",
+        choices=("read_only", "interactive", "workspace_write", "trusted_local"),
+        default="interactive",
+    )
+    parser.add_argument("--task-id")
+    parser.add_argument("--run-id")
+    parser.add_argument("--terminal-approvals", action="store_true")
+    parser.add_argument("--owner-pid", type=int)
+    parser.add_argument("--owner-birth")
+    parser.add_argument("--session-database", type=Path)
+    parser.add_argument("--session-id")
     args = parser.parse_args(argv)
     workspace_root = args.workspace_root.resolve()
+    if args.shared_profile:
+        if args.read_search_only:
+            parser.error("Shared profile and read/search-only selection are mutually exclusive")
+        registry = shared_tool_registry(args.shared_profile)
+        if args.shared_profile == "coding":
+            if not args.task_id or not args.run_id:
+                parser.error("Shared coding requires task/run IDs")
+            manager = PermissionManager(
+                PermissionPolicy.from_approval_preset(args.approval_policy),
+                TerminalApproval(args.task_id, args.run_id, workspace_root)
+                if args.terminal_approvals
+                else None,
+            )
+            from ai_provider.acceptance_processes import process_identity
+
+            if not args.owner_pid or not args.owner_birth:
+                parser.error("Shared coding requires foreground owner identity")
+
+            def owner_active() -> bool:
+                return process_identity(args.owner_pid) == args.owner_birth
+
+            if not owner_active():
+                parser.error("Shared coding owner is no longer active")
+            registry = scoped_registry(
+                registry, manager, workspace_root, args.task_id, args.run_id, owner_active
+            )
+            if bool(args.session_database) != bool(args.session_id):
+                parser.error("Session database and ID must be supplied together")
+            if args.session_database:
+                from ai_provider.coding_sessions import CodingSession
+
+                if not args.session_database.is_file():
+                    parser.error("Shared receipt database must already exist")
+                session = CodingSession(args.session_database, args.session_id, workspace_root)
+                with session.connection() as connection:
+                    row = connection.execute(
+                        "SELECT workspace,status FROM coding_sessions WHERE session_id=?",
+                        (args.session_id,),
+                    ).fetchone()
+                if (
+                    row is None
+                    or Path(row["workspace"]).resolve() != workspace_root
+                    or row["status"] != "running"
+                ):
+                    parser.error("Shared receipt session must be running in this workspace")
+                registry = session.observe_registry(
+                    registry, operation_prefix=f"shared:{args.task_id}:{args.run_id}:"
+                )
+        return run_stdio_server(workspace_root=workspace_root, registry=registry)
     catalog_path = args.catalog if args.catalog.is_absolute() else workspace_root / args.catalog
     return run_stdio_server(
         workspace_root=workspace_root,

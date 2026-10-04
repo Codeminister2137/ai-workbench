@@ -2202,7 +2202,8 @@ def _main(argv: Sequence[str] | None = None) -> int:
             parser.error("--shared-tools conflicts with legacy action or Codex MCP settings")
         if args.tool_profile != "coding":
             parser.error("--shared-tools inspection cannot be combined with research tools")
-        args.approval_policy = "read_only"
+        if args.shared_tools == "inspection":
+            args.approval_policy = "read_only"
     use_native_tools = (
         args.native_tools
         or bool(args.shared_tools)
@@ -2480,6 +2481,7 @@ def _main(argv: Sequence[str] | None = None) -> int:
     ):
         if (
             external_orchestration.execution_plan.target.access_method is AccessMethod.CODEX_CLI
+            and not getattr(args, "shared_tools", None)
             and _prompt_requests_git_metadata_write(args.prompt)
             and ApprovalPolicyPreset(args.approval_policy) is not ApprovalPolicyPreset.TRUSTED_LOCAL
         ):
@@ -3290,13 +3292,18 @@ def _fallback_config(target: Any, args: argparse.Namespace, repo_root: Path) -> 
         recommendation=None,
         execution_plan=ExecutionPlan(target=target, reasons=()),
     )
-    preset = "read_only" if getattr(args, "shared_tools", None) else args.approval_policy
+    preset = (
+        "read_only" if getattr(args, "shared_tools", None) == "inspection" else args.approval_policy
+    )
     return _external_agent_config_from_orchestration(
         orchestration,
         repo_root=repo_root,
         timeout_seconds=target.timeout_seconds,
         sandbox=_codex_sandbox_for_approval_policy(preset),
-        approval_policy=preset if target.access_method is not AccessMethod.CODEX_CLI else "never",
+        approval_policy=preset
+        if target.access_method is not AccessMethod.CODEX_CLI
+        or getattr(args, "shared_tools", None) == "coding"
+        else "never",
         codex_persist_session=args.codex_persist_session,
         codex_resume=args.codex_resume,
         output_last_message_path=args.codex_output_last_message,
@@ -3675,6 +3682,7 @@ def _run_external_agent_cli_mode(
             approval_policy=(
                 args.approval_policy
                 if target.access_method is not AccessMethod.CODEX_CLI
+                or getattr(args, "shared_tools", None) == "coding"
                 else "never"
             ),
             codex_persist_session=args.codex_persist_session,
@@ -3906,6 +3914,7 @@ def _run_external_agent_cli_mode(
                     approval_policy=(
                         args.approval_policy
                         if target.access_method is not AccessMethod.CODEX_CLI
+                        or getattr(args, "shared_tools", None) == "coding"
                         else "never"
                     ),
                     codex_persist_session=args.codex_persist_session,

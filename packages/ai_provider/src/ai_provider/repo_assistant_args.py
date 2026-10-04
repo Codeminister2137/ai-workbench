@@ -132,8 +132,8 @@ def build_argument_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--shared-tools",
-        choices=["inspection"],
-        help="Require the same project-owned inspection tools on primary and fallback routes.",
+        choices=["inspection", "coding"],
+        help="Require shared inspection or permission-controlled coding tools across routes.",
     )
     parser.add_argument(
         "--skill",

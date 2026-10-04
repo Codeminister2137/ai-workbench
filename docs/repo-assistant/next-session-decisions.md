@@ -32,7 +32,8 @@ D1 configurable privacy/approval defaults are implemented offline. D2's fresh
 public operator probes remain deferred under the current offline constraint.
 D3's [concrete local-first contract](acceptance-job-proposal.md) is accepted and
 implemented offline. No executable job or compute window was selected.
-Shared external mutation approvals remain an approved foundation follow-up.
+Shared external mutation approvals and scoped receipts are implemented offline
+under ADR-041. Live terminal/client permission acceptance remains deferred.
 
 Implement versioned native tool-compatibility evidence and effective model-input
 admission using existing routing/context contracts (ADR-041). Respect explicit
@@ -40,7 +41,8 @@ model selection; prefer verified GPT-OSS for automatic native tool routes.
 Invalidate compatibility evidence after relevant model/runtime changes. Preserve
 complete required instructions and refuse requests that cannot fit; distinguish
 estimated byte admission from verified token counts. Use offline fixtures first.
-Then continue shared terminal mutation approvals and external-client receipts.
+Then verify synthetic continuation after partial shared-tool effects without replay,
+preserving task/privacy/preset/deadline and fresh per-run scopes across fallback.
 
 Completion condition for the compatibility slice: deterministic compatibility/invalidation
 and input-fit refusal tests, reviewed focused commit, updated roadmap/handoff and

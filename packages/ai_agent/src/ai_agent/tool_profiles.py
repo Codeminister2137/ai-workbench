@@ -3,12 +3,15 @@
 from dataclasses import dataclass
 
 from ai_agent.tools import (
+    CreateFileTool,
+    EditFileTool,
     FindFilesTool,
     GitDiffTool,
     GitStatusTool,
     GrepSearchTool,
     ListDirTool,
     ReadFileTool,
+    RunCommandTool,
     ToolRegistry,
 )
 
@@ -22,19 +25,23 @@ class SharedToolProfile:
 INSPECTION_PROFILE = SharedToolProfile(
     "inspection", ("read_file", "list_dir", "find_files", "grep_search", "git_status", "git_diff")
 )
+CODING_PROFILE = SharedToolProfile(
+    "coding", (*INSPECTION_PROFILE.tool_names, "create_file", "edit_file", "run_command")
+)
 
 
 def shared_tool_profile(name: str) -> SharedToolProfile:
     """Refuse unknown profiles rather than silently omit required capabilities."""
-    if name != INSPECTION_PROFILE.name:
-        raise ValueError(f"Unsupported shared tool profile: {name}")
-    return INSPECTION_PROFILE
+    for profile in (INSPECTION_PROFILE, CODING_PROFILE):
+        if name == profile.name:
+            return profile
+    raise ValueError(f"Unsupported shared tool profile: {name}")
 
 
 def shared_tool_registry(name: str) -> ToolRegistry:
     """Use the same implementations for provider-native execution and MCP."""
     shared_tool_profile(name)
-    return ToolRegistry(
+    registry = ToolRegistry(
         tools=(
             ReadFileTool(),
             ListDirTool(),
@@ -44,3 +51,7 @@ def shared_tool_registry(name: str) -> ToolRegistry:
             GitDiffTool(),
         )
     )
+    if name == "coding":
+        for tool in (CreateFileTool(), EditFileTool(), RunCommandTool()):
+            registry.register(tool)
+    return registry

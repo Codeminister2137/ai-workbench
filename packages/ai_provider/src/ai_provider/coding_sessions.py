@@ -184,10 +184,12 @@ class CodingSession:
                 (status, digest, _now(), self.session_id, receipt_id),
             )
 
-    def observe_registry(self, registry: ToolRegistry) -> ToolRegistry:
+    def observe_registry(
+        self, registry: ToolRegistry, *, operation_prefix: str = ""
+    ) -> ToolRegistry:
         return ToolRegistry(
             tuple(
-                ObservedTool(tool, self)
+                ObservedTool(tool, self, operation_prefix)
                 for definition in registry.list_definitions()
                 if (tool := registry.get(definition.name)) is not None
             )
@@ -213,16 +215,21 @@ class CodingSession:
 class ObservedTool(BaseTool):
     """Persist start/finish around a tool; original category and boundary remain intact."""
 
-    def __init__(self, tool: BaseTool, session: CodingSession):
+    def __init__(self, tool: BaseTool, session: CodingSession, operation_prefix: str = ""):
         self.tool = tool
         self.session = session
+        self.operation_prefix = operation_prefix
 
     @property
     def definition(self) -> ToolDefinition:
         return self.tool.definition
 
     def execute(self, arguments: dict, context: ToolContext) -> ToolResult:
-        receipt = self.session.begin(self.definition.name)
+        operation = self.definition.name
+        if self.operation_prefix:
+            digest = hashlib.sha256(json.dumps(arguments, sort_keys=True).encode()).hexdigest()
+            operation = self.operation_prefix + operation + ":" + digest
+        receipt = self.session.begin(operation)
         try:
             result = self.tool.execute(arguments, context)
         except Exception:

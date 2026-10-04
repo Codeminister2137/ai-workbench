@@ -15,7 +15,7 @@ replacement SearXNG investigation, and the accepted local typed acceptance-job
 contract. D3 is implemented offline under ADR-043; live execution still needs an
 explicit compute window. Specific SearXNG operator selection remains unresolved.
 Historical checkpoints below retain their original validation counts. The latest
-full offline checkpoint is 1051 passed, seven live tests skipped, Ruff/Pyright clean.
+full offline checkpoint is 1079 passed, seven live tests skipped, Ruff/Pyright clean.
 
 The goal is to perform inspect/plan/edit/test/review workflows from the project
 CLI, invoke the required skills, resume work and recover from allowance exhaustion
@@ -237,7 +237,8 @@ precedence, effective persisted session privacy and retained read-only inspectio
 D2 public operator probes remain deferred while work is offline. D3's
 [typed-job contract](acceptance-job-proposal.md) was subsequently accepted and
 implemented offline under ADR-043.
-Shared external mutation approvals also remain an approved foundation follow-up.
+Shared external mutation approvals were subsequently implemented offline; bounded
+live permission acceptance remains deferred.
 
 ### D1 user defaults: COMPLETE offline
 
@@ -268,8 +269,30 @@ Focused offline tests: 55 passed; Pyright clean. Full suite and repository check
 are recorded in the latest checkpoint above. No model inference, actual acceptance
 queue entry, runtime startup, new service, download or sleep was performed.
 Dummy owned-process tests and fixed validators do not establish live model quality.
-Next implement shared external mutation approvals and scoped receipts under ADR-041;
+Shared external mutation approvals and scoped receipts are implemented below;
 D3 live execution remains deferred until a selected compute window.
+
+### Shared coding approvals: COMPLETE offline
+
+`--shared-tools coding` exposes existing inspection/file/shell tools with the
+selected preset. Official-client MCP calls pass the project permission manager;
+interactive requests use a controlling terminal independently of MCP transport,
+approve one exact operation and deny when unavailable. Fresh run IDs and
+foreground PID/birth checks prevent inherited authority after owner exit.
+Existing optional coding sessions persist task/run/tool and argument/output digest
+receipts, including denied/failed calls. No new store, service or saved grant exists.
+Shared inspection remains read-only; per-run Codex/Copilot/Kiro mappings avoid
+global bypass flags, and Antigravity stays excluded.
+
+Offline tests verify policies, denial, one-use approvals, owner/restart expiry,
+workspace refusal, terminal escaping/isolation, scoped mappings and existing
+SQLite receipt reuse.
+Focused shared-tool/session/MCP tests: 54 passed; full suite: 1079 passed, seven
+live tests skipped. Ruff lint/format and Pyright are clean. Live terminal
+propagation and actual client mutations remain unverified under the offline limit.
+The CLI foundation remains INCOMPLETE. Next verify synthetic fallback after a
+partial shared-tool effect without replay, preserving tool/preset/privacy/deadline
+contracts and observed receipts; live acceptance waits for an explicit window.
 
 ## Optional capabilities: unselected
 

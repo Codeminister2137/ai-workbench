@@ -35,7 +35,7 @@ key authorizes transmitting repository contents or spending credits.
 | Select native agents, preferences and fallback | [External agents](repo-assistant/external-agents.md) |
 | Understand writes, logs and data boundaries | [Permissions and privacy](repo-assistant/permissions.md) |
 | Plan and explicitly start budgeted research jobs | [Task scheduling](repo-assistant/scheduling.md) |
-| Carry common inspection tools and skills through fallback | [Common inspection](repo-assistant/common-inspection.md) |
+| Carry common tools, scoped approvals and skills through fallback | [Common tools and approvals](repo-assistant/common-inspection.md) |
 | Retain coding receipts and supervise foreground children | [Coding continuity](repo-assistant/coding-continuity.md) |
 
 ## Current limits

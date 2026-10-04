@@ -10,7 +10,7 @@ import threading
 import time
 import uuid
 from collections.abc import Callable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -38,6 +38,11 @@ class ExternalAgentConfig:
     codex_mcp_tools: bool = False
     shared_tool_profile: str | None = None
     shared_agent_name: str | None = None
+    shared_task_id: str = field(default_factory=lambda: uuid.uuid4().hex)
+    shared_run_id: str = field(default_factory=lambda: uuid.uuid4().hex)
+    shared_terminal_approvals: bool = False
+    shared_session_database: Path | None = None
+    shared_session_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -530,7 +535,7 @@ def external_agent_config_from_orchestration(
         model=target.model,
         cwd=repo_root,
         timeout_seconds=timeout_seconds,
-        sandbox=sandbox,
+        sandbox="read-only" if shared_tool_profile else sandbox,
         approval_policy=approval_policy,
         ephemeral=(
             target.access_method is AccessMethod.CODEX_CLI
@@ -544,6 +549,7 @@ def external_agent_config_from_orchestration(
         image_paths=image_paths,
         codex_mcp_tools=codex_mcp_tools,
         shared_tool_profile=shared_tool_profile,
+        shared_terminal_approvals=shared_tool_profile == "coding" and sys.stdin.isatty(),
     )
 
 
@@ -642,18 +648,20 @@ def build_external_agent_command(
     if config.codex_mcp_tools:
         command.extend(_codex_mcp_config_overrides(config.cwd))
     if config.shared_tool_profile:
-        if config.shared_tool_profile != "inspection" or config.codex_mcp_tools:
+        if config.shared_tool_profile not in {"inspection", "coding"} or config.codex_mcp_tools:
             raise ValueError("Shared inspection cannot be combined with legacy Codex MCP tools")
         if config.sandbox != "read-only":
             raise ValueError("Shared inspection requires a read-only sandbox")
         from ai_provider.shared_client_tools import codex_inspection_overrides
 
-        command.extend(codex_inspection_overrides(config.cwd))
+        command.extend(codex_inspection_overrides(config.cwd, _shared_run_context(config)))
     if config.approval_policy:
         command.extend(
             [
                 "--ask-for-approval",
-                _codex_approval_policy(config.approval_policy),
+                "never"
+                if config.shared_tool_profile
+                else _codex_approval_policy(config.approval_policy),
             ]
         )
     if config.resume is not None:
@@ -775,7 +783,9 @@ def _build_shared_inspection_command(
 ) -> tuple[str, ...]:
     from ai_provider.shared_client_tools import copilot_inspection_options
 
-    if config.shared_tool_profile != "inspection" or config.approval_policy != "read_only":
+    if config.shared_tool_profile not in {"inspection", "coding"} or (
+        config.shared_tool_profile == "inspection" and config.approval_policy != "read_only"
+    ):
         raise ValueError("Common inspection requires the read_only preset")
     if config.sandbox != "read-only":
         raise ValueError("Common inspection requires a read-only sandbox")
@@ -793,7 +803,7 @@ def _build_shared_inspection_command(
     if config.access_method is AccessMethod.COPILOT_CLI:
         command = [
             config.command,
-            *copilot_inspection_options(config.cwd),
+            *copilot_inspection_options(config.cwd, _shared_run_context(config)),
             "--no-ask-user",
             "--model",
             config.model,
@@ -819,6 +829,21 @@ def _build_shared_inspection_command(
         command.append(prompt if prompt is not None else "<prompt supplied at execution>")
         return tuple(command)
     raise NotImplementedError(f"Shared inspection is not mapped for {config.access_method.value}")
+
+
+def _shared_run_context(config: ExternalAgentConfig):
+    from ai_provider.shared_client_tools import SharedToolRun
+
+    if config.shared_tool_profile != "coding":
+        return None
+    return SharedToolRun(
+        config.shared_task_id,
+        config.shared_run_id,
+        config.approval_policy,
+        config.shared_terminal_approvals,
+        config.shared_session_database,
+        config.shared_session_id,
+    )
 
 
 def _codex_mcp_config_overrides(repo_root: Path) -> list[str]:
@@ -887,6 +912,14 @@ def run_external_agent(
     from ai_provider.coding_sessions import ACTIVE_SESSION
 
     session = ACTIVE_SESSION.get()
+    if config.shared_tool_profile == "coding":
+        config = replace(
+            config,
+            shared_run_id=uuid.uuid4().hex,
+            shared_task_id=session.session_id if session else config.shared_task_id,
+            shared_session_database=session.database if session else None,
+            shared_session_id=session.session_id if session else None,
+        )
     receipt = session.begin("external_client:" + config.access_method.value) if session else None
     try:
         result = _run_external_agent_owned(
@@ -939,7 +972,7 @@ def _run_external_agent_owned(
         parent_existed = directory.parent.exists()
         directory.mkdir(parents=True, exist_ok=True)
         path = directory / (name + ".json")
-        content = json.dumps(kiro_inspection_agent(config.cwd, name))
+        content = json.dumps(kiro_inspection_agent(config.cwd, name, _shared_run_context(config)))
         created = False
         try:
             with path.open("x", encoding="utf-8") as file:

@@ -28,6 +28,14 @@ Unsafe filter override names are refused; repository configuration is unchanged.
 Submodule content is not traversed; Git pointer changes remain visible. Inspect a
 submodule's content by selecting its own workspace explicitly.
 
+The opt-in [shared coding profile](common-inspection.md#shared-coding-and-terminal-approvals)
+enforces these presets in the project MCP server. Interactive requests use the
+controlling terminal, require approval for each exact operation and refuse when
+no human terminal is available. Task/run/workspace scope and foreground process
+identity prevent inherited grants after owner exit. Shared inspection remains
+read-only. Existing coding sessions persist scoped digest receipts without raw
+tool arguments or outputs; live client permission acceptance remains deferred.
+
 Avoid `--allow-outside-files` unless you deliberately want to allow outside-repo
 paths without a prompt.
 
