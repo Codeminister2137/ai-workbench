@@ -28,7 +28,11 @@ preparation; the supervisor receives its remaining task deadline. The ten-minute
 default handoff reserve is outside the execution window.
 
 Only existing supervised research workers are supported, with local-only Ollama,
-free-only billing and trusted-local research tool controls. The scheduler does
+the research CLI's `local_only` cost policy and trusted-local research tool controls.
+Each worker receives a Markdown report target under
+`artifacts/scheduled-research/<queue-and-task-digest>/report.md`. The digest includes
+the resolved database path and task ID; task labels are never used as path segments.
+Planning creates no report directories. The scheduler does
 not start an Ollama service. Existing public retrieval/search permissions and
 receipt controls still apply. Stopping the owned worker tree does not guarantee
 an independent Ollama server stops computing. Distinct concurrent scheduler
@@ -40,6 +44,13 @@ worker has stopped, use `fail-interrupted TASK --reason TEXT` to record failure;
 that command does not kill processes. Terminal definitions are not automatically
 retried or resumed; plan a new ID for another attempt. Historical run/stage records
 are preserved when the additive task table is initialized.
+
+The initial task definition stores only the prompt, primary model, repository and
+allocation. It cannot preserve explicit reviewer/tokenizer settings or launch the
+acceptance/evaluation scripts. Keep a task requiring those settings deferred until
+the definition contract is extended through an approved decision. Putting settings
+in its prompt does not configure the worker. The PowerShell research launcher runs
+immediately; it does not enqueue its arguments.
 
 Research supervisor failure finalization also survives a broken progress-output
 consumer: queued run IDs are still parsed, durable handoff state is recorded, and

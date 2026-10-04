@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import math
 import sqlite3
 import sys
@@ -124,6 +125,15 @@ class ResearchTaskStore(SQLiteOrchestratedRunStore):
 
 def research_command(task: ResearchTask, database: Path) -> list[str]:
     """Construct fixed research flags; definitions cannot supply arbitrary commands."""
+    # IDs are opaque labels, never path segments. Include the database identity
+    # so independent queues do not write the same report for an identical ID.
+    identity = f"{database.resolve()}\0{task.task_id}".encode()
+    report = (
+        Path("artifacts")
+        / "scheduled-research"
+        / hashlib.sha256(identity).hexdigest()
+        / "report.md"
+    )
     return [
         sys.executable,
         "-m",
@@ -140,6 +150,8 @@ def research_command(task: ResearchTask, database: Path) -> list[str]:
         str(database.resolve()),
         "--tool-profile",
         "research",
+        "--research-report",
+        str(report),
         "--approval-policy",
         "trusted_local",
         "--provider",
@@ -147,7 +159,7 @@ def research_command(task: ResearchTask, database: Path) -> list[str]:
         "--privacy",
         "local_only",
         "--cost-policy",
-        "free_only",
+        "local_only",
         "--model",
         task.model,
         "--",

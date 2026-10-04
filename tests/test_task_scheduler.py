@@ -1,9 +1,12 @@
 import sqlite3
+import sys
 from pathlib import Path
 
 import pytest
 from ai_orchestrator.scheduling import ScheduledTaskStatus as Status
 from ai_provider.orchestrated_runs import OrchestratedStagePlanItem, SQLiteOrchestratedRunStore
+from ai_provider.repo_assistant_args import build_argument_parser
+from ai_provider.research_execution import validate_research_arguments
 from ai_provider.task_scheduler import (
     ResearchTask,
     ResearchTaskStore,
@@ -176,13 +179,102 @@ def test_command_fixed_local_free_supervised_research(store) -> None:
     for flag, value in (
         ("--privacy", "local_only"),
         ("--provider", "ollama"),
-        ("--cost-policy", "free_only"),
+        ("--cost-policy", "local_only"),
         ("--tool-profile", "research"),
     ):
         assert command[command.index(flag) + 1] == value
     assert "--start-ollama" not in command
     assert "--orchestrated" in command
     assert command[-2:] == ["--", "Public Python research"]
+
+
+def test_worker_command_passes_real_research_validation_without_side_effects(store) -> None:
+    task = store.get_task("first")
+    parser = build_argument_parser()
+    args = parser.parse_args(research_command(task, store.path)[3:])
+    validate_research_arguments(args, task.repo_root, parser)
+    assert args.research_report is not None
+    assert not (task.repo_root / args.research_report).exists()
+
+
+def test_report_paths_are_queue_specific_and_do_not_embed_task_ids(tmp_path) -> None:
+    task = ResearchTask("../../outside / label", tmp_path, "Public research", "local", 60)
+    parser = build_argument_parser()
+    first = parser.parse_args(research_command(task, tmp_path / "first.sqlite3")[3:])
+    second = parser.parse_args(research_command(task, tmp_path / "second.sqlite3")[3:])
+    validate_research_arguments(first, tmp_path, parser)
+    assert first.research_report != second.research_report
+    assert first.research_report.parts[:2] == ("artifacts", "scheduled-research")
+    assert first.research_report.name == "report.md"
+    assert len(first.research_report.parent.name) == 64
+
+
+@pytest.mark.parametrize("outcome", ["success", "failure", "timeout"])
+def test_cli_sequence_uses_real_supervised_process_and_persists_result(
+    tmp_path, monkeypatch, capsys, outcome
+) -> None:
+    """Exercise CLI admission, claims, subprocess supervision and durable state without AI."""
+    database = tmp_path / "runs.sqlite3"
+    prefix = ["--database", str(database)]
+    for task_id in ("smoke", "waiting"):
+        assert (
+            main(
+                [
+                    *prefix,
+                    "plan",
+                    task_id,
+                    "--prompt",
+                    "Public smoke task",
+                    "--model",
+                    "local",
+                    "--required-minutes",
+                    "0.05" if outcome == "timeout" else "0.1",
+                    "--repo-root",
+                    str(tmp_path),
+                ]
+            )
+            == 0
+        )
+
+    def worker_command(task, path):
+        # Validate the production command before replacing only the AI worker.
+        parser = build_argument_parser()
+        args = parser.parse_args(research_command(task, path)[3:])
+        validate_research_arguments(args, task.repo_root, parser)
+        code = "from pathlib import Path; Path('worker-started').write_text('started'); "
+        if outcome == "timeout":
+            code += "import time; time.sleep(10)"
+        else:
+            code += f"raise SystemExit({0 if outcome == 'success' else 3})"
+        return [sys.executable, "-c", code]
+
+    monkeypatch.setattr("ai_provider.task_scheduler.research_command", worker_command)
+    # The local imported function above retains the production builder.
+    result = main(
+        [
+            *prefix,
+            "run",
+            "smoke",
+            "waiting",
+            "--start",
+            "--local-compute-available",
+            "--available-minutes",
+            "1",
+            "--handoff-minutes",
+            "0.1",
+        ]
+    )
+    reopened = ResearchTaskStore(database)
+    assert (tmp_path / "worker-started").read_text() == "started"
+    if outcome == "success":
+        assert result == 0
+        assert all(task.status is Status.COMPLETED for task in reopened.list_tasks())
+        assert "research_supervisor_status: completed" in capsys.readouterr().out
+    else:
+        assert result == 1
+        assert reopened.get_task("smoke").status is Status.FAILED
+        assert reopened.get_task("smoke").exit_code == (124 if outcome == "timeout" else 3)
+        assert reopened.get_task("waiting").status is Status.PLANNED
 
 
 def test_adapter_passes_remaining_allocation_to_existing_supervisor(store, monkeypatch) -> None:
