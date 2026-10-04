@@ -64,6 +64,13 @@ status/diff tools under READ permissions; the default Codex delegation profile
 is unchanged. Focused fixtures verify index preservation, staged/unstaged diffs,
 literal paths, outside-root refusal and disabled external diff helpers.
 
+A portable `review-repo-change` skill source lives under `packages/ai_agent/skills/`.
+Its syntax validator passed. Copilot CLI 1.0.91 discovered an isolated fixture copy,
+produced an explicit skill invocation receipt, used shared Git/read tools and
+reported an injected regression without changing files. This is one bounded
+read-only skill acceptance; automatic installation, common discovery/dependency
+checks and provider-native skill activation remain incomplete.
+
 Next, investigate per-tool/skill readiness using existing tool contracts. A new
 shared capability manifest or materially different client configuration contract
 needs a decision brief before implementation. Continue independent context
