@@ -25,7 +25,7 @@ from ai_orchestrator import (
 )
 from ai_provider import BackendConfig, PrivacyClass, ProviderKind, create_chat_client
 
-from ai_agent.contracts import ToolCall, ToolDefinition, ToolResult
+from ai_agent.contracts import ToolCall, ToolCategory, ToolDefinition, ToolResult
 from ai_agent.loop import AgentLoop
 from ai_agent.tools import (
     FindFilesTool,
@@ -212,7 +212,7 @@ def tool_definition_to_mcp_tool(definition: ToolDefinition) -> dict[str, Any]:
             "required": required,
         },
         "annotations": {
-            "readOnlyHint": definition.name != "delegate_task",
+            "readOnlyHint": definition.category in {ToolCategory.READ, ToolCategory.SEARCH},
             "openWorldHint": False,
             "destructiveHint": False,
         },
@@ -235,6 +235,16 @@ def handle_mcp_message(
         return _error_response(message_id, -32600, "Invalid request: method is required.")
 
     if method == "initialize":
+        instructions = (
+            "Use these tools only for repository inspection inside the configured "
+            "workspace. Paths outside the workspace are rejected. "
+            "No write or shell tools are exposed by this MCP server."
+        )
+        if registry.get("delegate_task") is not None:
+            instructions += (
+                " The delegate_task tool provides bounded delegation to a "
+                "local-only child agent with read/search tools only."
+            )
         return {
             "jsonrpc": "2.0",
             "id": message_id,
@@ -245,13 +255,7 @@ def handle_mcp_message(
                     "name": "ai-projects-repo-tools",
                     "version": "0.1.0",
                 },
-                "instructions": (
-                    "Use these tools only for repository inspection and bounded local "
-                    "delegation inside the configured workspace. Paths outside the "
-                    "workspace are rejected. The delegate_task tool routes to a local-only "
-                    "child agent with read/search tools only. No write or shell tools are "
-                    "exposed by this MCP server."
-                ),
+                "instructions": instructions,
             },
         }
     if method == "tools/list":

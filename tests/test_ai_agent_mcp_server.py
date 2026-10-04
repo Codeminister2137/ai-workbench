@@ -9,7 +9,7 @@ from ai_agent.mcp_server import (
     read_search_tool_registry,
     tool_definition_to_mcp_tool,
 )
-from ai_agent.tools import ReadFileTool, ToolContext
+from ai_agent.tools import CreateFileTool, ReadFileTool, ToolContext
 from ai_orchestrator import AccessMethod, TaskCapability
 
 
@@ -31,10 +31,16 @@ def test_mcp_initialize_and_tools_list(tmp_path: Path) -> None:
     assert initialized is not None
     assert initialized["result"]["capabilities"] == {"tools": {}}
     assert "No write or shell tools" in initialized["result"]["instructions"]
+    assert "delegate_task" not in initialized["result"]["instructions"]
     assert listed is not None
     tool_names = {tool["name"] for tool in listed["result"]["tools"]}
     assert tool_names == {"read_file", "list_dir", "find_files", "grep_search"}
     assert "run_command" not in tool_names
+
+
+def test_write_definition_is_not_annotated_read_only() -> None:
+    descriptor = tool_definition_to_mcp_tool(CreateFileTool().definition)
+    assert descriptor["annotations"]["readOnlyHint"] is False
 
 
 def test_read_search_only_entrypoint_omits_model_backed_delegation(monkeypatch, tmp_path):
