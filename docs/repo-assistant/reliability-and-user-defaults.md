@@ -45,12 +45,20 @@ retaining the time budget. An explicitly configured request timeout wins over
 away-mode automatic request sizing; omit it to retain automatic sizing.
 Scheduler deadline admission is unchanged.
 
-## Subsequently approved configuration follow-up
+## Privacy and approval defaults
 
-Owner approved configurable privacy/approval defaults retaining `local_only`
-and `interactive`; implementation remains pending. Broader defaults were not
-selected. The [next-session brief](next-session-decisions.md) records this approval
-alongside search-operator investigation and bounded acceptance-job design.
+Private `[defaults]` now accepts `privacy` and `approval_policy`, validated against
+the existing CLI enums. Shipped values remain `local_only` and `interactive`.
+Explicit CLI flags win, including abbreviated and equals forms and values equal
+to shipped defaults. No broader values were selected for the owner's private file.
+
+Coding sessions record the effective configured/CLI privacy before execution and
+refuse a resume with different privacy/cost boundaries. Shared inspection still
+forces `read_only`; configuration cannot broaden native client restrictions.
+The research scheduler and PowerShell research launcher continue to supply their
+existing explicit privacy/approval flags, which take precedence over private defaults.
+The [next-session brief](next-session-decisions.md) retains the D1 approval and
+separate search-operator and acceptance-job design boundaries.
 
 ## Remaining configuration boundaries
 

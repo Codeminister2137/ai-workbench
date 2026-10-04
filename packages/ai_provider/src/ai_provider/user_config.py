@@ -6,9 +6,11 @@ import argparse
 import math
 import tomllib
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 
-from ai_orchestrator import CostPolicyTier, QualityThreshold
+from ai_agent.permissions import ApprovalPolicyPreset
+from ai_orchestrator import CostPolicyTier, PrivacyClass, QualityThreshold
 from ai_orchestrator.fallback import FallbackQualityPolicy
 
 from ai_provider.repo_context import (
@@ -20,6 +22,8 @@ from ai_provider.repo_context import (
 EXECUTION_DEFAULT_KEYS = frozenset(
     {
         "quality",
+        "privacy",
+        "approval_policy",
         "context_budget_chars",
         "context_file_budget_chars",
         "instruction_budget_chars",
@@ -38,6 +42,8 @@ class UserConfig:
     fallback_enabled: bool = True
     fallback_quality_policy: FallbackQualityPolicy = FallbackQualityPolicy.PRESERVE_QUALITY
     quality: QualityThreshold = QualityThreshold.STANDARD
+    privacy: PrivacyClass = PrivacyClass.LOCAL_ONLY
+    approval_policy: ApprovalPolicyPreset = ApprovalPolicyPreset.INTERACTIVE
     context_budget_chars: int = DEFAULT_CONTEXT_BUDGET_CHARS
     context_file_budget_chars: int = DEFAULT_CONTEXT_FILE_BUDGET_CHARS
     instruction_budget_chars: int = DEFAULT_INSTRUCTION_BUDGET_CHARS
@@ -52,7 +58,7 @@ def apply_user_defaults(args: argparse.Namespace, config: UserConfig) -> None:
     provided = getattr(args, "_provided_user_defaults", frozenset())
     for key in EXECUTION_DEFAULT_KEYS - provided:
         value = getattr(config, key)
-        setattr(args, key, value.value if isinstance(value, QualityThreshold) else value)
+        setattr(args, key, value.value if isinstance(value, StrEnum) else value)
     args._configured_user_defaults = config.configured_defaults
 
 
@@ -95,6 +101,10 @@ def load_user_config(path: Path, *, required: bool = False) -> UserConfig:
         raise ValueError("fallback.enabled must be a boolean")
     return UserConfig(
         quality=QualityThreshold(defaults.get("quality", base.quality.value)),
+        privacy=PrivacyClass(defaults.get("privacy", base.privacy.value)),
+        approval_policy=ApprovalPolicyPreset(
+            defaults.get("approval_policy", base.approval_policy.value)
+        ),
         context_budget_chars=defaults.get("context_budget_chars", base.context_budget_chars),
         context_file_budget_chars=defaults.get(
             "context_file_budget_chars", base.context_file_budget_chars

@@ -2041,13 +2041,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     if not parsed.execute or parsed.mode not in {"ask", "review", "implement"}:
         parser.error("--coding-session requires an executed ask/review/implement request")
     root = parsed.repo_root.resolve() if parsed.repo_root else find_repo_root(Path.cwd())
-    from ai_provider.user_config import load_user_config
+    from ai_provider.user_config import apply_user_defaults, load_user_config
 
     config_path = parsed.user_config or root / "user-config.toml"
     try:
         user_config = load_user_config(config_path, required=parsed.user_config is not None)
     except (OSError, ValueError, TypeError) as exc:
         parser.error(f"Invalid user config {config_path}: {exc}")
+    apply_user_defaults(parsed, user_config)
     effective_cost_policy = parsed.cost_policy or user_config.cost_policy.value
     database = parsed.coding_session_db
     if not database.is_absolute():

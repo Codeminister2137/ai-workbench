@@ -209,6 +209,7 @@ def build_argument_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--privacy",
+        action=UserDefaultAction,
         choices=[item.value for item in OrchestratorPrivacyClass],
         default=OrchestratorPrivacyClass.LOCAL_ONLY.value,
         help="Privacy class for the request.",
@@ -244,6 +245,7 @@ def build_argument_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--approval-policy",
+        action=UserDefaultAction,
         choices=APPROVAL_POLICY_PRESETS,
         default=ApprovalPolicyPreset.INTERACTIVE.value,
         help=(

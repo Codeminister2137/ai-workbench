@@ -65,6 +65,12 @@ max_repair_cycles = -1
     "setting",
     [
         'quality = "excellent"',
+        'privacy = "public"',
+        'privacy = "LOCAL_ONLY"',
+        'approval_policy = "never"',
+        'approval_policy = "allow_all"',
+        "privacy = false",
+        "approval_policy = 1",
         "context_budget_chars = -1",
         "context_budget_chars = true",
         "context_file_budget_chars = 0",
@@ -89,6 +95,8 @@ def test_invalid_defaults_rejected(tmp_path, setting):
     "option,key,value",
     [
         ("--quality", "quality", "standard"),
+        ("--privacy", "privacy", "local_only"),
+        ("--approval-policy", "approval_policy", "interactive"),
         ("--context-budget-chars", "context_budget_chars", 0),
         ("--context-file-budget-chars", "context_file_budget_chars", 2500),
         ("--instruction-budget-chars", "instruction_budget_chars", 64000),
@@ -105,6 +113,8 @@ def test_explicit_cli_value_wins_even_if_equal_to_shipped_default(
         config_file(
             tmp_path,
             """quality = "high"
+privacy = "external_allowed"
+approval_policy = "trusted_local"
 context_budget_chars = 100
 context_file_budget_chars = 100
 instruction_budget_chars = 100
@@ -164,3 +174,96 @@ def test_cli_loads_preferences_before_readiness_without_provider_calls(tmp_path,
         == 0
     )
     assert observed == [("high", 75.0, tmp_path)]
+
+
+@pytest.mark.parametrize(
+    "privacy", ["local_only", "external_allowed", "sensitive_review_required", "public_or_low_risk"]
+)
+@pytest.mark.parametrize(
+    "approval", ["read_only", "interactive", "workspace_write", "trusted_local"]
+)
+def test_configured_privacy_approval_reuse_existing_enums(tmp_path, privacy, approval):
+    from ai_agent.permissions import ApprovalPolicyPreset
+    from ai_orchestrator import PrivacyClass
+
+    config = load_user_config(
+        config_file(tmp_path, f'privacy = "{privacy}"\napproval_policy = "{approval}"')
+    )
+    assert config.privacy is PrivacyClass(privacy)
+    assert config.approval_policy is ApprovalPolicyPreset(approval)
+    args = build_argument_parser().parse_args([])
+    apply_user_defaults(args, config)
+    assert (args.privacy, args.approval_policy) == (privacy, approval)
+
+
+def test_cli_configured_boundaries_apply_before_offline_readiness(tmp_path, monkeypatch):
+    from ai_provider import repo_coding_assistant as cli
+
+    config_file(tmp_path, 'privacy = "public_or_low_risk"\napproval_policy = "workspace_write"')
+    seen = []
+    monkeypatch.setattr(
+        cli,
+        "_print_fallback_readiness",
+        lambda args, root: (seen.append((args.privacy, args.approval_policy)) or 0),
+    )
+    assert cli.main(["--repo-root", str(tmp_path), "--fallback-readiness"]) == 0
+    assert seen == [("public_or_low_risk", "workspace_write")]
+
+
+def test_session_privacy_uses_effective_defaults_and_refuses_changed_resume(tmp_path, monkeypatch):
+    from ai_provider import repo_coding_assistant as cli
+    from ai_provider.coding_sessions import ACTIVE_SESSION
+
+    config_file(tmp_path, 'privacy = "external_allowed"\napproval_policy = "trusted_local"')
+    observed = []
+
+    def execute(argv):
+        session = ACTIVE_SESSION.get()
+        assert session is not None
+        observed.append(session)
+        return 0
+
+    monkeypatch.setattr(cli, "_main", execute)
+    args = ["--repo-root", str(tmp_path), "--execute", "--coding-session", "new", "Task"]
+    assert cli.main(args) == 0
+    with observed[0].connection() as connection:
+        row = connection.execute("SELECT privacy_class FROM coding_sessions").fetchone()
+        assert row[0] == "external_allowed"
+    assert (
+        cli.main(
+            [
+                "--repo-root",
+                str(tmp_path),
+                "--execute",
+                "--coding-session",
+                observed[0].session_id,
+                "--privacy",
+                "local_only",
+                "Continue",
+            ]
+        )
+        == 1
+    )
+    assert len(observed) == 1
+
+
+def test_shared_inspection_retains_read_only_despite_configured_authority(
+    tmp_path, monkeypatch, capsys
+):
+    from ai_provider import repo_coding_assistant as cli
+
+    config_file(tmp_path, 'approval_policy = "trusted_local"')
+    assert (
+        cli.main(
+            [
+                "--repo-root",
+                str(tmp_path),
+                "--shared-tools",
+                "inspection",
+                "--skip-prompt-review",
+                "Inspect",
+            ]
+        )
+        == 0
+    )
+    assert "provider_native_approval_policy: read_only" in capsys.readouterr().out
