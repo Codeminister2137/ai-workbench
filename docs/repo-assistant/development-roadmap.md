@@ -9,6 +9,11 @@
 Decision and milestone recording is complete as of 2026-10-04. Verified tools and
 fallback are foundations; they do not constitute completed cross-agent parity.
 
+The current [next-session plan and pending decisions](next-session-decisions.md)
+separates approved implementation from owner selections and missing inputs.
+Historical checkpoints below retain their original validation counts; the latest
+full offline checkpoint is 933 passed, seven live tests skipped, Ruff/Pyright clean.
+
 The goal is to perform inspect/plan/edit/test/review workflows from the project
 CLI, invoke the required skills, resume work and recover from allowance exhaustion
 with the common tools still available. PyCharm may host tools initially; eventually

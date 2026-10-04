@@ -11,6 +11,16 @@ The context window is how much text the model can read in one request. It is not
 the account's usage limit. New messages and command results add text; waiting does
 not. Exact allowance charged to the IDE assistant was not measured in this run.
 
+A session's cached-input total can accumulate reuse of the same history across
+many model requests. A reported 55M total does not establish a 55M current context
+or a particular remaining subscription allowance. Prompt caching is reuse of
+input, not a promise of free model work. Check IDE `/status` for current context
+and account signals. Switching at a saved, committed milestone can reduce old
+history carried forward, but does not reset account limits or guarantee savings.
+See [prompt caching](https://developers.openai.com/api/docs/guides/prompt-caching)
+and [usage guidance](https://learn.chatgpt.com/docs/pricing). This interpretation
+does not verify how a particular PyCharm counter aggregates its events.
+
 Local Ollama inference, foreground scheduler waits, subprocess polling and test
 execution run locally. They do not themselves make Codex subscription requests.
 The existing scheduler and external-client process readers already wait in ordinary
