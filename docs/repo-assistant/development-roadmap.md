@@ -32,7 +32,7 @@ it should only be the human editor/viewer. Different model performance is allowe
 | M1 | Readiness and adapter contracts | In progress; offline fallback diagnostic slice verified | Deterministic route/tool/skill/approval checks explain eligibility and exclusions; forced-limit coverage preserves tier and task constraints |
 | M2 | Common tools and portable skills | In progress; shared inspection works on three official clients; portable Copilot skill fixture passed | C1-C4 work through common contracts on selected routes; explicit skills resolve dependencies; required instructions are available or omissions cause a clear refusal |
 | M3 | Semantic tooling with temporary IDE host | Pending CLI bridge; direct host operations verified | Selected C5 operations work through a verified PyCharm bridge with defined semantics and permissions |
-| M4 | Coding and process continuity | Pending; design choices open | Agreed session/process model preserves objective, decisions, scoped approvals, receipts and handles across turns and fallback; uncertain effects are reconciled |
+| M4 | Coding and process continuity | In progress; opt-in native sessions and foreground children implemented | Agreed session/process model preserves objective, decisions, scoped approvals, receipts and handles across turns and fallback; uncertain effects are reconciled |
 | M5 | Independence from the IDE tool host | Pending | Approved C1-C6 workflows remain usable with PyCharm tool hosting unavailable; PyCharm can serve only as editor/viewer |
 
 Each milestone has deterministic correctness checks and separately recorded live
@@ -150,8 +150,33 @@ capabilities and limitations. Model-quality comparisons are a separate evaluatio
 ## Open design decisions
 
 The investigated options and recommendations are in
-[foundation decisions](foundation-decisions.md). They remain proposals pending
-owner selection; ADR-040's direction and scope are already accepted.
+[foundation decisions](foundation-decisions.md). All six recommendations are now
+accepted in ADR-041; historical pending labels above are superseded. They must not
+be presented to the owner for approval again. Current status follows below.
+
+### 2026-10-04 implementation checkpoint
+
+- Common inspection, checked project-local skill selection and complete required
+  instructions are implemented. Forced Codex-limit fallback through real Copilot
+  preserved those contracts; the production Kiro mapping passed its read fixture.
+- Opt-in coding sessions retain objectives, explicit decisions and hashed receipts
+  in existing application SQLite storage. Native process tools inspect direct
+  children without AI calls; cleanup stops owned children. Restart requires human
+  reconciliation of uncertain effects and never restores old approvals or pipes.
+- Shared mutation approval across external clients, versioned native compatibility
+  evidence and effective model-input admission remain incomplete. Native approval
+  requests now show task, workspace and complete operation; no-human requests deny.
+- The official MCP SDK is approved but not installed or declared yet: an explicit
+  local PyCharm MCP endpoint is still needed before implementing the CLI bridge.
+- The scheduled full-instruction acceptance ended failed at 14:05:08 UTC. The repair
+  exceeded its local context budget; the saved report and final handoff survived.
+  The scheduler recorded failure and stopped the sequence. No quality improvement
+  or successful refinement acceptance is established by the reviewer pass.
+- Offline follow-up bounds tool-capable repair/refinement previews instead of
+  copying the tool-free review packet, retaining complete original requirements.
+  This addresses avoidable input duplication; successful live repair is unverified.
+- The owner returned; only offline implementation/checks are now authorized for
+  this run. Do not start further inference or invoke workstation sleep.
 
 The owner subsequently raised allowance overhead and requested sleep after saved
 work. [Resource and usage guidance](resource-and-usage.md) records the immediate
@@ -159,16 +184,14 @@ avoid-idle-model-polling workflow, observed client usage and prioritized measure
 follow-up. An explicit Windows sleep helper is implemented; it adds no automatic
 queue behavior or global power configuration.
 
-- Minimal project-owned coding-session state and native-session interaction.
-- Process ownership, handle lifetime and recovery after client or host shutdown.
-- Any persistence/schema change required by those designs.
-- Shared-tool approval channel and equivalent native-client restrictions.
-- Concrete independent semantic tooling, dependencies and runtime integrations.
+- Explicit local IDE endpoint/activation and its access scope.
+- Search source configuration: missing Tavily/Brave credentials and the failed
+  SearXNG endpoint prevent search acceptance; direct URL fetching already works.
+- Optional capabilities and generalizing the research-only scheduler, if needed.
 
-These are unresolved implementations within an approved direction. Do not ask
-again whether shared tools or a temporary IDE host are wanted. Investigate each
-decision when its milestone requires it, recommend options and defer only that
-part until the owner chooses.
+Shared terminal approvals and native foreground recovery are accepted directions,
+with implementation/acceptance still outstanding. Additional architecture choices
+must be investigated separately; they are not automatically new approval gates.
 
 ## Optional capabilities: unselected
 

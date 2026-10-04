@@ -48,6 +48,19 @@ without the applicable account accounting rules.
 
 ## Priority follow-up
 
+On 2026-10-04 the hosted supervisor stopped at 14:02:04.319 UTC (16:02 local).
+Its session event recorded the displayed capacity message with
+`codex_error_info: server_overloaded`. This was a hosted availability error;
+it was not a recorded subscription-limit or local-memory failure. OpenAI has
+[documented this exact message during service incidents](https://status.openai.com/incidents/01KX46HHYJ0YB8VPBZTB0KZ03V).
+That historical incident explains the wording, not the cause of today's outage.
+
+An already-started local scheduler worker continued independently and saved its
+final handoff at 14:05:08 UTC. Its separate failure was a local repair context
+budget overflow. No worker remained when the owner returned. The idle owned
+Ollama server was fingerprint-checked and stopped at 17:00:53 UTC; port 11434
+had no listener afterward. No new live run or sleep request followed the return.
+
 Treat avoidable idle model turns as an immediate workflow priority. Wait in the
 existing process supervisor while a task runs, do independent work, and return on
 completion. Finish once independent authorized work is exhausted instead of making
