@@ -85,8 +85,10 @@ The owner also requested handling model overload and context-budget failures.
 Temporary overload must remain distinct from exhausted allowance. Error parsing
 now recognizes completion events with structured errors, and the CLI explains
 capacity failures as hosted availability rather than an account-limit receipt.
-Automatic overload continuation versus a saved handoff is awaiting the specific
-behavior selection requested during implementation; no repeated live calls were made.
+The owner subsequently selected automatic overload fallback with a configurable
+quality gate. ADR-042 records the implementation: default comparable declared
+quality, bounded route attempts, bucket-aware usage fallback and a saved handoff
+when no suitable continuation remains. No live calls were made for this change.
 
 Research request sizing now reserves output and framing space and includes tool
 schemas in its existing byte estimate. Oversize messages produce a diagnostic with

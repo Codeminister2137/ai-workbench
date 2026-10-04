@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ai_orchestrator import CostPolicyTier
+from ai_orchestrator.fallback import FallbackQualityPolicy
 
 
 @dataclass(frozen=True)
@@ -15,6 +16,7 @@ class UserConfig:
 
     cost_policy: CostPolicyTier = CostPolicyTier.PREPAID_CREDITS_ALLOWED
     fallback_enabled: bool = True
+    fallback_quality_policy: FallbackQualityPolicy = FallbackQualityPolicy.PRESERVE_QUALITY
 
 
 def load_user_config(path: Path, *, required: bool = False) -> UserConfig:
@@ -30,8 +32,8 @@ def load_user_config(path: Path, *, required: bool = False) -> UserConfig:
     if not isinstance(defaults, dict) or set(defaults) - {"cost_policy"}:
         raise ValueError("User config defaults supports only cost_policy")
     fallback = data.get("fallback", {})
-    if not isinstance(fallback, dict) or set(fallback) - {"enabled"}:
-        raise ValueError("User config fallback supports only enabled")
+    if not isinstance(fallback, dict) or set(fallback) - {"enabled", "quality_policy"}:
+        raise ValueError("User config fallback supports only enabled and quality_policy")
     enabled = fallback.get("enabled", True)
     if not isinstance(enabled, bool):
         raise ValueError("fallback.enabled must be a boolean")
@@ -40,4 +42,7 @@ def load_user_config(path: Path, *, required: bool = False) -> UserConfig:
             defaults.get("cost_policy", CostPolicyTier.PREPAID_CREDITS_ALLOWED.value)
         ),
         fallback_enabled=enabled,
+        fallback_quality_policy=FallbackQualityPolicy(
+            fallback.get("quality_policy", FallbackQualityPolicy.PRESERVE_QUALITY.value)
+        ),
     )

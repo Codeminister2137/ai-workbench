@@ -336,12 +336,13 @@ option/approval reason. The existing compatibility gate and authentication check
 still decide whether execution is permitted; explanations do not authorize routes.
 
 Coding runs automatically try an authenticated, compatible route on the same
-billing tier after an allowance/quota limit. An explicit Codex route/model
+billing tier after an allowance/quota limit or recognized model overload. An explicit Codex route/model
 selects the first attempt; fallback may change it. Task privacy, required tools,
-minimum quality and latency remain constraints. Higher quality grades are
-preferred, but a standard-grade route can replace a high-grade route when the
-task only requires standard quality. No paid escalation or lower-tier switch
-occurs automatically. Exhausted billing buckets are skipped for that run.
+minimum quality and latency remain constraints. The default `preserve_quality`
+also requires the original declared quality grade. Explicit `task_minimum` permits
+a weaker route meeting the task requirements. Unknown original model-grade evidence
+refuses continuation. No paid escalation or lower-tier switch occurs automatically.
+Usage exhaustion excludes billing buckets; overload excludes only affected routes.
 
 Before the primary run, primary and eligible fallback native clients receive
 non-inference authentication checks. An interactive terminal offers sign-in for missing accounts. In a
@@ -355,9 +356,12 @@ observed progress counts. The replacement inspects current files and validates
 the final artifacts. Raw tool arguments/outputs and private native session state
 are not transferred. A replacement remains selected for repair attempts.
 Orchestrated implementation records include its route and attempt history.
-Other errors retain existing failure handling. If no ready comparable route
-remains, the CLI reports `fallback_exhausted`, preserves edits, and returns
-failure without prompting during execution.
+Other errors retain existing failure handling. If no suitable route or time remains,
+the CLI reports `fallback_exhausted`, preserves edits and writes a metadata handoff
+under `artifacts/fallback-handoffs/`, then returns failure. The handoff contains the
+objective, observations and next action, not private reasoning or full instruction
+packets. A weaker model is not called solely to summarize. Save failures are reported
+explicitly. Login/readiness is not proof of remaining credits or actual quality.
 
 Only `trusted_local` currently permits cross-client fallback to Copilot,
 Antigravity, and Kiro; their other approval mappings remain unavailable.
@@ -370,7 +374,13 @@ The default can be disabled in private `user-config.toml`:
 ```toml
 [fallback]
 enabled = false
+quality_policy = "preserve_quality"
 ```
+
+Use `--fallback-quality-policy task_minimum` for an explicit per-run override.
+These preferences apply to both usage-limit and overload continuation. Catalog
+quality grades are declared estimates; they do not substitute for representative
+model evaluations. See ADR-042 for the updated decision.
 
 Run `uv run python scripts/fallback-acceptance.py` for a synthetic Codex-limit
 simulation followed by a real Copilot continuation. This consumes a Copilot

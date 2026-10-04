@@ -2095,6 +2095,11 @@ def _main(argv: Sequence[str] | None = None) -> int:
     if args.cost_policy is None:
         args.cost_policy = user_config.cost_policy.value
     args.fallback_enabled = user_config.fallback_enabled
+    from ai_orchestrator.fallback import FallbackQualityPolicy
+
+    args.fallback_quality_policy = FallbackQualityPolicy(
+        args.fallback_quality_policy or user_config.fallback_quality_policy
+    )
     if args.fallback_readiness:
         if any(
             (
@@ -2370,6 +2375,10 @@ def _main(argv: Sequence[str] | None = None) -> int:
                 target, args, repo_root, probe_provider=False
             ),
             enabled=args.fallback_enabled,
+            quality_policy=args.fallback_quality_policy,
+            save_handoff=lambda summary: _save_fallback_handoff(
+                repo_root, {"objective": args.prompt or "", **summary}
+            ),
         )
         if args.away_minutes:
             args.fallback_session.deadline = time.perf_counter() + args.away_minutes * 60
@@ -3391,6 +3400,7 @@ def _print_fallback_readiness(args: argparse.Namespace, repo_root: Path) -> int:
             target, args, repo_root, probe_provider=False
         ),
         enabled=args.fallback_enabled,
+        quality_policy=args.fallback_quality_policy,
     )
     print(json.dumps(report, indent=2))
     return 0
@@ -3525,7 +3535,38 @@ def _fallback_details(args: argparse.Namespace) -> dict[str, Any]:
     return {
         "effective_route_id": session.current.route_id,
         "fallback_attempts": list(session.attempts),
+        **({"fallback_handoff": session.handoff} if session.handoff is not None else {}),
     }
+
+
+def _save_fallback_handoff(repo_root: Path, summary: dict[str, Any]) -> None:
+    """Save a metadata-only stop receipt without invoking a weaker model or touching edits."""
+    import uuid
+
+    directory = repo_root / "artifacts" / "fallback-handoffs"
+    if not directory.resolve().is_relative_to(repo_root.resolve()):
+        raise ValueError("Fallback handoff directory leaves the workspace")
+    directory.mkdir(parents=True, exist_ok=True)
+    target = directory / (uuid.uuid4().hex + ".json")
+    try:
+        status = subprocess.run(
+            ["git", "-C", str(repo_root), "status", "--short"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+        if status.returncode == 0:
+            summary = {
+                **summary,
+                "working_tree_status": status.stdout[:8000],
+                "working_tree_status_truncated": len(status.stdout) > 8000,
+            }
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    with target.open("x", encoding="utf-8") as stream:
+        json.dump(summary, stream, indent=2)
+    print(f"fallback_handoff_file: {target}")
 
 
 def _run_external_agent_cli_mode(

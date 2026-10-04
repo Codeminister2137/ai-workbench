@@ -82,9 +82,17 @@ def routes():
             QualityThreshold.HIGH,
         ),
         entry(
-            "copilot", AccessMethod.COPILOT_CLI, BillingSource.GITHUB_COPILOT_SUBSCRIPTION_ALLOWANCE
+            "copilot",
+            AccessMethod.COPILOT_CLI,
+            BillingSource.GITHUB_COPILOT_SUBSCRIPTION_ALLOWANCE,
+            QualityThreshold.HIGH,
         ),
-        entry("kiro", AccessMethod.KIRO_CLI, BillingSource.KIRO_SUBSCRIPTION_ALLOWANCE),
+        entry(
+            "kiro",
+            AccessMethod.KIRO_CLI,
+            BillingSource.KIRO_SUBSCRIPTION_ALLOWANCE,
+            QualityThreshold.HIGH,
+        ),
     )
 
 
@@ -114,12 +122,115 @@ def session(monkeypatch, routes, **kwargs):
     )
 
 
-def test_task_requirements_allow_lower_route_grade_and_prefer_higher_grade(routes):
-    higher = replace(routes[2], quality=QualityThreshold.HIGH)
-    candidates = fallback_candidates(profile(), (routes[0], routes[1], higher), initial(routes))
+def test_default_preserves_original_quality_and_explicit_task_minimum_allows_downgrade(routes):
+    from ai_orchestrator.fallback import FallbackQualityPolicy
+
+    weaker = replace(routes[1], quality=QualityThreshold.STANDARD)
+    catalog = (routes[0], weaker, routes[2])
+    assert [
+        row.backend.route_id for row in fallback_candidates(profile(), catalog, initial(routes))
+    ] == ["kiro"]
+    candidates = fallback_candidates(
+        profile(), catalog, initial(routes), quality_policy=FallbackQualityPolicy.TASK_MINIMUM
+    )
     assert [row.backend.route_id for row in candidates] == ["kiro", "copilot"]
-    strict = profile(quality_threshold=QualityThreshold.HIGH)
-    assert fallback_candidates(strict, routes, initial(routes)) == ()
+
+
+def test_overload_can_switch_same_bucket_without_exhausting_account(monkeypatch, routes):
+    sibling = replace(
+        routes[1],
+        backend=replace(
+            routes[1].backend,
+            route=replace(routes[1].backend.route, billing_source=routes[0].backend.billing_source),
+        ),
+    )
+    run = session(monkeypatch, (routes[0], sibling))
+    calls = []
+
+    def execute(target, prompt):
+        calls.append(target.route_id)
+        if target.route_id == "codex":
+            return ExternalAgentResult((), 1, "", "server_overloaded")
+        assert "Inspect current files" in prompt
+        return "done"
+
+    assert (
+        run.run(
+            "Continue work",
+            execute,
+            lambda value: isinstance(value, ExternalAgentResult) and external_usage_limit(value),
+            observe=str,
+        )
+        == "done"
+    )
+    assert calls == ["codex", "copilot"]
+    assert run.overloaded == {"codex"} and not run.exhausted
+
+
+def test_native_overload_is_bounded_and_weaker_route_only_gets_handoff(
+    monkeypatch, routes, tmp_path
+):
+    weaker = replace(routes[1], quality=QualityThreshold.STANDARD)
+    saved = []
+    path = tmp_path / "work.txt"
+    path.write_text("partial work")
+    run = session(monkeypatch, (routes[0], weaker), save_handoff=saved.append)
+    calls = []
+
+    def execute(target, prompt):
+        calls.append(target.route_id)
+        raise ProviderError("server_overloaded", category=ProviderErrorCategory.RETRYABLE)
+
+    with pytest.raises(ProviderError, match="server_overloaded"):
+        run.run("Continue", execute, lambda result: False, observe=str)
+    assert calls == ["codex"] and path.read_text() == "partial work"
+    assert saved[0]["status"] == "continuation_stopped"
+    assert saved[0]["failure_kind"] == "model_overload"
+    assert not run.exhausted
+
+
+def test_every_overloaded_route_is_tried_once(monkeypatch, routes):
+    run = session(monkeypatch, routes)
+    calls = []
+
+    def execute(target, prompt):
+        calls.append(target.route_id)
+        return ExternalAgentResult((), 1, "", "server_overloaded")
+
+    run.run("Continue", execute, external_usage_limit, observe=str)
+    assert calls == ["codex", "copilot", "kiro"]
+    assert run.handoff is not None and not run.exhausted
+
+
+def test_quality_config_is_validated_and_missing_model_evidence_refuses(routes, tmp_path):
+    from ai_orchestrator.fallback import FallbackQualityPolicy
+
+    assert (
+        load_user_config(tmp_path / "missing").fallback_quality_policy
+        is FallbackQualityPolicy.PRESERVE_QUALITY
+    )
+    config = tmp_path / "user-config.toml"
+    config.write_text('[fallback]\nquality_policy = "task_minimum"\n')
+    assert load_user_config(config).fallback_quality_policy is FallbackQualityPolicy.TASK_MINIMUM
+    config.write_text('[fallback]\nquality_policy = "anything"\n')
+    with pytest.raises(ValueError):
+        load_user_config(config)
+    assert (
+        fallback_candidates(profile(), routes, replace(initial(routes), model="ungraded-model"))
+        == ()
+    )
+
+
+def test_saved_fallback_handoff_preserves_work_and_omits_prompt(tmp_path):
+    from ai_provider.repo_coding_assistant import _save_fallback_handoff
+
+    source = tmp_path / "source.txt"
+    source.write_text("partial effect")
+    summary = {"status": "continuation_stopped", "next_action": "Inspect current files"}
+    _save_fallback_handoff(tmp_path, summary)
+    saved = list((tmp_path / "artifacts/fallback-handoffs").glob("*.json"))
+    assert len(saved) == 1 and json.loads(saved[0].read_text()) == summary
+    assert source.read_text() == "partial effect"
 
 
 def test_fallback_filters_tier_privacy_tools_and_exhausted_bucket(routes):
@@ -168,7 +279,7 @@ def test_quota_continuation_retains_partial_file_edit_and_observed_context(
             path.write_text("partial edit")
             raise ProviderError("usage limit", category=ProviderErrorCategory.USAGE_LIMIT)
         assert path.read_text() == "partial edit"
-        assert "Usage-limit continuation" in prompt
+        assert "Route-failure continuation" in prompt
         assert "Fix source" in prompt
         assert "codex" in prompt
         path.write_text("completed edit")
@@ -412,6 +523,8 @@ quality = "standard"
 chat = true
 tools = true
 """)
+    config = tmp_path / "user-config.toml"
+    config.write_text('[fallback]\nquality_policy = "task_minimum"\n')
     monkeypatch.setenv("CODEX_COMMAND", "codex-test")
     monkeypatch.setenv("GITHUB_COPILOT_COMMAND", "copilot-test")
     order = []
@@ -438,7 +551,7 @@ tools = true
                 ("codex",), 1, '{"type":"file_change","path":"source.py"}\n', "", events=events
             )
         assert source.read_text() == "value = 1\n"
-        assert "Usage-limit continuation" in prompt
+        assert "Route-failure continuation" in prompt
         assert "source.py" in prompt
         assert config.approval_policy == "trusted_local"
         source.write_text("value = 2\n")

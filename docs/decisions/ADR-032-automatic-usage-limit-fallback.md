@@ -3,6 +3,12 @@
 **Status:** Accepted
 **Date:** 2026-10-01
 
+**Partially superseded on 2026-10-04:**
+[ADR-042](ADR-042-overload-fallback-and-configurable-continuation-quality.md)
+adds overload fallback and defaults to preserving original declared quality,
+with the former task-minimum behavior available through explicit configuration.
+The historical decision and rationale below are retained.
+
 ## Context And Owner Direction
 
 The owner wants the coding CLI to continue automatically when Codex or another

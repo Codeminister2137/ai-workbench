@@ -54,7 +54,18 @@ def test_compatible_offline_routes_do_not_claim_authenticated_or_connected(
     monkeypatch, tmp_path, capsys
 ):
     monkeypatch.setenv("GITHUB_COPILOT_COMMAND", "copilot-test")
-    assert cli.main(offline_args(tmp_path, "--approval-policy", "trusted_local")) == 0
+    assert (
+        cli.main(
+            offline_args(
+                tmp_path,
+                "--approval-policy",
+                "trusted_local",
+                "--fallback-quality-policy",
+                "task_minimum",
+            )
+        )
+        == 0
+    )
     report = json.loads(capsys.readouterr().out)
     copilot = next(row for row in report["fallback_candidates"] if "copilot" in row["route_id"])
     assert copilot["executor_compatible"]

@@ -2,6 +2,9 @@
 [defaults]
 cost_policy = "prepaid_credits_allowed"
 
-# Automatic same-tier fallback on usage limits is on by default.
+# Automatic same-tier fallback on usage limits and model overload is on by default.
 [fallback]
 enabled = true
+# Stop and save a handoff if no replacement matches the original declared quality.
+# Explicit alternative: "task_minimum" permits a weaker route meeting task requirements.
+quality_policy = "preserve_quality"

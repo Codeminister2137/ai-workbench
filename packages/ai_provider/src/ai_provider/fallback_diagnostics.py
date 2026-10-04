@@ -5,7 +5,7 @@ from dataclasses import replace
 from typing import Any
 
 from ai_orchestrator import ExecutionTarget, ModelCatalogEntry, TaskProfile, prepare_execution
-from ai_orchestrator.fallback import fallback_candidates
+from ai_orchestrator.fallback import FallbackQualityPolicy, fallback_candidates
 
 
 def fallback_readiness_report(
@@ -15,13 +15,14 @@ def fallback_readiness_report(
     *,
     incompatibility: Callable[[ExecutionTarget], str | None],
     enabled: bool = True,
+    quality_policy: FallbackQualityPolicy = FallbackQualityPolicy.PRESERVE_QUALITY,
 ) -> dict[str, Any]:
     """Explain policy/adapter exclusions without performing runtime or account probes.
 
     The caller supplies a static inspector. An eligible route may still lack
     authentication, connected tools or allowance; none is asserted by this report.
     """
-    eligible = fallback_candidates(profile, catalog, primary)
+    eligible = fallback_candidates(profile, catalog, primary, quality_policy=quality_policy)
     candidates = []
     for entry in eligible:
         plan = prepare_execution(
@@ -66,6 +67,7 @@ def fallback_readiness_report(
     return {
         "status": "offline",
         "fallback_enabled": enabled,
+        "fallback_quality_policy": quality_policy.value,
         "primary_route": primary.route_id,
         "cost_policy_tier": primary.cost_policy_tier.value,
         "authentication": "not_checked",

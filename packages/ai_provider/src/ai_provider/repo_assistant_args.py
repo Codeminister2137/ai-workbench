@@ -33,6 +33,11 @@ def build_argument_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("prompt", nargs="?", help="Coding prompt to prepare or execute.")
     parser.add_argument(
+        "--fallback-quality-policy",
+        choices=("preserve_quality", "task_minimum"),
+        help="Override user fallback quality policy for this invocation.",
+    )
+    parser.add_argument(
         "--fallback-readiness",
         action="store_true",
         help=(

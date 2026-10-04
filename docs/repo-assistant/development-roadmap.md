@@ -156,6 +156,13 @@ be presented to the owner for approval again. Current status follows below.
 
 ### 2026-10-04 implementation checkpoint
 
+Overload and usage fallback now share the configurable ADR-042 continuation gate.
+Default `preserve_quality` requires the original declared grade; explicit
+`task_minimum` permits task-qualified weaker routes. Failed continuation saves a
+local handoff without a weaker model call. Remaining balances and actual model
+quality are not guaranteed by these deterministic checks. Full current validation:
+892 passed, seven live tests skipped; live overload/quality-gate acceptance deferred.
+
 - Common inspection, checked project-local skill selection and complete required
   instructions are implemented. Forced Codex-limit fallback through real Copilot
   preserved those contracts; the production Kiro mapping passed its read fixture.

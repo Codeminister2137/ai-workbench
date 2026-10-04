@@ -9,7 +9,7 @@ from dataclasses import replace
 from typing import Any
 
 from ai_orchestrator import ExecutionTarget, ModelCatalogEntry, TaskProfile, prepare_execution
-from ai_orchestrator.fallback import fallback_candidates
+from ai_orchestrator.fallback import FallbackQualityPolicy, fallback_candidates
 
 from ai_provider.agent_readiness import AgentReadiness, check_agent_readiness
 from ai_provider.errors import ProviderError, ProviderErrorCategory
@@ -82,6 +82,8 @@ class FallbackSession:
         enabled: bool = True,
         progress: Callable[[str], None] = print,
         deadline: float | None = None,
+        quality_policy: FallbackQualityPolicy = FallbackQualityPolicy.PRESERVE_QUALITY,
+        save_handoff: Callable[[dict[str, Any]], None] | None = None,
     ) -> None:
         self.profile = profile
         self.catalog = catalog
@@ -90,7 +92,11 @@ class FallbackSession:
         self.enabled = enabled
         self.progress = progress
         self.deadline = deadline
+        self.quality_policy = FallbackQualityPolicy(quality_policy)
+        self.save_handoff = save_handoff
         self.exhausted: set[str] = set()
+        self.overloaded: set[str] = set()
+        self.handoff: dict[str, Any] | None = None
         self.attempts: list[dict[str, str]] = []
         self.ready: dict[str, ExecutionTarget] = {}
         self.unavailable: dict[str, str] = {}
@@ -101,7 +107,13 @@ class FallbackSession:
         if is_external_agent_access_method(initial.access_method):
             checked[initial.access_method] = self._authenticate(initial)
             self.primary_ready = checked[initial.access_method].ready
-        for entry in fallback_candidates(profile, catalog, initial):
+        for entry in fallback_candidates(
+            profile,
+            catalog,
+            initial,
+            allow_initial_billing_source=True,
+            quality_policy=self.quality_policy,
+        ):
             plan = prepare_execution(
                 "Fallback",
                 replace(
@@ -168,7 +180,7 @@ class FallbackSession:
         *,
         observe: Callable[[Any], str],
     ) -> Any:
-        """Continue only after a normalized usage limit, without logging in mid-run."""
+        """Continue comparable work after usage/availability failure; never replay effects."""
 
         current_prompt = prompt
         observed_history: list[str] = []
@@ -177,49 +189,71 @@ class FallbackSession:
                 "Primary account authentication was not verified before execution.",
                 category=ProviderErrorCategory.AUTHENTICATION,
             )
-        if self.enabled and self.current.billing_source.value in self.exhausted:
+        if self.enabled and (
+            self.current.billing_source.value in self.exhausted
+            or self.current.route_id in self.overloaded
+        ):
             self.progress("fallback_exhausted: no ready route remains; partial work preserved")
             raise ProviderError(
-                "All ready same-tier routes exhausted; no further execution attempted.",
-                category=ProviderErrorCategory.USAGE_LIMIT,
+                "No ready continuation route remains; no further execution attempted. "
+                "Partial work and handoff preserved.",
+                category=ProviderErrorCategory.RETRYABLE
+                if self.current.route_id in self.overloaded
+                else ProviderErrorCategory.USAGE_LIMIT,
             )
         while True:
             error = None
             try:
                 result = execute(self.current, current_prompt)
                 limited = is_limited(result)
-                observed = observe(result) if limited else ""
+                overload = (
+                    not limited
+                    and isinstance(result, ExternalAgentResult)
+                    and external_model_overload(result)
+                )
+                observed = observe(result) if limited or overload else ""
             except ProviderError as exc:
-                if exc.category not in {
+                overload = explicit_model_overload(str(exc)) and exc.category in {
+                    ProviderErrorCategory.RETRYABLE,
+                    ProviderErrorCategory.UNKNOWN,
+                }
+                if not overload and exc.category not in {
                     ProviderErrorCategory.RATE_LIMIT,
                     ProviderErrorCategory.USAGE_LIMIT,
                 }:
                     raise
                 error = exc
-                limited = True
+                limited = not overload
                 messages = exc.partial_messages
                 tool_count = sum(message.role.value == "tool" for message in messages)
                 observed = (
-                    "Provider reported a usage limit. "
+                    "Provider reported a route failure. "
                     f"Native checkpoint contains {len(messages)} messages and "
                     f"{tool_count} tool results. Raw arguments and outputs are omitted; "
                     "inspect the current working tree before continuing."
                 )
                 result = None
-            if not limited or not self.enabled:
+            if not (limited or overload) or not self.enabled:
                 self.attempts.append({"route_id": self.current.route_id, "status": "finished"})
                 if error:
                     raise error
                 return result
             failed = self.current
-            self.attempts.append({"route_id": failed.route_id, "status": "usage_limit"})
+            reason = "model_overload" if overload else "usage_limit"
+            self.attempts.append({"route_id": failed.route_id, "status": reason})
             observed_history.append(f"Route {failed.route_id}:\n{observed}")
-            self.exhausted.add(failed.billing_source.value)
+            if overload:
+                self.overloaded.add(failed.route_id)
+            else:
+                self.exhausted.add(failed.billing_source.value)
             candidates = fallback_candidates(
                 self.profile,
                 self.catalog,
                 self.initial,
                 exhausted_billing_sources=frozenset(self.exhausted),
+                unavailable_route_ids=frozenset(self.overloaded),
+                allow_initial_billing_source=bool(self.overloaded),
+                quality_policy=self.quality_policy,
             )
             next_target = next(
                 (
@@ -232,6 +266,27 @@ class FallbackSession:
             if self.deadline is not None and time.perf_counter() >= self.deadline:
                 next_target = None
             if next_target is None:
+                self.handoff = {
+                    "status": "continuation_stopped",
+                    "reason": "deadline_or_no_comparable_compatible_route",
+                    "failed_route_id": failed.route_id,
+                    "failure_kind": reason,
+                    "quality_policy": self.quality_policy.value,
+                    "observed": observed_history,
+                    "next_action": (
+                        "Inspect saved edits/receipts and uncertain effects before restarting."
+                    ),
+                    "remaining_allowance": "unknown unless reported by the provider",
+                }
+                self.progress("fallback_handoff: " + json.dumps(self.handoff))
+                if self.save_handoff is not None:
+                    try:
+                        self.save_handoff(self.handoff)
+                    except (OSError, ValueError) as save_error:
+                        self.handoff["save_error"] = str(save_error)
+                        self.progress(
+                            f"fallback_handoff_save_failed: {save_error}; edits preserved"
+                        )
                 self.progress(
                     "fallback_exhausted: no authenticated comparable route on the same "
                     "billing tier; partial work preserved"
@@ -241,7 +296,7 @@ class FallbackSession:
                 return result
             self.current = next_target
             self.progress(
-                f"fallback_switch: {failed.route_id} -> {next_target.route_id} (usage limit)"
+                f"fallback_switch: {failed.route_id} -> {next_target.route_id} ({reason})"
             )
             remaining = self.deadline - time.perf_counter() if self.deadline else None
             if remaining is not None:
@@ -249,8 +304,8 @@ class FallbackSession:
                     next_target, timeout_seconds=min(next_target.timeout_seconds, remaining)
                 )
             current_prompt = (
-                prompt + "\n\n## Usage-limit continuation\n"
-                f"Previous route {failed.route_id} exhausted its usage allowance. "
+                prompt + "\n\n## Route-failure continuation\n"
+                f"Previous route {failed.route_id} failed with {reason}. "
                 "Continue the same objective in the existing working tree. Inspect current files "
                 "before acting; preserve existing edits. Do not repeat completed external writes "
                 "or commands merely because the agent changed. Native session/private reasoning "

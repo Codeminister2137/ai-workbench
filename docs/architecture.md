@@ -170,9 +170,11 @@ user-preference format and alternate official CLI adapters.
 Default usage-limit fallback policy belongs to `ai_orchestrator.fallback`.
 The CLI preflights eligible executors, preserves the working tree, and supplies
 an observed-state handoff. Replacement routes stay on the same billing tier,
-retain task/privacy/approval constraints, and may have a lower quality grade
-when task requirements are met. Exhausted billing buckets are excluded for the
-run; no persistent quota registry is introduced. See ADR-032.
+retain task/privacy/approval constraints, and default to preserving the original
+declared quality grade. An explicit task-minimum preference permits a downgrade.
+Exhausted billing buckets and temporarily overloaded routes are tracked separately
+for the run; no persistent quota registry is introduced. No suitable replacement
+produces a saved handoff without invoking a weaker model. See ADR-032 and ADR-042.
 
 External user authorization is a shared infrastructure concern, not a per-tool
 implementation detail. GitHub, Codex plugins/apps, cloud deployment targets,

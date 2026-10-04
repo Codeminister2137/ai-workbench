@@ -296,6 +296,19 @@ over the hosted PyCharm assistant or approve a new search operator/service.
 Detailed checkpoint and remaining behavior choice:
 [return checkpoint](repo-assistant/return-checkpoint-20261004.md).
 
+## ADR-042 — Overload fallback and configurable continuation quality
+
+**Status:** Accepted
+**Date:** 2026-10-04
+
+The owner requires overload and usage fallback while preserving work quality.
+Default `preserve_quality` refuses weaker or ungraded continuation; explicit
+`task_minimum` retains the previous policy. Overload disables a route rather than
+its billing bucket; same-tier/privacy/tool limits remain. No suitable route produces
+a local handoff without invoking a weaker model. ADR-032 is partially superseded.
+
+Detailed ADR: [ADR-042](decisions/ADR-042-overload-fallback-and-configurable-continuation-quality.md)
+
 ## Research Review Execution Preference
 **Status:** Accepted conditional authorization; current execution unchanged
 **Date:** 2026-10-02
