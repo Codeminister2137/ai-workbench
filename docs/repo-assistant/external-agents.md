@@ -71,6 +71,11 @@ ceiling does not enforce service-side overage settings. Live quota discovery
 remains outside this implementation. Automatic continuation on reported usage
 exhaustion is implemented as described below. See ADR-031 and ADR-032.
 
+Antigravity can return process exit zero while explicitly reporting that headless
+tool permissions were auto-denied and no answer was produced. The adapter treats
+that diagnostic as a task failure, preserves the actual process status and any
+receipts, and lets the CLI report failure. It does not grant additional permissions.
+
 ## External Coding Agent Routes
 
 The catalog includes subscription/client-backed coding-agent routes alongside

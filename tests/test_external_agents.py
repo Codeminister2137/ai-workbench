@@ -1,4 +1,5 @@
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -6,6 +7,7 @@ from ai_orchestrator import AccessMethod
 from ai_provider.external_agents import (
     ExternalAgentConfig,
     _external_agent_progress_line,
+    _external_agent_result_from_completed_process,
     _external_agent_stderr_progress_line,
     build_codex_plugin_command,
     build_external_agent_command,
@@ -15,6 +17,70 @@ from ai_provider.external_agents import (
     parse_external_agent_jsonl,
     validate_codex_plugin_selector,
 )
+
+
+def test_antigravity_zero_exit_permission_refusal_is_a_failure(tmp_path: Path) -> None:
+    config = ExternalAgentConfig(
+        access_method=AccessMethod.ANTIGRAVITY_CLI,
+        command="agy",
+        model="fixture",
+        cwd=tmp_path,
+        timeout_seconds=60.0,
+    )
+    diagnostic = (
+        'jetski: no output produced — a tool required the "mcp" permission that '
+        "headless mode cannot prompt for, so it was auto-denied."
+    )
+    result = _external_agent_result_from_completed_process(
+        ("agy",), config, subprocess.CompletedProcess(("agy",), 0, "", diagnostic)
+    )
+
+    assert result.returncode == 0
+    assert result.stderr == diagnostic
+    assert result.events is not None
+    assert result.events.failure_reason is not None
+    assert "headless tool permission was denied" in result.events.failure_reason
+
+
+def test_antigravity_permission_diagnostic_does_not_override_answer(tmp_path: Path) -> None:
+    answer_path = tmp_path / "answer.txt"
+    answer_path.write_text("Review complete.", encoding="utf-8")
+    config = ExternalAgentConfig(
+        access_method=AccessMethod.ANTIGRAVITY_CLI,
+        command="agy",
+        model="fixture",
+        cwd=tmp_path,
+        timeout_seconds=60.0,
+        output_last_message_path=answer_path,
+    )
+    result = _external_agent_result_from_completed_process(
+        ("agy",),
+        config,
+        subprocess.CompletedProcess(
+            ("agy",),
+            0,
+            "",
+            "jetski: no output produced; headless mode tool auto-denied",
+        ),
+    )
+
+    assert result.last_message == "Review complete."
+    assert result.events is None
+
+
+def test_antigravity_benign_stderr_does_not_create_a_failure(tmp_path: Path) -> None:
+    config = ExternalAgentConfig(
+        access_method=AccessMethod.ANTIGRAVITY_CLI,
+        command="agy",
+        model="fixture",
+        cwd=tmp_path,
+        timeout_seconds=60.0,
+    )
+    result = _external_agent_result_from_completed_process(
+        ("agy",), config, subprocess.CompletedProcess(("agy",), 0, "", "warning: retrying")
+    )
+
+    assert result.events is None
 
 
 def test_build_external_agent_command_can_enable_codex_search(tmp_path: Path) -> None:

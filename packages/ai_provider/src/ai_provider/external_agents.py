@@ -9,7 +9,7 @@ import sys
 import threading
 import time
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -946,11 +946,32 @@ def _external_agent_result_from_completed_process(
     last_message = None
     if config.output_last_message_path is not None and config.output_last_message_path.exists():
         last_message = config.output_last_message_path.read_text(encoding="utf-8", errors="replace")
+    stderr = completed.stderr or ""
+    if (
+        config.access_method == AccessMethod.ANTIGRAVITY_CLI
+        and completed.returncode == 0
+        and not last_message
+        and not (events and events.final_answer)
+        and "jetski: no output produced" in stderr
+        and "auto-denied" in stderr
+        and "headless mode" in stderr
+    ):
+        # This client reports a headless permission refusal with a successful exit.
+        # Preserve the process status and receipts, but do not claim task completion.
+        events = events or parse_external_agent_jsonl(stdout)
+        if events.failure_reason is None:
+            events = replace(
+                events,
+                failure_reason=(
+                    "Antigravity produced no answer because headless tool permission was denied. "
+                    "Configure permission for the required tools or use an interactive session."
+                ),
+            )
     return ExternalAgentResult(
         command=command,
         returncode=completed.returncode,
         stdout=stdout,
-        stderr=completed.stderr or "",
+        stderr=stderr,
         last_message=last_message,
         events=events,
     )

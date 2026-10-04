@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from ai_provider.agent_readiness import AgentReadiness
 from ai_provider.orchestrated_runs import SQLiteOrchestratedRunStore
 
 from .support import (
@@ -375,6 +376,53 @@ def test_cli_reports_nonzero_external_agent_exit_without_jsonl_failure(
     assert "external_agent_stderr_first_line: plain stderr failure detail" in output
     assert "execution_status: failed" in output
     assert output.rfind("partial answer") > output.rfind("execution_status: failed")
+
+
+def test_cli_reports_antigravity_headless_refusal_despite_zero_exit(
+    tmp_path: Path,
+    capsys,
+    monkeypatch,
+) -> None:
+    def fake_run(*args, **kwargs):
+        return _EXAMPLE.subprocess.CompletedProcess(
+            args[0],
+            0,
+            "",
+            "jetski: no output produced; headless mode tool was auto-denied",
+        )
+
+    monkeypatch.setenv("ANTIGRAVITY_COMMAND", "agy-test")
+    monkeypatch.setattr(
+        "ai_provider.execution_fallback.check_agent_readiness",
+        lambda *args, **kwargs: AgentReadiness(True, "fixture authentication ready"),
+    )
+    monkeypatch.setattr(_EXAMPLE.subprocess, "run", fake_run)
+
+    assert (
+        main(
+            [
+                "--mode",
+                "ask",
+                "Review this repository.",
+                "--privacy",
+                "external_allowed",
+                "--route-id",
+                "google-antigravity-gemini-3-1-pro",
+                "--approval-policy",
+                "trusted_local",
+                "--execute",
+                "--skip-prompt-review",
+                "--log-file",
+                str(tmp_path / "transcript.log"),
+            ]
+        )
+        == 1
+    )
+
+    output = capsys.readouterr().out
+    assert "execution_status: failed" in output
+    assert "external_agent_returncode: 0" in output
+    assert "headless tool permission was denied" in output
 
 
 def test_cli_explains_codex_timeout_without_duplicate_response_header(
