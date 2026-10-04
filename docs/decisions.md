@@ -336,6 +336,17 @@ An explicit config timeout wins over away-mode automatic request sizing; an abse
 key retains that sizing. Privacy and approval choices still require specific owner
 selections. No new settings service or persistence mechanism is introduced.
 
+## Session handoff selections — accepted 2026-10-04
+
+Owner approved D1-D3 recommendations in the
+[next-session brief](repo-assistant/next-session-decisions.md): configurable
+privacy/approval defaults retaining `local_only`/`interactive`, investigation of
+replacement SearXNG operators before specific operator selection, and design of
+a bounded typed acceptance-job scheduler extension before concrete contract
+approval. No broader shipped authority, operator switch, arbitrary-command queue,
+new service or immediate live inference was approved. Implementation/investigation
+remains pending; the brief preserves alternatives and technical rationale.
+
 ## Template
 ```text
 ## ADR-NNN — Short Name

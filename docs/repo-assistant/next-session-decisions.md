@@ -1,7 +1,25 @@
 # Next session: plan and owner decisions
 
 2026-10-04. Latest implementation slice COMPLETE; CLI foundation INCOMPLETE.
-This is a pending decision brief, not approval or a replacement for ADRs.
+Owner approved recommendations D1-D3 on 2026-10-04. Implementation/investigation
+remains INCOMPLETE. Alternatives below preserve the reviewed decision brief.
+
+## Approval recorded
+
+- D1-A: Implement configurable privacy and approval defaults, retaining shipped
+  `local_only` and `interactive`. No broader default authority was selected.
+- D2-A: Investigate replacement SearXNG operators through public, model-free
+  shortlist/smoke checks. Present the specific operator before switching; no
+  local service, keyed provider or repository-data transmission was approved.
+- D3-A: Investigate/design a narrow typed acceptance-job scheduler extension with
+  fixed harnesses, resource limits, receipts, deadlines and owned-process cleanup.
+  Review the concrete contract before implementation. Arbitrary-command jobs and
+  immediate live inference remain outside approval.
+
+These selections implement the owner's approval of the recommendations as
+presented; the technical trade-offs below preserve their rationale. Do not ask
+the owner to approve the same directions again. New material choices, the IDE
+endpoint and a compute window remain separate boundaries/inputs.
 
 ## Approved next implementation
 
@@ -36,7 +54,7 @@ Recommendation: A. `workspace_write` permits workspace file writes but denies
 legacy shell actions; `trusted_local` allows local writes/shell. Neither should
 be adopted automatically just to make tests run unattended. A default is not a
 substitute for task-level privacy classification or native client restrictions.
-Question: approve A, keep C, or explicitly select broader values under B?
+Owner selection: A. Implementation pending.
 
 ## D2: restore search after the public SearXNG instance fails upstream
 
@@ -53,8 +71,7 @@ the project can repair the operator's upstream configuration.
 - D: Defer search acceptance and continue direct-source/offline implementation.
 
 Recommendation: A; choose D if search is not needed in the next slice.
-Question: investigate a replacement SearXNG operator, host locally, select a
-keyed provider, or defer? A shortlist does not authorize switching operators.
+Owner selection: investigate A. A shortlist does not authorize switching operators.
 
 ## D3: scheduler scope for deferred live acceptance
 
@@ -72,8 +89,7 @@ acceptance remains failed even though a reviewer passed an intermediate result.
   execution/security/recovery obligations than the demonstrated need.
 
 Recommendation: A if automated acceptance is wanted; otherwise B. Defer C.
-Question: approve investigating the bounded typed acceptance extension, or keep
-non-research checks manual? Neither selection authorizes inference immediately.
+Owner selection: investigate/design A. This does not authorize inference immediately.
 
 ## Inputs and deferred options, not new approval requests
 

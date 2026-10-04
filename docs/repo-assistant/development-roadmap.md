@@ -9,8 +9,10 @@
 Decision and milestone recording is complete as of 2026-10-04. Verified tools and
 fallback are foundations; they do not constitute completed cross-agent parity.
 
-The current [next-session plan and pending decisions](next-session-decisions.md)
-separates approved implementation from owner selections and missing inputs.
+The current [next-session plan and approved directions](next-session-decisions.md)
+records D1-D3 approval: conservative configurable privacy/approval defaults,
+replacement SearXNG investigation, and bounded typed acceptance-job design.
+Specific operator selection and scheduler contract review remain future boundaries.
 Historical checkpoints below retain their original validation counts; the latest
 full offline checkpoint is 933 passed, seven live tests skipped, Ruff/Pyright clean.
 
@@ -171,7 +173,8 @@ quality are not guaranteed by these deterministic checks. Full current validatio
 Owner-approved task quality, context/instruction limits, request/validation
 timeouts and repair caps are now typed private user defaults. Explicit CLI flags
 win; shipped values, instruction overflow refusal and scheduler deadline admission
-are preserved. Privacy and approval defaults await specific selections.
+are preserved. Configurable privacy/approval defaults are subsequently approved
+with shipped `local_only`/`interactive`; implementation remains pending.
 
 - Common inspection, checked project-local skill selection and complete required
   instructions are implemented. Forced Codex-limit fallback through real Copilot

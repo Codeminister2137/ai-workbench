@@ -45,12 +45,17 @@ retaining the time budget. An explicitly configured request timeout wins over
 away-mode automatic request sizing; omit it to retain automatic sizing.
 Scheduler deadline admission is unchanged.
 
-## Remaining configuration recommendations — not yet selected
+## Subsequently approved configuration follow-up
+
+Owner approved configurable privacy/approval defaults retaining `local_only`
+and `interactive`; implementation remains pending. Broader defaults were not
+selected. The [next-session brief](next-session-decisions.md) records this approval
+alongside search-operator investigation and bounded acceptance-job design.
+
+## Remaining configuration boundaries
 
 | Setting | Recommendation and reason |
 | --- | --- |
-| Privacy default | Add only after explicit selection: it determines which data may leave the PC. Keep current local-only default meanwhile. |
-| Approval preset | Add only after explicit selection: it changes command/write authority. Preserve current interactive behavior meanwhile. |
 | IDE endpoint and search operator | Use explicit local config once connection/operator is selected; never discover a service and silently send data to it. |
 | Persistent quota balances, reset guesses, cross-tier fallback | Defer: account-specific reliable evidence is needed; local guesses cannot guarantee allowance or spending limits. |
 
