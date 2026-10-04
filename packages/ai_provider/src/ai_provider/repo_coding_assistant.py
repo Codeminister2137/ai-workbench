@@ -2168,6 +2168,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         allow_outside_files=args.allow_outside_files,
         context_budget_chars=context_budget_chars,
         context_file_budget_chars=args.context_file_budget_chars,
+        diagnostic=print,
     )
     prompt = build_repo_prompt(args.prompt, context_files)
     if args.away_minutes is not None:

@@ -96,6 +96,7 @@ def load_prompt_context(
     allow_outside_files: bool = False,
     context_budget_chars: int | None = DEFAULT_CONTEXT_BUDGET_CHARS,
     context_file_budget_chars: int = DEFAULT_CONTEXT_FILE_BUDGET_CHARS,
+    diagnostic: Callable[[str], None] | None = None,
 ) -> tuple[RepoContextFile, ...]:
     """Load approved context files within deterministic size budgets."""
 
@@ -104,9 +105,21 @@ def load_prompt_context(
     if context_file_budget_chars <= 0:
         raise ValueError("context_file_budget_chars must be greater than zero.")
 
+    nested_instructions: list[Path] = []
+    for selected in selected_paths:
+        resolved = resolve_context_path(repo_root, selected)
+        if not is_relative_to(resolved, repo_root.resolve()):
+            continue
+        directory = resolved if resolved.is_dir() else resolved.parent
+        ancestors: list[Path] = []
+        while directory != repo_root.resolve() and is_relative_to(directory, repo_root.resolve()):
+            ancestors.append(directory / "AGENTS.md")
+            directory = directory.parent
+        nested_instructions.extend(reversed(ancestors))
     context_paths = [
         repo_root / "AGENTS.md",
         repo_root / "CURRENT_CONTEXT.md",
+        *nested_instructions,
         *selected_paths,
     ]
     loaded: list[RepoContextFile] = []
@@ -126,16 +139,24 @@ def load_prompt_context(
             else max(context_budget_chars - sum(len(item.content) for item in loaded), 0)
         )
         if remaining_budget == 0:
+            if diagnostic is not None:
+                diagnostic(f"context_budget_omitted: {display_path(repo_root, resolved)}")
             continue
         content_limit = context_file_budget_chars
         if remaining_budget is not None:
             content_limit = min(content_limit, remaining_budget)
+        raw_content = resolved.read_text(encoding="utf-8", errors="replace")
+        if len(raw_content) > content_limit and diagnostic is not None:
+            diagnostic(
+                f"context_file_truncated: {display_path(repo_root, resolved)} "
+                f"original_chars={len(raw_content)} budget_chars={content_limit}"
+            )
         loaded.append(
             RepoContextFile(
                 path=resolved,
                 display_path=display_path(repo_root, resolved),
                 content=_limit_context_content(
-                    resolved.read_text(encoding="utf-8", errors="replace"),
+                    raw_content,
                     content_limit,
                 ),
                 inside_repo=inside_repo,

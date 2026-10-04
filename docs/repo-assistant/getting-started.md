@@ -258,6 +258,14 @@ Pass `--file` more than once:
 The CLI always tries to include root `AGENTS.md` and `CURRENT_CONTEXT.md`
 automatically. You do not need to pass those manually.
 
+For explicitly selected paths inside the repository, it also includes applicable
+nested `AGENTS.md` files, ordered from outer directories to inner directories.
+Selecting a file outside the repository does not load its neighboring instructions.
+Context still has per-file and total character budgets. The CLI prints
+`context_file_truncated` or `context_budget_omitted` diagnostics when these limits
+cut or exclude a file; these warnings do not guarantee complete instructions or
+refuse execution. Check them before relying on the supplied context.
+
 ## Quick Command Templates
 
 Local answer only:

@@ -95,6 +95,51 @@ def test_limit_context_content_preserves_file_edges() -> None:
     assert "context truncated" in limited
 
 
+def test_context_reports_instruction_truncation_and_budget_omissions(tmp_path: Path) -> None:
+    (tmp_path / "AGENTS.md").write_text("required rule\n" * 20)
+    (tmp_path / "CURRENT_CONTEXT.md").write_text("handoff")
+    warnings: list[str] = []
+    loaded = load_prompt_context(
+        tmp_path,
+        [],
+        context_budget_chars=40,
+        context_file_budget_chars=40,
+        diagnostic=warnings.append,
+    )
+    assert len(loaded) == 1
+    assert warnings[0].startswith("context_file_truncated: AGENTS.md")
+    assert warnings[1] == "context_budget_omitted: CURRENT_CONTEXT.md"
+
+
+def test_selected_file_loads_nested_instructions_in_scope_order(tmp_path: Path) -> None:
+    (tmp_path / "AGENTS.md").write_text("root rules")
+    package = tmp_path / "package"
+    package.mkdir()
+    (package / "AGENTS.md").write_text("package rules")
+    child = package / "child"
+    child.mkdir()
+    (child / "AGENTS.md").write_text("child rules")
+    source = child / "source.py"
+    source.write_text("value = 1")
+    loaded = load_prompt_context(tmp_path, [source, source])
+    assert [item.path for item in loaded] == [
+        tmp_path / "AGENTS.md",
+        package / "AGENTS.md",
+        child / "AGENTS.md",
+        source,
+    ]
+
+
+def test_outside_file_does_not_implicitly_load_its_neighbor_instructions(tmp_path: Path) -> None:
+    root = tmp_path / "repo"
+    root.mkdir()
+    outside = tmp_path / "outside.py"
+    outside.write_text("explicitly approved")
+    (tmp_path / "AGENTS.md").write_text("outside rules must not be implicitly read")
+    loaded = load_prompt_context(root, [outside], allow_outside_files=True)
+    assert [item.path for item in loaded] == [outside]
+
+
 def test_build_repo_prompt_marks_context_boundaries(tmp_path: Path) -> None:
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
