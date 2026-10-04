@@ -77,6 +77,10 @@ Native coding and the opt-in inspection MCP profile now share bounded local Git
 status/diff tools under READ permissions; the default Codex delegation profile
 is unchanged. Focused fixtures verify index preservation, staged/unstaged diffs,
 literal paths, outside-root refusal and disabled external diff helpers.
+Final review also verified that ordinary Git diff can execute configured content
+filters. Inspection now disables clean/process helpers and nested submodule content
+scans, preserves pointer changes, and reports raw-content comparison explicitly.
+Regression fixtures verify helpers do not run and configuration/index stay intact.
 
 A portable `review-repo-change` skill source lives under `packages/ai_agent/skills/`.
 Its syntax validator passed. Copilot CLI 1.0.91 discovered an isolated fixture copy,
@@ -187,6 +191,12 @@ arbitrary coding or acceptance commands into that queue. Record unsupported live
 cases as pending work, rather than presenting them as executable queue entries.
 
 ## Session handoff and milestone updates
+
+At the 2026-10-04 implementation checkpoint, the full offline suite passed:
+857 tests, seven live checks skipped. Ruff and Pyright passed. Separate live checks
+described above ran only during the owner-selected compute window. No new runtime
+dependencies or user-wide permission settings were introduced. The owned Ollama
+runtime was stopped and its listener was verified absent after live work finished.
 
 This file is the tracked milestone source; ADR-040 preserves the decision.
 Update milestone status only with implementation and acceptance evidence, naming
