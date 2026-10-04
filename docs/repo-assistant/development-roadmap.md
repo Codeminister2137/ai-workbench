@@ -153,6 +153,12 @@ The investigated options and recommendations are in
 [foundation decisions](foundation-decisions.md). They remain proposals pending
 owner selection; ADR-040's direction and scope are already accepted.
 
+The owner subsequently raised allowance overhead and requested sleep after saved
+work. [Resource and usage guidance](resource-and-usage.md) records the immediate
+avoid-idle-model-polling workflow, observed client usage and prioritized measurement
+follow-up. An explicit Windows sleep helper is implemented; it adds no automatic
+queue behavior or global power configuration.
+
 - Minimal project-owned coding-session state and native-session interaction.
 - Process ownership, handle lifetime and recovery after client or host shutdown.
 - Any persistence/schema change required by those designs.
