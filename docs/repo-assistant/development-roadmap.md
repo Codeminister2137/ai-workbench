@@ -5,8 +5,8 @@
 
 ## Status and outcome
 
-**INCOMPLETE — approved roadmap, implementation milestones pending.**
-Decision and milestone recording is complete as of 2026-10-04. Existing tools and
+**INCOMPLETE — independent foundation slices implemented; design and acceptance gaps remain.**
+Decision and milestone recording is complete as of 2026-10-04. Verified tools and
 fallback are foundations; they do not constitute completed cross-agent parity.
 
 The goal is to perform inspect/plan/edit/test/review workflows from the project
@@ -30,8 +30,8 @@ it should only be the human editor/viewer. Different model performance is allowe
 | ID | Milestone | Status | Completion condition |
 | --- | --- | --- | --- |
 | M1 | Readiness and adapter contracts | In progress; offline fallback diagnostic slice verified | Deterministic route/tool/skill/approval checks explain eligibility and exclusions; forced-limit coverage preserves tier and task constraints |
-| M2 | Common tools and portable skills | In progress; context diagnostics and read/search MCP profile verified | C1-C4 work through common contracts on selected routes; explicit skills resolve dependencies; required instructions are available or omissions cause a clear refusal |
-| M3 | Semantic tooling with temporary IDE host | Pending | Selected C5 operations work through a verified PyCharm bridge with defined semantics and permissions |
+| M2 | Common tools and portable skills | In progress; shared inspection works on three official clients; portable Copilot skill fixture passed | C1-C4 work through common contracts on selected routes; explicit skills resolve dependencies; required instructions are available or omissions cause a clear refusal |
+| M3 | Semantic tooling with temporary IDE host | Pending CLI bridge; direct host operations verified | Selected C5 operations work through a verified PyCharm bridge with defined semantics and permissions |
 | M4 | Coding and process continuity | Pending; design choices open | Agreed session/process model preserves objective, decisions, scoped approvals, receipts and handles across turns and fallback; uncertain effects are reconciled |
 | M5 | Independence from the IDE tool host | Pending | Approved C1-C6 workflows remain usable with PyCharm tool hosting unavailable; PyCharm can serve only as editor/viewer |
 
@@ -50,14 +50,27 @@ different-bucket policy tests now cover every cost ceiling. Full offline suite:
 acceptance continued a partial edit through real Copilot and passed its fixture.
 These results do not prove canonical tool/skill parity or alternate approval modes.
 
-The next independent slices include nested repository instructions for selected
+Implemented context slices include nested repository instructions for selected
 paths and visible context truncation/omission diagnostics. Existing budgets still
 apply; enforcing complete required instructions remains a decision. A model-free
 `--read-search-only` MCP profile exposes repository inspection tools. A
 bounded real Copilot acceptance discovered and called `find_files`, `list_dir`
 and `read_file` with explicit read/search grants, returned the fixture marker and
-left the fixture unchanged. This confirms one client connection, not write/shell,
-skill activation, all-client parity or fallback with common MCP configuration.
+left the fixture unchanged. Further isolated fixtures connected Codex and Kiro to
+the same inspection profile. Codex found an injected regression through shared
+Git/read/search tools; Kiro returned a marker using shared file discovery/read.
+These checks confirm three client connections, not write/shell, all-client parity
+or fallback with common MCP configuration. Codex's review is not evidence of a
+dedicated native skill activation receipt.
+
+All four configured official clients are discovered when the repository's normal
+environment file is loaded, and their existing authentication checks report ready.
+This does not establish remaining allowance or equivalent authorization. An
+Antigravity inspection fixture returned exit zero with no answer or tool receipts:
+headless MCP permission was auto-denied. The adapter now reports that explicit
+diagnostic as failure while preserving the process status. Narrow native grants
+and common approval mapping remain unresolved; no global permission settings
+were changed for this fixture.
 
 Native coding and the opt-in inspection MCP profile now share bounded local Git
 status/diff tools under READ permissions; the default Codex delegation profile
@@ -79,6 +92,12 @@ each prompt; both missed checks only removed a final newline). Qwen2.5-Coder
 returned textual requests with no actual calls on all 20 tasks under each prompt.
 No broad model-quality or pass-rate improvement is established; model-native
 tool compatibility remains a readiness gap. Catalog routing was not changed.
+
+Direct current-session PyCharm host checks verified interpreter selection, symbol
+information, diagnostics and a rename that updated an import and call in a small
+temporary package; the imported result passed afterward. The owned fixture was
+archived and removed. These checks validate host operations, not the project CLI
+bridge, mutating refactor approval semantics or independence from the IDE.
 
 Next, investigate per-tool/skill readiness using existing tool contracts. A new
 shared capability manifest or materially different client configuration contract
@@ -155,6 +174,8 @@ an owner-selected window on 2026-10-04, including verified tokenizer admission,
 report receipts and durable final handoff. Its refinement attempts made no report
 progress, and search failure remained recorded. This establishes plumbing, not
 model-quality improvement or continuous use of the full allocated budget.
+Selecting that completed task again was refused before worker execution with
+"Only planned tasks are eligible to start"; terminal tasks are not replayed.
 Long local model work must wait for an explicitly selected
 compute window and a supported queued task. ADR-039 does not authorize inserting
 arbitrary coding or acceptance commands into that queue. Record unsupported live
