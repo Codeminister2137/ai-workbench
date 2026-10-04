@@ -30,6 +30,19 @@ file to inspect in prose.
 """.strip()
 )
 
+NATIVE_TOOL_SYSTEM_PROMPT = (
+    BASE_SYSTEM_PROMPT
+    + "\n\n"
+    + """
+Use the supplied provider-native tools for needed repository inspection and
+authorized actions. Submit actual native tool calls; tool requests written in
+response text or fenced JSON do not execute. Use observed tool results to decide
+what to do next and report what changed and which checks actually passed.
+Respect denied operations and scoped approvals; do not use another tool to evade
+a denial. If a needed operation is unavailable, explain the concrete limitation.
+""".strip()
+)
+
 TOOL_SYSTEM_PROMPT = (
     BASE_SYSTEM_PROMPT
     + "\n\n"
@@ -86,6 +99,13 @@ def build_default_system_prompt(
     if not extra_system_prompt:
         return system_prompt
     return f"{system_prompt}\n\nAdditional instruction:\n{extra_system_prompt.strip()}"
+
+
+def build_native_tool_system_prompt(extra_system_prompt: str | None = None) -> str:
+    """Describe actual native calls without the answer-only or legacy JSON workflow."""
+    if not extra_system_prompt:
+        return NATIVE_TOOL_SYSTEM_PROMPT
+    return f"{NATIVE_TOOL_SYSTEM_PROMPT}\n\nAdditional instruction:\n{extra_system_prompt.strip()}"
 
 
 def load_prompt_context(

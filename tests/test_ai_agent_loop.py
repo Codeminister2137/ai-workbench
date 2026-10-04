@@ -76,6 +76,24 @@ def test_agent_loop_executes_tools_and_returns_final_response(tmp_path: Path) ->
     assert client.requests[1].messages[-1].role is MessageRole.TOOL
 
 
+def test_iteration_limit_preserves_effect_and_observed_history(tmp_path: Path) -> None:
+    from ai_provider import ProviderError, ProviderErrorCategory
+
+    client = FakeClient()
+    with pytest.raises(ProviderError, match="exceeded max_iterations=1") as captured:
+        AgentLoop(
+            client,
+            default_coding_tools(),
+            ToolContext(tmp_path),
+            permissions=PermissionManager(policy=PermissionPolicy.permissive()),
+            max_iterations=1,
+        ).run("Create the file", privacy_class=PrivacyClass.LOCAL_ONLY)
+    assert captured.value.category is ProviderErrorCategory.NON_RETRYABLE
+    assert (tmp_path / "out.txt").read_text() == "done"
+    assert captured.value.partial_messages[-1].role is MessageRole.TOOL
+    assert captured.value.partial_messages[-1].tool_call_id == "call-1"
+
+
 def test_delegation_tool_runs_bounded_child_task(tmp_path: Path) -> None:
     calls: list[str] = []
 

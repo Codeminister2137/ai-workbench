@@ -7,19 +7,27 @@
 Default behavior:
 
 - selected files inside the repo are read automatically;
-- assistant actions inside the repo are allowed automatically;
 - selected files outside the repo ask first;
 - assistant action paths or command working directories outside the repo ask
   first;
 - provider calls happen only with `--execute`;
-- local file/command actions happen only with `--apply-actions`.
+- executed provider `implement` routes use native tools by default; the selected
+  `--approval-policy` controls them (`interactive` asks before writes and shell);
+- `--apply-actions` enables the legacy fenced-JSON action path; use
+  `--no-native-tools` when intentionally selecting that path.
+
+Native file tools reject outside-workspace paths. The shell tool checks its
+working directory but does not sandbox the command's effects; a shell grant is
+broader than a workspace-file grant. External clients have their own restrictions
+and only supported policy mappings are accepted. Read-only Git status/diff tools
+use fixed commands under READ permissions; they do not grant general shell access.
 
 Avoid `--allow-outside-files` unless you deliberately want to allow outside-repo
 paths without a prompt.
 
 ## Important Precautions
 
-- Review `git diff` after any run that used `--apply-actions`.
+- Review `git diff` after any run that could write files.
 - Start with local Ollama for private or sensitive code.
 - Use hosted providers only when you are comfortable sending the selected
   context to that external provider.

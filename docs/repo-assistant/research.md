@@ -335,9 +335,11 @@ response path. Use
 `--approval-policy read_only|interactive|workspace_write|trusted_local` to
 choose the model-neutral local action policy. The default is `interactive`.
 
-Native execution rejects a legacy JSON tool request returned as plain text when
-no tools were executed. Such a response is a failed implementation, rather than
-evidence that a command ran or a file was created. Text is never promoted to a
+Native coding receives a system prompt for actual provider-native calls. Native
+execution rejects an unexecuted JSON tool request returned as plain text, even
+after earlier tools ran. Earlier effects remain visible in tool receipts and
+must be inspected before continuing. Iteration-limit failures preserve observed
+message history and report a non-retryable failure. Text is never promoted to a
 native tool call. In orchestrated runs, `--start-ollama` also applies to the
 auxiliary review before implementation, using the configured startup command,
 timeout, resource profile, and log path.

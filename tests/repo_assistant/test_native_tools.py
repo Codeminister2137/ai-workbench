@@ -80,6 +80,14 @@ def test_native_agent_mode_executes_provider_tool_calls(tmp_path: Path, monkeypa
     from ai_provider import BackendConfig, ProviderKind
 
     client = _NativeFakeClient()
+    requests = []
+    complete = client.complete
+
+    def capture_request(request):
+        requests.append(request)
+        return complete(request)
+
+    monkeypatch.setattr(client, "complete", capture_request)
     monkeypatch.setattr(_EXAMPLE, "create_chat_client", lambda config: client)
     monkeypatch.setattr("builtins.input", lambda prompt: "yes")
     args = type(
@@ -108,6 +116,10 @@ def test_native_agent_mode_executes_provider_tool_calls(tmp_path: Path, monkeypa
     )
 
     assert result.response.message.content == "native complete"
+    from ai_provider.repo_context import NATIVE_TOOL_SYSTEM_PROMPT
+
+    assert requests[0].messages[0].content == NATIVE_TOOL_SYSTEM_PROMPT
+    assert requests[0].tools
     assert (tmp_path / "native.txt").read_text(encoding="utf-8") == "native"
     assert result.tool_results[0].is_error is False
     assert events[0] == "local_agent_activity: model_request - provider=ollama model=test"
@@ -159,6 +171,75 @@ def test_native_agent_rejects_textual_actions_without_execution(
 )
 def test_native_textual_action_guard_allows_ordinary_responses(content: str) -> None:
     assert not _EXAMPLE._contains_textual_tool_request(content, {"run_command"})
+
+
+def test_native_agent_preserves_earlier_effect_when_final_request_is_textual(tmp_path, monkeypatch):
+    from argparse import Namespace
+
+    from ai_provider import AIMessage, AIResponse, BackendConfig, MessageRole, ProviderError
+
+    client = _NativeFakeClient()
+    complete = client.complete
+
+    def incomplete(request):
+        if client.calls == 0:
+            return complete(request)
+        return AIResponse(
+            message=AIMessage(
+                MessageRole.ASSISTANT,
+                '{"name":"create_file","arguments":{"path":"missing.txt","content":"x"}}',
+            ),
+            backend=client.backend,
+        )
+
+    monkeypatch.setattr(client, "complete", incomplete)
+    monkeypatch.setattr(_EXAMPLE, "create_chat_client", lambda config: client)
+    events = []
+    with pytest.raises(ProviderError, match="Earlier tool effects remain"):
+        _run_native_agent(
+            "Create two files",
+            BackendConfig(provider=_EXAMPLE.ProviderKind.OLLAMA, model="test"),
+            _EXAMPLE.coding_task_profile(),
+            Namespace(
+                start_ollama=False,
+                system=None,
+                max_action_rounds=3,
+                approval_policy="trusted_local",
+            ),
+            tmp_path,
+            progress_callback=events.append,
+        )
+    assert (tmp_path / "native.txt").read_text() == "native"
+    assert not (tmp_path / "missing.txt").exists()
+    assert any("local_tool_activity: ok - create_file" in event for event in events)
+    assert any("local_agent_activity: incomplete" in event for event in events)
+
+
+def test_native_iteration_limit_reports_observed_receipts(tmp_path, monkeypatch):
+    from argparse import Namespace
+
+    from ai_provider import BackendConfig, ProviderError
+
+    client = _NativeFakeClient()
+    monkeypatch.setattr(_EXAMPLE, "create_chat_client", lambda config: client)
+    events = []
+    with pytest.raises(ProviderError, match="exceeded max_iterations=1"):
+        _run_native_agent(
+            "Create a file",
+            BackendConfig(provider=_EXAMPLE.ProviderKind.OLLAMA, model="test"),
+            _EXAMPLE.coding_task_profile(),
+            Namespace(
+                start_ollama=False,
+                system=None,
+                max_action_rounds=1,
+                approval_policy="trusted_local",
+            ),
+            tmp_path,
+            progress_callback=events.append,
+        )
+    assert (tmp_path / "native.txt").read_text() == "native"
+    assert "local_agent_activity: failed - earlier receipts follow" in events
+    assert any("local_tool_activity: recorded - create_file" in event for event in events)
 
 
 def test_implement_mode_defaults_to_native_tools(capsys, monkeypatch) -> None:

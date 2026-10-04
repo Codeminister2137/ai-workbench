@@ -71,6 +71,15 @@ reported an injected regression without changing files. This is one bounded
 read-only skill acceptance; automatic installation, common discovery/dependency
 checks and provider-native skill activation remain incomplete.
 
+Native coding now uses an actual-tool prompt and retains receipts on bounded
+loop failure or an unexecuted final textual request. A live local GPT-OSS coding
+fixture performed inspect/edit/PowerShell validation/diff successfully. A paired
+20-task synthetic probe returned real tools on GPT-OSS (19/20 strict checks under
+each prompt; both missed checks only removed a final newline). Qwen2.5-Coder
+returned textual requests with no actual calls on all 20 tasks under each prompt.
+No broad model-quality or pass-rate improvement is established; model-native
+tool compatibility remains a readiness gap. Catalog routing was not changed.
+
 Next, investigate per-tool/skill readiness using existing tool contracts. A new
 shared capability manifest or materially different client configuration contract
 needs a decision brief before implementation. Continue independent context

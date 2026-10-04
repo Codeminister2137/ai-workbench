@@ -128,6 +128,7 @@ from ai_provider.repo_context import (
     DEFAULT_CONTEXT_FILE_BUDGET_CHARS as DEFAULT_CONTEXT_FILE_BUDGET_CHARS,
     RepoContextFile as RepoContextFile,  # noqa: F401 - compatibility export
     build_default_system_prompt,
+    build_native_tool_system_prompt,
     build_repo_prompt,
     find_repo_root,
     load_prompt_context,
@@ -2354,6 +2355,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             close_transcript=close_transcript_func,
         )
 
+    if args.native_tools and args.tool_profile != "research":
+        primary_system_prompt = build_native_tool_system_prompt(args.system)
+        if args.away_minutes is not None:
+            primary_system_prompt = _system_prompt_with_away_budget(
+                primary_system_prompt,
+                away_minutes=args.away_minutes,
+            )
     if args.log_full_prompt:
         _print_model_input("Primary", system_prompt=primary_system_prompt, prompt=prompt)
     primary_elapsed_seconds = None
@@ -4289,7 +4297,13 @@ def _run_native_agent(
         )
         system_prompt = RESEARCH_SYSTEM_PROMPT + ("\n" + args.system if args.system else "")
     else:
-        system_prompt = build_default_system_prompt(args.system, actions_enabled=False)
+        system_prompt = build_native_tool_system_prompt(args.system)
+        away_minutes = getattr(args, "away_minutes", None)
+        if away_minutes is not None:
+            system_prompt = _system_prompt_with_away_budget(
+                system_prompt,
+                away_minutes=away_minutes,
+            )
     agent = AgentLoop(
         client,
         registry,
@@ -4300,25 +4314,31 @@ def _run_native_agent(
         ),
         max_iterations=args.max_action_rounds,
     )
-    result = agent.run(
-        prompt,
-        system_prompt=system_prompt,
-        model=config.model,
-        privacy_class=PrivacyClass(profile.privacy_class.value),
-    )
-    if not result.tool_results and _contains_textual_tool_request(
+    try:
+        result = agent.run(
+            prompt,
+            system_prompt=system_prompt,
+            model=config.model,
+            privacy_class=PrivacyClass(profile.privacy_class.value),
+        )
+    except ProviderError as exc:
+        if progress_callback is not None:
+            progress_callback("local_agent_activity: failed - earlier receipts follow")
+            for message in exc.partial_messages:
+                if message.role is MessageRole.TOOL:
+                    progress_callback(
+                        f"local_tool_activity: recorded - {message.name}: "
+                        f"{_activity_preview(message.content)}"
+                    )
+        raise
+    textual_request = _contains_textual_tool_request(
         result.response.message.content,
         {definition.name for definition in registry.list_definitions()},
-    ):
-        raise ProviderError(
-            "Native agent returned a textual tool request without executing any tools. "
-            "No action was performed; this response cannot count as completed implementation.",
-            category=ProviderErrorCategory.NON_RETRYABLE,
-            provider=config.provider.value,
-        )
+    )
     if progress_callback is not None:
         progress_callback(
-            f"local_agent_activity: completed - iterations={result.iterations} "
+            f"local_agent_activity: {'incomplete' if textual_request else 'completed'} "
+            f"- iterations={result.iterations} "
             f"tool_results={len(result.tool_results)}"
         )
         for tool_result in result.tool_results:
@@ -4327,6 +4347,19 @@ def _run_native_agent(
                 f"local_tool_activity: {status} - {tool_result.name}: "
                 f"{_activity_preview(tool_result.output)}"
             )
+    if textual_request:
+        message = (
+            "Native agent returned an unexecuted textual tool request after earlier tools. "
+            "Earlier tool effects remain; inspect their receipts before continuing."
+            if result.tool_results
+            else "Native agent returned a textual tool request without executing any tools. "
+            "No action was performed; this response cannot count as completed implementation."
+        )
+        raise ProviderError(
+            message,
+            category=ProviderErrorCategory.NON_RETRYABLE,
+            provider=config.provider.value,
+        )
     return result
 
 

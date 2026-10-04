@@ -15,6 +15,7 @@ from ai_provider import (
     MessageRole,
     PrivacyClass,
     ProviderError,
+    ProviderErrorCategory,
 )
 
 from ai_agent.contracts import ToolCall, ToolResult
@@ -110,7 +111,14 @@ class AgentLoop:
                     )
                 )
 
-        raise RuntimeError(f"Agent loop exceeded max_iterations={self.max_iterations}")
+        error = ProviderError(
+            f"Agent loop exceeded max_iterations={self.max_iterations}; "
+            "earlier tool effects remain and must be inspected before continuing.",
+            category=ProviderErrorCategory.NON_RETRYABLE,
+            provider=self.client.backend.provider,
+        )
+        error.partial_messages = tuple(messages)
+        raise error
 
 
 def _tool_definition(definition: Any) -> AIToolDefinition:
