@@ -344,8 +344,11 @@ privacy/approval defaults retaining `local_only`/`interactive`, investigation of
 replacement SearXNG operators before specific operator selection, and design of
 a bounded typed acceptance-job scheduler extension before concrete contract
 approval. No broader shipped authority, operator switch, arbitrary-command queue,
-new service or immediate live inference was approved. Implementation/investigation
-remains pending; the brief preserves alternatives and technical rationale.
+new service or immediate live inference was approved.
+D1 is implemented in `f86aca5`; the brief preserves alternatives and technical
+rationale. D2 fresh operator probes remain deferred under the offline constraint.
+D3's [concrete acceptance-job proposal](repo-assistant/acceptance-job-proposal.md)
+is ready for contract review and is not an accepted ADR or implemented scheduler.
 
 ## Template
 ```text

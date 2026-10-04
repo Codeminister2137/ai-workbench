@@ -14,7 +14,7 @@ records D1-D3 approval: conservative configurable privacy/approval defaults,
 replacement SearXNG investigation, and bounded typed acceptance-job design.
 Specific operator selection and scheduler contract review remain future boundaries.
 Historical checkpoints below retain their original validation counts. The latest
-full offline checkpoint is 965 passed, seven live tests skipped, Ruff/Pyright clean.
+full offline checkpoint is 996 passed, seven live tests skipped, Ruff/Pyright clean.
 
 The goal is to perform inspect/plan/edit/test/review workflows from the project
 CLI, invoke the required skills, resume work and recover from allowance exhaustion
@@ -173,8 +173,8 @@ quality are not guaranteed by these deterministic checks. Full current validatio
 Owner-approved task quality, context/instruction limits, request/validation
 timeouts and repair caps are now typed private user defaults. Explicit CLI flags
 win; shipped values, instruction overflow refusal and scheduler deadline admission
-are preserved. Configurable privacy/approval defaults are subsequently approved
-with shipped `local_only`/`interactive`; implementation remains pending.
+are preserved. Configurable privacy/approval defaults are implemented with shipped
+`local_only`/`interactive`; explicit flags and client restrictions take precedence.
 
 - Common inspection, checked project-local skill selection and complete required
   instructions are implemented. Forced Codex-limit fallback through real Copilot
@@ -231,9 +231,23 @@ No model inference, live client acceptance, new service or workstation sleep ran
 Final full offline suite: 965 passed, seven live tests skipped; Ruff lint/format and
 Pyright clean. Foundation M1/M2
 remain in progress; synthetic checks do not complete live acceptance or tool parity.
-D1-D3 owner answers remain approved. Next implement D1 with CLI precedence tests;
-then prepare D2 operator options and D3 concrete typed-job contract for review.
+D1-D3 owner answers remain approved. D1 now includes enum validation, explicit CLI
+precedence, effective persisted session privacy and retained read-only inspection.
+D2 public operator probes remain deferred while work is offline. D3's
+[typed-job contract proposal](acceptance-job-proposal.md) awaits concrete review.
 Shared external mutation approvals also remain an approved foundation follow-up.
+
+### D1 user defaults: COMPLETE offline
+
+Commit `f86aca5` adds typed `privacy`/`approval_policy` defaults retaining shipped
+`local_only`/`interactive`. Explicit CLI options win, including abbreviations,
+equals syntax and selections equal to shipped defaults. Session storage uses the
+effective privacy before execution; incompatible resumes still refuse. Shared
+inspection remains read-only and native client restrictions remain effective.
+Owner private configuration was not rewritten. Full offline validation: 996 passed,
+seven live skipped; Ruff lint/format, Pyright and commit hooks passed. D3 design
+is complete for review, but its persisted contract/runtime ownership proposal is
+not approved or implemented. No inference, service startup or sleep ran.
 
 ## Optional capabilities: unselected
 

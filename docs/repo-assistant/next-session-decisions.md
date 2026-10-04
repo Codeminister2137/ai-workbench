@@ -27,7 +27,10 @@ The versioned native coding compatibility/estimated input-admission slice is now
 **COMPLETE offline**; see [implementation and deferred checks](native-admission.md).
 CLI foundation remains **INCOMPLETE**. The requirements below are retained as the
 slice's acceptance contract, not a request to repeat completed implementation.
-Next implement approved D1, then investigate D2 and design D3 for concrete review.
+D1 configurable privacy/approval defaults are implemented offline. D2's fresh
+public operator probes remain deferred under the current offline constraint.
+D3's [concrete local-first job proposal](acceptance-job-proposal.md) is ready for
+owner review; it is not an approved executable scheduler contract.
 Shared external mutation approvals remain an approved foundation follow-up.
 
 Implement versioned native tool-compatibility evidence and effective model-input
@@ -61,7 +64,8 @@ Recommendation: A. `workspace_write` permits workspace file writes but denies
 legacy shell actions; `trusted_local` allows local writes/shell. Neither should
 be adopted automatically just to make tests run unattended. A default is not a
 substitute for task-level privacy classification or native client restrictions.
-Owner selection: A. Implementation pending.
+Owner selection: A. Implemented offline with enum validation, explicit CLI
+precedence, effective session privacy and retained read-only shared inspection.
 
 ## D2: restore search after the public SearXNG instance fails upstream
 
@@ -97,6 +101,8 @@ acceptance remains failed even though a reviewer passed an intermediate result.
 
 Recommendation: A if automated acceptance is wanted; otherwise B. Defer C.
 Owner selection: investigate/design A. This does not authorize inference immediately.
+Concrete proposal: [typed acceptance jobs](acceptance-job-proposal.md). Approval
+of this contract remains required before implementation; existing jobs are unchanged.
 
 ## Inputs and deferred options, not new approval requests
 
