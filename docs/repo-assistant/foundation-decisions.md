@@ -145,6 +145,53 @@ route is wanted. No natural account-exhaustion test is required.
 
 ## Work order after selections
 
+### Concrete package proposed to the owner on 2026-10-04
+
+These are recommendations awaiting selection, not additional accepted decisions.
+
+- Profiles: choose 1A; discover skills from explicit project-local directories,
+  validate declared prerequisites, and pass selected instructions and equivalent
+  tools to each eligible route. No automatic global installation.
+- Instructions: choose 2A with a configurable 64,000-character instruction limit,
+  separate from optional snippets. The root AGENTS.md currently contains 31,724
+  characters. Never truncate required instructions; refuse when the instruction
+  limit or a known model input limit cannot accommodate them. Character counts
+  alone must not be described as proof of model token capacity.
+- Permissions: inspection first, then a terminal approval channel for shared
+  writes/commands using existing permission presets. Requests identify the task,
+  workspace and operation. Interactive requests do not proceed without a human;
+  other authorized work may continue. Approvals expire on CLI restart. Keep
+  Antigravity out of tool-requiring fallback until scoped permissions are verified;
+  leave its global settings unchanged.
+- IDE bridge: choose 4B and approve the official Python MCP SDK as an optional
+  bridge dependency, with a pinned compatible release selected after checking the
+  configured Python SDK and the actual local IDE transport. Begin with interpreter,
+  diagnostics and navigation; mutations stay behind the shared approval contract.
+  Keep all endpoint configuration explicit and local.
+- Continuity: choose 5B, a foreground supervisor and additive records in the
+  existing application SQLite storage. Save objectives, explicit decisions and
+  observed process/tool results, not credentials or private model reasoning.
+  Retain records until explicit user deletion. Restart invalidates mutation
+  approvals and requires reconciliation of uncertain effects; no blind replay.
+  No persistent daemon or promise to restore dead process pipes.
+- Local coding: choose 6A for automatic routing, initially using the verified
+  GPT-OSS route. Explicit model choices remain explicit; incompatible native tool
+  choices receive a refusal with an explanation, not a silent substitution. Record
+  model/runtime versions; invalidate compatibility evidence after relevant updates.
+  Investigate Qwen separately without treating the synthetic probes as a quality
+  ranking.
+
+Proposed five-hour priorities: CLI common profiles/instructions/fallback, followed
+by IDE/approvals/continuity as dependencies permit; a second track investigates
+research search failures and no-progress refinement, then runs bounded acceptance
+through the existing research scheduler. Summarize available usage receipts without
+new account polling or storage. The current scheduler does not accept arbitrary
+coding/evaluation jobs; generalizing it remains a separate decision. Council,
+job-search and optional browser/notebook/debugger integrations remain later goals.
+Do useful authorized work until completed, blocked or the window ends; do not
+occupy the deadline with idle model calls. Save changes, validation and the handoff
+before invoking the owner-authorized sleep helper.
+
 Implement shared inspection requirements/client mappings and complete-instruction
 handling first; verify the same fixture through forced allowance fallback. Then
 add the read-only IDE bridge, shared mutation approvals and selected session/process

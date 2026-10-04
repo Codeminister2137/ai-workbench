@@ -2,6 +2,15 @@
 
 ## Model usage versus process waiting
 
+In plain terms: running tests or a local Ollama model uses this PC. Asking a
+hosted AI model to do work uses that model account's allowance. A process can wait
+without asking an AI model anything. Repeatedly asking the assistant whether that
+process has finished creates extra AI requests; the passing minutes do not.
+
+The context window is how much text the model can read in one request. It is not
+the account's usage limit. New messages and command results add text; waiting does
+not. Exact allowance charged to the IDE assistant was not measured in this run.
+
 Local Ollama inference, foreground scheduler waits, subprocess polling and test
 execution run locally. They do not themselves make Codex subscription requests.
 The existing scheduler and external-client process readers already wait in ordinary
@@ -53,6 +62,11 @@ switching need investigation and approval. Do not spend allowance to exhaust it
 as a test. Exact IDE supervisor usage remains unmeasured.
 
 ## Explicit Windows sleep after work
+
+Live acceptance confirmed: the owner reported on 2026-10-04 that the computer
+slept successfully. The saved receipt also records `sleep_api_returned_success`
+at 12:54:29 UTC. This confirms the explicit helper worked on this workstation;
+automatic completion integration remains separate.
 
 `scripts/workstation-sleep.ps1` is a small Windows PowerShell helper. Default
 invocation only describes the planned action. `-Sleep` explicitly requests suspend;
