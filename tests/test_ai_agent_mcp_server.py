@@ -37,6 +37,24 @@ def test_mcp_initialize_and_tools_list(tmp_path: Path) -> None:
     assert "run_command" not in tool_names
 
 
+def test_read_search_only_entrypoint_omits_model_backed_delegation(monkeypatch, tmp_path):
+    captured = []
+
+    def serve(*, workspace_root, registry):
+        captured.extend(tool.name for tool in registry.list_definitions())
+        assert workspace_root == tmp_path
+        return 0
+
+    monkeypatch.setattr(_MCP_SERVER, "run_stdio_server", serve)
+    monkeypatch.setattr(
+        _MCP_SERVER,
+        "codex_mcp_tool_registry",
+        lambda **kwargs: (_ for _ in ()).throw(AssertionError("delegation registry created")),
+    )
+    assert _MCP_SERVER.main(["--workspace-root", str(tmp_path), "--read-search-only"]) == 0
+    assert captured == ["read_file", "list_dir", "find_files", "grep_search"]
+
+
 def test_codex_mcp_registry_includes_bounded_delegate_task(tmp_path: Path) -> None:
     registry = codex_mcp_tool_registry(catalog_path=tmp_path / "catalog.toml")
     context = ToolContext(workspace_root=tmp_path)

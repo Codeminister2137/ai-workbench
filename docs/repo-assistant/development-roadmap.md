@@ -30,7 +30,7 @@ it should only be the human editor/viewer. Different model performance is allowe
 | ID | Milestone | Status | Completion condition |
 | --- | --- | --- | --- |
 | M1 | Readiness and adapter contracts | In progress; offline fallback diagnostic slice verified | Deterministic route/tool/skill/approval checks explain eligibility and exclusions; forced-limit coverage preserves tier and task constraints |
-| M2 | Common tools and portable skills | Pending | C1-C4 work through common contracts on selected routes; explicit skills resolve dependencies; required instructions are available or omissions cause a clear refusal |
+| M2 | Common tools and portable skills | In progress; context diagnostics and read/search MCP profile verified | C1-C4 work through common contracts on selected routes; explicit skills resolve dependencies; required instructions are available or omissions cause a clear refusal |
 | M3 | Semantic tooling with temporary IDE host | Pending | Selected C5 operations work through a verified PyCharm bridge with defined semantics and permissions |
 | M4 | Coding and process continuity | Pending; design choices open | Agreed session/process model preserves objective, decisions, scoped approvals, receipts and handles across turns and fallback; uncertain effects are reconciled |
 | M5 | Independence from the IDE tool host | Pending | Approved C1-C6 workflows remain usable with PyCharm tool hosting unavailable; PyCharm can serve only as editor/viewer |
@@ -49,6 +49,15 @@ different-bucket policy tests now cover every cost ceiling. Full offline suite:
 828 passed, seven live tests skipped; Pyright clean. Fresh synthetic-exhaustion
 acceptance continued a partial edit through real Copilot and passed its fixture.
 These results do not prove canonical tool/skill parity or alternate approval modes.
+
+The next independent slices include nested repository instructions for selected
+paths and visible context truncation/omission diagnostics. Existing budgets still
+apply; enforcing complete required instructions remains a decision. A model-free
+`--read-search-only` MCP profile exposes the four existing inspection tools. A
+bounded real Copilot acceptance discovered and called `find_files`, `list_dir`
+and `read_file` with explicit read/search grants, returned the fixture marker and
+left the fixture unchanged. This confirms one client connection, not write/shell,
+skill activation, all-client parity or fallback with common MCP configuration.
 
 Next, investigate per-tool/skill readiness using existing tool contracts. A new
 shared capability manifest or materially different client configuration contract

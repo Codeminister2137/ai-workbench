@@ -305,6 +305,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="Model catalog used for local-only delegated subtasks.",
     )
     parser.add_argument(
+        "--read-search-only",
+        action="store_true",
+        help="Expose only repository read/search tools; omit model-backed delegation.",
+    )
+    parser.add_argument(
         "--delegation-timeout-seconds",
         type=float,
         default=DEFAULT_DELEGATION_TIMEOUT_SECONDS,
@@ -321,10 +326,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     catalog_path = args.catalog if args.catalog.is_absolute() else workspace_root / args.catalog
     return run_stdio_server(
         workspace_root=workspace_root,
-        registry=codex_mcp_tool_registry(
-            catalog_path=catalog_path,
-            timeout_seconds=args.delegation_timeout_seconds,
-            max_iterations=args.delegation_max_iterations,
+        registry=(
+            read_search_tool_registry()
+            if args.read_search_only
+            else codex_mcp_tool_registry(
+                catalog_path=catalog_path,
+                timeout_seconds=args.delegation_timeout_seconds,
+                max_iterations=args.delegation_max_iterations,
+            )
         ),
     )
 

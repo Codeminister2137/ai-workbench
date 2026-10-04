@@ -221,6 +221,20 @@ bounded to the configured workspace root. `delegate_task` routes to a local-only
 child agent with the same read/search tool surface, nested delegation disabled,
 and no MCP write or shell capability.
 
+For a model-free inspection surface, start the same stdio server with
+`--read-search-only`. It exposes `read_file`, `list_dir`, `find_files` and
+`grep_search` without constructing the delegation runner:
+
+```powershell
+python -m uv run --no-sync python -m ai_agent.mcp_server `
+  --workspace-root . --read-search-only
+```
+
+An MCP client launches this command and owns its stdio connection; it is not a
+background service. This opt-in profile does not change the existing Codex
+injection defaults or register another client. Client discovery and permissions
+still need independent verification.
+
 The PyCharm-bundled Codex CLI verified in this repository is `codex-cli
 0.137.0`. On 2026-09-26, `gpt-5.5` completed a low-risk JSONL execution through
 ChatGPT sign-in, while `gpt-5.1` returned an upstream invalid-request error for
