@@ -1,8 +1,9 @@
-# D3: fixed acceptance-job contract for owner review
+# D3: accepted fixed acceptance-job contract
 
-**PROPOSED — design complete; contract not approved or implemented.**
-CLI foundation remains INCOMPLETE. D3 authorizes investigation/design, with concrete
-contract review before implementation. This document does not authorize live work.
+**ACCEPTED — offline implementation complete; live acceptance deferred.**
+Owner accepted option 1 on 2026-10-04. See [ADR-043](../decisions/ADR-043-fixed-local-native-acceptance-jobs.md)
+and the [CLI usage](../repo-coding-assistant.md#fixed-local-acceptance-jobs).
+CLI foundation remains INCOMPLETE. This contract does not authorize live work.
 
 ## Finding and recommendation
 
@@ -20,7 +21,7 @@ and test offline after approval; live execution needs a separately selected wind
 Hosted overload/fallback jobs follow only after scoped client mutation and receipt
 contracts are ready. Tool-free negative admission checks belong in ordinary tests.
 
-## Proposed v1 definition
+## Accepted v1 definition
 
 Reject unknown fields, unsupported revisions and invalid types before claiming work.
 The definition is immutable; results and process receipts are separate records.
@@ -31,7 +32,7 @@ The definition is immutable; results and process receipts are separate records.
 | `task_id` | Nonempty opaque ID; hashed for artifact paths, never used as a path segment |
 | `job_kind` | Exactly `native_coding_tools_v1`; resolves a built-in harness, not an import path |
 | `harness_revision` | Exactly `1`; mismatch refuses pending re-planning |
-| `repo_root` | Existing absolute project root used for trusted harness/interpreter discovery; the model receives only generated fixture content |
+| `repo_root` | Existing absolute project root for catalog/artifacts; the built-in harness and interpreter come from the running project environment; the model receives only generated fixture content |
 | `route_id`, `model` | Explicit catalog local-runtime Ollama route and model; no silent substitution, fallback or automatic model downloads |
 | `runtime_version`, `model_digest`, `native_contract_version` | Pinned expected compatibility identity; must match installed metadata and positive evidence |
 | `runtime_base_url` | Explicit credential-free loopback HTTP URL; must be unused before this job starts its exclusively owned runtime |
@@ -42,7 +43,7 @@ The definition is immutable; results and process receipts are separate records.
 | `max_iterations` | Positive integer with harness v1 ceiling `4` |
 
 Example bounded planning values: 300 seconds total, 60 seconds/request, 8192 context,
-512 output tokens, four iterations. These are a proposal, not selected owner settings.
+512 output tokens, four iterations. These are examples, not selected owner settings.
 V1 fixes `local_only` privacy/cost and fixture-scoped `workspace_write` approval.
 No shell, process, delegation, search or external tools are exposed to the model.
 Definitions cannot supply prompts, shell commands, executables, environment values,
@@ -108,7 +109,9 @@ reasoning are excluded. Retain artifacts/records until explicit deletion.
 3. Keep scheduling research-only and run other acceptance manually in selected
    windows. Lowest implementation cost, but retains manual supervision.
 
-Approve option 1's concrete contract, revise it, or select option 3. Approval permits
-offline implementation, not immediate inference. Preserve the owner's rationale in
-an ADR if this contract is selected. No implementation or executable queue entry has
-been added by this design work.
+Owner selected option 1. Offline implementation includes strict v1 payloads,
+additive SQLite tables, the fixed fixture and retained Windows process-tree cleanup.
+Unsupported platforms refuse before starting a runtime. The validator restricts
+source syntax to a single pure arithmetic function rather than executing arbitrary
+model-authored code. Receipts flush during work and survive worker interruption.
+No executable acceptance queue entry or live run was created in this session.

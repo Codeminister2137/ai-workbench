@@ -11,10 +11,11 @@ fallback are foundations; they do not constitute completed cross-agent parity.
 
 The current [next-session plan and approved directions](next-session-decisions.md)
 records D1-D3 approval: conservative configurable privacy/approval defaults,
-replacement SearXNG investigation, and bounded typed acceptance-job design.
-Specific operator selection and scheduler contract review remain future boundaries.
+replacement SearXNG investigation, and the accepted local typed acceptance-job
+contract. D3 is implemented offline under ADR-043; live execution still needs an
+explicit compute window. Specific SearXNG operator selection remains unresolved.
 Historical checkpoints below retain their original validation counts. The latest
-full offline checkpoint is 996 passed, seven live tests skipped, Ruff/Pyright clean.
+full offline checkpoint is 1051 passed, seven live tests skipped, Ruff/Pyright clean.
 
 The goal is to perform inspect/plan/edit/test/review workflows from the project
 CLI, invoke the required skills, resume work and recover from allowance exhaustion
@@ -234,7 +235,8 @@ remain in progress; synthetic checks do not complete live acceptance or tool par
 D1-D3 owner answers remain approved. D1 now includes enum validation, explicit CLI
 precedence, effective persisted session privacy and retained read-only inspection.
 D2 public operator probes remain deferred while work is offline. D3's
-[typed-job contract proposal](acceptance-job-proposal.md) awaits concrete review.
+[typed-job contract](acceptance-job-proposal.md) was subsequently accepted and
+implemented offline under ADR-043.
 Shared external mutation approvals also remain an approved foundation follow-up.
 
 ### D1 user defaults: COMPLETE offline
@@ -245,9 +247,29 @@ equals syntax and selections equal to shipped defaults. Session storage uses the
 effective privacy before execution; incompatible resumes still refuse. Shared
 inspection remains read-only and native client restrictions remain effective.
 Owner private configuration was not rewritten. Full offline validation: 996 passed,
-seven live skipped; Ruff lint/format, Pyright and commit hooks passed. D3 design
-is complete for review, but its persisted contract/runtime ownership proposal is
-not approved or implemented. No inference, service startup or sleep ran.
+seven live skipped; Ruff lint/format, Pyright and commit hooks passed. At that
+checkpoint D3 design awaited review; subsequent acceptance is recorded below.
+No inference, service startup or sleep ran.
+
+### D3 fixed local acceptance jobs: COMPLETE offline
+
+Owner accepted the concrete contract in this session. `ai_provider.acceptance_jobs`
+adds strict immutable v1 definitions and separate receipts to existing SQLite,
+with conditional claims and explicit sequential time admission. The fixed native
+harness allows source-only edits, preserves instructions/protected tests, requires
+actual ordered read/edit effects, and uses bounded host arithmetic validation.
+Retained Windows Job Objects own runtime/worker/validator trees, including after
+root exit; other platforms refuse before runtime launch. Cleanup, interruption
+and stale runtime/model/native-contract refusal have deterministic coverage.
+Receipts flush during work and survive worker interruption. Planning starts no
+processes and creates no fixture. Existing research contracts remain unchanged.
+
+Focused offline tests: 55 passed; Pyright clean. Full suite and repository checks
+are recorded in the latest checkpoint above. No model inference, actual acceptance
+queue entry, runtime startup, new service, download or sleep was performed.
+Dummy owned-process tests and fixed validators do not establish live model quality.
+Next implement shared external mutation approvals and scoped receipts under ADR-041;
+D3 live execution remains deferred until a selected compute window.
 
 ## Optional capabilities: unselected
 

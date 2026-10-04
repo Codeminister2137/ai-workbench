@@ -305,6 +305,13 @@ application SQLite store and admits explicitly selected jobs sequentially. Its f
 acceptance adapter reuses this supervisor and the standalone harness's public prompt
 and postchecks, with dedicated task artifacts; it exposes no arbitrary command
 executor. Old task states/defaults survive the additive migration. See ADR-039.
+ADR-043 adds `ai_provider.acceptance_jobs` with immutable local native coding
+definitions and receipts in separate additive SQLite tables. It reuses neutral
+time admission and a fixed, source-scoped fixture. Its foreground supervisor
+owns Windows runtime/worker/validator trees, verifies listener identity and
+records cleanup before completion. This does not generalize research payloads
+or introduce arbitrary-command or hosted jobs. Live execution requires a new
+explicit selected window; planning is offline and never starts a runtime.
 `ai_provider.research_refinement` composes repeated report review, native execution,
 and validation through existing stages after structural success. It shares repair
 limits, reserves final-review time, and detects repeated report/source no-progress.

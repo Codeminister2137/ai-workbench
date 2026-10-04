@@ -13,7 +13,8 @@ remains INCOMPLETE. Alternatives below preserve the reviewed decision brief.
   local service, keyed provider or repository-data transmission was approved.
 - D3-A: Investigate/design a narrow typed acceptance-job scheduler extension with
   fixed harnesses, resource limits, receipts, deadlines and owned-process cleanup.
-  Review the concrete contract before implementation. Arbitrary-command jobs and
+  Owner subsequently accepted the concrete local v1 contract on 2026-10-04;
+  offline implementation is complete under ADR-043. Arbitrary-command jobs and
   immediate live inference remain outside approval.
 
 These selections implement the owner's approval of the recommendations as
@@ -29,8 +30,8 @@ CLI foundation remains **INCOMPLETE**. The requirements below are retained as th
 slice's acceptance contract, not a request to repeat completed implementation.
 D1 configurable privacy/approval defaults are implemented offline. D2's fresh
 public operator probes remain deferred under the current offline constraint.
-D3's [concrete local-first job proposal](acceptance-job-proposal.md) is ready for
-owner review; it is not an approved executable scheduler contract.
+D3's [concrete local-first contract](acceptance-job-proposal.md) is accepted and
+implemented offline. No executable job or compute window was selected.
 Shared external mutation approvals remain an approved foundation follow-up.
 
 Implement versioned native tool-compatibility evidence and effective model-input
@@ -100,9 +101,9 @@ acceptance remains failed even though a reviewer passed an intermediate result.
   execution/security/recovery obligations than the demonstrated need.
 
 Recommendation: A if automated acceptance is wanted; otherwise B. Defer C.
-Owner selection: investigate/design A. This does not authorize inference immediately.
-Concrete proposal: [typed acceptance jobs](acceptance-job-proposal.md). Approval
-of this contract remains required before implementation; existing jobs are unchanged.
+Owner selection: A, including acceptance of the [concrete local v1 contract](acceptance-job-proposal.md).
+Offline implementation is complete; see [ADR-043](../decisions/ADR-043-fixed-local-native-acceptance-jobs.md).
+This does not authorize inference immediately; existing research jobs are unchanged.
 
 ## Inputs and deferred options, not new approval requests
 

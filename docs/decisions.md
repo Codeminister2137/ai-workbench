@@ -347,8 +347,21 @@ approval. No broader shipped authority, operator switch, arbitrary-command queue
 new service or immediate live inference was approved.
 D1 is implemented in `f86aca5`; the brief preserves alternatives and technical
 rationale. D2 fresh operator probes remain deferred under the offline constraint.
-D3's [concrete acceptance-job proposal](repo-assistant/acceptance-job-proposal.md)
-is ready for contract review and is not an accepted ADR or implemented scheduler.
+D3's [concrete acceptance-job contract](repo-assistant/acceptance-job-proposal.md)
+was subsequently accepted; its offline implementation is recorded in ADR-043.
+
+## ADR-043 — Fixed local native acceptance jobs
+
+**Status:** Accepted; offline implementation complete; live acceptance deferred
+**Date:** 2026-10-04
+
+Add one versioned, immutable local coding fixture job to existing SQLite storage.
+Reuse explicit sequential time admission, require actual read/edit effects and
+fixed host validation, and retain Windows process-tree ownership through cleanup.
+Preserve research contracts; defer hosted and arbitrary-command jobs. Contract
+approval does not authorize live inference or select a compute window.
+
+Detailed ADR: [ADR-043](decisions/ADR-043-fixed-local-native-acceptance-jobs.md)
 
 ## Template
 ```text
