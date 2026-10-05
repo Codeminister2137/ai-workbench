@@ -33,6 +33,12 @@ file's byte digest, page bounds and next offset, allowing callers to recognize a
 changed report between reads. Reads and writes share a 1 MB file bound; externally
 enlarged reports fail explicitly rather than silently losing their tail.
 
+Public retrieval cancels socket header/body reads at the shared fetch deadline;
+slowly arriving bytes cannot renew that budget. Response streams and deadline
+watchdogs are closed after success, redirects and failure. System DNS resolution
+still follows the operating system's resolver timing; this is not a guarantee
+that a blocked DNS lookup can be interrupted by Python.
+
 After structural repair succeeds, `ai_provider.research_refinement` repeatedly
 reviews the configured report, sends findings to the tool-capable primary agent,
 and validates each revision. A reviewer pass does not end improvement by itself.

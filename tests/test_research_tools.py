@@ -5,6 +5,8 @@ import io
 import json
 import os
 import socket
+import threading
+import time
 from argparse import ArgumentParser, Namespace
 from datetime import UTC, datetime
 from email.message import Message
@@ -186,7 +188,11 @@ def response(body=b"source", *, status=200, mime="text/plain", **headers):
         message[key.replace("_", "-")] = value
     stream = io.BytesIO(body)
     return SimpleNamespace(
-        status=status, headers=message, getheader=message.get, read1=stream.read1
+        status=status,
+        headers=message,
+        getheader=message.get,
+        read1=stream.read1,
+        close=stream.close,
     )
 
 
@@ -199,6 +205,50 @@ def test_fetch_bounds_bytes_and_records_real_digest(monkeypatch):
     assert requests[1][0:2] == ("GET", "/path?q=1")
     assert set(requests[1][2]) == {"User-Agent", "Accept", "Accept-Encoding"}
     assert requests[-1] == "closed"
+
+
+class TestFetchDeadline:
+    @pytest.mark.parametrize("phase", ["headers", "body"])
+    def test_slow_response_bytes_cannot_extend_the_fetch_budget(self, monkeypatch, phase):
+        listener = socket.socket()
+        listener.bind(("127.0.0.1", 0))
+        listener.listen(1)
+        port = listener.getsockname()[1]
+        stopped = threading.Event()
+
+        def serve():
+            try:
+                with listener.accept()[0] as client:
+                    client.recv(4096)
+                    headers = b"HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\n"
+                    if phase == "body":
+                        client.sendall(headers)
+                    payload = headers + b"x" if phase == "headers" else b"x" * 60
+                    for byte in payload:
+                        if stopped.wait(0.02):
+                            return
+                        client.sendall(bytes([byte]))
+            except OSError:
+                pass
+
+        worker = threading.Thread(target=serve, daemon=True)
+        worker.start()
+        monkeypatch.setattr(
+            research_http,
+            "public_endpoint",
+            lambda url: ("http", "fixture.invalid", port, "127.0.0.1", "/"),
+        )
+        started = time.monotonic()
+        try:
+            with pytest.raises((TimeoutError, OSError)):
+                research_http.fetch_public_url("http://fixture.invalid/", timeout_seconds=0.15)
+            elapsed = time.monotonic() - started
+            assert elapsed < 0.7, f"{phase} kept the fetch alive for {elapsed:.2f}s"
+        finally:
+            stopped.set()
+            listener.close()
+            worker.join(timeout=2)
+        assert not worker.is_alive()
 
 
 def test_redirect_is_revalidated_before_connection(monkeypatch):

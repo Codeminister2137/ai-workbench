@@ -7,6 +7,7 @@ import http.client
 import ipaddress
 import socket
 import ssl
+import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -95,6 +96,9 @@ def fetch_public_url(
         if remaining <= 0:
             raise TimeoutError("Source-fetch budget exhausted")
         connection = (_PinnedHTTPS if scheme == "https" else _PinnedHTTP)(host, port, ip, remaining)
+        response = None
+        watchdog = None
+        expired = threading.Event()
         try:
             connection.request(
                 "GET",
@@ -105,7 +109,28 @@ def fetch_public_url(
                     "Accept-Encoding": "identity",
                 },
             )
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise TimeoutError("Source-fetch budget exhausted")
+            deadline_socket = connection.sock
+            if deadline_socket is not None:
+                deadline_socket.settimeout(remaining)
+
+                def abort_read(sock=deadline_socket, event=expired):
+                    event.set()
+                    try:
+                        # HTTPResponse may retain the socket after connection.sock
+                        # becomes None for a Connection: close response.
+                        sock.shutdown(socket.SHUT_RDWR)
+                    except OSError:
+                        pass
+
+                watchdog = threading.Timer(remaining, abort_read)
+                watchdog.daemon = True
+                watchdog.start()
             response = connection.getresponse()
+            if expired.is_set() or time.monotonic() >= deadline:
+                raise TimeoutError("Source-fetch budget exhausted")
             if response.status in {301, 302, 303, 307, 308}:
                 location = response.getheader("Location")
                 if not location:
@@ -133,12 +158,14 @@ def fetch_public_url(
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
                     raise TimeoutError("Source-fetch budget exhausted")
-                if connection.sock is not None:
-                    connection.sock.settimeout(remaining)
+                if deadline_socket is not None:
+                    deadline_socket.settimeout(remaining)
                 chunk = response.read1(min(64_000, MAX_SOURCE_BYTES + 1 - len(body)))
                 if not chunk:
                     break
                 body.extend(chunk)
+            if expired.is_set() or time.monotonic() >= deadline:
+                raise TimeoutError("Source-fetch budget exhausted")
             truncated = len(body) > MAX_SOURCE_BYTES
             retained = bytes(body[:MAX_SOURCE_BYTES])
             return FetchedSource(
@@ -155,6 +182,15 @@ def fetch_public_url(
                     "truncated": truncated,
                 },
             )
+        except (OSError, http.client.HTTPException) as error:
+            if expired.is_set():
+                raise TimeoutError("Source-fetch budget exhausted") from error
+            raise
         finally:
+            if watchdog is not None:
+                watchdog.cancel()
+                watchdog.join(timeout=1)
+            if response is not None:
+                response.close()
             connection.close()
     raise ValueError("Too many source redirects")
