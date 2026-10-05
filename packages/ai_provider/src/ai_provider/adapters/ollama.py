@@ -33,15 +33,36 @@ from ai_provider.privacy import enforce_privacy_policy
 
 
 def _tool_calls_from_raw(raw_calls: object) -> tuple[AIToolCall, ...]:
-    if not isinstance(raw_calls, list):
+    if raw_calls is None:
         return ()
+    if not isinstance(raw_calls, list):
+        raise ProviderError(
+            "Ollama tool calls must be an array.",
+            category=ProviderErrorCategory.NON_RETRYABLE,
+            provider="ollama",
+        )
     calls: list[AIToolCall] = []
     for index, raw_call in enumerate(raw_calls):
         if not isinstance(raw_call, dict):
-            continue
+            raise ProviderError(
+                "Ollama tool call must be an object.",
+                category=ProviderErrorCategory.NON_RETRYABLE,
+                provider="ollama",
+            )
         function = raw_call.get("function", raw_call)
         if not isinstance(function, dict):
-            continue
+            raise ProviderError(
+                "Ollama tool function must be an object.",
+                category=ProviderErrorCategory.NON_RETRYABLE,
+                provider="ollama",
+            )
+        name = function.get("name")
+        if not isinstance(name, str) or not name.strip():
+            raise ProviderError(
+                "Ollama tool function requires a nonempty name.",
+                category=ProviderErrorCategory.NON_RETRYABLE,
+                provider="ollama",
+            )
         arguments = function.get("arguments", {})
         if isinstance(arguments, str):
             try:
@@ -61,7 +82,7 @@ def _tool_calls_from_raw(raw_calls: object) -> tuple[AIToolCall, ...]:
         calls.append(
             AIToolCall(
                 id=str(raw_call.get("id") or f"tool-call-{index}"),
-                name=str(function.get("name", "")),
+                name=name,
                 arguments=arguments,
             )
         )
@@ -133,6 +154,7 @@ class OllamaChatClient:
 
             content = str(raw_message.get("content", ""))
             chunk_calls = raw_message.get("tool_calls")
+            _tool_calls_from_raw(chunk_calls)
             if isinstance(chunk_calls, list):
                 raw_tool_calls.extend(chunk_calls)
             if content:

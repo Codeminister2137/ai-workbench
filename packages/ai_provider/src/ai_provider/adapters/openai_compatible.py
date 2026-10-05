@@ -440,15 +440,36 @@ def _message_to_payload(message: AIMessage) -> dict[str, Any]:
 
 
 def _tool_calls_from_raw(raw_calls: object, *, provider: str) -> tuple[AIToolCall, ...]:
-    if not isinstance(raw_calls, list):
+    if raw_calls is None:
         return ()
+    if not isinstance(raw_calls, list):
+        raise ProviderError(
+            "Tool calls must be an array.",
+            category=ProviderErrorCategory.NON_RETRYABLE,
+            provider=provider,
+        )
     calls: list[AIToolCall] = []
     for index, raw_call in enumerate(raw_calls):
         if not isinstance(raw_call, dict):
-            continue
+            raise ProviderError(
+                "Tool call must be an object.",
+                category=ProviderErrorCategory.NON_RETRYABLE,
+                provider=provider,
+            )
         function = raw_call.get("function")
         if not isinstance(function, dict):
-            continue
+            raise ProviderError(
+                "Tool function must be an object.",
+                category=ProviderErrorCategory.NON_RETRYABLE,
+                provider=provider,
+            )
+        name = function.get("name")
+        if not isinstance(name, str) or not name.strip():
+            raise ProviderError(
+                "Tool function requires a nonempty name.",
+                category=ProviderErrorCategory.NON_RETRYABLE,
+                provider=provider,
+            )
         raw_arguments = function.get("arguments", "{}")
         try:
             arguments = (
@@ -469,7 +490,7 @@ def _tool_calls_from_raw(raw_calls: object, *, provider: str) -> tuple[AIToolCal
         calls.append(
             AIToolCall(
                 id=str(raw_call.get("id") or f"tool-call-{index}"),
-                name=str(function.get("name", "")),
+                name=name,
                 arguments=arguments,
             )
         )

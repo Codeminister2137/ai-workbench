@@ -50,6 +50,34 @@ def adapter(request, monkeypatch):
 
 
 class TestMalformedResponses:
+    @pytest.mark.parametrize(
+        "calls",
+        [
+            {},
+            [None],
+            [{"function": []}],
+            [{"function": {"name": ""}}],
+            [{"function": {"name": 42}}],
+        ],
+    )
+    @pytest.mark.parametrize("stream", [False, True])
+    def test_invalid_call_shapes_are_not_silently_dropped(self, adapter, calls, stream):
+        provider, respond = adapter
+        message = {"content": "", "tool_calls": calls}
+        payload = (
+            {"message": message, "done": True}
+            if provider is ProviderKind.OLLAMA
+            else {
+                "choices": [
+                    {"delta" if stream else "message": message, "finish_reason": "tool_calls"}
+                ]
+            }
+        )
+        with pytest.raises(ProviderError) as failure:
+            respond(json.dumps(payload).encode(), stream=stream)
+        assert failure.value.category is ProviderErrorCategory.NON_RETRYABLE
+        assert failure.value.provider == provider.value
+
     @pytest.mark.parametrize("body", [b"not-json", b"\xff", b"[]", b"null"])
     @pytest.mark.parametrize("stream", [False, True])
     def test_invalid_wire_data_is_a_normalized_nonretryable_error(self, adapter, body, stream):
