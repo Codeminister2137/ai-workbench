@@ -26,13 +26,29 @@ if ($ReceiptPath -and (Test-Path -LiteralPath $ReceiptPath)) {
     throw "Sleep receipt already exists; choose a new path to preserve earlier evidence."
 }
 
+$warsawTimeZone = [TimeZoneInfo]::FindSystemTimeZoneById("Central European Standard Time")
+$sleepTransitionTimesUtc = [ordered]@{}
+$sleepTransitionTimesWarsaw = [ordered]@{}
+$plannedSleepWarsaw = [TimeZoneInfo]::ConvertTimeFromUtc(
+    [datetime]::UtcNow.AddSeconds($DelaySeconds), $warsawTimeZone
+).ToString("yyyy-MM-dd HH:mm:ss")
+
 function Write-SleepReceipt([string]$Status) {
+    $transitionUtc = [datetime]::UtcNow
+    $sleepTransitionTimesUtc[$Status] = $transitionUtc.ToString("o")
+    $sleepTransitionTimesWarsaw[$Status] = [TimeZoneInfo]::ConvertTimeFromUtc(
+        $transitionUtc, $warsawTimeZone
+    ).ToString("yyyy-MM-dd HH:mm:ss")
     if ($ReceiptPath) {
         $receiptFile = [System.IO.Path]::GetFullPath($ReceiptPath)
         [System.IO.Directory]::CreateDirectory([System.IO.Path]::GetDirectoryName($receiptFile)) | Out-Null
         [ordered]@{
             status = $Status
-            recorded_utc = [datetime]::UtcNow.ToString("o")
+            recorded_utc = $transitionUtc.ToString("o")
+            time_zone = "Europe/Warsaw"
+            planned_sleep_warsaw = $plannedSleepWarsaw
+            transition_times_utc = $sleepTransitionTimesUtc
+            transition_times_warsaw = $sleepTransitionTimesWarsaw
             process_id = $PID
             force = $false
             wake_events_disabled = $false
@@ -41,10 +57,12 @@ function Write-SleepReceipt([string]$Status) {
 }
 
 Write-SleepReceipt "sleep_scheduled"
+Write-Output "sleep_planned_warsaw: $plannedSleepWarsaw (Europe/Warsaw; estimated)"
 if ($DelaySeconds) {
     Start-Sleep -Seconds $DelaySeconds
 }
 Write-SleepReceipt "sleep_requested"
+Write-Output "sleep_requested_warsaw: $($sleepTransitionTimesWarsaw['sleep_requested']) (Europe/Warsaw)"
 Write-Output "sleep_status: requesting"
 $accepted = [System.Windows.Forms.Application]::SetSuspendState(
     [System.Windows.Forms.PowerState]::Suspend, $false, $false

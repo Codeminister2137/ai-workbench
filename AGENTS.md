@@ -739,6 +739,14 @@ Unless explicitly waived:
 
 Be concise and technically precise.
 
+When the owner requests PC sleep at the end of work, include the date and time
+in Warsaw time (`Europe/Warsaw`, accounting for daylight saving) in the final
+report. Clearly distinguish scheduled sleep, the sleep request, and a verified
+Windows sleep transition. Record the work start time for unattended runs and
+report elapsed work time when reliable start/end evidence exists. Never use the
+sleep API's return-after-wake timestamp as the time work ended. Preserve these
+timestamps in the handoff/receipt before requesting sleep.
+
 For autonomous taskful work, do not report after every search, edit, test, or
 other small sub-step. Keep progress updates to material phase changes,
 long-running waits, and genuine blockers or decision boundaries. Use

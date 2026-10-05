@@ -112,6 +112,14 @@ reporting. The optional receipt is written before the request; success can retur
 only after wake. Report a scheduled/requested action honestly rather than claiming
 sleep was observed before the PC resumes.
 
+Final sleep reports must include the date and time in `Europe/Warsaw`, with
+daylight saving applied. The helper prints the estimated scheduled time and the
+request time; its receipt preserves UTC and Warsaw timestamps for every stage.
+The API return timestamp can occur after wake and must not replace the request
+time when reporting when work ended. A Windows Kernel-Power event can establish
+the actual sleep transition afterwards. Record the unattended work start in the
+handoff so elapsed work time can be reported from reliable evidence.
+
 The helper uses Microsoft's
 [Application.SetSuspendState](https://learn.microsoft.com/en-us/dotnet/api/system.windows.forms.application.setsuspendstate?view=netframework-4.8.1)
 with suspend, force false and wake events enabled. Applications get the normal
