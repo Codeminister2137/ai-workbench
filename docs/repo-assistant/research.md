@@ -25,6 +25,14 @@ guard, not a tokenizer guarantee. The model can refetch sources or read its repo
 Transient provider response errors retry at most twice, without replaying tools.
 Progress is flushed to the UTF-8 transcript throughout execution.
 
+`read_research_report` returns at most 20,000 characters per page. A longer
+report includes a continuation instruction with the next `offset`; read every
+page before replacing the complete report. Offsets count characters, with line
+endings normalized as in ordinary text reads. Result metadata includes the full
+file's byte digest, page bounds and next offset, allowing callers to recognize a
+changed report between reads. Reads and writes share a 1 MB file bound; externally
+enlarged reports fail explicitly rather than silently losing their tail.
+
 After structural repair succeeds, `ai_provider.research_refinement` repeatedly
 reviews the configured report, sends findings to the tool-capable primary agent,
 and validates each revision. A reviewer pass does not end improvement by itself.

@@ -36,6 +36,61 @@ def receipt():
     }
 
 
+class TestReportContinuation:
+    def test_long_unicode_report_can_be_read_completely_without_losing_the_source_map(
+        self, tmp_path
+    ):
+        content = "Zażółć 🧠\n" * 3_000 + "\nSource map tail: keep this evidence."
+        target = tmp_path / "report.md"
+        target.write_text(content, encoding="utf-8")
+        tool = ResearchReportTool(target, lambda *args: None, write=False)
+        recovered = []
+        offset = 0
+        pages = []
+        while True:
+            result = tool.run(
+                ToolCall("read_research_report", {"offset": offset}), ToolContext(tmp_path)
+            )
+            assert not result.is_error
+            pages.append(result)
+            recovered.append(result.output[: result.metadata["returned_chars"]])
+            offset = result.metadata["next_offset"]
+            if offset is None:
+                break
+            assert f"offset={offset}" in result.output
+        assert "".join(recovered) == content
+        assert "Source map tail" in pages[-1].output and "End of report" in pages[-1].output
+        assert len({result.metadata["sha256"] for result in pages}) == 1
+        assert all(result.metadata["total_chars"] == len(content) for result in pages)
+        assert target.read_text(encoding="utf-8") == content
+
+    def test_small_report_read_without_arguments_preserves_original_output(self, tmp_path):
+        target = tmp_path / "report.md"
+        target.write_text("complete report", encoding="utf-8")
+        result = ResearchReportTool(target, lambda *args: None, write=False).run(
+            ToolCall("read_research_report", {}), ToolContext(tmp_path)
+        )
+        assert result.output == "complete report"
+        assert result.metadata["next_offset"] is None
+
+    @pytest.mark.parametrize("offset", [-1, True, "0", 1_000_001, 100])
+    def test_invalid_or_out_of_range_offset_does_not_read_another_file(self, tmp_path, offset):
+        target = tmp_path / "report.md"
+        target.write_text("small", encoding="utf-8")
+        result = ResearchReportTool(target, lambda *args: None, write=False).run(
+            ToolCall("read_research_report", {"offset": offset}), ToolContext(tmp_path)
+        )
+        assert result.is_error and "offset" in result.output
+
+    def test_externally_oversized_report_is_refused_instead_of_silently_cut_off(self, tmp_path):
+        target = tmp_path / "report.md"
+        target.write_bytes(b"x" * 1_000_001)
+        result = ResearchReportTool(target, lambda *args: None, write=False).run(
+            ToolCall("read_research_report", {}), ToolContext(tmp_path)
+        )
+        assert result.is_error and "1 MB" in result.output
+
+
 def valid_report():
     return report(
         source=f"S1 https://docs.python.org/3/ accessed {datetime.now(UTC).date()}; fetched"

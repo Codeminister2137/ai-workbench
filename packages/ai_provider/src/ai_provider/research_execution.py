@@ -616,7 +616,9 @@ class ResearchExecution:
             "Actual current-run fetch receipts (latest five, bounded preview):\n"
             f"{receipts[:4000]}\nReceipt preview truncated: {len(receipts) > 4000}\n"
             "Use read_research_report to inspect the saved report and its source map before "
-            "editing. Fetch primary URLs again when more source evidence is needed. "
+            "editing. Follow its offset continuation when a page is truncated; inspect all "
+            "pages before replacing the report. Fetch primary URLs again when more "
+            "source evidence is needed. "
             "A source URL or reviewer suggestion is not a retrieval receipt. Preserve "
             "existing correct content and use actual write_research_report calls for changes."
         )
