@@ -3,12 +3,16 @@
 2026-10-05 update: SDK-based IDE acceptance and grouped test-workflow slice COMPLETE.
 The owner supplied the IDE endpoint and selected authenticated foreground MCP
 under ADR-044; these inputs are resolved. Remaining foundation work needs attended
-terminal acceptance, search-operator selection and separately scoped capability
+terminal acceptance and separately scoped refactoring/host-independence
 decisions. See [roadmap](development-roadmap.md) and [test workflow](../test-workflow.md).
 The owner accepted grouped local checks and retaining direct URL fetching on
 2026-10-05. Jenkins/hosted CI and a new search service are deferred; they do not
 block independent implementation. A fresh unattended plan audit must substantiate
 remaining candidates individually before treating the wider roadmap as blocked.
+The fresh audit found and implemented additional eligible work; see
+[evidence and remaining decisions](post-audit-decisions.md). Search replacement
+is now deferred in favor of direct fetching. Historical D2 alternatives below
+remain a record of the earlier investigation, not a current blocker.
 
 Historical 2026-10-04 brief follows; completed tasks and resource restrictions
 below are superseded by the current checkpoint and active owner's instruction.

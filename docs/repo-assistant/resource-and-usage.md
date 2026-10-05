@@ -106,8 +106,9 @@ and estimated calls, with the measured-call fraction shown. External `stdout.jso
 uses the existing client parser and displays its latest usage receipt without
 summing cumulative checkpoints. Copilot premium-request/nano-AIU checkpoints are
 now recognized. Kiro exports recognized numeric meter units; repeated entries
-are displayed individually and their aggregate remains unknown. Cached/reasoning counters are separate and never added to
-input/output totals. No currency or credit conversion is inferred.
+are displayed individually and their aggregate remains unknown. Cached/reasoning
+counters are separate and never added to input/output totals. No currency or
+credit conversion is inferred.
 
 The diagnostic reads only named bounded files in the selected directories and
 prints recognized numeric counters. It creates no state, calls no account API,

@@ -19,12 +19,17 @@ The fixes keep production behavior unchanged:
 - The diagnose boundary and local-capability composition tests use explicit
   metadata fixtures rather than the owner's running services and hardware.
 
-The verified offline workspace check passed **1,154 tests, with one optional
-token-count skip**: root component suites took 56.14 seconds and Council took
-1.92 seconds. Six live-provider cases are excluded from this command. The root
+The initial verified offline workspace check passed **1,154 tests, with one
+Windows symlink-permission skip**: root component suites took 56.14 seconds and
+Council took 1.92 seconds. Six live-provider cases are excluded from this command. The root
 portion is about 65% faster than the baseline despite eight additional regression
 cases. An intermediate run took 93.32 seconds before the remaining workspace and
 diagnostics fixture fixes; these are machine measurements, not latency guarantees.
+
+The fresh plan-audit fixes increased coverage to **1,287 passed**, with the same
+Windows symlink-permission skip: 58.56 seconds for root suites and 2.23 seconds
+for Council. The extra coverage did not make the roughly one-minute full gate a
+bottleneck. The group table below preserves the earlier profiling checkpoint.
 
 | Group | Modules | Collected cases | Sum of measured case times |
 | --- | ---: | ---: | ---: |
@@ -96,6 +101,10 @@ python -m uv run --no-sync pytest tests/test_ide_bridge.py::TestConfigurationImp
 ```
 
 Classes improve navigation and allow a whole contract to be selected by node ID.
+The fresh audit's JUnit report contains 16 coherent class groups covering 145
+cases, including SDK failures, receipt admission, streamed calls, hard latency
+and report continuation. These group related behavior rather than merely wrapping
+each existing function in a class.
 They do not reduce execution count or automatically share fixture setup. Existing
 fixtures remain function-scoped to preserve permission/session independence.
 Use a class when a file contains several recognizable contracts with related

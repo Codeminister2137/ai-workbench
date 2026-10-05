@@ -12,12 +12,12 @@ fallback are foundations; they do not constitute completed cross-agent parity.
 The current [next-session plan and approved directions](next-session-decisions.md)
 records D1-D3 approval: conservative configurable privacy/approval defaults,
 replacement SearXNG investigation, and the accepted local typed acceptance-job
-contract. D3 is implemented offline under ADR-043; live execution still needs an
-explicit compute window. Specific SearXNG operator selection remains unresolved.
+contract. D3's bounded live fixture passed. The owner now retains direct URL
+fetching; search replacement is deferred and does not block independent work.
 Historical checkpoints below retain their original validation counts. The latest
-full offline workspace checkpoint is 1154 passed, one optional token-count skip;
-six live-provider cases are excluded. Root suites took 56.14 seconds and Council
-1.92 seconds. Ruff/Pyright and commit hooks are clean. See [test workflow](../test-workflow.md).
+full offline workspace checkpoint is 1287 passed, one Windows symlink-permission
+skip; six live-provider cases are excluded. Root suites took 58.56 seconds and
+Council 2.23 seconds. Ruff/Pyright and commit hooks are clean. See [test workflow](../test-workflow.md).
 
 The goal is to perform inspect/plan/edit/test/review workflows from the project
 CLI, invoke the required skills, resume work and recover from allowance exhaustion
@@ -26,7 +26,7 @@ it should only be the human editor/viewer. Different model performance is allowe
 
 ## 2026-10-05 checkpoint and remaining boundaries
 
-**Current slices COMPLETE; remaining CLI foundation BLOCKED on concrete inputs/decisions.**
+**Earlier slices COMPLETE; CLI foundation INCOMPLETE, with fresh audit below.**
 
 Earlier checkpoint validation: 1106 passed, seven live tests skipped in 142.00 seconds; repository
 Ruff lint/format, Pyright and focused commit hooks passed. Separate live results
@@ -69,11 +69,22 @@ Antigravity remains excluded. This is bounded acceptance, not full tool parity.
 Component selection and suite timing are documented in [test workflow](../test-workflow.md).
 The workspace check also runs the previously omitted Council suite separately.
 
-Wider master/Council/Orchestrator plans were checked against the current code.
-Their historic unchecked foundation items are not fresh implementation tasks.
-Council synthesis/application integration, job-search ingestion/evidence storage
-and quota-source integration need focused API/data/provider decisions before
-starting a separate feature track. Optional capabilities remain outside C1-C6.
+The fresh wider-plan audit found eligible unfinished work beyond those earlier
+slices: common public fetching, deadline/session/shutdown races, streamed provider
+tools and trailing usage, malformed-response normalization, saved usage diagnostics,
+complete report paging and hard-latency validation. These are implemented and
+verified; the earlier blanket blocker conclusion was insufficient.
+
+A bounded actual Copilot fixture called the common public fetch tool once and
+returned its HTTP 200 receipt and matching body digest. It used only a public
+Python documentation URL in a synthetic workspace, took 13.7 seconds and reported
+one premium request. The foreground listener closed. This verifies one client,
+not all-client research parity or authenticated-source access.
+
+All six private DOCX plans and five Markdown plans were reviewed again against
+code and accepted decisions. Remaining concrete boundaries and recommended next
+work are recorded in [the fresh audit](post-audit-decisions.md). This does not mark
+the wider project complete or turn old unchecked plan items into new approval.
 
 ## Approved capability set
 
@@ -92,7 +103,7 @@ starting a separate feature track. Optional capabilities remain outside C1-C6.
 | --- | --- | --- | --- |
 | M1 | Readiness and adapter contracts | In progress; offline fallback diagnostic slice verified | Deterministic route/tool/skill/approval checks explain eligibility and exclusions; forced-limit coverage preserves tier and task constraints |
 | M2 | Common tools and portable skills | In progress; shared inspection works on three official clients; portable Copilot skill fixture passed | C1-C4 work through common contracts on selected routes; explicit skills resolve dependencies; required instructions are available or omissions cause a clear refusal |
-| M3 | Semantic tooling with temporary IDE host | Pending CLI bridge; direct host operations verified | Selected C5 operations work through a verified PyCharm bridge with defined semantics and permissions |
+| M3 | Semantic tooling with temporary IDE host | Read-only bridge accepted; mutating refactor contract pending | Selected C5 operations work through a verified PyCharm bridge with defined semantics and permissions |
 | M4 | Coding and process continuity | In progress; opt-in native sessions and foreground children implemented | Agreed session/process model preserves objective, decisions, scoped approvals, receipts and handles across turns and fallback; uncertain effects are reconciled |
 | M5 | Independence from the IDE tool host | Pending | Approved C1-C6 workflows remain usable with PyCharm tool hosting unavailable; PyCharm can serve only as editor/viewer |
 
