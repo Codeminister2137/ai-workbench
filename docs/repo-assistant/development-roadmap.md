@@ -15,7 +15,7 @@ replacement SearXNG investigation, and the accepted local typed acceptance-job
 contract. D3 is implemented offline under ADR-043; live execution still needs an
 explicit compute window. Specific SearXNG operator selection remains unresolved.
 Historical checkpoints below retain their original validation counts. The latest
-full offline checkpoint is 1091 passed, seven live tests skipped, Ruff/Pyright clean.
+full offline checkpoint is 1106 passed, seven live tests skipped, Ruff/Pyright clean.
 
 The goal is to perform inspect/plan/edit/test/review workflows from the project
 CLI, invoke the required skills, resume work and recover from allowance exhaustion
@@ -25,6 +25,10 @@ it should only be the human editor/viewer. Different model performance is allowe
 ## 2026-10-05 checkpoint and remaining boundaries
 
 **Current slices COMPLETE; remaining CLI foundation BLOCKED on concrete inputs/decisions.**
+
+Final validation: 1106 passed, seven live tests skipped in 142.00 seconds; repository
+Ruff lint/format, Pyright and focused commit hooks passed. Separate live results
+below are preserved independently of the skipped optional integration tests.
 
 - Shared partial-effect fallback retains complete instructions, objectives,
   task identity, fresh run scopes/approvals, updated receipts and external deadlines.
