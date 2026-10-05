@@ -57,10 +57,12 @@ def test_task_runner_keeps_core_operations() -> None:
         assert f'"{task}"' in tasks
 
 
-def test_private_runtime_files_are_gitignored_but_council_config_is_trackable() -> None:
+def test_private_runtime_files_are_gitignored_and_example_config_is_trackable() -> None:
     gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
 
-    assert "council.json" not in gitignore
+    assert "council.json" in gitignore.splitlines()
+    assert "council.example.json" not in gitignore.splitlines()
+    assert (ROOT / EXAMPLE_CONFIG_PATH).is_file()
 
     for pattern in ["data/", "logs/", "__pycache__/", ".pytest_cache/", ".idea/"]:
         assert pattern in gitignore

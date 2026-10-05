@@ -24,7 +24,7 @@ repos:
 
       - id: pytest
         name: pytest
-        entry: .venv/Scripts/pytest.exe
+        entry: .venv/Scripts/python.exe scripts/run-tests.py full
         language: system
         pass_filenames: false
         stages: [pre-push]

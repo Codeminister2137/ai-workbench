@@ -88,6 +88,8 @@ def test_local_capability_snapshot_can_start_ollama_without_listing_models(
 ) -> None:
     calls: list[str] = []
 
+    monkeypatch.setattr("ai_provider.local_capabilities.get_ollama_version", lambda: "test-version")
+
     monkeypatch.setattr(
         "ai_provider.local_capabilities.ensure_ollama_server",
         lambda: calls.append("started"),
@@ -110,6 +112,7 @@ def test_local_capability_snapshot_can_start_ollama_without_listing_models(
 
     assert calls == ["started"]
     assert snapshot.ollama_available is True
+    assert snapshot.ollama_version == "test-version"
     assert snapshot.installed_ollama_models == ()
 
 

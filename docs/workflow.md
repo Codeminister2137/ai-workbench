@@ -68,6 +68,10 @@ pyright
 ```
 Do not claim a check was run if it was not.
 
+Use [component suites](test-workflow.md) while iterating, then
+`python scripts/run-tests.py full` for the complete offline workspace gate.
+The runner includes Council in a separate process and keeps live tests opt-in.
+
 ## 6. AI evaluation workflow
 Before starting live performance tests, tell the owner so they can defer the
 tests or close games and other competing workloads. Proceed within an explicitly

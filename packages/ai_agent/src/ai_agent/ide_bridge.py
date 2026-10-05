@@ -66,24 +66,34 @@ async def _request(
         raise RuntimeError(
             "Install the ai-agent ide optional extra to use the PyCharm bridge"
         ) from exc
-    async with http.AsyncClient(
-        headers=config.headers, timeout=30, trust_env=False, follow_redirects=False
-    ) as http_client:
-        transport = transport_module.streamable_http_client(config.url, http_client=http_client)
-        async with sdk.Client(transport) as client:
-            listed = await client.list_tools()
-            available = {tool.name for tool in listed.tools}
-            if operation is None:
-                return {name: remote in available for name, remote in REMOTE_TOOLS.items()}
-            remote = REMOTE_TOOLS[operation]
-            if remote not in available:
-                raise ValueError(f"PyCharm does not expose the required tool: {remote}")
-            result = await client.call_tool(remote, arguments)
-            return {
-                "output": "\n".join(block.text for block in result.content if block.type == "text"),
-                "is_error": result.is_error,
-                "metadata": result.structured_content or {},
-            }
+    try:
+        async with http.AsyncClient(
+            headers=config.headers, timeout=30, trust_env=False, follow_redirects=False
+        ) as http_client:
+            transport = transport_module.streamable_http_client(config.url, http_client=http_client)
+            async with sdk.Client(transport) as client:
+                listed = await client.list_tools()
+                available = {tool.name for tool in listed.tools}
+                if operation is None:
+                    return {name: remote in available for name, remote in REMOTE_TOOLS.items()}
+                remote = REMOTE_TOOLS[operation]
+                if remote not in available:
+                    raise ValueError(f"PyCharm does not expose the required tool: {remote}")
+                result = await client.call_tool(remote, arguments)
+                return {
+                    "output": "\n".join(
+                        block.text for block in result.content if block.type == "text"
+                    ),
+                    "is_error": result.is_error,
+                    "metadata": result.structured_content or {},
+                }
+    except ValueError:
+        raise
+    except Exception as exc:
+        # Transport/task-group errors must not print endpoint headers or SDK internals.
+        raise RuntimeError(
+            "Cannot communicate with the configured local PyCharm MCP endpoint"
+        ) from exc
 
 
 class IdeTool(BaseTool):

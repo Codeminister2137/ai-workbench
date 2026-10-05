@@ -74,6 +74,8 @@ def test_cli_orchestrated_plan_prints_stage_plan_without_provider(
                 "--orchestrated",
                 "--approval-policy",
                 "trusted_local",
+                "--repo-root",
+                str(tmp_path),
                 "--away-run-db",
                 str(run_db),
             ]
@@ -276,6 +278,8 @@ def test_cli_orchestrated_implement_updates_stage_statuses(
                 "--away-minutes",
                 "30",
                 "--orchestrated",
+                "--repo-root",
+                str(tmp_path),
                 "--away-run-db",
                 str(run_db),
             ]
@@ -414,6 +418,8 @@ def test_cli_orchestrated_auxiliary_failure_affects_final_status(
                 "--away-minutes",
                 "30",
                 "--orchestrated",
+                "--repo-root",
+                str(tmp_path),
                 "--away-run-db",
                 str(run_db),
             ]
@@ -506,6 +512,8 @@ def test_cli_orchestrated_validation_failure_affects_final_status(
                 "--away-minutes",
                 "30",
                 "--orchestrated",
+                "--repo-root",
+                str(tmp_path),
                 "--away-run-db",
                 str(run_db),
             ]

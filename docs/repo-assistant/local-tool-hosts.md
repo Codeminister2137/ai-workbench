@@ -66,6 +66,14 @@ python -m uv run --no-sync python -m ai_agent.ide_bridge --check
 ```
 
 The check reports whether the IDE exposes the three required underlying tools.
+Use `--extra ide` on subsequent synchronizing `uv run` commands, or use
+`--no-sync` after installation, to retain the optional dependency. On Windows,
+close project MCP clients before synchronizing a rebuilt `ai-agent` package:
+an active `ai-agent-mcp.exe` can prevent launcher replacement. SDK acceptance on
+the owner's machine used a hash-checked `uv export --extra ide --no-dev
+--no-emit-workspace` dependency list with `uv pip install --require-hashes -r ...`
+to preserve the running IDE launcher. This installs the locked third-party
+dependencies without reinstalling workspace entry points.
 With valid local configuration, shared inspection/coding tools include:
 
 | Project tool | PyCharm operation | Arguments |
@@ -84,9 +92,9 @@ the IDE affects IDE tools; the foreground CLI remains the process owner.
 
 ## Validation checkpoint
 
-Full offline suite: 1124 passed, eight skipped in 154.50 seconds; Ruff lint/format
-and Pyright passed. Seven skips are the existing optional live checks; the eighth
-is official SDK interoperability until the optional dependency is installed.
+The official SDK interoperability test now passes, including foreground session
+deletion (HTTP 204). [Test workflow](../test-workflow.md) records the current full
+workspace validation and timing investigation.
 
 `scripts/fallback-acceptance.py --shared-process --fallback-client copilot` and the
 equivalent Kiro fixture each passed: synthetic initial quota failure, real shared
@@ -95,7 +103,8 @@ validation and verified child cleanup. Four failed Copilot handshake fixtures
 remain retained separately from the passing runs. Offline tests cover denial,
 scope/session mismatch, expiry during approval, owner shutdown and restart refusal.
 
-Direct read-only PyCharm HTTP calls also passed. Installation and acceptance using
-the project's optional SDK bridge remain pending; direct probes are separate evidence.
-PyCharm returned 404 to direct session-deletion requests. The SDK must be checked
-against that lifecycle behavior rather than assuming IDE session deletion succeeded.
+All three read-only project wrappers passed using the installed official SDK.
+Recorded traffic shows HTTP 200 deletion for each IDE session. The historical
+direct HTTP probe returned 404 on deletion; the SDK acceptance establishes the
+implemented lifecycle separately. A closed endpoint produces an explicit failure;
+missing dependency and nested transport errors have regression coverage.

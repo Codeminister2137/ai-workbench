@@ -58,15 +58,14 @@ both children were cleaned up. Four failed Copilot handshake runs are preserved;
 the newer `server/discover` probe now receives the supported protocol fallback.
 
 The read-only IDE wrappers/configuration importer are implemented, with the
-supplied endpoint saved only in ignored local storage. Direct HTTP interpreter,
-diagnostics and symbol calls passed. Optional SDK installation/project-bridge
-acceptance awaits the package-manager clarification required by the Python-tools
-skill; PyCharm reports `unknown`. See [local setup](local-tool-hosts.md).
+supplied endpoint saved only in ignored local storage. After the owner's SDK
+installation approval, SDK interoperability and all three project IDE wrappers
+passed, including successful IDE session deletion. Missing-SDK/unavailable-endpoint
+diagnostics were verified. See [local setup](local-tool-hosts.md).
 Interactive human approval acceptance still requires an attended terminal.
 Antigravity remains excluded. This is bounded acceptance, not full tool parity.
-Current offline validation: 1124 passed, eight skipped in 154.50 seconds; the
-additional skip is the optional SDK interoperability test while SDK installation
-is pending. Ruff lint/format and Pyright are clean.
+Component selection and suite timing are documented in [test workflow](../test-workflow.md).
+The workspace check also runs the previously omitted Council suite separately.
 
 Wider master/Council/Orchestrator plans were checked against the current code.
 Their historic unchecked foundation items are not fresh implementation tasks.
@@ -250,8 +249,8 @@ are preserved. Configurable privacy/approval defaults are implemented with shipp
   offline; exact tool-bearing counts and fresh live acceptance remain deferred.
   Native approval requests now show task, workspace and complete operation;
   no-human requests deny.
-- The official MCP SDK is approved but not installed or declared yet: an explicit
-  local PyCharm MCP endpoint is still needed before implementing the CLI bridge.
+- Superseded on 2026-10-05: the endpoint was supplied, the SDK was installed with
+  owner approval, and project-wrapper/session-lifecycle acceptance passed.
 - The scheduled full-instruction acceptance ended failed at 14:05:08 UTC. The repair
   exceeded its local context budget; the saved report and final handoff survived.
   The scheduler recorded failure and stopped the sequence. No quality improvement
@@ -259,8 +258,8 @@ are preserved. Configurable privacy/approval defaults are implemented with shipp
 - Offline follow-up bounds tool-capable repair/refinement previews instead of
   copying the tool-free review packet, retaining complete original requirements.
   This addresses avoidable input duplication; successful live repair is unverified.
-- The owner returned; only offline implementation/checks are now authorized for
-  this run. Do not start further inference or invoke workstation sleep.
+- Historical 2026-10-04 compute/sleep limits applied to that run. Current resource
+  authorization belongs to the active owner's instruction, not this roadmap.
 
 The owner subsequently raised allowance overhead and requested sleep after saved
 work. [Resource and usage guidance](resource-and-usage.md) records the immediate

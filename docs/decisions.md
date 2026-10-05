@@ -365,7 +365,7 @@ Detailed ADR: [ADR-043](decisions/ADR-043-fixed-local-native-acceptance-jobs.md)
 
 ## ADR-044 — Authenticated foreground loopback MCP host
 
-**Status:** Accepted; foreground host implemented; optional IDE SDK acceptance pending
+**Status:** Accepted; foreground host and read-only IDE bridge acceptance passed
 **Date:** 2026-10-05
 
 The owner selected authenticated loopback MCP for shared foreground process access,

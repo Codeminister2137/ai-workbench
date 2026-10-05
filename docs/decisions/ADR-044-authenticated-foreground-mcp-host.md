@@ -1,6 +1,6 @@
 # ADR-044 — Authenticated foreground loopback MCP host
 
-**Status:** Accepted; foreground host implemented; optional IDE SDK acceptance pending
+**Status:** Accepted; foreground host and read-only IDE bridge acceptance passed
 **Date:** 2026-10-05
 
 ## Context and alternatives
@@ -67,7 +67,9 @@ first probes `server/discover`; unsupported discovery returns JSON-RPC -32601 so
 it can negotiate classic initialization rather than losing the connection.
 Explicit per-client environment forwarding contains variable references, not tokens.
 
-Direct PyCharm HTTP interpreter, diagnostics and symbol calls passed. The optional
-SDK is declared/locked but not installed while package-manager clarification is
-pending. These direct probes do not establish the project's SDK bridge acceptance.
+The owner approved SDK installation. The official SDK interoperability test and
+all three project IDE wrappers passed against PyCharm. Recorded SDK traffic shows
+successful HTTP 200 session deletion for each wrapper; the earlier direct probe's
+404 is preserved as historical evidence. Unavailable-endpoint and missing-SDK
+failures are explicit, with transport task-group errors redacted at the CLI boundary.
 Attended terminal approval and production Codex/Antigravity parity remain open.

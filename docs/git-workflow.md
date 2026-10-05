@@ -60,7 +60,10 @@ The `pre-commit` stage runs fast file-oriented checks:
 The `pre-push` stage runs slower repo-wide checks:
 
 - `pyright`;
-- the normal non-live `pytest` suite.
+- `scripts/run-tests.py full`, covering the offline workspace and Council suites.
+
+See [test selection and timing](test-workflow.md) for focused component commands,
+class-level selection, profiling evidence and the separate live test boundary.
 
 Live integration tests stay out of Git hooks. They may require Ollama, external
 services, credentials, network access, or local state, so run them explicitly

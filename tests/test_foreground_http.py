@@ -341,5 +341,7 @@ def test_official_sdk_client_interoperates_with_foreground_host(tmp_path):
     try:
         with foreground.invocation(config(tmp_path)) as scoped:
             asyncio.run(exercise(scoped))
+            assert foreground.host is not None
+            assert 204 in foreground.host.request_statuses
     finally:
         foreground.close()

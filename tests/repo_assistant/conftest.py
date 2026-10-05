@@ -21,3 +21,19 @@ def mock_native_runtime_admission(monkeypatch):
         "ai_provider.repo_coding_assistant.prepare_native_coding_client",
         lambda client, config, args, diagnostic: client,
     )
+
+
+@pytest.fixture(autouse=True)
+def mock_fallback_runtime_probes(monkeypatch):
+    """CLI regressions use fake clients; runtime evidence has dedicated boundary tests."""
+    from ai_provider import ProviderError
+
+    def unavailable_identity(config):
+        raise ProviderError("Mocked native runtime is unavailable")
+
+    monkeypatch.setattr(
+        "ai_provider.repo_coding_assistant.installed_native_identity", unavailable_identity
+    )
+    monkeypatch.setattr(
+        "ai_provider.repo_coding_assistant.is_ollama_server_available", lambda *a: False
+    )

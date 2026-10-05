@@ -115,6 +115,8 @@ def test_cli_orchestrated_repair_reruns_validation_until_passed(
                 "--away-minutes",
                 "30",
                 "--orchestrated",
+                "--repo-root",
+                str(tmp_path),
                 "--away-run-db",
                 str(run_db),
             ]
@@ -253,6 +255,8 @@ def test_cli_orchestrated_external_agent_repair_reruns_validation_until_passed(
                 "--away-minutes",
                 "30",
                 "--orchestrated",
+                "--repo-root",
+                str(tmp_path),
                 "--away-run-db",
                 str(run_db),
             ]

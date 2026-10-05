@@ -137,7 +137,22 @@ def test_research_script_keeps_local_unattended_defaults() -> None:
     assert '"--search-privacy", $SearchPrivacy' in text
 
 
-def test_cli_modes_enforce_action_boundaries(capsys) -> None:
+def test_cli_modes_enforce_action_boundaries(capsys, monkeypatch, tmp_path) -> None:
+    from ai_provider.local_capabilities import LocalProviderCapabilitySnapshot, LocalSystemInfo
+
+    snapshot = LocalProviderCapabilitySnapshot(
+        system=LocalSystemInfo("TestOS", "1", "test", "test"),
+        models_path=tmp_path,
+        models_disk=None,
+        ollama_available=False,
+        ollama_version=None,
+        installed_ollama_models=(),
+        running_ollama_models=(),
+    )
+    monkeypatch.setattr(
+        "ai_provider.repo_coding_assistant.get_local_provider_capability_snapshot", lambda: snapshot
+    )
+    monkeypatch.setattr(_EXAMPLE, "_external_agent_status", lambda: {"codex": {}})
     assert main(["--mode", "diagnose"]) == 0
     diagnose_output = capsys.readouterr().out
     assert '"system"' in diagnose_output
