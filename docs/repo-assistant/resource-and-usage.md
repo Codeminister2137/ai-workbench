@@ -75,6 +75,12 @@ Treat avoidable idle model turns as an immediate workflow priority. Wait in the
 existing process supervisor while a task runs, do independent work, and return on
 completion. Finish once independent authorized work is exhausted instead of making
 repeated model turns solely to occupy the owner's absence.
+For an explicitly timed unattended implementation request, record its deadline
+and keep a candidate ledger. Before claiming exhaustion, freshly compare all
+relevant plans with code/tests and name the evidence or exact decision blocking
+each remaining candidate. A finished immediate slice or old blanket blocker is
+insufficient. Continue independent approved work. Distinguish useful work from
+waiting, and preserve any owner-requested earliest sleep time.
 
 Next usage-diagnostics slice: summarize already available provider/client usage
 receipts per acceptance run, mark missing measurements unknown, and distinguish
@@ -101,6 +107,11 @@ automatic task-completion hook or global power setting is installed.
 .\scripts\workstation-sleep.ps1 -Sleep -WhatIf
 .\scripts\workstation-sleep.ps1 -Sleep -ReceiptPath artifacts\sleep-receipt.json
 ```
+
+For a timed unattended run, also pass its recorded UTC deadline using
+`-NotBeforeUtc 'YYYY-MM-DDTHH:MM:SSZ'`. The helper refuses an early request rather
+than waiting or sleeping. The deadline is preserved in the receipt; the default
+without this argument retains explicitly authorized immediate sleep behavior.
 
 Save repository files and the handoff, finish or stop owned operations, inspect
 Git status/diff and preserve validation evidence before executing. This helper does

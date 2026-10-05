@@ -6,7 +6,8 @@ param(
     [switch]$Sleep,
     [ValidateRange(0, 60)]
     [int]$DelaySeconds = 0,
-    [string]$ReceiptPath = ""
+    [string]$ReceiptPath = "",
+    [datetimeoffset]$NotBeforeUtc = [datetimeoffset]::MinValue
 )
 
 Set-StrictMode -Version Latest
@@ -17,6 +18,13 @@ if (-not $Sleep) {
     return
 }
 
+function Assert-WorkWindowEnded {
+    if ([datetimeoffset]::UtcNow -lt $NotBeforeUtc) {
+        throw "The unattended work window has not ended. Sleep is refused before $($NotBeforeUtc.ToUniversalTime().ToString('o'))."
+    }
+}
+
+Assert-WorkWindowEnded
 Add-Type -AssemblyName System.Windows.Forms
 if (-not $PSCmdlet.ShouldProcess("This Windows computer", "Request sleep without forcing applications or disabling wake events")) {
     return
@@ -47,6 +55,11 @@ function Write-SleepReceipt([string]$Status) {
             recorded_utc = $transitionUtc.ToString("o")
             time_zone = "Europe/Warsaw"
             planned_sleep_warsaw = $plannedSleepWarsaw
+            not_before_utc = if ($NotBeforeUtc -eq [datetimeoffset]::MinValue) {
+                $null
+            } else {
+                $NotBeforeUtc.ToUniversalTime().ToString("o")
+            }
             transition_times_utc = $sleepTransitionTimesUtc
             transition_times_warsaw = $sleepTransitionTimesWarsaw
             process_id = $PID
@@ -61,6 +74,7 @@ Write-Output "sleep_planned_warsaw: $plannedSleepWarsaw (Europe/Warsaw; estimate
 if ($DelaySeconds) {
     Start-Sleep -Seconds $DelaySeconds
 }
+Assert-WorkWindowEnded
 Write-SleepReceipt "sleep_requested"
 Write-Output "sleep_requested_warsaw: $($sleepTransitionTimesWarsaw['sleep_requested']) (Europe/Warsaw)"
 Write-Output "sleep_status: requesting"

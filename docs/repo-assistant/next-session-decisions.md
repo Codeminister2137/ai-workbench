@@ -5,7 +5,10 @@ The owner supplied the IDE endpoint and selected authenticated foreground MCP
 under ADR-044; these inputs are resolved. Remaining foundation work needs attended
 terminal acceptance, search-operator selection and separately scoped capability
 decisions. See [roadmap](development-roadmap.md) and [test workflow](../test-workflow.md).
-Jenkins remains a proposal requiring a concrete CI host/access decision.
+The owner accepted grouped local checks and retaining direct URL fetching on
+2026-10-05. Jenkins/hosted CI and a new search service are deferred; they do not
+block independent implementation. A fresh unattended plan audit must substantiate
+remaining candidates individually before treating the wider roadmap as blocked.
 
 Historical 2026-10-04 brief follows; completed tasks and resource restrictions
 below are superseded by the current checkpoint and active owner's instruction.

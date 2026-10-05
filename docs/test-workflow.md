@@ -109,6 +109,8 @@ and [class node IDs and markers](https://docs.pytest.org/en/stable/example/marke
 The current approximately one-minute offline gate is manageable for a single
 developer. Keep focused local checks plus the full pre-push gate. No extra test
 plugin, Jenkins installation, service, account, or remote runner was introduced.
+The owner accepted this recommendation on 2026-10-05. Jenkins and hosted CI are
+deferred until a concrete requirement justifies their infrastructure and access.
 
 | Option | Benefit | Cost / decision needed |
 | --- | --- | --- |

@@ -747,6 +747,23 @@ report elapsed work time when reliable start/end evidence exists. Never use the
 sleep API's return-after-wake timestamp as the time work ended. Preserve these
 timestamps in the handoff/receipt before requesting sleep.
 
+For an explicitly timed unattended run, record the start and deadline in UTC and
+Warsaw time before implementation. Treat an intermediate commit or clean working
+tree as a checkpoint, not completion of the requested work window. Maintain a
+local candidate ledger listing relevant plans, accepted scope, implementation
+evidence, and concrete remaining actions or decision boundaries. Before declaring
+all work blocked, freshly compare the wider plans with current code and tests;
+account for each remaining candidate rather than reusing a blanket blocker from
+an earlier handoff. Continue independent approved work when one candidate needs
+an owner decision. Preserve the deadline and next action across context changes.
+
+Do not request sleep before the agreed deadline merely because the first slice
+finished. Pass the recorded deadline to `scripts/workstation-sleep.ps1` using
+`-NotBeforeUtc` for timed runs. Do not fill the window with unnecessary changes,
+repeated checks, or idle model calls; when all useful approved work is actually
+exhausted, preserve the per-candidate evidence and pending decisions, keep sleep
+guarded by the deadline, and clearly distinguish work time from waiting time.
+
 For autonomous taskful work, do not report after every search, edit, test, or
 other small sub-step. Keep progress updates to material phase changes,
 long-running waits, and genuine blockers or decision boundaries. Use
