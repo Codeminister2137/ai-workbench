@@ -316,6 +316,98 @@ def test_foreground_refuses_task_or_workspace_change(tmp_path):
         foreground.close()
 
 
+def test_session_deletion_invalidates_a_queued_mutation_without_revoking_bearer(
+    tmp_path, monkeypatch
+):
+    foreground = ForegroundTools(tmp_path)
+    waiting, release = threading.Event(), threading.Event()
+    results = []
+
+    class Gate:
+        def __enter__(self):
+            waiting.set()
+            assert release.wait(5)
+
+        def __exit__(self, *args):
+            pass
+
+    def mutate(connection):
+        try:
+            results.append(call(connection, "create_file", path="expired.txt", content="no"))
+        except HTTPError as error:
+            results.append(error.code)
+
+    worker = None
+    try:
+        with foreground.invocation(config(tmp_path)) as scoped:
+            connection = initialize(scoped)
+            assert foreground.host is not None
+            host = foreground.host
+            original_lock = host.operations
+            monkeypatch.setattr(host, "operations", Gate())
+            worker = threading.Thread(target=mutate, args=(connection,))
+            worker.start()
+            assert waiting.wait(5)
+            connection.close()
+            assert host.active(connection.token)
+            release.set()
+            worker.join(5)
+            assert not worker.is_alive()
+            assert results == [404]
+            assert not (tmp_path / "expired.txt").exists()
+            monkeypatch.setattr(host, "operations", original_lock)
+            replacement = initialize(scoped)
+            assert not call(replacement, "create_file", path="fresh.txt", content="yes")["isError"]
+            replacement.close()
+    finally:
+        release.set()
+        if worker is not None:
+            worker.join(5)
+        foreground.close()
+
+
+def test_session_deletion_cancels_pending_human_approval(tmp_path, monkeypatch):
+    from dataclasses import replace
+
+    from ai_agent.shared_approvals import TerminalApproval
+
+    waiting = threading.Event()
+    results = []
+
+    def approve(self, operation, category):
+        waiting.set()
+        until = time.monotonic() + 5
+        while self.is_active() and time.monotonic() < until:
+            time.sleep(0.01)
+        return True  # A late human answer cannot restore the deleted MCP session.
+
+    monkeypatch.setattr(TerminalApproval, "__call__", approve)
+    foreground = ForegroundTools(tmp_path)
+    worker = None
+    try:
+        with foreground.invocation(
+            replace(config(tmp_path, policy="interactive"), shared_terminal_approvals=True)
+        ) as scoped:
+            connection = initialize(scoped)
+            worker = threading.Thread(
+                target=lambda: results.append(
+                    call(connection, "create_file", path="expired.txt", content="no")
+                )
+            )
+            worker.start()
+            assert waiting.wait(5)
+            connection.close()
+            worker.join(5)
+            assert not worker.is_alive()
+            assert results[0]["isError"]
+            assert not (tmp_path / "expired.txt").exists()
+            assert foreground.host is not None and foreground.host.active(connection.token)
+    finally:
+        foreground.close()
+        if worker is not None:
+            worker.join(5)
+
+
 def test_official_sdk_client_interoperates_with_foreground_host(tmp_path):
     import asyncio
 

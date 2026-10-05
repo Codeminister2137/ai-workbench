@@ -20,6 +20,9 @@ Start/stop require the selected preset's shell authority; status is read-only.
 Interactive operations need an attended terminal. Missing terminal input causes
 denial. Workspace containment is not an operating-system sandbox. The existing
 supervisor manages direct children, not independently detached descendants.
+Closed supervisors refuse new starts, including a launch racing shutdown; stored
+observations remain readable. Cleanup attempts every owned child even if one
+termination reports an error.
 
 Per-run stdio adapters preserve compatibility with Codex, Copilot and Kiro's
 existing client mappings. They forward to the common HTTP host. Authentication
@@ -34,6 +37,9 @@ Calls are not retried automatically after a lost response: inspect uncertain eff
 Newer clients probing `server/discover` receive JSON-RPC -32601 and can negotiate
 the supported classic initialization. Per-client environment references explicitly
 forward the invocation credential without including its value in configuration.
+Deleting a session invalidates queued calls and pending human approvals for that
+session. The invocation bearer can initialize a fresh session while it remains
+active; deletion never restores or transfers an approval.
 
 ## Machine-local PyCharm setup
 
@@ -108,3 +114,7 @@ Recorded traffic shows HTTP 200 deletion for each IDE session. The historical
 direct HTTP probe returned 404 on deletion; the SDK acceptance establishes the
 implemented lifecycle separately. A closed endpoint produces an explicit failure;
 missing dependency and nested transport errors have regression coverage.
+The SDK request now has a 30-second wall-clock bound covering handshake, tool
+discovery/call and session cleanup. A real SDK regression fixture streams
+heartbeats without answering and verifies deadline cancellation; all three
+wrappers were rechecked successfully against the owner's configured IDE endpoint.

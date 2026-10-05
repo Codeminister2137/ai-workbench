@@ -30,8 +30,16 @@ class ProcessSupervisor:
     def __init__(self, workspace: Path):
         self.workspace = workspace.resolve()
         self.processes: dict[str, OwnedProcess] = {}
+        self.lock = threading.RLock()
+        self.closed = False
 
     def start(self, argv: list[str], cwd: str = ".") -> str:
+        with self.lock:
+            if self.closed:
+                raise ValueError("Process supervisor has closed; no new children can start")
+            return self._start(argv, cwd)
+
+    def _start(self, argv: list[str], cwd: str) -> str:
         directory = (self.workspace / cwd).resolve()
         if not directory.is_relative_to(self.workspace) or not directory.is_dir():
             raise ValueError("Process working directory must be inside the workspace")
@@ -107,8 +115,19 @@ class ProcessSupervisor:
         return self.status(handle)
 
     def close(self) -> None:
-        for handle in tuple(self.processes):
-            self.stop(handle)
+        with self.lock:
+            self.closed = True
+            handles = tuple(self.processes)
+        failure: Exception | None = None
+        for handle in handles:
+            try:
+                self.stop(handle)
+            except (OSError, subprocess.TimeoutExpired) as error:
+                # One failed termination must not leave the other owned children alive.
+                if failure is None:
+                    failure = error
+        if failure is not None:
+            raise failure
 
 
 class ProcessTool(BaseTool):

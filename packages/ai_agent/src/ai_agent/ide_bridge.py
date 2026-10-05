@@ -22,6 +22,7 @@ REMOTE_TOOLS = {
     "file_diagnostics": "get_file_problems",
     "symbol_info": "get_symbol_info",
 }
+IDE_TIMEOUT_SECONDS = 30
 
 
 @dataclass(frozen=True)
@@ -67,26 +68,38 @@ async def _request(
             "Install the ai-agent ide optional extra to use the PyCharm bridge"
         ) from exc
     try:
-        async with http.AsyncClient(
-            headers=config.headers, timeout=30, trust_env=False, follow_redirects=False
-        ) as http_client:
-            transport = transport_module.streamable_http_client(config.url, http_client=http_client)
-            async with sdk.Client(transport) as client:
-                listed = await client.list_tools()
-                available = {tool.name for tool in listed.tools}
-                if operation is None:
-                    return {name: remote in available for name, remote in REMOTE_TOOLS.items()}
-                remote = REMOTE_TOOLS[operation]
-                if remote not in available:
-                    raise ValueError(f"PyCharm does not expose the required tool: {remote}")
-                result = await client.call_tool(remote, arguments)
-                return {
-                    "output": "\n".join(
-                        block.text for block in result.content if block.type == "text"
-                    ),
-                    "is_error": result.is_error,
-                    "metadata": result.structured_content or {},
-                }
+        # HTTP inactivity timeouts alone cannot bound a stream that keeps sending
+        # events. Include handshake, tools and session cleanup in one wall-clock limit.
+        async with asyncio.timeout(IDE_TIMEOUT_SECONDS):
+            async with http.AsyncClient(
+                headers=config.headers,
+                timeout=IDE_TIMEOUT_SECONDS,
+                trust_env=False,
+                follow_redirects=False,
+            ) as http_client:
+                transport = transport_module.streamable_http_client(
+                    config.url, http_client=http_client
+                )
+                async with sdk.Client(transport) as client:
+                    listed = await client.list_tools()
+                    available = {tool.name for tool in listed.tools}
+                    if operation is None:
+                        return {name: remote in available for name, remote in REMOTE_TOOLS.items()}
+                    remote = REMOTE_TOOLS[operation]
+                    if remote not in available:
+                        raise ValueError(f"PyCharm does not expose the required tool: {remote}")
+                    result = await client.call_tool(remote, arguments)
+                    return {
+                        "output": "\n".join(
+                            block.text for block in result.content if block.type == "text"
+                        ),
+                        "is_error": result.is_error,
+                        "metadata": result.structured_content or {},
+                    }
+    except TimeoutError as exc:
+        raise RuntimeError(
+            "The configured local PyCharm MCP request exceeded its time limit"
+        ) from exc
     except ValueError:
         raise
     except Exception as exc:

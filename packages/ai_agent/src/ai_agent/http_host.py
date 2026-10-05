@@ -11,6 +11,7 @@ import secrets
 import threading
 import time
 from collections import deque
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -37,6 +38,9 @@ class ForegroundMcpHost:
         self.scopes: dict[str, AccessScope] = {}
         self.lock = threading.RLock()
         self.operations = threading.Lock()
+        self.request_session: ContextVar[tuple[str, str] | None] = ContextVar(
+            "foreground_mcp_request_session", default=None
+        )
         self.closed = False
         self.request_statuses: deque[int] = deque(maxlen=32)
         host = self
@@ -148,9 +152,17 @@ class ForegroundMcpHost:
                     if not host.active(token):
                         self.reply(401)
                         return
-                    response = handle_mcp_message(
-                        message, registry=scope.registry, context=host.context
-                    )
+                    with host.lock:
+                        if session not in scope.sessions:
+                            self.reply(404, {"error": "MCP session has closed"})
+                            return
+                    request_scope = host.request_session.set((token, session))
+                    try:
+                        response = handle_mcp_message(
+                            message, registry=scope.registry, context=host.context
+                        )
+                    finally:
+                        host.request_session.reset(request_scope)
                     self.reply(200 if response is not None else 202, response, session)
 
             do_POST = dispatch
@@ -174,10 +186,16 @@ class ForegroundMcpHost:
     def active(self, token: str) -> bool:
         with self.lock:
             scope = self.scopes.get(token)
+            request_session = self.request_session.get()
             return (
                 not self.closed
                 and scope is not None
                 and (scope.deadline is None or time.perf_counter() < scope.deadline)
+                and (
+                    request_session is None
+                    or request_session[0] != token
+                    or request_session[1] in scope.sessions
+                )
             )
 
     def revoke(self, token: str) -> None:
