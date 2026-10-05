@@ -29,6 +29,7 @@ from ai_provider.acceptance_processes import (
     verify_runtime_owner,
 )
 from ai_provider.config import BackendConfig, ProviderKind
+from ai_provider.errors import ProviderError, ProviderErrorCategory
 from ai_provider.native_admission import installed_native_identity
 
 
@@ -115,8 +116,17 @@ def run_acceptance_job(
                 "OLLAMA_CONTEXT_LENGTH": str(job.context_tokens),
                 "OLLAMA_MAX_LOADED_MODELS": "1",
                 "OLLAMA_NUM_PARALLEL": "1",
+                "OLLAMA_NO_CLOUD": "true",
+                "OLLAMA_NOPRUNE": "true",
             }
         )
+        models_path = os.environ.get("OLLAMA_MODELS")
+        if models_path:
+            if not Path(models_path).is_absolute() or not Path(models_path).is_dir():
+                raise ValueError(
+                    "Configured Ollama model library must be an existing absolute directory"
+                )
+            environment["OLLAMA_MODELS"] = models_path
 
         def record(value: dict[str, Any]) -> None:
             store.receipt(job.task_id, value)
@@ -149,14 +159,44 @@ def run_acceptance_job(
             runtime.identity,
             timeout=min(2, remaining(active_deadline, clock)),
         )
-        identity = installed_native_identity(
-            BackendConfig(
-                ProviderKind.OLLAMA,
-                job.model,
+        metadata_deadline = min(active_deadline, clock() + min(30, job.request_timeout_seconds))
+        while True:
+            remaining(metadata_deadline, clock)
+            verify_runtime_owner(
                 job.runtime_base_url,
-                timeout_seconds=min(2, remaining(active_deadline, clock)),
+                runtime.identity,
+                timeout=min(2, remaining(metadata_deadline, clock)),
             )
-        )
+            try:
+                identity = installed_native_identity(
+                    BackendConfig(
+                        ProviderKind.OLLAMA,
+                        job.model,
+                        job.runtime_base_url,
+                        timeout_seconds=min(2, remaining(metadata_deadline, clock)),
+                    )
+                )
+                if identity[1] is None:
+                    raise ProviderError(
+                        "Owned runtime version is not available during startup",
+                        category=ProviderErrorCategory.RETRYABLE,
+                    )
+                record(
+                    {
+                        "stage": "runtime_metadata",
+                        "model_digest": identity[0],
+                        "runtime_version": identity[1],
+                    }
+                )
+                break
+            except ProviderError as exc:
+                if exc.category not in {
+                    ProviderErrorCategory.TIMEOUT,
+                    ProviderErrorCategory.RETRYABLE,
+                }:
+                    raise
+                record({"stage": "runtime_metadata_retry", "category": exc.category.value})
+                time.sleep(min(0.1, remaining(metadata_deadline, clock)))
         if identity != (job.model_digest, job.runtime_version):
             raise ValueError("Planned runtime/model fingerprint changed; no inference performed")
         launch_in_progress = True

@@ -44,6 +44,7 @@ from ai_provider.contracts import (
     BackendLocation,
     MessageRole,
 )
+from ai_provider.errors import ProviderError, ProviderErrorCategory
 
 
 @pytest.fixture
@@ -387,16 +388,27 @@ def test_occupied_endpoint_never_starts_or_stops_children(
     assert not artifact_directory(job, store.path).exists()
 
 
+@pytest.mark.parametrize("transient", ["none", "timeout", "missing_version"])
 def test_runtime_stale_identity_cleans_only_owned_root(
-    job: AcceptanceJob, tmp_path: Path, monkeypatch
+    job: AcceptanceJob, tmp_path: Path, monkeypatch, transient
 ) -> None:
     store = AcceptanceJobStore(tmp_path / "jobs.sqlite")
     store.plan(job)
     stopped = []
+    model_library = tmp_path / "installed-models"
+    model_library.mkdir()
+    monkeypatch.setenv("OLLAMA_MODELS", str(model_library))
+    monkeypatch.setenv("OPENAI_API_KEY", "fixture-secret")
+    checks = []
 
     class Child:
         def __init__(self, *args, role, receipt, **kwargs):
             assert role == "runtime"
+            environment = kwargs["env"]
+            assert environment["OLLAMA_MODELS"] == str(model_library)
+            assert environment["OLLAMA_NO_CLOUD"] == "true"
+            assert environment["OLLAMA_NOPRUNE"] == "true"
+            assert "OPENAI_API_KEY" not in environment
             self.identity = {"role": role, "pid": 123, "birth": "owned"}
             self.process = self
             self.pid = 123
@@ -411,13 +423,21 @@ def test_runtime_stale_identity_cleans_only_owned_root(
     monkeypatch.setattr(runtime, "port_unused", lambda _: True)
     monkeypatch.setattr(runtime, "listener_owned", lambda *a, **k: True)
     monkeypatch.setattr(runtime, "verify_runtime_owner", lambda *a, **k: None)
-    monkeypatch.setattr(
-        runtime, "installed_native_identity", lambda _: ("changed", job.runtime_version)
-    )
+
+    def identity(config):
+        checks.append(config)
+        if transient == "timeout" and len(checks) == 1:
+            raise ProviderError("startup timeout", category=ProviderErrorCategory.TIMEOUT)
+        if transient == "missing_version" and len(checks) == 1:
+            return job.model_digest, None
+        return "changed", job.runtime_version
+
+    monkeypatch.setattr(runtime, "installed_native_identity", identity)
     result = runtime.run_acceptance_job(job, store, time.monotonic() + 60)
     assert not result["passed"] and result["cleanup_verified"]
     assert "fingerprint changed" in result["reason"]
     assert len(stopped) == 1
+    assert len(checks) == (1 if transient == "none" else 2)
     assert (artifact_directory(job, store.path) / "result.json").exists()
 
 

@@ -64,3 +64,9 @@ research-only scheduler as arbitrary jobs:
 
 These checks establish bounded compatibility/admission behavior, not model quality
 improvement, cross-agent parity or exact tokenizer verification.
+
+The fixed D3 GPT-OSS fixture passed on 2026-10-05 in the owner-selected compute
+window with real read/edit effects and host validation. It emitted three complete
+estimated admission records separately from provider-reported usage. Runtime,
+worker and validators were cleaned up and listener absence was verified. This
+does not complete growing-history live overflow or exact tool-bearing counting.

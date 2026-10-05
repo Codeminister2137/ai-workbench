@@ -114,4 +114,24 @@ additive SQLite tables, the fixed fixture and retained Windows process-tree clea
 Unsupported platforms refuse before starting a runtime. The validator restricts
 source syntax to a single pure arithmetic function rather than executing arbitrary
 model-authored code. Receipts flush during work and survive worker interruption.
-No executable acceptance queue entry or live run was created in this session.
+No executable acceptance queue entry or live run was created at that checkpoint.
+
+## Live checkpoint (2026-10-05)
+
+Owner authorized an hour of local compute. Fixed job
+`native-coding-tools-20261005-startup-fix` passed using GPT-OSS 20B / Ollama 0.32.5,
+8192 context, 1024 generation tokens, four iterations and a five-minute allocation.
+Actual ordered source read/edit receipts, failing baseline, passing host validation,
+protected content and retained runtime/worker/validator cleanup were verified.
+The selected loopback listener was absent afterward. This one fixture establishes
+bounded harness/compatibility behavior, not comparative model quality.
+
+Two earlier jobs remain failed with verified cleanup: the first dropped the
+configured model library and timed out during metadata startup; the second hit a
+temporarily missing version response. Runtime startup now preserves the owner's
+existing absolute `OLLAMA_MODELS` directory, disables cloud discovery and pruning,
+and retries transient metadata failures within a bounded startup/deadline budget.
+It still refuses a real model/runtime mismatch before inference. Worker environment
+filtering excludes provider credentials. No library download or global setting
+change was performed. Receipts remain in `data/acceptance-jobs.sqlite3` and ignored
+`artifacts/acceptance-jobs/`; terminal jobs were never replayed.

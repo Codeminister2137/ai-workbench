@@ -69,3 +69,11 @@ fixtures, actual synthetic tool effects, interrupted receipts and cleanup failur
 Owned-process tests use dummy processes and fixed validators without inference.
 Live model acceptance remains deferred until the owner selects a compute window.
 This single fixture cannot establish general coding quality or cross-agent parity.
+
+2026-10-05 bounded live acceptance passed during the owner's one-hour compute
+window. Actual source read/edit effects, baseline/postchange validation, protected
+files and runtime/worker/validator cleanup were verified. Earlier failed startup
+jobs remain preserved. The owned runtime now retains the existing model library,
+disables cloud discovery/pruning and bounds transient metadata readiness retries;
+real identity mismatches still refuse. See the proposal's live checkpoint for
+allocation and artifact details. No broader quality/parity claim follows.
