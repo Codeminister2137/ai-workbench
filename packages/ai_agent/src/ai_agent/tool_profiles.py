@@ -27,7 +27,8 @@ INSPECTION_PROFILE = SharedToolProfile(
     "inspection", ("read_file", "list_dir", "find_files", "grep_search", "git_status", "git_diff")
 )
 CODING_PROFILE = SharedToolProfile(
-    "coding", (*INSPECTION_PROFILE.tool_names, "create_file", "edit_file", "run_command")
+    "coding",
+    (*INSPECTION_PROFILE.tool_names, "create_file", "edit_file", "run_command", "fetch_url"),
 )
 
 
@@ -53,8 +54,13 @@ def shared_tool_registry(name: str, workspace: Path | None = None) -> ToolRegist
         )
     )
     if name == "coding":
+        from ai_agent.tools.research import FetchURLTool
+
         for tool in (CreateFileTool(), EditFileTool(), RunCommandTool()):
             registry.register(tool)
+        # Provenance is returned to the caller. Coding-session storage keeps the
+        # ordinary hashed tool receipt, not fetched text or a separate research log.
+        registry.register(FetchURLTool(lambda _event, _receipt: None))
     if workspace is not None:
         from ai_agent.ide_bridge import add_ide_tools
 

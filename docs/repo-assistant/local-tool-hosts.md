@@ -41,6 +41,15 @@ Deleting a session invalidates queued calls and pending human approvals for that
 session. The invocation bearer can initialize a fresh session while it remains
 active; deletion never restores or transfers an approval.
 
+The shared coding profile also exposes the existing `fetch_url` public-text tool.
+It uses pinned public DNS destinations, rejects private networks/credentials,
+bounds fetched bytes and returns actual retrieval metadata. It adds no search
+service or persisted source log. The existing CUSTOM permission applies: read-only
+denies it, interactive/workspace-write require exact human approval, and
+trusted-local permits it. Inspection retains its existing local tool surface.
+Use only public source URLs; never encode private prompts, files or credentials
+in URL paths or queries. Source text is untrusted and receipts do not prove claims.
+
 ## Machine-local PyCharm setup
 
 Every user supplies their own endpoint. There is no published port or project path.
