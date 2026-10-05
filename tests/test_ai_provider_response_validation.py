@@ -49,6 +49,43 @@ def adapter(request, monkeypatch):
     return provider, respond
 
 
+class TestOptionalResponseMetadata:
+    @pytest.mark.parametrize("invalid", [True, -1, "10", 1.5])
+    def test_invalid_counters_remain_unknown_without_losing_the_answer(self, adapter, invalid):
+        provider, respond = adapter
+        message = {"content": "Valid answer"}
+        payload = (
+            {"message": message, "done": True, "prompt_eval_count": invalid, "eval_count": 3}
+            if provider is ProviderKind.OLLAMA
+            else {
+                "choices": [{"message": message, "finish_reason": "stop"}],
+                "usage": {
+                    "prompt_tokens": invalid,
+                    "completion_tokens": 3,
+                    "total_tokens": invalid,
+                },
+            }
+        )
+        response = respond(json.dumps(payload).encode())
+        assert response.message.content == "Valid answer"
+        assert response.usage.input_tokens is None
+        assert response.usage.output_tokens == 3
+        assert response.usage.total_tokens is None
+
+    @pytest.mark.parametrize("reason", [[], {}])
+    def test_unknown_finish_metadata_does_not_escape_as_a_type_error(self, adapter, reason):
+        provider, respond = adapter
+        message = {"content": "Valid answer"}
+        payload = (
+            {"message": message, "done": True, "done_reason": reason}
+            if provider is ProviderKind.OLLAMA
+            else {"choices": [{"message": message, "finish_reason": reason}]}
+        )
+        response = respond(json.dumps(payload).encode())
+        assert response.message.content == "Valid answer"
+        assert response.finish_reason.value == "unknown"
+
+
 class TestMalformedResponses:
     @pytest.mark.parametrize(
         "calls",

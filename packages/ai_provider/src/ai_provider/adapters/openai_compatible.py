@@ -405,9 +405,11 @@ class OpenAICompatibleChatClient:
         total_tokens = raw_usage.get("total_tokens")
         return UsageMetadata(
             source=UsageSource.PROVIDER_REPORTED,
-            input_tokens=input_tokens if isinstance(input_tokens, int) else None,
-            output_tokens=output_tokens if isinstance(output_tokens, int) else None,
-            total_tokens=total_tokens if isinstance(total_tokens, int) else None,
+            input_tokens=input_tokens if type(input_tokens) is int and input_tokens >= 0 else None,
+            output_tokens=output_tokens
+            if type(output_tokens) is int and output_tokens >= 0
+            else None,
+            total_tokens=total_tokens if type(total_tokens) is int and total_tokens >= 0 else None,
         )
 
     @staticmethod
@@ -416,7 +418,7 @@ class OpenAICompatibleChatClient:
             return FinishReason.STOP
         if raw_reason == "length":
             return FinishReason.LENGTH
-        if raw_reason in {"content_filter", "tool_calls", "function_call"}:
+        if raw_reason in ("content_filter", "tool_calls", "function_call"):
             return FinishReason.UNKNOWN
         return FinishReason.UNKNOWN
 

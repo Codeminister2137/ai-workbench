@@ -417,6 +417,8 @@ class OllamaChatClient:
     def _usage_from_response(raw_response: dict[str, Any]) -> UsageMetadata:
         input_tokens = raw_response.get("prompt_eval_count")
         output_tokens = raw_response.get("eval_count")
+        input_tokens = input_tokens if type(input_tokens) is int and input_tokens >= 0 else None
+        output_tokens = output_tokens if type(output_tokens) is int and output_tokens >= 0 else None
         total_tokens = (
             input_tokens + output_tokens
             if isinstance(input_tokens, int) and isinstance(output_tokens, int)
@@ -426,14 +428,14 @@ class OllamaChatClient:
             return UsageMetadata(source=UsageSource.UNAVAILABLE)
         return UsageMetadata(
             source=UsageSource.PROVIDER_REPORTED,
-            input_tokens=input_tokens if isinstance(input_tokens, int) else None,
-            output_tokens=output_tokens if isinstance(output_tokens, int) else None,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
             total_tokens=total_tokens,
         )
 
     @staticmethod
     def _finish_reason(done_reason: object) -> FinishReason:
-        if done_reason in {"stop", "unload"}:
+        if done_reason in ("stop", "unload"):
             return FinishReason.STOP
         if done_reason == "length":
             return FinishReason.LENGTH

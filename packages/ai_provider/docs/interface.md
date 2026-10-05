@@ -82,6 +82,9 @@ never silently become an empty executable call. Software fixtures verify these
 contracts without hosted calls or model-quality claims.
 Malformed tool arrays, call/function objects and empty function names also fail
 explicitly rather than being dropped or converted into a successful tool-free answer.
+Optional token counters accept only nonnegative integers, excluding booleans;
+invalid counters remain unknown without discarding a valid answer. Unexpected
+finish metadata normalizes to `unknown`.
 
 ### `BackendConfig`
 
