@@ -41,8 +41,12 @@ model selection; prefer verified GPT-OSS for automatic native tool routes.
 Invalidate compatibility evidence after relevant model/runtime changes. Preserve
 complete required instructions and refuse requests that cannot fit; distinguish
 estimated byte admission from verified token counts. Use offline fixtures first.
-Then verify synthetic continuation after partial shared-tool effects without replay,
-preserving task/privacy/preset/deadline and fresh per-run scopes across fallback.
+Synthetic continuation after partial shared-tool effects is now COMPLETE offline:
+actual MCP effects continue through Codex/Copilot mappings without replay, with
+fresh approvals/run IDs, stable task identity and bounded external deadlines.
+Updated saved session receipts accompany route switches. Full offline suite:
+1091 passed, seven live skipped; Ruff and Pyright clean. Live client/terminal
+mutation acceptance remains separate from this synthetic evidence.
 
 Completion condition for the compatibility slice: deterministic compatibility/invalidation
 and input-fit refusal tests, reviewed focused commit, updated roadmap/handoff and

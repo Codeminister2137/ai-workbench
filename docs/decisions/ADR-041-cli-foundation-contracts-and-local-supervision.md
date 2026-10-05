@@ -87,3 +87,9 @@ argument/output digests without introducing a new store or saved grants. Offline
 tests cover authorization, denial, restart/owner expiry, scoped mappings, receipt
 reuse and transport isolation. Live client/terminal mutation acceptance remains
 deferred; this checkpoint is not a claim of complete cross-agent parity.
+
+Synthetic partial-effect continuation now exercises actual shared MCP read/edit
+tools through Codex/Copilot mappings after usage exhaustion or overload. Updated
+session receipts, stable task identity without persistence, fresh per-run scopes,
+fresh interactive approval and external overall deadline enforcement are covered.
+Live terminal/client mutation acceptance remains unverified.

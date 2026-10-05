@@ -202,6 +202,17 @@ class FallbackSession:
                 else ProviderErrorCategory.USAGE_LIMIT,
             )
         while True:
+            if self.deadline is not None:
+                remaining = self.deadline - time.perf_counter()
+                if remaining <= 0:
+                    raise ProviderError(
+                        "Continuation deadline expired; no execution attempted. "
+                        "Inspect saved edits/receipts before restarting.",
+                        category=ProviderErrorCategory.TIMEOUT,
+                    )
+                self.current = replace(
+                    self.current, timeout_seconds=min(self.current.timeout_seconds, remaining)
+                )
             error = None
             try:
                 result = execute(self.current, current_prompt)

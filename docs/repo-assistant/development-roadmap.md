@@ -15,7 +15,7 @@ replacement SearXNG investigation, and the accepted local typed acceptance-job
 contract. D3 is implemented offline under ADR-043; live execution still needs an
 explicit compute window. Specific SearXNG operator selection remains unresolved.
 Historical checkpoints below retain their original validation counts. The latest
-full offline checkpoint is 1079 passed, seven live tests skipped, Ruff/Pyright clean.
+full offline checkpoint is 1091 passed, seven live tests skipped, Ruff/Pyright clean.
 
 The goal is to perform inspect/plan/edit/test/review workflows from the project
 CLI, invoke the required skills, resume work and recover from allowance exhaustion
@@ -140,6 +140,15 @@ is necessary only after inspecting existing contracts; defer a material public
 contract change for an explicit decision and continue independent tests/diagnostics.
 
 ### Cross-agent acceptance
+
+Synthetic shared-coding continuation is verified for usage exhaustion and overload
+through Codex/Copilot command mappings and actual MCP read/edit effects. Full
+instructions, objective, preset, quality/tier policy and task identity survive;
+run IDs are fresh even without durable sessions. Saved sessions supply updated
+hashed receipts on route switches. Interactive continuation requires fresh exact
+approval; a denied call leaves the partial edit unchanged. Deadlines refuse later
+stages and bound external clients even when they continuously emit output.
+This is deterministic evidence, not live client mutation/terminal acceptance.
 
 Synthetic clients must perform a representative inspect/edit/test/review fixture,
 exhaust a route after a partial effect, continue using the common tools without

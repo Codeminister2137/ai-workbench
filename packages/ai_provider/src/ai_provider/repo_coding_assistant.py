@@ -3295,7 +3295,7 @@ def _fallback_config(target: Any, args: argparse.Namespace, repo_root: Path) -> 
     preset = (
         "read_only" if getattr(args, "shared_tools", None) == "inspection" else args.approval_policy
     )
-    return _external_agent_config_from_orchestration(
+    config = _external_agent_config_from_orchestration(
         orchestration,
         repo_root=repo_root,
         timeout_seconds=target.timeout_seconds,
@@ -3313,6 +3313,7 @@ def _fallback_config(target: Any, args: argparse.Namespace, repo_root: Path) -> 
         codex_mcp_tools=args.codex_mcp_tools,
         shared_tool_profile=getattr(args, "shared_tools", None),
     )
+    return replace(config, shared_task_id=getattr(args, "shared_task_id", config.shared_task_id))
 
 
 def _fallback_target_compatible(target: Any, args: argparse.Namespace, repo_root: Path) -> bool:
@@ -3460,6 +3461,11 @@ def _execute_fallback_route(
     repo_root: Path,
     progress_callback: Any,
 ) -> Any:
+    from ai_provider.coding_sessions import ACTIVE_SESSION
+
+    active_session = ACTIVE_SESSION.get()
+    if active_session is not None:
+        prompt += "\n\n" + active_session.handoff()
     if _is_external_agent_access_method(target.access_method):
         config = _fallback_config(target, args, repo_root)
         external_prompt = _external_agent_prompt_with_execution_metadata(
@@ -3469,7 +3475,12 @@ def _execute_fallback_route(
             sandbox=config.sandbox,
             mode=args.mode,
         )
-        return _run_external_agent(external_prompt, config, progress_callback=progress_callback)
+        return _run_external_agent(
+            external_prompt,
+            config,
+            progress_callback=progress_callback,
+            deadline=getattr(getattr(args, "fallback_session", None), "deadline", None),
+        )
     config = backend_config_from_execution_target(target)
     if args.mode == "implement" or getattr(args, "shared_tools", None):
         return _run_native_agent(
@@ -3514,10 +3525,16 @@ def _run_external_agent_with_fallback(
     session = getattr(args, "fallback_session", None)
     if session is None or not session.enabled:
         return _run_external_agent(prompt, config, progress_callback=progress_callback)
+    args.shared_task_id = config.shared_task_id
 
     def execute(target: Any, payload: str) -> Any:
         if target.route_id == session.initial.route_id:
-            return _run_external_agent(payload, config, progress_callback=progress_callback)
+            return _run_external_agent(
+                payload,
+                replace(config, timeout_seconds=target.timeout_seconds),
+                progress_callback=progress_callback,
+                deadline=session.deadline,
+            )
         return _execute_fallback_route(
             target,
             payload,

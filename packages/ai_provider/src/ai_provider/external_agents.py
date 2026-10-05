@@ -907,6 +907,7 @@ def run_external_agent(
     popen_factory: Callable[..., subprocess.Popen[str]] = subprocess.Popen,
     progress_callback: Callable[[str], None] | None = None,
     progress_interval_seconds: float = 15.0,
+    deadline: float | None = None,
 ) -> ExternalAgentResult:
     """Run an official coding client using its native prompt transport."""
     from ai_provider.coding_sessions import ACTIVE_SESSION
@@ -929,6 +930,7 @@ def run_external_agent(
             popen_factory=popen_factory,
             progress_callback=progress_callback,
             progress_interval_seconds=progress_interval_seconds,
+            deadline=deadline,
         )
     except BaseException:
         if session and receipt:
@@ -960,6 +962,7 @@ def _run_external_agent_owned(
     popen_factory: Callable[..., subprocess.Popen[str]],
     progress_callback: Callable[[str], None] | None,
     progress_interval_seconds: float,
+    deadline: float | None = None,
 ) -> ExternalAgentResult:
     if config.shared_tool_profile and config.access_method is AccessMethod.KIRO_CLI:
         from ai_provider.shared_client_tools import kiro_inspection_agent
@@ -985,6 +988,7 @@ def _run_external_agent_owned(
                 popen_factory=popen_factory,
                 progress_callback=progress_callback,
                 progress_interval_seconds=progress_interval_seconds,
+                deadline=deadline,
             )
         finally:
             # Delete only our unchanged generated file, never client/user edits.
@@ -1006,6 +1010,7 @@ def _run_external_agent_owned(
         popen_factory=popen_factory,
         progress_callback=progress_callback,
         progress_interval_seconds=progress_interval_seconds,
+        deadline=deadline,
     )
 
 
@@ -1017,7 +1022,14 @@ def _run_external_agent_process(
     popen_factory: Callable[..., subprocess.Popen[str]],
     progress_callback: Callable[[str], None] | None,
     progress_interval_seconds: float,
+    deadline: float | None = None,
 ) -> ExternalAgentResult:
+    runner_timeout = config.timeout_seconds
+    if deadline is not None:
+        remaining = deadline - time.perf_counter()
+        if remaining <= 0:
+            raise subprocess.TimeoutExpired(config.command, timeout=0)
+        runner_timeout = min(runner_timeout, remaining)
     command = build_external_agent_command(config, prompt=prompt)
     process_input = prompt
     if config.access_method is AccessMethod.ANTIGRAVITY_CLI:
@@ -1036,7 +1048,7 @@ def _run_external_agent_process(
             encoding="utf-8",
             errors="replace",
             capture_output=True,
-            timeout=config.timeout_seconds,
+            timeout=runner_timeout,
             cwd=config.cwd,
         )
         return _external_agent_result_from_completed_process(command, config, completed)
@@ -1079,6 +1091,17 @@ def _run_external_agent_process(
     last_progress = started
     while process.poll() is None or not output_queue.empty():
         now = time.monotonic()
+        if deadline is not None and time.perf_counter() >= deadline:
+            process.kill()
+            for reader in readers:
+                reader.join(timeout=1.0)
+            _drain_process_output(output_queue, stdout_lines, stderr_lines)
+            raise subprocess.TimeoutExpired(
+                command,
+                timeout=config.timeout_seconds,
+                output="".join(stdout_lines),
+                stderr="".join(stderr_lines),
+            )
         try:
             label, line = output_queue.get(timeout=0.2)
         except queue.Empty:

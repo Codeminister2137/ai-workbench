@@ -202,6 +202,51 @@ def test_every_overloaded_route_is_tried_once(monkeypatch, routes):
     assert run.handoff is not None and not run.exhausted
 
 
+def test_expired_deadline_refuses_initial_and_later_stage(monkeypatch, routes):
+    clock = [1.0]
+    monkeypatch.setattr("ai_provider.execution_fallback.time.perf_counter", lambda: clock[0])
+    run = session(monkeypatch, routes, deadline=10.0)
+    calls = []
+
+    def execute(target, prompt):
+        calls.append(target.timeout_seconds)
+        return "done"
+
+    assert run.run("First stage", execute, lambda result: False, observe=str) == "done"
+    assert calls == [9.0]
+    clock[0] = 11.0
+    with pytest.raises(ProviderError, match="deadline expired") as error:
+        run.run("Later stage", execute, lambda result: False, observe=str)
+    assert error.value.category is ProviderErrorCategory.TIMEOUT
+    assert calls == [9.0]
+    fresh = session(monkeypatch, routes, deadline=10.0)
+    with pytest.raises(ProviderError, match="no execution attempted"):
+        fresh.run("Expired first stage", execute, lambda result: False, observe=str)
+    assert calls == [9.0]
+
+
+def test_deadline_after_partial_effect_preserves_handoff_without_fallback(
+    monkeypatch, routes, tmp_path
+):
+    clock = [1.0]
+    saved = []
+    monkeypatch.setattr("ai_provider.execution_fallback.time.perf_counter", lambda: clock[0])
+    run = session(monkeypatch, routes, deadline=10.0, save_handoff=saved.append)
+    path = tmp_path / "effect.txt"
+    calls = []
+
+    def execute(target, prompt):
+        calls.append(target.route_id)
+        path.write_text("partial effect")
+        clock[0] = 11.0
+        return ExternalAgentResult((), 1, "", "usage_limit_reached")
+
+    run.run("Continue", execute, external_usage_limit, observe=str)
+    assert calls == ["codex"] and path.read_text() == "partial effect"
+    assert saved[0]["status"] == "continuation_stopped"
+    assert "Inspect saved edits/receipts" in saved[0]["next_action"]
+
+
 def test_quality_config_is_validated_and_missing_model_evidence_refuses(routes, tmp_path):
     from ai_orchestrator.fallback import FallbackQualityPolicy
 
