@@ -15,7 +15,9 @@ replacement SearXNG investigation, and the accepted local typed acceptance-job
 contract. D3 is implemented offline under ADR-043; live execution still needs an
 explicit compute window. Specific SearXNG operator selection remains unresolved.
 Historical checkpoints below retain their original validation counts. The latest
-full offline checkpoint is 1106 passed, seven live tests skipped, Ruff/Pyright clean.
+full offline workspace checkpoint is 1154 passed, one optional token-count skip;
+six live-provider cases are excluded. Root suites took 56.14 seconds and Council
+1.92 seconds. Ruff/Pyright and commit hooks are clean. See [test workflow](../test-workflow.md).
 
 The goal is to perform inspect/plan/edit/test/review workflows from the project
 CLI, invoke the required skills, resume work and recover from allowance exhaustion
@@ -26,7 +28,7 @@ it should only be the human editor/viewer. Different model performance is allowe
 
 **Current slices COMPLETE; remaining CLI foundation BLOCKED on concrete inputs/decisions.**
 
-Final validation: 1106 passed, seven live tests skipped in 142.00 seconds; repository
+Earlier checkpoint validation: 1106 passed, seven live tests skipped in 142.00 seconds; repository
 Ruff lint/format, Pyright and focused commit hooks passed. Separate live results
 below are preserved independently of the skipped optional integration tests.
 

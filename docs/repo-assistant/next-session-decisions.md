@@ -1,6 +1,15 @@
 # Next session: plan and owner decisions
 
-2026-10-04. Latest implementation slice COMPLETE; CLI foundation INCOMPLETE.
+2026-10-05 update: SDK-based IDE acceptance and grouped test-workflow slice COMPLETE.
+The owner supplied the IDE endpoint and selected authenticated foreground MCP
+under ADR-044; these inputs are resolved. Remaining foundation work needs attended
+terminal acceptance, search-operator selection and separately scoped capability
+decisions. See [roadmap](development-roadmap.md) and [test workflow](../test-workflow.md).
+Jenkins remains a proposal requiring a concrete CI host/access decision.
+
+Historical 2026-10-04 brief follows; completed tasks and resource restrictions
+below are superseded by the current checkpoint and active owner's instruction.
+Latest implementation slice COMPLETE; CLI foundation INCOMPLETE.
 Owner approved recommendations D1-D3 on 2026-10-04. Implementation/investigation
 remains INCOMPLETE. Alternatives below preserve the reviewed decision brief.
 
@@ -37,8 +46,8 @@ under ADR-041. Live terminal/client permission acceptance remains deferred.
 
 2026-10-05: fixed D3 native acceptance and shared `workspace_write` continuation
 through real Copilot/Kiro passed. Interactive terminal acceptance is still pending.
-Current implementation is blocked on the explicit IDE endpoint and the new
-[foreground process-channel choice](process-sharing-decision.md). D2's
+The IDE endpoint and [foreground process-channel choice](process-sharing-decision.md)
+are now resolved and their acceptance passed. D2's
 [fresh operator investigation](search-operator-investigation.md) found no usable
 JSON replacement; no operator setting was changed.
 
