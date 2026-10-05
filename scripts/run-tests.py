@@ -50,7 +50,11 @@ GROUPS = {
         "tests/test_live_delegation_runner_example.py",
         "tests/test_test_suites.py",
     ),
-    "research": ("tests/test_research_*.py", "tests/test_acceptance_jobs.py"),
+    "research": (
+        "tests/test_research_*.py",
+        "tests/test_acceptance_jobs.py",
+        "tests/test_acceptance_usage.py",
+    ),
     "council": ("apps/ai_council/tests/test_*.py",),
     "live": ("tests/integration/test_*.py",),
 }

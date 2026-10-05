@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import queue
 import shutil
@@ -1443,6 +1444,21 @@ def _find_usage(value: Any) -> dict[str, Any] | None:
     """Find the first nested usage/token payload in an event."""
 
     if isinstance(value, dict):
+        if _event_type(value) == "session.usage_checkpoint":
+            data = value.get("data")
+            if isinstance(data, dict):
+                counters = {
+                    name: data[key]
+                    for name, key in (
+                        ("premium_requests", "totalPremiumRequests"),
+                        ("nano_aiu", "totalNanoAiu"),
+                    )
+                    if type(data.get(key)) in {int, float}
+                    and (type(data[key]) is int or math.isfinite(data[key]))
+                    and data[key] >= 0
+                }
+                if counters:
+                    return {**counters, "scope": "session_checkpoint"}
         for key, nested in value.items():
             key_lower = key.lower()
             if key_lower == "usage" and isinstance(nested, dict):

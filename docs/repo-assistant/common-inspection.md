@@ -43,7 +43,8 @@ These checks do not establish shared mutation permissions or complete coding par
 ## Shared coding and terminal approvals
 
 `--shared-tools coding` adds the existing `create_file`, `edit_file` and
-`run_command` tools to inspection. It preserves the selected approval preset:
+`run_command` tools to inspection, plus the existing public-text `fetch_url`
+operation. It preserves the selected approval preset:
 
 | Preset | File writes | Shell |
 | --- | --- | --- |
@@ -51,6 +52,13 @@ These checks do not establish shared mutation permissions or complete coding par
 | `interactive` | Ask per operation | Ask per operation |
 | `workspace_write` | Allow within existing file boundary | Ask per operation |
 | `trusted_local` | Allow | Allow |
+
+Public fetching uses the existing CUSTOM permission: read-only denies it;
+interactive/workspace-write ask for the exact URL; trusted-local allows it.
+Inspection does not gain network access. Only public source URLs are permitted;
+never encode private files, prompts or secrets in a URL. Retrieval metadata comes
+from actual tool execution and does not establish factual truth. See
+[local tool contracts](local-tool-hosts.md).
 
 ```powershell
 .\scripts\repo-assistant.ps1 "Edit the fixture and review its diff" --mode implement --shared-tools coding --approval-policy interactive --coding-session new --execute

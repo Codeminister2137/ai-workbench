@@ -3,6 +3,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
 from ai_orchestrator import AccessMethod
 from ai_provider.external_agents import (
     ExternalAgentConfig,
@@ -31,6 +32,57 @@ def test_completed_event_with_structured_overload_error_is_failure():
     }
     summary = parse_external_agent_jsonl(json.dumps(event))
     assert summary.failure_reason == event["error"]["message"]
+
+
+class TestUsageReceipts:
+    def test_copilot_final_result_retains_existing_raw_usage_contract(self):
+        events = [
+            {
+                "type": "session.usage_checkpoint",
+                "data": {
+                    "totalPremiumRequests": 1,
+                    "totalNanoAiu": 200,
+                },
+            },
+            {
+                "type": "result",
+                "usage": {
+                    "premiumRequests": 2,
+                    "codeChanges": {"private_file": "private change"},
+                },
+            },
+        ]
+        usage = parse_external_agent_jsonl("\n".join(json.dumps(event) for event in events)).usage
+        assert usage == events[-1]["usage"]
+
+    def test_latest_copilot_checkpoint_is_retained_without_summing_or_private_cache_state(self):
+        checkpoints = [
+            {
+                "type": "session.usage_checkpoint",
+                "data": {
+                    "totalPremiumRequests": amount,
+                    "totalNanoAiu": amount * 100,
+                    "modelCacheState": {"private": "must not be exported"},
+                    "promptCacheBreakState": "private prompt state",
+                },
+            }
+            for amount in (1, 3)
+        ]
+        events = "\n".join(json.dumps(event) for event in checkpoints)
+        usage = parse_external_agent_jsonl(events).usage
+        assert usage == {"premium_requests": 3, "nano_aiu": 300, "scope": "session_checkpoint"}
+        assert "private" not in json.dumps(usage)
+        progress = _external_agent_progress_line(json.dumps(checkpoints[-1]))
+        assert progress is not None and '"premium_requests": 3' in progress
+        assert "private" not in progress
+
+    @pytest.mark.parametrize("invalid", [True, -1, "1", float("nan"), float("inf")])
+    def test_invalid_copilot_counters_remain_unknown(self, invalid):
+        event = {
+            "type": "session.usage_checkpoint",
+            "data": {"totalPremiumRequests": invalid, "totalNanoAiu": invalid},
+        }
+        assert parse_external_agent_jsonl(json.dumps(event)).usage is None
 
 
 def test_antigravity_zero_exit_permission_refusal_is_a_failure(tmp_path: Path) -> None:

@@ -90,6 +90,32 @@ metadata/artifacts; new quota polling, account APIs, persistence or automatic bu
 switching need investigation and approval. Do not spend allowance to exhaust it
 as a test. Exact IDE supervisor usage remains unmeasured.
 
+### Saved receipt summary
+
+The read-only receipt diagnostic is implemented. Select each acceptance directory
+and its known billing source explicitly; nothing is inferred from authentication,
+directory names or missing balances:
+
+```powershell
+python -m uv run --no-sync python -m ai_provider.acceptance_usage --run local_free artifacts\acceptance-jobs\RUN_ID
+python -m uv run --no-sync python -m ai_provider.acceptance_usage --run chatgpt_subscription_allowance artifacts\CODEX_RUN --run github_copilot_subscription_allowance artifacts\COPILOT_RUN
+```
+
+Local `worker-result.json` counters are summed separately for provider-reported
+and estimated calls, with the measured-call fraction shown. External `stdout.jsonl`
+uses the existing client parser and displays its latest usage receipt without
+summing cumulative checkpoints. Copilot premium-request/nano-AIU checkpoints are
+now recognized. Kiro exports recognized numeric meter units; ambiguous repeated
+units remain unknown. Cached/reasoning counters are separate and never added to
+input/output totals. No currency or credit conversion is inferred.
+
+The diagnostic reads only named bounded files in the selected directories and
+prints recognized numeric counters. It creates no state, calls no account API,
+loads no model and exports no prompt/raw client event/cache state. Missing receipts
+or unsupported formats remain unknown; malformed/unreadable admitted files return
+a failure. A declared source is a caller label, not verified account identity.
+Remaining allowance and the current IDE supervisor's usage remain unknown.
+
 ## Explicit Windows sleep after work
 
 Live acceptance confirmed: the owner reported on 2026-10-04 that the computer
