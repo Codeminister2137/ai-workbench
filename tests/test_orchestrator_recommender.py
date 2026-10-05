@@ -229,6 +229,32 @@ def test_recommender_filters_by_max_expected_latency_seconds() -> None:
     assert "60s" in recommendation.rejected[0].reason
 
 
+class TestHardLatencyValidation:
+    @pytest.mark.parametrize("value", [float("nan"), float("inf"), -1, True])
+    def test_invalid_task_bound_refuses_selection(self, value):
+        candidate = _candidate("ollama", "fast", BackendLocation.LOCAL)
+        with pytest.raises(ValueError, match="finite nonnegative"):
+            recommend_model(TaskProfile(max_expected_latency_seconds=value), (candidate,))
+
+    @pytest.mark.parametrize("value", [float("nan"), float("inf"), -1, True])
+    def test_invalid_programmatic_estimate_cannot_bypass_hard_bound(self, value):
+        invalid = _candidate(
+            "ollama",
+            "invalid",
+            BackendLocation.LOCAL,
+            estimate=ModelPerformanceEstimate(typical_latency_seconds=value),
+        )
+        valid = _candidate(
+            "ollama",
+            "fast",
+            BackendLocation.LOCAL,
+            estimate=ModelPerformanceEstimate(typical_latency_seconds=20),
+        )
+        result = recommend_model(TaskProfile(max_expected_latency_seconds=30), (invalid, valid))
+        assert result.selected is valid
+        assert "invalid" in result.rejected[0].reason
+
+
 def test_recommender_rejects_missing_latency_for_hard_latency_constraint() -> None:
     candidate = _candidate("ollama", "unknown", BackendLocation.LOCAL)
 

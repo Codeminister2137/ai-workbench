@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+
 from ai_orchestrator.models import (
     CandidateRejection,
     ModelCatalogEntry,
@@ -30,6 +32,11 @@ def recommend_model(
 
     if not catalog:
         raise ValueError("Model catalog must not be empty.")
+
+    if profile.max_expected_latency_seconds is not None and not _valid_latency(
+        profile.max_expected_latency_seconds
+    ):
+        raise ValueError("Maximum expected latency must be a finite nonnegative number.")
 
     accepted: list[ModelCatalogEntry] = []
     rejected: list[CandidateRejection] = []
@@ -119,6 +126,8 @@ def _rejection_reason(profile: TaskProfile, candidate: ModelCatalogEntry) -> str
         estimate = candidate.backend.estimate
         if estimate.typical_latency_seconds is None:
             return "Rejected because no latency estimate is available for the time constraint."
+        if not _valid_latency(estimate.typical_latency_seconds):
+            return "Rejected because the latency estimate is invalid for the time constraint."
         if estimate.typical_latency_seconds > profile.max_expected_latency_seconds:
             return (
                 "Rejected because estimated latency "
@@ -127,6 +136,15 @@ def _rejection_reason(profile: TaskProfile, candidate: ModelCatalogEntry) -> str
             )
 
     return None
+
+
+def _valid_latency(value: object) -> bool:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    try:
+        return math.isfinite(value) and value >= 0
+    except OverflowError:
+        return False
 
 
 def _candidate_score(profile: TaskProfile, candidate: ModelCatalogEntry) -> tuple[int, int, int]:

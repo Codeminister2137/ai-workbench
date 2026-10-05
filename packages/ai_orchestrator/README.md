@@ -83,6 +83,9 @@ Catalog entries may include optional source-labelled numeric estimates under
 tokens. Recommendations include these numbers when available, and
 `TaskProfile(max_expected_latency_seconds=...)` treats missing latency data as
 not satisfying the hard time constraint.
+Catalog latency/cost estimates must be finite, nonnegative numbers; booleans,
+NaN and infinity are rejected. A hard latency bound must meet the same numeric
+requirements, and invalid programmatic latency estimates cannot satisfy it.
 
 Public pricing and model documentation are useful catalog priors, but wall-clock
 latency should be treated as unknown unless it comes from measured local or

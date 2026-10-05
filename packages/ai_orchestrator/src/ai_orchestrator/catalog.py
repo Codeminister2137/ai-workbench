@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import tomllib
 from collections.abc import Sequence
 from pathlib import Path
@@ -271,9 +272,15 @@ def _optional_float(raw: dict[str, Any], key: str) -> float | None:
     value = raw.get(key)
     if value is None:
         return None
-    if not isinstance(value, (int, float)):
-        raise ValueError(f"Estimate {key!r} must be a number.")
-    return float(value)
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"Estimate {key!r} must be a finite nonnegative number.")
+    try:
+        number = float(value)
+    except OverflowError as error:
+        raise ValueError(f"Estimate {key!r} must be a finite nonnegative number.") from error
+    if not math.isfinite(number) or number < 0:
+        raise ValueError(f"Estimate {key!r} must be a finite nonnegative number.")
+    return number
 
 
 def _optional_positive_int(raw: dict[str, Any], key: str) -> int | None:

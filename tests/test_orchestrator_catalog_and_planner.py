@@ -26,6 +26,27 @@ from ai_orchestrator import (
 from ai_orchestrator.models import LatencyTarget, ModelCatalogEntry, ModelContextLimits
 
 
+class TestEstimateValidation:
+    @pytest.mark.parametrize(
+        "field",
+        [
+            "typical_latency_seconds",
+            "input_cost_per_million_tokens",
+            "output_cost_per_million_tokens",
+        ],
+    )
+    @pytest.mark.parametrize("value", ["nan", "inf", "-inf", "-1", "true"])
+    def test_invalid_estimates_are_rejected_at_catalog_load(self, tmp_path, field, value):
+        path = tmp_path / "catalog.toml"
+        path.write_text(
+            '[[models]]\nprovider = "ollama"\nmodel = "test"\nlocation = "local"\n'
+            f"[models.estimate]\n{field} = {value}\n",
+            encoding="utf-8",
+        )
+        with pytest.raises(ValueError, match="finite nonnegative"):
+            load_model_catalog(path)
+
+
 def test_load_model_catalog_reads_toml_entries(tmp_path: Path) -> None:
     catalog_path = tmp_path / "models.toml"
     catalog_path.write_text(
