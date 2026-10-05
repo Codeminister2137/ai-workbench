@@ -46,10 +46,18 @@ def _tool_calls_from_raw(raw_calls: object) -> tuple[AIToolCall, ...]:
         if isinstance(arguments, str):
             try:
                 arguments = json.loads(arguments)
-            except json.JSONDecodeError:
-                arguments = {}
+            except json.JSONDecodeError as error:
+                raise ProviderError(
+                    "Ollama tool arguments returned invalid JSON; no executable call was produced.",
+                    category=ProviderErrorCategory.NON_RETRYABLE,
+                    provider="ollama",
+                ) from error
         if not isinstance(arguments, dict):
-            arguments = {}
+            raise ProviderError(
+                "Ollama tool arguments must be a JSON object; no executable call was produced.",
+                category=ProviderErrorCategory.NON_RETRYABLE,
+                provider="ollama",
+            )
         calls.append(
             AIToolCall(
                 id=str(raw_call.get("id") or f"tool-call-{index}"),
@@ -107,6 +115,7 @@ class OllamaChatClient:
         payload = self._chat_payload(request, stream=True)
         started = time.perf_counter()
         content_parts: list[str] = []
+        raw_tool_calls: list[Any] = []
         final_response: AIResponse | None = None
 
         for raw_chunk in self._stream_chat(payload):
@@ -123,6 +132,9 @@ class OllamaChatClient:
                 )
 
             content = str(raw_message.get("content", ""))
+            chunk_calls = raw_message.get("tool_calls")
+            if isinstance(chunk_calls, list):
+                raw_tool_calls.extend(chunk_calls)
             if content:
                 content_parts.append(content)
                 yield AIStreamDelta(content=content, raw_metadata=raw_chunk)
@@ -133,6 +145,7 @@ class OllamaChatClient:
                 final_raw["message"] = {
                     **raw_message,
                     "content": "".join(content_parts),
+                    "tool_calls": raw_tool_calls,
                 }
                 final_response = self._response_from_raw(
                     final_raw,
@@ -140,6 +153,7 @@ class OllamaChatClient:
                     latency_ms=latency_ms,
                 )
                 yield AIStreamFinal(response=final_response)
+                return
 
         if final_response is None:
             raise ProviderError(
@@ -214,6 +228,13 @@ class OllamaChatClient:
         model: str,
         latency_ms: float,
     ) -> AIResponse:
+        if not isinstance(raw_response, dict):
+            raise ProviderError(
+                "Ollama response must be a JSON object.",
+                category=ProviderErrorCategory.NON_RETRYABLE,
+                provider="ollama",
+                raw_error=raw_response,
+            )
         raw_message = raw_response.get("message")
         if not isinstance(raw_message, dict):
             raise ProviderError(
@@ -256,6 +277,13 @@ class OllamaChatClient:
         try:
             with urlopen(request, timeout=self.config.timeout_seconds) as response:
                 return json.loads(response.read().decode("utf-8"))
+        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+            raise ProviderError(
+                "Ollama response returned invalid JSON or UTF-8.",
+                category=ProviderErrorCategory.NON_RETRYABLE,
+                provider="ollama",
+                raw_error=exc,
+            ) from exc
         except TimeoutError as exc:
             raise ProviderError(
                 "Ollama request timed out.",
@@ -309,8 +337,16 @@ class OllamaChatClient:
                     raw_line = line.strip()
                     if not raw_line:
                         continue
-                    yield json.loads(raw_line.decode("utf-8"))
-        except json.JSONDecodeError as exc:
+                    chunk = json.loads(raw_line.decode("utf-8"))
+                    if not isinstance(chunk, dict):
+                        raise ProviderError(
+                            "Ollama stream chunk must be a JSON object.",
+                            category=ProviderErrorCategory.NON_RETRYABLE,
+                            provider="ollama",
+                            raw_error=chunk,
+                        )
+                    yield chunk
+        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
             raise ProviderError(
                 "Ollama stream returned invalid JSON.",
                 category=ProviderErrorCategory.NON_RETRYABLE,

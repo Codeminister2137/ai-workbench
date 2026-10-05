@@ -107,9 +107,22 @@ class OpenAICompatibleChatClient:
         started = time.perf_counter()
         content_parts: list[str] = []
         final_raw: dict[str, Any] | None = None
+        last_raw: dict[str, Any] | None = None
+        usage_chunk: dict[str, Any] | None = None
+        tool_fragments: dict[int, dict[str, Any]] = {}
 
         for raw_chunk in self._stream_chat(payload):
-            final_raw = raw_chunk
+            last_raw = raw_chunk
+            if raw_chunk.get("choices") == [] and isinstance(raw_chunk.get("usage"), dict):
+                usage_chunk = raw_chunk
+                continue
+            if final_raw is not None:
+                raise ProviderError(
+                    "Chat Completions stream returned a choice after its final choice.",
+                    category=ProviderErrorCategory.NON_RETRYABLE,
+                    provider=self.config.provider.value,
+                    raw_error=raw_chunk,
+                )
             choice = _first_choice(raw_chunk, provider=self.config.provider.value)
             delta = choice.get("delta")
             if not isinstance(delta, dict):
@@ -118,30 +131,44 @@ class OpenAICompatibleChatClient:
             if isinstance(content, str) and content:
                 content_parts.append(content)
                 yield AIStreamDelta(content=content, raw_metadata=raw_chunk)
+            _collect_tool_fragments(
+                delta.get("tool_calls"), tool_fragments, provider=self.config.provider.value
+            )
 
             if choice.get("finish_reason") is not None:
-                latency_ms = (time.perf_counter() - started) * 1000
-                final_response = AIResponse(
-                    message=AIMessage(
-                        role=MessageRole.ASSISTANT,
-                        content="".join(content_parts),
-                    ),
-                    backend=self._backend_for_model(model),
-                    usage=self._usage_from_response(raw_chunk),
-                    finish_reason=self._finish_reason(choice.get("finish_reason")),
-                    latency_ms=latency_ms,
-                    raw_metadata=raw_chunk,
-                )
-                yield AIStreamFinal(response=final_response)
-                return
+                final_raw = raw_chunk
 
-        raise ProviderError(
-            "Chat Completions stream ended without a final response object.",
-            category=ProviderErrorCategory.RETRYABLE,
-            retryable=True,
+        if final_raw is None:
+            raise ProviderError(
+                "Chat Completions stream ended without a final response object.",
+                category=ProviderErrorCategory.RETRYABLE,
+                retryable=True,
+                provider=self.config.provider.value,
+                raw_error=last_raw,
+            )
+        tool_calls = _tool_calls_from_raw(
+            [tool_fragments[index] for index in sorted(tool_fragments)],
             provider=self.config.provider.value,
-            raw_error=final_raw,
         )
+        metadata = final_raw
+        if usage_chunk is not None:
+            metadata = {**final_raw, "stream_usage_chunk": usage_chunk}
+        final_response = AIResponse(
+            message=AIMessage(
+                role=MessageRole.ASSISTANT,
+                content="".join(content_parts),
+                tool_calls=tool_calls,
+            ),
+            backend=self._backend_for_model(model),
+            usage=self._usage_from_response(usage_chunk or final_raw),
+            finish_reason=self._finish_reason(
+                _first_choice(final_raw, provider=self.config.provider.value).get("finish_reason")
+            ),
+            latency_ms=(time.perf_counter() - started) * 1000,
+            tool_calls=tool_calls,
+            raw_metadata=metadata,
+        )
+        yield AIStreamFinal(response=final_response)
 
     def _chat_payload(self, request: AIRequest, *, stream: bool) -> dict[str, Any]:
         if self.config.require_free_model:
@@ -210,7 +237,9 @@ class OpenAICompatibleChatClient:
             )
 
         content = raw_message.get("content", "") or ""
-        tool_calls = _tool_calls_from_raw(raw_message.get("tool_calls"))
+        tool_calls = _tool_calls_from_raw(
+            raw_message.get("tool_calls"), provider=self.config.provider.value
+        )
         return AIResponse(
             message=AIMessage(
                 role=MessageRole.ASSISTANT, content=str(content), tool_calls=tool_calls
@@ -244,7 +273,7 @@ class OpenAICompatibleChatClient:
         try:
             with urlopen(request, timeout=self.config.timeout_seconds) as response:
                 return json.loads(response.read().decode("utf-8"))
-        except json.JSONDecodeError as exc:
+        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
             raise ProviderError(
                 "Chat Completions response returned invalid JSON.",
                 category=ProviderErrorCategory.NON_RETRYABLE,
@@ -291,12 +320,22 @@ class OpenAICompatibleChatClient:
             with urlopen(request, timeout=self.config.timeout_seconds) as response:
                 for line in response:
                     raw_line = line.strip()
-                    if not raw_line or raw_line == b"data: [DONE]":
+                    if raw_line == b"data: [DONE]":
+                        break
+                    if not raw_line or raw_line.startswith((b":", b"event:", b"id:", b"retry:")):
                         continue
                     if raw_line.startswith(b"data: "):
                         raw_line = raw_line.removeprefix(b"data: ")
-                    yield json.loads(raw_line.decode("utf-8"))
-        except json.JSONDecodeError as exc:
+                    chunk = json.loads(raw_line.decode("utf-8"))
+                    if not isinstance(chunk, dict):
+                        raise ProviderError(
+                            "Chat Completions stream chunk must be a JSON object.",
+                            category=ProviderErrorCategory.NON_RETRYABLE,
+                            provider=self.config.provider.value,
+                            raw_error=chunk,
+                        )
+                    yield chunk
+        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
             raise ProviderError(
                 "Chat Completions stream returned invalid JSON.",
                 category=ProviderErrorCategory.NON_RETRYABLE,
@@ -400,7 +439,7 @@ def _message_to_payload(message: AIMessage) -> dict[str, Any]:
     return payload
 
 
-def _tool_calls_from_raw(raw_calls: object) -> tuple[AIToolCall, ...]:
+def _tool_calls_from_raw(raw_calls: object, *, provider: str) -> tuple[AIToolCall, ...]:
     if not isinstance(raw_calls, list):
         return ()
     calls: list[AIToolCall] = []
@@ -415,10 +454,18 @@ def _tool_calls_from_raw(raw_calls: object) -> tuple[AIToolCall, ...]:
             arguments = (
                 json.loads(raw_arguments) if isinstance(raw_arguments, str) else raw_arguments
             )
-        except json.JSONDecodeError:
-            arguments = {}
+        except json.JSONDecodeError as error:
+            raise ProviderError(
+                "Tool arguments returned invalid JSON; no executable call was produced.",
+                category=ProviderErrorCategory.NON_RETRYABLE,
+                provider=provider,
+            ) from error
         if not isinstance(arguments, dict):
-            arguments = {}
+            raise ProviderError(
+                "Tool arguments must be a JSON object; no executable call was produced.",
+                category=ProviderErrorCategory.NON_RETRYABLE,
+                provider=provider,
+            )
         calls.append(
             AIToolCall(
                 id=str(raw_call.get("id") or f"tool-call-{index}"),
@@ -427,6 +474,50 @@ def _tool_calls_from_raw(raw_calls: object) -> tuple[AIToolCall, ...]:
             )
         )
     return tuple(calls)
+
+
+def _collect_tool_fragments(
+    raw_calls: object, fragments: dict[int, dict[str, Any]], *, provider: str
+) -> None:
+    """Reassemble interleaved function calls by their provider stream index."""
+    if raw_calls is None:
+        return
+    if not isinstance(raw_calls, list):
+        raise ProviderError(
+            "Streamed tool calls must be an array.",
+            category=ProviderErrorCategory.NON_RETRYABLE,
+            provider=provider,
+        )
+    for raw_call in raw_calls:
+        index = raw_call.get("index") if isinstance(raw_call, dict) else None
+        if type(index) is not int or index < 0:
+            raise ProviderError(
+                "Streamed tool call requires a nonnegative integer index.",
+                category=ProviderErrorCategory.NON_RETRYABLE,
+                provider=provider,
+            )
+        assert isinstance(raw_call, dict)
+        current = fragments.setdefault(index, {"id": "", "function": {"name": "", "arguments": ""}})
+        function = raw_call.get("function") or {}
+        if not isinstance(function, dict):
+            raise ProviderError(
+                "Streamed tool function must be an object.",
+                category=ProviderErrorCategory.NON_RETRYABLE,
+                provider=provider,
+            )
+        for destination, key, value in (
+            (current, "id", raw_call.get("id")),
+            (current["function"], "name", function.get("name")),
+            (current["function"], "arguments", function.get("arguments")),
+        ):
+            if value is not None:
+                if not isinstance(value, str):
+                    raise ProviderError(
+                        "Streamed tool fields must be text fragments.",
+                        category=ProviderErrorCategory.NON_RETRYABLE,
+                        provider=provider,
+                    )
+                destination[key] += value
 
 
 def _zero_price_row(row: dict[str, Any]) -> bool:
@@ -454,6 +545,13 @@ def _zero_price_row(row: dict[str, Any]) -> bool:
 
 
 def _first_choice(raw_response: dict[str, Any], *, provider: str) -> dict[str, Any]:
+    if not isinstance(raw_response, dict):
+        raise ProviderError(
+            "Chat Completions response must be a JSON object.",
+            category=ProviderErrorCategory.NON_RETRYABLE,
+            provider=provider,
+            raw_error=raw_response,
+        )
     choices = raw_response.get("choices")
     if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
         raise ProviderError(

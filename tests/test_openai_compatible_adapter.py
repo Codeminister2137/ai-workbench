@@ -9,6 +9,7 @@ from ai_provider import (
     AIRequest,
     AIStreamDelta,
     AIStreamFinal,
+    AIToolCall,
     BackendLocation,
     FinishReason,
     MessageRole,
@@ -260,3 +261,82 @@ def test_openai_compatible_adapter_streams_deltas_and_final_response(
     assert final.response.usage.input_tokens == 3
     assert final.response.usage.output_tokens == 2
     assert final.response.finish_reason is FinishReason.STOP
+
+
+class TestStreamingCalls:
+    def test_interleaved_function_fragments_and_trailing_usage_are_preserved(self, monkeypatch):
+        def chunk(calls):
+            return {"choices": [{"delta": {"tool_calls": calls}, "finish_reason": None}]}
+
+        usage = {"prompt_tokens": 13, "completion_tokens": 7, "total_tokens": 20}
+        chunks = [
+            chunk(
+                [
+                    {
+                        "index": 1,
+                        "id": "second",
+                        "function": {"name": "probe", "arguments": '{"b":'},
+                    },
+                    {
+                        "index": 0,
+                        "id": "first",
+                        "function": {"name": "lookup", "arguments": '{"a":"'},
+                    },
+                ]
+            ),
+            chunk(
+                [
+                    {"index": 0, "function": {"arguments": 'value"}'}},
+                    {"index": 1, "function": {"arguments": "2}"}},
+                ]
+            ),
+            {"choices": [{"delta": {}, "finish_reason": "tool_calls"}]},
+            {"choices": [], "usage": usage},
+        ]
+        monkeypatch.setattr(
+            "ai_provider.adapters.openai_compatible.urlopen",
+            lambda *args, **kwargs: FakeStreamingHttpResponse(chunks),
+        )
+        client = OpenAICompatibleChatClient(
+            BackendConfig(provider=ProviderKind.OPENAI, model="fixture", api_key="fixture")
+        )
+        events = list(
+            client.stream(
+                AIRequest(
+                    messages=(AIMessage(MessageRole.USER, "fixture"),),
+                    privacy_class=PrivacyClass.PUBLIC_OR_LOW_RISK,
+                )
+            )
+        )
+        assert len(events) == 1 and isinstance(events[0], AIStreamFinal)
+        response = events[0].response
+        assert response.tool_calls == (
+            AIToolCall("first", "lookup", {"a": "value"}),
+            AIToolCall("second", "probe", {"b": 2}),
+        )
+        assert response.message.tool_calls == response.tool_calls
+        assert response.usage.total_tokens == 20
+        assert response.raw_metadata["stream_usage_chunk"] == chunks[-1]
+        assert response.raw_metadata["choices"] == chunks[-2]["choices"]
+
+    @pytest.mark.parametrize("index", [None, True, -1, "0"])
+    def test_malformed_tool_fragment_index_fails_before_producing_calls(self, monkeypatch, index):
+        chunks = [
+            {"choices": [{"delta": {"tool_calls": [{"index": index}]}, "finish_reason": None}]}
+        ]
+        monkeypatch.setattr(
+            "ai_provider.adapters.openai_compatible.urlopen",
+            lambda *args, **kwargs: FakeStreamingHttpResponse(chunks),
+        )
+        client = OpenAICompatibleChatClient(
+            BackendConfig(provider=ProviderKind.OPENAI, model="fixture", api_key="fixture")
+        )
+        with pytest.raises(ProviderError, match="integer index"):
+            list(
+                client.stream(
+                    AIRequest(
+                        messages=(AIMessage(MessageRole.USER, "fixture"),),
+                        privacy_class=PrivacyClass.PUBLIC_OR_LOW_RISK,
+                    )
+                )
+            )

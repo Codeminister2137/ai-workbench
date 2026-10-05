@@ -67,6 +67,20 @@ One normalized provider response:
 Streaming adapters must enforce the same privacy policy as non-streaming
 completion before sending the request.
 
+Final streaming responses preserve tool calls in both `message.tool_calls` and
+`tool_calls`. Hosted calls are assembled by stream index, including interleaved
+argument fragments; Ollama calls arriving before its final usage chunk remain
+available. Hosted trailing usage is normalized and its original chunk retained
+under `raw_metadata.stream_usage_chunk`. The adapter does not add an
+`include_usage` request option, so absent provider counts remain unavailable.
+These layouts follow [OpenAI's streaming contract](https://developers.openai.com/api/reference/resources/chat/subresources/completions/streaming-events)
+and [Ollama's streamed tool responses](https://ollama.com/blog/streaming-tool).
+
+Malformed JSON/UTF-8, non-object response envelopes and invalid tool argument
+JSON are normalized to nonretryable `ProviderError` instances. Invalid arguments
+never silently become an empty executable call. Software fixtures verify these
+contracts without hosted calls or model-quality claims.
+
 ### `BackendConfig`
 
 Configured backend selection:

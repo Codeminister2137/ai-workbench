@@ -336,3 +336,39 @@ def test_ollama_adapter_stream_requires_final_chunk(monkeypatch: pytest.MonkeyPa
 
     with pytest.raises(ProviderError, match="without a final response"):
         list(client.stream(AIRequest(messages=(AIMessage(MessageRole.USER, "Hello"),))))
+
+
+def test_stream_preserves_earlier_tool_calls_when_final_chunk_only_reports_usage(monkeypatch):
+    from ai_provider import AIToolCall
+
+    chunks = [
+        {
+            "message": {
+                "content": "",
+                "tool_calls": [{"function": {"name": "lookup", "arguments": {"a": 1}}}],
+            },
+            "done": False,
+        },
+        {
+            "message": {
+                "content": "",
+                "tool_calls": [{"function": {"name": "probe", "arguments": {"b": 2}}}],
+            },
+            "done": False,
+        },
+        {"done": True, "done_reason": "stop", "eval_count": 10},
+    ]
+    monkeypatch.setattr(
+        "ai_provider.adapters.ollama.urlopen",
+        lambda *args, **kwargs: FakeStreamingHttpResponse(chunks),
+    )
+    client = OllamaChatClient(BackendConfig(provider=ProviderKind.OLLAMA, model="fixture"))
+    events = list(client.stream(AIRequest(messages=(AIMessage(MessageRole.USER, "fixture"),))))
+    assert len(events) == 1 and isinstance(events[0], AIStreamFinal)
+    response = events[0].response
+    assert response.tool_calls == (
+        AIToolCall("tool-call-0", "lookup", {"a": 1}),
+        AIToolCall("tool-call-1", "probe", {"b": 2}),
+    )
+    assert response.message.tool_calls == response.tool_calls
+    assert response.usage.output_tokens == 10
