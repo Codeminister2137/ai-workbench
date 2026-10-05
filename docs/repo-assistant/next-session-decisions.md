@@ -35,6 +35,13 @@ implemented offline. No executable job or compute window was selected.
 Shared external mutation approvals and scoped receipts are implemented offline
 under ADR-041. Live terminal/client permission acceptance remains deferred.
 
+2026-10-05: fixed D3 native acceptance and shared `workspace_write` continuation
+through real Copilot/Kiro passed. Interactive terminal acceptance is still pending.
+Current implementation is blocked on the explicit IDE endpoint and the new
+[foreground process-channel choice](process-sharing-decision.md). D2's
+[fresh operator investigation](search-operator-investigation.md) found no usable
+JSON replacement; no operator setting was changed.
+
 Implement versioned native tool-compatibility evidence and effective model-input
 admission using existing routing/context contracts (ADR-041). Respect explicit
 model selection; prefer verified GPT-OSS for automatic native tool routes.

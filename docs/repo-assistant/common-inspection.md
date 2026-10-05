@@ -87,3 +87,20 @@ The file tools retain their existing workspace boundary. Shell cwd containment
 does not sandbox a command's effects. A shell grant remains broader than a file
 grant. Client discovery, terminal propagation, mutations and fallback need bounded
 live acceptance; offline contract tests do not establish cross-agent coding parity.
+
+2026-10-05 bounded live checks: simulated Codex exhaustion after an actual shared
+edit continued through real Copilot 1.0.91 and Kiro 2.24.0 under `workspace_write`.
+Each fixture retained its partial comment, passed host assignment validation and
+recorded exactly two completed shared edits under distinct run IDs. No shell calls
+were requested. Copilot reported one premium request. Kiro's unchanged generated
+configuration was removed. Run the opt-in harness with
+`python -m uv run scripts/fallback-acceptance.py --shared-coding`
+or add `--fallback-client kiro`; these commands use installed authenticated clients
+and transmit synthetic public fixture context. They are not offline checks.
+
+Saved native-session handoffs now include observed process handles/statuses, with
+staleness and restart warnings. This does not expose native process tools through
+the external shared profile. The remaining foreground transport choice is in the
+[process-sharing brief](process-sharing-decision.md). Interactive terminal mutation
+acceptance, Codex native/shared write interaction and Antigravity grants remain
+separate checks; this evidence does not complete all-client parity.

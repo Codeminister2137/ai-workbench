@@ -34,7 +34,8 @@ controlling terminal, require approval for each exact operation and refuse when
 no human terminal is available. Task/run/workspace scope and foreground process
 identity prevent inherited grants after owner exit. Shared inspection remains
 read-only. Existing coding sessions persist scoped digest receipts without raw
-tool arguments or outputs; live client permission acceptance remains deferred.
+tool arguments or outputs. Bounded `workspace_write` continuation through real
+Copilot and Kiro passed; interactive terminal approval remains unverified.
 
 Avoid `--allow-outside-files` unless you deliberately want to allow outside-repo
 paths without a prompt.

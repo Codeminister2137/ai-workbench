@@ -22,6 +22,40 @@ CLI, invoke the required skills, resume work and recover from allowance exhausti
 with the common tools still available. PyCharm may host tools initially; eventually
 it should only be the human editor/viewer. Different model performance is allowed.
 
+## 2026-10-05 checkpoint and remaining boundaries
+
+**Current slices COMPLETE; remaining CLI foundation BLOCKED on concrete inputs/decisions.**
+
+- Shared partial-effect fallback retains complete instructions, objectives,
+  task identity, fresh run scopes/approvals, updated receipts and external deadlines.
+- Saved foreground process observations survive route changes; an actual synthetic
+  in-flight child is polled through the same handle without relaunch. Restarted
+  handles remain metadata, not attachment authority.
+- Fixed D3 native acceptance passed with real GPT-OSS read/edit effects, host
+  validation and verified runtime/worker/validator cleanup. Two earlier startup
+  failures remain preserved. Existing model-library configuration is retained;
+  owned acceptance runtimes disable cloud discovery/pruning and bound metadata
+  readiness retries. No download or global setting changes were made.
+- Real Copilot 1.0.91 and Kiro 2.24.0 continued a synthetic Codex quota failure
+  using shared workspace writes. Each fixture recorded exactly two successful
+  edits under distinct run IDs, retained the partial comment and passed host
+  assignment validation. This is bounded continuation evidence, not complete
+  tool/skill/interactive-approval parity.
+- The [D2 public operator investigation](search-operator-investigation.md) found
+  no usable JSON replacement. No configured search operator was changed.
+
+Next implementation requires the explicit local PyCharm HTTP Stream endpoint and
+the [foreground process-channel decision](process-sharing-decision.md). Local IPC
+and authenticated loopback MCP are materially different authentication/transport
+choices; per-client supervisors would lose live shared handles. Interactive human
+approval acceptance requires an attended terminal. Antigravity remains excluded.
+
+Wider master/Council/Orchestrator plans were checked against the current code.
+Their historic unchecked foundation items are not fresh implementation tasks.
+Council synthesis/application integration, job-search ingestion/evidence storage
+and quota-source integration need focused API/data/provider decisions before
+starting a separate feature track. Optional capabilities remain outside C1-C6.
+
 ## Approved capability set
 
 | ID | Capability | Required outcome |
