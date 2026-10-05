@@ -149,6 +149,12 @@ class CodingSession:
                 "ORDER BY created_at_utc DESC, rowid DESC LIMIT 30",
                 (self.session_id,),
             ).fetchall()
+            processes = connection.execute(
+                "SELECT process_handle,pid,status,returncode,observed_at_utc "
+                "FROM coding_processes WHERE session_id=? "
+                "ORDER BY observed_at_utc DESC, rowid DESC LIMIT 30",
+                (self.session_id,),
+            ).fetchall()
         assert session is not None
         return (
             "## Coding-session handoff\nApprovals from earlier invocations have expired. "
@@ -156,7 +162,11 @@ class CodingSession:
             "observations, not current file state or validation proof.\n"
             f"Original objective: {session['objective']}\n"
             f"Explicit decisions: {session['decisions_json']}\n"
-            "Recent receipts: " + json.dumps([dict(row) for row in receipts])
+            "Recent receipts: "
+            + json.dumps([dict(row) for row in receipts])
+            + "\nRecent process observations (may be stale; poll through this foreground "
+            "host before acting; handles cannot attach to processes after restart): "
+            + json.dumps([dict(row) for row in processes])
         )
 
     def status(self, value: str) -> None:

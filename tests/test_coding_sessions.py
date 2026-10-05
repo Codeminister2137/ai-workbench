@@ -81,6 +81,9 @@ def test_unknown_process_handles_remain_metadata_after_restart(tmp_path):
             == "unknown_after_restart"
         )
     assert not resumed.supervisor.processes
+    assert "unknown_after_restart" in resumed.handoff()
+    assert '"process_handle": "old"' in resumed.handoff()
+    assert "cannot attach to processes after restart" in resumed.handoff()
 
 
 def test_interrupted_client_requires_reconciliation_even_after_failed_session(tmp_path):

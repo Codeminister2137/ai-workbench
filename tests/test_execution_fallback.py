@@ -247,6 +247,75 @@ def test_deadline_after_partial_effect_preserves_handoff_without_fallback(
     assert "Inspect saved edits/receipts" in saved[0]["next_action"]
 
 
+def test_foreground_process_handle_survives_route_switch_without_relaunch(
+    monkeypatch, routes, tmp_path
+):
+    import sys
+
+    from ai_agent.contracts import ToolCall
+    from ai_agent.processes import ProcessTool
+    from ai_agent.tools import ToolContext, ToolRegistry
+    from ai_provider.coding_sessions import CodingSession
+
+    coding = CodingSession.open(tmp_path / "session.sqlite3", "new", tmp_path, "Validate", [])
+    registry = coding.observe_registry(
+        ToolRegistry(
+            tuple(
+                ProcessTool(coding.supervisor, operation)
+                for operation in ("start", "status", "stop")
+            )
+        )
+    )
+    run = session(monkeypatch, routes)
+    handles = []
+
+    def execute(target, prompt):
+        if target.route_id == "codex":
+            result = registry.execute(
+                ToolCall(
+                    "process_start",
+                    {
+                        "argv": [
+                            sys.executable,
+                            "-c",
+                            "import threading; threading.Event().wait(30)",
+                        ]
+                    },
+                ),
+                ToolContext(tmp_path),
+            )
+            assert not result.is_error
+            handles.append(result.metadata["process_handle"])
+            return ExternalAgentResult((), 1, "", "usage_limit_reached")
+        handoff = coding.handoff()
+        assert handles[0] in handoff and '"status": "running"' in handoff
+        assert "Approvals from earlier invocations have expired" in handoff
+        status = registry.execute(
+            ToolCall("process_status", {"process_handle": handles[0]}), ToolContext(tmp_path)
+        )
+        assert status.metadata["status"] == "running"
+        assert len(coding.supervisor.processes) == 1
+        return "continue with existing handle"
+
+    try:
+        assert (
+            run.run(
+                "Validate",
+                execute,
+                lambda result: isinstance(result, ExternalAgentResult)
+                and external_usage_limit(result),
+                observe=str,
+            )
+            == "continue with existing handle"
+        )
+        with coding.connection() as connection:
+            operations = [r[0] for r in connection.execute("SELECT operation FROM coding_receipts")]
+        assert operations == ["process_start", "process_status"]
+    finally:
+        coding.supervisor.close()
+    assert coding.supervisor.status(handles[0])["status"] != "running"
+
+
 def test_quality_config_is_validated_and_missing_model_evidence_refuses(routes, tmp_path):
     from ai_orchestrator.fallback import FallbackQualityPolicy
 
