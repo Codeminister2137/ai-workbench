@@ -363,6 +363,19 @@ approval does not authorize live inference or select a compute window.
 
 Detailed ADR: [ADR-043](decisions/ADR-043-fixed-local-native-acceptance-jobs.md)
 
+## ADR-044 — Authenticated foreground loopback MCP host
+
+**Status:** Accepted; foreground host implemented; optional IDE SDK acceptance pending
+**Date:** 2026-10-05
+
+The owner selected authenticated loopback MCP for shared foreground process access,
+because authentication, connection/session lifecycle and shutdown behavior should
+be implemented now rather than deferred. Existing supervision, permissions,
+receipts and restart reconciliation remain in force. PyCharm configuration is
+imported per machine into ignored local storage.
+
+Detailed ADR: [ADR-044](decisions/ADR-044-authenticated-foreground-mcp-host.md)
+
 ## Template
 ```text
 ## ADR-NNN — Short Name

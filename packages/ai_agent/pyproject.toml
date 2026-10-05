@@ -9,6 +9,9 @@ dependencies = [
     "ai-orchestrator",
 ]
 
+[project.optional-dependencies]
+ide = ["mcp>=2.3,<3"]
+
 [project.scripts]
 ai-agent-mcp = "ai_agent.mcp_server:main"
 

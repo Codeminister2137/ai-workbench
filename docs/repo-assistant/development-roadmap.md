@@ -48,11 +48,25 @@ below are preserved independently of the skipped optional integration tests.
 - The [D2 public operator investigation](search-operator-investigation.md) found
   no usable JSON replacement. No configured search operator was changed.
 
-Next implementation requires the explicit local PyCharm HTTP Stream endpoint and
-the [foreground process-channel decision](process-sharing-decision.md). Local IPC
-and authenticated loopback MCP are materially different authentication/transport
-choices; per-client supervisors would lose live shared handles. Interactive human
-approval acceptance requires an attended terminal. Antigravity remains excluded.
+The owner subsequently selected authenticated loopback MCP in
+[ADR-044](../decisions/ADR-044-authenticated-foreground-mcp-host.md) and supplied
+their machine-local PyCharm endpoint. The shared foreground host is implemented:
+fresh bearer/session scopes, start/status/stop across routes, denial/expiry,
+interruption cleanup and restart refusal. Real Copilot and Kiro each polled the
+same live child after synthetic quota fallback and completed the partial edit;
+both children were cleaned up. Four failed Copilot handshake runs are preserved;
+the newer `server/discover` probe now receives the supported protocol fallback.
+
+The read-only IDE wrappers/configuration importer are implemented, with the
+supplied endpoint saved only in ignored local storage. Direct HTTP interpreter,
+diagnostics and symbol calls passed. Optional SDK installation/project-bridge
+acceptance awaits the package-manager clarification required by the Python-tools
+skill; PyCharm reports `unknown`. See [local setup](local-tool-hosts.md).
+Interactive human approval acceptance still requires an attended terminal.
+Antigravity remains excluded. This is bounded acceptance, not full tool parity.
+Current offline validation: 1124 passed, eight skipped in 154.50 seconds; the
+additional skip is the optional SDK interoperability test while SDK installation
+is pending. Ruff lint/format and Pyright are clean.
 
 Wider master/Council/Orchestrator plans were checked against the current code.
 Their historic unchecked foundation items are not fresh implementation tasks.

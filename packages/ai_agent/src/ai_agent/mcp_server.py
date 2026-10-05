@@ -61,9 +61,9 @@ def read_search_tool_registry() -> ToolRegistry:
     )
 
 
-def repo_inspection_tool_registry() -> ToolRegistry:
+def repo_inspection_tool_registry(workspace: Path | None = None) -> ToolRegistry:
     """Extend read/search with bounded local Git status and diff inspection."""
-    return shared_tool_registry("inspection")
+    return shared_tool_registry("inspection", workspace)
 
 
 def codex_mcp_tool_registry(
@@ -359,12 +359,20 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--owner-birth")
     parser.add_argument("--session-database", type=Path)
     parser.add_argument("--session-id")
+    parser.add_argument("--proxy-url")
+    parser.add_argument("--proxy-token-env")
     args = parser.parse_args(argv)
+    if args.proxy_url or args.proxy_token_env:
+        if not args.proxy_url or not args.proxy_token_env:
+            parser.error("Foreground proxy URL and token environment name are required together")
+        from ai_agent.http_proxy import run_http_proxy
+
+        return run_http_proxy(args.proxy_url, args.proxy_token_env)
     workspace_root = args.workspace_root.resolve()
     if args.shared_profile:
         if args.read_search_only:
             parser.error("Shared profile and read/search-only selection are mutually exclusive")
-        registry = shared_tool_registry(args.shared_profile)
+        registry = shared_tool_registry(args.shared_profile, workspace_root)
         if args.shared_profile == "coding":
             if not args.task_id or not args.run_id:
                 parser.error("Shared coding requires task/run IDs")
@@ -414,7 +422,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     return run_stdio_server(
         workspace_root=workspace_root,
         registry=(
-            repo_inspection_tool_registry()
+            repo_inspection_tool_registry(workspace_root)
             if args.read_search_only
             else codex_mcp_tool_registry(
                 catalog_path=catalog_path,

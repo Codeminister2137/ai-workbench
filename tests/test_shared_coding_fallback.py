@@ -7,10 +7,7 @@ from io import StringIO
 from typing import Any, cast
 
 import pytest
-from ai_agent import mcp_server
-from ai_agent.mcp_server import handle_mcp_message
 from ai_agent.shared_approvals import TerminalApproval
-from ai_agent.tools import ToolContext
 from ai_orchestrator import AccessMethod
 from ai_provider import repo_coding_assistant as cli
 from ai_provider.agent_readiness import AgentReadiness
@@ -81,17 +78,15 @@ tools = true
     monkeypatch.setattr(TerminalApproval, "__call__", approve)
     runs, tasks, effects, timeouts, deadlines = [], [], [], [], []
 
-    def serve(*, workspace_root, registry):
+    def serve(connection):
         def call(name, arguments):
-            response = handle_mcp_message(
+            response = connection.send(
                 {
                     "jsonrpc": "2.0",
                     "id": 1,
                     "method": "tools/call",
                     "params": {"name": name, "arguments": arguments},
                 },
-                registry=registry,
-                context=ToolContext(workspace_root),
             )
             assert response is not None
             result = response["result"]
@@ -115,8 +110,6 @@ tools = true
         assert not call("read_file", {"path": "source.py"})["isError"]
         return 0
 
-    monkeypatch.setattr(mcp_server, "run_stdio_server", serve)
-
     def runner(command, **kwargs):
         if command[0] == "codex-test":
             settings = dict(
@@ -135,13 +128,35 @@ tools = true
                 assert "Explicit decisions" in payload and "Preserve protected.txt" in payload
         assert instructions in payload
         assert "Set value to 2" in payload
-        assert args[args.index("--approval-policy") + 1] == preset
-        tasks.append(args[args.index("--task-id") + 1])
+        from ai_agent.http_proxy import HttpMcpConnection
+        from ai_provider.coding_sessions import ACTIVE_SESSION
+
+        connection = HttpMcpConnection(
+            args[args.index("--proxy-url") + 1],
+            kwargs["env"][args[args.index("--proxy-token-env") + 1]],
+        )
+        connection.send({"jsonrpc": "2.0", "id": 1, "method": "initialize"})
+        connection.send({"jsonrpc": "2.0", "method": "notifications/initialized"})
+        response = connection.send(
+            {
+                "jsonrpc": "2.0",
+                "id": 2,
+                "method": "tools/call",
+                "params": {"name": "read_file", "arguments": {"path": "source.py"}},
+            }
+        )
+        assert response is not None
+        observed = response["result"]["structuredContent"]["metadata"]["shared_receipt"]
+        tasks.append(observed["task_id"])
+        runs.append(observed["run_id"])
         if persist:
-            assert tasks[-1] == args[args.index("--session-id") + 1]
-        runs.append(args[args.index("--run-id") + 1])
+            session = ACTIVE_SESSION.get()
+            assert session is not None and tasks[-1] == session.session_id
         timeouts.append(kwargs["timeout"])
-        assert mcp_server.main(args[2:]) == 0
+        try:
+            assert serve(connection) == 0
+        finally:
+            connection.close()
         return subprocess.CompletedProcess(
             command,
             1 if len(runs) == 1 else 0,

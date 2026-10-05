@@ -19,8 +19,15 @@ from ai_agent.tools.base import BaseTool, ToolContext, ToolRegistry
 class TerminalApproval:
     """Ask once for this exact operation; never read model-controlled stdio."""
 
-    def __init__(self, task_id: str, run_id: str, workspace: Path):
+    def __init__(
+        self,
+        task_id: str,
+        run_id: str,
+        workspace: Path,
+        is_active: Callable[[], bool] | None = None,
+    ):
         self.task_id, self.run_id, self.workspace = task_id, run_id, workspace.resolve()
+        self.is_active = is_active
 
     def __call__(self, call: ToolCall, category: ToolCategory) -> bool:
         operation = json.dumps({"tool": call.name, "arguments": call.arguments}, ensure_ascii=True)
@@ -36,6 +43,8 @@ class TerminalApproval:
             ):
                 if not reader.isatty() or not writer.isatty():
                     return False
+                if self.is_active is not None:
+                    self._discard_pending_input(reader)
                 writer.write(
                     json.dumps(
                         {
@@ -50,9 +59,61 @@ class TerminalApproval:
                     + "\nApprove this operation once? [yes/NO] "
                 )
                 writer.flush()
-                return reader.readline().strip().lower() == "yes"
+                if self.is_active is None:
+                    return reader.readline().strip().lower() == "yes"
+                return self._scoped_answer(reader, writer)
         except (OSError, EOFError, KeyboardInterrupt):
             return False
+
+    def _scoped_answer(self, reader, writer) -> bool:
+        """Poll the controlling terminal so revoked HTTP scopes can shut down."""
+        import time
+
+        answer = ""
+        while self.is_active and self.is_active():
+            if os.name == "nt":
+                import msvcrt
+
+                if not msvcrt.kbhit():
+                    time.sleep(0.05)
+                    continue
+                character = msvcrt.getwch()
+                if character in {"\0", "\xe0"}:
+                    msvcrt.getwch()
+                    continue
+                if character in {"\r", "\n"}:
+                    writer.write("\n")
+                    writer.flush()
+                    return answer.strip().lower() == "yes"
+                if character == "\x03":
+                    return False
+                if character == "\b":
+                    if answer:
+                        answer = answer[:-1]
+                        writer.write("\b \b")
+                elif character.isprintable() and len(answer) < 16:
+                    answer += character
+                    writer.write(character)
+                writer.flush()
+            else:
+                import select
+
+                if select.select([reader], [], [], 0.05)[0]:
+                    return reader.readline().strip().lower() == "yes"
+        return False
+
+    @staticmethod
+    def _discard_pending_input(reader) -> None:
+        """A queued answer from an expired prompt cannot approve the next operation."""
+        if os.name == "nt":
+            import msvcrt
+
+            while msvcrt.kbhit():
+                msvcrt.getwch()
+        else:
+            import termios
+
+            termios.tcflush(reader.fileno(), termios.TCIFLUSH)
 
 
 class ScopedTool(BaseTool):

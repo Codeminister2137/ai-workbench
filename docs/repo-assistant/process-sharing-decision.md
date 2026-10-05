@@ -1,6 +1,12 @@
 # Shared foreground process access: decision brief
 
-**BLOCKED on transport/authentication choice; existing foreground supervisor stays approved.**
+**B selected by owner on 2026-10-05; foreground host implemented and bounded Copilot/Kiro acceptance passed.**
+
+The owner chose authenticated loopback MCP because authentication, connection/session
+lifecycle and shutdown behavior will be needed eventually and should be implemented
+now. [ADR-044](../decisions/ADR-044-authenticated-foreground-mcp-host.md) records the
+decision; [local tool-host setup](local-tool-hosts.md) documents the implementation.
+The alternatives and original recommendation below are preserved as decision history.
 
 ADR-041 selected a foreground supervisor, existing SQLite receipts and explicit
 restart reconciliation. Native session tools now expose its process handles;
@@ -33,5 +39,4 @@ and reconciliation semantics. No command/output/credential persistence or daemon
 is proposed. Implementation must test a real in-flight child through route changes,
 denied start/stop, adapter expiry, interruption, cleanup and restart refusal.
 
-Owner question: choose A, B or C, and state the main reason if it differs from the
-recommendation. Record a detailed ADR only after the owner selects the channel.
+Owner selection: B; rationale and implementation boundaries are recorded in ADR-044.

@@ -73,6 +73,15 @@ justifies them; other focused dependencies remain allowed when they satisfy the
 same criteria.
 
 ## 2. Modular monolith first
+
+The repo-assistant CLI owns shared direct-child processes through one foreground
+supervisor. Its per-client MCP adapters forward to an authenticated ephemeral
+loopback MCP host with invocation-scoped credentials and sessions (ADR-044).
+Native tool execution uses the same supervisor. Existing optional SQLite receipts
+record observations; restart does not restore live pipes or process ownership.
+Read-only PyCharm wrappers use a separately imported machine-local endpoint and
+an optional official MCP SDK. Neither host introduces a background daemon.
+
 Start as a modular monolith. Extract a separately deployable service only for a demonstrated need such as independent scaling/deployment, a different security/runtime boundary, operational isolation, or a real development bottleneck.
 
 For GitHub publication, keep the workspace as one cleaned-up monorepo with

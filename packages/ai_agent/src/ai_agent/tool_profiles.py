@@ -1,6 +1,7 @@
 """Built-in common tool surfaces; profiles select tools without granting permissions."""
 
 from dataclasses import dataclass
+from pathlib import Path
 
 from ai_agent.tools import (
     CreateFileTool,
@@ -38,7 +39,7 @@ def shared_tool_profile(name: str) -> SharedToolProfile:
     raise ValueError(f"Unsupported shared tool profile: {name}")
 
 
-def shared_tool_registry(name: str) -> ToolRegistry:
+def shared_tool_registry(name: str, workspace: Path | None = None) -> ToolRegistry:
     """Use the same implementations for provider-native execution and MCP."""
     shared_tool_profile(name)
     registry = ToolRegistry(
@@ -54,4 +55,8 @@ def shared_tool_registry(name: str) -> ToolRegistry:
     if name == "coding":
         for tool in (CreateFileTool(), EditFileTool(), RunCommandTool()):
             registry.register(tool)
+    if workspace is not None:
+        from ai_agent.ide_bridge import add_ide_tools
+
+        add_ide_tools(registry, workspace)
     return registry

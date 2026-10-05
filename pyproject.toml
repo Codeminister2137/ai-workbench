@@ -9,6 +9,9 @@ dependencies = [
     "ai-agent",
 ]
 
+[project.optional-dependencies]
+ide = ["ai-agent[ide]"]
+
 [dependency-groups]
 dev = [
     "pytest>=9.0.0,<10.0.0",

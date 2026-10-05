@@ -20,6 +20,9 @@ class SharedToolRun:
     terminal_approvals: bool = False
     session_database: Path | None = None
     session_id: str | None = None
+    host_url: str | None = None
+    token_env: str | None = None
+    available_tools: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         ApprovalPolicyPreset(self.approval_policy)
@@ -28,6 +31,20 @@ class SharedToolRun:
 
 
 def inspection_server(workspace: Path, run: SharedToolRun | None = None) -> dict[str, object]:
+    if run and run.host_url:
+        if not run.token_env:
+            raise ValueError("Foreground HTTP mapping needs its token environment name")
+        return {
+            "command": sys.executable,
+            "args": [
+                "-m",
+                "ai_agent.mcp_server",
+                "--proxy-url",
+                run.host_url,
+                "--proxy-token-env",
+                run.token_env,
+            ],
+        }
     extra = ["--read-search-only"]
     if run:
         from ai_provider.acceptance_processes import process_identity
@@ -81,16 +98,16 @@ def codex_inspection_overrides(workspace: Path, run: SharedToolRun | None = None
         },
         "mcp_servers.repo_shared.enabled": True,
         "mcp_servers.repo_shared.required": True,
-        "mcp_servers.repo_shared.enabled_tools": list(
-            shared_tool_profile("coding" if run else "inspection").tool_names
-        ),
+        "mcp_servers.repo_shared.enabled_tools": list(run_tool_names(run, workspace)),
         "mcp_servers.repo_shared.default_tools_approval_mode": "approve",
     }
+    if run and run.host_url:
+        values["mcp_servers.repo_shared.env_vars"] = [run.token_env]
     return [item for key, value in values.items() for item in ("-c", key + "=" + json.dumps(value))]
 
 
 def copilot_inspection_options(workspace: Path, run: SharedToolRun | None = None) -> list[str]:
-    tools = shared_tool_profile("coding" if run else "inspection").tool_names
+    tools = run_tool_names(run, workspace)
     config = {
         "mcpServers": {
             "repo_shared": {
@@ -100,6 +117,8 @@ def copilot_inspection_options(workspace: Path, run: SharedToolRun | None = None
             }
         }
     }
+    if run and run.host_url and run.token_env:
+        config["mcpServers"]["repo_shared"]["env"] = {run.token_env: "${" + run.token_env + "}"}
     options = ["--disable-builtin-mcps", "--additional-mcp-config", json.dumps(config)]
     for tool in tools:
         options.extend(["--allow-tool", f"repo_shared({tool})"])
@@ -110,18 +129,31 @@ def copilot_inspection_options(workspace: Path, run: SharedToolRun | None = None
 def kiro_inspection_agent(
     workspace: Path, name: str, run: SharedToolRun | None = None
 ) -> dict[str, object]:
-    tools = [
-        "@repo_shared/" + tool
-        for tool in shared_tool_profile("coding" if run else "inspection").tool_names
-    ]
+    tools = ["@repo_shared/" + tool for tool in run_tool_names(run, workspace)]
+    server = inspection_server(workspace, run)
+    if run and run.host_url and run.token_env:
+        server["env"] = {run.token_env: "${" + run.token_env + "}"}
     return {
         "name": name,
         "description": "Project-owned common inspection tools for this run",
         "prompt": "Use only the shared project tools and respect their permission decisions."
         if run
         else "Use shared repository inspection tools. No edits, shell, network or delegation.",
-        "mcpServers": {"repo_shared": inspection_server(workspace, run)},
+        "mcpServers": {"repo_shared": server},
         "tools": tools,
         "allowedTools": tools,
         "resources": [],
     }
+
+
+def run_tool_names(run: SharedToolRun | None, workspace: Path) -> tuple[str, ...]:
+    if run and run.available_tools:
+        return run.available_tools
+    tools = shared_tool_profile("coding" if run else "inspection").tool_names
+    if run and run.host_url:
+        tools += ("process_start", "process_status", "process_stop")
+    from ai_agent.ide_bridge import CONFIG_PATH, IDE_TOOL_NAMES
+
+    if (workspace / CONFIG_PATH).is_file():
+        tools += IDE_TOOL_NAMES
+    return tools

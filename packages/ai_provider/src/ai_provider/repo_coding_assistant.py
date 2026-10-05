@@ -2037,6 +2037,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     if not parsed.coding_session:
         if parsed.session_decision or parsed.coding_session_reconciled:
             parser.error("Session decisions/reconciliation require --coding-session")
+        if parsed.shared_tools == "coding" and parsed.execute:
+            from ai_provider.foreground_tools import ACTIVE_FOREGROUND, ForegroundTools
+
+            root = parsed.repo_root.resolve() if parsed.repo_root else find_repo_root(Path.cwd())
+            foreground = ForegroundTools(root)
+            foreground_token = ACTIVE_FOREGROUND.set(foreground)
+            try:
+                return _main(argv)
+            finally:
+                try:
+                    foreground.close()
+                finally:
+                    ACTIVE_FOREGROUND.reset(foreground_token)
         return _main(argv)
     if not parsed.execute or parsed.mode not in {"ask", "review", "implement"}:
         parser.error("--coding-session requires an executed ask/review/implement request")
@@ -2069,6 +2082,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 1
     print(f"coding_session_id: {session.session_id}")
     token = ACTIVE_SESSION.set(session)
+    from ai_provider.foreground_tools import ACTIVE_FOREGROUND, ForegroundTools
+
+    foreground = ForegroundTools(root, session)
+    foreground_token = ACTIVE_FOREGROUND.set(foreground)
     finished = False
     try:
         status = _main(argv)
@@ -2077,13 +2094,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         return status
     finally:
         try:
-            session.supervisor.close()
+            foreground.close()
             for handle in session.supervisor.processes:
                 session.observe_process(session.supervisor.status(handle))
         finally:
             if not finished:
                 session.status("interrupted")
             ACTIVE_SESSION.reset(token)
+            ACTIVE_FOREGROUND.reset(foreground_token)
 
 
 def _main(argv: Sequence[str] | None = None) -> int:
@@ -4542,7 +4560,7 @@ def _run_native_agent(
     if getattr(args, "shared_tools", None):
         from ai_agent.tool_profiles import shared_tool_registry
 
-        registry = shared_tool_registry(args.shared_tools)
+        registry = shared_tool_registry(args.shared_tools, repo_root)
     research = getattr(args, "research_execution", None)
     if research is not None:
         from ai_provider.research_execution import (
@@ -4581,6 +4599,11 @@ def _run_native_agent(
     from ai_provider.coding_sessions import ACTIVE_SESSION
 
     active_session = ACTIVE_SESSION.get()
+    from ai_provider.foreground_tools import ACTIVE_FOREGROUND
+
+    foreground = ACTIVE_FOREGROUND.get()
+    if research is None and getattr(args, "shared_tools", None) == "coding" and foreground:
+        registry = foreground.registry()
     if active_session is not None:
         if research is None and not getattr(args, "shared_tools", None):
             from ai_agent.processes import ProcessTool

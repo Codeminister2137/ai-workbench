@@ -43,6 +43,10 @@ class ExternalAgentConfig:
     shared_terminal_approvals: bool = False
     shared_session_database: Path | None = None
     shared_session_id: str | None = None
+    shared_host_url: str | None = None
+    shared_token_env: str | None = None
+    shared_child_env: dict[str, str] | None = field(default=None, repr=False, compare=False)
+    shared_available_tools: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -843,6 +847,9 @@ def _shared_run_context(config: ExternalAgentConfig):
         config.shared_terminal_approvals,
         config.shared_session_database,
         config.shared_session_id,
+        config.shared_host_url,
+        config.shared_token_env,
+        config.shared_available_tools,
     )
 
 
@@ -923,15 +930,26 @@ def run_external_agent(
         )
     receipt = session.begin("external_client:" + config.access_method.value) if session else None
     try:
-        result = _run_external_agent_owned(
-            prompt,
-            config,
-            runner=runner,
-            popen_factory=popen_factory,
-            progress_callback=progress_callback,
-            progress_interval_seconds=progress_interval_seconds,
-            deadline=deadline,
+        from contextlib import nullcontext
+
+        from ai_provider.foreground_tools import ACTIVE_FOREGROUND
+
+        foreground = ACTIVE_FOREGROUND.get()
+        scope = (
+            foreground.invocation(config, deadline=deadline)
+            if foreground and config.shared_tool_profile == "coding"
+            else nullcontext(config)
         )
+        with scope as scoped_config:
+            result = _run_external_agent_owned(
+                prompt,
+                scoped_config,
+                runner=runner,
+                popen_factory=popen_factory,
+                progress_callback=progress_callback,
+                progress_interval_seconds=progress_interval_seconds,
+                deadline=deadline,
+            )
     except BaseException:
         if session and receipt:
             session.finish(receipt, status="interrupted")
@@ -1050,6 +1068,7 @@ def _run_external_agent_process(
             capture_output=True,
             timeout=runner_timeout,
             cwd=config.cwd,
+            **({"env": config.shared_child_env} if config.shared_child_env is not None else {}),
         )
         return _external_agent_result_from_completed_process(command, config, completed)
 
@@ -1063,6 +1082,7 @@ def _run_external_agent_process(
         errors="replace",
         cwd=config.cwd,
         bufsize=1,
+        **({"env": config.shared_child_env} if config.shared_child_env is not None else {}),
     )
     output_queue: queue.Queue[tuple[str, str]] = queue.Queue()
     stdout_lines: list[str] = []

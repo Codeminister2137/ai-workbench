@@ -44,8 +44,11 @@ def valid_source(text: str) -> bool:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--shared-coding", action="store_true")
+    parser.add_argument("--shared-process", action="store_true")
     parser.add_argument("--fallback-client", choices=("copilot", "kiro"), default="copilot")
     args = parser.parse_args()
+    if args.shared_process:
+        args.shared_coding = True
     root = Path(__file__).resolve().parents[1]
     artifact = (
         root / "artifacts" / ("fallback-acceptance-" + datetime.now(UTC).strftime("%Y%m%d-%H%M%S"))
@@ -122,14 +125,33 @@ tools = true
     real_execute = cli._run_external_agent
     real_auth = execution_fallback.check_agent_readiness
     attempts = []
+    owned_session = None
+    process_handle = None
+    owned_foreground = None
 
     def execute(prompt, config, **kwargs):
+        nonlocal owned_session, process_handle, owned_foreground
         attempts.append(config.access_method.value)
         if config.access_method is AccessMethod.CODEX_CLI:
             partial = "# Partial work before simulated quota exhaustion\nvalue = 1\n"
             if args.shared_coding:
                 session = ACTIVE_SESSION.get()
                 assert session is not None
+                if args.shared_process:
+                    from ai_provider.foreground_tools import ACTIVE_FOREGROUND
+
+                    owned_foreground = ACTIVE_FOREGROUND.get()
+                    owned_session = session
+                    # Host-controlled fixture setup is separate from agent shell authority.
+                    process_handle = session.supervisor.start(
+                        [
+                            sys.executable,
+                            "-u",
+                            "-c",
+                            "import time; print('continuation-child', flush=True); time.sleep(180)",
+                        ]
+                    )
+                    session.observe_process(session.supervisor.status(process_handle))
                 registry = scoped_registry(
                     shared_tool_registry("coding"),
                     PermissionManager(PermissionPolicy.from_approval_preset("workspace_write")),
@@ -175,7 +197,14 @@ tools = true
                     if args.shared_coding
                     else "Run test_source.py to verify. "
                 )
-                + "Do not edit the test or other fixture files.",
+                + "Do not edit the test or other fixture files. "
+                + (
+                    "If a running process is recorded in the coding-session handoff, "
+                    "call process_status on that exact handle and confirm its running state. "
+                    "Do not start a replacement process or stop it; the host will clean up."
+                    if args.shared_process
+                    else ""
+                ),
                 "--repo-root",
                 str(artifact),
                 "--catalog",
@@ -216,6 +245,7 @@ tools = true
     # Validate the tiny assignment without executing model-authored Python.
     source_valid = valid_source(source.read_text(encoding="utf-8"))
     completed_edits = []
+    completed_process_polls = []
     if args.shared_coding:
         with sqlite3.connect(artifact / "session.sqlite3") as connection:
             completed_edits = [
@@ -225,6 +255,18 @@ tools = true
                     "WHERE status='completed' AND operation LIKE 'shared:%:edit_file:%'"
                 )
             ]
+            completed_process_polls = [
+                row[0]
+                for row in connection.execute(
+                    "SELECT operation FROM coding_receipts "
+                    "WHERE status='completed' AND operation LIKE 'shared:%:process_status:%'"
+                )
+            ]
+    child_cleaned = (
+        owned_session is not None
+        and process_handle is not None
+        and owned_session.supervisor.status(process_handle)["returncode"] is not None
+    )
     edit_runs = [operation.split(":")[2] for operation in completed_edits]
     protected_unchanged = all(
         (artifact / name).read_bytes() == content for name, content in protected_content.items()
@@ -237,6 +279,7 @@ tools = true
         and protected_unchanged
         and "Partial work" in source.read_text(encoding="utf-8")
         and attempts == ["codex_cli", args.fallback_client + "_cli"]
+        and (not args.shared_process or (completed_process_polls and child_cleaned))
     )
     result = {
         "passed": passed,
@@ -248,6 +291,14 @@ tools = true
         "completed_shared_edits": len(completed_edits),
         "shared_edit_runs": edit_runs,
         "shared_coding": args.shared_coding,
+        "shared_process": args.shared_process,
+        "completed_process_polls": completed_process_polls,
+        "child_cleaned": child_cleaned if args.shared_process else None,
+        "foreground_http_statuses": (
+            list(owned_foreground.host.request_statuses)
+            if owned_foreground and owned_foreground.host
+            else []
+        ),
         "protected_files_unchanged": protected_unchanged,
     }
     (artifact / "results.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
