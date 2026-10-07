@@ -14,11 +14,57 @@ class DevelopmentSkill:
     required_tools: frozenset[str]
 
 
+@dataclass(frozen=True)
+class SkillAvailability:
+    name: str
+    source: Path | None
+    required_tools: tuple[str, ...]
+    available: bool
+    reason: str | None = None
+
+
 SKILL_TOOLS = {
     "review-repo-change": frozenset(
         {"git_status", "git_diff", "read_file", "find_files", "grep_search"}
     )
 }
+
+
+def discover_development_skills(
+    directories: list[Path], *, available_tools: frozenset[str]
+) -> tuple[SkillAvailability, ...]:
+    """List supported skill sources and check their tool/runtime prerequisites."""
+    results: list[SkillAvailability] = []
+    for name, required_tools in sorted(SKILL_TOOLS.items()):
+        candidates: set[Path] = set()
+        for directory in directories:
+            root = directory.resolve()
+            candidate = (root / name / "SKILL.md").resolve()
+            if not candidate.is_relative_to(root):
+                raise ValueError(f"Skill source leaves its configured directory: {name}")
+            if candidate.is_file():
+                candidates.add(candidate)
+        if len(candidates) != 1:
+            reason = (
+                "no source found"
+                if not candidates
+                else f"multiple sources found: {len(candidates)}"
+            )
+            results.append(
+                SkillAvailability(name, None, tuple(sorted(required_tools)), False, reason)
+            )
+            continue
+
+        source = candidates.pop()
+        try:
+            load_development_skills([name], directories, available_tools=available_tools)
+        except (OSError, ValueError) as exc:
+            results.append(
+                SkillAvailability(name, source, tuple(sorted(required_tools)), False, str(exc))
+            )
+            continue
+        results.append(SkillAvailability(name, source, tuple(sorted(required_tools)), True))
+    return tuple(results)
 
 
 def load_development_skills(

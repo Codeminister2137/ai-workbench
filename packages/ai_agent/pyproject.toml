@@ -11,6 +11,7 @@ dependencies = [
 
 [project.optional-dependencies]
 ide = ["mcp>=2.3,<3"]
+rename-preview = ["jedi==0.20.0"]
 
 [project.scripts]
 ai-agent-mcp = "ai_agent.mcp_server:main"

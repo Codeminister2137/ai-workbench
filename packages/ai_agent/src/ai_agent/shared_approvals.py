@@ -136,6 +136,9 @@ class ScopedTool(BaseTool):
     def definition(self) -> ToolDefinition:
         return self.tool.definition
 
+    def approval_call(self, call: ToolCall) -> ToolCall | None:
+        return self.tool.approval_call(call)
+
     def execute(self, arguments: dict[str, Any], context: ToolContext) -> ToolResult:
         if context.workspace_root.resolve() != self.workspace:
             raise ValueError("Shared approval workspace changed")

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import secrets
+import socket
 import threading
 import time
 from collections import deque
@@ -37,6 +38,8 @@ class ForegroundMcpHost:
         self.context = ToolContext(workspace.resolve())
         self.scopes: dict[str, AccessScope] = {}
         self.lock = threading.RLock()
+        self.connections: set[socket.socket] = set()
+        self.connection_lock = threading.Lock()
         self.operations = threading.Lock()
         self.request_session: ContextVar[tuple[str, str] | None] = ContextVar(
             "foreground_mcp_request_session", default=None
@@ -49,6 +52,29 @@ class ForegroundMcpHost:
             def setup(self):
                 super().setup()
                 self.connection.settimeout(5)
+                with host.connection_lock:
+                    host.connections.add(self.connection)
+                    if host.closed:
+                        try:
+                            self.connection.shutdown(socket.SHUT_RDWR)
+                        except OSError:
+                            pass
+
+            def handle(self):
+                try:
+                    super().handle()
+                except (ConnectionError, TimeoutError):
+                    self.close_connection = True
+
+            def finish(self):
+                try:
+                    try:
+                        super().finish()
+                    except (ConnectionError, TimeoutError):
+                        pass
+                finally:
+                    with host.connection_lock:
+                        host.connections.discard(self.connection)
 
             def log_message(self, format, *args):
                 pass  # Never log headers, credentials, tool arguments or output.
@@ -56,14 +82,18 @@ class ForegroundMcpHost:
             def reply(self, status: int, body: Any = None, session: str | None = None):
                 host.request_statuses.append(status)
                 raw = json.dumps(body).encode() if body is not None else b""
-                self.send_response(status)
-                self.send_header("Content-Length", str(len(raw)))
-                self.send_header("Content-Type", "application/json")
-                self.send_header("Cache-Control", "no-store")
-                if session:
-                    self.send_header("Mcp-Session-Id", session)
-                self.end_headers()
-                self.wfile.write(raw)
+                try:
+                    self.send_response(status)
+                    self.send_header("Content-Length", str(len(raw)))
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Cache-Control", "no-store")
+                    if session:
+                        self.send_header("Mcp-Session-Id", session)
+                    self.end_headers()
+                    self.wfile.write(raw)
+                except OSError:
+                    # A disconnected client or owner shutdown cannot receive a reply.
+                    self.close_connection = True
 
             def dispatch(self):
                 with host.lock:
@@ -98,23 +128,28 @@ class ForegroundMcpHost:
                             del scope.sessions[session]
                             self.reply(204)
                         return
-                    if self.headers.get("Transfer-Encoding") or (
-                        self.headers.get("Content-Type", "").split(";")[0] != "application/json"
-                    ):
-                        self.reply(400)
+                if self.headers.get("Transfer-Encoding") or (
+                    self.headers.get("Content-Type", "").split(";")[0] != "application/json"
+                ):
+                    self.reply(400)
+                    return
+                accept = self.headers.get("Accept", "")
+                if "application/json" not in accept or "text/event-stream" not in accept:
+                    self.reply(406)
+                    return
+                try:
+                    length = int(self.headers.get("Content-Length", "0"))
+                    if not 0 < length <= BODY_LIMIT:
+                        self.reply(413)
                         return
-                    accept = self.headers.get("Accept", "")
-                    if "application/json" not in accept or "text/event-stream" not in accept:
-                        self.reply(406)
-                        return
-                    try:
-                        length = int(self.headers.get("Content-Length", "0"))
-                        if not 0 < length <= BODY_LIMIT:
-                            self.reply(413)
-                            return
-                        message = json.loads(self.rfile.read(length))
-                    except (ValueError, OSError):
-                        self.reply(400)
+                    # Network reads must not prevent scope revocation or owner shutdown.
+                    message = json.loads(self.rfile.read(length))
+                except (ValueError, OSError):
+                    self.reply(400)
+                    return
+                with host.lock:
+                    if not host.active(token):
+                        self.reply(401)
                         return
                     if not isinstance(message, dict) or message.get("jsonrpc") != "2.0":
                         self.reply(400, {"error": "Invalid JSON-RPC envelope"})
@@ -170,7 +205,8 @@ class ForegroundMcpHost:
             do_DELETE = dispatch
 
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-        self.server.daemon_threads = False
+        # Windows socket shutdown may not interrupt a handler blocked in makefile.read().
+        self.server.daemon_threads = True
         self.url = f"http://127.0.0.1:{self.server.server_port}/mcp"
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
@@ -207,8 +243,17 @@ class ForegroundMcpHost:
             self.closed = True
             self.scopes.clear()
         self.server.shutdown()
+        with self.connection_lock:
+            for connection in tuple(self.connections):
+                try:
+                    connection.shutdown(socket.SHUT_RDWR)
+                except OSError:
+                    pass  # The handler may already have closed its connection.
         self.server.server_close()
         self.thread.join(timeout=5)
+        # Do not return while a tool call already holding authority can still mutate state.
+        with self.operations:
+            pass
 
     def __enter__(self):
         return self

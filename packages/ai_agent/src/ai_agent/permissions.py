@@ -123,6 +123,7 @@ class PermissionManager:
 
         # ASK_USER
         if self.approval_callback is not None:
-            return self.approval_callback(call, category)
+            approval_call = tool.approval_call(call)
+            return approval_call is not None and self.approval_callback(approval_call, category)
         # If no approval callback is registered, deny by default for safety
         return False

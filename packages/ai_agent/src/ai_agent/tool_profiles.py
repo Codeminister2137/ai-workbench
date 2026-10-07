@@ -11,7 +11,12 @@ from ai_agent.tools import (
     GitStatusTool,
     GrepSearchTool,
     ListDirTool,
+    PythonNavigateTool,
+    PythonRuntimeTool,
     ReadFileTool,
+    RenameApplyTool,
+    RenamePlanStore,
+    RenamePreviewTool,
     RunCommandTool,
     ToolRegistry,
 )
@@ -28,7 +33,17 @@ INSPECTION_PROFILE = SharedToolProfile(
 )
 CODING_PROFILE = SharedToolProfile(
     "coding",
-    (*INSPECTION_PROFILE.tool_names, "create_file", "edit_file", "run_command", "fetch_url"),
+    (
+        *INSPECTION_PROFILE.tool_names,
+        "create_file",
+        "edit_file",
+        "run_command",
+        "fetch_url",
+        "python_runtime",
+        "python_navigate",
+        "rename_preview",
+        "rename_apply",
+    ),
 )
 
 
@@ -40,7 +55,12 @@ def shared_tool_profile(name: str) -> SharedToolProfile:
     raise ValueError(f"Unsupported shared tool profile: {name}")
 
 
-def shared_tool_registry(name: str, workspace: Path | None = None) -> ToolRegistry:
+def shared_tool_registry(
+    name: str,
+    workspace: Path | None = None,
+    *,
+    rename_plans: RenamePlanStore | None = None,
+) -> ToolRegistry:
     """Use the same implementations for provider-native execution and MCP."""
     shared_tool_profile(name)
     registry = ToolRegistry(
@@ -61,6 +81,11 @@ def shared_tool_registry(name: str, workspace: Path | None = None) -> ToolRegist
         # Provenance is returned to the caller. Coding-session storage keeps the
         # ordinary hashed tool receipt, not fetched text or a separate research log.
         registry.register(FetchURLTool(lambda _event, _receipt: None))
+        registry.register(PythonRuntimeTool())
+        registry.register(PythonNavigateTool())
+        plans = rename_plans or RenamePlanStore(workspace)
+        registry.register(RenamePreviewTool(plans))
+        registry.register(RenameApplyTool(plans))
     if workspace is not None:
         from ai_agent.ide_bridge import add_ide_tools
 

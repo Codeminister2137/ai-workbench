@@ -11,12 +11,20 @@ from ai_agent.tools.filesystem import (
     ReadFileTool,
 )
 from ai_agent.tools.git import GitDiffTool, GitStatusTool
+from ai_agent.tools.python_runtime import PythonRuntimeTool
+from ai_agent.tools.refactor import (
+    PythonNavigateTool,
+    RenameApplyTool,
+    RenamePlanStore,
+    RenamePreviewTool,
+)
 from ai_agent.tools.search import FindFilesTool, GrepSearchTool
 from ai_agent.tools.shell import RunCommandTool
 
 
-def default_coding_tools() -> ToolRegistry:
+def default_coding_tools(*, rename_plans: RenamePlanStore | None = None) -> ToolRegistry:
     """Create and return a registry populated with default coding and repo tools."""
+    plans = rename_plans or RenamePlanStore()
     return ToolRegistry(
         tools=(
             ReadFileTool(),
@@ -28,6 +36,10 @@ def default_coding_tools() -> ToolRegistry:
             GitStatusTool(),
             GitDiffTool(),
             RunCommandTool(),
+            PythonRuntimeTool(),
+            PythonNavigateTool(),
+            RenamePreviewTool(plans),
+            RenameApplyTool(plans),
         )
     )
 
@@ -43,6 +55,11 @@ __all__ = [
     "GitStatusTool",
     "ListDirTool",
     "ReadFileTool",
+    "PythonRuntimeTool",
+    "PythonNavigateTool",
+    "RenameApplyTool",
+    "RenamePlanStore",
+    "RenamePreviewTool",
     "RunCommandTool",
     "ToolContext",
     "ToolRegistry",

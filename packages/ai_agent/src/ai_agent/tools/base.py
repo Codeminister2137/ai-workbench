@@ -69,6 +69,10 @@ class BaseTool(ABC):
                 is_error=True,
             )
 
+    def approval_call(self, call: ToolCall) -> ToolCall | None:
+        """Return the exact operation to show for approval, or refuse approval."""
+        return call
+
 
 class ToolRegistry:
     """Registry managing available tools and their schema exports."""
