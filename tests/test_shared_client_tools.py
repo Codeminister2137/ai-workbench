@@ -5,7 +5,11 @@ import subprocess
 from pathlib import Path
 
 import pytest
-from ai_agent.skills import load_development_skills, skill_prompt
+from ai_agent.skills import (
+    discover_development_skills,
+    load_development_skills,
+    skill_prompt,
+)
 from ai_agent.tool_profiles import INSPECTION_PROFILE, shared_tool_registry
 from ai_orchestrator import AccessMethod
 from ai_provider.external_agents import (
@@ -41,7 +45,10 @@ def test_inspection_mapping_has_every_required_tool_and_no_broad_grant(tmp_path,
 
 
 def test_antigravity_shared_inspection_is_explicitly_ineligible(tmp_path):
-    with pytest.raises(NotImplementedError, match="not verified"):
+    with pytest.raises(
+        NotImplementedError,
+        match=r"headless mode denies MCP tools.*permissions\.allow.*dangerously-skip-permissions",
+    ):
         build_external_agent_command(config(tmp_path, AccessMethod.ANTIGRAVITY_CLI))
 
 
@@ -114,6 +121,66 @@ def test_skill_source_prerequisites_and_duplicate_detection(tmp_path):
         load_development_skills([name], [tmp_path, other], available_tools=available)
 
 
+def test_skill_discovery_reports_sources_and_missing_prerequisites(tmp_path, monkeypatch):
+    name = "review-repo-change"
+    source = tmp_path / name / "SKILL.md"
+    source.parent.mkdir()
+    source.write_text(f"---\nname: {name}\ndescription: review\n---\nRead the diff.")
+    monkeypatch.setattr("ai_agent.skills.shutil.which", lambda executable: None)
+
+    skill = discover_development_skills(
+        [tmp_path], available_tools=frozenset(INSPECTION_PROFILE.tool_names)
+    )[0]
+    assert skill.name == name
+    assert skill.source == source.resolve()
+    assert not skill.available
+    assert skill.required_tools == (
+        "find_files",
+        "git_diff",
+        "git_status",
+        "grep_search",
+        "read_file",
+    )
+    assert skill.reason == "Skill review-repo-change requires an installed Git executable"
+
+    blocked = discover_development_skills(
+        [tmp_path],
+        available_tools=frozenset(INSPECTION_PROFILE.tool_names) - {"git_diff"},
+    )[0]
+    assert not blocked.available
+    assert "requires unavailable tools: git_diff" in blocked.reason
+
+
+def test_skill_discovery_reports_missing_and_ambiguous_sources(tmp_path):
+    first = tmp_path / "first"
+    second = tmp_path / "second"
+    assert not discover_development_skills([first], available_tools=frozenset())[0].available
+
+    for directory in (first, second):
+        source = directory / "review-repo-change" / "SKILL.md"
+        source.parent.mkdir(parents=True)
+        source.write_text("---\nname: review-repo-change\ndescription: review\n---\nRead the diff.")
+    ambiguous = discover_development_skills([first, second], available_tools=frozenset())[0]
+    assert not ambiguous.available
+    assert ambiguous.source is None
+    assert ambiguous.reason == "multiple sources found: 2"
+
+
 def test_skill_selection_refuses_traversal_or_unknown_prerequisites(tmp_path):
     with pytest.raises(ValueError, match="supported prerequisite"):
         load_development_skills(["../private"], [tmp_path], available_tools=frozenset())
+
+
+def test_skill_selection_refuses_when_git_executable_is_missing(tmp_path, monkeypatch):
+    name = "review-repo-change"
+    source = tmp_path / name / "SKILL.md"
+    source.parent.mkdir()
+    source.write_text(f"---\nname: {name}\ndescription: review\n---\nRead the diff.")
+    monkeypatch.setattr("ai_agent.skills.shutil.which", lambda executable: None)
+
+    with pytest.raises(ValueError, match="requires an installed Git executable"):
+        load_development_skills(
+            [name],
+            [tmp_path],
+            available_tools=frozenset(INSPECTION_PROFILE.tool_names),
+        )

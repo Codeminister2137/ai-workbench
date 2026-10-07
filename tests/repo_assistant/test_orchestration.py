@@ -58,6 +58,7 @@ def test_cli_orchestrated_plan_prints_stage_plan_without_provider(
 
     monkeypatch.setattr(_EXAMPLE, "create_chat_client", fail_if_called)
     run_db = tmp_path / "repo-assistant-runs.sqlite3"
+    validation_python = tmp_path / ".venv" / "Scripts" / "python.exe"
 
     assert (
         main(
@@ -78,6 +79,8 @@ def test_cli_orchestrated_plan_prints_stage_plan_without_provider(
                 str(tmp_path),
                 "--away-run-db",
                 str(run_db),
+                "--validation-python",
+                str(validation_python),
             ]
         )
         == 0
@@ -100,6 +103,7 @@ def test_cli_orchestrated_plan_prints_stage_plan_without_provider(
     assert "away_plan_external_writes: disabled" in output
     assert "away_plan_approval_policy: trusted_local" in output
     assert 'away_plan_validation_commands_json: ["python -m pytest -q"]' in output
+    assert f"away_plan_validation_python: {validation_python}" in output
     assert "away_plan_max_repair_cycles: 3" in output
     assert "away_stage: prompt_review route=deterministic/local status=planned" in output
     assert "away_stage: planning route=primary status=planned" in output
@@ -110,6 +114,10 @@ def test_cli_orchestrated_plan_prints_stage_plan_without_provider(
     assert "away_stage: repair route=policy_bounded status=planned" in output
     assert "away_stage: final_handoff route=deterministic/local status=planned" in output
     assert "execution_status: planned" in output
+    assert "## **SUMMARY**" in output
+    assert "- Changed: No final response was captured" in output
+    assert "- Validated: Not run by the CLI" in output
+    assert "### Agent report\nNo final response was captured." in output
 
     run_id = next(
         line.removeprefix("away_run_id: ")

@@ -2,12 +2,14 @@
 
 import json
 import os
+import socket
 import subprocess
 import sys
 import threading
 import time
 from typing import Any, cast
 from urllib.error import HTTPError
+from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 
 import pytest
@@ -437,3 +439,116 @@ def test_official_sdk_client_interoperates_with_foreground_host(tmp_path):
             assert 204 in foreground.host.request_statuses
     finally:
         foreground.close()
+
+
+class TestIncompleteHttpRequests:
+    """Unfinished wire input cannot hold invocation authority or prevent shutdown."""
+
+    @staticmethod
+    def start_request(host, token, *, partial_headers=False):
+        address = urlsplit(host.url)
+        client = socket.create_connection((address.hostname, address.port), timeout=5)
+        body = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "initialize"}).encode()
+        headers = (
+            f"POST /mcp HTTP/1.1\r\nHost: {address.netloc}\r\n"
+            f"Authorization: Bearer {token}\r\n"
+            "Content-Type: application/json\r\n"
+            "Accept: application/json, text/event-stream\r\n"
+            f"Content-Length: {len(body)}\r\nConnection: close\r\n\r\n"
+        ).encode()
+        client.sendall(headers[:-2] if partial_headers else headers + body[:1])
+        return client, body[1:]
+
+    @pytest.mark.parametrize("partial_headers", [True, False])
+    def test_close_interrupts_incomplete_headers_or_body(self, tmp_path, partial_headers):
+        from ai_agent.http_host import ForegroundMcpHost
+        from ai_agent.tool_profiles import shared_tool_registry
+
+        host = ForegroundMcpHost(tmp_path)
+        token = host.grant(shared_tool_registry("inspection"))
+        client, _ = self.start_request(host, token, partial_headers=partial_headers)
+        closed = threading.Event()
+        closer = threading.Thread(target=lambda: (host.close(), closed.set()))
+        try:
+            until = time.monotonic() + 5
+            while time.monotonic() < until:
+                with host.connection_lock:
+                    if host.connections:
+                        break
+                time.sleep(0.01)
+            assert host.connections
+            closer.start()
+            assert closed.wait(2), "Shutdown waited for the client's inactivity timeout"
+            assert host.closed
+            assert not host.scopes
+            assert not host.thread.is_alive()
+            client.settimeout(1)
+            assert client.recv(1) == b""
+        finally:
+            client.close()
+            if closer.ident is not None:
+                closer.join(6)
+            else:
+                host.close()
+        assert not closer.is_alive()
+        until = time.monotonic() + 1
+        while time.monotonic() < until:
+            with host.connection_lock:
+                if not host.connections:
+                    break
+            time.sleep(0.01)
+        assert not host.connections
+
+    def test_close_waits_for_an_active_tool_operation(self, tmp_path):
+        from ai_agent.http_host import ForegroundMcpHost
+
+        host = ForegroundMcpHost(tmp_path)
+        host.operations.acquire()
+        closed = threading.Event()
+        closer = threading.Thread(target=lambda: (host.close(), closed.set()))
+        closer.start()
+        try:
+            until = time.monotonic() + 2
+            while not host.closed and time.monotonic() < until:
+                time.sleep(0.01)
+            assert host.closed
+            assert not closed.wait(0.1), "Shutdown returned while a tool operation was active"
+        finally:
+            host.operations.release()
+            closer.join(3)
+        assert closed.is_set()
+        assert not closer.is_alive()
+
+    def test_revoke_does_not_wait_for_body_and_late_body_cannot_initialize(self, tmp_path):
+        from ai_agent.http_host import ForegroundMcpHost
+        from ai_agent.tool_profiles import shared_tool_registry
+
+        host = ForegroundMcpHost(tmp_path)
+        token = host.grant(shared_tool_registry("inspection"))
+        authorized, revoked = threading.Event(), threading.Event()
+
+        class ObservedScopes(dict):
+            def get(self, key, default=None):
+                result = super().get(key, default)
+                if key == token:
+                    authorized.set()
+                return result
+
+        host.scopes = ObservedScopes(host.scopes)
+        client, remaining_body = self.start_request(host, token)
+        revoker = threading.Thread(target=lambda: (host.revoke(token), revoked.set()))
+        try:
+            assert authorized.wait(5)
+            revoker.start()
+            assert revoked.wait(1), "Body read retained the bearer revocation lock"
+            client.sendall(remaining_body)
+            response = client.recv(4096)
+            assert response.startswith(b"HTTP/1.0 401")
+            assert b"Mcp-Session-Id:" not in response
+            assert not host.scopes
+        finally:
+            client.close()
+            if revoker.ident is not None:
+                revoker.join(6)
+            host.close()
+        assert not revoker.is_alive()

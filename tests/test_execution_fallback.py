@@ -167,6 +167,33 @@ def test_overload_can_switch_same_bucket_without_exhausting_account(monkeypatch,
     assert run.overloaded == {"codex"} and not run.exhausted
 
 
+def test_fallback_continuation_preserves_selected_skill_instructions(monkeypatch, routes):
+    run = session(monkeypatch, routes)
+    skill = (
+        "## Selected development skill: review-repo-change\n"
+        "Read the complete diff before commenting. Report only reproducible findings."
+    )
+    prompts = []
+
+    def execute(target, prompt):
+        prompts.append((target.route_id, prompt))
+        if target.route_id == "codex":
+            return ExternalAgentResult((), 1, "", "usage limit reached")
+        return "continued"
+
+    result = run.run(
+        "Review the current change.\n\n" + skill,
+        execute,
+        lambda value: isinstance(value, ExternalAgentResult) and external_usage_limit(value),
+        observe=str,
+    )
+
+    assert result == "continued"
+    assert [route for route, _ in prompts] == ["codex", "copilot"]
+    assert skill in prompts[1][1]
+    assert "Continue the same objective in the existing working tree." in prompts[1][1]
+
+
 def test_native_overload_is_bounded_and_weaker_route_only_gets_handoff(
     monkeypatch, routes, tmp_path
 ):

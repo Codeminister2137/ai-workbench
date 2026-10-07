@@ -601,6 +601,33 @@ def test_large_research_history_compacts_excerpts_but_keeps_task_and_receipts():
     assert len(json.loads(original[3].content)["text"]) > 12000
 
 
+def test_bounded_research_messages_bounds_latest_large_tool_response():
+    from ai_provider import AIMessage, AIToolCall, MessageRole
+    from ai_provider.research_execution import bounded_research_messages
+
+    messages = (
+        AIMessage(MessageRole.SYSTEM, "Instruction " * 500),
+        AIMessage(MessageRole.USER, "Research prompt"),
+        AIMessage(
+            MessageRole.ASSISTANT,
+            "",
+            tool_calls=(AIToolCall("1", "fetch_url", {"url": "https://example.com"}),),
+        ),
+        AIMessage(
+            MessageRole.TOOL,
+            json.dumps({"receipt": receipt(), "text": "evidence " * 2000, "links": []}),
+            name="fetch_url",
+            tool_call_id="1",
+        ),
+    )
+    limit = 12000
+    bounded = bounded_research_messages(messages, byte_limit=limit)
+    assert len(bounded) == 4
+    tool_content = json.loads(bounded[3].content)
+    assert tool_content["text_excerpt_truncated"] is True
+    assert tool_content["receipt"] == json.loads(messages[3].content)["receipt"]
+
+
 def test_research_input_budget_reserves_output_and_tool_schema_before_inference():
     from dataclasses import replace
 

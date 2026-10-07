@@ -135,7 +135,8 @@ def test_cli_can_scrutinize_completed_response(capsys, monkeypatch, tmp_path: Pa
         == 0
     )
     output = capsys.readouterr().out
-    assert "=== Assistant response ===" in output
+    assert "## **SUMMARY**" in output
+    assert "### Agent report" in output
     assert "primary answer" in output
     assert "=== Response scrutiny ===" in output
     assert "VERDICT: needs_revision" in output

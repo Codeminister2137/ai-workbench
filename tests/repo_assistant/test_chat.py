@@ -83,6 +83,10 @@ def test_chat_mode_persists_and_resumes_local_transcript(
 
     assert f"chat_session_id: {session.session_id}" in first_output
     assert f"chat_session_id: {session.session_id}" in second_output
+    for output, response in ((first_output, "answer 1"), (second_output, "answer 2")):
+        assert output.count("## **SUMMARY**") == 1
+        assert "- Validated: Not run by the CLI" in output
+        assert f"### Agent report\n{response}" in output
     assert len(requests) == 2
     assert [message.role for message in requests[1].messages] == [
         MessageRole.SYSTEM,
@@ -93,6 +97,7 @@ def test_chat_mode_persists_and_resumes_local_transcript(
     assert "Remember this first turn." in requests[1].messages[1].content
     assert requests[1].messages[2].content == "answer 1"
     assert "Use the previous turn." in requests[1].messages[3].content
+    assert "## **SUMMARY**" in requests[0].messages[0].content
     assert [message.role for message in store.list_messages(session.session_id)] == [
         "system",
         "user",

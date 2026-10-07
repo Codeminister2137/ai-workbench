@@ -1,6 +1,7 @@
 """Machine-local configuration and a fixed read-only IDE boundary."""
 
 import json
+import sys
 
 import pytest
 from ai_agent import ide_bridge
@@ -105,7 +106,53 @@ class TestReadOnlyWrappers:
         ).is_error
 
     def test_missing_configuration_keeps_existing_tool_surface(self, tmp_path):
+        assert not (tmp_path / CONFIG_PATH).exists()
+        inspection = shared_tool_registry("inspection", tmp_path)
+        coding = shared_tool_registry("coding", tmp_path)
         assert not set(IDE_TOOL_NAMES) & {
-            definition.name
-            for definition in shared_tool_registry("inspection", tmp_path).list_definitions()
+            definition.name for definition in inspection.list_definitions()
         }
+        coding_names = {definition.name for definition in coding.list_definitions()}
+        assert not set(IDE_TOOL_NAMES) & coding_names
+        assert {"read_file", "edit_file", "python_runtime"} <= coding_names
+
+        runtime = coding.get("python_runtime")
+        assert runtime is not None
+        result = runtime.run(ToolCall("python_runtime", {}), ToolContext(tmp_path))
+        assert not result.is_error
+
+        target = tmp_path / "module.py"
+        target.write_text("def value():\n    return 'before'\n", encoding="utf-8")
+        read_file = coding.get("read_file")
+        edit_file = coding.get("edit_file")
+        assert read_file is not None and edit_file is not None
+        context = ToolContext(tmp_path)
+
+        inspected = read_file.run(ToolCall("read_file", {"path": "module.py"}), context)
+        assert not inspected.is_error
+        assert "return 'before'" in inspected.output
+
+        edited = edit_file.run(
+            ToolCall(
+                "edit_file",
+                {
+                    "path": "module.py",
+                    "old_text": "return 'before'",
+                    "new_text": "return 'after'",
+                },
+            ),
+            context,
+        )
+        assert not edited.is_error
+        reviewed = read_file.run(ToolCall("read_file", {"path": "module.py"}), context)
+        assert not reviewed.is_error
+        assert "return 'after'" in reviewed.output
+
+        run_command = coding.get("run_command")
+        assert run_command is not None
+        command = (
+            "Write-Output validation-ok" if sys.platform == "win32" else "printf validation-ok"
+        )
+        validated = run_command.run(ToolCall("run_command", {"command": command}), context)
+        assert not validated.is_error
+        assert "validation-ok" in validated.output

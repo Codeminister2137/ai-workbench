@@ -179,6 +179,47 @@ def test_identical_rewrites_and_repeated_fetches_do_not_fill_budget(research_run
     assert history["attempt_count"] == 2
 
 
+def test_empty_refinement_without_tool_or_evidence_progress_fails_immediately(research_run):
+    research_run[0].max_repair_cycles = 3
+    attempts = []
+
+    def empty(*args):
+        attempts.append(1)
+        return "completed", None
+
+    status, validation, response = _run(research_run, empty)
+
+    assert status == "completed_with_refinement_errors"
+    assert response == "done"
+    assert validation is not None and validation.details is not None
+    assert validation.details["validation_status"] == "passed"
+    assert attempts == [1]
+    history = _stage(research_run, "repair").details["research_refinement"]
+    assert history["stop_reason"] == "refinement_execution_failed"
+    assert history["attempt_count"] == 1
+    assert history["attempts"][0]["status"] == "failed"
+    assert "no final response" in history["attempts"][0]["failure_reason"]
+
+
+def test_empty_refinement_with_report_progress_remains_completed(research_run):
+    research_run[0].max_repair_cycles = 1
+
+    def write_without_final_text(*args):
+        _write(research_run[0].research_execution, valid_report() + "\nEvidence update")
+        return "completed", None
+
+    status, validation, _ = _run(research_run, write_without_final_text)
+
+    assert status == "completed"
+    assert validation is not None and validation.details is not None
+    assert validation.details["validation_status"] == "passed"
+    history = _stage(research_run, "repair").details["research_refinement"]
+    assert history["stop_reason"] == "cycle_limit"
+    assert history["attempt_count"] == 1
+    assert history["attempts"][0]["status"] == "completed"
+    assert history["attempts"][0]["progress"] == "evidence_changed"
+
+
 def test_failed_review_is_not_repeated_without_an_artifact_change(research_run):
     calls = []
 

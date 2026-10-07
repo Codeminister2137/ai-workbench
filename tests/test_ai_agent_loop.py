@@ -72,7 +72,7 @@ def test_agent_loop_executes_tools_and_returns_final_response(tmp_path: Path) ->
     assert result.iterations == 2
     assert result.tool_results[0].is_error is False
     assert (tmp_path / "out.txt").read_text() == "done"
-    assert len(client.requests[0].tools) == 9
+    assert len(client.requests[0].tools) == 12
     assert client.requests[1].messages[-1].role is MessageRole.TOOL
 
 
@@ -111,7 +111,7 @@ def test_delegation_tool_runs_bounded_child_task(tmp_path: Path) -> None:
     assert result.output == "child done"
     assert calls == ["write a small helper"]
     assert (tmp_path / "child.txt").read_text(encoding="utf-8") == "child"
-    assert len(registry.list_definitions()) == 10
+    assert len(registry.list_definitions()) == 13
 
 
 def test_provider_failure_preserves_completed_tool_receipt_without_replaying(

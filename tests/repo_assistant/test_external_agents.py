@@ -229,6 +229,10 @@ def test_cli_executes_codex_external_agent_route(capsys, monkeypatch, tmp_path: 
     assert "external_agent_status: running elapsed_seconds=0.0" in output
     assert "away_stage_status: validation status=completed" in output
     assert "away_stage_status: final_handoff status=completed" in output
+    assert "## **SUMMARY**" in output
+    assert "- Validated: passed" in output
+    assert "- Notes: status=ready; execution_status=completed" in output
+    assert "### Agent report\ncodex done" in output
     assert output.rfind("codex done") > output.rfind("execution_status: completed")
     command = next(call["args"][0] for call in calls if "exec" in call["args"][0])
     exec_index = command.index("exec")
@@ -243,6 +247,7 @@ def test_cli_executes_codex_external_agent_route(capsys, monkeypatch, tmp_path: 
     stdin_prompt = exec_call["kwargs"]["input"]
     assert stdin_prompt.startswith("# Repo assistant system prompt")
     assert "You are a repo-aware coding assistant." in stdin_prompt
+    assert "## **SUMMARY**" in stdin_prompt
     assert "# User request" in stdin_prompt
     assert "# External agent execution metadata" in stdin_prompt
     assert "codex_sandbox: workspace-write" in stdin_prompt
@@ -457,7 +462,8 @@ def test_cli_explains_codex_timeout_without_duplicate_response_header(
     )
 
     output = capsys.readouterr().out
-    assert output.count("=== Assistant response ===") == 1
+    assert output.count("## **SUMMARY**") == 1
+    assert output.count("### Agent report") == 1
     assert "failure_hint: Codex CLI did not finish before the repo assistant timeout" in output
     assert "--codex-login-device" in output
 
