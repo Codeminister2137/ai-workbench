@@ -148,6 +148,7 @@ def test_skill_discovery_reports_sources_and_missing_prerequisites(tmp_path, mon
         available_tools=frozenset(INSPECTION_PROFILE.tool_names) - {"git_diff"},
     )[0]
     assert not blocked.available
+    assert blocked.reason is not None
     assert "requires unavailable tools: git_diff" in blocked.reason
 
 
