@@ -48,6 +48,78 @@ If the existing documentation already defines the decision, follow it without as
 
 Do not implement an option merely because it is easier.
 
+Every material decision brief is a user-facing response, not merely a handoff
+update or tool payload. Present the choice and why it matters; name the viable
+material options (at least two when at least two are genuinely viable); state
+the pros and cons of each; give a clear technical recommendation and rationale
+when one option is preferable; and ask the exact owner question. If no option is
+preferable, identify the unresolved uncertainty rather than manufacturing a
+recommendation. Never leave the owner to infer the recommendation or trade-offs.
+For completed work, likewise provide the concise verified summary directly to
+the user. A completion tool is supplemental; if invoking it would suppress the
+visible response in the current interface, send the response and do not invoke
+that optional tool.
+
+In this Copilot chat surface, `task_complete` has repeatedly appeared to the
+user only as a tool event; its summary payload was not rendered as the ordinary
+assistant response. Never invoke it here, even if a task reminder asks for it
+or its arguments contain a complete summary. Finish with the ordinary visible
+summary or decision brief, and make that response the final chat action. The
+repository also provides this instruction in `.github/copilot-instructions.md`
+for Copilot Chat contexts that load repository-wide custom instructions.
+
+GitHub documents repository-wide custom instructions as an input to Copilot
+Chat, including in JetBrains IDEs, but notes that Copilot may not follow custom
+instructions consistently because its behavior is nondeterministic:
+[response customization](https://docs.github.com/en/copilot/concepts/prompting/response-customization).
+These files reinforce the required behavior; they cannot technically disable a
+runtime-provided tool. A guaranteed prohibition would require a chat/runtime
+setting that removes or blocks that tool, which this repository cannot provide.
+
+The repo-assistant CLI also prints one fixed `## **SUMMARY**` closeout for
+provider, native, chat, external-agent, and fallback runs. The selected agent's
+response is retained under `Agent report`; validation and execution fields use
+CLI-recorded evidence. `Changed` previews the first agent-reported outcome line
+without independently attributing workspace changes. This wrapper enforces a
+consistent CLI surface even when an agent's response format varies; agent
+prompts also say not to emit a duplicate summary.
+
+### Human-approved terminal operations
+
+Routine, bounded, repository-local inspection, tests, lint, formatting, and type
+checks within the already-approved task scope do not require a separate chat
+approval request or renewed readiness confirmation. Do not interrupt the owner
+to approve each such check.
+
+For an operation outside that routine scope that may wait for owner approval,
+first send an ordinary visible notice containing the exact command or bounded
+operation, working directory, expected effects, approval prompt, and the
+owner's required action. Stop and wait for the owner to confirm they are present
+and ready before starting it. If a routine command unexpectedly pauses for a
+physical terminal approval, stop at that prompt, display the exact request, and
+wait for the owner's attended approval; never bypass it or continue while
+approval is pending. Never treat an unanswered readiness request as
+confirmation or launch approval-gated work in the background or through another
+tool route. Chat-mediated readiness is not evidence of physical terminal input.
+
+If the exact command, scope, or effects change for an approval-gated operation,
+announce the revised request and wait again. General approval of a plan or test
+window is not confirmation that the owner is present for a specific interactive
+prompt.
+
+Start every notice with the standalone prominent heading
+`## **APPROVAL PENDING**`, matching the visual convention of the CLI's
+`## **SUMMARY**` closeout. Keep the command, working directory, bounded effects,
+expected terminal prompt, and required owner action directly below it.
+
+Suggested notice:
+
+> ## **APPROVAL PENDING**
+>
+> I’m about to run `<exact command>` from `<working directory>`. It will
+> `<expected bounded effects>` and will pause for `<approval prompt/action>` in
+> the terminal. Please confirm when you are present and ready to approve it.
+
 ## 4. Implementation pass
 After scope is clear:
 1. Implement only the approved scope.

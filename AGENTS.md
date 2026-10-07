@@ -81,16 +81,31 @@ Then ask only for the information that actually requires the user's input.
 
 ### How to ask
 
-When a material decision is required, provide a concise decision brief:
+When a material decision is required, provide a concise, user-facing decision
+brief before implementing the disputed part:
 
 1. **Decision needed** — what must be chosen.
-2. **Why it matters** — what it affects.
-3. **Options** — the materially different choices.
-4. **Pros and cons / trade-offs** — important advantages, disadvantages, risks, and future consequences of each option.
-5. **Technical recommendation** — what Codex recommends, when a recommendation is useful.
-6. **Question** — what the user needs to decide.
+2. **Why it matters** — concrete effects on behavior, users, compatibility,
+   privacy, data, or future constraints.
+3. **Options** — name the viable materially different choices. Include at least
+   two when at least two are genuinely viable; do not invent weak alternatives
+   merely to satisfy a count.
+4. **Pros and cons** — state the material benefits and costs/risks for every
+   listed option. Do not give a one-sided comparison or leave trade-offs implicit.
+5. **Technical recommendation** — give a clear recommendation whenever one
+   option is technically preferable, and explain why it fits the known goals and
+   constraints. If none is preferable, say so and explain the deciding
+   uncertainty rather than presenting a false recommendation.
+6. **Question** — ask the owner to choose or confirm the recommended option.
 
-Codex may recommend an option, but must clearly distinguish its recommendation from the user's decision.
+The recommendation and option trade-offs are required parts of every material
+decision brief, not optional extras. Keep the brief concise, but do not replace
+it with an unranked list, a recommendation without alternatives, or a question
+that makes the owner reconstruct the consequences. Small reversible
+implementation details are not material decisions and do not need a formal brief.
+
+Codex may recommend an option, but must clearly distinguish its recommendation
+from the user's decision.
 
 Do not phrase an unapproved recommendation as an established project decision.
 
@@ -186,6 +201,38 @@ Examples include:
 * changing what data may be sent to external providers.
 
 When Codex reaches a decision boundary, it should **stop implementation of the disputed part** and ask the user rather than resolving the decision by itself.
+
+### Announcing human terminal approvals
+
+Routine, bounded, repository-local inspection, tests, lint, formatting, and type
+checks within the already-approved task scope do not require a separate chat
+approval request or renewed readiness confirmation. Do not interrupt the owner
+to approve each such check.
+
+For an operation outside that routine scope which may wait for owner approval,
+announce the request in the ordinary user-visible conversation **before calling
+the terminal tool**. State the exact command (or bounded operation), working
+directory, expected effects, the approval prompt the owner should expect, and
+the action needed. Then stop and wait for the owner to confirm they are present
+and ready before starting it. If a routine command unexpectedly pauses for a
+physical terminal approval, stop at that prompt, show the exact request, and
+wait for the owner's attended approval; do not bypass it or continue while
+approval is pending.
+
+Never treat an unanswered readiness request as confirmation, continue executing
+after announcing a pending approval, or launch approval-gated work in the
+background or through another route.
+
+Begin every such notice with the standalone, visually prominent heading
+`## **APPROVAL PENDING**`, analogous to the CLI's `## **SUMMARY**` closeout.
+Keep it immediately above the command/effects/action details so the owner can
+distinguish a pending terminal approval from ordinary progress or chat approval.
+
+If the exact command, scope, or expected effect changes for an approval-gated
+operation after notice, announce the revised operation and obtain readiness
+again. Do not conflate chat readiness with the owner physically
+observing/answering a terminal prompt, and do not claim physical approval
+unless that actually occurred.
 
 ### Codex's role at a decision boundary
 
@@ -767,8 +814,40 @@ guarded by the deadline, and clearly distinguish work time from waiting time.
 For autonomous taskful work, do not report after every search, edit, test, or
 other small sub-step. Keep progress updates to material phase changes,
 long-running waits, and genuine blockers or decision boundaries. Use
-`task_complete` only after the current requested task is fully implemented and
-verified; an intermediate milestone or checkpoint is not task completion.
+no workflow-completion signal in this Copilot chat. An intermediate milestone
+or checkpoint is not task completion. Once the requested work is verified,
+finish with one ordinary visible assistant response; do not call
+`task_complete` before or after it.
+
+### User-visible closeout and decision boundary
+
+Repository state, handoff files, tool results, and completion-tool payloads do
+not replace a user-facing assistant response. When work reaches a material
+decision boundary, present the complete concise decision brief directly to the
+user in the same response in which work stops. Include the decision, why it
+matters, viable options and each option's pros and cons, a clearly labeled
+technical recommendation and rationale when one option is preferable, and the
+exact question requiring the owner's choice. If no option is preferable, state
+what uncertainty prevents a recommendation.
+Do not leave the user to discover or reconstruct the question from
+`CURRENT_CONTEXT.md`, another document, or a later session.
+
+When a completion tool is available, its payload is not a user-facing response.
+This Copilot chat surface has repeatedly shown only the `task_complete` event
+instead of its payload. Therefore never invoke `task_complete` here, including
+after placing a summary in its arguments or in a preceding tool-oriented
+commentary. Finish the turn with the normal visible assistant response. This
+reporting rule is additive: it does not change when a decision is required,
+authorize choosing on the owner's behalf, or weaken any validation, handoff, or
+definition-of-done requirement.
+
+**End-of-turn tool prohibition:** some interfaces define `task_complete` as
+ending the assistant turn immediately. In such an interface it is impossible
+to call the tool and then provide the required ordinary final response. Do not
+call `task_complete` in that case; finish with the visible user-facing response
+instead. Never treat a completion-tool message or payload as the final report,
+and never make a completion-tool call the last action when it would suppress
+that report. A workflow signal is optional; the visible closeout is mandatory.
 
 Handoffs must prominently classify the current task or roadmap as `COMPLETE`,
 `INCOMPLETE`, or `BLOCKED`. An `INCOMPLETE` handoff must name an imperative next
@@ -800,6 +879,15 @@ Use `## **SUMMARY**` for normal task completion reports unless a simpler
 one-line answer is clearly better. The marker should catch the eye; the rest of
 the report can stay flexible. Do not force the body into a rigid template when
 a simpler sentence is clearer. The format is a readability aid, not ceremony.
+
+The repo-assistant CLI enforces this closeout structure for provider, native,
+chat, external-agent, and fallback execution paths. It preserves the selected
+agent's response under `Agent report`; its `Validated` and execution-status
+fields come from CLI-recorded evidence. `Changed` contains a short
+agent-reported outcome preview and explicitly does not attribute workspace
+edits the CLI cannot independently identify. Agent prompt instructions say the
+CLI owns the closeout and to avoid a duplicate; the CLI envelope, not model
+compliance, is the consistency guarantee.
 
 For subsection labels inside a summary, avoid run-in bold labels that are
 followed immediately by a sentence on the same rendered line. Prefer a short
