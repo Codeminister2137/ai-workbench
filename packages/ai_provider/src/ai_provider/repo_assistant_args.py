@@ -55,6 +55,11 @@ def build_argument_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--list-skills",
+        action="store_true",
+        help="Discover supported project-local development skills and check prerequisites offline.",
+    )
+    parser.add_argument(
         "--mode",
         choices=CLI_MODES,
         default="ask",
@@ -353,6 +358,16 @@ def build_argument_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--validation-python",
+        metavar="PYTHON",
+        type=_validation_python_argument,
+        help=(
+            "Python executable for the default pytest validation command only. "
+            "Defaults to the executable running this repo assistant; explicit "
+            "--validation-command values are left unchanged."
+        ),
+    )
+    parser.add_argument(
         "--skip-validation",
         action="store_true",
         help="Skip deterministic validation in orchestrated executed runs.",
@@ -560,3 +575,11 @@ def build_argument_parser() -> argparse.ArgumentParser:
 
     add_research_arguments(parser)
     return parser
+
+
+def _validation_python_argument(value: str) -> str:
+    """Reject an empty explicit executable rather than silently selecting default."""
+    executable = value.strip()
+    if not executable:
+        raise argparse.ArgumentTypeError("validation Python executable must not be empty")
+    return executable

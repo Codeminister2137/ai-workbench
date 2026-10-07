@@ -75,6 +75,18 @@ def bounded_research_messages(
                     "context_note": "Older excerpt compacted; refetch if more evidence is needed",
                 }
                 content = json.dumps(value, ensure_ascii=False)
+        elif message.role is MessageRole.TOOL and message.name == "search_web":
+            try:
+                value = json.loads(content)
+            except json.JSONDecodeError:
+                value = None
+            if isinstance(value, dict):
+                results = value.get("results", [])
+                value = {
+                    "results": results[:2] if isinstance(results, list) else [],
+                    "context_note": "Older search discovery compacted; primary URLs retained",
+                }
+                content = json.dumps(value, ensure_ascii=False)
         elif len(content) > 1200:
             content = (
                 content[:1200] + "\n[Older content compacted; read the saved report if needed]"
@@ -97,6 +109,36 @@ def bounded_research_messages(
         result[index] = replace(message, content=content, tool_calls=calls)
         if size() <= byte_limit:
             return tuple(result)
+    if size() > byte_limit and len(result) >= 1:
+        last_index = len(result) - 1
+        last_message = result[last_index]
+        if last_message.role is MessageRole.TOOL:
+            content = last_message.content
+            if last_message.name == "fetch_url":
+                try:
+                    value = json.loads(content)
+                except json.JSONDecodeError:
+                    value = None
+                if isinstance(value, dict) and isinstance(value.get("receipt"), dict):
+                    excess = size() - byte_limit
+                    current_text = str(value.get("text", ""))
+                    max_text_len = max(100, len(current_text) - excess - 200)
+                    links = value.get("links", [])
+                    value = {
+                        **value,
+                        "text": current_text[:max_text_len],
+                        "links": links[:3] if isinstance(links, list) else [],
+                        "text_excerpt_truncated": True,
+                        "context_note": "Excerpt bounded to fit model input budget",
+                    }
+                    content = json.dumps(value, ensure_ascii=False)
+            elif len(content) > 300:
+                excess = size() - byte_limit
+                max_len = max(100, len(content) - excess - 100)
+                content = content[:max_len] + "\n[Content truncated to fit model input budget]"
+            result[last_index] = replace(last_message, content=content)
+            if size() <= byte_limit:
+                return tuple(result)
     raise ProviderError(
         "Research context remains too large after compacting old excerpts. "
         f"Serialized messages require {size()} bytes; the input budget is {byte_limit} bytes. "

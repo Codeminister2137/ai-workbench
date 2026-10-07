@@ -804,7 +804,12 @@ def _build_shared_inspection_command(
     ):
         raise NotImplementedError("Codex-specific options are not mapped for common inspection")
     if config.access_method is AccessMethod.ANTIGRAVITY_CLI:
-        raise NotImplementedError("Antigravity scoped shared-tool permissions are not verified")
+        raise NotImplementedError(
+            "Antigravity headless mode denies MCP tools without an explicit "
+            "permissions.allow grant; scoped shared-tool access is not configured. "
+            "Add narrow mcp(server/tool) grants in Antigravity settings; "
+            "--dangerously-skip-permissions is not supported."
+        )
     if config.access_method is AccessMethod.COPILOT_CLI:
         command = [
             config.command,

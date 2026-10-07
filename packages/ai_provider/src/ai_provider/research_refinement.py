@@ -165,6 +165,15 @@ def run_research_refinement(
         except (ProviderError, subprocess.TimeoutExpired, OSError, RuntimeError) as error:
             attempt_status, response = "failed", None
             attempt["failure_reason"] = str(error)
+        if (
+            attempt_status == "completed"
+            and not (response and response.strip())
+            and before == research.progress_fingerprint()
+        ):
+            attempt_status = "failed"
+            attempt["failure_reason"] = (
+                "Refinement returned no final response and produced no report or evidence changes."
+            )
         if response:
             assistant_response_text = response
             # Final response only, not private reasoning; retain why an attempt did no work.

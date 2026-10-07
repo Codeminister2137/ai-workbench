@@ -14,6 +14,7 @@ def fallback_readiness_report(
     primary: ExecutionTarget,
     *,
     incompatibility: Callable[[ExecutionTarget], str | None],
+    executable_status: Callable[[ExecutionTarget], str],
     enabled: bool = True,
     quality_policy: FallbackQualityPolicy = FallbackQualityPolicy.PRESERVE_QUALITY,
 ) -> dict[str, Any]:
@@ -45,6 +46,7 @@ def fallback_readiness_report(
                 "route_id": plan.target.route_id,
                 "executor_compatible": reason is None,
                 "reason": reason,
+                "executable_status": executable_status(plan.target),
                 "authentication": "not_checked",
                 "tool_connection": "not_checked",
                 "allowance": "unknown",

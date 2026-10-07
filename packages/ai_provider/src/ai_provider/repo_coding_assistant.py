@@ -6,6 +6,7 @@ import copy
 import json
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 import time
@@ -99,6 +100,7 @@ from ai_provider.chat_transcripts import (
     SQLiteChatTranscriptStore,
     messages_to_ai_messages,
 )
+from ai_provider.closeout import FINAL_RESPONSE_INSTRUCTION, format_cli_closeout
 from ai_provider.codex_mcp import setup_project_codex_mcp
 from ai_provider.execution_fallback import FallbackSession, external_usage_limit
 from ai_provider.external_agents import (
@@ -239,6 +241,7 @@ class ValidationCommandResult:
     returncode: int | None
     status: str
     elapsed_seconds: float
+    executable: str | None = None
     stdout_preview: str = ""
     stderr_preview: str = ""
     failure_reason: str = ""
@@ -607,6 +610,9 @@ def _print_orchestrated_stage_plan(
         "away_plan_validation_commands_json: "
         + json.dumps(list(validation_commands), sort_keys=True)
     )
+    default_validation_python = _default_validation_python(args)
+    if default_validation_python is not None:
+        print(f"away_plan_validation_python: {default_validation_python}")
     print(
         "away_plan_max_repair_cycles: "
         + ("unbounded" if args.max_repair_cycles == -1 else str(args.max_repair_cycles))
@@ -724,11 +730,26 @@ def _validation_commands_from_args(args: argparse.Namespace) -> tuple[str, ...]:
     return commands or (DEFAULT_VALIDATION_COMMAND,)
 
 
+def _split_validation_command(command: str, *, windows: bool) -> list[str]:
+    """Split a direct-execution command while preserving Windows path separators."""
+
+    arguments = shlex.split(command, posix=not windows)
+    if windows:
+        arguments = [
+            argument[1:-1]
+            if len(argument) >= 2 and argument[0] == argument[-1] == '"'
+            else argument
+            for argument in arguments
+        ]
+    return arguments
+
+
 def _run_validation_commands(
     commands: Sequence[str],
     *,
     repo_root: Path,
     timeout_seconds: float,
+    default_python: str | None = sys.executable,
     progress_callback: Callable[[str], None] = print,
 ) -> tuple[ValidationCommandResult, ...]:
     """Run deterministic local validation commands and capture bounded output."""
@@ -737,9 +758,13 @@ def _run_validation_commands(
     for index, command in enumerate(commands, start=1):
         progress_callback(f"validation_command: {command}")
         started = time.perf_counter()
+        command_arguments = _split_validation_command(command, windows=sys.platform == "win32")
+        if command == DEFAULT_VALIDATION_COMMAND and default_python is not None:
+            command_arguments[0] = default_python
+        executable = command_arguments[0] if command_arguments else None
         try:
             completed = subprocess.run(
-                shlex.split(command, posix=sys.platform != "win32"),
+                command_arguments,
                 cwd=repo_root,
                 capture_output=True,
                 text=True,
@@ -753,6 +778,7 @@ def _run_validation_commands(
             results.append(
                 ValidationCommandResult(
                     command=command,
+                    executable=executable,
                     returncode=None,
                     status="timeout",
                     elapsed_seconds=elapsed,
@@ -767,6 +793,7 @@ def _run_validation_commands(
             results.append(
                 ValidationCommandResult(
                     command=command,
+                    executable=executable,
                     returncode=None,
                     status="failed_to_start",
                     elapsed_seconds=elapsed,
@@ -780,6 +807,7 @@ def _run_validation_commands(
             results.append(
                 ValidationCommandResult(
                     command=command,
+                    executable=executable,
                     returncode=completed.returncode,
                     status=status,
                     elapsed_seconds=elapsed,
@@ -794,6 +822,18 @@ def _run_validation_commands(
                 f"validation_result: {index} status={status} returncode={completed.returncode}"
             )
     return tuple(results)
+
+
+def _default_validation_python(args: argparse.Namespace) -> str | None:
+    """Select an explicit executable only when the built-in pytest default is active."""
+    commands = getattr(args, "validation_command", ())
+    if getattr(args, "skip_validation", False) or any(
+        isinstance(command, str) and command.strip() for command in commands
+    ):
+        return None
+    if getattr(args, "tool_profile", "coding") == "research":
+        return None
+    return getattr(args, "validation_python", None) or sys.executable
 
 
 def _validation_status(results: Sequence[ValidationCommandResult]) -> str:
@@ -816,6 +856,7 @@ def _validation_results_json(
     return [
         {
             "command": result.command,
+            "executable": result.executable,
             "returncode": result.returncode,
             "status": result.status,
             "elapsed_seconds": round(result.elapsed_seconds, 3),
@@ -831,6 +872,37 @@ def _validation_status_from_stage(stage: OrchestratedStageRecord | None) -> str:
     if stage is None:
         return "not_recorded"
     return str((stage.details or {}).get("validation_status", stage.status))
+
+
+def _print_cli_closeout(
+    *,
+    args: argparse.Namespace,
+    response_text: str | None,
+    status: str,
+    execution_status: str,
+    validation_stage: OrchestratedStageRecord | None = None,
+    failure_reason: str | None = None,
+) -> None:
+    """Print the same evidence-bounded summary for every CLI execution route."""
+
+    fallback_attempts = _fallback_details(args).get("fallback_attempts", [])
+    if not isinstance(fallback_attempts, list):
+        fallback_attempts = []
+    print(
+        format_cli_closeout(
+            response_text=response_text,
+            status=status,
+            execution_status=execution_status,
+            validation_details=validation_stage.details if validation_stage is not None else None,
+            fallback_attempts=fallback_attempts,
+            failure_reason=failure_reason,
+        ),
+        end="",
+    )
+
+
+def _system_prompt_with_final_response_contract(system_prompt: str) -> str:
+    return f"{system_prompt.rstrip()}\n\n{FINAL_RESPONSE_INSTRUCTION}"
 
 
 def _validation_stage_needs_repair(stage: OrchestratedStageRecord | None) -> bool:
@@ -1061,6 +1133,7 @@ class OrchestratedRunTracker:
             timeout_seconds=min(args.validation_timeout_seconds, remaining / max(1, len(commands)))
             if remaining is not None
             else args.validation_timeout_seconds,
+            default_python=_default_validation_python(args),
             progress_callback=self._progress_callback,
         )
         if research is not None:
@@ -1965,6 +2038,13 @@ def _run_chat_mode(
         print("status: failed")
         print(f"failure_reason: {exc}")
         print("execution_status: failed")
+        _print_cli_closeout(
+            args=args,
+            response_text=None,
+            status="failed",
+            execution_status="failed",
+            failure_reason=str(exc),
+        )
         _print_run_metrics(
             metrics,
             primary_elapsed_seconds=primary_elapsed_seconds,
@@ -2008,8 +2088,6 @@ def _run_chat_mode(
     print(f"chat_context_total_chars: {context.total_chars}")
     print(f"provider: {response.backend.provider}")
     print(f"model: {response.backend.model}")
-    print("\n=== Assistant response ===")
-    print(response.message.content)
     print("status: ready")
     print("execution_status: completed")
     _print_run_metrics(
@@ -2018,6 +2096,12 @@ def _run_chat_mode(
         primary_response=response,
         scrutiny_elapsed_seconds=None,
         scrutiny_response=None,
+    )
+    _print_cli_closeout(
+        args=args,
+        response_text=response.message.content,
+        status="ready",
+        execution_status="completed",
     )
     if close_transcript is not None:
         close_transcript()
@@ -2133,6 +2217,26 @@ def _main(argv: Sequence[str] | None = None) -> int:
     args.fallback_quality_policy = FallbackQualityPolicy(
         args.fallback_quality_policy or user_config.fallback_quality_policy
     )
+    if args.list_skills:
+        if any(
+            (
+                args.execute,
+                args.fallback_readiness,
+                args.local_capabilities,
+                args.start_ollama,
+                args.codex_login,
+                args.codex_login_device,
+                args.codex_plugin_install,
+                args.codex_plugin_remove,
+                args.codex_mcp_setup,
+                args.codex_mcp_register_global,
+                args.skill,
+            )
+        ):
+            parser.error(
+                "--list-skills cannot be combined with execution, setup, or selected skills"
+            )
+        return _print_skill_discovery(args, repo_root)
     if args.fallback_readiness:
         if any(
             (
@@ -2147,6 +2251,19 @@ def _main(argv: Sequence[str] | None = None) -> int:
             )
         ):
             parser.error("--fallback-readiness cannot be combined with execution or setup actions")
+        if args.native_tools and args.no_native_tools:
+            parser.error("--native-tools cannot be combined with --no-native-tools")
+        if args.codex_persist_session and args.codex_resume:
+            parser.error("--codex-persist-session cannot be combined with --codex-resume")
+        if args.skill and not args.shared_tools:
+            args.shared_tools = "inspection"
+        if args.shared_tools:
+            if args.apply_actions or args.no_native_tools or args.codex_mcp_tools:
+                parser.error("--shared-tools conflicts with legacy action or Codex MCP settings")
+            if args.tool_profile != "coding":
+                parser.error("--shared-tools inspection cannot be combined with research tools")
+            if args.shared_tools == "inspection":
+                args.approval_policy = "read_only"
         return _print_fallback_readiness(args, repo_root)
     if args.codex_login or args.codex_login_device:
         return _run_codex_login(args=args, repo_root=repo_root, parser=parser)
@@ -2372,6 +2489,7 @@ def _main(argv: Sequence[str] | None = None) -> int:
             primary_system_prompt,
             away_minutes=args.away_minutes,
         )
+    primary_system_prompt = _system_prompt_with_final_response_contract(primary_system_prompt)
     ollama_resource_profile = (
         get_ollama_resource_profile(args.ollama_profile)
         if args.ollama_profile is not None
@@ -2530,6 +2648,7 @@ def _main(argv: Sequence[str] | None = None) -> int:
                 primary_system_prompt,
                 away_minutes=args.away_minutes,
             )
+        primary_system_prompt = _system_prompt_with_final_response_contract(primary_system_prompt)
     if args.log_full_prompt:
         _print_model_input("Primary", system_prompt=primary_system_prompt, prompt=prompt)
     primary_elapsed_seconds = None
@@ -2562,6 +2681,13 @@ def _main(argv: Sequence[str] | None = None) -> int:
         print("status: failed")
         print(f"failure_reason: {exc}")
         print("execution_status: failed")
+        _print_cli_closeout(
+            args=args,
+            response_text=None,
+            status="failed",
+            execution_status="failed",
+            failure_reason=str(exc),
+        )
         _print_run_metrics(
             metrics,
             primary_elapsed_seconds=primary_elapsed_seconds,
@@ -2629,6 +2755,7 @@ def _main(argv: Sequence[str] | None = None) -> int:
     orchestrated_tracker = None
     orchestrated_deadline = None
     auxiliary_status = None
+    validation_stage = None
     if args.orchestrated:
         assert args.away_minutes is not None
         orchestrated_deadline = time.perf_counter() + args.away_minutes * 60
@@ -2705,7 +2832,6 @@ def _main(argv: Sequence[str] | None = None) -> int:
                     "failure_reason": auxiliary_result.failure_reason or "",
                 },
             )
-    print("\n=== Assistant response ===")
     assistant_response_text = None
     if args.native_tools and args.execute and result.config is not None:
         if orchestrated_tracker is not None and args.mode == "implement":
@@ -2773,6 +2899,14 @@ def _main(argv: Sequence[str] | None = None) -> int:
             print(f"status: {final_status}")
             print(f"delegation: {delegation_status}")
             print(f"execution_status: {execution_status}")
+            _print_cli_closeout(
+                args=args,
+                response_text=None,
+                status=final_status,
+                execution_status=execution_status,
+                validation_stage=validation_stage,
+                failure_reason=str(exc),
+            )
             _print_run_metrics(
                 metrics,
                 primary_elapsed_seconds=primary_elapsed_seconds,
@@ -2784,7 +2918,6 @@ def _main(argv: Sequence[str] | None = None) -> int:
                 close_transcript_func()
             return 1
         assistant_response_text = native_result.response.message.content
-        print(assistant_response_text)
         delegation_status = _delegation_status_after_native_tools(
             delegation_status,
             native_result.tool_results,
@@ -2806,7 +2939,6 @@ def _main(argv: Sequence[str] | None = None) -> int:
             )
     elif result.response is not None:
         assistant_response_text = result.response.message.content
-        print(assistant_response_text)
         if orchestrated_tracker is not None and args.mode == "implement":
             orchestrated_tracker.start_stage(
                 "implementation",
@@ -3070,6 +3202,14 @@ def _main(argv: Sequence[str] | None = None) -> int:
         primary_response=result.response,
         scrutiny_elapsed_seconds=scrutiny_elapsed_seconds,
         scrutiny_response=scrutiny_result.response if scrutiny_result is not None else None,
+    )
+    _print_cli_closeout(
+        args=args,
+        response_text=assistant_response_text,
+        status=final_status,
+        execution_status=execution_status,
+        validation_stage=validation_stage if orchestrated_tracker is not None else None,
+        failure_reason=result.orchestration.failure_reason,
     )
     if close_transcript_func is not None:
         close_transcript_func()
@@ -3339,6 +3479,21 @@ def _fallback_target_compatible(target: Any, args: argparse.Namespace, repo_root
     return _fallback_target_incompatibility(target, args, repo_root) is None
 
 
+def _fallback_executable_status(target: Any, repo_root: Path) -> str:
+    """Check local external-client executable presence without invoking it."""
+
+    if not _is_external_agent_access_method(target.access_method):
+        return "not_applicable"
+    command = external_agent_command(target.access_method)
+    if command is None:
+        return "unavailable"
+    path = Path(command)
+    if path.is_absolute() or path.parent != Path("."):
+        candidate = path if path.is_absolute() else repo_root / path
+        return "available" if candidate.is_file() else "unavailable"
+    return "available" if shutil.which(command) else "unavailable"
+
+
 def _fallback_target_incompatibility(
     target: Any,
     args: argparse.Namespace,
@@ -3456,6 +3611,26 @@ def _print_fallback_readiness(args: argparse.Namespace, repo_root: Path) -> int:
     if result.execution_plan is None:
         print(json.dumps({"status": "blocked", "reason": result.failure_reason}))
         return 1
+    selected_skills: tuple[str, ...] = ()
+    if args.skill:
+        from ai_agent.skills import load_development_skills
+        from ai_agent.tool_profiles import shared_tool_profile
+
+        directories = (
+            [path if path.is_absolute() else repo_root / path for path in args.skill_dir]
+            if args.skill_dir
+            else [repo_root / ".agents/skills", repo_root / "packages/ai_agent/skills"]
+        )
+        try:
+            skills = load_development_skills(
+                args.skill,
+                directories,
+                available_tools=frozenset(shared_tool_profile(args.shared_tools).tool_names),
+            )
+        except (ValueError, OSError) as exc:
+            print(json.dumps({"status": "blocked", "reason": str(exc)}))
+            return 1
+        selected_skills = tuple(skill.name for skill in skills)
     report = fallback_readiness_report(
         profile,
         catalog,
@@ -3463,11 +3638,68 @@ def _print_fallback_readiness(args: argparse.Namespace, repo_root: Path) -> int:
         incompatibility=lambda target: _fallback_target_incompatibility(
             target, args, repo_root, probe_provider=False
         ),
+        executable_status=lambda target: _fallback_executable_status(target, repo_root),
         enabled=args.fallback_enabled,
         quality_policy=args.fallback_quality_policy,
     )
+    report["requirements"] = {
+        "shared_tool_profile": args.shared_tools,
+        "approval_policy": args.approval_policy,
+        "selected_skills": list(selected_skills),
+    }
     print(json.dumps(report, indent=2))
     return 0
+
+
+def _print_skill_discovery(args: argparse.Namespace, repo_root: Path) -> int:
+    """Report supported skill sources and prerequisites without execution."""
+    from ai_agent.skills import discover_development_skills
+    from ai_agent.tool_profiles import shared_tool_profile
+
+    directories = (
+        [path if path.is_absolute() else repo_root / path for path in args.skill_dir]
+        if args.skill_dir
+        else [repo_root / ".agents/skills", repo_root / "packages/ai_agent/skills"]
+    )
+    profile = args.shared_tools or "inspection"
+    try:
+        skills = discover_development_skills(
+            directories,
+            available_tools=frozenset(shared_tool_profile(profile).tool_names),
+        )
+    except (OSError, ValueError) as exc:
+        print(json.dumps({"status": "error", "reason": str(exc)}, indent=2))
+        return 1
+
+    records = []
+    for skill in skills:
+        source = skill.source
+        if source is not None:
+            try:
+                source = source.relative_to(repo_root)
+            except ValueError:
+                pass
+        records.append(
+            {
+                "name": skill.name,
+                "available": skill.available,
+                "source": str(source) if source is not None else None,
+                "required_tools": list(skill.required_tools),
+                "reason": skill.reason,
+            }
+        )
+    print(
+        json.dumps(
+            {
+                "status": "ready" if all(item.available for item in skills) else "blocked",
+                "shared_tool_profile": profile,
+                "skills": records,
+                "execution": "offline; no client, provider, or skill installation was started",
+            },
+            indent=2,
+        )
+    )
+    return 0 if all(item.available for item in skills) else 1
 
 
 def _execute_fallback_route(
@@ -3703,11 +3935,12 @@ def _run_external_agent_cli_mode(
     external_result = None
     execution_status = "planned"
     exit_code = 0
-    response_header_printed = False
     final_answer_text: str | None = None
+    failure_reason: str | None = None
     orchestrated_tracker = None
     orchestrated_deadline = None
     auxiliary_status = None
+    validation_stage = None
     try:
         config = _external_agent_config_from_orchestration(
             orchestration,
@@ -3870,12 +4103,17 @@ def _run_external_agent_cli_mode(
                 )
                 print(f"delegation: {delegation_status}")
             if external_result.returncode != 0 and parsed_failure is None:
+                failure_reason = (
+                    f"external agent process exited with code {external_result.returncode}"
+                )
                 print(
                     "external_agent_failure_reason: "
                     f"process exited with code {external_result.returncode}"
                 )
                 if external_result.stderr:
                     print("external_agent_failure_hint: inspect external_agent_stderr_file")
+            elif parsed_failure is not None:
+                failure_reason = parsed_failure
             execution_status = (
                 "completed"
                 if external_result.returncode == 0 and parsed_failure is None
@@ -3893,8 +4131,6 @@ def _run_external_agent_cli_mode(
                 )
             exit_code = 0 if execution_status == "completed" else external_result.returncode or 1
         else:
-            print("\n=== Assistant response ===")
-            response_header_printed = True
             print("execution: skipped")
     except (
         FileNotFoundError,
@@ -3902,9 +4138,8 @@ def _run_external_agent_cli_mode(
         subprocess.TimeoutExpired,
         ProviderError,
     ) as exc:
-        if not response_header_printed:
-            print("\n=== Assistant response ===")
         print(f"failure_reason: {exc}")
+        failure_reason = str(exc)
         if isinstance(exc, subprocess.TimeoutExpired):
             _print_external_agent_timeout_output(exc)
         hint = _external_agent_exception_hint(exc)
@@ -4048,12 +4283,14 @@ def _run_external_agent_cli_mode(
         scrutiny_elapsed_seconds=None,
         scrutiny_response=None,
     )
-    if final_answer_text is not None:
-        print("\n=== Assistant response ===")
-        response_header_printed = True
-        print(final_answer_text, end="")
-        if not final_answer_text.endswith("\n"):
-            print()
+    _print_cli_closeout(
+        args=args,
+        response_text=final_answer_text,
+        status="failed" if exit_code else "ready",
+        execution_status=execution_status,
+        validation_stage=validation_stage,
+        failure_reason=failure_reason,
+    )
     if close_transcript is not None:
         close_transcript()
     return exit_code

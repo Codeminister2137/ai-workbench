@@ -33,9 +33,14 @@ class ForegroundTools:
         self.supervisor = session.supervisor if session else ProcessSupervisor(workspace)
         self.host: ForegroundMcpHost | None = None
         self.task_id: str | None = session.session_id if session else None
+        from ai_agent.tools.refactor import RenamePlanStore
+
+        self.rename_plans = RenamePlanStore(
+            self.workspace, owner_id=uuid.uuid4().hex, task_id=self.task_id
+        )
 
     def registry(self):
-        registry = shared_tool_registry("coding", self.workspace)
+        registry = shared_tool_registry("coding", self.workspace, rename_plans=self.rename_plans)
         for operation in ("start", "status", "stop"):
             registry.register(ProcessTool(self.supervisor, operation))
         return registry
@@ -48,6 +53,7 @@ class ForegroundTools:
             raise ValueError("Foreground MCP workspace changed")
         if self.task_id is None:
             self.task_id = config.shared_task_id
+            self.rename_plans.bind_task(self.task_id)
         if config.shared_task_id != self.task_id:
             raise ValueError("Foreground MCP task changed")
         if self.host is None:
