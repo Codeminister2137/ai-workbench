@@ -3,13 +3,35 @@
 Use Git history as part of the project design. The repository should be easy to
 review by the owner, future Codex sessions, and portfolio reviewers.
 
-## Branches
+## Branch strategy
 
-Use `master` as the stable base branch.
+This repository uses a two-branch integration model.
 
-For non-trivial work, create a focused feature branch:
+### `master` — stable, portfolio-facing
+
+`master` always contains complete, validated, presentable work.
+
+- Recruiters and reviewers land here.
+- Only promoted from `develop` at an explicit stable milestone.
+- Never the direct target of feature branches.
+- Never force-pushed.
+
+### `develop` — integration branch
+
+`develop` is where all feature branches are merged and integrated.
+
+- Every new feature or fix branch is created from `develop`.
+- Merge feature branches into `develop` when work is complete and validated.
+- `develop` is periodically promoted to `master` via fast-forward or a clean
+  merge commit when the accumulated work is stable and presentable.
+- `develop` is never deleted; it is the permanent integration branch.
+
+### Feature branches
+
+For non-trivial work, create a focused branch from `develop`:
 
 ```powershell
+git switch develop
 git switch -c feature/short-purpose
 ```
 
@@ -20,8 +42,22 @@ Use branch names that describe the work, such as:
 - `docs/architecture-decisions`
 - `fix/provider-timeout-errors`
 
-Small documentation or mechanical fixes may happen directly on the current
-feature branch when they support that branch's work.
+Small documentation or mechanical fixes may happen directly on `develop`
+when they are trivial, bounded, and clearly not in-progress feature work.
+
+### Promoting `develop` to `master`
+
+When `develop` is stable and the accumulated work is complete:
+
+```powershell
+git checkout master
+git merge --ff-only develop   # prefer fast-forward; use a merge commit only
+                               # if the histories have genuinely diverged
+git push origin master
+```
+
+Do not promote to `master` mid-feature or to satisfy a deadline. The goal
+is that `master` always reflects a coherent, working state.
 
 ## Commits
 

@@ -738,17 +738,37 @@ Do not declare an AI improvement based on a single example.
 
 ## Git
 
+### Branch strategy
+
+This repository uses a two-branch integration model:
+
+* **`master`** is the stable, portfolio-facing branch. It only receives
+  changes via explicit promotion from `develop` at a stable milestone.
+  Never commit directly to `master` or target it with feature branches.
+* **`develop`** is the permanent integration branch. All feature and fix
+  branches are created from `develop` and merged back into `develop`.
+* **Feature branches** (`feature/`, `fix/`, `docs/`) branch from `develop`
+  and merge back into `develop` when complete and validated.
+
+Codex must:
+
+* always branch from `develop` for new work;
+* always target `develop` as the merge destination for feature branches;
+* never merge directly to `master`;
+* never push directly to `master` — promotion to master requires explicit
+  owner approval and instruction.
+
 For substantial work:
 
-* use a focused branch;
+* use a focused branch off `develop`;
 * keep commits logically grouped;
-* avoid unrelated changes.
+* avoid unrelated changes;
 * commit often enough that each commit describes one coherent change;
 * use clear imperative commit messages;
-* prefer several reviewable commits over one large mixed commit;
-* keep `master` stable and use feature branches for non-trivial work.
+* prefer several reviewable commits over one large mixed commit.
 
-See `docs/git-workflow.md` for the repository workflow.
+See `docs/git-workflow.md` for the full repository workflow including the
+promotion process from `develop` to `master`.
 
 Before completion:
 
