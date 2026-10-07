@@ -232,7 +232,7 @@ def test_antigravity_coding_remains_excluded(tmp_path):
         approval_policy="interactive",
         shared_tool_profile="coding",
     )
-    with pytest.raises(NotImplementedError, match="not verified"):
+    with pytest.raises(NotImplementedError, match="permissions.allow"):
         build_external_agent_command(config, prompt="edit fixture")
 
 
