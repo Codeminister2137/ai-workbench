@@ -61,6 +61,12 @@ and clamp each request timeout to the remaining attempt allocation. The initial
 attempt leaves the review reserve; subsequent attempts use their repair allocation.
 Refinement attempts and their preceding review findings persist under the
 existing repair stage's `research_refinement` metadata, including in-flight state.
+If a refinement is reported successful but returns no final response and leaves
+the report/evidence fingerprint unchanged, the controller records an explicit
+refinement failure immediately rather than treating a silent empty turn as a
+successful no-op and spending another cycle. A non-empty response explaining
+why no change is justified still follows the existing evidence-based
+no-progress counter.
 
 Research scrutiny receives the configured report excerpt and actual current-run
 fetch receipts, without unrelated workspace files. Report/excerpt truncation is

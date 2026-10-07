@@ -87,6 +87,25 @@ tool permissions were auto-denied and no answer was produced. The adapter treats
 that diagnostic as a task failure, preserves the actual process status and any
 receipts, and lets the CLI report failure. It does not grant additional permissions.
 
+2026-10-06 verification: Antigravity CLI 1.2.16 loaded a workspace-local
+`.agents/mcp_config.json` server, but default headless `request-review` denied
+`mcp(repo_shared/read_file)` before execution. The CLI diagnostic directs users
+to a matching `permissions.allow` rule in `settings.json`; official docs describe
+global and project-level permissions, but the CLI does not expose a project
+permission command or document a project-local permission file. Creating
+`settings.json` at the workspace root or `.agents/settings.json` in isolated
+fixtures did not grant the tool. The documented CLI settings file is a
+user-level profile, not a project-scoped grant. Separate `--sandbox` probes also
+showed headless mode denying a native
+`write_to_file` request and a harmless native `run_command`; the write sentinel
+remained unchanged and the command produced no marker. Thus `--sandbox` did not
+grant either tested action, and a narrowly scoped MCP read grant can be evaluated
+without granting native writes or commands. The project-only scope is approved,
+but cannot be applied through the installed CLI environment; keep shared-tool
+routes excluded until it is configured in Antigravity's project settings and
+verified. Never substitute
+`--dangerously-skip-permissions`, which auto-approves every tool request.
+
 ## External Coding Agent Routes
 
 The catalog includes subscription/client-backed coding-agent routes alongside

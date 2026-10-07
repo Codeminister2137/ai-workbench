@@ -1,10 +1,31 @@
 # Next session: plan and owner decisions
 
-2026-10-05 update: SDK-based IDE acceptance and grouped test-workflow slice COMPLETE.
-The owner supplied the IDE endpoint and selected authenticated foreground MCP
-under ADR-044; these inputs are resolved. Remaining foundation work needs attended
-terminal acceptance and separately scoped refactoring/host-independence
-decisions. See [roadmap](development-roadmap.md) and [test workflow](../test-workflow.md).
+2026-10-06 update: ADR-045 records the owner's IDE-independence rationale.
+ADR-046 additionally records the owner's selection of an explicit
+`--validation-python` for the default pytest command, preserving the current
+assistant-process default and custom validation commands. The rationale is
+predictable selection without silent environment guessing, advancing IDE
+independence. The effective default executable is reported in the run plan and
+the actual executable is retained in validation results.
+Native and synthetic shared-MCP rename preview, denial and owner-approved exact
+apply passed on an isolated temporary package; both file effects were verified
+and cleaned up. This does not establish physical terminal input or installed
+third-party-client parity. The standalone `python_runtime` diagnostic and
+orchestrated default validation interpreter binding are implemented; default
+pytest now uses the repo-assistant's Python executable, and Windows quoted
+validation paths preserve backslashes. Ruff/Pyright remain opt-in. SDK-based IDE
+acceptance, grouped test-workflow slice,
+and one owner-approved live shared-file-write approval are COMPLETE. The owner
+supplied the IDE endpoint and selected authenticated foreground MCP under
+ADR-044; these inputs are resolved. The confirmation came in chat and was
+relayed into the controlling terminal, so this does not prove the owner
+physically typed there. Shell approval and general client parity remain
+unverified. The owner selected the Jedi-based preview-first rename direction
+(option A) on 2026-10-06; its optional dependency and narrow tool contract are
+implemented offline. The owner chose it to advance IDE independence while
+permitting PyCharm as a temporary tool host; see ADR-045.
+See the [implementation contract](semantic-refactoring-proposal.md),
+[roadmap](development-roadmap.md) and [test workflow](../test-workflow.md).
 The owner accepted grouped local checks and retaining direct URL fetching on
 2026-10-05. Jenkins/hosted CI and a new search service are deferred; they do not
 block independent implementation. A fresh unattended plan audit must substantiate
@@ -13,6 +34,12 @@ The fresh audit found and implemented additional eligible work; see
 [evidence and remaining decisions](post-audit-decisions.md). Search replacement
 is now deferred in favor of direct fetching. Historical D2 alternatives below
 remain a record of the earlier investigation, not a current blocker.
+
+The attended approval fixture's first terminal result was not retained, but its
+process exited and cleaned the temporary directory. A second bounded run after
+the owner's explicit `yes` passed through the actual foreground HTTP host and
+terminal approval handler, verified the exact temporary file, and cleaned it up.
+Its evidence and limitation are recorded in [post-audit decisions](post-audit-decisions.md).
 
 Historical 2026-10-04 brief follows; completed tasks and resource restrictions
 below are superseded by the current checkpoint and active owner's instruction.

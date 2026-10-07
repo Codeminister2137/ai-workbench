@@ -11,6 +11,7 @@ dependencies = [
 
 [project.optional-dependencies]
 ide = ["ai-agent[ide]"]
+rename-preview = ["ai-agent[rename-preview]"]
 
 [dependency-groups]
 dev = [

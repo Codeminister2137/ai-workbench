@@ -2,9 +2,12 @@
 
 `--shared-tools inspection` selects the same six project-owned Git/read/search
 operations for provider-native execution, Codex, Copilot and Kiro. Antigravity is
-excluded until scoped MCP access is verified. This profile cannot edit or run
-commands; it sets the read-only approval preset. Existing coding defaults and
-the older Codex-only delegation option remain separate.
+excluded because its headless CLI denied a workspace-local MCP read without a
+matching `permissions.allow` grant. It remains excluded until narrow grants are
+configured and verified; the client-wide `--dangerously-skip-permissions` flag
+is not an acceptable substitute. This profile cannot edit or run commands; it
+sets the read-only approval preset. Existing coding defaults and the older
+Codex-only delegation option remain separate.
 
 ```powershell
 .\scripts\repo-assistant.ps1 "Review the change" --mode review --shared-tools inspection --execute
@@ -19,6 +22,19 @@ Exactly one source must match each name. Current prerequisite contracts support
 `review-repo-change`; unknown skills are refused rather than claiming dependencies
 were checked. Skill selection passes complete instructions to every route. It is
 not evidence that a client's separate native skill menu was invoked.
+
+Discover supported skill sources and check their common-tool/Git prerequisites
+without starting a client or provider:
+
+```powershell
+.\scripts\repo-assistant.ps1 --list-skills
+.\scripts\repo-assistant.ps1 --list-skills --skill-dir .agents/skills --shared-tools inspection
+```
+
+The JSON report lists supported skills, source paths, required common tools and
+any missing prerequisites. A blocked skill is reported with a nonzero exit code.
+Discovery does not install skills, grant tools, or advertise sources without a
+known prerequisite contract.
 
 Required root and selected-path nested `AGENTS.md` instructions are loaded intact,
 before optional snippets. Their independent limit defaults to 64,000 characters;
@@ -44,7 +60,8 @@ These checks do not establish shared mutation permissions or complete coding par
 
 `--shared-tools coding` adds the existing `create_file`, `edit_file` and
 `run_command` tools to inspection, plus the existing public-text `fetch_url`
-operation. It preserves the selected approval preset:
+operation, read-only `python_navigate`, and the preview-first `rename_preview` /
+`rename_apply` pair. It preserves the selected approval preset:
 
 | Preset | File writes | Shell |
 | --- | --- | --- |
@@ -59,6 +76,30 @@ Inspection does not gain network access. Only public source URLs are permitted;
 never encode private files, prompts or secrets in a URL. Retrieval metadata comes
 from actual tool execution and does not establish factual truth. See
 [local tool contracts](local-tool-hosts.md).
+
+Python definitions/references and symbol rename previews use the optional Jedi
+integration:
+`python -m uv sync --extra rename-preview`. `rename_preview` does not modify
+files and returns a complete bounded diff plus a short-lived plan handle.
+`rename_apply` requires the selected write authority; interactive approval shows
+the full immutable diff. Changed or out-of-workspace files, links, unsupported
+syntax/encodings and oversized plans are refused. Multi-file writes use atomic
+per-file replacement, not a transaction; partial failure is reported for manual
+reconciliation. Plans are held only by the foreground owner and expire after
+five minutes. See [semantic rename contract](semantic-refactoring-proposal.md).
+`python_navigate` accepts a Python path, one-based identifier position, and
+`definitions` or `references` operation. It returns at most 100 results with
+workspace-relative paths and short source snippets; external, non-Python and
+invalid results are excluded and counted. It is read-only and available only in
+the coding profile, so the inspection profile remains unchanged. Jedi navigation
+is best-effort for dynamic Python and does not claim complete reference coverage.
+
+The coding profile's read-only `python_runtime` reports the interpreter running
+the project agent and workspace hints from `pyproject.toml`, `uv.lock`, and a
+conventional `.venv` path. It does not switch interpreters, execute workspace
+code, or prove that another process or shell command uses that environment.
+Use it to diagnose runtime selection before issuing separately authorized
+validation commands.
 
 ```powershell
 .\scripts\repo-assistant.ps1 "Edit the fixture and review its diff" --mode implement --shared-tools coding --approval-policy interactive --coding-session new --execute

@@ -376,6 +376,28 @@ imported per machine into ignored local storage.
 
 Detailed ADR: [ADR-044](decisions/ADR-044-authenticated-foreground-mcp-host.md)
 
+## ADR-045 — IDE-Independent Semantic Rename
+**Status:** Accepted; bounded native/shared MCP acceptance passed; installed-client acceptance pending
+**Date:** 2026-10-06
+
+Add an optional standalone Jedi-based Python rename preview/apply pair to advance
+IDE independence. PyCharm may continue hosting tools during the transition.
+Disposable native/shared MCP acceptance passed; installed-client acceptance and
+the broader IDE-independence milestone remain separate.
+
+Detailed ADR: [ADR-045](decisions/ADR-045-ide-independent-semantic-rename.md)
+
+## ADR-046 — Explicit Interpreter for Default Validation
+**Status:** Accepted
+**Date:** 2026-10-06
+
+Add an explicit `--validation-python` override for the built-in pytest command.
+Keep the repo-assistant executable as the default and never rewrite explicit
+`--validation-command` values. The owner chose this for predictable selection
+without silent environment guessing and to advance IDE independence.
+
+Detailed ADR: [ADR-046](decisions/ADR-046-explicit-validation-interpreter.md)
+
 ## Template
 ```text
 ## ADR-NNN — Short Name

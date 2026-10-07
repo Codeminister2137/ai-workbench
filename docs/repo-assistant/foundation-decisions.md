@@ -71,13 +71,20 @@ Antigravity's installed headless client denied MCP access without an answer whil
 returning process exit zero. The adapter now reports failure. Its
 [headless documentation](https://www.antigravity.google/docs/cli/headless/) describes
 scoped grants in global settings; a supported narrow per-run override has not been
-established. Choose either explicitly approved native grants for the selected
-inspection server/tools, or temporary exclusion from shared-tool fallback.
-Changing global settings may affect other sessions; broad bypass is not proposed.
-A separate tool-free request returned the expected answer through existing sign-in;
-the MCP refusal is distinct from basic client execution availability.
+established. On 2026-10-06, the owner approved exact project-scoped MCP allow rules
+for the shared read-only inspection tools only (`read_file`, `list_dir`,
+`find_files`, `grep_search`, `git_status`, and `git_diff`); native writes and
+commands remain ungranted. The installed CLI does not expose a project-permission
+command or document a project-local permission file, and the Antigravity IDE
+project settings UI is unavailable in this environment. Workspace-root and
+`.agents/settings.json` candidates were denied in isolated CLI tests. Do not
+substitute a user-wide grant or broad bypass. Keep Antigravity excluded until the
+approved project grants are configured in the project settings UI and verified.
+A separate tool-free request returned the expected answer through existing
+sign-in; the MCP refusal is distinct from basic client execution availability.
 
-Owner selection pending: approval-channel sequencing and Antigravity grant/exclusion.
+The approval-channel sequence remains option A followed by B; only applying the
+approved Antigravity project grants is blocked on access to its settings UI.
 
 ## 4. Temporary IDE bridge
 

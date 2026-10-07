@@ -1,9 +1,9 @@
-# Semantic rename preview: owner decision
+# Python semantic rename preview and apply
 
-**PROPOSED; not approved or implemented.** Investigated 2026-10-05 to make the
-remaining C5/M5 boundary concrete. Neither candidate library is installed in the
-workspace. Public package metadata and pinned source were inspected without
-importing them or changing dependencies.
+**Option A accepted by the owner on 2026-10-06; offline implementation complete.**
+The owner selected this direction to advance IDE independence. PyCharm remains
+permissible during the transition, but the long-term goal is for project tools to
+work independently of it. See [ADR-045](../decisions/ADR-045-ide-independent-semantic-rename.md).
 
 ## Why a decision is needed
 
@@ -14,8 +14,8 @@ Renaming and then reverting the working tree is not a reliable preview: it would
 temporarily mutate user files and could overwrite concurrent editor changes.
 
 The choice affects a new dependency, public tools, approval scope and eventual
-independence from the IDE. Existing interpreter/diagnostics/symbol wrappers remain
-the accepted working implementation.
+independence from the IDE. Existing interpreter/diagnostics/symbol wrappers and
+the temporary PyCharm bridge remain available during migration.
 
 | Option | Benefit | Trade-off |
 | --- | --- | --- |
@@ -56,7 +56,7 @@ dynamic Python reference.
 
 ## Recommended v1 contract
 
-This is the proposed implementation scope for approval, not an accepted API:
+Accepted v1 contract:
 
 1. Preview identifies an existing workspace Python file, symbol position and
    valid new identifier. Reject ambiguous selection, syntax failure and file/module
@@ -78,11 +78,50 @@ This is the proposed implementation scope for approval, not an accepted API:
    create project state or silently install packages. Interpreter, cache and
    concurrency isolation are part of acceptance, not assumptions about the library.
 
+Implementation detail: the `rename-preview` optional extra pins Jedi 0.20.0;
+without it the tools remain discoverable but preview reports the installation
+command. `rename_preview` is read-only and returns the complete diff plus a
+five-minute, one-use plan handle. `rename_apply` is a WRITE tool. Under
+interactive approval the callback receives the plan digest and complete diff,
+not only the opaque handle. The plan is process-local and owner/task/workspace
+bound; route changes within the foreground owner may reuse it, but process
+restart cannot. Preview verifies that each current file still matches Jedi's
+source snapshot before preparing the plan. Application rechecks all original
+digests before writing, then uses atomic per-file replacements and reports
+partial effects without rollback.
+
 Acceptance should cover cross-file imports/calls, duplicate names in separate
 scopes, Unicode/newlines, unchanged preview bytes, outside/link refusal, stale
 files, expired handles, denied/no-human approval and partial-write reconciliation.
-Run a real isolated fixture through native and shared MCP routes after approval.
+An isolated temporary-package preview passed through both the native registry
+and foreground HTTP MCP transport using a synthetic MCP client; the fixture
+remained unchanged. Interactive denial also passed through the shared transport
+and left the fixture unchanged. After the owner approved the exact displayed
+`Widget` -> `Gadget` diff, apply through that transport succeeded under the
+interactive permission policy; both changed files and their effect receipts
+were verified, then the disposable fixture was cleaned up. The owner's approval
+was supplied in chat and relayed to the exact-diff callback. This is bounded
+synthetic-client acceptance, not proof of physical terminal input, a live
+third-party client, or overall IDE independence.
 
-Owner question: approve A with optional Jedi/Parso and this narrow contract,
-choose B with its explicit lack of a preview, or defer via C? If selecting A/B,
-record why that trade-off matters so the subsequent ADR preserves the owner's intent.
+Offline implementation plus bounded native/shared-transport acceptance are
+complete; installed-client/attended acceptance remains separate. The owner selected the standalone
+preview/apply direction because project tools should eventually be independent
+of PyCharm, while allowing PyCharm to host tools during the transition. This
+choice advances that goal for Python rename but does not itself complete IDE
+independence.
+
+## IDE-independent navigation extension
+
+The current continuation adds a read-only `python_navigate` tool to the native
+and shared coding profiles. It accepts `definitions` or `references`, resolves
+an identifier at a one-based file position with the same pinned optional Jedi
+dependency, and returns up to 100 workspace-relative Python results with short
+snippets. Results outside the workspace, non-Python files and invalid positions
+are excluded and counted. The read-only inspection profile is unchanged.
+
+This is a bounded convenience for ordinary Python projects, not a language
+server or a completeness guarantee: dynamic imports, generated code and other
+runtime behavior can make Jedi references incomplete. It adds no dependency,
+persistent state, write authority or PyCharm requirement. Installed-client
+acceptance remains part of the broader C5/M5 work.

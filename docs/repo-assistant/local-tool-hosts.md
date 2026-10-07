@@ -14,7 +14,9 @@ observed process metadata; process sharing also works without persistence.
 Process handles remain valid across agent route changes while this CLI lives.
 Each replacement client receives new permissions and authentication; the old
 client's access expires. On CLI shutdown, the listener closes and owned direct
-children stop. Restarted handles cannot reattach to old processes by PID.
+children stop. Incomplete HTTP requests are disconnected without delaying host
+closure; tool operations already in progress are drained before shutdown returns.
+Restarted handles cannot reattach to old processes by PID.
 
 Start/stop require the selected preset's shell authority; status is read-only.
 Interactive operations need an attended terminal. Missing terminal input causes
@@ -23,6 +25,13 @@ supervisor manages direct children, not independently detached descendants.
 Closed supervisors refuse new starts, including a launch racing shutdown; stored
 observations remain readable. Cleanup attempts every owned child even if one
 termination reports an error.
+
+On 2026-10-06, an owner-approved `create_file` operation passed through the
+foreground HTTP host and the controlling-terminal approval handler. The owner
+provided the exact one-time confirmation in chat, which was relayed to the
+waiting local terminal; the temporary file contents were verified and the
+fixture directory removed. This does not establish that a person typed into the
+terminal, shell-command approval, or broad client parity.
 
 Per-run stdio adapters preserve compatibility with Codex, Copilot and Kiro's
 existing client mappings. They forward to the common HTTP host. Authentication

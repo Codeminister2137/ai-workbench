@@ -31,11 +31,21 @@ assistant's existing tool policies.
 
 Executed orchestrated runs now update deterministic validation and final
 handoff stages before the run is marked complete. The validation stage runs
-`python -m pytest -q` by default, records command output previews and return
-codes, and can be changed with repeated `--validation-command CMD` flags or
-disabled with `--skip-validation`. Ruff and Pyright remain available through the
-repository's pre-commit hooks; pass a pre-commit command explicitly when an
-orchestrated run should include that broader gate. The final handoff stage
+`python -m pytest -q` by default, bound directly to the same `sys.executable`
+that runs the repo-assistant process so Windows PATH or shell activation cannot
+silently select another Python. Each validation result records both the
+displayed command and executable argument. Repeated `--validation-command CMD`
+values remain explicit caller-selected commands and are not rewritten; validation
+can be disabled with `--skip-validation`. Use `--validation-python PYTHON` to
+select an explicit executable for the default pytest command without changing
+the repo-assistant process interpreter. This option does not rewrite explicit
+`--validation-command` values. The effective default interpreter is shown in the
+plan and the executable used is recorded in validation results. On Windows,
+quoted executable/argument paths are unquoted for direct process execution while
+backslashes are preserved.
+Ruff and Pyright remain available through the repository's pre-commit hooks;
+pass a pre-commit command explicitly when an orchestrated run should include
+that broader gate. The final handoff stage
 records the execution status, validation status, concise `git status --short`
 output, response availability, blockers, risks, and next action fields in the
 local SQLite stage details. Failed deterministic validation changes the final

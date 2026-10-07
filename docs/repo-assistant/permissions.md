@@ -35,7 +35,25 @@ no human terminal is available. Task/run/workspace scope and foreground process
 identity prevent inherited grants after owner exit. Shared inspection remains
 read-only. Existing coding sessions persist scoped digest receipts without raw
 tool arguments or outputs. Bounded `workspace_write` continuation through real
-Copilot and Kiro passed; interactive terminal approval remains unverified.
+Copilot and Kiro passed. On 2026-10-06, an owner-approved exact file creation
+passed through the live foreground MCP host and controlling-terminal approval
+handler; the confirmation was supplied in chat and relayed to the waiting local
+terminal. This verifies one approved write, not a human typing into the terminal,
+shell approval, or general client parity.
+
+For an assistant-initiated live acceptance that can block on terminal approval,
+the assistant must first tell the owner the exact command, working directory,
+expected effects and approval prompt, then wait for explicit confirmation that
+the owner is present and ready before launching it. Prior approval of the
+acceptance plan does not establish availability for a later prompt. If the
+owner is not ready, defer the command; do not start it in the background or
+relay a chat response as if it were physical terminal input.
+
+Python semantic rename is separate from the read-only IDE bridge. The coding
+profile's `rename_preview` does not modify files; `rename_apply` is WRITE and
+approval displays the full immutable diff and digest. The optional Jedi extra,
+expiry, workspace/digest checks and partial-effect semantics are documented in
+[the semantic rename contract](semantic-refactoring-proposal.md).
 
 Avoid `--allow-outside-files` unless you deliberately want to allow outside-repo
 paths without a prompt.
