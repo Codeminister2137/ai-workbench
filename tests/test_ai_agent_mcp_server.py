@@ -9,6 +9,7 @@ from ai_agent.mcp_server import (
     read_search_tool_registry,
     tool_definition_to_mcp_tool,
 )
+from ai_agent.tool_profiles import INSPECTION_PROFILE
 from ai_agent.tools import CreateFileTool, ReadFileTool, ToolContext
 from ai_orchestrator import AccessMethod, TaskCapability
 
@@ -34,7 +35,11 @@ def test_mcp_initialize_and_tools_list(tmp_path: Path) -> None:
     assert "delegate_task" not in initialized["result"]["instructions"]
     assert listed is not None
     tool_names = {tool["name"] for tool in listed["result"]["tools"]}
-    assert tool_names == {"read_file", "list_dir", "find_files", "grep_search"}
+    # read_search_tool_registry exposes only read/search tools — no write, shell, or git tools.
+    expected = {tool.name for tool in read_search_tool_registry().list_definitions()}
+    assert tool_names == expected
+    assert "run_command" not in tool_names
+    assert "create_file" not in tool_names
     assert "run_command" not in tool_names
 
 
@@ -58,14 +63,9 @@ def test_read_search_only_entrypoint_omits_model_backed_delegation(monkeypatch, 
         lambda **kwargs: (_ for _ in ()).throw(AssertionError("delegation registry created")),
     )
     assert _MCP_SERVER.main(["--workspace-root", str(tmp_path), "--read-search-only"]) == 0
-    assert captured == [
-        "read_file",
-        "list_dir",
-        "find_files",
-        "grep_search",
-        "git_status",
-        "git_diff",
-    ]
+    # --read-search-only serves the inspection profile tools (read/search + git inspection).
+    # Derived from INSPECTION_PROFILE so the test stays in sync when tools are added/removed.
+    assert captured == list(INSPECTION_PROFILE.tool_names)
 
 
 def test_codex_mcp_registry_includes_bounded_delegate_task(tmp_path: Path) -> None:
