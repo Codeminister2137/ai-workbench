@@ -60,9 +60,10 @@ class FakeClient:
 
 def test_agent_loop_executes_tools_and_returns_final_response(tmp_path: Path) -> None:
     client = FakeClient()
+    tools = default_coding_tools()
     result = AgentLoop(
         client,
-        default_coding_tools(),
+        tools,
         ToolContext(tmp_path),
         permissions=PermissionManager(policy=PermissionPolicy.permissive()),
         max_iterations=3,
@@ -72,7 +73,8 @@ def test_agent_loop_executes_tools_and_returns_final_response(tmp_path: Path) ->
     assert result.iterations == 2
     assert result.tool_results[0].is_error is False
     assert (tmp_path / "out.txt").read_text() == "done"
-    assert len(client.requests[0].tools) == 13
+    # All registered tools are forwarded to the provider request.
+    assert len(client.requests[0].tools) == len(tools.list_definitions())
     assert client.requests[1].messages[-1].role is MessageRole.TOOL
 
 
@@ -111,7 +113,8 @@ def test_delegation_tool_runs_bounded_child_task(tmp_path: Path) -> None:
     assert result.output == "child done"
     assert calls == ["write a small helper"]
     assert (tmp_path / "child.txt").read_text(encoding="utf-8") == "child"
-    assert len(registry.list_definitions()) == 14
+    # coding_tools_with_delegation adds DelegateTaskTool on top of default_coding_tools.
+    assert len(registry.list_definitions()) == len(default_coding_tools().list_definitions()) + 1
 
 
 def test_provider_failure_preserves_completed_tool_receipt_without_replaying(
