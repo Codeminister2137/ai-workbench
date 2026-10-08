@@ -18,6 +18,9 @@ derives consistent settings for primary, repair and fallback execution.
 `validation` owns direct-process validation, interpreter selection and bounded
 result metadata. It can be exercised without importing CLI orchestration;
 malformed commands produce `failed_to_start` results rather than aborting a run.
+`chat_context` owns transcript assembly and incremental rolling summaries. It
+preserves required system instructions and the latest raw turn, reuses saved
+coverage, and refuses impossible character budgets before requesting a summary.
 Provider/client adapters stay in `ai_provider`, and routing policy stays in
 `ai_orchestrator`. Existing research/run-store/fallback helpers remain in the
 provider package for this slice. Legacy provider CLI paths remain compatibility

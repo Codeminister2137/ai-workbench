@@ -30,6 +30,12 @@ exceeded, `--chat-context-mode full_history` or `--chat-history-budget-chars 0`
 to send the full local transcript, and `--chat-recent-message-count N` to choose
 how many recent non-system messages are kept raw.
 
+Context assembly lives in `ai_agent.chat_context` and is tested separately from
+the CLI. Required system messages and the latest turn are never truncated to make
+a request fit. If those alone exceed the budget, assembly refuses before a summary
+request; cached or newly generated summaries must also fit with the latest turn.
+These limits count characters and roles, not provider tokens.
+
 Chat transcripts may contain the request and selected repository context because
 they preserve the provider-neutral messages that were actually sent to the
 model. Keep them local and private.

@@ -61,11 +61,8 @@ from ai_provider import (
 from ai_provider import PrivacyClass as ProviderPrivacyClass
 from ai_provider.chat_transcripts import (
     DEFAULT_CHAT_TRANSCRIPT_DB,
-    ChatMessageRecord,
-    ChatRollingSummaryRecord,
     ChatSessionRecord,
     SQLiteChatTranscriptStore,
-    messages_to_ai_messages,
 )
 from ai_provider.closeout import FINAL_RESPONSE_INSTRUCTION, format_cli_closeout
 from ai_provider.codex_mcp import setup_project_codex_mcp
@@ -202,6 +199,21 @@ from ai_agent import (
     coding_tools_with_delegation,
     default_coding_tools,
 )
+from ai_agent.chat_context import (
+    ChatContextAssembly as ChatContextAssembly,  # noqa: F401 - compatibility export
+)
+from ai_agent.chat_context import (
+    assemble_chat_context as _assemble_chat_context,  # noqa: F401 - compatibility export
+)
+from ai_agent.chat_context import (
+    build_chat_summary_prompt as _build_chat_summary_prompt,  # noqa: F401 - compatibility export
+)
+from ai_agent.chat_context import (
+    messages_total_chars as _messages_total_chars,  # noqa: F401 - compatibility export
+)
+from ai_agent.chat_context import (
+    update_chat_rolling_summary as _update_chat_rolling_summary,  # noqa: F401 - compatibility export
+)
 from ai_agent.external_execution import ExternalExecutionSettings
 from ai_agent.repo_assistant_args import (
     APPROVAL_POLICY_PRESETS as APPROVAL_POLICY_PRESETS,
@@ -307,19 +319,6 @@ class AuxiliaryPanelResult:
     model: str | None = None
     response_text: str | None = None
     failure_reason: str | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class ChatContextAssembly:
-    """Bounded provider request context for one persisted chat turn."""
-
-    messages: tuple[AIMessage, ...]
-    mode: str
-    summary_used: bool
-    summary_updated: bool
-    raw_message_count: int
-    omitted_message_count: int
-    total_chars: int
 
 
 def _capability_report(snapshot: Any) -> dict[str, Any]:
@@ -1579,204 +1578,6 @@ def _print_chat_sessions(sessions: Sequence[ChatSessionRecord]) -> None:
             f"privacy={session.privacy_class} "
             f"title={session.title}"
         )
-
-
-def _assemble_chat_context(
-    *,
-    store: SQLiteChatTranscriptStore,
-    session: ChatSessionRecord,
-    messages: tuple[ChatMessageRecord, ...],
-    client: ChatClient,
-    config: BackendConfig,
-    privacy_class: PrivacyClass,
-    mode: str,
-    budget_chars: int,
-    recent_message_count: int,
-) -> ChatContextAssembly:
-    """Build bounded request messages for chat mode."""
-
-    if budget_chars <= 0 or mode == "full_history":
-        request_messages = messages_to_ai_messages(messages)
-        return ChatContextAssembly(
-            messages=request_messages,
-            mode=mode,
-            summary_used=False,
-            summary_updated=False,
-            raw_message_count=len(messages),
-            omitted_message_count=0,
-            total_chars=_messages_total_chars(request_messages),
-        )
-
-    full_messages = messages_to_ai_messages(messages)
-    full_chars = _messages_total_chars(full_messages)
-    if full_chars <= budget_chars:
-        return ChatContextAssembly(
-            messages=full_messages,
-            mode=mode,
-            summary_used=False,
-            summary_updated=False,
-            raw_message_count=len(messages),
-            omitted_message_count=0,
-            total_chars=full_chars,
-        )
-
-    if mode == "hard_fail":
-        raise ProviderError(
-            "chat history exceeds --chat-history-budget-chars and --chat-context-mode is hard_fail",
-            category=ProviderErrorCategory.NON_RETRYABLE,
-            provider=config.provider.value,
-        )
-
-    system_messages = tuple(
-        message for message in messages if message.role == MessageRole.SYSTEM.value
-    )
-    conversation_messages = tuple(
-        message for message in messages if message.role != MessageRole.SYSTEM.value
-    )
-    recent_count = max(1, recent_message_count)
-    recent_messages = conversation_messages[-recent_count:]
-    older_messages = conversation_messages[:-recent_count]
-    summary = store.get_rolling_summary(session.session_id)
-    summary_updated = False
-    unsummarized_older_messages = tuple(
-        message
-        for message in older_messages
-        if summary is None or message.message_order > summary.covered_message_order
-    )
-    if unsummarized_older_messages:
-        summary = _update_chat_rolling_summary(
-            store=store,
-            session=session,
-            prior_summary=summary.summary if summary is not None else "",
-            older_messages=unsummarized_older_messages,
-            client=client,
-            config=config,
-            privacy_class=privacy_class,
-        )
-        summary_updated = True
-    if summary is None:
-        raise ProviderError(
-            "chat history exceeds --chat-history-budget-chars but there are no older "
-            "messages available for rolling summarization",
-            category=ProviderErrorCategory.NON_RETRYABLE,
-            provider=config.provider.value,
-        )
-
-    included_records = [*system_messages]
-    summary_message = AIMessage(
-        MessageRole.SYSTEM,
-        "Rolling summary of earlier chat turns. Use this as compressed context; "
-        "the following messages are the recent raw transcript tail.\n\n"
-        f"{summary.summary}",
-    )
-    request_messages = (*messages_to_ai_messages(system_messages), summary_message)
-    recent_records = list(recent_messages)
-    while recent_records:
-        recent_request_messages = messages_to_ai_messages(tuple(recent_records))
-        candidate = (*request_messages, *recent_request_messages)
-        if _messages_total_chars(candidate) <= budget_chars:
-            request_messages = candidate
-            included_records.extend(recent_records)
-            break
-        recent_records = recent_records[1:]
-    else:
-        latest_record = recent_messages[-1]
-        request_messages = (*request_messages, *messages_to_ai_messages((latest_record,)))
-        included_records.append(latest_record)
-
-    total_chars = _messages_total_chars(request_messages)
-    if total_chars > budget_chars:
-        raise ProviderError(
-            "chat rolling summary plus latest message exceeds --chat-history-budget-chars",
-            category=ProviderErrorCategory.NON_RETRYABLE,
-            provider=config.provider.value,
-        )
-    included_orders = {record.message_order for record in included_records}
-    omitted_message_count = len(messages) - len(included_orders)
-    return ChatContextAssembly(
-        messages=request_messages,
-        mode=mode,
-        summary_used=True,
-        summary_updated=summary_updated,
-        raw_message_count=len(included_orders),
-        omitted_message_count=max(0, omitted_message_count),
-        total_chars=total_chars,
-    )
-
-
-def _update_chat_rolling_summary(
-    *,
-    store: SQLiteChatTranscriptStore,
-    session: ChatSessionRecord,
-    prior_summary: str,
-    older_messages: tuple[ChatMessageRecord, ...],
-    client: ChatClient,
-    config: BackendConfig,
-    privacy_class: PrivacyClass,
-) -> ChatRollingSummaryRecord:
-    highest_order = max(message.message_order for message in older_messages)
-    response = client.complete(
-        AIRequest(
-            messages=(
-                AIMessage(
-                    MessageRole.SYSTEM,
-                    "Update a rolling chat summary for a coding assistant. Preserve "
-                    "requirements, user decisions, unresolved questions, file paths, "
-                    "commands, validation outcomes, and constraints. Do not invent facts. "
-                    "Return only the updated summary.",
-                ),
-                AIMessage(
-                    MessageRole.USER,
-                    _build_chat_summary_prompt(prior_summary, older_messages),
-                ),
-            ),
-            model=config.model,
-            privacy_class=privacy_class,
-            metadata={
-                "task_type": "chat_rolling_summary",
-                "chat_session_id": session.session_id,
-                "covered_message_order": highest_order,
-            },
-        )
-    )
-    summary_text = response.message.content.strip()
-    if not summary_text:
-        raise ProviderError(
-            "chat rolling summarizer returned an empty summary",
-            category=ProviderErrorCategory.NON_RETRYABLE,
-            provider=response.backend.provider,
-        )
-    return store.upsert_rolling_summary(
-        session.session_id,
-        summary=summary_text,
-        covered_message_order=highest_order,
-        provider=response.backend.provider,
-        model=response.backend.model,
-        metadata={
-            "finish_reason": response.finish_reason.value,
-            "usage_source": response.usage.source.value,
-            "input_tokens": response.usage.input_tokens,
-            "output_tokens": response.usage.output_tokens,
-            "total_tokens": response.usage.total_tokens,
-            "latency_ms": response.latency_ms,
-        },
-    )
-
-
-def _build_chat_summary_prompt(prior_summary: str, messages: tuple[ChatMessageRecord, ...]) -> str:
-    rendered_messages = "\n\n".join(
-        f"[{message.message_order}] {message.role}:\n{message.content}" for message in messages
-    )
-    return (
-        "# Existing rolling summary\n"
-        f"{prior_summary or '(none)'}\n\n"
-        "# New raw messages to fold into the summary\n"
-        f"{rendered_messages}"
-    )
-
-
-def _messages_total_chars(messages: Sequence[AIMessage]) -> int:
-    return sum(len(message.role.value) + len(message.content) for message in messages)
 
 
 def _run_chat_mode(
