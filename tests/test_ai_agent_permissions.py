@@ -73,13 +73,18 @@ def test_permission_manager_interactive_callback() -> None:
     )
 
     # Read is auto-allowed
-    assert manager.check_and_authorize(read_tool, ToolCall(name="read_file", arguments={})) is True
+    assert (
+        manager.check_and_authorize(
+            read_tool, ToolCall(name="read_file", arguments={"path": "a.txt"})
+        )
+        is True
+    )
     assert len(decisions) == 0
 
     # Write calls approval callback and returns True
     assert (
         manager.check_and_authorize(
-            write_tool, ToolCall(name="create_file", arguments={"path": "a.txt"})
+            write_tool, ToolCall(name="create_file", arguments={"path": "a.txt", "content": "ok"})
         )
         is True
     )

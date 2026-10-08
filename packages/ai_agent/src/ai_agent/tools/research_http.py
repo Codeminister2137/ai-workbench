@@ -77,6 +77,29 @@ class _PinnedHTTPS(_PinnedHTTP):
         self.sock = ssl.create_default_context().wrap_socket(self.sock, server_hostname=self.host)
 
 
+def response_watchdog(connection, deadline: float, expired: threading.Event):
+    """Interrupt header/body reads at a total deadline, including close responses."""
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise TimeoutError("HTTP response budget exhausted")
+    sock = connection.sock
+    if sock is None:
+        return None, None
+    sock.settimeout(remaining)
+
+    def abort_read():
+        expired.set()
+        try:
+            sock.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            pass
+
+    timer = threading.Timer(remaining, abort_read)
+    timer.daemon = True
+    timer.start()
+    return sock, timer
+
+
 def fetch_public_url(
     url: str,
     *,
@@ -109,25 +132,7 @@ def fetch_public_url(
                     "Accept-Encoding": "identity",
                 },
             )
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                raise TimeoutError("Source-fetch budget exhausted")
-            deadline_socket = connection.sock
-            if deadline_socket is not None:
-                deadline_socket.settimeout(remaining)
-
-                def abort_read(sock=deadline_socket, event=expired):
-                    event.set()
-                    try:
-                        # HTTPResponse may retain the socket after connection.sock
-                        # becomes None for a Connection: close response.
-                        sock.shutdown(socket.SHUT_RDWR)
-                    except OSError:
-                        pass
-
-                watchdog = threading.Timer(remaining, abort_read)
-                watchdog.daemon = True
-                watchdog.start()
+            deadline_socket, watchdog = response_watchdog(connection, deadline, expired)
             response = connection.getresponse()
             if expired.is_set() or time.monotonic() >= deadline:
                 raise TimeoutError("Source-fetch budget exhausted")

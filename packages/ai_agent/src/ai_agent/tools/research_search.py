@@ -7,6 +7,7 @@ import http.client
 import json
 import math
 import os
+import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -18,7 +19,12 @@ from ai_orchestrator.search_policy import search_routes
 
 from ai_agent.contracts import ToolCategory, ToolDefinition, ToolParameter, ToolResult
 from ai_agent.tools.base import BaseTool, ToolContext
-from ai_agent.tools.research_http import MAX_SOURCE_BYTES, _PinnedHTTPS, public_endpoint
+from ai_agent.tools.research_http import (
+    MAX_SOURCE_BYTES,
+    _PinnedHTTPS,
+    public_endpoint,
+    response_watchdog,
+)
 
 DEFAULT_SEARXNG_ENDPOINT = "https://search.mectov.my.id/search"
 
@@ -64,6 +70,9 @@ def search_json(
         if remaining <= 0:
             raise SearchFailure("timeout")
         connection = _PinnedHTTPS(host, port, ip, remaining)
+        watchdog = None
+        response = None
+        expired = threading.Event()
         try:
             body = json.dumps(payload).encode() if payload is not None else None
             connection.request(
@@ -78,7 +87,10 @@ def search_json(
                     **headers,
                 },
             )
+            deadline_socket, watchdog = response_watchdog(connection, deadline, expired)
             response = connection.getresponse()
+            if expired.is_set() or time.monotonic() >= deadline:
+                raise SearchFailure("timeout")
             status = response.status
             if not 200 <= status < 300:
                 category = (
@@ -98,12 +110,14 @@ def search_json(
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
                     raise SearchFailure("timeout")
-                if connection.sock is not None:
-                    connection.sock.settimeout(remaining)
+                if deadline_socket is not None:
+                    deadline_socket.settimeout(remaining)
                 chunk = response.read1(min(64_000, MAX_SOURCE_BYTES + 1 - len(retained)))
                 if not chunk:
                     break
                 retained.extend(chunk)
+            if expired.is_set() or time.monotonic() >= deadline:
+                raise SearchFailure("timeout")
             if len(retained) > MAX_SOURCE_BYTES:
                 raise SearchFailure("response_too_large", status=status)
             data = json.loads(retained)
@@ -111,6 +125,11 @@ def search_json(
                 raise SearchFailure("invalid_response", status=status)
             return SearchResponse(data, hashlib.sha256(retained).hexdigest(), status)
         finally:
+            if watchdog is not None:
+                watchdog.cancel()
+                watchdog.join(timeout=1)
+            if response is not None:
+                response.close()
             connection.close()
     except SearchFailure:
         raise

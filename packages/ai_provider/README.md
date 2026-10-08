@@ -134,6 +134,10 @@ these primitives only after a separate routing or provisioning-policy decision.
 
 ## Tests
 
+Authenticated OpenAI-compatible requests refuse HTTP redirects for inference,
+streaming and model-catalog reads. Configure the final API endpoint directly;
+credentials and prompts are never forwarded to a redirect destination.
+
 Normal tests use mocks and do not require Ollama or hosted credentials:
 
 ```powershell

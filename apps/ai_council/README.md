@@ -42,6 +42,13 @@ Start the browser UI:
 
 Open `http://127.0.0.1:8765`.
 
+The server supports loopback binding only (`127.0.0.1` or `localhost`). Requests
+must use the actual loopback host/port; supplied Origin headers must match it.
+The ask endpoint requires a JSON object with string prompt/conversation fields,
+one Content-Length, and at most 512,000 bytes. Request body reads have a total
+five-second budget. Invalid requests are refused before inference or storage.
+These controls do not provide remote-user authentication.
+
 Stop the server:
 
 ```powershell

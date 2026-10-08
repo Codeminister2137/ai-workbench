@@ -70,7 +70,9 @@ def test_process_ownership_workspace_and_approval_boundaries(tmp_path):
         tool = ProcessTool(supervisor, operation)
         assert not manager.check_and_authorize(tool, ToolCall(tool.definition.name, {}))
     status = ProcessTool(supervisor, "status")
-    assert manager.check_and_authorize(status, ToolCall(status.definition.name, {}))
+    assert manager.check_and_authorize(
+        status, ToolCall(status.definition.name, {"process_handle": "missing"})
+    )
     assert status.run(
         ToolCall(status.definition.name, {"process_handle": "missing"}), ToolContext(tmp_path)
     ).is_error

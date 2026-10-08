@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.request import Request
 
 from ai_provider.config import BackendConfig, ProviderKind, _provider_api_key
 from ai_provider.contracts import (
@@ -36,6 +36,7 @@ from ai_provider.contracts import (
     UsageSource,
 )
 from ai_provider.errors import ProviderError, ProviderErrorCategory
+from ai_provider.http_transport import urlopen
 from ai_provider.privacy import enforce_privacy_policy
 
 _DEFAULT_BASE_URLS = {

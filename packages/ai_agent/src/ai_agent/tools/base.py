@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -51,6 +52,7 @@ class BaseTool(ABC):
     def run(self, call: ToolCall, context: ToolContext) -> ToolResult:
         """Run the tool for a ToolCall request."""
         try:
+            self.validate_arguments(call.arguments)
             result = self.execute(call.arguments, context)
             if result.call_id is None and call.call_id is not None:
                 return ToolResult(
@@ -68,6 +70,38 @@ class BaseTool(ABC):
                 call_id=call.call_id,
                 is_error=True,
             )
+
+    def validate_arguments(self, arguments: dict[str, Any]) -> None:
+        """Enforce declared parameter types before approval or side effects.
+
+        Unknown keys remain allowed, matching the published schemas. Tools own
+        semantic bounds and array item validation beyond these simple contracts.
+        """
+        if not isinstance(arguments, dict):
+            raise ValueError("Tool arguments must be an object")
+        types = {
+            "string": str,
+            "boolean": bool,
+            "integer": int,
+            "number": (int, float),
+            "array": list,
+            "object": dict,
+        }
+        for parameter in self.definition.parameters:
+            if parameter.name not in arguments:
+                if parameter.required:
+                    raise ValueError(f"Missing required parameter: {parameter.name}")
+                continue
+            value = arguments[parameter.name]
+            expected = types.get(parameter.type_name)
+            if expected is None or not isinstance(value, expected):
+                raise ValueError(f"Parameter {parameter.name} must be {parameter.type_name}")
+            if parameter.type_name in {"integer", "number"} and (
+                isinstance(value, bool) or not math.isfinite(value)
+            ):
+                raise ValueError(f"Parameter {parameter.name} must be a finite number")
+            if parameter.enum_values is not None and value not in parameter.enum_values:
+                raise ValueError(f"Invalid value for parameter {parameter.name}")
 
     def approval_call(self, call: ToolCall) -> ToolCall | None:
         """Return the exact operation to show for approval, or refuse approval."""

@@ -28,6 +28,17 @@ Unsafe filter override names are refused; repository configuration is unchanged.
 Submodule content is not traversed; Git pointer changes remain visible. Inspect a
 submodule's content by selecting its own workspace explicitly.
 
+Recursive search skips directory symlinks and Windows junctions, including
+workspace-internal directory links. Every discovered file is checked against
+the resolved workspace boundary before reading. These checks do not sandbox a
+concurrent local process that swaps filesystem links during access.
+
+Native and shared tools validate declared argument types, required fields and
+enum values before approval and execution. Strings such as `"false"` are not
+boolean flags. Invalid mutations return errors without changing files or asking
+the owner to approve an invalid operation. Individual tools also enforce their
+semantic bounds. See [ADR-047](../decisions/ADR-047-fail-closed-execution-boundaries.md).
+
 The opt-in [shared coding profile](common-inspection.md#shared-coding-and-terminal-approvals)
 enforces these presets in the project MCP server. Interactive requests use the
 controlling terminal, require approval for each exact operation and refuse when

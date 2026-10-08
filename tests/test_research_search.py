@@ -341,6 +341,7 @@ def fake_connection(monkeypatch, status=200, body=b'{"results": []}', encoding="
             return SimpleNamespace(
                 status=status,
                 read1=stream.read1,
+                close=stream.close,
                 getheader=lambda name, default=None: encoding
                 if name == "Content-Encoding"
                 else default,
@@ -408,3 +409,55 @@ def test_search_transport_rejects_private_dns(monkeypatch):
     monkeypatch.setattr(socket, "getaddrinfo", lambda *a, **k: [(0, 0, 0, "", ("127.0.0.1", 443))])
     with pytest.raises(SearchFailure):
         research_search.search_json("https://example.com/search", "GET", {}, None, 1)
+
+
+@pytest.mark.parametrize("phase", ["headers", "body"])
+def test_search_total_deadline_interrupts_slow_response(monkeypatch, phase):
+    import http.client
+    import threading
+
+    listener = socket.socket()
+    listener.bind(("127.0.0.1", 0))
+    listener.listen(1)
+    port = listener.getsockname()[1]
+    stopped = threading.Event()
+
+    def serve():
+        try:
+            with listener.accept()[0] as client:
+                client.recv(4096)
+                headers = b"HTTP/1.0 200 OK\r\nContent-Type: application/json\r\n\r\n"
+                if phase == "body":
+                    client.sendall(headers)
+                payload = headers if phase == "headers" else b" " * 80 + b"{}"
+                for byte in payload:
+                    if stopped.wait(0.02):
+                        return
+                    client.sendall(bytes([byte]))
+        except OSError:
+            pass
+
+    worker = threading.Thread(target=serve, daemon=True)
+    worker.start()
+    monkeypatch.setattr(
+        research_search,
+        "public_endpoint",
+        lambda url: ("https", "fixture.invalid", 443, "127.0.0.1", "/"),
+    )
+    monkeypatch.setattr(
+        research_search,
+        "_PinnedHTTPS",
+        lambda host, unused_port, ip, timeout: http.client.HTTPConnection(
+            ip, port, timeout=timeout
+        ),
+    )
+    started = time.monotonic()
+    try:
+        with pytest.raises(SearchFailure):
+            research_search.search_json("https://fixture.invalid", "GET", {}, None, 0.15)
+        assert time.monotonic() - started < 0.7
+    finally:
+        stopped.set()
+        listener.close()
+        worker.join(2)
+    assert not worker.is_alive()

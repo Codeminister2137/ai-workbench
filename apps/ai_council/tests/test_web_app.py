@@ -85,3 +85,57 @@ def test_ask_endpoint_streams_server_sent_events(council_server, monkeypatch) ->
     assert '"type": "council_started"' in body
     assert '"type": "member_delta"' in body
     assert '"type": "council_finished"' in body
+
+
+@pytest.mark.parametrize(
+    "headers,body,status",
+    [
+        ({"Origin": "https://untrusted.invalid"}, b'{"prompt":"hello"}', 403),
+        ({"Host": "untrusted.invalid"}, b'{"prompt":"hello"}', 403),
+        ({"Content-Type": "text/plain"}, b'{"prompt":"hello"}', 415),
+        ({}, b"{broken", 400),
+        ({}, b"[]", 400),
+        ({}, b'{"prompt":null}', 400),
+        ({}, b'{"prompt":123}', 400),
+        ({"Content-Length": "999999999"}, b"x", 413),
+        ({"Content-Length": "-1"}, b"x", 413),
+        ({"Content-Length": "invalid"}, b"x", 400),
+        ({"Transfer-Encoding": "chunked"}, b"x", 400),
+    ],
+)
+def test_rejected_request_never_loads_council(council_server, monkeypatch, headers, body, status):
+    def forbidden(*args, **kwargs):
+        pytest.fail("Rejected request reached configuration/model/storage")
+
+    monkeypatch.setattr("web_app.load_config", forbidden)
+    request = Request(
+        council_server + "/api/ask",
+        data=body,
+        headers={"Content-Type": "application/json", **headers},
+        method="POST",
+    )
+    with pytest.raises(HTTPError) as error:
+        urlopen(request, timeout=2)
+    assert error.value.code == status
+    error.value.close()
+
+
+def test_incomplete_body_has_total_deadline(council_server, monkeypatch):
+    import socket
+    import time
+    from urllib.parse import urlsplit
+
+    monkeypatch.setattr("web_app.REQUEST_TIMEOUT_SECONDS", 0.15)
+    monkeypatch.setattr("web_app.load_config", lambda *args: pytest.fail("Request had effects"))
+    address = urlsplit(council_server)
+    with socket.create_connection((address.hostname, address.port), timeout=2) as client:
+        started = time.monotonic()
+        client.sendall(
+            (
+                f"POST /api/ask HTTP/1.1\r\nHost: {address.netloc}\r\n"
+                "Content-Type: application/json\r\nContent-Length: 100\r\n\r\n{"
+            ).encode()
+        )
+        response = client.recv(4096)
+        assert b"408" in response
+        assert time.monotonic() - started < 1

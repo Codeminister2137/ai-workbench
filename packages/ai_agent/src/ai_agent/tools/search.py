@@ -11,6 +11,25 @@ from ai_agent.contracts import ToolCategory, ToolDefinition, ToolParameter, Tool
 from ai_agent.tools.base import BaseTool, ToolContext
 
 
+def _workspace_entries(base: Path, context: ToolContext):
+    """Walk visible entries without traversing links or Windows junctions."""
+    for directory, directories, files in base.walk(follow_symlinks=False):
+        directories[:] = [
+            name
+            for name in directories
+            if not name.startswith(".")
+            and name != "__pycache__"
+            and not (directory / name).is_symlink()
+            and not (directory / name).is_junction()
+            and context.is_within_workspace(directory / name)
+        ]
+        for name in (*directories, *files):
+            path = directory / name
+            if not name.startswith(".") and name != "__pycache__":
+                if context.is_within_workspace(path):
+                    yield path
+
+
 class FindFilesTool(BaseTool):
     """Tool for locating files by glob pattern."""
 
@@ -72,9 +91,7 @@ class FindFilesTool(BaseTool):
             )
 
         matches: list[str] = []
-        for item in target_path.rglob("*"):
-            if any(part.startswith(".") or part == "__pycache__" for part in item.parts):
-                continue
+        for item in _workspace_entries(target_path, context):
             if fnmatch.fnmatch(item.name, pattern):
                 try:
                     rel = item.relative_to(context.workspace_root)
@@ -184,10 +201,8 @@ class GrepSearchTool(BaseTool):
         if target_path.is_file():
             files_to_search.append(target_path)
         else:
-            for p in target_path.rglob("*"):
-                if p.is_file() and not any(
-                    part.startswith(".") or part == "__pycache__" for part in p.parts
-                ):
+            for p in _workspace_entries(target_path, context):
+                if p.is_file():
                     files_to_search.append(p)
 
         results: list[str] = []
@@ -195,7 +210,10 @@ class GrepSearchTool(BaseTool):
 
         for file_path in files_to_search:
             try:
-                content = file_path.read_text(encoding="utf-8", errors="ignore")
+                resolved = file_path.resolve()
+                if not context.is_within_workspace(resolved):
+                    continue
+                content = resolved.read_text(encoding="utf-8", errors="ignore")
             except Exception:  # noqa: BLE001
                 continue
 

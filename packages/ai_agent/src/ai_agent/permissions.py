@@ -113,6 +113,10 @@ class PermissionManager:
 
     def check_and_authorize(self, tool: BaseTool, call: ToolCall) -> bool:
         """Check whether a tool call is authorized under the current policy."""
+        try:
+            tool.validate_arguments(call.arguments)
+        except (ValueError, OverflowError):
+            return False
         category = tool.definition.category
         action = self.policy.action_for_category(category)
 
