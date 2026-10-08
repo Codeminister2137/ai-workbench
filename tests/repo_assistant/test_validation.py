@@ -1,6 +1,7 @@
 """Validation behavior is independent from CLI orchestration and model output."""
 
 import subprocess
+from typing import Any
 
 import pytest
 from ai_agent.validation import (
@@ -115,3 +116,23 @@ def test_validation_metadata_retains_unknown_exit_status_and_execution_evidence(
     assert metadata["elapsed_seconds"] == 0.123
     assert metadata["executable"] == "checker"
     assert validation_status(()) == "not_run"
+
+
+@pytest.mark.parametrize(
+    "timeout", [0, -1, float("nan"), float("inf"), -float("inf"), True, "5", 10**400]
+)
+def test_invalid_programmatic_timeout_is_rejected_before_process_launch(tmp_path, timeout: Any):
+    events = []
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("invalid validation deadline started a process")
+
+    with pytest.raises(ValueError, match="finite positive"):
+        run_validation_commands(
+            ("checker",),
+            repo_root=tmp_path,
+            timeout_seconds=timeout,
+            runner=forbidden,
+            progress_callback=events.append,
+        )
+    assert events == []

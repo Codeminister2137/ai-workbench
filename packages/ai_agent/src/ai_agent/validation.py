@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import math
 import shlex
 import subprocess
 import sys
@@ -82,6 +83,14 @@ def run_validation_commands(
 ) -> tuple[ValidationCommandResult, ...]:
     """Run deterministic local validation commands and capture bounded output."""
 
+    if isinstance(timeout_seconds, bool) or not isinstance(timeout_seconds, (int, float)):
+        raise ValueError("Validation timeout must be a finite positive number")
+    try:
+        valid_timeout = timeout_seconds > 0 and math.isfinite(timeout_seconds)
+    except OverflowError:
+        valid_timeout = False
+    if not valid_timeout:
+        raise ValueError("Validation timeout must be a finite positive number")
     results: list[ValidationCommandResult] = []
     execute = subprocess.run if runner is None else runner
     for index, command in enumerate(commands, start=1):
