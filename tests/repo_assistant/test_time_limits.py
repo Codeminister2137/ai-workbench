@@ -17,11 +17,23 @@ TIME_OPTIONS = (
 
 
 @pytest.mark.parametrize("option", TIME_OPTIONS)
-@pytest.mark.parametrize("value", ["nan", "inf", "-inf", "0", "-1", "1e999", "invalid"])
+@pytest.mark.parametrize("value", ["nan", "inf", "-inf", "-1", "1e999", "invalid"])
 def test_cli_rejects_invalid_time_limits(option: str, value: str):
     with pytest.raises(SystemExit) as error:
         build_argument_parser().parse_args(["task", f"{option}={value}"])
     assert error.value.code == 2
+
+
+@pytest.mark.parametrize("option", TIME_OPTIONS[1:])
+def test_runtime_time_limits_reject_zero(option: str):
+    with pytest.raises(SystemExit) as error:
+        build_argument_parser().parse_args(["task", f"{option}=0"])
+    assert error.value.code == 2
+
+
+def test_maximum_latency_preserves_existing_nonnegative_contract():
+    args = build_argument_parser().parse_args(["task", "--max-latency-seconds=0"])
+    assert args.max_latency_seconds == 0
 
 
 @pytest.mark.parametrize("option", TIME_OPTIONS)

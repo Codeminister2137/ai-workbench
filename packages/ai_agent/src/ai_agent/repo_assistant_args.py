@@ -36,15 +36,25 @@ class UserDefaultAction(argparse.Action):
         namespace._provided_user_defaults = provided | {self.dest}
 
 
-def _positive_finite_float(value: str) -> float:
+def _finite_time_argument(value: str, *, allow_zero: bool = False) -> float:
     """Validate time limits before any command/session setup can have effects."""
+    boundary = "zero or greater" if allow_zero else "greater than zero"
+    message = f"must be a finite number {boundary}"
     try:
         number = float(value)
     except ValueError as exc:
-        raise argparse.ArgumentTypeError("must be a finite number greater than zero") from exc
-    if not math.isfinite(number) or number <= 0:
-        raise argparse.ArgumentTypeError("must be a finite number greater than zero")
+        raise argparse.ArgumentTypeError(message) from exc
+    if not math.isfinite(number) or number < 0 or (number == 0 and not allow_zero):
+        raise argparse.ArgumentTypeError(message)
     return number
+
+
+def _positive_finite_float(value: str) -> float:
+    return _finite_time_argument(value)
+
+
+def _nonnegative_finite_float(value: str) -> float:
+    return _finite_time_argument(value, allow_zero=True)
 
 
 def _away_minutes_argument(value: str) -> float:
@@ -279,7 +289,7 @@ def build_argument_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
-        "--max-latency-seconds", type=_positive_finite_float, help="Hard latency constraint."
+        "--max-latency-seconds", type=_nonnegative_finite_float, help="Hard latency constraint."
     )
     parser.add_argument(
         "--timeout-seconds",
