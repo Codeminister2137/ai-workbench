@@ -35,6 +35,9 @@ summary references identify lines actually supplied, including after truncation.
 of command dispatch, with typed profiles/catalogs and shared target translation.
 `repair_workflow` drives repair through an injected execution callback and actual
 validation receipts, preserving time reserves, cycle caps and no-progress guards.
+`scrutiny_workflow` reviews observed effects and validation evidence through
+explicit execution/client hooks. Its established local-only policy and research
+review options are preserved; model verdicts cannot clear validation failures.
 Provider/client adapters stay in `ai_provider`, and routing policy stays in
 `ai_orchestrator`. Existing research/run-store/fallback helpers remain in the
 provider package for this slice. Legacy provider CLI paths remain compatibility

@@ -2,14 +2,25 @@
 
 import argparse
 import subprocess
-from types import SimpleNamespace
+from dataclasses import replace
+from pathlib import Path
 
 import pytest
 from ai_agent import repo_coding_assistant as cli
 from ai_agent.repair_workflow import run_orchestrated_repair_loop
 from ai_agent.run_tracking import OrchestratedRunTracker
+from ai_agent.scrutiny_workflow import run_orchestrated_scrutiny
+from ai_orchestrator import load_model_catalog
 from ai_orchestrator.repair import repair_progress, review_reserve_seconds
-from ai_provider import ProviderError
+from ai_provider import (
+    AIMessage,
+    AIResponse,
+    BackendInfo,
+    BackendLocation,
+    MessageRole,
+    ProviderError,
+)
+from ai_provider.coding_assist import CodingAssistResult
 from ai_provider.orchestrated_runs import OrchestratedStagePlanItem, SQLiteOrchestratedRunStore
 from ai_provider.repair_state import changed_paths, workspace_fingerprints
 
@@ -82,6 +93,21 @@ def _loop(run, repair, **overrides):
 
 def _stage(run, name):
     return next(s for s in run[3].list_stages(run[1].run_record.run_id) if s.name == name)
+
+
+def _review_result(text: str) -> CodingAssistResult:
+    prepared = cli.run_coding_prompt(
+        "review",
+        cli.coding_task_profile(model_override="qwen2.5-coder:14b"),
+        load_model_catalog(Path("packages/ai_orchestrator/examples/model_catalog.toml")),
+    )
+    return replace(
+        prepared,
+        response=AIResponse(
+            AIMessage(MessageRole.ASSISTANT, text),
+            BackendInfo("ollama", "qwen2.5-coder:14b", BackendLocation.LOCAL),
+        ),
+    )
 
 
 @pytest.mark.parametrize("initial_status", ["completed", "completed_with_validation_errors"])
@@ -284,8 +310,8 @@ def test_scrutiny_provider_failure_is_visible(run, monkeypatch):
     def review(*a, **kw):
         raise ProviderError("local reviewer unavailable")
 
-    monkeypatch.setattr(cli, "run_coding_prompt", review)
-    status = cli._run_orchestrated_scrutiny(
+    status = run_orchestrated_scrutiny(
+        coding_runner=review,
         args=run[0],
         tracker=run[1],
         repo_root=run[4],
@@ -326,10 +352,10 @@ def test_scrutiny_reviews_artifact_validation_and_claims_locally(
             f"VERDICT: {verdict}\nSCORE: 7\nSTRENGTHS: x\nISSUES: y\n"
             "RECOMMENDED_NEXT_ACTION: inspect report\nREVISED_RESPONSE: incomplete"
         )
-        return SimpleNamespace(response=SimpleNamespace(message=SimpleNamespace(content=text)))
+        return _review_result(text)
 
-    monkeypatch.setattr(cli, "run_coding_prompt", review)
-    status = cli._run_orchestrated_scrutiny(
+    status = run_orchestrated_scrutiny(
+        coding_runner=review,
         args=run[0],
         tracker=run[1],
         repo_root=run[4],
@@ -349,15 +375,9 @@ def test_scrutiny_cannot_erase_validation_failure(run, monkeypatch):
         "VERDICT: pass\nSCORE: 8\nSTRENGTHS: x\nISSUES: none\n"
         "RECOMMENDED_NEXT_ACTION: review\nREVISED_RESPONSE: done"
     )
-    monkeypatch.setattr(
-        cli,
-        "run_coding_prompt",
-        lambda *a, **kw: SimpleNamespace(
-            response=SimpleNamespace(message=SimpleNamespace(content=text))
-        ),
-    )
     assert (
-        cli._run_orchestrated_scrutiny(
+        run_orchestrated_scrutiny(
+            coding_runner=lambda *a, **kw: _review_result(text),
             args=run[0],
             tracker=run[1],
             repo_root=run[4],
@@ -372,14 +392,51 @@ def test_scrutiny_cannot_erase_validation_failure(run, monkeypatch):
     )
 
 
+def test_reusable_scrutiny_uses_explicit_client_without_runtime_access(run):
+    run[0].start_ollama = False
+    requests = []
+    text = (
+        "VERDICT: pass\nSCORE: 8\nSTRENGTHS: x\nISSUES: none\n"
+        "RECOMMENDED_NEXT_ACTION: review\nREVISED_RESPONSE: done"
+    )
+
+    class Client:
+        def __init__(self, config):
+            self.backend = BackendInfo(config.provider.value, config.model, BackendLocation.LOCAL)
+
+        def complete(self, request):
+            requests.append(request)
+            return AIResponse(AIMessage(MessageRole.ASSISTANT, text), self.backend)
+
+        def stream(self, request):
+            raise NotImplementedError
+
+    status = run_orchestrated_scrutiny(
+        args=run[0],
+        tracker=run[1],
+        repo_root=run[4],
+        profile=cli.coding_task_profile(),
+        catalog=load_model_catalog(Path("packages/ai_orchestrator/examples/model_catalog.toml")),
+        validation_stage=run[2],
+        assistant_response_text="done",
+        execution_status="completed_with_validation_errors",
+        deadline=None,
+        client_factory=Client,
+    )
+    assert len(requests) == 1
+    assert requests[0].privacy_class.value == "local_only"
+    assert status == "completed_with_validation_errors"
+    assert _stage(run, "scrutiny").details["verdict"] == "pass"
+
+
 def test_budget_exhausted_scrutiny_is_recorded_in_handoff(run, monkeypatch):
     monkeypatch.setattr(cli.time, "perf_counter", lambda: 1000)
 
     def review(*a, **kw):
         raise AssertionError("must not call a provider after budget exhaustion")
 
-    monkeypatch.setattr(cli, "run_coding_prompt", review)
-    status = cli._run_orchestrated_scrutiny(
+    status = run_orchestrated_scrutiny(
+        coding_runner=review,
         args=run[0],
         tracker=run[1],
         repo_root=run[4],
