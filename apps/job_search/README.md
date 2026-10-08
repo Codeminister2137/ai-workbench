@@ -35,6 +35,19 @@ workspace member for path resolution.
 
 ### Tests
 
+`approve_package` requires a readable attachment and records a digest binding
+the recipient, subject, body, attachment path/variant and exact attachment bytes.
+Changing any reviewed materials invalidates approval. `deliver_application`
+always enforces approval, including when the legacy `require_approval=False`
+argument is supplied, and sends a temporary copy of verified attachment bytes.
+The transport must read that copy synchronously; it is deleted after the call.
+Keep the returned SENT/FAILED package rather than reusing an old approved object.
+Persistent/concurrent delivery deduplication is not implemented.
+
+The full workspace test runner now includes these tests in the isolated
+`job-search` group. The legacy `main.py` workflow is still a separate entry
+point; selecting its replacement approval flow remains an owner decision.
+
 ```powershell
 python -m uv run pytest apps/job_search/job-email/test_job_search.py
 ```

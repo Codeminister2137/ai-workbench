@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import os
 from dataclasses import replace
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Protocol, runtime_checkable
 
 from models import ApplicationPackage, ApplicationStatus, SendReceipt, utc_now_iso
@@ -133,22 +135,33 @@ def deliver_application(
 ) -> ApplicationPackage:
     """Deliver an application package via the supplied transport.
 
-    CRITICAL HARD CONSTRAINT:
-    If require_approval is True and package.is_approved_for_sending() is False,
-    this function raises UnapprovedApplicationError and performs no transmission.
+    Approval cannot be disabled. The legacy keyword is retained only to reject
+    bypass attempts explicitly. Delivery uses a temporary copy of verified bytes
+    so changes to the original attachment after validation cannot change the send.
     """
-    if require_approval and not package.is_approved_for_sending():
+    try:
+        attachment = Path(package.cv_attachment_path).read_bytes()
+    except OSError:
+        attachment = None
+    if (
+        require_approval is not True
+        or attachment is None
+        or not package.approves_materials(attachment)
+    ):
         raise UnapprovedApplicationError(
             f"Application package {package.application_id!r} for {package.contact_email!r} "
             f"cannot be sent without explicit human approval (status={package.status.value})."
         )
 
-    receipt = transport.send(
-        to_email=package.contact_email,
-        subject=package.subject,
-        contents=package.body,
-        attachments=package.cv_attachment_path,
-    )
+    with TemporaryDirectory(prefix="approved-application-") as directory:
+        snapshot = Path(directory) / Path(package.cv_attachment_path).name
+        snapshot.write_bytes(attachment)
+        receipt = transport.send(
+            to_email=package.contact_email,
+            subject=package.subject,
+            contents=package.body,
+            attachments=str(snapshot),
+        )
 
     new_status = ApplicationStatus.SENT if receipt.success else ApplicationStatus.FAILED
     return replace(

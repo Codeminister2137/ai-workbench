@@ -7,6 +7,7 @@ can be delivered without explicit, recorded human approval.
 from __future__ import annotations
 
 from dataclasses import replace
+from pathlib import Path
 
 from models import ApplicationPackage, ApplicationStatus, utc_now_iso
 
@@ -26,6 +27,9 @@ def approve_package(
         raise ApplicationLifecycleError("Cannot approve an already-sent application package.")
     if package.status is ApplicationStatus.SKIPPED:
         raise ApplicationLifecycleError("Cannot approve an explicitly rejected/skipped package.")
+    if not approved_by.strip():
+        raise ApplicationLifecycleError("Approval requires an operator identity.")
+    digest = package.materials_digest(Path(package.cv_attachment_path).read_bytes())
 
     return replace(
         package,
@@ -33,6 +37,7 @@ def approve_package(
         approved_at_utc=utc_now_iso(),
         approved_by=approved_by,
         approval_notes=notes,
+        approved_materials_sha256=digest,
     )
 
 
@@ -80,5 +85,6 @@ def update_package_content(
         updates["status"] = ApplicationStatus.PREPARED
         updates["approved_at_utc"] = None
         updates["approved_by"] = None
+        updates["approved_materials_sha256"] = None
 
     return replace(package, **updates)

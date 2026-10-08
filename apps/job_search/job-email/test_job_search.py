@@ -28,7 +28,9 @@ from sender import DryRunEmailTransport, UnapprovedApplicationError, deliver_app
 
 
 @pytest.fixture
-def sample_profile() -> CandidateProfile:
+def sample_profile(tmp_path) -> CandidateProfile:
+    attachment = tmp_path / "cv_backend.pdf"
+    attachment.write_bytes(b"synthetic reviewed CV")
     return CandidateProfile(
         applicant_name="Jakub Jaworski",
         applicant_location="Poland",
@@ -42,7 +44,7 @@ def sample_profile() -> CandidateProfile:
             "Kubernetes": SkillEvidence("Kubernetes", EvidenceStatus.LEARNING),
         },
         cv_variants={
-            "backend": CVVariant("backend", "cv_backend.pdf", "Backend Developer"),
+            "backend": CVVariant("backend", str(attachment), "Backend Developer"),
         },
     )
 
@@ -182,3 +184,95 @@ def test_reject_package_marks_skipped_and_blocks_delivery(
     transport = DryRunEmailTransport()
     with pytest.raises(UnapprovedApplicationError):
         deliver_application(rejected, transport)
+
+
+def test_approval_cannot_be_disabled(sample_profile, sample_vacancy):
+    transport = DryRunEmailTransport()
+    with pytest.raises(UnapprovedApplicationError):
+        deliver_application(
+            prepare_application(sample_profile, sample_vacancy), transport, require_approval=False
+        )
+    assert not transport.sent_deliveries
+
+
+@pytest.mark.parametrize("change", ["attachment", "recipient", "body", "subject"])
+def test_changed_materials_cannot_use_old_approval(sample_profile, sample_vacancy, change):
+    from dataclasses import replace
+    from pathlib import Path
+
+    package = approve_package(prepare_application(sample_profile, sample_vacancy))
+    if change == "attachment":
+        Path(package.cv_attachment_path).write_bytes(b"changed")
+    else:
+        package = replace(
+            package, **{"contact_email" if change == "recipient" else change: "changed"}
+        )
+    transport = DryRunEmailTransport()
+    assert not package.is_approved_for_sending()
+    with pytest.raises(UnapprovedApplicationError):
+        deliver_application(package, transport)
+    assert not transport.sent_deliveries
+
+
+def test_delivery_uses_verified_snapshot_and_cleans_it(sample_profile, sample_vacancy):
+    from pathlib import Path
+
+    package = approve_package(prepare_application(sample_profile, sample_vacancy))
+    original = Path(package.cv_attachment_path)
+    expected = original.read_bytes()
+    snapshots = []
+
+    class Transport(DryRunEmailTransport):
+        def send(self, **kwargs):
+            original.write_bytes(b"changed during send")
+            snapshot = Path(kwargs["attachments"])
+            snapshots.append(snapshot)
+            assert snapshot.read_bytes() == expected
+            return super().send(**kwargs)
+
+    transport = Transport()
+    delivered = deliver_application(package, transport)
+    assert not snapshots[0].exists()
+    with pytest.raises(UnapprovedApplicationError):
+        deliver_application(delivered, transport)
+    assert len(transport.sent_deliveries) == 1
+
+
+def test_failed_delivery_requires_fresh_approval(sample_profile, sample_vacancy):
+    from dataclasses import replace
+
+    package = approve_package(prepare_application(sample_profile, sample_vacancy))
+
+    class Failure(DryRunEmailTransport):
+        def send(self, **kwargs):
+            return replace(super().send(**kwargs), success=False)
+
+    transport = Failure()
+    failed = deliver_application(package, transport)
+    assert failed.status is ApplicationStatus.FAILED
+    with pytest.raises(UnapprovedApplicationError):
+        deliver_application(failed, transport)
+
+
+@pytest.mark.parametrize(
+    "required,preferred,critical,score",
+    [
+        (("Python",), ("Rust", "Go", "C"), False, 0.25),
+        (("Kubernetes", "Python", "Rust"), (), False, 0.417),
+        (("Python", "Rust"), (), False, 0.5),
+        (("Python", "Rust", "Go"), (), True, 0.333),
+        (("Python", " python "), ("PYTHON",), False, 1.0),
+        ((), (), False, 1.0),
+    ],
+)
+def test_fit_uses_unique_requirements_and_preserves_required_status(
+    sample_profile, sample_vacancy, required, preferred, critical, score
+):
+    from dataclasses import replace
+
+    from evidence import analyze_vacancy_fit
+
+    vacancy = replace(sample_vacancy, required_skills=required, preferred_skills=preferred)
+    result = analyze_vacancy_fit(vacancy, sample_profile)
+    assert result.has_critical_gaps is critical
+    assert result.match_score == score

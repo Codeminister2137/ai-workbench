@@ -6,9 +6,12 @@ package contracts required by the Job Search Automation plan.
 
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
+from pathlib import Path
 
 
 class WorkMode(StrEnum):
@@ -145,7 +148,36 @@ class ApplicationPackage:
     approved_by: str | None = None
     approval_notes: str | None = None
     send_receipt: SendReceipt | None = None
+    approved_materials_sha256: str | None = None
+
+    def materials_digest(self, attachment: bytes) -> str:
+        """Bind review to recipient, message, attachment identity and exact bytes."""
+        metadata = json.dumps(
+            [
+                self.application_id,
+                self.vacancy_ref,
+                self.contact_email,
+                self.subject,
+                self.body,
+                self.cv_attachment_path,
+                self.cv_variant_id,
+                hashlib.sha256(attachment).hexdigest(),
+            ],
+            ensure_ascii=True,
+        ).encode()
+        return hashlib.sha256(metadata).hexdigest()
+
+    def approves_materials(self, attachment: bytes) -> bool:
+        return (
+            self.status is ApplicationStatus.APPROVED
+            and bool(self.approved_at_utc)
+            and bool(self.approved_by)
+            and self.approved_materials_sha256 == self.materials_digest(attachment)
+        )
 
     def is_approved_for_sending(self) -> bool:
         """Verify that human approval was explicitly granted before delivery."""
-        return self.status is ApplicationStatus.APPROVED and self.approved_at_utc is not None
+        try:
+            return self.approves_materials(Path(self.cv_attachment_path).read_bytes())
+        except OSError:
+            return False

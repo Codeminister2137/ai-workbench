@@ -26,16 +26,17 @@ class VacancyMatchAnalysis:
     learning_skills: tuple[str, ...]
     missing_requirements: tuple[str, ...]
     match_score: float
+    required_skills: tuple[str, ...] = ()
 
     @property
     def has_critical_gaps(self) -> bool:
         """Return True if more than half of required skills are completely missing."""
-        total_reqs = (
-            len(self.matched_skills) + len(self.adjacent_skills) + len(self.missing_requirements)
-        )
+        required = {skill.strip().casefold() for skill in self.required_skills}
+        total_reqs = len(required)
         if total_reqs == 0:
             return False
-        return len(self.missing_requirements) > total_reqs / 2
+        missing = {skill.strip().casefold() for skill in self.missing_requirements}
+        return len(required & missing) > total_reqs / 2
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,7 +59,13 @@ def analyze_vacancy_fit(
     learning: list[str] = []
     missing: list[str] = []
 
-    all_reqs = list(vacancy.required_skills) + list(vacancy.preferred_skills)
+    all_reqs = list(
+        {
+            skill.strip().casefold(): skill.strip()
+            for skill in (*vacancy.required_skills, *vacancy.preferred_skills)
+            if skill.strip()
+        }.values()
+    )
     if not all_reqs:
         # If no explicit skills listed, fallback to a neutral baseline
         return VacancyMatchAnalysis(
@@ -89,6 +96,7 @@ def analyze_vacancy_fit(
         learning_skills=tuple(learning),
         missing_requirements=tuple(missing),
         match_score=round(score, 3),
+        required_skills=vacancy.required_skills,
     )
 
 
