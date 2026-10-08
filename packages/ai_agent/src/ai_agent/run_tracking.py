@@ -9,6 +9,7 @@ import subprocess
 import time
 from collections.abc import Callable, Sequence
 from pathlib import Path
+from typing import Any
 
 from ai_orchestrator import OrchestrationResult
 from ai_orchestrator.review import research_review_reserve_seconds
@@ -459,3 +460,40 @@ def resolve_orchestrated_run_db_path(args: argparse.Namespace, repo_root: Path) 
     if path.is_absolute():
         return path
     return repo_root / path
+
+
+def execution_status_with_validation_stage(
+    execution_status: str,
+    validation_stage: OrchestratedStageRecord | None,
+) -> str:
+    """Surface deterministic validation failures in the final execution status."""
+
+    if validation_stage is None:
+        return execution_status
+    validation_status = str((validation_stage.details or {}).get("validation_status", ""))
+    if execution_status == "completed" and validation_status in {"failed", "timeout"}:
+        return "completed_with_validation_errors"
+    return execution_status
+
+
+def execution_status_without_validation_error(execution_status: str) -> str:
+    if execution_status == "completed_with_validation_errors":
+        return "completed"
+    return execution_status
+
+
+def validation_status_from_stage(stage: OrchestratedStageRecord | None) -> str:
+    if stage is None:
+        return "not_recorded"
+    return str((stage.details or {}).get("validation_status", stage.status))
+
+
+def fallback_details(args: argparse.Namespace) -> dict[str, Any]:
+    session = getattr(args, "fallback_session", None)
+    if session is None:
+        return {}
+    return {
+        "effective_route_id": session.current.route_id,
+        "fallback_attempts": list(session.attempts),
+        **({"fallback_handoff": session.handoff} if session.handoff is not None else {}),
+    }

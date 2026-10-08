@@ -6,6 +6,8 @@ from types import SimpleNamespace
 
 import pytest
 from ai_agent import repo_coding_assistant as cli
+from ai_agent.repair_workflow import run_orchestrated_repair_loop
+from ai_agent.run_tracking import OrchestratedRunTracker
 from ai_orchestrator.repair import repair_progress, review_reserve_seconds
 from ai_provider import ProviderError
 from ai_provider.orchestrated_runs import OrchestratedStagePlanItem, SQLiteOrchestratedRunStore
@@ -32,7 +34,7 @@ def run(tmp_path, monkeypatch):
             for name in ("validation", "repair", "scrutiny", "final_handoff")
         ],
     )
-    tracker = cli.OrchestratedRunTracker(store=store, run_record=record)
+    tracker = OrchestratedRunTracker(store=store, run_record=record)
     tracker.begin_run()
     args = argparse.Namespace(
         mode="implement",
@@ -65,7 +67,7 @@ def run(tmp_path, monkeypatch):
 
 def _loop(run, repair, **overrides):
     args, tracker, validation, _, root = run
-    return cli._run_orchestrated_repair_loop(
+    return run_orchestrated_repair_loop(
         args=args,
         tracker=tracker,
         repo_root=root,

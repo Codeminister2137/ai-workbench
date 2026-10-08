@@ -33,6 +33,8 @@ before creating records and derives displayed budgets from persisted run data.
 summary references identify lines actually supplied, including after truncation.
 `support_passes` exposes local context delegation and auxiliary review independently
 of command dispatch, with typed profiles/catalogs and shared target translation.
+`repair_workflow` drives repair through an injected execution callback and actual
+validation receipts, preserving time reserves, cycle caps and no-progress guards.
 Provider/client adapters stay in `ai_provider`, and routing policy stays in
 `ai_orchestrator`. Existing research/run-store/fallback helpers remain in the
 provider package for this slice. Legacy provider CLI paths remain compatibility
