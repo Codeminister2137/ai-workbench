@@ -70,6 +70,9 @@ Also owns the `ai-assistant` command, repository-assistant workflow implementati
 argument registration and common CLI execution settings (ADR-048). Provider
 adapters stay in `ai_provider`; research/run-store/fallback helper migration is
 outside this focused ownership change. Legacy provider CLI imports remain aliases.
+Reusable workflow modules include `validation`, `chat_context`,
+`external_reporting`, `run_tracking`, `delegation_context`, `support_passes` and
+`repair_workflow`.
 
 Use this package when work concerns local tool execution, approval-policy
 enforcement, MCP tool exposure, or agent-loop behavior. Keep provider API

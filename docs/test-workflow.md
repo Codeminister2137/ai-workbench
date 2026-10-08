@@ -76,8 +76,8 @@ python -m uv run --no-sync python scripts/run-tests.py full -- -q --durations=20
 Use the configured interpreter when running these commands from an IDE agent.
 After an intentional dependency change, synchronize the required extras first.
 Everything after `--` is forwarded to pytest. With multiple pytest processes,
-`--junitxml=report.xml` produces separate `report-workspace.xml` and
-`report-council.xml`, preserving both reports.
+`--junitxml=report.xml` produces separate `report-workspace.xml`,
+`report-council.xml` and `report-job-search.xml`, preserving all three reports.
 
 The pre-commit stage still runs fast Ruff checks. Pre-push runs Pyright and the
 full offline workspace runner. Council runs in its own pytest process because

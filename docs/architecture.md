@@ -82,6 +82,10 @@ Provider/client adapters remain in `ai_provider`. Existing research, run-store
 and fallback helpers remain there for this focused migration; earlier references
 to provider-owned CLI composition describe that historical/helper placement.
 Legacy CLI module imports and entry points delegate to the agent implementation.
+Within `ai_agent`, validation execution, chat-context assembly, external diagnostics,
+foreground run tracking, delegated-source rendering, local support passes and repair are
+reusable modules. Command dispatch composes them; provider storage/adapters and
+orchestrator policy keep their existing boundaries.
 
 The repo-assistant CLI owns shared direct-child processes through one foreground
 supervisor. Its per-client MCP adapters forward to an authenticated ephemeral

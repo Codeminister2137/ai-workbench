@@ -44,6 +44,11 @@ the optional context cap; `max_repair_cycles = -1` removes the cycle cap while
 retaining the time budget. An explicitly configured request timeout wins over
 away-mode automatic request sizing; omit it to retain automatic sizing.
 Scheduler deadline admission is unchanged.
+CLI request, validation, command, startup and latency limits must be finite and
+positive. Away minutes must also convert to a finite seconds budget. Invalid
+values fail at argument parsing before session setup. Reusable validation and
+run-tracking APIs validate their numeric limits before starting processes or
+creating run records.
 
 ## Privacy and approval defaults
 

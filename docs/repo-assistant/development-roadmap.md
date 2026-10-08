@@ -15,7 +15,8 @@ replacement SearXNG investigation, and the accepted local typed acceptance-job
 contract. D3's bounded live fixture passed. The owner now retains direct URL
 fetching; search replacement is deferred and does not block independent work.
 Historical checkpoints below retain their original validation counts. The latest
-full offline workspace gate is 1,372 passed and 2 skipped; Council: 21 passed.
+full offline gate is 1,655 passed: root 1,585, Council 33 and job-search 37,
+with 3 Windows file-symlink permission skips.
 The final M1 readiness suite has 84 passing tests. Ruff/formatting, Pyright and
 `git diff --check` pass. Live-provider cases remain excluded. See
 [test workflow](../test-workflow.md).
@@ -24,6 +25,31 @@ The goal is to perform inspect/plan/edit/test/review workflows from the project
 CLI, invoke the required skills, resume work and recover from allowance exhaustion
 with the common tools still available. PyCharm may host tools initially; eventually
 it should only be the human editor/viewer. Different model performance is allowed.
+
+## 2026-10-08 design/test audit — approved offline slice complete
+
+ADR-047 records the accepted execution-boundary fixes and requirements-based
+regressions. ADR-048 moves the assistant command and workflow into `ai_agent`,
+preserving legacy import/launch compatibility and provider-core independence.
+Validation, chat context, diagnostics, run tracking, source rendering, local
+support passes and repair now have reusable modules and direct behavior tests.
+
+The follow-up fixes malformed validation commands, preserves timeout output,
+rejects impossible mandatory chat budgets, retains structured external failures,
+checks references against actually supplied source lines, counts full rendered
+context within its budget, and validates time limits before side effects.
+Local support derives configuration through the existing execution-target adapter.
+Repair success requires actual passed revalidation; skipped checks cannot erase
+an existing failure, and missing handoff receipts remain explicit risks.
+Storage formats, routing/privacy/approval policies and dependencies are unchanged.
+
+The final offline gate passed 1,655 cases with 3 file-symlink permission skips;
+Ruff, formatting and Pyright pass. The CLI remains partly monolithic; broader
+composition-helper ownership and attended/live acceptance remain separate work.
+All three infrastructure packages built offline wheels. Isolated wheel imports
+verify the seven extracted modules, command metadata and both module launchers.
+No live model/account access, email transmission, installation, merge or push ran
+in this slice.
 
 ## 2026-10-06 closeout consistency — COMPLETE
 
