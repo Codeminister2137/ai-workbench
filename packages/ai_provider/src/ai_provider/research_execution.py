@@ -36,7 +36,7 @@ from ai_provider.ollama_models import show_ollama_model
 from ai_provider.orchestrated_runs import SQLiteOrchestratedRunStore
 
 if TYPE_CHECKING:
-    from ai_agent.repo_coding_assistant import OrchestratedRunTracker
+    from ai_agent.run_tracking import OrchestratedRunTracker
     from ai_orchestrator import OrchestrationResult
 
 _HISTORY_BYTES = 64_000

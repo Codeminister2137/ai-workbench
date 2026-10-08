@@ -50,8 +50,7 @@ def run(tmp_path, monkeypatch):
         ollama_profile=None,
     )
     monkeypatch.setattr(
-        cli,
-        "_run_validation_commands",
+        "ai_agent.run_tracking.run_validation_commands",
         lambda *a, **kw: (
             cli.ValidationCommandResult(
                 "verify", 1, "failed", 0.1, stdout_preview="missing research file: RESEARCH_test.md"
@@ -114,7 +113,7 @@ def test_ignored_report_changes_allow_active_repairs(run, monkeypatch):
             ),
         )
 
-    monkeypatch.setattr(cli, "_run_validation_commands", validate)
+    monkeypatch.setattr("ai_agent.run_tracking.run_validation_commands", validate)
     status, _, _ = _loop(run, repair)
     assert status == "completed"
     assert attempts == [1, 2, 3, 4]
@@ -132,7 +131,7 @@ def test_changing_validation_evidence_resets_no_progress(run, monkeypatch):
         failure = "new failure" if len(attempts) >= 2 else "missing research file: RESEARCH_test.md"
         return (cli.ValidationCommandResult("verify", 1, "failed", 0.1, stdout_preview=failure),)
 
-    monkeypatch.setattr(cli, "_run_validation_commands", validate)
+    monkeypatch.setattr("ai_agent.run_tracking.run_validation_commands", validate)
     _loop(run, repair)
     assert len(attempts) == 4
     assert _stage(run, "repair").details["attempts"][1]["progress"] == "failure_changed"
@@ -146,8 +145,7 @@ def test_timing_noise_does_not_keep_repairs_alive(run, monkeypatch):
         return "completed", "done"
 
     monkeypatch.setattr(
-        cli,
-        "_run_validation_commands",
+        "ai_agent.run_tracking.run_validation_commands",
         lambda *a, **kw: (
             cli.ValidationCommandResult(
                 "verify",
@@ -208,7 +206,7 @@ def test_repair_validation_timeout_preserves_review_budget(run, monkeypatch):
         observed.append(kw["timeout_seconds"])
         return (cli.ValidationCommandResult("verify", 0, "passed", 0.1),)
 
-    monkeypatch.setattr(cli, "_run_validation_commands", validate)
+    monkeypatch.setattr("ai_agent.run_tracking.run_validation_commands", validate)
 
     def repair(prompt, number, timeout):
         assert timeout == 9.5
@@ -244,7 +242,7 @@ def test_initial_validation_does_not_consume_review_reserve(run, monkeypatch):
     def validate(*a, **kw):
         raise AssertionError("validation must leave the review reserve intact")
 
-    monkeypatch.setattr(cli, "_run_validation_commands", validate)
+    monkeypatch.setattr("ai_agent.run_tracking.run_validation_commands", validate)
     stage = run[1].record_validation_stage(
         args=run[0], repo_root=run[4], execution_status="completed"
     )

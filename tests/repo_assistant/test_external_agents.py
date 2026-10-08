@@ -172,8 +172,7 @@ def test_cli_executes_codex_external_agent_route(capsys, monkeypatch, tmp_path: 
     monkeypatch.setenv("CODEX_COMMAND", "codex-test")
     patch_external_runner(monkeypatch, fake_run)
     monkeypatch.setattr(
-        _EXAMPLE,
-        "_run_validation_commands",
+        "ai_agent.run_tracking.run_validation_commands",
         lambda *args, **kwargs: (
             _EXAMPLE.ValidationCommandResult(
                 command="python -m pytest -q",

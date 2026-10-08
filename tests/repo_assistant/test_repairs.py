@@ -98,8 +98,7 @@ def test_cli_orchestrated_repair_reruns_validation_until_passed(
 
     monkeypatch.setattr(_EXAMPLE, "_run_native_agent", fake_native_agent)
     monkeypatch.setattr(
-        _EXAMPLE,
-        "_run_validation_commands",
+        "ai_agent.run_tracking.run_validation_commands",
         lambda *args, **kwargs: validation_results.pop(0),
     )
 
@@ -233,8 +232,7 @@ def test_cli_orchestrated_external_agent_repair_reruns_validation_until_passed(
         lambda *args, **kwargs: _EXAMPLE.AuxiliaryPanelResult(status="completed"),
     )
     monkeypatch.setattr(
-        _EXAMPLE,
-        "_run_validation_commands",
+        "ai_agent.run_tracking.run_validation_commands",
         lambda *args, **kwargs: validation_results.pop(0),
     )
 

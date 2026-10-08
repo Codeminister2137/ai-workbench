@@ -24,6 +24,9 @@ coverage, and refuses impossible character budgets before requesting a summary.
 `external_reporting` formats client event diagnostics and bounded console stderr
 previews independently of execution. Typed/nested failures remain failures;
 full filtered stderr is kept in the existing sidecar when logging is enabled.
+`run_tracking` owns foreground stage transitions and deterministic handoff
+receipts through the existing SQLite store. It rejects invalid time budgets
+before creating records and derives displayed budgets from persisted run data.
 Provider/client adapters stay in `ai_provider`, and routing policy stays in
 `ai_orchestrator`. Existing research/run-store/fallback helpers remain in the
 provider package for this slice. Legacy provider CLI paths remain compatibility

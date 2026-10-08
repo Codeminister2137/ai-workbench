@@ -260,8 +260,7 @@ def test_cli_orchestrated_implement_updates_stage_statuses(
     )
     monkeypatch.setattr(_EXAMPLE, "_run_native_agent", lambda *args, **kwargs: native_response)
     monkeypatch.setattr(
-        _EXAMPLE,
-        "_run_validation_commands",
+        "ai_agent.run_tracking.run_validation_commands",
         lambda *args, **kwargs: (
             _EXAMPLE.ValidationCommandResult(
                 command="python -m pytest -q",
@@ -400,8 +399,7 @@ def test_cli_orchestrated_auxiliary_failure_affects_final_status(
     )
     monkeypatch.setattr(_EXAMPLE, "_run_native_agent", lambda *args, **kwargs: native_response)
     monkeypatch.setattr(
-        _EXAMPLE,
-        "_run_validation_commands",
+        "ai_agent.run_tracking.run_validation_commands",
         lambda *args, **kwargs: (
             _EXAMPLE.ValidationCommandResult(
                 command="python -m pytest -q",
@@ -492,8 +490,7 @@ def test_cli_orchestrated_validation_failure_affects_final_status(
     )
     monkeypatch.setattr(_EXAMPLE, "_run_native_agent", lambda *args, **kwargs: native_response)
     monkeypatch.setattr(
-        _EXAMPLE,
-        "_run_validation_commands",
+        "ai_agent.run_tracking.run_validation_commands",
         lambda *args, **kwargs: (
             _EXAMPLE.ValidationCommandResult(
                 command="python -m pytest -q",

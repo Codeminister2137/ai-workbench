@@ -101,8 +101,7 @@ def test_cli_can_scrutinize_completed_response(capsys, monkeypatch, tmp_path: Pa
 
     monkeypatch.setattr(_EXAMPLE, "run_coding_prompt", fake_run)
     monkeypatch.setattr(
-        _EXAMPLE,
-        "_run_validation_commands",
+        "ai_agent.run_tracking.run_validation_commands",
         lambda *args, **kwargs: (
             _EXAMPLE.ValidationCommandResult(
                 command="python -m pytest -q",
