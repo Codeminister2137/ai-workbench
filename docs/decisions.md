@@ -419,3 +419,13 @@ Why?
 
 **Consequences**
 ```
+
+## ADR-047 - Fail-Closed Execution Boundaries
+
+**Status:** Accepted (2026-10-08); CLI packaging and legacy email entry-point
+choices remain open.
+
+Refuse authenticated provider redirects, validate tool arguments before approval,
+contain recursive search, bound Council/public HTTP reads, bind application
+approval to exact materials, and test real package execution boundaries.
+See [ADR-047](decisions/ADR-047-fail-closed-execution-boundaries.md).

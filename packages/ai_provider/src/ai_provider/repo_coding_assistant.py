@@ -63,6 +63,7 @@ from ai_orchestrator.review import (
     research_review_reserve_seconds,
     select_review_plan,
 )
+from ai_provider.external_execution import ExternalExecutionSettings
 from ai_provider.repair_state import changed_paths, workspace_fingerprints
 from ai_provider import (
     AIMessage,
@@ -111,7 +112,6 @@ from ai_provider.external_agents import (
     build_codex_plugin_command,
     codex_plugin_status_by_name,
     codex_capability_status as _codex_capability_status,  # noqa: F401 - compatibility export
-    external_agent_config_from_orchestration as _external_agent_config_from_orchestration,
     external_agent_command,
     external_agent_status as _external_agent_status,
     is_external_agent_access_method as _is_external_agent_access_method,
@@ -3440,38 +3440,7 @@ def _external_fallback_response(result: ExternalAgentResult, target: Any) -> Any
 
 
 def _fallback_config(target: Any, args: argparse.Namespace, repo_root: Path) -> ExternalAgentConfig:
-    from ai_orchestrator import ExecutionPlan, OrchestrationStatus, TaskProfile
-
-    orchestration = OrchestrationResult(
-        original_prompt="",
-        profile=TaskProfile(),
-        status=OrchestrationStatus.READY,
-        prompt_judge=None,
-        recommendation=None,
-        execution_plan=ExecutionPlan(target=target, reasons=()),
-    )
-    preset = (
-        "read_only" if getattr(args, "shared_tools", None) == "inspection" else args.approval_policy
-    )
-    config = _external_agent_config_from_orchestration(
-        orchestration,
-        repo_root=repo_root,
-        timeout_seconds=target.timeout_seconds,
-        sandbox=_codex_sandbox_for_approval_policy(preset),
-        approval_policy=preset
-        if target.access_method is not AccessMethod.CODEX_CLI
-        or getattr(args, "shared_tools", None) == "coding"
-        else "never",
-        codex_persist_session=args.codex_persist_session,
-        codex_resume=args.codex_resume,
-        output_last_message_path=args.codex_output_last_message,
-        output_schema_path=args.codex_output_schema,
-        web_search=args.codex_search,
-        image_paths=tuple(args.codex_image),
-        codex_mcp_tools=args.codex_mcp_tools,
-        shared_tool_profile=getattr(args, "shared_tools", None),
-    )
-    return replace(config, shared_task_id=getattr(args, "shared_task_id", config.shared_task_id))
+    return ExternalExecutionSettings.from_namespace(args).build(target, repo_root)
 
 
 def _fallback_target_compatible(target: Any, args: argparse.Namespace, repo_root: Path) -> bool:
@@ -3941,27 +3910,9 @@ def _run_external_agent_cli_mode(
     orchestrated_deadline = None
     auxiliary_status = None
     validation_stage = None
+    execution_settings = ExternalExecutionSettings.from_namespace(args)
     try:
-        config = _external_agent_config_from_orchestration(
-            orchestration,
-            repo_root=repo_root,
-            timeout_seconds=args.timeout_seconds,
-            sandbox=_codex_sandbox_for_approval_policy(args.approval_policy),
-            approval_policy=(
-                args.approval_policy
-                if target.access_method is not AccessMethod.CODEX_CLI
-                or getattr(args, "shared_tools", None) == "coding"
-                else "never"
-            ),
-            codex_persist_session=args.codex_persist_session,
-            codex_resume=args.codex_resume,
-            output_last_message_path=args.codex_output_last_message,
-            output_schema_path=args.codex_output_schema,
-            web_search=args.codex_search,
-            image_paths=tuple(args.codex_image),
-            codex_mcp_tools=args.codex_mcp_tools,
-            shared_tool_profile=getattr(args, "shared_tools", None),
-        )
+        config = execution_settings.build(target, repo_root, timeout_seconds=args.timeout_seconds)
         print(f"external_agent_command: {config.command}")
         print(f"approval_policy: {args.approval_policy}")
         print(f"external_agent_sandbox: {config.sandbox}")
@@ -4176,24 +4127,10 @@ def _run_external_agent_cli_mode(
                 _attempt_number: int,
                 timeout_seconds: float,
             ) -> tuple[str, str | None]:
-                repair_config = _external_agent_config_from_orchestration(
-                    orchestration,
-                    repo_root=repo_root,
+                repair_config = execution_settings.build(
+                    target,
+                    repo_root,
                     timeout_seconds=timeout_seconds,
-                    sandbox=_codex_sandbox_for_approval_policy(args.approval_policy),
-                    approval_policy=(
-                        args.approval_policy
-                        if target.access_method is not AccessMethod.CODEX_CLI
-                        or getattr(args, "shared_tools", None) == "coding"
-                        else "never"
-                    ),
-                    codex_persist_session=args.codex_persist_session,
-                    codex_resume=args.codex_resume,
-                    output_last_message_path=args.codex_output_last_message,
-                    output_schema_path=args.codex_output_schema,
-                    web_search=args.codex_search,
-                    image_paths=tuple(args.codex_image),
-                    codex_mcp_tools=args.codex_mcp_tools,
                 )
                 repair_external_prompt = _external_agent_prompt_with_execution_metadata(
                     repair_prompt,
@@ -5064,17 +5001,6 @@ def _run_action_loop(
         current_response = result.response.message.content
         print(current_response)
     return all_actions_ok
-
-
-def _codex_sandbox_for_approval_policy(approval_policy: str) -> str:
-    """Map model-neutral approval presets to supported Codex CLI sandbox modes."""
-
-    preset = ApprovalPolicyPreset(approval_policy)
-    if preset is ApprovalPolicyPreset.READ_ONLY:
-        return "read-only"
-    if preset is ApprovalPolicyPreset.TRUSTED_LOCAL:
-        return "danger-full-access"
-    return "workspace-write"
 
 
 def _prompt_requests_git_metadata_write(prompt: str) -> bool:

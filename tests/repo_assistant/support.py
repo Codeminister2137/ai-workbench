@@ -2,26 +2,29 @@
 
 from __future__ import annotations
 
-import importlib.util
-import sys
+from functools import partial
 from io import StringIO
 from pathlib import Path
 from types import SimpleNamespace
 
+from ai_provider import repo_coding_assistant as _EXAMPLE
+from ai_provider.external_agents import run_external_agent
+
 _EXAMPLE_PATH = (
-    Path(__file__).resolve().parents[2]
-    / "packages"
-    / "ai_provider"
-    / "examples"
-    / "repo_coding_assistant.py"
+    Path(__file__).resolve().parents[2] / "packages/ai_provider/examples/repo_coding_assistant.py"
 )
-sys.path.insert(0, str(_EXAMPLE_PATH.parent))
-_SPEC = importlib.util.spec_from_file_location("repo_coding_assistant_example", _EXAMPLE_PATH)
-assert _SPEC is not None
-assert _SPEC.loader is not None
-_EXAMPLE = importlib.util.module_from_spec(_SPEC)
-sys.modules[_SPEC.name] = _EXAMPLE
-_SPEC.loader.exec_module(_EXAMPLE)
+
+
+def patch_external_runner(monkeypatch, runner):
+    """Inject only process execution; retain production scopes and receipts."""
+    monkeypatch.setattr(_EXAMPLE.subprocess, "run", runner)
+    monkeypatch.setattr(
+        _EXAMPLE,
+        "_run_external_agent",
+        partial(run_external_agent, runner=lambda *a, **kw: runner(*a, **kw)),
+    )
+
+
 build_repo_prompt = _EXAMPLE.build_repo_prompt
 main = _EXAMPLE.main
 build_delegation_context = _EXAMPLE.build_delegation_context

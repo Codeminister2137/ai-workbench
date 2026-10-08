@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from argparse import Namespace
 from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
 
@@ -171,6 +171,9 @@ def test_local_context_delegation_reports_activity(monkeypatch) -> None:
                 backend=self.backend,
             )
 
+        def stream(self, request):
+            raise NotImplementedError("This fixture exercises non-streaming delegation")
+
     catalog = _EXAMPLE.load_model_catalog(
         Path("packages/ai_orchestrator/examples/model_catalog.toml")
     )
@@ -180,6 +183,9 @@ def test_local_context_delegation_reports_activity(monkeypatch) -> None:
         model_override="qwen2.5-coder:14b",
     )
     events: list[str] = []
+
+    def client_factory(config):
+        return FakeClient()
 
     summary, status = run_local_context_delegation(
         (
@@ -192,7 +198,7 @@ def test_local_context_delegation_reports_activity(monkeypatch) -> None:
         ),
         profile,
         catalog,
-        client_factory=lambda config: FakeClient(),
+        client_factory=client_factory,
         progress_callback=events.append,
     )
 
@@ -277,7 +283,7 @@ def test_native_agent_can_delegate_small_write_task(tmp_path: Path, monkeypatch)
 
     clients = [PrimaryClient(), ChildClient()]
     monkeypatch.setattr(_EXAMPLE, "create_chat_client", lambda config: clients.pop(0))
-    args = SimpleNamespace(
+    args = Namespace(
         start_ollama=False,
         ollama_command="ollama",
         ollama_startup_timeout_seconds=1.0,

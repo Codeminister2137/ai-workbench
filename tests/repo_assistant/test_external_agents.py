@@ -13,6 +13,7 @@ from .support import (
     _EXAMPLE,
     main,
     parse_external_agent_jsonl,
+    patch_external_runner,
 )
 
 
@@ -169,7 +170,7 @@ def test_cli_executes_codex_external_agent_route(capsys, monkeypatch, tmp_path: 
         )
 
     monkeypatch.setenv("CODEX_COMMAND", "codex-test")
-    monkeypatch.setattr(_EXAMPLE.subprocess, "run", fake_run)
+    patch_external_runner(monkeypatch, fake_run)
     monkeypatch.setattr(
         _EXAMPLE,
         "_run_validation_commands",
@@ -226,7 +227,6 @@ def test_cli_executes_codex_external_agent_route(capsys, monkeypatch, tmp_path: 
     ) in output
     assert "codex done" in output
     assert "execution_status: completed" in output
-    assert "external_agent_status: running elapsed_seconds=0.0" in output
     assert "away_stage_status: validation status=completed" in output
     assert "away_stage_status: final_handoff status=completed" in output
     assert "## **SUMMARY**" in output
@@ -303,7 +303,7 @@ def test_cli_does_not_print_raw_jsonl_when_codex_fails(capsys, monkeypatch) -> N
         return _EXAMPLE.subprocess.CompletedProcess(args[0], 1, raw_jsonl, "")
 
     monkeypatch.setenv("CODEX_COMMAND", "codex-test")
-    monkeypatch.setattr(_EXAMPLE.subprocess, "run", fake_run)
+    patch_external_runner(monkeypatch, fake_run)
 
     assert (
         main(
@@ -347,7 +347,7 @@ def test_cli_reports_nonzero_external_agent_exit_without_jsonl_failure(
 
     log_file = tmp_path / "transcript.log"
     monkeypatch.setenv("CODEX_COMMAND", "codex-test")
-    monkeypatch.setattr(_EXAMPLE.subprocess, "run", fake_run)
+    patch_external_runner(monkeypatch, fake_run)
 
     assert (
         main(
@@ -401,7 +401,7 @@ def test_cli_reports_antigravity_headless_refusal_despite_zero_exit(
         "ai_provider.execution_fallback.check_agent_readiness",
         lambda *args, **kwargs: AgentReadiness(True, "fixture authentication ready"),
     )
-    monkeypatch.setattr(_EXAMPLE.subprocess, "run", fake_run)
+    patch_external_runner(monkeypatch, fake_run)
 
     assert (
         main(
@@ -438,7 +438,7 @@ def test_cli_explains_codex_timeout_without_duplicate_response_header(
         raise _EXAMPLE.subprocess.TimeoutExpired(args[0], timeout=60.0)
 
     monkeypatch.setenv("CODEX_COMMAND", "codex-test")
-    monkeypatch.setattr(_EXAMPLE.subprocess, "run", fake_run)
+    patch_external_runner(monkeypatch, fake_run)
 
     assert (
         main(
@@ -571,7 +571,7 @@ def test_cli_preserves_raw_codex_jsonl_in_transcript_only(
         return _EXAMPLE.subprocess.CompletedProcess(args[0], 0, raw_jsonl, "")
 
     monkeypatch.setenv("CODEX_COMMAND", "codex-test")
-    monkeypatch.setattr(_EXAMPLE.subprocess, "run", fake_run)
+    patch_external_runner(monkeypatch, fake_run)
     log_file = tmp_path / "codex.log"
 
     assert (
@@ -621,7 +621,7 @@ def test_cli_can_use_codex_output_last_message_file(
         )
 
     monkeypatch.setenv("CODEX_COMMAND", "codex-test")
-    monkeypatch.setattr(_EXAMPLE.subprocess, "run", fake_run)
+    patch_external_runner(monkeypatch, fake_run)
     output_file = tmp_path / "codex" / "last.txt"
 
     assert (

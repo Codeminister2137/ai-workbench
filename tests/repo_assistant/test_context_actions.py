@@ -5,9 +5,9 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from ai_provider.repo_context import _limit_context_content
 
 from .support import (
-    _EXAMPLE,
     AssistantAction,
     build_repo_prompt,
     execute_actions,
@@ -90,7 +90,7 @@ def test_load_prompt_context_applies_total_and_per_file_budgets(tmp_path: Path) 
 def test_limit_context_content_preserves_file_edges() -> None:
     content = "HEAD" + ("x" * 100) + "TAIL"
 
-    limited = _EXAMPLE._limit_context_content(content, 40)
+    limited = _limit_context_content(content, 40)
 
     assert limited.startswith("HEAD")
     assert limited.endswith("TAIL")

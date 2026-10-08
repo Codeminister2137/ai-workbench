@@ -18,24 +18,29 @@ class TestSuiteSelection:
         commands = suites.test_commands(["full"], [option])
         assert commands[0][-1].endswith("report-workspace.xml")
         assert commands[1][-1].endswith("report-council.xml")
+        assert commands[2][-1].endswith("report-job-search.xml")
 
     def test_full_excludes_live_and_runs_council_separately(self):
         commands = suites.test_commands(["full"], ["-q"])
-        assert len(commands) == 2
+        assert len(commands) == 3
         assert "tests/test_ide_bridge.py" in commands[0]
         assert all("tests/integration/" not in path for command in commands for path in command)
         assert all("apps/ai_council/" not in path for path in commands[0])
         assert "apps/ai_council/tests/test_council.py" in commands[1]
+        assert "apps/job_search/job-email/test_job_search.py" in commands[2]
         assert all(command[-1] == "-q" for command in commands)
 
-    def test_new_unassigned_test_fails_selection(self, tmp_path):
+    @pytest.mark.parametrize("directory", ["tests", "apps/new_app", "packages/new_package"])
+    def test_new_unassigned_test_fails_selection(self, tmp_path, directory):
         # Copy filenames only; the selector must never import or execute test files.
         for patterns in suites.GROUPS.values():
             for pattern in patterns:
                 target = tmp_path / pattern.replace("*", "fixture")
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.touch()
-        (tmp_path / "tests/test_unassigned.py").touch()
+        target = tmp_path / directory / "test_unassigned.py"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.touch()
         with pytest.raises(ValueError, match="test_unassigned.py"):
             suites.suite_files(tmp_path)
 
@@ -46,7 +51,7 @@ class TestSuiteSelection:
     def test_failure_status_survives_later_success(self, monkeypatch):
         from types import SimpleNamespace
 
-        statuses = iter((1, 0))
+        statuses = iter((1, 0, 0))
         monkeypatch.setattr(
             suites.subprocess, "run", lambda *a, **kw: SimpleNamespace(returncode=next(statuses))
         )

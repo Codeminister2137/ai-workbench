@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from argparse import Namespace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -90,10 +91,8 @@ def test_native_agent_mode_executes_provider_tool_calls(tmp_path: Path, monkeypa
     monkeypatch.setattr(client, "complete", capture_request)
     monkeypatch.setattr(_EXAMPLE, "create_chat_client", lambda config: client)
     monkeypatch.setattr("builtins.input", lambda prompt: "yes")
-    args = type(
-        "Args",
-        (),
-        {
+    args = Namespace(
+        **{
             "start_ollama": False,
             "ollama_command": "ollama",
             "ollama_startup_timeout_seconds": 1.0,
@@ -102,8 +101,8 @@ def test_native_agent_mode_executes_provider_tool_calls(tmp_path: Path, monkeypa
             "approval_policy": "trusted_local",
             "ollama_log_file": None,
             "ollama_profile": None,
-        },
-    )()
+        }
+    )
     profile = coding_task_profile(privacy_class=OrchestratorPrivacyClass.LOCAL_ONLY)
     events: list[str] = []
     result = _run_native_agent(

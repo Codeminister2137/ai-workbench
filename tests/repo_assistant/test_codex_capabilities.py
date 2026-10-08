@@ -12,6 +12,7 @@ from ai_provider.codex_mcp import CodexMcpSetupResult
 from .support import (
     _EXAMPLE,
     main,
+    patch_external_runner,
 )
 
 
@@ -87,7 +88,7 @@ def test_cli_can_refresh_codex_login(capsys, monkeypatch, tmp_path: Path) -> Non
         raise AssertionError(joined)
 
     monkeypatch.setenv("CODEX_COMMAND", "codex")
-    monkeypatch.setattr(_EXAMPLE.subprocess, "run", fake_run)
+    patch_external_runner(monkeypatch, fake_run)
 
     assert main(["--repo-root", str(tmp_path), "--codex-login"]) == 0
 
@@ -117,7 +118,7 @@ def test_cli_can_refresh_codex_login_with_device_auth(
         raise AssertionError(joined)
 
     monkeypatch.setenv("CODEX_COMMAND", "codex")
-    monkeypatch.setattr(_EXAMPLE.subprocess, "run", fake_run)
+    patch_external_runner(monkeypatch, fake_run)
 
     assert main(["--repo-root", str(tmp_path), "--codex-login-device"]) == 0
 
@@ -340,7 +341,7 @@ def test_codex_capability_status_reports_expected_diagnostics(monkeypatch) -> No
             )
         raise AssertionError(joined)
 
-    monkeypatch.setattr(_EXAMPLE.subprocess, "run", fake_run)
+    patch_external_runner(monkeypatch, fake_run)
     monkeypatch.delenv("CODEX_HOME", raising=False)
 
     status = _EXAMPLE._codex_capability_status("C:/codex/bin/codex.exe")
@@ -449,7 +450,7 @@ def test_cli_can_install_codex_plugins_when_explicitly_executed(
         raise AssertionError(joined)
 
     monkeypatch.setenv("CODEX_COMMAND", "codex")
-    monkeypatch.setattr(_EXAMPLE.subprocess, "run", fake_run)
+    patch_external_runner(monkeypatch, fake_run)
 
     def fake_plugin_operation(command, *, action, selector, timeout_seconds=60.0):
         nonlocal plugin_installed

@@ -1,7 +1,7 @@
 """Run explicit component suites without replacing the final workspace check.
 
-Council has a legacy top-level ``tests`` package and runs in a separate pytest
-process. Live suites retain their existing environment opt-ins.
+Council and job-search use legacy top-level imports and run in separate pytest
+processes. Live suites retain their existing environment opt-ins.
 """
 
 from __future__ import annotations
@@ -58,6 +58,7 @@ GROUPS = {
         "tests/test_acceptance_usage.py",
     ),
     "council": ("apps/ai_council/tests/test_*.py",),
+    "job-search": ("apps/job_search/job-email/test_*.py",),
     "live": ("tests/integration/test_*.py",),
 }
 
@@ -80,8 +81,12 @@ def suite_files(root: Path = ROOT) -> dict[str, tuple[str, ...]]:
             owners.setdefault(path, []).append(name)
     discovered = {
         path.relative_to(root).as_posix()
-        for directory in (root / "tests", root / "apps/ai_council/tests")
+        for directory in (root / "tests", root / "apps", root / "packages")
         for path in directory.rglob("test_*.py")
+        if not any(
+            part.startswith(".") or part == "__pycache__"
+            for part in path.relative_to(directory).parts
+        )
     }
     missing = sorted(discovered - owners.keys())
     duplicate = sorted(path for path, names in owners.items() if len(names) > 1)
@@ -97,20 +102,22 @@ def test_commands(names: list[str], extra: list[str], *, root: Path = ROOT) -> l
         selected |= set(groups) - {"live"}
         selected.remove("full")
     commands = []
-    for isolated_council in (False, True):
+    labels = []
+    for label in ("workspace", "council", "job-search"):
         paths = sorted(
             {
                 path
                 for name in selected
-                if (name == "council") == isolated_council
+                if (name if name in {"council", "job-search"} else "workspace") == label
                 for path in groups[name]
             }
         )
         if paths:
             commands.append([sys.executable, "-m", "pytest", *paths, *extra])
+            labels.append(label)
     if len(commands) > 1:
         # Separate processes must not overwrite each other's CI test report.
-        for label, command in zip(("workspace", "council"), commands, strict=True):
+        for label, command in zip(labels, commands, strict=True):
             for index, value in enumerate(command):
                 option, separator, path = value.partition("=")
                 if option not in {"--junitxml", "--junit-xml"}:

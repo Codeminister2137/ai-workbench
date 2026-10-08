@@ -6,12 +6,14 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
+import pytest
 from ai_provider.orchestrated_runs import SQLiteOrchestratedRunStore
 
 from .support import (
     _EXAMPLE,
     _implementation_scrutiny_result,
     main,
+    patch_external_runner,
 )
 
 
@@ -169,8 +171,10 @@ def test_cli_orchestrated_repair_reruns_validation_until_passed(
     assert final_handoff_details["blockers"] == ""
 
 
+@pytest.mark.parametrize("shared_tools", [None, "coding"])
 def test_cli_orchestrated_external_agent_repair_reruns_validation_until_passed(
     capsys,
+    shared_tools,
     monkeypatch,
     tmp_path: Path,
 ) -> None:
@@ -222,7 +226,7 @@ def test_cli_orchestrated_external_agent_repair_reruns_validation_until_passed(
         )
 
     monkeypatch.setenv("CODEX_COMMAND", "codex-test")
-    monkeypatch.setattr(_EXAMPLE.subprocess, "run", fake_run)
+    patch_external_runner(monkeypatch, fake_run)
     monkeypatch.setattr(
         _EXAMPLE,
         "run_auxiliary_panel",
@@ -240,6 +244,7 @@ def test_cli_orchestrated_external_agent_repair_reruns_validation_until_passed(
                 "--mode",
                 "implement",
                 "Repair through Codex.",
+                *(["--shared-tools", shared_tools] if shared_tools else []),
                 "--privacy",
                 "external_allowed",
                 "--route-id",
@@ -274,6 +279,13 @@ def test_cli_orchestrated_external_agent_repair_reruns_validation_until_passed(
 
     exec_calls = [call for call in calls if "exec" in call["args"][0]]
     assert len(exec_calls) == 2
+    if shared_tools:
+        for call in exec_calls:
+            command = call["args"][0]
+            assert "--proxy-url" in " ".join(command)
+            assert call["kwargs"]["env"]
+            assert command[command.index("--sandbox") + 1] == "read-only"
+
     repair_prompt = exec_calls[1]["kwargs"]["input"]
     assert "Deterministic validation failure evidence" in repair_prompt
     assert "FAILED tests/test_codex.py::test_external_repair" in repair_prompt

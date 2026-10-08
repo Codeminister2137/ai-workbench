@@ -49,6 +49,17 @@ Ignored local XML/profiling evidence is under `artifacts/local-tool-host-accepta
 
 ## Run relevant groups while iterating
 
+The 2026-10-08 audit adds `job-search` to the full offline gate. Root, Council,
+and job-search run in separate processes to avoid legacy top-level import
+collisions. Discovery checks root tests plus all applications/packages and fails
+on unassigned modules. JUnit output preserves `workspace`, `council`, and
+`job-search` reports when multiple groups execute.
+
+CLI tests import the package implementation directly. Synthetic external-client
+process execution is injected through its runner argument, preserving actual
+foreground scopes and session receipts. Examples no longer copy test patches
+into production globals.
+
 The standard-library runner selects explicit files; it does not guess coverage
 from changed Git paths. Its group manifest fails if a discovered test module is
 unassigned or belongs to multiple groups. Group ownership follows the behavior

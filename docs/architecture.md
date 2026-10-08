@@ -170,6 +170,15 @@ cancellation remains unsupported. See ADR-039.
 
 ## 4.1 Authorization and approval policy
 
+Declared tool parameter types are checked before authorization and execution.
+Authenticated provider requests refuse redirects, recursive inspection validates
+resolved file paths, and public fetch/search share a response deadline watchdog.
+Council's local HTTP surface validates origins and bounded JSON bodies before
+inference. Job application approval binds exact reviewed materials and guarded
+delivery uses verified attachment bytes. These bounded hardening changes are
+recorded in [ADR-047](decisions/ADR-047-fail-closed-execution-boundaries.md);
+remote authentication and CLI packaging remain separate decisions.
+
 Task profiles default to `PREPAID_CREDITS_ALLOWED`. The repo assistant overlays
 private TOML user preferences before routing; explicit CLI flags take precedence.
 Paid Requesty catalog routes require prepaid authorization; the separate free
