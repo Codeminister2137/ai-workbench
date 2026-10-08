@@ -50,6 +50,10 @@ All three infrastructure packages built offline wheels. Isolated wheel imports
 verify the seven extracted modules, command metadata and both module launchers.
 No live model/account access, email transmission, installation, merge or push ran
 in this slice.
+A final planning-only review identified a separate owner choice about explicit
+local-only privacy for context delegation versus inherited parent privacy.
+Accepted behavior is preserved pending that choice; see
+[the decision brief](post-audit-decisions.md#context-delegation-privacy--owner-choice-pending-2026-10-08).
 
 ## 2026-10-06 closeout consistency — COMPLETE
 
