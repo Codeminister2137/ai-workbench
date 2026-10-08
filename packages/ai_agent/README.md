@@ -31,6 +31,8 @@ receipts through the existing SQLite store. It rejects invalid time budgets
 before creating records and derives displayed budgets from persisted run data.
 `delegation_context` renders bounded source excerpts and checks that local
 summary references identify lines actually supplied, including after truncation.
+`support_passes` exposes local context delegation and auxiliary review independently
+of command dispatch, with typed profiles/catalogs and shared target translation.
 Provider/client adapters stay in `ai_provider`, and routing policy stays in
 `ai_orchestrator`. Existing research/run-store/fallback helpers remain in the
 provider package for this slice. Legacy provider CLI paths remain compatibility

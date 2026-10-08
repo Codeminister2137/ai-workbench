@@ -17,6 +17,18 @@ from ai_provider.external_agents import (
 MAX_DIAGNOSTIC_LINE_CHARS = 1_500
 
 
+def activity_preview(value: str, *, limit: int = 160) -> str:
+    """Return a single-line activity detail within its character limit."""
+    limit = max(0, limit)
+    preview = " ".join(value.strip().split())
+    if len(preview) <= limit:
+        return preview
+    suffix = " ...[truncated]"
+    if limit < len(suffix):
+        return preview[:limit]
+    return preview[: limit - len(suffix)].rstrip() + suffix
+
+
 def _diagnostic_line(text: str) -> str:
     if len(text) <= MAX_DIAGNOSTIC_LINE_CHARS:
         return text
