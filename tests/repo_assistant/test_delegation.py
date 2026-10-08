@@ -209,6 +209,59 @@ def test_local_context_delegation_reports_activity(monkeypatch) -> None:
     assert any(event.startswith("delegated_agent_activity: completed -") for event in events)
 
 
+@pytest.mark.parametrize(
+    "summary",
+    [
+        "unsupported claim [source:src.py:",
+        "unsupported claim [source:src.py:999]",
+        "unsupported claim [source:wrong.py:1]",
+    ],
+)
+def test_local_context_delegation_discards_invalid_model_references(summary: str):
+    from ai_provider import AIMessage, AIResponse, BackendInfo, BackendLocation, MessageRole
+
+    class FakeClient:
+        backend = BackendInfo("ollama", "qwen2.5-coder:14b", BackendLocation.LOCAL)
+
+        def complete(self, request):
+            return AIResponse(AIMessage(MessageRole.ASSISTANT, summary), self.backend)
+
+        def stream(self, request):
+            raise NotImplementedError
+
+    catalog = _EXAMPLE.load_model_catalog(
+        Path("packages/ai_orchestrator/examples/model_catalog.toml")
+    )
+    profile = _EXAMPLE.coding_task_profile(
+        provider_override="ollama", model_override="qwen2.5-coder:14b"
+    )
+    events = []
+    result, status = run_local_context_delegation(
+        (_EXAMPLE.RepoContextFile(Path("src.py"), "src.py", "value = 1", True),),
+        profile,
+        catalog,
+        client_factory=lambda _: FakeClient(),
+        progress_callback=events.append,
+    )
+    assert result is None
+    assert status.startswith("rejected:")
+    assert not any("completed -" in event for event in events)
+
+
+def test_local_context_delegation_skips_sources_without_visible_lines():
+    def unexpected_call(config):
+        pytest.fail("no visible source line should not contact a model")
+
+    result, status = run_local_context_delegation(
+        (_EXAMPLE.RepoContextFile(Path("src.py"), "src.py", "", True),),
+        _EXAMPLE.coding_task_profile(),
+        (),
+        client_factory=unexpected_call,
+    )
+    assert result is None
+    assert status.startswith("skipped:")
+
+
 def test_native_agent_can_delegate_small_write_task(tmp_path: Path, monkeypatch) -> None:
     from ai_orchestrator import PrivacyClass as OrchestratorPrivacyClass
     from ai_provider import BackendConfig, ProviderKind

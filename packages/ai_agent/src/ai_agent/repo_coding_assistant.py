@@ -209,6 +209,12 @@ from ai_agent.chat_context import (
 from ai_agent.chat_context import (
     update_chat_rolling_summary as _update_chat_rolling_summary,  # noqa: F401 - compatibility export
 )
+from ai_agent.delegation_context import (
+    assemble_delegation_context,
+)
+from ai_agent.delegation_context import (
+    has_source_citation as _has_source_citation,
+)
 from ai_agent.external_execution import ExternalExecutionSettings
 from ai_agent.external_reporting import (
     dedupe_preserving_order as _dedupe_preserving_order,  # noqa: F401 - compatibility export
@@ -373,46 +379,9 @@ def build_delegation_context(
     *,
     max_chars: int = DEFAULT_DELEGATION_CONTEXT_BUDGET_CHARS,
 ) -> tuple[str, tuple[str, ...]]:
-    """Build bounded, line-numbered context for safe local extraction."""
-
-    if max_chars <= 0:
-        raise ValueError("max_chars must be greater than zero.")
-    sections: list[str] = []
-    sources: list[str] = []
-    remaining = max_chars
-    for context_file in context_files:
-        if remaining <= 0:
-            break
-        source = context_file.display_path
-        header = f"=== SOURCE: {source} ===\n"
-        if len(header) >= remaining:
-            sections.append(header[:remaining])
-            break
-        lines = context_file.content.splitlines()
-        rendered = [header]
-        used = len(header)
-        for line_number, line in enumerate(lines, start=1):
-            line_text = f"{line_number}: {line}\n"
-            marker = f"[source truncated after line {line_number - 1}]"
-            if used + len(line_text) + len(marker) > remaining:
-                rendered.append(marker)
-                used = remaining
-                break
-            rendered.append(line_text)
-            used += len(line_text)
-        sections.append("".join(rendered).rstrip())
-        sources.append(source)
-        remaining -= used
-    return "\n\n".join(sections), tuple(sources)
-
-
-def _has_source_citation(summary: str, sources: Sequence[str]) -> bool:
-    """Return whether a local summary cites one of the supplied sources."""
-
-    normalized = summary.replace("\\", "/").lower()
-    return any(
-        f"[source:{source.replace(chr(92), '/').lower()}:" in normalized for source in sources
-    )
+    """Return bounded rendered context and sources with visible lines."""
+    context = assemble_delegation_context(context_files, max_chars=max_chars)
+    return context.text, context.sources
 
 
 def run_local_context_delegation(
@@ -438,10 +407,11 @@ def run_local_context_delegation(
                 f"delegated_agent_activity: rejected - {_activity_preview(decision.reason)}"
             )
         return None, f"rejected: {decision.reason}"
-    delegation_context, sources = build_delegation_context(
+    delegation_context = assemble_delegation_context(
         context_files,
         max_chars=max_chars,
     )
+    sources = delegation_context.sources
     if not sources:
         if progress_callback is not None:
             progress_callback("delegated_agent_activity: skipped - no repository context")
@@ -473,7 +443,7 @@ def run_local_context_delegation(
                     "Extract only concrete facts needed for the user's coding request from "
                     "the supplied sources. Cite every claim with [source:path:line]. Do not "
                     "make architectural or implementation decisions.\n\n"
-                    f"{delegation_context}"
+                    f"{delegation_context.text}"
                 ),
             ),
         ),
@@ -482,7 +452,7 @@ def run_local_context_delegation(
     )
     response = client_factory(config).complete(request)
     summary = response.message.content.strip()
-    if not _has_source_citation(summary, sources):
+    if not _has_source_citation(summary, delegation_context):
         if progress_callback is not None:
             progress_callback(
                 "delegated_agent_activity: rejected - local summary contained no "
@@ -1898,7 +1868,7 @@ def _main(argv: Sequence[str] | None = None) -> int:
             progress_callback=print,
         )
         if delegated_summary is not None:
-            prompt = f"{prompt}\n\n## Verified local context extraction\n{delegated_summary}"
+            prompt = f"{prompt}\n\n## Local context with source references\n{delegated_summary}"
             external_orchestration = replace(external_orchestration, original_prompt=prompt)
     elif args.delegate_context:
         delegation_status = "planned: requires --execute"

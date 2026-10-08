@@ -166,7 +166,11 @@ should receive directly, enable bounded local context delegation:
 This sends a bounded, line-numbered copy of the loaded context to a local
 Ollama model first. The summary must cite supplied sources using
 `[source:path:line]` references before it is injected into the primary prompt.
-Uncited summaries are discarded. Local delegation is restricted to bounded
+At least one complete reference must identify a line actually supplied to the
+local model; missing, invalid or truncated-away references are discarded. This
+checks reference existence, not factual support for each claim. Headers,
+separators and truncation notices count toward the character limit.
+Local delegation is restricted to bounded
 support work; architecture and implementation decisions remain with the
 primary model. Use `--delegation-context-budget-chars` to adjust the local
 context budget. Without `--execute`, the option only reports that delegation is
