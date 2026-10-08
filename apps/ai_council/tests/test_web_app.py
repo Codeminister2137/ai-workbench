@@ -110,7 +110,9 @@ def test_rejected_request_never_loads_council(council_server, monkeypatch, heade
     monkeypatch.setattr("web_app.load_config", forbidden)
     request = Request(
         council_server + "/api/ask",
-        data=body,
+        # Invalid envelopes must be rejected before any body arrives. Sending a
+        # body after rejection races socket close and masks the status on Windows.
+        data=None if headers else body,
         headers={"Content-Type": "application/json", **headers},
         method="POST",
     )
