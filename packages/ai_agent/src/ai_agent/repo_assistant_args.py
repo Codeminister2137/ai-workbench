@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import math
 from pathlib import Path
 
 from ai_orchestrator import AccessMethod, CostPolicyTier, QualityThreshold
@@ -33,6 +34,24 @@ class UserDefaultAction(argparse.Action):
         setattr(namespace, self.dest, values)
         provided = getattr(namespace, "_provided_user_defaults", frozenset())
         namespace._provided_user_defaults = provided | {self.dest}
+
+
+def _positive_finite_float(value: str) -> float:
+    """Validate time limits before any command/session setup can have effects."""
+    try:
+        number = float(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("must be a finite number greater than zero") from exc
+    if not math.isfinite(number) or number <= 0:
+        raise argparse.ArgumentTypeError("must be a finite number greater than zero")
+    return number
+
+
+def _away_minutes_argument(value: str) -> float:
+    minutes = _positive_finite_float(value)
+    if not math.isfinite(minutes * 60):
+        raise argparse.ArgumentTypeError("must produce a finite work budget in seconds")
+    return minutes
 
 
 def build_argument_parser() -> argparse.ArgumentParser:
@@ -259,11 +278,13 @@ def build_argument_parser() -> argparse.ArgumentParser:
             "but denies legacy shell actions, and trusted_local allows local writes/shell."
         ),
     )
-    parser.add_argument("--max-latency-seconds", type=float, help="Hard latency constraint.")
+    parser.add_argument(
+        "--max-latency-seconds", type=_positive_finite_float, help="Hard latency constraint."
+    )
     parser.add_argument(
         "--timeout-seconds",
         action=UserDefaultAction,
-        type=float,
+        type=_positive_finite_float,
         default=180.0,
         help=(
             "Provider timeout. For external-agent routes, this is an inactivity "
@@ -272,7 +293,7 @@ def build_argument_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--away-minutes",
-        type=float,
+        type=_away_minutes_argument,
         help=(
             "Visible foreground work budget for unattended runs. If --timeout-seconds "
             "is not supplied, provider and external-agent timeouts are set to this "
@@ -375,7 +396,7 @@ def build_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--validation-timeout-seconds",
         action=UserDefaultAction,
-        type=float,
+        type=_positive_finite_float,
         default=300.0,
         help="Timeout for each deterministic validation command.",
     )
@@ -402,7 +423,7 @@ def build_argument_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--ollama-startup-timeout-seconds",
-        type=float,
+        type=_positive_finite_float,
         default=10.0,
         help="Seconds to wait for Ollama to become reachable after starting it.",
     )
@@ -562,7 +583,7 @@ def build_argument_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--command-timeout-seconds",
-        type=float,
+        type=_positive_finite_float,
         default=60.0,
         help="Timeout for assistant-proposed local commands.",
     )

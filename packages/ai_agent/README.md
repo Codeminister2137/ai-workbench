@@ -15,6 +15,8 @@ python -m uv run ai-assistant --help
 `ai_agent.cli` is the stable entry point; `repo_coding_assistant` composes the
 workflow, `repo_assistant_args` registers options, and `external_execution`
 derives consistent settings for primary, repair and fallback execution.
+CLI time limits must be finite and positive; invalid values fail before session
+setup, and away minutes must convert to a finite seconds budget.
 `validation` owns direct-process validation, interpreter selection and bounded
 result metadata. It can be exercised without importing CLI orchestration;
 malformed commands produce `failed_to_start` results rather than aborting a run.
