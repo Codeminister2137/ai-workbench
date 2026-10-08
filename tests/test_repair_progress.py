@@ -138,6 +138,23 @@ def test_disabled_repair_does_not_hide_initial_validation_failure(run):
     assert _stage(run, "repair").status == "skipped"
 
 
+@pytest.mark.parametrize("override_deadline", [False, True])
+def test_caller_cannot_disable_or_extend_tracker_repair_deadline(
+    run, monkeypatch, override_deadline
+):
+    deadline = run[1].deadline
+    monkeypatch.setattr(cli.time, "perf_counter", lambda: deadline)
+    status, _, _ = _loop(
+        run,
+        lambda *a: pytest.fail("expired tracker budget launched a repair"),
+        deadline=deadline + 100 if override_deadline else None,
+    )
+    assert status == "completed_with_validation_errors"
+    stage = _stage(run, "repair")
+    assert stage.status == "timeout"
+    assert stage.details["attempt_count"] == 0
+
+
 @pytest.mark.parametrize("response", ["Done.", "Ran a tool and checked the report."])
 def test_identical_no_op_repairs_stop_even_when_unbounded(run, response):
     status, validation, _ = _loop(run, lambda *a: ("completed", response))
@@ -427,6 +444,28 @@ def test_reusable_scrutiny_uses_explicit_client_without_runtime_access(run):
     assert requests[0].privacy_class.value == "local_only"
     assert status == "completed_with_validation_errors"
     assert _stage(run, "scrutiny").details["verdict"] == "pass"
+
+
+@pytest.mark.parametrize("override_deadline", [False, True])
+def test_caller_cannot_disable_or_extend_tracker_scrutiny_deadline(
+    run, monkeypatch, override_deadline
+):
+    deadline = run[1].deadline
+    monkeypatch.setattr(cli.time, "perf_counter", lambda: deadline)
+    status = run_orchestrated_scrutiny(
+        args=run[0],
+        tracker=run[1],
+        repo_root=run[4],
+        profile=cli.coding_task_profile(),
+        catalog=(),
+        validation_stage=None,
+        assistant_response_text="done",
+        execution_status="completed",
+        deadline=deadline + 100 if override_deadline else None,
+        coding_runner=lambda *a, **kw: pytest.fail("expired tracker budget launched scrutiny"),
+    )
+    assert status == "completed_with_scrutiny_errors"
+    assert _stage(run, "scrutiny").status == "skipped"
 
 
 def test_budget_exhausted_scrutiny_is_recorded_in_handoff(run, monkeypatch):

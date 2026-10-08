@@ -72,6 +72,7 @@ def run_orchestrated_scrutiny(
             else "derived_local_cheap"
         },
     )
+    deadline = tracker.deadline if deadline is None else min(deadline, tracker.deadline)
     remaining = remaining_orchestrated_budget_seconds(deadline=deadline)
     details: dict[str, object] = {}
     stage_status = "failed"

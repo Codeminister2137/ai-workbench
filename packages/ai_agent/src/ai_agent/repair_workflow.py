@@ -125,6 +125,7 @@ def run_orchestrated_repair_loop(
         return execution_status, validation_stage, assistant_response_text
 
     execution_status = execution_status_with_validation_stage(execution_status, validation_stage)
+    deadline = tracker.deadline if deadline is None else min(deadline, tracker.deadline)
     max_cycles = args.max_repair_cycles
     if max_cycles == 0:
         tracker.complete_stage(
