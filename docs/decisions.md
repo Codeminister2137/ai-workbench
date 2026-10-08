@@ -422,8 +422,8 @@ Why?
 
 ## ADR-047 - Fail-Closed Execution Boundaries
 
-**Status:** Accepted (2026-10-08); CLI packaging and legacy email entry-point
-choices remain open.
+**Status:** Accepted (2026-10-08); CLI package ownership remains under review.
+The legacy email entry point now uses preview and explicit guarded delivery.
 
 Refuse authenticated provider redirects, validate tool arguments before approval,
 contain recursive search, bound Council/public HTTP reads, bind application

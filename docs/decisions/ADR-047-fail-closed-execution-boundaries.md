@@ -1,6 +1,6 @@
 # ADR-047 - Fail-closed execution boundaries and requirements-based regression tests
 
-**Status:** Accepted; packaging and legacy email entry-point choices remain open
+**Status:** Accepted; CLI package ownership remains under review
 
 **Date:** 2026-10-08
 
@@ -61,10 +61,18 @@ Immutable prepared packages do not replace a future durable delivery ledger.
 
 ## Open choices
 
-- Optional CLI dependencies through an `ai-provider[cli]` extra versus a separate
-  composition package require the owner's explicit selection.
-- Routing the legacy email CLI through preview/approval/guarded delivery versus
-  disabling its send workflow requires the owner's product selection.
+- The owner proposed CLI ownership in `ai_agent`. The existing dependency
+  direction supports this, but several earlier ADRs and architecture sections
+  explicitly place CLI/run composition in `ai_provider`. A focused migration of
+  entry point, CLI implementation, arguments and execution settings is recommended;
+  confirmation of the ownership revision/migration scope remains pending. Provider
+  and official-client adapters should retain their lower-layer ownership.
+- The owner subsequently selected routing the legacy email CLI through
+  preview/approval/guarded delivery, preserving the useful outreach workflow.
+  Preview is the default; `--send` requests exact per-recipient confirmation.
+  Shared preparation replaces the duplicated message formatter. The existing
+  sent-file records successful sends; failed recording after SMTP success stops
+  the batch for reconciliation. This does not introduce transactional persistence.
 - Broader decomposition of the CLI remains incremental work. Extracting common
   external-execution settings does not claim that the entire CLI is decomposed.
 
