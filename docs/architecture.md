@@ -83,7 +83,7 @@ and fallback helpers remain there for this focused migration; earlier references
 to provider-owned CLI composition describe that historical/helper placement.
 Legacy CLI module imports and entry points delegate to the agent implementation.
 Within `ai_agent`, validation execution, chat-context assembly, external diagnostics,
-foreground run tracking, delegated-source rendering, local support passes and repair are
+foreground run tracking, delegated-source rendering, local support, repair and scrutiny are
 reusable modules. Command dispatch composes them; provider storage/adapters and
 orchestrator policy keep their existing boundaries.
 

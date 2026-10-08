@@ -15,7 +15,7 @@ replacement SearXNG investigation, and the accepted local typed acceptance-job
 contract. D3's bounded live fixture passed. The owner now retains direct URL
 fetching; search replacement is deferred and does not block independent work.
 Historical checkpoints below retain their original validation counts. The latest
-full offline gate is 1,655 passed: root 1,585, Council 33 and job-search 37,
+full offline gate is 1,660 passed: root 1,590, Council 33 and job-search 37,
 with 3 Windows file-symlink permission skips.
 The final M1 readiness suite has 84 passing tests. Ruff/formatting, Pyright and
 `git diff --check` pass. Live-provider cases remain excluded. See
@@ -32,7 +32,7 @@ ADR-047 records the accepted execution-boundary fixes and requirements-based
 regressions. ADR-048 moves the assistant command and workflow into `ai_agent`,
 preserving legacy import/launch compatibility and provider-core independence.
 Validation, chat context, diagnostics, run tracking, source rendering, local
-support passes and repair now have reusable modules and direct behavior tests.
+support passes, repair and final scrutiny now have reusable modules and direct behavior tests.
 
 The follow-up fixes malformed validation commands, preserves timeout output,
 rejects impossible mandatory chat budgets, retains structured external failures,
@@ -41,13 +41,17 @@ context within its budget, and validates time limits before side effects.
 Local support derives configuration through the existing execution-target adapter.
 Repair success requires actual passed revalidation; skipped checks cannot erase
 an existing failure, and missing handoff receipts remain explicit risks.
+Repair and scrutiny derive their deadline from the run tracker; an omitted or
+later caller deadline cannot bypass its budget. The CLI retains a thin scrutiny
+wrapper around explicit execution/client hooks for compatibility.
 Storage formats, routing/privacy/approval policies and dependencies are unchanged.
 
-The final offline gate passed 1,655 cases with 3 file-symlink permission skips;
+The final offline gate passed 1,660 cases with 3 file-symlink permission skips;
 Ruff, formatting and Pyright pass. The CLI remains partly monolithic; broader
 composition-helper ownership and attended/live acceptance remain separate work.
 All three infrastructure packages built offline wheels. Isolated wheel imports
-verify the seven extracted modules, command metadata and both module launchers.
+verify the eight extracted modules, command metadata and both module launchers.
+Packaged repair and scrutiny also refuse execution after their tracker deadline.
 No live model/account access, email transmission, installation, merge or push ran
 in this slice.
 A final planning-only review identified a separate owner choice about explicit
