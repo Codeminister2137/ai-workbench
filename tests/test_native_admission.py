@@ -193,7 +193,7 @@ def test_known_cloud_capacity_and_unknown_capacity_are_distinct():
 
 
 def test_cli_native_boundary_enforces_guard_with_no_model_call(tmp_path, monkeypatch):
-    from ai_provider import repo_coding_assistant as cli
+    from ai_agent import repo_coding_assistant as cli
 
     client = RecordingClient()
     monkeypatch.setattr(cli, "create_chat_client", lambda config: client)
@@ -220,7 +220,7 @@ def test_cli_native_boundary_enforces_guard_with_no_model_call(tmp_path, monkeyp
 
 
 def test_cli_native_boundary_preserves_required_instructions(admitted, tmp_path, monkeypatch):
-    from ai_provider import repo_coding_assistant as cli
+    from ai_agent import repo_coding_assistant as cli
 
     _, client, _ = admitted
     monkeypatch.setattr(cli, "create_chat_client", lambda config: client)
@@ -270,7 +270,7 @@ def test_offline_native_readiness_selects_tested_route_without_metadata(
 ):
     import json
 
-    from ai_provider import repo_coding_assistant as cli
+    from ai_agent import repo_coding_assistant as cli
 
     def forbidden(*args, **kwargs):
         pytest.fail("offline readiness must not contact a runtime")

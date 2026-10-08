@@ -422,10 +422,20 @@ Why?
 
 ## ADR-047 - Fail-Closed Execution Boundaries
 
-**Status:** Accepted (2026-10-08); CLI package ownership remains under review.
+**Status:** Accepted (2026-10-08); CLI ownership resolved by ADR-048.
 The legacy email entry point now uses preview and explicit guarded delivery.
 
 Refuse authenticated provider redirects, validate tool arguments before approval,
 contain recursive search, bound Council/public HTTP reads, bind application
 approval to exact materials, and test real package execution boundaries.
 See [ADR-047](decisions/ADR-047-fail-closed-execution-boundaries.md).
+
+## ADR-048 - Agent-Owned Repository Assistant CLI
+
+**Status:** Accepted (2026-10-08).
+
+The owner approved moving the command, CLI implementation, argument parsing and
+execution settings to `ai_agent`. Provider/client adapters remain in `ai_provider`;
+old CLI module imports delegate for compatibility without a reverse dependency.
+This supersedes their historical provider placement, leaving wider helper
+migration outside scope. See [ADR-048](decisions/ADR-048-agent-owned-assistant-cli.md).

@@ -185,7 +185,7 @@ def research_command(task: ResearchTask, database: Path) -> list[str]:
     return [
         sys.executable,
         "-m",
-        "ai_provider.repo_coding_assistant",
+        "ai_agent.repo_coding_assistant",
         "--repo-root",
         str(task.repo_root),
         "--mode",

@@ -1,13 +1,13 @@
-"""Stable command entry point for the repository coding assistant."""
+"""Compatibility import for the agent-owned CLI entry point."""
 
-from __future__ import annotations
+import sys
+from typing import Any
 
-from collections.abc import Sequence
-
-from ai_provider import repo_coding_assistant
+from ai_agent import cli as _implementation
 
 
-def main(argv: Sequence[str] | None = None) -> int:
-    """Run the stable CLI entry point."""
+def __getattr__(name: str) -> Any:
+    return getattr(_implementation, name)
 
-    return repo_coding_assistant.main(argv)
+
+sys.modules[__name__] = _implementation

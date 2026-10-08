@@ -188,7 +188,7 @@ def test_requesty_catalog_requires_prepaid_policy() -> None:
 
 
 def test_cli_cost_policy_precedence(tmp_path: Path, capsys) -> None:
-    from ai_provider.repo_coding_assistant import main
+    from ai_agent.repo_coding_assistant import main
 
     root = Path(__file__).resolve().parents[1]
     config = tmp_path / "preferences.toml"

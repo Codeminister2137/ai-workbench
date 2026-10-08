@@ -7,9 +7,9 @@ from io import StringIO
 from typing import Any, cast
 
 import pytest
+from ai_agent import repo_coding_assistant as cli
 from ai_agent.shared_approvals import TerminalApproval
 from ai_orchestrator import AccessMethod
-from ai_provider import repo_coding_assistant as cli
 from ai_provider.agent_readiness import AgentReadiness
 from ai_provider.external_agents import ExternalAgentConfig, run_external_agent
 

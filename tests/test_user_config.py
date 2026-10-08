@@ -3,8 +3,8 @@
 from pathlib import Path
 
 import pytest
-from ai_provider.repo_assistant_args import build_argument_parser
-from ai_provider.repo_coding_assistant import _configure_away_mode
+from ai_agent.repo_assistant_args import build_argument_parser
+from ai_agent.repo_coding_assistant import _configure_away_mode
 from ai_provider.user_config import UserConfig, apply_user_defaults, load_user_config
 
 
@@ -151,7 +151,7 @@ def test_away_timeout_respects_explicit_preferences(tmp_path, configured, argv, 
 
 
 def test_cli_loads_preferences_before_readiness_without_provider_calls(tmp_path, monkeypatch):
-    from ai_provider import repo_coding_assistant as cli
+    from ai_agent import repo_coding_assistant as cli
 
     path = config_file(tmp_path, 'quality = "high"\ntimeout_seconds = 75')
     observed = []
@@ -197,7 +197,7 @@ def test_configured_privacy_approval_reuse_existing_enums(tmp_path, privacy, app
 
 
 def test_cli_configured_boundaries_apply_before_offline_readiness(tmp_path, monkeypatch):
-    from ai_provider import repo_coding_assistant as cli
+    from ai_agent import repo_coding_assistant as cli
 
     config_file(tmp_path, 'privacy = "public_or_low_risk"\napproval_policy = "workspace_write"')
     seen = []
@@ -211,7 +211,7 @@ def test_cli_configured_boundaries_apply_before_offline_readiness(tmp_path, monk
 
 
 def test_session_privacy_uses_effective_defaults_and_refuses_changed_resume(tmp_path, monkeypatch):
-    from ai_provider import repo_coding_assistant as cli
+    from ai_agent import repo_coding_assistant as cli
     from ai_provider.coding_sessions import ACTIVE_SESSION
 
     config_file(tmp_path, 'privacy = "external_allowed"\napproval_policy = "trusted_local"')
@@ -250,7 +250,7 @@ def test_session_privacy_uses_effective_defaults_and_refuses_changed_resume(tmp_
 def test_shared_inspection_retains_read_only_despite_configured_authority(
     tmp_path, monkeypatch, capsys
 ):
-    from ai_provider import repo_coding_assistant as cli
+    from ai_agent import repo_coding_assistant as cli
 
     config_file(tmp_path, 'approval_policy = "trusted_local"')
     assert (

@@ -175,7 +175,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\repo-assistant.ps1 "
 The underlying Python CLI lives at:
 
 ```text
-packages/ai_provider/src/ai_provider/repo_coding_assistant.py
+packages/ai_agent/src/ai_agent/repo_coding_assistant.py
 ```
 
 The coding orchestration helpers used by that CLI live in

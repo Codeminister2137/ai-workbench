@@ -1,6 +1,6 @@
 # ADR-047 - Fail-closed execution boundaries and requirements-based regression tests
 
-**Status:** Accepted; CLI package ownership remains under review
+**Status:** Accepted; CLI ownership resolved by ADR-048
 
 **Date:** 2026-10-08
 
@@ -59,14 +59,12 @@ Digest validation plus a verified temporary copy closes the validation-to-send
 gap while preserving the existing path-based synchronous transport contract.
 Immutable prepared packages do not replace a future durable delivery ledger.
 
-## Open choices
+## Subsequent owner decisions and remaining scope
 
-- The owner proposed CLI ownership in `ai_agent`. The existing dependency
-  direction supports this, but several earlier ADRs and architecture sections
-  explicitly place CLI/run composition in `ai_provider`. A focused migration of
-  entry point, CLI implementation, arguments and execution settings is recommended;
-  confirmation of the ownership revision/migration scope remains pending. Provider
-  and official-client adapters should retain their lower-layer ownership.
+- The owner approved the focused CLI migration to `ai_agent`. ADR-048 supersedes
+  the historical placement of its entry point, implementation, arguments and
+  execution settings. Provider/client adapters retain lower-layer ownership;
+  wider composition/helper migration remains outside this slice.
 - The owner subsequently selected routing the legacy email CLI through
   preview/approval/guarded delivery, preserving the useful outreach workflow.
   Preview is the default; `--send` requests exact per-recipient confirmation.

@@ -5,9 +5,9 @@ import subprocess
 from types import SimpleNamespace
 
 import pytest
+from ai_agent import repo_coding_assistant as cli
 from ai_orchestrator.repair import repair_progress, review_reserve_seconds
 from ai_provider import ProviderError
-from ai_provider import repo_coding_assistant as cli
 from ai_provider.orchestrated_runs import OrchestratedStagePlanItem, SQLiteOrchestratedRunStore
 from ai_provider.repair_state import changed_paths, workspace_fingerprints
 

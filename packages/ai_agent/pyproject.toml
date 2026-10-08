@@ -14,6 +14,7 @@ ide = ["mcp>=2.3,<3"]
 rename-preview = ["jedi==0.20.0"]
 
 [project.scripts]
+ai-assistant = "ai_agent.cli:main"
 ai-agent-mcp = "ai_agent.mcp_server:main"
 
 [build-system]

@@ -7,7 +7,7 @@ from io import StringIO
 from pathlib import Path
 from types import SimpleNamespace
 
-from ai_provider import repo_coding_assistant as _EXAMPLE
+from ai_agent import repo_coding_assistant as _EXAMPLE
 from ai_provider.external_agents import run_external_agent
 
 _EXAMPLE_PATH = (

@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import importlib
+import re
+import subprocess
 import sys
+import tomllib
 from io import StringIO
 from pathlib import Path
 
@@ -150,7 +154,7 @@ def test_cli_modes_enforce_action_boundaries(capsys, monkeypatch, tmp_path) -> N
         running_ollama_models=(),
     )
     monkeypatch.setattr(
-        "ai_provider.repo_coding_assistant.get_local_provider_capability_snapshot", lambda: snapshot
+        "ai_agent.repo_coding_assistant.get_local_provider_capability_snapshot", lambda: snapshot
     )
     monkeypatch.setattr(_EXAMPLE, "_external_agent_status", lambda: {"codex": {}})
     assert main(["--mode", "diagnose"]) == 0
@@ -300,14 +304,62 @@ def test_log_full_prompt_requires_log_file() -> None:
 
 
 def test_stable_ai_assistant_entry_point_loads_cli() -> None:
-    from ai_provider.cli import main as stable_main
+    from ai_agent.cli import main as stable_main
 
     assert stable_main(["--mode", "plan", "Review code.", "--provider", "ollama"]) == 0
 
 
+@pytest.mark.parametrize(
+    "module", ["cli", "repo_coding_assistant", "repo_assistant_args", "external_execution"]
+)
+def test_legacy_import_preserves_module_identity_and_attribute_updates(module, monkeypatch):
+    current = importlib.import_module(f"ai_agent.{module}")
+    legacy = importlib.import_module(f"ai_provider.{module}")
+    assert legacy is current
+    sentinel = object()
+    monkeypatch.setattr(legacy, "_compatibility_probe", sentinel, raising=False)
+    assert current._compatibility_probe is sentinel
+
+
+@pytest.mark.parametrize(
+    "module", ["ai_agent.repo_coding_assistant", "ai_provider.repo_coding_assistant"]
+)
+def test_module_entry_points_offer_help_without_execution(module):
+    result = subprocess.run(
+        [sys.executable, "-m", module, "--help"],
+        capture_output=True,
+        text=True,
+        timeout=15,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "--approval-policy" in result.stdout
+    assert "--shared-tools" in result.stdout
+
+
+def test_command_belongs_to_agent_without_reverse_provider_dependency():
+    root = Path(__file__).resolve().parents[2]
+    agent = tomllib.loads((root / "packages/ai_agent/pyproject.toml").read_text())
+    provider = tomllib.loads((root / "packages/ai_provider/pyproject.toml").read_text())
+    assert agent["project"]["scripts"]["ai-assistant"] == "ai_agent.cli:main"
+    assert "ai-assistant" not in provider["project"].get("scripts", {})
+    assert not any(
+        re.match(r"ai[-_.]agent(?=[\[<>=!~;\s]|$)", requirement, re.IGNORECASE)
+        for requirement in provider["project"]["dependencies"]
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", "import sys, ai_provider; assert 'ai_agent' not in sys.modules"],
+        capture_output=True,
+        text=True,
+        timeout=15,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+
+
 def test_stable_cli_reports_provider_failures(capsys, monkeypatch) -> None:
+    from ai_agent import repo_coding_assistant as stable_cli
     from ai_provider import ProviderError
-    from ai_provider import repo_coding_assistant as stable_cli
 
     def fail_request(*args, **kwargs):
         raise ProviderError("provider unavailable")

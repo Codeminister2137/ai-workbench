@@ -11,7 +11,7 @@ from ai_provider.config import BackendConfig, ProviderKind
 
 
 def test_cli_handles_unicode_with_windows_output_encoding(monkeypatch) -> None:
-    from ai_provider.repo_coding_assistant import main
+    from ai_agent.repo_coding_assistant import main
 
     buffer = io.BytesIO()
     stream = io.TextIOWrapper(buffer, encoding="cp1252")

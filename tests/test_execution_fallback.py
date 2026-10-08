@@ -363,7 +363,7 @@ def test_quality_config_is_validated_and_missing_model_evidence_refuses(routes, 
 
 
 def test_saved_fallback_handoff_preserves_work_and_omits_prompt(tmp_path):
-    from ai_provider.repo_coding_assistant import _save_fallback_handoff
+    from ai_agent.repo_coding_assistant import _save_fallback_handoff
 
     source = tmp_path / "source.txt"
     source.write_text("partial effect")
@@ -632,7 +632,7 @@ def test_copilot_auth_rpc_creates_no_model_session_and_closes_process(monkeypatc
 
 
 def test_cli_continues_codex_partial_edit_via_copilot(monkeypatch, tmp_path, capsys):
-    from ai_provider import repo_coding_assistant as cli
+    from ai_agent import repo_coding_assistant as cli
 
     catalog = tmp_path / "catalog.toml"
     catalog.write_text("""[[models]]
@@ -789,7 +789,7 @@ def test_native_loop_preserves_tool_history_on_provider_limit(tmp_path):
 
 
 def test_handoff_omits_raw_external_tool_payload():
-    from ai_provider.repo_coding_assistant import _fallback_observed
+    from ai_agent.repo_coding_assistant import _fallback_observed
 
     result = ExternalAgentResult((), 1, "PRIVATE_TOOL_PAYLOAD", "PRIVATE_TOOL_PAYLOAD")
     assert "PRIVATE_TOOL_PAYLOAD" not in _fallback_observed(result)
@@ -797,6 +797,7 @@ def test_handoff_omits_raw_external_tool_payload():
 
 @pytest.mark.parametrize("native", [False, True])
 def test_provider_coding_wrappers_continue_on_normalized_limit(monkeypatch, routes, native):
+    from ai_agent import repo_coding_assistant as cli
     from ai_agent.loop import AgentResult
     from ai_provider import (
         AIMessage,
@@ -807,7 +808,6 @@ def test_provider_coding_wrappers_continue_on_normalized_limit(monkeypatch, rout
     from ai_provider import (
         BackendLocation as Location,
     )
-    from ai_provider import repo_coding_assistant as cli
 
     catalog = tuple(
         replace(

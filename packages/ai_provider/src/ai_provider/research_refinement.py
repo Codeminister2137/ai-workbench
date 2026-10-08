@@ -15,7 +15,7 @@ from ai_provider.errors import ProviderError
 from ai_provider.orchestrated_runs import OrchestratedStageRecord
 
 if TYPE_CHECKING:
-    from ai_provider.repo_coding_assistant import OrchestratedRunTracker
+    from ai_agent.repo_coding_assistant import OrchestratedRunTracker
 
 
 def run_research_refinement(

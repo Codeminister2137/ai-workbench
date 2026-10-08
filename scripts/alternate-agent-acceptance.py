@@ -84,7 +84,7 @@ def main() -> int:
         command = [
             sys.executable,
             "-m",
-            "ai_provider.repo_coding_assistant",
+            "ai_agent.repo_coding_assistant",
             "--mode",
             "implement",
             prompt,

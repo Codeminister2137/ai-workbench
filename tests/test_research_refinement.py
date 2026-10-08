@@ -6,10 +6,10 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from ai_agent import repo_coding_assistant as cli
 from ai_agent.contracts import ToolCall
 from ai_agent.tools.base import ToolContext
 from ai_provider import ProviderError
-from ai_provider import repo_coding_assistant as cli
 from ai_provider.orchestrated_runs import OrchestratedStagePlanItem, SQLiteOrchestratedRunStore
 from ai_provider.research_execution import ResearchExecution
 from ai_provider.research_refinement import run_research_refinement

@@ -66,6 +66,11 @@ by the repo coding assistant. It contains the tool registry, permission policy
 mapping, authorization diagnostics, MCP server entry point, and bounded
 delegation support such as `delegate_task`.
 
+Also owns the `ai-assistant` command, repository-assistant workflow implementation,
+argument registration and common CLI execution settings (ADR-048). Provider
+adapters stay in `ai_provider`; research/run-store/fallback helper migration is
+outside this focused ownership change. Legacy provider CLI imports remain aliases.
+
 Use this package when work concerns local tool execution, approval-policy
 enforcement, MCP tool exposure, or agent-loop behavior. Keep provider API
 translation in `ai_provider` and high-level route selection in

@@ -22,6 +22,7 @@ Repository layout:
 packages/
   ai_provider/
   ai_orchestrator/
+  ai_agent/
 apps/
   ai_council/
   job_search/
@@ -73,6 +74,14 @@ justifies them; other focused dependencies remain allowed when they satisfy the
 same criteria.
 
 ## 2. Modular monolith first
+
+The `ai-assistant` entry point and its CLI implementation, argument parsing and
+execution settings belong to `ai_agent` (ADR-048). This composes its existing
+provider/orchestrator dependencies without adding a reverse provider dependency.
+Provider/client adapters remain in `ai_provider`. Existing research, run-store
+and fallback helpers remain there for this focused migration; earlier references
+to provider-owned CLI composition describe that historical/helper placement.
+Legacy CLI module imports and entry points delegate to the agent implementation.
 
 The repo-assistant CLI owns shared direct-child processes through one foreground
 supervisor. Its per-client MCP adapters forward to an authenticated ephemeral
@@ -177,7 +186,8 @@ Council's local HTTP surface validates origins and bounded JSON bodies before
 inference. Job application approval binds exact reviewed materials and guarded
 delivery uses verified attachment bytes. These bounded hardening changes are
 recorded in [ADR-047](decisions/ADR-047-fail-closed-execution-boundaries.md);
-remote authentication and CLI packaging remain separate decisions.
+remote authentication remains a separate decision. CLI ownership is resolved by
+[ADR-048](decisions/ADR-048-agent-owned-assistant-cli.md).
 
 Task profiles default to `PREPAID_CREDITS_ALLOWED`. The repo assistant overlays
 private TOML user preferences before routing; explicit CLI flags take precedence.
@@ -312,7 +322,8 @@ metadata; see ADR-035.
 
 The explicit research tool profile uses neutral selection in `ai_orchestrator`,
 public fetching/report tools and deterministic report checks in `ai_agent`, and
-CLI/run-store composition in `ai_provider`. Actual tool receipts reuse existing
+agent-owned CLI composition over existing research/run-store helpers in
+`ai_provider` (ADR-048). Actual tool receipts reuse existing
 SQLite implementation-stage metadata. Research requires local provider-native
 execution; external clients own their registries and cannot preserve this
 restricted surface. See ADR-033 for fetching, permission, and evidence boundaries.
@@ -337,7 +348,8 @@ Research model requests also respect the remaining attempt allocation.
 ADR-036 composes Tavily, Brave, and SearXNG discovery with bounded free-only
 fallback. Neutral route eligibility belongs to `ai_orchestrator.search_policy`,
 HTTP adapters/tool execution to `ai_agent.tools.research_search`, and CLI/run
-evidence composition to `ai_provider.research_execution`. Reduced tracking stays
+evidence helpers to `ai_provider.research_execution`, invoked by the agent-owned
+CLI (ADR-048). Reduced tracking stays
 on SearXNG; local inference is independent of public search transmission.
 Full query/attempt receipts remain separate from source-fetch evidence.
 ADR-037 adds process-local source excerpt retention in `ai_agent.research_evidence`,

@@ -6,7 +6,7 @@ import sys
 from types import SimpleNamespace
 
 import pytest
-from ai_provider import repo_coding_assistant as cli
+from ai_agent import repo_coding_assistant as cli
 
 
 def test_default_pytest_validation_uses_current_agent_interpreter(tmp_path, monkeypatch):

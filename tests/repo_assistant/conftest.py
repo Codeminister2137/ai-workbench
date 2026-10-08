@@ -18,7 +18,7 @@ def mock_fallback_account_checks(monkeypatch):
 def mock_native_runtime_admission(monkeypatch):
     """Legacy loop fixtures use synthetic models; admission has separate contract tests."""
     monkeypatch.setattr(
-        "ai_provider.repo_coding_assistant.prepare_native_coding_client",
+        "ai_agent.repo_coding_assistant.prepare_native_coding_client",
         lambda client, config, args, diagnostic: client,
     )
 
@@ -32,8 +32,8 @@ def mock_fallback_runtime_probes(monkeypatch):
         raise ProviderError("Mocked native runtime is unavailable")
 
     monkeypatch.setattr(
-        "ai_provider.repo_coding_assistant.installed_native_identity", unavailable_identity
+        "ai_agent.repo_coding_assistant.installed_native_identity", unavailable_identity
     )
     monkeypatch.setattr(
-        "ai_provider.repo_coding_assistant.is_ollama_server_available", lambda *a: False
+        "ai_agent.repo_coding_assistant.is_ollama_server_available", lambda *a: False
     )

@@ -255,7 +255,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         parser.error("--away-minutes must be finite and greater than zero")
     root = args.repo_root.resolve()
     return supervise_research(
-        [sys.executable, "-m", "ai_provider.repo_coding_assistant", *arguments],
+        [sys.executable, "-m", "ai_agent.repo_coding_assistant", *arguments],
         root=root,
         database=root / args.away_run_db,
         budget_seconds=args.away_minutes * 60,

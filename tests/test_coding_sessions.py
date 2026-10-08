@@ -112,7 +112,7 @@ def test_interrupted_client_requires_reconciliation_even_after_failed_session(tm
 
 
 def test_cli_session_uses_effective_config_cost_policy_and_cleans_up(tmp_path, monkeypatch):
-    from ai_provider import repo_coding_assistant
+    from ai_agent import repo_coding_assistant
     from ai_provider.coding_sessions import ACTIVE_SESSION
 
     database = tmp_path / "sessions.sqlite3"
@@ -148,7 +148,7 @@ def test_cli_session_uses_effective_config_cost_policy_and_cleans_up(tmp_path, m
 
 
 def test_invalid_session_options_fail_before_creating_storage(tmp_path):
-    from ai_provider import repo_coding_assistant
+    from ai_agent import repo_coding_assistant
 
     database = tmp_path / "sessions.sqlite3"
     with pytest.raises(SystemExit) as exc:

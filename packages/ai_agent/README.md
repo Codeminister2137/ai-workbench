@@ -4,6 +4,24 @@ Agentic tool execution loop, tool registry, permission policies, and
 multi-turn coding session management built on top of `ai_orchestrator` and
 `ai_provider`.
 
+## Repository assistant CLI
+
+This package owns the `ai-assistant` command. The workspace launcher remains:
+
+```powershell
+python -m uv run ai-assistant --help
+```
+
+`ai_agent.cli` is the stable entry point; `repo_coding_assistant` composes the
+workflow, `repo_assistant_args` registers options, and `external_execution`
+derives consistent settings for primary, repair and fallback execution.
+Provider/client adapters stay in `ai_provider`, and routing policy stays in
+`ai_orchestrator`. Existing research/run-store/fallback helpers remain in the
+provider package for this slice. Legacy provider CLI paths remain compatibility
+aliases; they require this package to be installed. See the
+[CLI guide](../../docs/repo-coding-assistant.md) and
+[ADR-048](../../docs/decisions/ADR-048-agent-owned-assistant-cli.md).
+
 ## Features
 
 - **Provider-Neutral Tool Registry**: Define tools with strict JSON schemas

@@ -952,7 +952,7 @@ def test_receipt_url_date_status_and_digest_are_checked(execution, change):
 
 
 def test_native_research_runs_only_research_tool_calls(execution, monkeypatch):
-    import ai_provider.repo_coding_assistant as cli
+    import ai_agent.repo_coding_assistant as cli
     from ai_provider import (
         AIMessage,
         AIResponse,
@@ -1013,7 +1013,7 @@ def test_native_research_runs_only_research_tool_calls(execution, monkeypatch):
 
 
 def test_research_external_fallback_rejected():
-    import ai_provider.repo_coding_assistant as cli
+    import ai_agent.repo_coding_assistant as cli
     from ai_orchestrator import AccessMethod
 
     assert not cli._fallback_target_compatible(
@@ -1031,7 +1031,7 @@ def test_research_cli_builtin_gate_controls_exit_code(
 ):
     from dataclasses import replace
 
-    import ai_provider.repo_coding_assistant as cli
+    import ai_agent.repo_coding_assistant as cli
     from ai_provider import (
         AIMessage,
         AIResponse,

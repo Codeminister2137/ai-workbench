@@ -100,8 +100,11 @@ The Windows convenience wrapper is:
 
 See the [CLI guide](../../docs/repo-coding-assistant.md) for modes, provider
 selection, local runtime startup, external agents, chat, research and permissions.
-Argument registration lives in `repo_assistant_args.py`; execution composition
-remains in `repo_coding_assistant.py`. Neither a planned request nor an acceptance
+The command is owned by `ai-agent`: argument registration lives in
+`ai_agent.repo_assistant_args`; execution composition lives in
+`ai_agent.repo_coding_assistant`. Old provider CLI imports remain compatibility
+aliases and require `ai-agent`. Provider-core imports remain independent of it.
+Neither a planned request nor an acceptance
 `--plan` requires inference.
 
 Research review supports an optional local tokenizer file with verified profile

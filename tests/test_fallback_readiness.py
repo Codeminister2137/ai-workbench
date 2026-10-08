@@ -4,8 +4,8 @@ import json
 from pathlib import Path
 
 import pytest
-from ai_provider import repo_coding_assistant as cli
-from ai_provider.repo_assistant_args import build_argument_parser
+from ai_agent import repo_coding_assistant as cli
+from ai_agent.repo_assistant_args import build_argument_parser
 
 
 def offline_args(tmp_path, *flags):

@@ -5,9 +5,9 @@ import sqlite3
 import sys
 
 import pytest
+from ai_agent.repo_assistant_args import build_argument_parser
 from ai_orchestrator.scheduling import ScheduledTaskStatus as Status
 from ai_provider.orchestrated_runs import SQLiteOrchestratedRunStore
-from ai_provider.repo_assistant_args import build_argument_parser
 from ai_provider.research_acceptance import RESEARCH_ACCEPTANCE_PROMPT
 from ai_provider.research_execution import validate_research_arguments
 from ai_provider.research_task_settings import ResearchTaskSettings

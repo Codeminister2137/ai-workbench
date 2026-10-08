@@ -10,6 +10,7 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
+from ai_agent import repo_coding_assistant as cli
 from ai_agent.contracts import ToolCall
 from ai_agent.permissions import PermissionManager, PermissionPolicy
 from ai_agent.shared_approvals import scoped_registry
@@ -17,7 +18,6 @@ from ai_agent.tool_profiles import shared_tool_registry
 from ai_agent.tools import ToolContext
 from ai_orchestrator import AccessMethod
 from ai_provider import execution_fallback
-from ai_provider import repo_coding_assistant as cli
 from ai_provider.agent_readiness import AgentReadiness
 from ai_provider.coding_sessions import ACTIVE_SESSION
 from ai_provider.external_agents import ExternalAgentResult, parse_external_agent_jsonl
