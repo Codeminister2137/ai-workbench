@@ -58,6 +58,9 @@ The staged workflow exposes a default repair policy of three repair cycles. Use
 `--away-minutes` wall-clock budget. When unresolved failures remain at the end
 of the run, the final handoff is responsible for preserving the validation
 details, blockers, and next action for the returning user.
+Repair success requires a passed deterministic validation receipt. Disabled or
+skipped revalidation cannot clear an existing validation failure; a missing
+receipt remains an explicit handoff risk even when the assistant claims success.
 
 Implementation repairs stop with `repair status=stalled` after two consecutive
 attempts leave both workspace content and validation failure evidence unchanged.

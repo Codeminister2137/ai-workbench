@@ -426,8 +426,12 @@ class OrchestratedRunTracker:
         elif validation_status in {"failed", "timeout"}:
             blockers = f"validation {validation_status}"
             next_action = "inspect validation failures and repair remaining issues"
-        elif validation_status == "not_run":
-            risks = "validation not run by deterministic wrapper"
+        elif validation_status in {"not_run", "not_recorded", "skipped"}:
+            risks = (
+                "validation not recorded by deterministic wrapper"
+                if validation_status == "not_recorded"
+                else "validation not run by deterministic wrapper"
+            )
             next_action = "run deterministic validation before treating the work as done"
         if execution_status == "completed_with_refinement_errors":
             blockers = "research refinement failed"
@@ -470,8 +474,8 @@ def execution_status_with_validation_stage(
 
     if validation_stage is None:
         return execution_status
-    validation_status = str((validation_stage.details or {}).get("validation_status", ""))
-    if execution_status == "completed" and validation_status in {"failed", "timeout"}:
+    result_status = validation_status_from_stage(validation_stage)
+    if execution_status == "completed" and result_status in {"failed", "timeout"}:
         return "completed_with_validation_errors"
     return execution_status
 

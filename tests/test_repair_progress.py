@@ -71,7 +71,7 @@ def _loop(run, repair, **overrides):
         args=args,
         tracker=tracker,
         repo_root=root,
-        execution_status="completed_with_validation_errors",
+        execution_status=overrides.get("execution_status", "completed_with_validation_errors"),
         validation_stage=validation,
         original_prompt=args.prompt,
         assistant_response_text="done",
@@ -82,6 +82,34 @@ def _loop(run, repair, **overrides):
 
 def _stage(run, name):
     return next(s for s in run[3].list_stages(run[1].run_record.run_id) if s.name == name)
+
+
+@pytest.mark.parametrize("initial_status", ["completed", "completed_with_validation_errors"])
+def test_skipped_revalidation_does_not_erase_existing_validation_failure(run, initial_status):
+    run[0].skip_validation = True
+    attempts = []
+
+    def repair(prompt, number, timeout):
+        attempts.append(number)
+        return "completed", "The repair is complete"
+
+    status, validation, _ = _loop(run, repair, execution_status=initial_status)
+    assert attempts == [1]
+    assert status == "completed_with_validation_errors"
+    assert validation is not None and validation.details is not None
+    assert validation.details["validation_status"] == "not_run"
+    stage = _stage(run, "repair")
+    assert stage.status == "skipped"
+    assert stage.details["stop_reason"] == "validation_not_run"
+
+
+def test_disabled_repair_does_not_hide_initial_validation_failure(run):
+    run[0].max_repair_cycles = 0
+    status, _, _ = _loop(
+        run, lambda *a: pytest.fail("disabled repair ran"), execution_status="completed"
+    )
+    assert status == "completed_with_validation_errors"
+    assert _stage(run, "repair").status == "skipped"
 
 
 @pytest.mark.parametrize("response", ["Done.", "Ran a tool and checked the report."])

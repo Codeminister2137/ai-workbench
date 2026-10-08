@@ -124,6 +124,7 @@ def run_orchestrated_repair_loop(
         )
         return execution_status, validation_stage, assistant_response_text
 
+    execution_status = execution_status_with_validation_stage(execution_status, validation_stage)
     max_cycles = args.max_repair_cycles
     if max_cycles == 0:
         tracker.complete_stage(
@@ -239,10 +240,14 @@ def run_orchestrated_repair_loop(
         no_progress_count = no_progress_count + 1 if progress == "no_progress" else 0
         print(f"repair_progress: {progress} consecutive_no_progress={no_progress_count}")
         attempts.append(attempt_details)
-        if not validation_stage_needs_repair(validation_stage):
+        if validation_status == "passed":
             repair_status = "completed"
             execution_status = execution_status_without_validation_error(execution_status)
             stop_reason = "validation_passed"
+            break
+        if not validation_stage_needs_repair(validation_stage):
+            repair_status = "skipped"
+            stop_reason = "validation_not_run"
             break
         if no_progress_count >= 2:
             repair_status = "stalled"

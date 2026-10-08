@@ -195,3 +195,34 @@ def test_validation_timeout_uses_remaining_run_budget(tmp_path: Path, monkeypatc
     )
     assert stage.status == "completed"
     assert 0 < captured["timeout_seconds"] < 95
+
+
+def test_missing_validation_receipt_is_explicit_in_handoff(tmp_path: Path, monkeypatch):
+    _, tracker = _tracker(tmp_path)
+    tracker.scrutiny_status = "pass"
+    monkeypatch.setattr(run_tracking, "git_status_short", lambda _: ())
+    handoff = tracker.record_final_handoff_stage(
+        execution_status="completed",
+        validation_stage=None,
+        repo_root=tmp_path,
+        assistant_response_text="Tests passed",
+    )
+    assert handoff.details is not None
+    assert handoff.details["validation_status"] == "not_recorded"
+    risks, next_action = handoff.details["risks"], handoff.details["next_action"]
+    assert isinstance(risks, str) and isinstance(next_action, str)
+    assert "validation not recorded" in risks
+    assert "run deterministic validation" in next_action
+
+
+@pytest.mark.parametrize("status", ["failed", "timeout"])
+def test_stage_failure_cannot_be_hidden_by_missing_optional_details(tmp_path: Path, status: str):
+    _, tracker = _tracker(tmp_path)
+    from ai_provider.orchestrated_runs import OrchestratedStageRecord
+
+    stage = OrchestratedStageRecord(
+        tracker.run_record.run_id, 5, "validation", "local", status, "validate"
+    )
+    assert run_tracking.execution_status_with_validation_stage("completed", stage) == (
+        "completed_with_validation_errors"
+    )
