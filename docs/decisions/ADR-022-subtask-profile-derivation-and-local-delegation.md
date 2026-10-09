@@ -77,6 +77,15 @@ respecting privacy and cost policies.
 
 ## Coding Delegation Policy
 
+### Owner confirmation (2026-10-09)
+
+The owner reaffirmed that the CLI context-delegation pass should retain inherited
+primary-task privacy by default. Its `LOCAL_ONLY` cost filter excludes normally
+classified external routes; privacy must not be forced to local-only merely
+because this pass usually runs locally. A future user-facing delegated-task
+privacy option may expose explicit overrides, while retaining inheritance as
+the default. That option remains deferred; no routing change was approved.
+
 Local delegation for coding is limited to bounded support work that can be
 checked against supplied sources: context extraction, file summarization,
 symbol extraction, and test-case generation. Architectural recommendations and

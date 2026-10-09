@@ -118,7 +118,7 @@ this direction to advance IDE independence while allowing PyCharm to host tools
 during the transition; this rationale and its limits are preserved in
 [ADR-045](../decisions/ADR-045-ide-independent-semantic-rename.md).
 
-## Context delegation privacy — owner choice pending (2026-10-08)
+## Context delegation privacy — inheritance confirmed (2026-10-09)
 
 ADR-022 explicitly lets a neutral subtask inherit its parent's privacy. The CLI
 context pass uses that default with `LOCAL_ONLY` cost, while the chat guide
@@ -126,16 +126,25 @@ describes a local Ollama pass. Cost classification does not independently enforc
 processing location: a planning-only synthetic external route labelled with
 `LOCAL_ONLY` cost was eligible when primary privacy was `EXTERNAL_ALLOWED`.
 This is not evidence of external execution with the shipped catalog; no provider
-call was made. The accepted behavior remains unchanged pending the owner choice.
+call was made. Normally classified external routes require a higher cost tier
+and are excluded by this pass's `LOCAL_ONLY` cost filter. The synthetic fixture
+used an external route explicitly labelled with `LOCAL_ONLY` cost.
 
 | Option | Benefit | Trade-off |
 | --- | --- | --- |
 | Explicit `LOCAL_ONLY` privacy for CLI context delegation | Makes its documented local boundary independent of cost labels; neutral Orchestrator inheritance remains available to other callers | Excludes custom external context-support routes and tightens this CLI pass's behavior |
 | Retain inherited privacy and clarify the guide | Preserves ADR-022 behavior and custom catalog flexibility | Local execution is a cost/routing preference, rather than a privacy guarantee when the parent allows external processing |
 
-Technical recommendation: enforce local-only privacy for this explicitly local
-CLI pass, while preserving neutral subtask inheritance. Owner approval is pending;
-the final review did not silently change privacy policy.
+The owner chose to retain inheritance: delegated tasks inherit the primary
+task's privacy by design. Cost filtering already selects local routes with the
+current classifications; adding an unconditional privacy restriction would
+change the intended default. The earlier recommendation to force local-only
+privacy was not accepted. No routing or privacy behavior changes are needed.
+
+A future user-facing option may assign a different privacy level to a delegated
+task, but inheritance must remain the default. This possibility is deferred,
+not authorization to implement a new option now. The neutral Orchestrator
+already supports explicit privacy overrides for callers (ADR-022).
 
 ## Wider plans: concrete next-track choices
 
