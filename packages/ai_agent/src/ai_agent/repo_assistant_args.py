@@ -16,13 +16,14 @@ from ai_provider.repo_context import (
     DEFAULT_INSTRUCTION_BUDGET_CHARS,
 )
 
+from ai_agent.coding_chat import DEFAULT_CODING_CHAT_HISTORY_BUDGET_CHARS
 from ai_agent.permissions import ApprovalPolicyPreset
 
 DEFAULT_DELEGATION_CONTEXT_BUDGET_CHARS = 6_000
 DEFAULT_CHAT_HISTORY_BUDGET_CHARS = 12_000
 DEFAULT_CHAT_RECENT_MESSAGE_COUNT = 8
 DEFAULT_VALIDATION_COMMAND = "python -m pytest -q"
-CLI_MODES = ("ask", "review", "implement", "plan", "diagnose", "chat")
+CLI_MODES = ("ask", "review", "implement", "plan", "diagnose", "chat", "coding-chat")
 CHAT_CONTEXT_MODES = ("rolling_summary", "hard_fail", "full_history")
 APPROVAL_POLICY_PRESETS = tuple(item.value for item in ApprovalPolicyPreset)
 
@@ -95,7 +96,8 @@ def build_argument_parser() -> argparse.ArgumentParser:
         help=(
             "Execution mode: ask/review answer without actions, implement permits "
             "approved actions, plan never contacts a provider, diagnose prints capabilities, "
-            "chat persists a provider-neutral local transcript."
+            "chat persists a provider-neutral local transcript; coding-chat starts "
+            "a continuous foreground coding conversation with scoped tools."
         ),
     )
     parser.add_argument(
@@ -194,6 +196,16 @@ def build_argument_parser() -> argparse.ArgumentParser:
         type=Path,
         default=DEFAULT_CHAT_TRANSCRIPT_DB,
         help="Existing application SQLite database for coding-session records.",
+    )
+    parser.add_argument(
+        "--coding-chat-history-budget-chars",
+        type=int,
+        default=DEFAULT_CODING_CHAT_HISTORY_BUDGET_CHARS,
+        help=(
+            "Maximum rendered conversation characters in coding-chat (0 disables this "
+            "limit). Overflow refuses a turn rather than silently losing decisions; "
+            "provider input limits still apply."
+        ),
     )
     parser.add_argument(
         "--session-decision",

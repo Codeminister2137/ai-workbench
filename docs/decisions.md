@@ -439,3 +439,13 @@ execution settings to `ai_agent`. Provider/client adapters remain in `ai_provide
 old CLI module imports delegate for compatibility without a reverse dependency.
 This supersedes their historical provider placement, leaving wider helper
 migration outside scope. See [ADR-048](decisions/ADR-048-agent-owned-assistant-cli.md).
+
+## ADR-049 - Continuous Coding Chat
+
+**Status:** Accepted direction (2026-10-09); migration acceptance incomplete.
+
+The owner selected a distinct continuous coding-chat mode with a reusable
+foreground controller and existing local SQLite records. Preserve scoped tools,
+instructions, decisions and recovery boundaries across turns. Migration requires
+comparable development quality and measured delegation economics, not merely
+passing tool fixtures. See [ADR-049](decisions/ADR-049-continuous-coding-chat.md).

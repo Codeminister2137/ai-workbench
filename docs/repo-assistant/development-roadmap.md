@@ -15,7 +15,7 @@ replacement SearXNG investigation, and the accepted local typed acceptance-job
 contract. D3's bounded live fixture passed. The owner now retains direct URL
 fetching; search replacement is deferred and does not block independent work.
 Historical checkpoints below retain their original validation counts. The latest
-full offline gate is 1,660 passed: root 1,590, Council 33 and job-search 37,
+full offline gate is 1,685 passed: root 1,615, Council 33 and job-search 37,
 with 3 Windows file-symlink permission skips.
 The final M1 readiness suite has 84 passing tests. Ruff/formatting, Pyright and
 `git diff --check` pass. Live-provider cases remain excluded. See
@@ -25,6 +25,41 @@ The goal is to perform inspect/plan/edit/test/review workflows from the project
 CLI, invoke the required skills, resume work and recover from allowance exhaustion
 with the common tools still available. PyCharm may host tools initially; eventually
 it should only be the human editor/viewer. Different model performance is allowed.
+
+### Migration requirement clarified (2026-10-09)
+
+The owner requires continuous coding chat and results comparable to or better
+than their current assistant conversations before moving daily development to
+the CLI. Separate coding invocations and bounded tool acceptance are insufficient.
+Coding-quality tools, instructions, skills and continuity must support that
+outcome. Model differences remain possible, but do not excuse a material quality
+regression in the migration workflow. Delegation should reduce cost without
+lowering quality; savings and quality preservation both need measured evidence.
+See the [continuous coding chat proposal](continuous-coding-chat-plan.md).
+
+## 2026-10-09 continuous coding chat — initial offline integration complete
+
+ADR-049 records the owner's selection of a distinct continuous foreground mode
+with existing local SQLite storage. `coding_chat` owns reusable conversation
+control; `coding_chat_cli` binds current native/official-client execution and
+shared scoped tools. Turns retain decisions and host-observed outcomes while
+refreshing files/instructions. Restart checks workspace/privacy/cost boundaries
+and requires reconciliation after interruption. Processes live across turns
+and are terminated on exit; MCP credentials are fresh and expire after each run.
+The provider-only `chat` mode retains its earlier contract.
+
+The slice adds 25 regression cases, including real file effects, approval denial,
+process continuity/cleanup, synthetic official-client execution through the real
+foreground host, transcript cleanup and deterministic SQLite connection release.
+Full gate: root 1,615 passed / 3 Windows symlink skips, Council 33, job-search 37;
+Ruff/formatting/Pyright pass. All three infrastructure wheels built offline and
+isolated wheel-loaded conversation/parser/persistence smoke passed.
+
+Migration remains INCOMPLETE: automatic history compaction, in-flight steering,
+full required-tool installed-client acceptance and representative quality/cost
+comparisons remain. A [20-case comparison set](coding-chat-quality-cases.md) is
+prepared; live route/account/compute scope awaits owner selection. No live model
+calls, private-source transmission, new database/daemon, merge or push occurred.
 
 ## 2026-10-08 design/test audit — approved offline slice complete
 
@@ -54,10 +89,11 @@ verify the eight extracted modules, command metadata and both module launchers.
 Packaged repair and scrutiny also refuse execution after their tracker deadline.
 No live model/account access, email transmission, installation, merge or push ran
 in this slice.
-A final planning-only review identified a separate owner choice about explicit
-local-only privacy for context delegation versus inherited parent privacy.
-Accepted behavior is preserved pending that choice; see
-[the decision brief](post-audit-decisions.md#context-delegation-privacy--owner-choice-pending-2026-10-08).
+A final planning-only review raised explicit local-only privacy versus inherited
+parent privacy for context delegation. On 2026-10-09 the owner confirmed
+inheritance as the intended default; routing behavior remains unchanged. A
+future delegated-task privacy option is deferred. See
+[the decision record](post-audit-decisions.md#context-delegation-privacy--inheritance-confirmed-2026-10-09).
 
 ## 2026-10-06 closeout consistency — COMPLETE
 

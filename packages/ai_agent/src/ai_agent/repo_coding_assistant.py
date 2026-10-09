@@ -477,6 +477,12 @@ def _print_cli_closeout(
 ) -> None:
     """Print the same evidence-bounded summary for every CLI execution route."""
 
+    observer = getattr(args, "_coding_chat_observer", None)
+    if observer is not None:
+        from ai_agent.coding_chat import CodingTurnResult
+
+        observer(CodingTurnResult(0, response_text, execution_status, failure_reason))
+
     fallback_attempts = _fallback_details(args).get("fallback_attempts", [])
     if not isinstance(fallback_attempts, list):
         fallback_attempts = []
@@ -551,10 +557,12 @@ def _resolve_chat_session(
         session = store.latest_session(repo_root=repo_root)
         if session is None:
             raise KeyError("no previous chat session exists for this repository")
-        return session, False
-    session = store.get_session(args.chat_session)
+    else:
+        session = store.get_session(args.chat_session)
     if session is None:
         raise KeyError(f"chat session does not exist: {args.chat_session}")
+    if session.status == "coding_chat":
+        raise KeyError("Coding conversations must resume with --mode coding-chat --coding-session")
     return session, False
 
 
@@ -816,6 +824,18 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     parser = build_argument_parser()
     parsed = parser.parse_args(argv)
+    if parsed.mode == "coding-chat":
+        from ai_agent.coding_chat_cli import run_coding_chat
+
+        return run_coding_chat(
+            parsed,
+            parser,
+            lambda args, config: _main(argv, parsed_args=args, user_config_override=config),
+        )
+    from ai_agent.coding_chat import DEFAULT_CODING_CHAT_HISTORY_BUDGET_CHARS
+
+    if parsed.coding_chat_history_budget_chars != DEFAULT_CODING_CHAT_HISTORY_BUDGET_CHARS:
+        parser.error("--coding-chat-history-budget-chars requires --mode coding-chat")
     if not parsed.coding_session:
         if parsed.session_decision or parsed.coding_session_reconciled:
             parser.error("Session decisions/reconciliation require --coding-session")
@@ -886,7 +906,28 @@ def main(argv: Sequence[str] | None = None) -> int:
             ACTIVE_FOREGROUND.reset(foreground_token)
 
 
-def _main(argv: Sequence[str] | None = None) -> int:
+def _main(
+    argv: Sequence[str] | None = None,
+    *,
+    parsed_args: argparse.Namespace | None = None,
+    user_config_override: Any = None,
+) -> int:
+    """Execute one request and restore its transcript even after interruption."""
+    args = parsed_args if parsed_args is not None else build_argument_parser().parse_args(argv)
+    try:
+        return _execute_request(argv, parsed_args=args, user_config_override=user_config_override)
+    finally:
+        cleanup = getattr(args, "_transcript_cleanup", None)
+        if cleanup is not None:
+            cleanup()
+
+
+def _execute_request(
+    argv: Sequence[str] | None = None,
+    *,
+    parsed_args: argparse.Namespace | None = None,
+    user_config_override: Any = None,
+) -> int:
     for stream in (sys.stdout, sys.stderr):
         if isinstance(stream, TextIOWrapper):
             stream.reconfigure(encoding="utf-8", errors="replace")
@@ -894,14 +935,16 @@ def _main(argv: Sequence[str] | None = None) -> int:
     parser = build_argument_parser()
     from ai_provider.research_execution import validate_research_arguments
 
-    args = parser.parse_args(argv)
+    args = parsed_args if parsed_args is not None else parser.parse_args(argv)
 
     repo_root = (args.repo_root or find_repo_root(Path.cwd())).resolve()
     from ai_provider.user_config import load_user_config
 
     config_path = args.user_config or repo_root / "user-config.toml"
     try:
-        user_config = load_user_config(config_path, required=args.user_config is not None)
+        user_config = user_config_override or load_user_config(
+            config_path, required=args.user_config is not None
+        )
     except (OSError, ValueError, TypeError) as exc:
         parser.error(f"Invalid user config {config_path}: {exc}")
     from ai_provider.user_config import apply_user_defaults
@@ -1082,8 +1125,10 @@ def _main(argv: Sequence[str] | None = None) -> int:
                 return
             sys.stdout = terminal
             transcript.close()
+            atexit.unregister(close_transcript)
 
         atexit.register(close_transcript)
+        args._transcript_cleanup = close_transcript
         close_transcript_func = close_transcript
         print(f"transcript_log_file: {args.log_file}")
         _print_transcript_header(args, argv)
@@ -1114,6 +1159,9 @@ def _main(argv: Sequence[str] | None = None) -> int:
             close_transcript_func()
         return 1
     prompt = build_repo_prompt(args.prompt, context_files)
+    history = getattr(args, "_coding_chat_history", "")
+    if history:
+        prompt = history + "\n\n## Current request and freshly loaded context\n" + prompt
     from ai_provider.coding_sessions import ACTIVE_SESSION
 
     active_session = ACTIVE_SESSION.get()

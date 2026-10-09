@@ -87,6 +87,13 @@ foreground run tracking, delegated-source rendering, local support, repair and s
 reusable modules. Command dispatch composes them; provider storage/adapters and
 orchestrator policy keep their existing boundaries.
 
+ADR-049 adds a distinct foreground `coding-chat` mode. `ai_agent.coding_chat`
+owns conversation continuity over injected turn execution; `coding_chat_cli`
+binds existing coding-session/foreground tools to the current CLI executor.
+Conversation transcripts and coding receipts share a session ID in existing
+SQLite storage without a schema migration. Each turn refreshes source context
+and execution scopes; history is not cached file state or approval authority.
+
 The repo-assistant CLI owns shared direct-child processes through one foreground
 supervisor. Its per-client MCP adapters forward to an authenticated ephemeral
 loopback MCP host with invocation-scoped credentials and sessions (ADR-044).

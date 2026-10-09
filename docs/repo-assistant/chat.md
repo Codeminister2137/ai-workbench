@@ -4,6 +4,10 @@
 
 ## Chat transcripts
 
+For continuous conversations that can inspect, edit and validate code, use
+[coding-chat](coding-chat.md). The mode documented below remains provider-only
+and does not permit coding actions.
+
 `--mode chat` starts the first persistent local chat workflow. It stores ordered
 provider-neutral messages in SQLite so later turns can resume the same chat:
 
@@ -163,8 +167,13 @@ should receive directly, enable bounded local context delegation:
   --delegate-context --execute --start-ollama
 ```
 
-This sends a bounded, line-numbered copy of the loaded context to a local
-Ollama model first. The summary must cite supplied sources using
+In this example, delegation sends a bounded, line-numbered copy of the loaded
+context to a local Ollama model first. Delegated tasks inherit the primary
+task's privacy by default, and this pass applies the `LOCAL_ONLY` cost filter.
+Normally classified external routes are excluded by that cost filter. Privacy
+and cost remain separate constraints: a custom external route labelled with
+`LOCAL_ONLY` cost is still excluded when the inherited privacy is `LOCAL_ONLY`.
+The summary must cite supplied sources using
 `[source:path:line]` references before it is injected into the primary prompt.
 At least one complete reference must identify a line actually supplied to the
 local model; missing, invalid or truncated-away references are discarded. This

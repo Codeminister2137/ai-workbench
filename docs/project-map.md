@@ -73,6 +73,8 @@ outside this focused ownership change. Legacy provider CLI imports remain aliase
 Reusable workflow modules include `validation`, `chat_context`,
 `external_reporting`, `run_tracking`, `delegation_context`, `support_passes` and
 `repair_workflow` and `scrutiny_workflow`.
+`coding_chat` and `coding_chat_cli` add reusable conversational control and
+foreground terminal composition over existing coding execution (ADR-049).
 
 Use this package when work concerns local tool execution, approval-policy
 enforcement, MCP tool exposure, or agent-loop behavior. Keep provider API

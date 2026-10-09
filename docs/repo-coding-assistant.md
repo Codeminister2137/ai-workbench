@@ -32,6 +32,7 @@ key authorizes transmitting repository contents or spending credits.
 | Retrieve public sources and produce a report | [Research tools and acceptance](repo-assistant/research.md) |
 | Configure reviewers, modes and token admission | [Research review](repo-assistant/research-review.md) |
 | Save or resume a local conversation | [Persistent chat](repo-assistant/chat.md) |
+| Keep a tool-capable coding conversation open across requests | [Continuous coding chat](repo-assistant/coding-chat.md) |
 | Select native agents, preferences and fallback | [External agents](repo-assistant/external-agents.md) |
 | Understand writes, logs and data boundaries | [Permissions and privacy](repo-assistant/permissions.md) |
 | Plan and explicitly start budgeted research jobs | [Task scheduling](repo-assistant/scheduling.md) |

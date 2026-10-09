@@ -46,6 +46,13 @@ aliases; they require this package to be installed. See the
 [CLI guide](../../docs/repo-coding-assistant.md) and
 [ADR-048](../../docs/decisions/ADR-048-agent-owned-assistant-cli.md).
 
+`--mode coding-chat --execute` adds a continuous foreground coding conversation.
+`coding_chat` owns reusable turn/history control, while `coding_chat_cli` binds
+existing coding execution, local transcripts, scoped approvals and owned processes.
+See the [coding-chat guide](../../docs/repo-assistant/coding-chat.md) and
+[ADR-049](../../docs/decisions/ADR-049-continuous-coding-chat.md). Initial offline
+integration does not establish model-quality parity or delegation savings.
+
 ## Features
 
 - **Provider-Neutral Tool Registry**: Define tools with strict JSON schemas

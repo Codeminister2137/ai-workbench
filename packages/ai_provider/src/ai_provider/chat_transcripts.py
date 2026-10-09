@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import sqlite3
 import uuid
+from collections.abc import Iterator
+from contextlib import closing, contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -131,13 +133,14 @@ class SQLiteChatTranscriptStore:
         title: str,
         privacy_class: str,
         status: str = "active",
+        session_id: str | None = None,
     ) -> ChatSessionRecord:
         """Insert and return one chat session."""
 
         self.initialize()
         now = _utc_now()
         record = ChatSessionRecord(
-            session_id=str(uuid.uuid4()),
+            session_id=session_id if session_id is not None else str(uuid.uuid4()),
             created_at_utc=now,
             updated_at_utc=now,
             repo_root=str(repo_root),
@@ -405,11 +408,14 @@ class SQLiteChatTranscriptStore:
             )
         return record
 
-    def _connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(self.path)
-        connection.row_factory = sqlite3.Row
-        connection.execute("PRAGMA foreign_keys = ON")
-        return connection
+    @contextmanager
+    def _connect(self) -> Iterator[sqlite3.Connection]:
+        """Commit/rollback a transaction and close its connection deterministically."""
+        with closing(sqlite3.connect(self.path)) as connection:
+            connection.row_factory = sqlite3.Row
+            connection.execute("PRAGMA foreign_keys = ON")
+            with connection:
+                yield connection
 
 
 def messages_to_ai_messages(messages: tuple[ChatMessageRecord, ...]) -> tuple[AIMessage, ...]:

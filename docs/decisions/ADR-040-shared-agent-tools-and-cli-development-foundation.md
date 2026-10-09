@@ -95,6 +95,16 @@ automatic live execution is approved by this decision.
 
 ## Consequences
 
+### Owner clarification (2026-10-09)
+
+The owner requires continuous coding chat with comparable-or-better development
+results before switching from their current assistant. Earlier acceptance of
+model performance differences does not waive this migration quality requirement.
+Common coding-quality tools, instructions, skills and continuity must support
+representative conversations. Delegation is intended to reduce cost without
+reducing quality; neither outcome is established by tool availability alone.
+This clarifies the required outcome while preserving the accepted architecture.
+
 - Agent capability mapping and portable skills become explicit development work.
 - Daily development continuity is an outcome with acceptance criteria, not merely
   a native client's resume flag.

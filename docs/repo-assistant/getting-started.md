@@ -4,8 +4,14 @@
 
 ## Moving Work From PyCharm Chat To The CLI
 
-For this repository's current local-only workflow, the CLI is ready to take over
-routine coding-assistant work. It is strongest for bounded repository tasks:
+The owner's migration target requires continuous coding conversations with
+comparable development quality. Use the new [continuous coding chat](coding-chat.md)
+mode for that workflow; the commands below illustrate individual turns. Initial
+continuous integration is implemented, but quality/cost acceptance remains open.
+
+The CLI supports bounded repository tasks, but full development-workflow
+acceptance remains incomplete. Start with a tested route and an attended pilot
+before relying on it as the primary development assistant. Supported work includes
 planning, asking, reviewing, implementation with explicit local tools, Codex CLI
 runs, diagnostics, transcript capture, and validation loops.
 
@@ -24,7 +30,7 @@ Use this default flow when starting a task:
 # 3. Implement only after the intended change is clear
 .\scripts\repo-assistant.ps1 --mode implement "Implement the approved change." `
   --file path\to\relevant.py `
-  --provider ollama --model qwen2.5-coder:14b `
+  --provider ollama --model gpt-oss:20b `
   --execute --native-tools --approval-policy interactive --start-ollama
 
 # 4. Verify from the terminal
@@ -57,10 +63,22 @@ Keep PyCharm AI Assistant chat for now when the work depends on IDE-only
 context, managed IDE or app/document-control tools, or a material product
 or architecture decision that needs discussion before implementation.
 
+The recorded native-tool probe verified actual tool calls with GPT-OSS;
+Qwen2.5-Coder returned textual requests without real tool calls. The GPT-OSS
+example requires an already available model and compatible runtime; it does not
+authorize downloading a model. See [native readiness](native-admission.md).
+
+`--mode chat` preserves provider conversation but does not permit coding actions
+or orchestrated execution. `--mode coding-chat` adds a continuous foreground
+tool-capable conversation with `--coding-session` recovery. Separate coding
+invocations remain available; they alone do not meet the migration requirement.
+
 Current parity status:
 
-- Ready for local repo coding workflows: yes.
-- Ready for Codex CLI-backed coding workflows: mostly, with explicit opt-ins.
+- Local repo coding: bounded native-tool acceptance exists; use a verified model
+  and validate the intended development workflow before daily adoption.
+- Codex CLI-backed coding: implemented, with explicit opt-ins; current allowance
+  and outstanding installed-client acceptance must be checked separately.
 - Ready for GitHub, deployment, document-control, or broad connected-app work:
   intentionally no, because this repository is still local-only and those
   connectors require separate authorization decisions.

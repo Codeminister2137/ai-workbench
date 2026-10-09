@@ -1,9 +1,53 @@
 from __future__ import annotations
 
+import sqlite3
 from pathlib import Path
 
+import pytest
 from ai_provider import MessageRole, SQLiteChatTranscriptStore
 from ai_provider.chat_transcripts import messages_to_ai_messages
+
+
+def test_transcript_store_releases_connections_after_success_and_failure(tmp_path, monkeypatch):
+    connections = []
+    connect = sqlite3.connect
+
+    def record(*args, **kwargs):
+        connection = connect(*args, **kwargs)
+        connections.append(connection)
+        return connection
+
+    monkeypatch.setattr(sqlite3, "connect", record)
+    store = SQLiteChatTranscriptStore(tmp_path / "chats.sqlite3")
+    session = store.create_session(
+        repo_root=tmp_path, title="Resources", privacy_class="local_only"
+    )
+    store.append_message(session.session_id, role="user", content="Retain me")
+    assert store.list_messages(session.session_id)[0].content == "Retain me"
+    with pytest.raises(KeyError):
+        store.append_message("missing", role="user", content="must not persist")
+    for connection in connections:
+        with pytest.raises(sqlite3.ProgrammingError, match="closed"):
+            connection.execute("SELECT 1")
+    store.path.rename(tmp_path / "closed.sqlite3")
+
+
+def test_explicit_linked_session_id_does_not_overwrite_existing_history(tmp_path):
+    store = SQLiteChatTranscriptStore(tmp_path / "chats.sqlite3")
+    first = store.create_session(
+        repo_root=tmp_path, title="Linked", privacy_class="local_only", session_id="coding-id"
+    )
+    store.append_message(first.session_id, role="user", content="Original decision")
+    with pytest.raises(sqlite3.IntegrityError):
+        store.create_session(
+            repo_root=tmp_path,
+            title="Overwrite",
+            privacy_class="local_only",
+            session_id="coding-id",
+        )
+    linked = store.get_session("coding-id")
+    assert linked is not None and linked.title == "Linked"
+    assert store.list_messages("coding-id")[0].content == "Original decision"
 
 
 def test_sqlite_chat_transcript_store_persists_ordered_provider_neutral_messages(
