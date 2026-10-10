@@ -101,6 +101,10 @@ code, or prove that another process or shell command uses that environment.
 Use it to diagnose runtime selection before issuing separately authorized
 validation commands.
 
+The runtime diagnostic resolves `pyproject.toml` within the workspace before
+reading it. Links to an outside configuration refuse without returning its
+contents; links to a configuration within the workspace remain supported.
+
 ```powershell
 .\scripts\repo-assistant.ps1 "Edit the fixture and review its diff" --mode implement --shared-tools coding --approval-policy interactive --coding-session new --execute
 ```

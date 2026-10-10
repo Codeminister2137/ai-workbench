@@ -39,6 +39,14 @@ an independent Ollama server stops computing. Distinct concurrent scheduler
 invocations are not a global queue; claims protect each definition from duplicate
 execution. Task completion is execution status, not a factual-quality certificate.
 
+Scheduled topic research uses the research launcher's 40 tool rounds per attempt
+and a 300-second request timeout, within its supervised task deadline. Fixed
+acceptance retains its 20-round contract. Both use a 1,500-character optional
+context budget and a task-local transcript; required repository instructions
+remain intact. A dedicated research workspace needs its model catalog at the
+CLI's configured default path. It avoids loading unrelated coding-session context
+without changing the research task's tools, privacy or report boundary.
+
 Use `defer TASK --reason TEXT` for a planned task. After verifying a stale running
 worker has stopped, use `fail-interrupted TASK --reason TEXT` to record failure;
 that command does not kill processes. Terminal definitions are not automatically

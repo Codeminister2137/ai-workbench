@@ -67,6 +67,15 @@ For mid-day session boundaries:
 2. Continue the current chat, or update `CURRENT_CONTEXT.md` and start a new
    chat, based on the recommendation.
 
+For an unattended work window:
+
+1. `Codex: Unattended Work Window`
+2. Supply the duration and current objective; preserve existing approval and
+   live-usage boundaries.
+3. Continue the selection/investigation/implementation/validation loop across
+   completed and blocked slices until the recorded deadline or an evidenced
+   exhaustion of useful authorized work.
+
 For PyCharm/Codex IDE compaction-risk checks:
 
 1. Run `.\scripts\session-boundary.ps1` for the repository-side signal.
@@ -105,6 +114,7 @@ For scope control:
 - `Codex: DoD Closeout`
 - `Codex: Closeout Helper Set`
 - `Codex: Session Boundary Check`
+- `Codex: Unattended Work Window`
 - `Codex: MVP/Stop Review`
 - `Codex: Job Search Task`
 - `Codex: AI Council Task`
@@ -140,7 +150,8 @@ $SELECTION
 Instructions:
 - Use the master checklist and CURRENT_CONTEXT.md.
 - Answer: what finished, what evidence changed the plan, which project has the highest immediate payoff, what can be removed from scope, what is the smallest next action, and what should be handed to Codex next.
-- Keep the provider -> orchestrator -> Council/job-search milestone order in mind.
+- Follow the current owner priorities in docs/workflow.md: CLI -> job search ->
+  business -> Council. Treat provider/Orchestrator work as needed prerequisites.
 - Do not turn this into implementation unless I ask.
 
 Output:
@@ -228,6 +239,68 @@ List the helper checks used, helper checks skipped, why they were skipped, and
 any action that should happen before stopping or committing.
 ```
 
+## `Codex: Unattended Work Window`
+
+```text
+Task:
+Work unattended for the owner-specified duration, starting with the current
+objective and continuing through other useful approved work when a slice finishes
+or becomes blocked. This is a work window, not a single-slice request.
+
+Context:
+$SELECTION
+
+Instructions:
+- Verify Git status, branch/checkpoint and CURRENT_CONTEXT.md; read applicable
+  AGENTS.md and follow its Unattended work windows loop.
+- Record execution start, duration and deadline in UTC and Europe/Warsaw before
+  implementation. "Around two hours" means two hours from execution start.
+  Never reuse an expired window or reset its deadline after compaction.
+- Maintain a compact candidate ledger in CURRENT_CONTEXT.md: authoritative plan/
+  accepted requirement, authorization boundary, current evidence, next action,
+  and READY/NEEDS_INVESTIGATION/IN_PROGRESS/COMPLETE/BLOCKED status.
+- Prioritize current work and prerequisites, then approved roadmap work and other
+  approved repository goals. Inspect relevant private plans, including extracting
+  relevant .docx text; verify plan statements against current code and tests.
+- Investigate, implement and validate reviewable slices. After completion or a
+  blocker, update that candidate and select the next useful authorized action.
+  Missing evidence requires investigation; one blocked live/attended/decision
+  candidate does not block independent work.
+- Preserve material decision, privacy, scoped approval and live-usage boundaries.
+  Queue owner decisions while absent; do not invent consent or implement proposals
+  as though already approved. Continue independent authorized work.
+- End only at the deadline, explicit owner stop, or a fresh per-candidate review
+  proving all relevant useful authorized work complete or concretely blocked.
+  Do not stop at a commit, passing tests, first-project completion or handoff.
+- Apply that review to specific next actions, not broad project labels. For each
+  blocker show the exact blocked action and independently available offline work.
+  Investigate those independent actions before claiming exhaustion. Passing tests,
+  a plan sweep or no obvious defect do not prove all approved work complete;
+  missing exhaustion evidence means NEEDS_INVESTIGATION, not BLOCKED.
+- Preserve deadline, reasoning and ledger across context changes. Reserve about
+  five minutes for safe closeout; do not start operations likely to overrun.
+- Treat slice results and queued decisions as intermediate commentary. A final
+  closeout ends the work window and needs one of the permitted stop conditions;
+  "requested work verified" does not mean only the initial named slice passed.
+- If the owner returns abruptly or resumes after a usage interruption, inspect
+  actual task/process state and switch to attended communication. If PC resources
+  are needed, launch no further resource-heavy work. Preserve ongoing scheduled
+  tasks under their existing supervision, report their identity/deadline/resource
+  use, and release only verified idle resources owned by this run. Bring queued
+  material decisions to the owner; do not reset the expired window.
+- Do not fill time with speculative changes, redundant tests/model calls or idle
+  waiting. Explain an early stop with candidate evidence and remaining time.
+- At closeout review diff/status, update the handoff's task status, validation,
+  blockers and imperative next action/completion condition, and provide a
+  copy-ready new-session prompt. Sleep is a separate owner instruction.
+
+Output:
+Implement useful approved work throughout the window. Give concise progress at
+material phase changes and the runtime-required intervals. Finish with a verified
+visible report of completed work, checks, elapsed time, remaining candidates and
+any concrete blockers; do not claim the whole roadmap complete after one slice.
+```
+
 ## `Codex: Session Boundary Check`
 
 ```text
@@ -242,6 +315,10 @@ Instructions:
 - Inspect `git status --short` and `CURRENT_CONTEXT.md`.
 - Identify whether the current work is mid-task, at a committed milestone, at an
   uncommitted but coherent stopping point, or about to switch to a distinct task.
+- If an unattended window is still active, a coherent slice or chat checkpoint
+  does not end it. Continue the remaining window; if an actual context problem
+  requires a handoff, include its original UTC/Warsaw start and deadline and the
+  remaining task. The new-session prompt must resume, not start a fresh duration.
 - If context pressure matters, ask the user to run `/status` in the Codex IDE
   chat and share the context-usage signal. Do not guess an exact threshold.
 - If available, run `.\scripts\session-boundary.ps1` first and use its output as

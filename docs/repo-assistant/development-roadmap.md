@@ -5,6 +5,14 @@
 
 ## Status and outcome
 
+The [2026-10-10 daily-use readiness report](daily-cli-readiness.md) recommends an
+attended real-work pilot as the shortest next step, while retaining the accepted
+quality/security migration gates. Full replacement remains incomplete. Usage
+fallback is implemented and has bounded installed-client continuation evidence;
+it does not make timed candidate selection host-enforced or establish recovery
+from today's actual IDE usage-limit interruption. Tomorrow's pilot selection and
+fresh live scope remain owner decisions.
+
 **INCOMPLETE — independent foundation slices implemented; design and acceptance gaps remain.**
 Decision and milestone recording is complete as of 2026-10-04. Verified tools and
 fallback are foundations; they do not constitute completed cross-agent parity.
@@ -14,9 +22,14 @@ records D1-D3 approval: conservative configurable privacy/approval defaults,
 replacement SearXNG investigation, and the accepted local typed acceptance-job
 contract. D3's bounded live fixture passed. The owner now retains direct URL
 fetching; search replacement is deferred and does not block independent work.
-Historical checkpoints below retain their original validation counts. The latest
-full offline gate is 1,685 passed: root 1,615, Council 33 and job-search 37,
+Historical checkpoints below retain their original validation counts. The earlier
+full offline checkpoint was 1,685 passed: root 1,615, Council 33 and job-search 37,
 with 3 Windows file-symlink permission skips.
+The 2026-10-09 unattended follow-up passed 1,785 offline checks: workspace 1,715,
+Council 33 and job-search 37, with the same three file-symlink skips. It adds
+strict acceptance effect auditing, redirect/path fixture preparation, runtime
+configuration containment and actual CLI skill/semantic continuity checks. See
+[the acceptance follow-up](coding-chat-acceptance-results.md#fresh-unattended-window-offline-follow-up-2026-10-09).
 The final M1 readiness suite has 84 passing tests. Ruff/formatting, Pyright and
 `git diff --check` pass. Live-provider cases remain excluded. See
 [test workflow](../test-workflow.md).
@@ -55,11 +68,15 @@ Full gate: root 1,615 passed / 3 Windows symlink skips, Council 33, job-search 3
 Ruff/formatting/Pyright pass. All three infrastructure wheels built offline and
 isolated wheel-loaded conversation/parser/persistence smoke passed.
 
-Migration remains INCOMPLETE: automatic history compaction, in-flight steering,
-full required-tool installed-client acceptance and representative quality/cost
-comparisons remain. A [20-case comparison set](coding-chat-quality-cases.md) is
-prepared; live route/account/compute scope awaits owner selection. No live model
-calls, private-source transmission, new database/daemon, merge or push occurred.
+Migration remains INCOMPLETE. Subsequent follow-up work implements deterministic
+history reduction and queued in-flight steering, with original transcripts,
+mandatory owner text, host outcomes and fresh approval tickets retained. Required
+tool installed-client acceptance and representative quality/cost comparisons
+remain. The [20-case comparison set](coding-chat-quality-cases.md) maps local
+preparation to the remaining conversational evidence. Earlier bounded live
+allowances recorded in the acceptance results are exhausted; further execution
+needs a newly selected scope. The initial offline integration above made no
+live calls, private-source transmission, new database/daemon, merge or push.
 
 ## 2026-10-08 design/test audit — approved offline slice complete
 

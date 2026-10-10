@@ -93,6 +93,14 @@ binds existing coding-session/foreground tools to the current CLI executor.
 Conversation transcripts and coding receipts share a session ID in existing
 SQLite storage without a schema migration. Each turn refreshes source context
 and execution scopes; history is not cached file state or approval authority.
+`coding_chat_input` arbitrates in-flight terminal input: steering is durably
+queued for the next turn, while approval answers name a fresh prompt ID and
+remain invocation-scoped. Its polling reader joins before idle input resumes;
+execution stays on the foreground thread for signal/context-variable cleanup.
+Long-history reduction is local and deterministic: owner messages and host
+evidence remain intact; older assistant reports become marked excerpts with
+references to unchanged SQLite originals. Mandatory-context overflow refuses
+execution, including after restart; no additional inference or summary store.
 
 The repo-assistant CLI owns shared direct-child processes through one foreground
 supervisor. Its per-client MCP adapters forward to an authenticated ephemeral
@@ -275,6 +283,33 @@ Track, where available:
 
 Avoid sensitive prompt content by default. Usage tracking should inform routing but remain conceptually separate from provider adapters.
 
+Under [ADR-050](decisions/ADR-050-usage-measurement-and-automatic-integration.md),
+external economics use allowance consumption or API spend. Local execution records
+total tokens and elapsed time; time informs evaluation without a hard median-time
+migration rejection gate. Automatic usage/allowance integration is the accepted
+direction, growing supported provider adapters incrementally. Provider-specific
+collection stays behind adapters; neutral routing policy stays in the Orchestrator.
+Existing receipt diagnostics do not yet provide automatic account balances/resets.
+The first automatic source is now `ai_provider.codex_usage`, selected because
+Codex is the owner's main source. It reads account quota windows through a
+temporary native stdio app-server and existing login, retains observation time
+and separate buckets in memory, and verifies owned process-tree cleanup. It
+does not change routing or infer per-task consumption from account-wide windows.
+Copilot's `account.getQuota` reader is also supported through native headless
+stdio. It preserves quota types, request units, remaining percentage and native
+ISO reset dates; BYOK subscription overrides remain unknown. A provider-layer
+dispatcher selects supported access/billing pairs; the collectors share owned
+native process deadlines and cleanup. Kiro CLI 2.24.0 additionally supports a
+temporary V2 quota-only session with empty tools/resources/hooks/MCP, outside
+repository ancestry. Its plan-credit output is explicitly a native estimate;
+remaining balance and percentage semantics are not inferred. Other Kiro versions
+and Antigravity startup isolation remain unverified. No reader creates model turns
+or discovers credential files; Kiro may retain ordinary native session state under
+the owner's isolated-session approval.
+The execution CLI collects once before the first supported subscription attempt
+per execution scope; coding chat creates one scope per owner turn. Unknown
+observations remain diagnostic and offline readiness does not perform account calls.
+
 ## 7. AI Council
 The Council is an application on top of the AI infrastructure:
 `user question → council router → multiple models → raw responses → synthesis → final answer`
@@ -285,6 +320,15 @@ orchestrator-guided routing without hard-coding Ollama, OpenAI, Requesty, or any
 other provider into Council-specific business logic.
 
 ## 8. Job Search Automation
+
+Openings is the owner-selected discovery/tracking candidate. The accepted
+integration boundary is an external API bridge plus a reviewed pinned fix for
+manual-import mirrors, rather than its internal collector interface. The offline
+client exports one page and intakes source postings explicitly as `new`, using
+only an operator-configured numeric loopback endpoint and token. Writes require
+verified patch deployment; tracker status never grants delivery approval. No app
+deployment or candidate-profile transmission has occurred. See ADR-051 and
+`integrations/openings/` for the patch and remaining runtime checks.
 Flow:
 `job sources → ingestion → normalization → matching → application analysis → CV/message suggestions → human review → application → tracking`
 

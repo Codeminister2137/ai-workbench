@@ -448,4 +448,42 @@ The owner selected a distinct continuous coding-chat mode with a reusable
 foreground controller and existing local SQLite records. Preserve scoped tools,
 instructions, decisions and recovery boundaries across turns. Migration requires
 comparable development quality and measured delegation economics, not merely
-passing tool fixtures. See [ADR-049](decisions/ADR-049-continuous-coding-chat.md).
+passing tool fixtures. The owner also accepted deterministic local history
+reduction: preserve owner messages/host outcomes, shorten older assistant reports
+visibly, retain originals and refuse mandatory-context overflow.
+See [ADR-049](decisions/ADR-049-continuous-coding-chat.md).
+
+## ADR-050 - Usage Measurement and Automatic Integration
+
+**Status:** Accepted direction (2026-10-10); Codex/Copilot observations and Kiro native estimates integrated.
+
+Measure external allowance/API spend and local total tokens plus elapsed time.
+Consider time without a hard median-completion-time rejection gate. Grow automatic
+provider usage integration incrementally, including provider-specific adapters.
+The owner selected Codex first because it is their main source. Its bounded native
+reader now automatically reports quota windows before execution, retaining source
+and observation time in memory; Copilot's native quota types and request counters
+are also supported, with verified installed-client reads. Pinned Kiro 2.24.0 V2
+sessions add isolated native credit estimates with unknown remaining balance;
+Antigravity startup isolation remains unproved. Routing is unchanged. The owner
+adopted a 20% measurable external savings target; below-target results require
+case-by-case review rather than automatic rejection. Strict quality remains required.
+See [ADR-050](decisions/ADR-050-usage-measurement-and-automatic-integration.md).
+
+## Owner product priorities - 2026-10-10
+
+The owner selected CLI, job search, business, then Council, reflecting their real
+needs. This supersedes earlier Council-first planning guidance. Prerequisites
+support the selected track; ordering does not authorize unresolved implementation
+contracts, integrations or privacy changes. See the current priority rules in
+[workflow](workflow.md#current-product-priorities).
+
+## ADR-051 - Openings API Integration
+
+**Status:** Accepted direction (2026-10-10); offline bridge implemented, deployment unvalidated.
+
+The owner approved a reviewed upstream mirror fix plus an external API bridge,
+keeping preparation code independent of Openings internals at the cost of patch
+maintenance. Intake explicitly uses `new`; tracking never grants delivery consent.
+No deployment or candidate-profile transmission is approved by this choice.
+See [ADR-051](decisions/ADR-051-openings-api-integration.md).

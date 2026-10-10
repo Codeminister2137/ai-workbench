@@ -58,6 +58,12 @@ without the applicable account accounting rules.
 
 ## Priority follow-up
 
+For matched external economics comparisons, ADR-050 records the owner's 20%
+savings target, including primary/delegated work, failures and retries. Below
+target means case-by-case owner review, not automatic rejection. Missing or
+incomparable billing measurements cannot establish savings. Local tokens and
+elapsed time remain diagnostic evidence without a hard runtime-reduction gate.
+
 On 2026-10-04 the hosted supervisor stopped at 14:02:04.319 UTC (16:02 local).
 Its session event recorded the displayed capacity message with
 `codex_error_info: server_overloaded`. This was a hosted availability error;
@@ -110,12 +116,185 @@ are displayed individually and their aggregate remains unknown. Cached/reasoning
 counters are separate and never added to input/output totals. No currency or
 credit conversion is inferred.
 
+New local fixed-harness receipts include elapsed seconds for the complete fixture
+(including validation) and each attempted model call. The diagnostic reports
+those separately, including failed calls whose token usage remains unknown.
+Responses received after the deadline retain their reported token counters even
+though the operation fails. Older receipts without timing remain readable and
+their elapsed time stays unknown. Timing informs comparison under ADR-050; it
+does not impose a hard completion-time acceptance threshold.
+
 The diagnostic reads only named bounded files in the selected directories and
 prints recognized numeric counters. It creates no state, calls no account API,
 loads no model and exports no prompt/raw client event/cache state. Missing receipts
 or unsupported formats remain unknown; malformed/unreadable admitted files return
 a failure. A declared source is a caller label, not verified account identity.
 Remaining allowance and the current IDE supervisor's usage remain unknown.
+
+### First automatic allowance source: Codex selected and implemented
+
+The owner accepted automatic integration under ADR-050. Investigation on
+2026-10-10 found two documented first-source candidates:
+
+- Copilot `account.getQuota`: exposes entitlement/used request counts, remaining
+  percentage and reset date by quota type. Reuses the headless RPC transport
+  already used for authentication readiness; does not cover Codex allowance.
+- Codex `account/rateLimits/read`: exposes quota windows and Unix reset timestamps,
+  with a multi-bucket view when available. Covers the baseline client, but needs
+  an app-server handshake and preserves separate buckets rather than inventing a
+  global remaining balance.
+
+The initial recommendation was Copilot first to reuse the existing transport.
+The owner selected Codex first because it is their main source. The implemented
+slice is a bounded read through the installed client's existing login, retaining
+normalized measurements in memory and leaving routing unchanged. The native
+client makes an authenticated provider request; no prompts or repository content
+are sent by the collector. Missing/unsupported responses remain unknown. No new
+credential discovery, SDK dependency, persistent snapshots or background monitor
+is introduced.
+
+```powershell
+python -m uv run --no-sync python -m ai_provider.codex_usage --timeout-seconds 15
+```
+
+The command returns normalized JSON: observation time, separate bucket/window
+identities, used percentages, durations and Unix reset timestamps. Unknown numeric
+fields remain null. It exports no raw errors, account identity, optional labels
+or credit/reset-redemption details. Initialization and one quota read are the only
+operations. Owned process-tree cleanup is checked; an unverified cleanup withholds
+the measurements. Timeout covers handshake/response, with up to two extra seconds
+for cleanup. The collector saves no snapshots; Codex manages its existing native
+authentication, logs and state. Exit 0 means a quota-window observation was read
+and cleanup verified; it does not guarantee future allowance or model availability.
+
+References: [Copilot usage and billing](https://docs.github.com/en/copilot/how-tos/copilot-sdk/features/usage-and-billing#account-quota-and-premium-interactions)
+and [Codex app-server rate limits](https://learn.chatgpt.com/docs/app-server#6-rate-limits-chatgpt).
+One authorized installed-client read succeeded at 2026-10-10 09:08:32 UTC,
+reporting 20% used in the 300-minute window and 64% in the 10080-minute window, with
+cleanup verified. Values are historical observations, not current remaining
+allowance guarantees. Account-wide windows may include other work and are not
+per-task billing measurements; no delegation savings claim follows. Quota-aware
+routing, other provider readers and task-level attribution remain subsequent work.
+
+Execution sessions now support an injected allowance observer. Observations stay
+in memory, carry the collector's source and observation time, and are separate
+from route eligibility, exhaustion decisions and saved continuation handoffs.
+The hook observes only attempted routes and caches both available and unknown
+results by billing source for the execution scope. Its collection time counts
+against an existing continuation deadline. The Codex adapter supports declared
+ChatGPT subscription routes only; it does not represent API spend or workspace
+credits. The execution CLI automatically invokes the observer before the first
+supported subscription attempt in each execution scope, including when automatic
+fallback is disabled. Coding chat creates a fresh scope for each owner turn;
+repairs within a turn reuse the same observation. There is no timer, end-of-task
+refresh or polling of authenticated candidates that are never attempted.
+This bounded default is an implementation choice under the approved automatic
+observe-only integration, not a new quota-based routing policy. The observation
+timestamp describes when data was read; a cached value does not guarantee current
+capacity. Unknown collection results do not stop execution or trigger fallback.
+An observer exception is retained as a sanitized unknown observation rather than
+aborting the task; cancellation still propagates. The existing execution deadline
+is rechecked after collection, including a failed collection. No raw adapter error
+is included in progress output, and a failed observer is not repeatedly called
+within the same execution scope.
+Copilot's existing authentication preflight now reuses the same owned native
+lifecycle and bounded account-RPC framing. Synthetic success, timeout and root-exit
+checks verify descendant cleanup; only `auth.getStatus` is requested and account
+identity fields are discarded. This software check does not establish current
+installed-client authentication or remaining allowance.
+The offline readiness report still performs no account calls.
+An injected progress reporter can display normalized observations; the existing
+explicit `--log-file` option also captures displayed progress. This adds no
+quota database or automatic snapshot files.
+
+The existing Copilot authentication-readiness transport now bounds header reads
+and accepts success only from a JSON-RPC 2.0 response with the exact integer
+request ID, no error field, and a boolean authenticated result. Malformed
+responses remain unverified and owned pipes/processes are closed. Authentication
+readiness remains distinct from the separate quota reader described below.
+
+### Copilot automatic allowance observations
+
+`ai_provider.account_usage` dispatches supported Codex, Copilot and pinned Kiro
+subscription routes to provider-specific readers. Copilot uses the headless stdio
+client's `account.getQuota` RPC with existing native global authentication.
+No session, prompt, model turn, login flow or credential-file discovery is used.
+GitHub receives the native authenticated account request; no repository content
+is selected or transmitted by the collector. BYOK environment overrides withhold
+subscription measurements. The collector creates no storage; the native client
+keeps responsibility for its normal authentication/runtime state.
+
+```powershell
+python -m uv run --no-sync python -m ai_provider.copilot_usage --timeout-seconds 15
+```
+
+Configure `GITHUB_COPILOT_COMMAND` or expose `copilot` on PATH using the existing
+execution configuration mechanism. The command does not automatically load `.env`.
+An unavailable command returns unknown without launching a process.
+
+Normalized windows retain quota type, entitlement/used requests, remaining percent
+and the reported ISO reset date. Entitlement `-1` is the native unlimited marker,
+not a negative balance. Missing values remain null; no reset timezone, available
+request count, token price or task charge is inferred. Quota types remain separate.
+The native request and cleanup use the same bounds/ownership machinery as Codex;
+strict bounded Content-Length framing and RPC identity validation are specific to
+Copilot. Unsupported/malformed responses remain unknown; unverified cleanup
+invalidates measurements. The once-per-execution-scope observer and offline
+readiness contracts are unchanged.
+
+One installed-client read succeeded at 2026-10-10 10:13:37 UTC with cleanup verified:
+chat reported 200 entitlement / 200 used / 0% remaining; completions 2000 / 0 /
+100%; premium interactions 0 / 0 / 0%. The provider returned reset date
+`2026-10-10T10:13:36.130Z`. These are historical account observations, including
+the provider's reset field, not guarantees of present capacity or proof of a
+particular paid plan. No model call or task-spend attribution was performed.
+See [GitHub account quota documentation](https://docs.github.com/en/copilot/how-tos/copilot-sdk/features/usage-and-billing#account-quota-and-premium-interactions).
+
+## Kiro isolated native estimates and Antigravity investigation
+
+`ai_provider.kiro_usage` supports the inspected Kiro CLI 2.24.0 V2 quota path.
+The collector checks the version before starting a session, creates a temporary
+agent with empty tools/resources/hooks/MCP, disables global MCP inclusion and
+process-local auto-updates, and submits only `/usage` with stdin closed. It refuses
+temporary directories inside repositories or instruction-bearing ancestry.
+Version checks and quota collection share the requested time allocation; each
+owned native process has up to two seconds of cleanup. Temporary profile files
+are removed after collection. Kiro retains responsibility for ordinary native
+authentication/session state; no new login, keys or permission grants are used.
+
+```powershell
+python -m uv run --no-sync python -m ai_provider.kiro_usage --timeout-seconds 15
+```
+
+Use existing `KIRO_COMMAND` configuration or native command discovery; `.env` is
+not automatically loaded. Automatic observations include supported Kiro
+subscription attempts, once per billing source per execution scope. Available
+and unknown observations remain separate from routing, exhaustion and handoffs.
+
+The native header says `Estimated Usage`: snapshots carry
+`measurement_kind: native_estimate`, `covered_credits`, `plan_credits`,
+`reported_percent` and the native reset date. They do not establish remaining
+credits, the percentage's used/remaining semantics, a reset timezone, exact
+subscription consumption or task-level savings. Unverified versions, additional
+credit/organization formats, invalid output and unsafe temporary ancestry remain
+unknown. Cleanup failure withholds observations. Offline tests exercise the
+actual owned subprocess lifecycle and isolation configuration using synthetic
+clients; they do not contact native accounts.
+
+The final installed-adapter check at 2026-10-10 11:26:09 UTC reported estimated
+50 covered / 50 plan credits, 100%, reset 2026-11-01, with cleanup verified.
+Earlier diagnostics were used to establish the native output format; two strict
+parser compatibility attempts returned unknown before the corrected adapter
+passed. No model turns, tools, hooks or repository content were submitted.
+
+Antigravity 1.3.0 has documented no-turn print-mode `/usage`, but installed-binary
+inspection found common manager/hook/background-worker initialization before
+quota dispatch. Startup isolation was not proved, so no quota diagnostic ran and
+no automatic collector is advertised. A documented account-only interface or
+supported startup isolation would unlock this candidate. Do not work around the
+boundary through global settings, new credentials or permissions.
+See [Kiro agent configuration](https://kiro.dev/docs/custom-agents/configuration-reference/)
+and [Antigravity's official CLI changelog](https://github.com/google-antigravity/antigravity-cli/blob/main/CHANGELOG.md).
 
 ## Explicit Windows sleep after work
 

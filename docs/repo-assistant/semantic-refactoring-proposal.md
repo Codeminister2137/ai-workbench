@@ -56,6 +56,14 @@ dynamic Python reference.
 
 ## Recommended v1 contract
 
+2026-10-10 offline follow-up: source reads now enforce the existing 512 KB limit
+before allocating the whole file, including digest checks during apply. A file
+that grows beyond the preview limit before apply invalidates its one-use plan
+before any write. Changes between per-file writes still require partial-effect
+reconciliation under the existing contract.
+Exact-limit, oversized preview/navigation and grown-file apply regressions pass;
+this does not add language coverage or establish installed-client acceptance.
+
 Accepted v1 contract:
 
 1. Preview identifies an existing workspace Python file, symbol position and

@@ -814,22 +814,100 @@ report elapsed work time when reliable start/end evidence exists. Never use the
 sleep API's return-after-wake timestamp as the time work ended. Preserve these
 timestamps in the handoff/receipt before requesting sleep.
 
-For an explicitly timed unattended run, record the start and deadline in UTC and
-Warsaw time before implementation. Treat an intermediate commit or clean working
-tree as a checkpoint, not completion of the requested work window. Maintain a
-local candidate ledger listing relevant plans, accepted scope, implementation
-evidence, and concrete remaining actions or decision boundaries. Before declaring
-all work blocked, freshly compare the wider plans with current code and tests;
-account for each remaining candidate rather than reusing a blanket blocker from
-an earlier handoff. Continue independent approved work when one candidate needs
-an owner decision. Preserve the deadline and next action across context changes.
+### Unattended work windows
 
-Do not request sleep before the agreed deadline merely because the first slice
-finished. Pass the recorded deadline to `scripts/workstation-sleep.ps1` using
-`-NotBeforeUtc` for timed runs. Do not fill the window with unnecessary changes,
-repeated checks, or idle model calls; when all useful approved work is actually
-exhausted, preserve the per-candidate evidence and pending decisions, keep sleep
-guarded by the deadline, and clearly distinguish work time from waiting time.
+An unattended duration authorizes a continuous work window across useful,
+already-authorized tasks. Completing or blocking the current slice triggers
+selection of the next task; it does not end the run. Continue until the deadline,
+an explicit owner stop, or a fresh investigation establishes that every remaining
+relevant candidate is complete or blocked. An intermediate commit, passing test
+gate, clean working tree, handoff update or session checkpoint is not completion
+of the requested window.
+
+Use this loop:
+
+1. Record the start, duration and deadline in UTC and `Europe/Warsaw` before
+   implementation. Interpret "around two hours" as two hours from execution
+   start, unless the owner specifies otherwise. Never reuse an expired deadline
+   for a new run or silently reset it after compaction.
+2. Maintain a compact candidate ledger in local `CURRENT_CONTEXT.md`. For each
+   candidate record its authoritative plan/accepted requirement, authorization
+   boundary, current code/test evidence, concrete next action and status:
+   `READY`, `NEEDS_INVESTIGATION`, `IN_PROGRESS`, `COMPLETE` or `BLOCKED`.
+3. Prioritize the current objective and prerequisites, then remaining approved
+   roadmap work, then other approved repository goals, following the current
+   owner priorities in docs/workflow.md. Inspect applicable private
+   plans, extracting relevant `.docx` text when needed. Proposed work is not
+   automatically approved work. Follow the established investigation/decision/
+   implementation workflow; do not silently make material owner decisions.
+4. Implement and appropriately validate a reviewable slice. On completion or a
+   blocker, update its ledger entry and immediately investigate/select the next
+   candidate. A live allowance, attended approval or architecture blocker applies
+   to that candidate, not independent authorized implementation or preparation.
+   Missing evidence means investigation is needed, not that the task is blocked.
+5. Before reporting everything blocked or complete, freshly compare the wider
+   relevant plans with current code and tests. Account for every remaining
+   candidate with concrete completion evidence or a specific blocker and the
+   action/decision that unlocks it. An earlier handoff's blanket blocker or the
+   exhaustion of the first project's work is insufficient.
+6. Preserve the original deadline, candidate ledger, active reasoning and next
+   action across context changes. Apply the session-boundary workflow when
+   needed; a checkpoint or compaction does not cancel the active work window.
+7. Reserve approximately five minutes before the deadline for safe closeout:
+   bounded cleanup, validation status, diff/status review, handoff and final
+   report. Do not start operations likely to exceed the remaining time. If all
+   useful authorized work is genuinely exhausted earlier, record the candidate
+   evidence, blockers and remaining time and explain the early stop.
+
+Apply completion and blockers to concrete slices, not whole project names. A
+passing suite establishes its covered contracts; it does not establish that all
+approved CLI, provider, research or Orchestrator work is complete. Split broad
+ledger rows into specific next actions before using them to justify an early stop.
+
+For each proposed blocker, record the exact action it prevents, the evidence for
+that restriction, and whether investigation, preparation or implementation can
+continue independently. Expired inference allowance blocks model calls, not
+inspection of saved runs or deterministic contract investigation. An unresolved
+savings threshold blocks final economics acceptance, not measurement preparation.
+An unselected future application track does not block the current approved tracks.
+
+During an unattended window, "requested work is verified" refers to the window
+and its candidate-selection contract, not just the initial named slice. Use
+commentary for intermediate results and continue the next authorized action;
+do not issue a final closeout or recommend ending the session at each milestone.
+If only a disputed part needs an owner decision, queue its decision brief and
+continue independent work. A queued question is not a reason to end the window.
+
+Before early closeout, actively investigate the remaining independent actions
+identified by this check. Record their concrete outcome and why each is complete
+or cannot progress within existing authorization. A documentation sweep, an
+absence of immediately obvious defects, or "tests pass" is insufficient evidence
+of exhaustion. If that evidence is still missing, retain NEEDS_INVESTIGATION and
+continue bounded investigation that advances an approved goal. Do not invent
+defects, add redundant tests or broaden scope to manufacture progress.
+
+Do not fill the window with speculative features, repeated passing checks,
+redundant model calls or waiting presented as implementation. Preserve privacy,
+scoped approvals, live usage limits and owner authority. While the owner is away,
+queue unresolved decisions and continue independent work; do not manufacture
+human approvals or broaden authorization to keep busy.
+
+Sleep remains separately authorized. Do not request it before the agreed deadline
+merely because a slice finished. For timed runs pass the recorded deadline to
+`scripts/workstation-sleep.ps1` using `-NotBeforeUtc`. Distinguish work time from
+waiting time, and scheduled sleep from a verified sleep transition.
+
+If the owner returns abruptly, including after a usage-limit interruption, switch
+to attended communication and verify actual queued task and process state. When
+the owner needs PC resources, do not start further resource-heavy work. Do not
+terminate an ongoing scheduled task merely because the owner returned: report
+its identity, deadline and resource use, and leave its existing supervision and
+cancellation rules intact unless the owner instructs otherwise. Release only
+verified idle resources owned by the run. Preserve the original deadline and
+record the interruption; time without execution is not work. Present unresolved
+material decisions to the now-present owner using the normal decision brief.
+
+### Autonomous communication
 
 For autonomous taskful work, do not report after every search, edit, test, or
 other small sub-step. Keep progress updates to material phase changes,

@@ -160,6 +160,95 @@ For prompt/model/orchestration changes:
 7. Inspect failures manually.
 8. Avoid conclusions from one example.
 
+## Current product priorities
+
+On 2026-10-10 the owner selected **CLI -> job search -> business -> Council**,
+reflecting their real needs. Use this order for planning and candidate selection;
+it supersedes older Council-first milestone guidance. Provider/Orchestrator work
+is a prerequisite when the selected track needs it, not a reason to indefinitely
+defer the applications. Investigate each selected slice against current code and
+private plans. Priority alone does not resolve its material implementation,
+integration, data or privacy decisions, or authorize additional model spending.
+
+The owner also prefers researching existing projects and reusing, adapting or
+cloning them over building from scratch. Investigate available implementations
+before proposing a custom application or capability. Compare functional fit,
+maintenance, licence, data flow and integration cost; write only the missing
+pieces that serve a demonstrated need. This preference does not automatically
+select a dependency, deployment, privacy boundary or third-party permission.
+
+## Unattended execution windows
+
+Follow the [unattended work-window loop](../AGENTS.md#unattended-work-windows).
+Use `Codex: Unattended Work Window` from the canonical prompt library for a
+reusable launch prompt. An unattended duration covers successive useful,
+authorized slices, rather than only the first named task.
+
+Keep the start/deadline and compact candidate ledger in local `CURRENT_CONTEXT.md`.
+
+An abrupt owner return, including after a usage-limit interruption, switches
+communication to attended mode. Inspect actual scheduled tasks and processes;
+when the owner needs PC resources, launch no further resource-heavy work. Preserve
+ongoing scheduled jobs under their existing supervision and report their identity,
+deadline and resource use. Release only verified idle resources owned by the run,
+record the interruption without extending the window, and present queued material
+decisions to the owner using the normal decision brief.
+After a completed or blocked slice, inspect remaining approved roadmap work and
+other approved repository goals, select an unblocked candidate, investigate,
+implement and validate it. A candidate requiring owner input does not prevent
+independent work. Inspect relevant private plans and current implementation before
+concluding that no useful work remains; proposals still require their existing
+approvals. Do not substitute an old handoff's blanket blocker for this review.
+
+At the deadline (with approximately five minutes reserved for closeout), or an
+evidenced early stop, report work completed, validation, remaining candidates,
+specific blockers and elapsed/remaining time. Preserve the original deadline
+through compaction and intermediate handoffs. Never pad a run with redundant
+checks or speculative changes; never bypass privacy, approval or usage limits.
+
+### Persistent improvement goal: reliable unattended execution
+
+**OPEN, owner requested 2026-10-10.** Repeated attempts have not established a
+reliable unattended workflow. In the latest two-hour window, work stopped after
+43 minutes 34 seconds with 76 minutes 26 seconds unused. Specific fixes passed,
+but broad project completion labels and live-only blockers did not prove that
+independent authorized work was exhausted. That early-stop conclusion was withdrawn.
+
+Improve the workflow and validate its behavior, rather than treating more
+instruction text as success. The concrete-slice completion and blocker checks in
+[AGENTS.md](../AGENTS.md#unattended-work-windows) are the initial correction.
+Keep this goal and its current evidence in `CURRENT_CONTEXT.md` across handoffs.
+
+Completion requires a subsequent owner-authorized unattended run that follows
+successive useful slices until its fixed deadline or an explicit owner stop;
+an earlier exhaustion claim must satisfy the concrete-action evidence rules.
+Verify scoped blockers, independent next actions, deadline continuity, preserved
+authorization boundaries and honest time/validation reporting. Static document
+checks and passing software tests alone do not validate the agent's behavior.
+No new runtime service, autonomous schedule or additional inference allowance is
+authorized by this goal.
+
+Recorded failure cases used for the initial instruction review:
+
+| Evidence | Failure mechanism | Required response under the revised rules |
+| --- | --- | --- |
+| [2026-10-05 audit](repo-assistant/post-audit-decisions.md#implemented-from-the-fresh-audit): a blanket no-work assertion was followed by eligible lifecycle, provider, research and routing fixes | Project-level blockers were used without resolving concrete independent actions | Inspect and classify scoped next actions; the broad project label cannot prove exhaustion |
+| 2026-10-10 window: quota/input/refactoring fixes passed, then the run stopped with 76m26s remaining; the owner challenged that conclusion | Passing selected contracts and a wider plan sweep were treated as completion of all authorized work | Report the specific slices complete; leave unexamined independent actions NEEDS_INVESTIGATION and pursue them |
+| Current allowance and scope decisions | Missing live allowance, economic threshold and future application selection were presented together as blockers | Separate model calls, final economics acceptance and future-track decisions from existing offline work |
+
+This review establishes the observed failure mechanisms and the rules intended
+to reject them. It is not a replay of agent execution and does not prove that an
+agent will obey the revised rules. Current instruction changes address scope of
+completion, scope of blockers and intermediate-versus-final reporting; actual
+window adherence remains unverified. Record subsequent run evidence before
+claiming that the repeated-stop problem is solved.
+
+The owner subsequently observed that work continued after a summary and judged
+that better than the earlier premature stop, while requiring the summary at the
+end. This is partial qualitative evidence of improved continuation, not proof
+of adherence through a complete timed window. Report intermediate findings in
+commentary; issue the final summary only at an authorized end condition.
+
 ## 7. Documentation
 Update docs when public behavior/configuration changes, architecture changes, or a durable decision is made. Avoid duplicating the same requirement across multiple documents.
 
