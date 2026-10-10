@@ -209,7 +209,7 @@ checks or speculative changes; never bypass privacy, approval or usage limits.
 ### Persistent improvement goal: reliable unattended execution
 
 **OPEN, owner requested 2026-10-10.** Repeated attempts have not established a
-reliable unattended workflow. In the latest two-hour window, work stopped after
+reliable unattended workflow. In the earlier two-hour window, work stopped after
 43 minutes 34 seconds with 76 minutes 26 seconds unused. Specific fixes passed,
 but broad project completion labels and live-only blockers did not prove that
 independent authorized work was exhausted. That early-stop conclusion was withdrawn.
@@ -248,6 +248,16 @@ that better than the earlier premature stop, while requiring the summary at the
 end. This is partial qualitative evidence of improved continuation, not proof
 of adherence through a complete timed window. Report intermediate findings in
 commentary; issue the final summary only at an authorized end condition.
+
+The subsequent window started 2026-10-10 at15:48:47 UTC /17:48:47 Warsaw,
+with a17:48:47 UTC /19:48:47 Warsaw deadline. Several useful offline slices
+completed before a usage-limit interruption. The owner returned to attended
+work; state verification occurred at19:29:20 UTC /21:29:20 Warsaw. The gap is
+not execution time, and full-window adherence remains unproved. No sleep request
+was issued; the owner explicitly cancelled sleep. CLI fallback can recover an
+eligible in-controller client failure, but cannot recover the IDE assistant
+conversation outside that controller. See the daily CLI readiness report for
+the separate gap between a maximum turn budget and host-enforced timed work.
 
 ## 7. Documentation
 Update docs when public behavior/configuration changes, architecture changes, or a durable decision is made. Avoid duplicating the same requirement across multiple documents.
