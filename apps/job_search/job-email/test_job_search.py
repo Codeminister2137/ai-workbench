@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 from approval import (
     approve_package,
@@ -130,6 +132,33 @@ def test_prepare_application_creates_unapproved_package(
     assert package.is_approved_for_sending() is False
     assert package.contact_email == "recruiter@acme.com"
     assert "Python" in package.body
+
+
+@pytest.mark.parametrize("variant_id", ["missing", ""])
+def test_explicit_unknown_cv_variant_does_not_fall_back(
+    sample_profile: CandidateProfile, sample_vacancy: JobVacancy, variant_id: str
+) -> None:
+    for profile in (sample_profile, replace(sample_profile, cv_variants={})):
+        with pytest.raises(ValueError, match="Unknown CV variant"):
+            prepare_application(profile, sample_vacancy, cv_variant_id=variant_id)
+
+
+def test_explicit_cv_variant_selects_requested_document(
+    sample_profile: CandidateProfile, sample_vacancy: JobVacancy, tmp_path
+) -> None:
+    alternate = tmp_path / "cv_alternate.pdf"
+    alternate.write_bytes(b"synthetic alternate CV")
+    profile = replace(
+        sample_profile,
+        cv_variants={
+            **sample_profile.cv_variants,
+            "alternate": CVVariant("alternate", str(alternate), "Alternate role"),
+        },
+    )
+    package = prepare_application(profile, sample_vacancy, cv_variant_id="alternate")
+    assert package.cv_variant_id == "alternate"
+    assert package.cv_attachment_path == str(alternate)
+    assert package.status is ApplicationStatus.PREPARED
 
 
 def test_delivery_strictly_blocks_unapproved_package(

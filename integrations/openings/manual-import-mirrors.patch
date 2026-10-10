@@ -1,0 +1,37 @@
+diff --git a/src/openings/application/jobs.py b/src/openings/application/jobs.py
+index eef185f..3af7f23 100644
+--- a/src/openings/application/jobs.py
++++ b/src/openings/application/jobs.py
+@@ -336,7 +336,24 @@ class JobApplicationService:
+         )
+         job = Job.from_row(record)
+         existing = self.db.find_job(job.posting_key, job.identity)
+-        if existing is not None:
++        if (
++            existing is not None
++            and job.posting_key is not None
++            and job.posting_key != existing.posting_key
++        ):
++            job = Job.from_row(
++                {**record, "relevance_score": calculate_relevance_score(job, self.config)}
++            )
++            result = self.db.upsert_jobs([job])
++            if result.skipped_blacklisted:
++                return CommandResult(
++                    success=False,
++                    job_ids=[existing.job_id],
++                    message="This posting is blacklisted; restore it first",
++                )
++            job_id = self.db.jobs_for_posting_keys([job.posting_key])[job.posting_key]
++            was_new = job_id in result.new_ids
++        elif existing is not None:
+             if existing.status is JobStatus.BLACKLISTED:
+                 return CommandResult(
+                     success=False,
+@@ -676,4 +693,4 @@ class JobApplicationService:
+         writer.writerows(rows)
+         return ExportResult(
+             buffer.getvalue().encode("utf-8"), "text/csv", "openings.csv", len(rows), total
+-        )
+\ No newline at end of file
++        )

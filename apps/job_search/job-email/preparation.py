@@ -72,7 +72,8 @@ def prepare_application(
 
     Validates that any explicitly claimed skills exist in the candidate's
     evidence profile. Fails fast with ProhibitedClaimError if an ungrounded
-    claim is detected under strict mode.
+    claim is detected under strict mode. An explicitly requested unknown CV
+    variant raises ValueError rather than selecting another document.
     """
     if explicit_claims:
         verification = verify_application_claims(explicit_claims, profile, strict=strict_evidence)
@@ -85,7 +86,9 @@ def prepare_application(
     # Determine CV attachment
     cv_attachment = "cv.pdf"
     variant_key = "default"
-    if cv_variant_id and cv_variant_id in profile.cv_variants:
+    if cv_variant_id is not None:
+        if cv_variant_id not in profile.cv_variants:
+            raise ValueError(f"Unknown CV variant: {cv_variant_id!r}")
         variant = profile.cv_variants[cv_variant_id]
         cv_attachment = variant.file_path
         variant_key = cv_variant_id

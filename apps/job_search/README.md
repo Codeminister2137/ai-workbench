@@ -4,10 +4,45 @@ This directory contains early application experiments. It is not a production
 job-search service and does not provide autonomous application approval,
 recipient discovery or campaign management.
 
+The owner selected a reuse-first direction on 2026-10-10: evaluate existing
+discovery tools and application workspaces before building another app. The
+[reuse review](../../docs/job-search-reuse-review.md) compares open-jobs,
+Openings, JobSpy and JobOps. Source inspection is complete for that comparison.
+The owner subsequently chose Openings as the primary candidate, with open-jobs
+under consideration as supplementary discovery. Deployment, runtime fit and
+the integration boundary remain to validate. Our custom scope should focus on
+evidence-backed CV/message preparation and human-approved delivery.
+
 ## Email prototype
 
 `job-email/` contains a structured job application email prototype with a
 domain model layer and a delivery scaffold.
+
+Preparation rejects an explicitly requested unknown CV variant instead of
+silently choosing another attachment. Omitting the variant retains the existing
+default selection; every prepared package still needs review before sending.
+
+`openings_import.import_openings_export` converts already-loaded Openings JSON
+export rows to the existing `JobVacancy` model. It performs no file/network access
+or delivery. Canonical IDs distinguish same-named requisitions; identical replay
+rows collapse and conflicting snapshots require review. Raw rows retain salary,
+tracking and source metadata that the prototype cannot fully represent. Skills,
+recipients, salary units, legal contract type and remote-country eligibility are
+not inferred. A false remote flag leaves work mode unspecified because it cannot
+distinguish onsite from hybrid. Tracker status never grants sending approval.
+
+The owner approved an external API bridge with a reviewed upstream mirror fix.
+`openings_api.OpeningsAPI` exports one JSON page or adds an `OpeningsPosting`
+explicitly as `new`. Configure numeric loopback host, port and an explicit token;
+the client discovers no credentials, starts no service and follows no redirects
+or retries. Requests/responses are capped at 2 MiB and a total socket deadline.
+Only source posting fields are accepted, with no CV/profile/delivery methods.
+Writes require `mirror_fix_verified=True` after operator verification, not merely
+because this client exists. See [the pinned patch](../../integrations/openings/README.md)
+and [ADR-051](../../docs/decisions/ADR-051-openings-api-integration.md).
+An ambiguous failed write may have reached the server: reconcile before retry.
+The bridge is tested offline and with a temporary synthetic local peer; no real
+Openings instance has been started or contacted.
 
 ### Domain model
 
