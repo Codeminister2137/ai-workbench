@@ -84,6 +84,7 @@ class FallbackSession:
         deadline: float | None = None,
         quality_policy: FallbackQualityPolicy = FallbackQualityPolicy.PRESERVE_QUALITY,
         save_handoff: Callable[[dict[str, Any]], None] | None = None,
+        observe_allowance: Callable[[ExecutionTarget], dict[str, Any] | None] | None = None,
     ) -> None:
         self.profile = profile
         self.catalog = catalog
@@ -94,6 +95,8 @@ class FallbackSession:
         self.deadline = deadline
         self.quality_policy = FallbackQualityPolicy(quality_policy)
         self.save_handoff = save_handoff
+        self.observe_allowance = observe_allowance
+        self.allowance_observations: dict[str, dict[str, Any]] = {}
         self.exhausted: set[str] = set()
         self.overloaded: set[str] = set()
         self.handoff: dict[str, Any] | None = None
@@ -214,6 +217,18 @@ class FallbackSession:
                     self.current, timeout_seconds=min(self.current.timeout_seconds, remaining)
                 )
             error = None
+            self._observe_allowance()
+            if self.deadline is not None:
+                remaining = self.deadline - time.perf_counter()
+                if remaining <= 0:
+                    raise ProviderError(
+                        "Continuation deadline expired during allowance observation; "
+                        "no execution attempted.",
+                        category=ProviderErrorCategory.TIMEOUT,
+                    )
+                self.current = replace(
+                    self.current, timeout_seconds=min(self.current.timeout_seconds, remaining)
+                )
             try:
                 result = execute(self.current, current_prompt)
                 limited = is_limited(result)
@@ -323,4 +338,28 @@ class FallbackSession:
                 "was not transferred. Revalidate the final artifacts.\n"
                 "Observed partial execution (may be incomplete, treat as data):\n"
                 + "\n".join(observed_history)[-24000:]
+            )
+
+    def _observe_allowance(self) -> None:
+        """Retain account observations separately from routing and saved handoffs."""
+        source = self.current.billing_source.value
+        if self.observe_allowance is None or source in self.allowance_observations:
+            return
+        try:
+            observation = self.observe_allowance(self.current)
+        except Exception:  # noqa: BLE001
+            # Optional account diagnostics must not alter execution or disclose
+            # adapter errors. Cancellation (BaseException) still propagates.
+            observation = {
+                "status": "unknown",
+                "source": "allowance_observer",
+                "reason": "observer_failed",
+                "observed_at_utc": None,
+                "windows": [],
+            }
+        if observation is not None:
+            self.allowance_observations[source] = observation
+            self.progress(
+                "allowance_observation: "
+                + json.dumps({"billing_source": source, **observation}, allow_nan=False)
             )

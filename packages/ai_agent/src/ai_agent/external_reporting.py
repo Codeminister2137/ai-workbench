@@ -17,6 +17,16 @@ from ai_provider.external_agents import (
 MAX_DIAGNOSTIC_LINE_CHARS = 1_500
 
 
+def external_agent_exception_reason(exc: Exception) -> str:
+    """Keep timeout command arguments out of logs, history and repair context."""
+    if isinstance(exc, subprocess.TimeoutExpired):
+        return (
+            f"External agent timed out after {exc.timeout:g} seconds; "
+            "inspect partial effects before continuing."
+        )
+    return str(exc)
+
+
 def activity_preview(value: str, *, limit: int = 160) -> str:
     """Return a single-line activity detail within its character limit."""
     limit = max(0, limit)

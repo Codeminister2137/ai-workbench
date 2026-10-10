@@ -20,6 +20,9 @@ GROUPS = {
         "tests/test_requesty_free_models.py",
         "tests/test_local_capabilities.py",
         "tests/test_local_ollama_latency_example.py",
+        "tests/test_codex_usage.py",
+        "tests/test_copilot_usage.py",
+        "tests/test_kiro_usage.py",
     ),
     "orchestrator": (
         "tests/test_orchestrator_*.py",
@@ -43,6 +46,7 @@ GROUPS = {
         "tests/repo_assistant/test_*.py",
         "tests/test_external_agents.py",
         "tests/test_execution_fallback.py",
+        "tests/test_agent_readiness_ownership.py",
         "tests/test_alternate_agent_routes.py",
         "tests/test_fallback*.py",
         "tests/test_chat_transcripts.py",

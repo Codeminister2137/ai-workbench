@@ -14,9 +14,47 @@ from ai_provider.agent_readiness import AgentReadiness
 from ai_provider.external_agents import ExternalAgentConfig, run_external_agent
 
 
+@pytest.fixture(autouse=True)
+def mock_allowance_account_reads(monkeypatch):
+    """Shared synthetic clients never use installed native accounts."""
+    monkeypatch.setattr(
+        "ai_provider.codex_usage.read_codex_allowance",
+        lambda **kwargs: {
+            "status": "unknown",
+            "source": "codex_app_server",
+            "reason": "mocked_account_check",
+            "observed_at_utc": None,
+            "windows": [],
+            "cleanup_verified": True,
+        },
+    )
+    monkeypatch.setattr(
+        "ai_provider.copilot_usage.read_copilot_allowance",
+        lambda **kwargs: {
+            "status": "unknown",
+            "source": "copilot_account_quota",
+            "reason": "mocked_account_check",
+            "observed_at_utc": None,
+            "windows": [],
+            "cleanup_verified": True,
+        },
+    )
+    monkeypatch.setattr(
+        "ai_provider.kiro_usage.read_kiro_allowance",
+        lambda **kwargs: {
+            "status": "unknown",
+            "source": "kiro_isolated_v2_usage",
+            "reason": "mocked_account_check",
+            "observed_at_utc": None,
+            "windows": [],
+            "cleanup_verified": True,
+        },
+    )
+
+
 @pytest.mark.parametrize("failure", ["usage_limit_reached", "server_overloaded"])
 @pytest.mark.parametrize("preset", ["workspace_write", "interactive"])
-@pytest.mark.parametrize("persist", [False, True])
+@pytest.mark.parametrize("persist", [False, True, "coding-chat", "coding-chat-terminal"])
 def test_cli_shared_partial_effect_continuation(
     tmp_path, monkeypatch, capsys, failure, preset, persist
 ):
@@ -75,8 +113,12 @@ tools = true
         approvals.append((self.run_id, call.name, dict(call.arguments)))
         return next(outcomes)
 
-    monkeypatch.setattr(TerminalApproval, "__call__", approve)
+    terminal_channel = persist == "coding-chat-terminal" and preset == "interactive"
+    if not terminal_channel:
+        monkeypatch.setattr(TerminalApproval, "__call__", approve)
+    terminals, tickets = [], []
     runs, tasks, effects, timeouts, deadlines = [], [], [], [], []
+    coding_chat = persist in {"coding-chat", "coding-chat-terminal"}
 
     def serve(connection):
         def call(name, arguments):
@@ -128,6 +170,15 @@ tools = true
                 assert "Explicit decisions" in payload and "Preserve protected.txt" in payload
         assert instructions in payload
         assert "Set value to 2" in payload
+        assert "shared_tool_profile: coding" in payload
+        assert f"shared_tool_approval_policy: {preset}" in payload
+        assert "separate per-call workspace and approval enforcement" in payload
+        assert "Do not retry a denied operation" in payload
+        if coding_chat:
+            assert "Owner decision: never change protected.txt or add dependencies" in payload
+            assert "Correction: preserve the current tool profile after fallback" in payload
+            assert '"report_shortened": true' in payload
+            assert '"outcome": "validation_failed"' in payload
         from ai_agent.http_proxy import HttpMcpConnection
         from ai_provider.coding_sessions import ACTIVE_SESSION
 
@@ -173,10 +224,76 @@ tools = true
 
     monkeypatch.setattr(cli, "_run_external_agent", execute)
     database = tmp_path / "sessions.sqlite3"
+    seed_id = "new"
+    store = None
+    originals = []
+    if coding_chat:
+        from ai_agent.coding_chat import CodingChatController, CodingTurnResult
+        from ai_agent.coding_chat_input import CodingChatInput, TerminalLinePoll
+        from ai_provider.chat_transcripts import SQLiteChatTranscriptStore
+        from ai_provider.coding_sessions import CodingSession
+
+        session = CodingSession.open(
+            database,
+            "new",
+            tmp_path,
+            "Synthetic long-history fallback",
+            ["Preserve protected.txt"],
+            privacy_class="public_or_low_risk",
+            cost_policy="allowances_allowed",
+        )
+        seed_id = session.session_id
+        store = SQLiteChatTranscriptStore(database)
+        CodingChatController.create(store, seed_id, tmp_path, "public_or_low_risk", "Synthetic")
+        history = CodingChatController(store, seed_id, tmp_path, "public_or_low_risk")
+        history.turn(
+            "Owner decision: never change protected.txt or add dependencies",
+            lambda request: CodingTurnResult(
+                1, "Synthetic earlier report " * 500, "validation_failed", "fixture test failed"
+            ),
+        )
+        history.stage("Correction: preserve the current tool profile after fallback")
+        originals = store.list_messages(seed_id)
+        session.status("completed")
+        monkeypatch.setattr(CodingChatInput, "read", lambda self, prompt: "/exit")
+        monkeypatch.setattr(TerminalLinePoll, "__call__", lambda self: None)
+        if terminal_channel:
+            from queue import Empty, Queue
+
+            def create_terminal(*, stage):
+                lines = Queue()
+                terminal = CodingChatInput(stage=stage)
+                terminals.append(terminal)
+
+                def write(text):
+                    if "Reply /approve" not in text:
+                        return
+                    assert terminal.ticket is not None and terminal.ticket not in tickets
+                    tickets.append(terminal.ticket)
+                    scope, operation = [json.loads(line) for line in text.splitlines()[:2]]
+                    assert operation["tool"] == "edit_file"
+                    assert operation["arguments"]["path"] == "source.py"
+                    approvals.append((scope["run"], operation["tool"], operation["arguments"]))
+                    lines.put("yes")
+                    lines.put("/approve expired-ticket yes")
+                    lines.put("/steer Owner correction: no cloud services; preserve protected.txt")
+                    lines.put(f"/approve {terminal.ticket} {'yes' if next(outcomes) else 'no'}")
+
+                def poll():
+                    try:
+                        return lines.get_nowait()
+                    except Empty:
+                        return None
+
+                terminal.write = write
+                monkeypatch.setattr(terminal, "poll", poll)
+                return terminal
+
+            monkeypatch.setattr("ai_agent.coding_chat_cli.CodingChatInput", create_terminal)
     session_args = (
         [
             "--coding-session",
-            "new",
+            seed_id,
             "--coding-session-db",
             str(database),
             "--session-decision",
@@ -189,7 +306,7 @@ tools = true
         cli.main(
             [
                 "--mode",
-                "implement",
+                "coding-chat" if coding_chat else "implement",
                 "Set value to 2 in source.py.",
                 "--repo-root",
                 str(tmp_path),
@@ -207,6 +324,7 @@ tools = true
                 "coding",
                 "--skip-prompt-review",
                 *session_args,
+                *(["--coding-chat-history-budget-chars", "4000"] if coding_chat else []),
                 "--away-minutes",
                 "1",
                 "--execute",
@@ -236,9 +354,26 @@ tools = true
             rows = connection.execute("SELECT operation,status FROM coding_receipts").fetchall()
         assert len([r for r in rows if ":edit_file:" in r[0] and r[1] == "completed"]) == 2
         assert not any("value =" in operation for operation, _ in rows)
+        if coding_chat:
+            assert store is not None
+            after = store.list_messages(seed_id)
+            assert after[: len(originals)] == originals
+            assert len(after) == len(originals) + (8 if terminal_channel else 2)
+            assert after[-1].metadata is not None
+            assert after[-1].metadata["returncode"] == 0
+            if terminal_channel:
+                queued = [
+                    m for m in after if (m.metadata or {}).get("source") == "coding_chat_queued"
+                ]
+                assert [m.content for m in queued].count("yes") == 3
+                assert len(tickets) == len(set(tickets)) == 3
+                assert all(terminal.closed and terminal.thread is None for terminal in terminals)
     else:
         assert not database.exists()
-    assert "effective_route_id: copilot" in capsys.readouterr().out
+    output = capsys.readouterr().out
+    assert "effective_route_id: copilot" in output
+    assert output.count('"source": "codex_app_server"') == 1
+    assert output.count('"source": "copilot_account_quota"') == 1
 
 
 def test_external_deadline_refuses_process_launch(tmp_path, monkeypatch):

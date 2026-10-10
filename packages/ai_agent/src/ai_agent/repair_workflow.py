@@ -16,6 +16,7 @@ from ai_provider import ProviderError
 from ai_provider.orchestrated_runs import OrchestratedStageRecord
 from ai_provider.repair_state import changed_paths, workspace_fingerprints
 
+from ai_agent.external_reporting import external_agent_exception_reason
 from ai_agent.run_tracking import (
     OrchestratedRunTracker,
     execution_status_with_validation_stage,
@@ -190,7 +191,7 @@ def run_orchestrated_repair_loop(
         except (ProviderError, subprocess.TimeoutExpired, OSError, RuntimeError) as exc:
             attempt_status = "timeout" if isinstance(exc, subprocess.TimeoutExpired) else "failed"
             attempt_response = None
-            failure_reason = str(exc)
+            failure_reason = external_agent_exception_reason(exc)
         else:
             failure_reason = ""
         if attempt_response:

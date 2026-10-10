@@ -17,6 +17,30 @@ from .support import (
 )
 
 
+@pytest.mark.parametrize(
+    ("profile", "policy"),
+    [("coding", "workspace_write"), ("coding", "interactive"), ("inspection", "read_only")],
+)
+def test_external_prompt_distinguishes_native_sandbox_from_shared_policy(profile, policy):
+    prompt = _EXAMPLE._external_agent_prompt_with_execution_metadata(
+        "Inspect the code; do not edit it.",
+        system_prompt="Keep owner decisions.",
+        approval_policy="workspace_write",
+        sandbox="read-only",
+        mode="implement",
+        shared_tool_profile=profile,
+        shared_approval_policy=policy,
+    )
+    assert "codex_sandbox: read-only" in prompt
+    assert f"shared_tool_profile: {profile}" in prompt
+    assert f"shared_tool_approval_policy: {policy}" in prompt
+    assert "separate per-call workspace and approval enforcement" in prompt
+    assert "a coding profile alone does not authorize edits" in prompt
+    assert "Do not retry a denied operation" in prompt
+    assert "do not request broader permissions" in prompt
+    assert "Inspect the code; do not edit it." in prompt
+
+
 def test_cli_plans_codex_external_agent_route(capsys, monkeypatch) -> None:
     monkeypatch.setenv("CODEX_COMMAND", "codex-test")
 
@@ -143,9 +167,27 @@ def test_cli_rejects_codex_commit_request_without_trusted_local(monkeypatch) -> 
         )
 
 
-def test_cli_executes_codex_external_agent_route(capsys, monkeypatch, tmp_path: Path) -> None:
+@pytest.mark.parametrize("fallback_enabled", [True, False])
+def test_cli_executes_codex_external_agent_route(
+    capsys, monkeypatch, tmp_path: Path, fallback_enabled
+) -> None:
+    allowance_reads = []
+
+    def read_allowance(**kwargs):
+        allowance_reads.append(kwargs)
+        return {
+            "status": "available",
+            "source": "codex_app_server",
+            "observed_at_utc": "2026-10-10T09:00:00+00:00",
+            "windows": [{"used_percent": 100}],
+            "cleanup_verified": True,
+        }
+
+    monkeypatch.setattr("ai_provider.codex_usage.read_codex_allowance", read_allowance)
     calls: list[dict[str, Any]] = []
     run_db = tmp_path / "repo-assistant-runs.sqlite3"
+    user_config = tmp_path / "user-config.toml"
+    user_config.write_text(f"[fallback]\nenabled = {str(fallback_enabled).lower()}\n")
 
     def fake_run(*args, **kwargs):
         calls.append({"args": args, "kwargs": kwargs})
@@ -198,6 +240,8 @@ def test_cli_executes_codex_external_agent_route(capsys, monkeypatch, tmp_path: 
                 "--model",
                 "gpt-5.5",
                 "--execute",
+                "--user-config",
+                str(user_config),
                 "--approval-policy",
                 "workspace_write",
                 "--skip-prompt-review",
@@ -213,6 +257,9 @@ def test_cli_executes_codex_external_agent_route(capsys, monkeypatch, tmp_path: 
     )
     output = capsys.readouterr().out
     assert "external_agent_returncode: 0" in output
+    assert allowance_reads == [{"timeout_seconds": 15}]
+    assert output.count("allowance_observation:") == 1
+    assert '"observed_at_utc": "2026-10-10T09:00:00+00:00"' in output
     assert "external_agent_jsonl_events: parsed" in output
     assert "external_agent_command_line_json:" in output
     assert "external_agent_command_event_count: 1" in output
@@ -250,7 +297,8 @@ def test_cli_executes_codex_external_agent_route(capsys, monkeypatch, tmp_path: 
     assert "# User request" in stdin_prompt
     assert "# External agent execution metadata" in stdin_prompt
     assert "codex_sandbox: workspace-write" in stdin_prompt
-    assert "Do not describe the session as read-only" in stdin_prompt
+    assert "native client filesystem policy" in stdin_prompt
+    assert "shared_tools_note" not in stdin_prompt
     assert calls[0]["kwargs"]["encoding"] == "utf-8"
     assert calls[0]["kwargs"]["errors"] == "replace"
     assert "# Repository context" in stdin_prompt
@@ -434,7 +482,9 @@ def test_cli_explains_codex_timeout_without_duplicate_response_header(
     monkeypatch,
 ) -> None:
     def fake_run(*args, **kwargs):
-        raise _EXAMPLE.subprocess.TimeoutExpired(args[0], timeout=60.0)
+        raise _EXAMPLE.subprocess.TimeoutExpired(
+            ["codex-test", "--prompt", "synthetic-private-history" * 1000], timeout=60.0
+        )
 
     monkeypatch.setenv("CODEX_COMMAND", "codex-test")
     patch_external_runner(monkeypatch, fake_run)
@@ -465,6 +515,8 @@ def test_cli_explains_codex_timeout_without_duplicate_response_header(
     assert output.count("### Agent report") == 1
     assert "failure_hint: Codex CLI did not finish before the repo assistant timeout" in output
     assert "--codex-login-device" in output
+    assert "synthetic-private-history" not in output
+    assert "failure_reason: External agent timed out after 60 seconds" in output
 
 
 def test_external_agent_stderr_summarizes_pytest_failures() -> None:

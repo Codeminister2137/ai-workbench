@@ -2,10 +2,9 @@
 
 import json
 import os
-import queue
 import subprocess
-import threading
 from dataclasses import dataclass
+from typing import Any
 
 from ai_orchestrator import AccessMethod
 
@@ -20,58 +19,25 @@ class AgentReadiness:
 
 
 def _copilot_authenticated(command: str, timeout: float) -> bool:
-    """Read the official SDK auth.getStatus RPC without creating a session."""
+    """Read account auth with bounded framing and verified owned-tree cleanup."""
+    from ai_provider.native_account_usage import read_native_account_usage
 
-    process = subprocess.Popen(
+    report = read_native_account_usage(
         (command, "--headless", "--no-auto-update", "--log-level", "none", "--stdio"),
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.DEVNULL,
+        source="copilot_auth_status",
+        timeout_seconds=timeout,
+        exchange=_exchange_copilot_auth,
     )
-    responses: queue.Queue[bool] = queue.Queue()
+    return report["status"] == "available" and report["cleanup_verified"]
 
-    def read() -> None:
-        try:
-            assert process.stdout is not None
-            while True:
-                header = process.stdout.readline()
-                if not header:
-                    break
-                if not header.startswith(b"Content-Length:"):
-                    continue
-                length = int(header.split(b":", 1)[1])
-                if not 0 < length <= 1048576:
-                    break
-                if process.stdout.readline().strip():
-                    break
-                response = json.loads(process.stdout.read(length))
-                if response.get("id") == 1:
-                    responses.put(response.get("result", {}).get("isAuthenticated") is True)
-                    return
-        except (OSError, ValueError, AttributeError):
-            pass
-        responses.put(False)
 
-    worker = threading.Thread(target=read, daemon=True)
-    worker.start()
-    try:
-        body = json.dumps(
-            {"jsonrpc": "2.0", "id": 1, "method": "auth.getStatus", "params": {}}
-        ).encode()
-        assert process.stdin is not None
-        process.stdin.write(f"Content-Length: {len(body)}\r\n\r\n".encode() + body)
-        process.stdin.flush()
-        return responses.get(timeout=timeout)
-    except (queue.Empty, OSError):
-        return False
-    finally:
-        if process.poll() is None:
-            process.kill()
-        process.wait(timeout=5)
-        worker.join(timeout=5)
-        for stream in (process.stdin, process.stdout):
-            if stream is not None:
-                stream.close()
+def _exchange_copilot_auth(process: subprocess.Popen[Any], deadline: float) -> list[dict[str, Any]]:
+    from ai_provider.copilot_usage import _exchange_account_result
+
+    result = _exchange_account_result(process, deadline, "auth.getStatus")
+    if type(result.get("isAuthenticated")) is not bool:
+        raise ValueError("Invalid authentication status")
+    return [{"authenticated": True}] if result["isAuthenticated"] else []
 
 
 def check_agent_readiness(method: AccessMethod, *, timeout: float = 15) -> AgentReadiness:

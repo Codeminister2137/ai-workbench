@@ -3,9 +3,12 @@
 import argparse
 import io
 import json
+import subprocess
+import time
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
+from typing import cast
 
 import pytest
 from ai_orchestrator import (
@@ -25,7 +28,7 @@ from ai_orchestrator import (
     prepare_execution,
 )
 from ai_orchestrator.fallback import fallback_candidates
-from ai_provider.agent_readiness import AgentReadiness, _copilot_authenticated
+from ai_provider.agent_readiness import AgentReadiness, _exchange_copilot_auth
 from ai_provider.errors import ProviderError, ProviderErrorCategory
 from ai_provider.execution_fallback import FallbackSession, external_usage_limit
 from ai_provider.external_agents import ExternalAgentResult, parse_external_agent_jsonl
@@ -120,6 +123,153 @@ def session(monkeypatch, routes, **kwargs):
     return FallbackSession(
         profile(), routes, initial(routes), compatible=lambda target: True, **kwargs
     )
+
+
+@pytest.mark.parametrize("status", ["available", "unknown"])
+def test_allowance_observation_is_once_per_source_and_never_routes(monkeypatch, routes, status):
+    reads = []
+    progress = []
+    observation = {
+        "status": status,
+        "source": "codex_app_server",
+        "observed_at_utc": "2026-10-10T09:00:00+00:00" if status == "available" else None,
+        "windows": [{"used_percent": 100}] if status == "available" else [],
+    }
+
+    def collect(target):
+        reads.append(target.route_id)
+        return observation
+
+    run = session(monkeypatch, routes, observe_allowance=collect, progress=progress.append)
+    executed = []
+
+    def execute(target, prompt):
+        executed.append(target.route_id)
+        return "done"
+
+    for _ in range(2):
+        assert run.run("Work", execute, lambda result: False, observe=str) == "done"
+    assert reads == ["codex"]
+    assert executed == ["codex", "codex"]
+    assert not run.exhausted
+    assert run.allowance_observations == {
+        BillingSource.CHATGPT_SUBSCRIPTION_ALLOWANCE.value: observation
+    }
+    assert sum(line.startswith("allowance_observation:") for line in progress) == 1
+    assert run.handoff is None
+
+
+@pytest.mark.parametrize("error", [OSError, ValueError, RuntimeError])
+def test_failed_optional_observer_remains_unknown_without_aborting_execution(
+    monkeypatch, routes, error
+):
+    reads, executed, progress = [], [], []
+
+    def collect(target):
+        reads.append(target.route_id)
+        raise error("private-account-detail")
+
+    run = session(monkeypatch, routes, observe_allowance=collect, progress=progress.append)
+
+    def execute(target, prompt):
+        executed.append(target.route_id)
+        return "done"
+
+    for _ in range(2):
+        assert run.run("Work", execute, lambda result: False, observe=str) == "done"
+    assert reads == ["codex"]
+    assert executed == ["codex", "codex"]
+    observation = run.allowance_observations[BillingSource.CHATGPT_SUBSCRIPTION_ALLOWANCE.value]
+    assert observation["status"] == "unknown"
+    assert observation["reason"] == "observer_failed"
+    assert observation["windows"] == []
+    assert observation["observed_at_utc"] is None
+    assert "private" not in json.dumps(observation) + "".join(progress)
+    assert run.handoff is None and not run.exhausted
+
+
+def test_optional_observer_cancellation_is_not_swallowed(monkeypatch, routes):
+    def collect(target):
+        raise KeyboardInterrupt
+
+    run = session(monkeypatch, routes, observe_allowance=collect)
+    with pytest.raises(KeyboardInterrupt):
+        run.run("Work", lambda *_: pytest.fail("execution after cancellation"), bool, observe=str)
+    assert not run.allowance_observations
+
+
+@pytest.mark.parametrize("collector_fails", [False, True])
+def test_allowance_collection_consumes_deadline_and_cannot_start_late_execution(
+    monkeypatch, routes, collector_fails
+):
+    clock = [1.0]
+    monkeypatch.setattr("ai_provider.execution_fallback.time.perf_counter", lambda: clock[0])
+
+    def collect(target):
+        clock[0] = 11.0
+        if collector_fails:
+            raise OSError("observation failed after consuming the deadline")
+        return {"status": "unknown"}
+
+    run = session(monkeypatch, routes, observe_allowance=collect, deadline=10.0)
+    executed = []
+    with pytest.raises(ProviderError, match="expired during allowance observation"):
+        run.run("Work", lambda *args: executed.append(args), lambda result: False, observe=str)
+    assert not executed
+
+
+def test_codex_allowance_adapter_respects_billing_source_and_execution_budget(monkeypatch, routes):
+    from ai_provider import codex_usage
+
+    calls = []
+    observation = {"status": "unknown", "reason": "timeout"}
+
+    def read(*, timeout_seconds):
+        calls.append(timeout_seconds)
+        return observation
+
+    monkeypatch.setattr(codex_usage, "read_codex_allowance", read)
+    target = replace(initial(routes), timeout_seconds=3)
+    assert codex_usage.read_execution_allowance(target) is observation
+    assert calls == [3]
+    assert codex_usage.read_execution_allowance(replace(target, timeout_seconds=30)) is observation
+    assert calls == [3, 15]
+    assert (
+        codex_usage.read_execution_allowance(
+            replace(target, billing_source=BillingSource.OPENAI_API_BILLING)
+        )
+        is None
+    )
+    assert (
+        codex_usage.read_execution_allowance(
+            replace(target, access_method=AccessMethod.COPILOT_CLI)
+        )
+        is None
+    )
+    assert calls == [3, 15]
+
+
+def test_allowance_observations_follow_actual_attempts_and_stay_out_of_handoff(monkeypatch, routes):
+    reads = []
+    saved = []
+
+    def collect(target):
+        reads.append(target.route_id)
+        return {"status": "available", "windows": [{"used_percent": 10}]}
+
+    run = session(monkeypatch, routes, observe_allowance=collect, save_handoff=saved.append)
+    assert reads == []  # Authentication preflight does not collect unused accounts.
+    run.run(
+        "Work",
+        lambda *_: ExternalAgentResult((), 1, "", "usage limit reached"),
+        external_usage_limit,
+        observe=str,
+    )
+    assert reads == ["codex", "copilot", "kiro"]
+    assert len(run.allowance_observations) == 3
+    assert len(saved) == 1
+    assert "allowance_observations" not in saved[0]
+    assert "windows" not in json.dumps(saved[0])
 
 
 def test_default_preserves_original_quality_and_explicit_task_minimum_allows_downgrade(routes):
@@ -612,7 +762,7 @@ def test_quota_words_in_success_or_tool_output_do_not_trigger_switch():
     assert external_usage_limit(replace(result, returncode=1, stderr="You've hit your usage limit"))
 
 
-def test_copilot_auth_rpc_creates_no_model_session_and_closes_process(monkeypatch):
+def test_copilot_auth_rpc_creates_no_model_session():
     body = json.dumps({"jsonrpc": "2.0", "id": 1, "result": {"isAuthenticated": True}}).encode()
     process = SimpleNamespace(
         stdin=io.BytesIO(),
@@ -621,18 +771,77 @@ def test_copilot_auth_rpc_creates_no_model_session_and_closes_process(monkeypatc
         kill=lambda: None,
         wait=lambda **kwargs: None,
     )
-    calls = []
-    monkeypatch.setattr(
-        "ai_provider.agent_readiness.subprocess.Popen",
-        lambda command, **kwargs: calls.append(command) or process,
+    assert _exchange_copilot_auth(cast(subprocess.Popen[bytes], process), time.monotonic() + 1) == [
+        {"authenticated": True}
+    ]
+    request = process.stdin.getvalue().split(b"\r\n\r\n", 1)[1]
+    assert json.loads(request) == {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "auth.getStatus",
+        "params": {},
+    }
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        {"jsonrpc": "2.0", "id": True, "result": {"isAuthenticated": True}},
+        {"jsonrpc": "2.0", "id": 1.0, "result": {"isAuthenticated": True}},
+        {"jsonrpc": "1.0", "id": 1, "result": {"isAuthenticated": True}},
+        {"id": 1, "result": {"isAuthenticated": True}},
+        {"jsonrpc": "2.0", "id": 1, "result": {"isAuthenticated": True}, "error": {}},
+        {"jsonrpc": "2.0", "id": 1, "result": [True]},
+        {"jsonrpc": "2.0", "id": 1, "result": {"isAuthenticated": 1}},
+        [],
+    ],
+)
+def test_copilot_auth_refuses_malformed_rpc_success(response):
+    body = json.dumps(response).encode()
+    process = SimpleNamespace(
+        stdin=io.BytesIO(),
+        stdout=io.BytesIO(f"Content-Length: {len(body)}\r\n\r\n".encode() + body),
+        poll=lambda: None,
+        kill=lambda: None,
+        wait=lambda **kwargs: None,
     )
-    assert _copilot_authenticated("copilot", 1)
-    assert "--stdio" in calls[0]
-    assert process.stdin.closed and process.stdout.closed
+    with pytest.raises(ValueError):
+        _exchange_copilot_auth(cast(subprocess.Popen[bytes], process), time.monotonic() + 1)
+
+
+@pytest.mark.parametrize("header", [b"x" * 1025 + b"\n", b"Content-Length: 5\r\n" + b"x" * 1025])
+def test_copilot_auth_header_reads_are_bounded(header):
+    sizes = []
+
+    class BoundedStream(io.BytesIO):
+        def readline(self, size: int | None = -1) -> bytes:
+            sizes.append(size)
+            assert size is not None and 0 < size <= 1025
+            return super().readline(size)
+
+    process = SimpleNamespace(
+        stdin=io.BytesIO(),
+        stdout=BoundedStream(header),
+        poll=lambda: None,
+        kill=lambda: None,
+        wait=lambda **kwargs: None,
+    )
+    with pytest.raises(ValueError):
+        _exchange_copilot_auth(cast(subprocess.Popen[bytes], process), time.monotonic() + 1)
+    assert sizes
 
 
 def test_cli_continues_codex_partial_edit_via_copilot(monkeypatch, tmp_path, capsys):
     from ai_agent import repo_coding_assistant as cli
+
+    allowance_reads = []
+
+    def collect(**kwargs):
+        allowance_reads.append(kwargs)
+        return {"status": "unknown", "source": "codex_app_server", "reason": "fixture"}
+
+    monkeypatch.setattr("ai_provider.codex_usage.read_codex_allowance", collect)
+    monkeypatch.setattr("ai_provider.copilot_usage.read_copilot_allowance", collect)
 
     catalog = tmp_path / "catalog.toml"
     catalog.write_text("""[[models]]
@@ -724,6 +933,7 @@ tools = true
         == 0
     )
     assert order == ["auth", "auth", "codex_cli", "copilot_cli"]
+    assert len(allowance_reads) == 2
     namespace = {}
     exec(source.read_text(), namespace)
     exec(test.read_text(), namespace)

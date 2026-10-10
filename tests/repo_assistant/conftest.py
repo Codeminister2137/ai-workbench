@@ -12,6 +12,39 @@ def mock_fallback_account_checks(monkeypatch):
         "ai_provider.execution_fallback.check_agent_readiness",
         lambda method: AgentReadiness(method.value == "codex_cli", "mocked account check"),
     )
+    monkeypatch.setattr(
+        "ai_provider.codex_usage.read_codex_allowance",
+        lambda **kwargs: {
+            "status": "unknown",
+            "source": "codex_app_server",
+            "reason": "mocked_account_check",
+            "observed_at_utc": None,
+            "windows": [],
+            "cleanup_verified": True,
+        },
+    )
+    monkeypatch.setattr(
+        "ai_provider.copilot_usage.read_copilot_allowance",
+        lambda **kwargs: {
+            "status": "unknown",
+            "source": "copilot_account_quota",
+            "reason": "mocked_account_check",
+            "observed_at_utc": None,
+            "windows": [],
+            "cleanup_verified": True,
+        },
+    )
+    monkeypatch.setattr(
+        "ai_provider.kiro_usage.read_kiro_allowance",
+        lambda **kwargs: {
+            "status": "unknown",
+            "source": "kiro_isolated_v2_usage",
+            "reason": "mocked_account_check",
+            "observed_at_utc": None,
+            "windows": [],
+            "cleanup_verified": True,
+        },
+    )
 
 
 @pytest.fixture(autouse=True)

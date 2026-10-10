@@ -49,6 +49,7 @@ from ai_provider import (
     OllamaResourceProfile as OllamaResourceProfile,
 )
 from ai_provider import PrivacyClass as ProviderPrivacyClass  # noqa: F401 - compatibility export
+from ai_provider.account_usage import read_execution_allowance
 from ai_provider.chat_transcripts import (
     DEFAULT_CHAT_TRANSCRIPT_DB,
     ChatSessionRecord,
@@ -220,6 +221,9 @@ from ai_agent.external_reporting import (
 )
 from ai_agent.external_reporting import (
     external_agent_exception_hint as _external_agent_exception_hint,  # noqa: F401 - compatibility export
+)
+from ai_agent.external_reporting import (
+    external_agent_exception_reason as _external_agent_exception_reason,
 )
 from ai_agent.external_reporting import (
     external_agent_failure_hint as _external_agent_failure_hint,  # noqa: F401 - compatibility export
@@ -1275,6 +1279,7 @@ def _execute_request(
                 target, args, repo_root, probe_provider=False
             ),
             enabled=args.fallback_enabled,
+            observe_allowance=read_execution_allowance,
             quality_policy=args.fallback_quality_policy,
             save_handoff=lambda summary: _save_fallback_handoff(
                 repo_root, {"objective": args.prompt or "", **summary}
@@ -2440,6 +2445,8 @@ def _execute_fallback_route(
             approval_policy=args.approval_policy,
             sandbox=config.sandbox,
             mode=args.mode,
+            shared_tool_profile=config.shared_tool_profile,
+            shared_approval_policy=config.approval_policy,
         )
         return _run_external_agent(
             external_prompt,
@@ -2490,7 +2497,7 @@ def _run_external_agent_with_fallback(
     progress_callback: Any = None,
 ) -> ExternalAgentResult:
     session = getattr(args, "fallback_session", None)
-    if session is None or not session.enabled:
+    if session is None:
         return _run_external_agent(prompt, config, progress_callback=progress_callback)
     args.shared_task_id = config.shared_task_id
 
@@ -2747,6 +2754,8 @@ def _run_external_agent_cli_mode(
                 approval_policy=args.approval_policy,
                 sandbox=config.sandbox,
                 mode=args.mode,
+                shared_tool_profile=config.shared_tool_profile,
+                shared_approval_policy=config.approval_policy,
             )
             primary_started = time.perf_counter()
             external_result = _run_external_agent_with_fallback(
@@ -2826,8 +2835,8 @@ def _run_external_agent_cli_mode(
         subprocess.TimeoutExpired,
         ProviderError,
     ) as exc:
-        print(f"failure_reason: {exc}")
-        failure_reason = str(exc)
+        failure_reason = _external_agent_exception_reason(exc)
+        print(f"failure_reason: {failure_reason}")
         if isinstance(exc, subprocess.TimeoutExpired):
             _print_external_agent_timeout_output(exc)
         hint = _external_agent_exception_hint(exc)
@@ -2838,7 +2847,7 @@ def _run_external_agent_cli_mode(
             orchestrated_tracker.complete_stage(
                 "implementation",
                 status="failed",
-                details={"failure_reason": str(exc), **_fallback_details(args)},
+                details={"failure_reason": failure_reason, **_fallback_details(args)},
             )
         exit_code = 1
 
@@ -2875,6 +2884,8 @@ def _run_external_agent_cli_mode(
                     approval_policy=args.approval_policy,
                     sandbox=repair_config.sandbox,
                     mode=args.mode,
+                    shared_tool_profile=repair_config.shared_tool_profile,
+                    shared_approval_policy=repair_config.approval_policy,
                 )
                 repair_result = _run_external_agent_with_fallback(
                     repair_external_prompt,
@@ -2977,8 +2988,25 @@ def _external_agent_prompt_with_execution_metadata(
     approval_policy: str,
     sandbox: str,
     mode: str,
+    shared_tool_profile: str | None = None,
+    shared_approval_policy: str | None = None,
 ) -> str:
-    """Add execution metadata so external agents do not infer the wrong sandbox."""
+    """Describe native and shared enforcement without granting tool authority."""
+
+    shared_note = ""
+    if shared_tool_profile is not None:
+        shared_note = (
+            f"\nshared_tool_profile: {shared_tool_profile}\n"
+            f"shared_tool_approval_policy: {shared_approval_policy}\n"
+            "shared_tools_note: repo_shared tools execute through the project-owned "
+            "host with separate per-call workspace and approval enforcement. The "
+            "native client sandbox describes native tools; it does not by itself "
+            "report whether a shared-tool operation is permitted. Use shared tools "
+            "for requested work within the selected profile and policy; a coding "
+            "profile alone does not authorize edits. Honor task restrictions and "
+            "actual tool denials. Do not retry a denied operation through native "
+            "tools or another route, and do not request broader permissions."
+        )
 
     return (
         "# Repo assistant system prompt\n"
@@ -2988,10 +3016,11 @@ def _external_agent_prompt_with_execution_metadata(
         f"repo_assistant_mode: {mode}\n"
         f"repo_assistant_approval_policy: {approval_policy}\n"
         f"codex_sandbox: {sandbox}\n"
-        "filesystem_note: Use the sandbox value above as the effective Codex CLI "
-        "filesystem policy for this run. Do not describe the session as read-only "
-        "unless a command result explicitly reports a read-only or permission-denied "
-        "failure."
+        "filesystem_note: The sandbox value above is the native client filesystem "
+        "policy. Respect its restrictions. Report permission failures from observed "
+        "tool results rather than assuming that all execution surfaces have the "
+        "same policy."
+        f"{shared_note}"
     )
 
 
@@ -3072,7 +3101,7 @@ def _run_native_agent(
         task = session.session_id if session else "current foreground task"
         operation = json.dumps(call.arguments, ensure_ascii=True)
         try:
-            answer = input(
+            answer = getattr(args, "_coding_chat_approval_read", input)(
                 f"Task: {task}\nWorkspace: {repo_root.resolve()}\n"
                 f"Allow {category.value} tool '{call.name}' {operation}? [y/N]: "
             )
