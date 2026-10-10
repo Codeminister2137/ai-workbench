@@ -58,6 +58,55 @@ def test_invalid_pyproject_is_reported_explicitly(tmp_path):
     assert "Cannot read workspace pyproject.toml" in result.output
 
 
+def test_outside_project_resolution_refuses_before_reading_contents(tmp_path, monkeypatch):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    project = workspace / "pyproject.toml"
+    project.write_text('[project]\nrequires-python = "PRIVATE_MARKER"\n', encoding="utf-8")
+    outside = tmp_path / "private.toml"
+    outside.write_bytes(project.read_bytes())
+    original_resolve = Path.resolve
+    original_read = Path.read_text
+    reads = []
+
+    # Model a file-link resolution without requiring Windows symlink privileges.
+    # The existing junction/search tests exercise actual reparse-point traversal.
+    def resolve(path, *args, **kwargs):
+        return outside if path == project else original_resolve(path, *args, **kwargs)
+
+    def read(path, *args, **kwargs):
+        reads.append(path)
+        return original_read(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "resolve", resolve)
+    monkeypatch.setattr(Path, "read_text", read)
+    result = PythonRuntimeTool().run(ToolCall("python_runtime", {}), ToolContext(workspace))
+
+    assert result.is_error
+    assert "outside" in result.output
+    assert "PRIVATE_MARKER" not in result.output
+    assert project not in reads and outside not in reads
+
+
+def test_inside_project_link_resolution_retains_workspace_hints(tmp_path, monkeypatch):
+    target = tmp_path / "project-settings.toml"
+    target.write_text('[project]\nrequires-python = ">=3.13"\n', encoding="utf-8")
+    project = tmp_path / "pyproject.toml"
+    project.write_bytes(target.read_bytes())
+    original_resolve = Path.resolve
+    monkeypatch.setattr(
+        Path,
+        "resolve",
+        lambda path, *args, **kwargs: target
+        if path == project
+        else original_resolve(path, *args, **kwargs),
+    )
+    result = PythonRuntimeTool().run(ToolCall("python_runtime", {}), ToolContext(tmp_path))
+
+    assert not result.is_error
+    assert result.metadata["workspace"]["workspace_requires_python"] == ">=3.13"
+
+
 def test_tool_is_available_to_native_and_shared_coding_profiles(tmp_path):
     assert "python_runtime" in CODING_PROFILE.tool_names
     assert isinstance(default_coding_tools().get("python_runtime"), PythonRuntimeTool)

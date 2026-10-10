@@ -31,7 +31,9 @@ class PythonRuntimeTool(BaseTool):
     def execute(self, arguments: dict[str, Any], context: ToolContext) -> ToolResult:
         del arguments
         workspace = context.workspace_root.resolve()
-        project_file = workspace / "pyproject.toml"
+        project_file = context.resolve_path(workspace / "pyproject.toml")
+        if not context.is_within_workspace(project_file):
+            raise ValueError("Workspace pyproject.toml resolves outside the workspace boundary")
         requires_python = None
         if project_file.is_file():
             try:

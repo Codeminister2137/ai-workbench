@@ -181,16 +181,23 @@ class DeadlineClient:
             self.config,
             timeout_seconds=min(self.config.timeout_seconds, remaining(self.deadline, self.clock)),
         )
-        response = self.factory(config).complete(request)
+        started = self.clock()
+        measurement: dict[str, Any] = {"source": "unavailable"}
+        try:
+            response = self.factory(config).complete(request)
+            measurement.update(
+                {
+                    "source": response.usage.source.value,
+                    "input_tokens": response.usage.input_tokens,
+                    "output_tokens": response.usage.output_tokens,
+                    "total_tokens": response.usage.total_tokens,
+                }
+            )
+        finally:
+            measurement["elapsed_seconds"] = self.clock() - started
+            self.usage.append(measurement)
+        # Late responses still consumed resources, even though the job must fail.
         remaining(self.deadline, self.clock)
-        self.usage.append(
-            {
-                "source": response.usage.source.value,
-                "input_tokens": response.usage.input_tokens,
-                "output_tokens": response.usage.output_tokens,
-                "total_tokens": response.usage.total_tokens,
-            }
-        )
         return response
 
     def stream(self, request: AIRequest) -> Iterator[AIStreamEvent]:
@@ -245,6 +252,7 @@ def run_fixture(
     validator: Callable[..., int] = validate_fixture,
 ) -> dict[str, Any]:
     """Run one immutable fixture; failures retain files and observed receipts."""
+    started = clock()
     fixture = artifact / "fixture"
     check_plain_path(fixture)
     fixture.mkdir()
@@ -332,4 +340,6 @@ def run_fixture(
     except Exception as exc:
         result["passed"] = False
         result["reason"] = f"{type(exc).__name__}: {exc}"[:2000]
+    finally:
+        result["elapsed_seconds"] = clock() - started
     return result

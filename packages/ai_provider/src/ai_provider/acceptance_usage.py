@@ -83,6 +83,24 @@ def summarize_usage(directory: Path, source: str) -> dict[str, Any]:
             raise ValueError("Worker result has no usage array")
         report["evidence"].append("worker-result.json")
         report["observed_calls"] = len(rows)
+        elapsed = _number(result.get("elapsed_seconds"))
+        if elapsed is not None:
+            report["metrics"]["elapsed_seconds"] = {
+                "value": elapsed,
+                "scope": "local_fixture_including_validation",
+            }
+        call_times = [
+            elapsed
+            for row in rows
+            if isinstance(row, dict)
+            and (elapsed := _number(row.get("elapsed_seconds"))) is not None
+        ]
+        if call_times:
+            report["metrics"]["model_elapsed_seconds"] = {
+                "value": sum(call_times),
+                "measured_calls": len(call_times),
+                "scope": "sum_of_recorded_calls",
+            }
         for provenance in ("provider_reported", "estimated"):
             matching = [
                 row for row in rows if isinstance(row, dict) and row.get("source") == provenance
@@ -98,6 +116,7 @@ def summarize_usage(directory: Path, source: str) -> dict[str, Any]:
                         "scope": "sum_of_recorded_calls",
                     }
         report["notes"].append("Missing call counters are unknown; sums may be partial")
+        report["notes"].append("Elapsed time is evidence, not a hard acceptance threshold")
         return report
 
     events = _read(directory, "stdout.jsonl")

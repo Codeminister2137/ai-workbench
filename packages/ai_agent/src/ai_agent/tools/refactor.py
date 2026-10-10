@@ -328,7 +328,7 @@ class RenameApplyTool(BaseTool):
 
         for change in plan.changes:
             _workspace_file(context.workspace_root.resolve(), str(change.path))
-            current = change.path.read_bytes()
+            current = _read_source(change.path)
             if hashlib.sha256(current).hexdigest() != change.original_sha256:
                 raise ValueError(
                     "Rename plan is stale; "
@@ -339,7 +339,7 @@ class RenameApplyTool(BaseTool):
         try:
             for change in plan.changes:
                 _workspace_file(context.workspace_root.resolve(), str(change.path))
-                current = change.path.read_bytes()
+                current = _read_source(change.path)
                 if hashlib.sha256(current).hexdigest() != change.original_sha256:
                     raise ValueError(
                         f"{change.path.relative_to(context.workspace_root)} changed during apply"
@@ -559,7 +559,8 @@ def _workspace_file(workspace: Path, raw_path: str) -> Path:
 
 
 def _read_source(path: Path) -> bytes:
-    raw = path.read_bytes()
+    with path.open("rb") as stream:
+        raw = stream.read(MAX_FILE_BYTES + 1)
     if len(raw) > MAX_FILE_BYTES:
         raise ValueError("Python source file exceeds the 512 KB preview limit")
     try:

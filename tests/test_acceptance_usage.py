@@ -7,6 +7,42 @@ from ai_provider import acceptance_usage
 
 
 class TestLocalUsage:
+    def test_elapsed_time_includes_failed_calls_without_inventing_their_tokens(self, tmp_path):
+        result = {
+            "elapsed_seconds": 9,
+            "usage": [
+                {"source": "provider_reported", "total_tokens": 12, "elapsed_seconds": 3},
+                {"source": "unavailable", "elapsed_seconds": 4},
+                {"source": "unavailable"},
+            ],
+        }
+        (tmp_path / "worker-result.json").write_text(json.dumps(result))
+        report = acceptance_usage.summarize_usage(tmp_path, "local_free")
+        assert report["metrics"]["elapsed_seconds"] == {
+            "value": 9,
+            "scope": "local_fixture_including_validation",
+        }
+        assert report["metrics"]["model_elapsed_seconds"] == {
+            "value": 7,
+            "scope": "sum_of_recorded_calls",
+            "measured_calls": 2,
+        }
+        assert report["metrics"]["provider_reported.total_tokens"]["measured_calls"] == 1
+        assert "unavailable.total_tokens" not in report["metrics"]
+
+    @pytest.mark.parametrize("value", [True, -1, float("inf"), float("nan"), "3"])
+    def test_invalid_timing_is_unknown(self, tmp_path, value):
+        (tmp_path / "worker-result.json").write_text(
+            json.dumps(
+                {
+                    "elapsed_seconds": value,
+                    "usage": [{"source": "unavailable", "elapsed_seconds": value}],
+                }
+            )
+        )
+        report = acceptance_usage.summarize_usage(tmp_path, "local_free")
+        assert report["metrics"] == {}
+
     def test_call_sums_keep_provenance_and_missing_measurements_visible(self, tmp_path):
         result = {
             "usage": [

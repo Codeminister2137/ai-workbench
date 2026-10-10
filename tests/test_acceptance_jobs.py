@@ -20,6 +20,7 @@ from ai_provider import native_admission
 from ai_provider.acceptance_harness import (
     PROTECTED,
     SOURCE,
+    DeadlineClient,
     FixtureTool,
     run_fixture,
     validate_fixture,
@@ -34,7 +35,7 @@ from ai_provider.acceptance_jobs import (
     validate_route,
 )
 from ai_provider.acceptance_processes import OwnedChild, process_identity, verify_runtime_owner
-from ai_provider.config import BackendConfig
+from ai_provider.config import BackendConfig, ProviderKind
 from ai_provider.contracts import (
     AIMessage,
     AIRequest,
@@ -43,6 +44,8 @@ from ai_provider.contracts import (
     BackendInfo,
     BackendLocation,
     MessageRole,
+    UsageMetadata,
+    UsageSource,
 )
 from ai_provider.errors import ProviderError, ProviderErrorCategory
 
@@ -321,6 +324,44 @@ class FakeClient:
         raise NotImplementedError
 
 
+@pytest.mark.parametrize("outcome", ["success", "failure", "late"])
+def test_local_call_measurement_retains_failed_and_late_resource_use(outcome: str) -> None:
+    ticks = [10.0]
+    usage: list[dict[str, Any]] = []
+    response = AIResponse(
+        AIMessage(MessageRole.ASSISTANT, "done"),
+        BackendInfo("ollama", "fixture", BackendLocation.LOCAL),
+        usage=UsageMetadata(UsageSource.PROVIDER_REPORTED, 10, 2, 12),
+    )
+
+    class Client(FakeClient):
+        def complete(self, request: AIRequest) -> AIResponse:
+            ticks[0] += 3
+            if outcome == "failure":
+                raise RuntimeError("fixture failure")
+            return response
+
+    client = DeadlineClient(
+        BackendConfig(ProviderKind.OLLAMA, "fixture"),
+        12 if outcome == "late" else 30,
+        lambda timeout: None,
+        lambda config: Client(config, [], []),
+        usage,
+        lambda: ticks[0],
+    )
+    request = AIRequest((AIMessage(MessageRole.USER, "fixture"),))
+    if outcome == "success":
+        assert client.complete(request) is response
+    else:
+        with pytest.raises(RuntimeError if outcome == "failure" else TimeoutError):
+            client.complete(request)
+    assert usage[0]["elapsed_seconds"] == 3
+    if outcome == "failure":
+        assert usage == [{"source": "unavailable", "elapsed_seconds": 3}]
+    else:
+        assert usage[0]["source"] == "provider_reported" and usage[0]["total_tokens"] == 12
+
+
 @pytest.mark.parametrize("actual", [True, False])
 def test_fixture_requires_real_tools_preserves_instructions_and_durable_receipts(
     job: AcceptanceJob, tmp_path: Path, monkeypatch, actual
@@ -360,6 +401,8 @@ def test_fixture_requires_real_tools_preserves_instructions_and_durable_receipts
         validator=validator,
     )
     assert result["passed"] is actual
+    assert result["elapsed_seconds"] >= 0
+    assert all(row["elapsed_seconds"] >= 0 for row in result["usage"])
     assert requests and all(
         request.model == job.model and request.max_output_tokens == 512 for request in requests
     )

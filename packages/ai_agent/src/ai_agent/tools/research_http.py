@@ -39,7 +39,7 @@ def public_endpoint(url: str) -> tuple[str, str, int, str, str]:
         or "\\" in url
     ):
         raise ValueError("Use a public HTTP(S) URL without credentials or control characters")
-    port = parsed.port or (443 if parsed.scheme == "https" else 80)
+    port = parsed.port if parsed.port is not None else (443 if parsed.scheme == "https" else 80)
     if port not in {80, 443}:
         raise ValueError("Research fetching supports public ports 80 and 443 only")
     addresses = socket.getaddrinfo(parsed.hostname, port, type=socket.SOCK_STREAM)

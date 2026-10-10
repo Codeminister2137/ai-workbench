@@ -211,20 +211,14 @@ def research_command(task: ResearchTask, database: Path) -> list[str]:
         "--model",
         task.model,
         *task.settings.worker_arguments(),
-        *(
-            [
-                "--max-action-rounds",
-                "20",
-                "--timeout-seconds",
-                "300",
-                "--context-budget-chars",
-                "1500",
-                "--log-file",
-                str(task_artifact_directory(task, database) / "assistant.log"),
-            ]
-            if task.task_kind == "acceptance"
-            else []
-        ),
+        "--max-action-rounds",
+        "20" if task.task_kind == "acceptance" else "40",
+        "--timeout-seconds",
+        "300",
+        "--context-budget-chars",
+        "1500",
+        "--log-file",
+        str(task_artifact_directory(task, database) / "assistant.log"),
         "--",
         task.prompt,
     ]

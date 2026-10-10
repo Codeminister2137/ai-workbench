@@ -15,11 +15,13 @@ from ai_agent.shared_approvals import scoped_registry
 from ai_agent.tool_profiles import CODING_PROFILE, shared_tool_registry
 from ai_agent.tools import ToolContext, default_coding_tools
 from ai_agent.tools.refactor import (
+    MAX_FILE_BYTES,
     PythonNavigateTool,
     RenameApplyTool,
     RenamePlanStore,
     RenamePreviewTool,
     _jedi_rename,
+    _read_source,
 )
 
 
@@ -64,7 +66,99 @@ def preview(root: Path, source: Path, line: int, column: int, new_name: str):
     return store, result
 
 
+@pytest.fixture
+def bounded_source_reads(monkeypatch):
+    """Assert the resource contract without allocating a huge source fixture."""
+    original = Path.open
+    requested = []
+
+    class GuardedReader:
+        def __init__(self, stream):
+            self.stream = stream
+
+        def __enter__(self):
+            self.stream.__enter__()
+            return self
+
+        def __exit__(self, *args):
+            return self.stream.__exit__(*args)
+
+        def read(self, size=-1):
+            requested.append(size)
+            assert 0 < size <= MAX_FILE_BYTES + 1, "Source reads must be bounded"
+            return self.stream.read(size)
+
+    def open_file(path, mode="r", *args, **kwargs):
+        stream = original(path, mode, *args, **kwargs)
+        return GuardedReader(stream) if mode == "rb" else stream
+
+    monkeypatch.setattr(Path, "open", open_file)
+    return requested
+
+
+def test_source_read_accepts_exact_limit_without_an_unbounded_read(tmp_path, bounded_source_reads):
+    source = tmp_path / "limit.py"
+    contents = b"#" + b" " * (MAX_FILE_BYTES - 1)
+    source.write_bytes(contents)
+    assert _read_source(source) == contents
+    assert bounded_source_reads
+
+
+@pytest.mark.parametrize("tool_name", ["rename_preview", "python_navigate"])
+def test_oversized_source_refuses_before_analysis(
+    tmp_path, monkeypatch, bounded_source_reads, tool_name
+):
+    source = tmp_path / "large.py"
+    source.write_bytes(b"value = 1\n#" + b" " * MAX_FILE_BYTES)
+    monkeypatch.setattr(
+        "ai_agent.tools.refactor._jedi_rename", lambda *a: pytest.fail("must not analyze")
+    )
+    monkeypatch.setattr(
+        "ai_agent.tools.refactor._jedi_navigate", lambda *a: pytest.fail("must not analyze")
+    )
+    tool = (
+        RenamePreviewTool(RenamePlanStore(tmp_path))
+        if tool_name == "rename_preview"
+        else PythonNavigateTool()
+    )
+    result = tool.run(
+        ToolCall(
+            tool_name,
+            {
+                "path": source.name,
+                "line": 1,
+                "column": 1,
+                "new_name": "other",
+                "operation": "definitions",
+            },
+        ),
+        ToolContext(tmp_path),
+    )
+    assert result.is_error and "512 KB" in result.output
+    assert bounded_source_reads and source.stat().st_size > MAX_FILE_BYTES
+
+
 class TestRenamePreview:
+    def test_apply_refuses_a_file_grown_past_the_limit_before_any_write(
+        self, tmp_path, jedi_required, monkeypatch
+    ):
+        source, caller = package_fixture(tmp_path)
+        store, result = preview(tmp_path, source, 1, 7, "Gadget")
+        original_source = source.read_bytes()
+        caller.write_bytes(b"#" + b" " * MAX_FILE_BYTES)
+        original_read = Path.read_bytes
+        monkeypatch.setattr(
+            Path, "read_bytes", lambda path: pytest.fail("Apply must not load unbounded source")
+        )
+        applied = RenameApplyTool(store).run(
+            ToolCall("rename_apply", {"plan_id": result.metadata["plan_id"]}),
+            ToolContext(tmp_path),
+        )
+        assert applied.is_error and "512 KB" in applied.output
+        assert original_read(source) == original_source
+        assert caller.stat().st_size == MAX_FILE_BYTES + 1
+        assert store.get(result.metadata["plan_id"], ToolContext(tmp_path)) is None
+
     def test_preview_tracks_imports_and_calls_without_mutating(self, tmp_path, jedi_required):
         source, caller = package_fixture(tmp_path)
         before = {path: path.read_bytes() for path in (source, caller)}

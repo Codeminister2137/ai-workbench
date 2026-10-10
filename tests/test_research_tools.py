@@ -154,6 +154,13 @@ def test_fetch_rejects_unsafe_urls(url):
         research_http.public_endpoint(url)
 
 
+@pytest.mark.parametrize("scheme", ["http", "https"])
+def test_explicit_zero_port_is_rejected_before_dns(monkeypatch, scheme):
+    monkeypatch.setattr(socket, "getaddrinfo", lambda *a, **k: pytest.fail("DNS queried"))
+    with pytest.raises(ValueError, match="ports 80 and 443"):
+        research_http.public_endpoint(f"{scheme}://example.com:0/")
+
+
 def fake_http(monkeypatch, responses):
     requests = []
     monkeypatch.setattr(
@@ -261,6 +268,16 @@ def test_redirect_is_revalidated_before_connection(monkeypatch):
         ],
     )
     with pytest.raises(ValueError, match="non-public"):
+        research_http.fetch_public_url("https://example.com/")
+    assert requests[-1] == "closed"
+    assert len(requests) == 3
+
+
+def test_redirect_to_zero_port_does_not_connect_to_a_substituted_default(monkeypatch):
+    requests = fake_http(
+        monkeypatch, [response(status=302, Location="https://example.com:0/redirected")]
+    )
+    with pytest.raises(ValueError, match="ports 80 and 443"):
         research_http.fetch_public_url("https://example.com/")
     assert requests[-1] == "closed"
     assert len(requests) == 3

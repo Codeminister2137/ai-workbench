@@ -197,6 +197,18 @@ def test_worker_command_passes_real_research_validation_without_side_effects(sto
     assert not (task.repo_root / args.research_report).exists()
 
 
+def test_scheduled_topic_has_enough_tool_rounds_for_source_collection_and_report(store):
+    """A topic needs multiple fetches and a report, beyond the coding default of three."""
+    task = store.get_task("first")
+    parser = build_argument_parser()
+    args = parser.parse_args(research_command(task, store.path)[3:])
+    assert args.max_action_rounds == 40
+    assert args.timeout_seconds == 300
+    assert args.context_budget_chars == 1500
+    assert args.log_file.parent == args.research_report.parent
+    assert not (task.repo_root / args.log_file).exists()
+
+
 def test_report_paths_are_queue_specific_and_do_not_embed_task_ids(tmp_path) -> None:
     task = ResearchTask("../../outside / label", tmp_path, "Public research", "local", 60)
     parser = build_argument_parser()
