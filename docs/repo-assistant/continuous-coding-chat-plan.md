@@ -6,6 +6,17 @@ records the decision. Initial controller/terminal integration is implemented
 offline; full migration quality/cost acceptance remains INCOMPLETE. Alternatives
 below preserve the reviewed proposal.
 
+The next foreground slice accepts queued in-flight corrections with immediate
+local transcript persistence, fresh approval prompt IDs and one joined terminal
+reader. Multiple queued messages use the latest request with earlier owner text
+retained in history. Restart does not automatically execute saved input. Running
+effects are not preempted by queued text; Ctrl+C retains reconciliation semantics.
+The owner subsequently accepted deterministic local long-history reduction:
+retain all owner messages/host outcomes, shorten older assistant reports visibly,
+keep originals retrievable and refuse mandatory-context overflow. This now runs
+without summary inference or schema changes, including after restart.
+Deterministic history/input evidence is not model-quality or cost evidence.
+
 ## Required outcome
 
 The owner can conduct ongoing development conversations in the project CLI:
@@ -97,7 +108,10 @@ review. Include the owner's existing conversation style, not just single-turn
 synthetic edits. Agree concrete tasks and acceptable regression criteria before
 claiming parity; a test pass count alone cannot establish model quality.
 The [20-case comparison set](coding-chat-quality-cases.md) is prepared as a
-reviewable starting point; execution and the acceptance threshold remain pending.
+reviewable starting point. The owner accepted strict per-required-case baseline
+assessment; representative execution remains pending. ADR-050 records the
+accepted economic metrics, 20% external savings target with case-by-case review
+below target, and automatic integration direction.
 
 Compare current-assistant baseline, CLI without delegation, and CLI with bounded
 delegation where available. Match primary model/configuration/context as closely
@@ -106,8 +120,11 @@ effects, regression/security coverage, evidence-based reviews, instruction and
 decision retention, and permission compliance. Human review supplements executable
 checks; no parity claim is justified by one successful fixture.
 
-Record latency, primary/delegated token use, API cost where estimable and
-subscription allowance consumption separately. Extra delegation requests or
+Record elapsed time and total primary/delegated token use, including failures
+and retries. External economic comparisons use API spend or subscription
+allowance consumption as applicable; local comparisons record total tokens and
+use elapsed time as the practical resource measurement. Consider time without a
+hard median-completion-time rejection gate. Extra delegation requests or
 larger summaries can outweigh savings. Do not equate fewer tokens with lower
 subscription charges or promise savings without measurements. Primary agents
 retain architecture/implementation responsibility; delegated output remains

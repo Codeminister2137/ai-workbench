@@ -203,7 +203,8 @@ def build_argument_parser() -> argparse.ArgumentParser:
         default=DEFAULT_CODING_CHAT_HISTORY_BUDGET_CHARS,
         help=(
             "Maximum rendered conversation characters in coding-chat (0 disables this "
-            "limit). Overflow refuses a turn rather than silently losing decisions; "
+            "limit). Older assistant reports shorten first; owner text and outcomes "
+            "remain intact. Mandatory-context overflow refuses execution; "
             "provider input limits still apply."
         ),
     )

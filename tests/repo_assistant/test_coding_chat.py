@@ -54,6 +54,172 @@ def test_followup_preserves_owner_decisions_and_failed_validation(tmp_path: Path
     ]
 
 
+def test_inflight_correction_is_durable_and_not_duplicated_or_replayed(tmp_path: Path):
+    from ai_agent.coding_chat_input import CodingChatInput
+
+    chat = controller(tmp_path)
+    terminal = CodingChatInput(lambda text: None, chat.stage)
+    requests = []
+
+    def execute(request):
+        requests.append(request)
+        if len(requests) == 1:
+            terminal.feed("/steer Correction: keep the provider boundary intact")
+        return CodingTurnResult(0, "original turn report", "completed")
+
+    chat.turn("Implement the approved change", execute)
+    staged = terminal.read("unused")
+    restarted = CodingChatController(chat.store, "conversation", tmp_path, "local_only")
+    assert "Correction: keep the provider boundary intact" in restarted.history()
+    assert "queued_not_executed" in restarted.history()
+    chat.turn(staged, execute)
+    assert requests[-1].text == "Correction: keep the provider boundary intact"
+    assert "original turn report" in requests[-1].history
+    assert "Correction:" not in requests[-1].history
+    assert len(chat.store.list_messages("conversation")) == 4
+    with pytest.raises(CodingChatInputError, match="already attempted"):
+        chat.turn(staged, execute)
+
+
+def test_inflight_correction_survives_interruption_without_automatic_replay(tmp_path: Path):
+    chat = controller(tmp_path)
+
+    def execute(request):
+        chat.stage("Do not use an external provider")
+        raise KeyboardInterrupt
+
+    with pytest.raises(KeyboardInterrupt):
+        chat.turn("Inspect the source", execute)
+    resumed = CodingChatController(chat.store, "conversation", tmp_path, "local_only")
+    assert "Do not use an external provider" in resumed.history()
+    assert "queued_not_executed" in resumed.history()
+    assert "interrupted" in resumed.history()
+
+
+def test_queued_input_is_scoped_to_its_conversation(tmp_path: Path):
+    first = controller(tmp_path)
+    queued = first.stage("Use no new dependencies")
+    other = tmp_path / "other"
+    other.mkdir()
+    second = controller(other)
+    with pytest.raises(CodingChatInputError, match="different conversation"):
+        second.turn(queued, lambda request: pytest.fail("must not execute"))
+
+
+def test_multiple_inflight_corrections_use_latest_request_with_all_owner_context(tmp_path):
+    from ai_agent.coding_chat_input import CodingChatInput
+
+    chat = controller(tmp_path)
+    terminal = CodingChatInput(lambda text: None, chat.stage)
+    terminal.feed("Add the dependency")
+    terminal.feed("Correction: use the standard library instead")
+    requests = []
+    chat.turn(
+        terminal.read("unused"),
+        lambda request: requests.append(request) or CodingTurnResult(0, "done", "completed"),
+    )
+    assert requests[0].text == "Correction: use the standard library instead"
+    assert "Add the dependency" in requests[0].history
+    assert not terminal.pending
+    assert len(chat.store.list_messages("conversation")) == 3
+
+
+def test_actual_cli_inflight_steering_is_separate_from_native_tool_approval(tmp_path, monkeypatch):
+    import threading
+
+    from ai_agent.coding_chat_input import CodingChatInput
+    from ai_provider import (
+        AIMessage,
+        AIResponse,
+        AIToolCall,
+        BackendInfo,
+        BackendLocation,
+        MessageRole,
+    )
+
+    queued = threading.Event()
+    started = threading.Event()
+    sent = []
+    terminal = CodingChatInput()
+
+    def write(text):
+        if text.startswith("coding_chat_queued"):
+            queued.set()
+
+    terminal.write = write
+
+    def poll():
+        if started.is_set() and not sent:
+            sent.append("correction")
+            return "/steer Correction: no edits; only explain the boundary"
+        if terminal.ticket and len(sent) == 1:
+            sent.append("stale")
+            return "/approve stale-ticket yes"
+        if terminal.ticket and len(sent) == 2:
+            sent.append("deny")
+            return f"/approve {terminal.ticket} no"
+        return None
+
+    original = terminal.in_flight
+    monkeypatch.setattr(terminal, "in_flight", lambda: original(poll))
+
+    def create_terminal(*, stage):
+        terminal.stage = stage
+        return terminal
+
+    monkeypatch.setattr("ai_agent.coding_chat_cli.CodingChatInput", create_terminal)
+    monkeypatch.setattr("builtins.input", lambda prompt: "/exit")
+    requests = []
+
+    class Client:
+        backend = BackendInfo("ollama", "gpt-oss:20b", BackendLocation.LOCAL)
+
+        def complete(self, request):
+            requests.append(request)
+            if len(requests) == 1:
+                started.set()
+                assert queued.wait(2)
+                message = AIMessage(
+                    MessageRole.ASSISTANT,
+                    "",
+                    tool_calls=(
+                        AIToolCall("edit", "create_file", {"path": "denied.txt", "content": "x"}),
+                    ),
+                )
+            else:
+                message = AIMessage(MessageRole.ASSISTANT, "Boundary explanation")
+            return AIResponse(message, self.backend)
+
+    monkeypatch.setattr(_EXAMPLE, "create_chat_client", lambda config: Client())
+    main(
+        [
+            "--mode",
+            "coding-chat",
+            "--execute",
+            "--repo-root",
+            str(tmp_path),
+            "--provider",
+            "ollama",
+            "--model",
+            "gpt-oss:20b",
+            "--skip-prompt-review",
+            "--approval-policy",
+            "interactive",
+            "Make the previously requested edit",
+        ]
+    )
+    assert len(requests) == 3
+    assert not (tmp_path / "denied.txt").exists()
+    assert "Correction: no edits" in "\n".join(m.content for m in requests[-1].messages)
+    assert terminal.closed and terminal.thread is None
+    store = SQLiteChatTranscriptStore(tmp_path / "data/repo-assistant-chats.sqlite3")
+    session = store.latest_session(repo_root=tmp_path)
+    assert session is not None
+    messages = store.list_messages(session.session_id)
+    assert len(messages) == 4
+    assert messages[1].content == "Correction: no edits; only explain the boundary"
+
+
 def test_budget_refuses_before_execution_without_losing_history(tmp_path: Path) -> None:
     chat = controller(tmp_path, budget=500)
     chat.turn("A" * 450, lambda request: CodingTurnResult(0, "result", "completed"))
@@ -219,6 +385,137 @@ def test_cli_restart_preserves_history_and_refuses_unreconciled_interruption(tmp
     )
     assert "Edit the file" in captured[0]
     assert "interrupted" in captured[0]
+
+
+def test_actual_partial_edit_interrupt_requires_reconciliation_and_fresh_denial(
+    tmp_path, monkeypatch
+):
+    from ai_provider import (
+        AIMessage,
+        AIResponse,
+        AIToolCall,
+        BackendInfo,
+        BackendLocation,
+        MessageRole,
+    )
+
+    source = tmp_path / "source.py"
+    source.write_text("value = 0\n")
+    protected = tmp_path / "protected.txt"
+    protected.write_text("owner-owned evidence\n")
+    database = tmp_path / "session.sqlite3"
+    requests, owners, prompts = [], [], []
+    phase = "interrupt"
+    phase_calls = 0
+
+    class Client:
+        backend = BackendInfo("ollama", "gpt-oss:20b", BackendLocation.LOCAL)
+
+        def complete(self, request):
+            nonlocal phase_calls
+            phase_calls += 1
+            requests.append(request)
+            owner = ACTIVE_FOREGROUND.get()
+            assert owner is not None
+            owners.append(owner)
+            if phase == "interrupt" and phase_calls == 2:
+                assert source.read_text() == "value = 1\n"
+                session = ACTIVE_SESSION.get()
+                assert session is not None
+                CodingChatController(
+                    SQLiteChatTranscriptStore(database), session.session_id, tmp_path, "local_only"
+                ).stage(
+                    "Owner correction: preserve protected.txt; inspect effects before further work"
+                )
+                raise KeyboardInterrupt
+            if phase == "resume" and phase_calls == 1:
+                call = AIToolCall("inspect-current", "read_file", {"path": "source.py"})
+            elif phase_calls == 1 or (phase == "resume" and phase_calls == 2):
+                before, after = (0, 1) if phase == "interrupt" else (1, 2)
+                call = AIToolCall(
+                    "edit",
+                    "edit_file",
+                    {
+                        "path": "source.py",
+                        "old_text": f"value = {before}",
+                        "new_text": f"value = {after}",
+                    },
+                )
+            else:
+                return AIResponse(
+                    AIMessage(
+                        MessageRole.ASSISTANT, "Fresh edit denied; original partial effect retained"
+                    ),
+                    self.backend,
+                )
+            return AIResponse(
+                AIMessage(MessageRole.ASSISTANT, "", tool_calls=(call,)), self.backend
+            )
+
+    monkeypatch.setattr(_EXAMPLE, "create_chat_client", lambda config: Client())
+    answers = iter(["yes"])
+
+    def read(prompt):
+        prompts.append(prompt)
+        return next(answers)
+
+    monkeypatch.setattr("builtins.input", read)
+    options = [
+        "--mode",
+        "coding-chat",
+        "--execute",
+        "--repo-root",
+        str(tmp_path),
+        "--provider",
+        "ollama",
+        "--model",
+        "gpt-oss:20b",
+        "--skip-prompt-review",
+        "--privacy",
+        "local_only",
+        "--cost-policy",
+        "local_only",
+        "--approval-policy",
+        "interactive",
+        "--coding-session-db",
+        str(database),
+    ]
+    assert main([*options, "Change value to 1; preserve protected.txt"]) == 130
+    assert source.read_text() == "value = 1\n"
+    assert ACTIVE_FOREGROUND.get() is None and ACTIVE_SESSION.get() is None
+    store = SQLiteChatTranscriptStore(database)
+    session = store.latest_session(repo_root=tmp_path)
+    assert session is not None
+    original_messages = store.list_messages(session.session_id)
+    assert (
+        "queued_not_executed"
+        in CodingChatController(store, session.session_id, tmp_path, "local_only").history()
+    )
+    assert main([*options, "--coding-session", session.session_id, "Continue"]) == 1
+    assert len(requests) == 2 and source.read_text() == "value = 1\n"
+    phase, phase_calls = "resume", 0
+    answers = iter(["no", "/exit"])
+    assert (
+        main(
+            [
+                *options,
+                "--coding-session",
+                session.session_id,
+                "--coding-session-reconciled",
+                "I inspected source.py: value is 1. Read it again before requesting value 2.",
+            ]
+        )
+        == 0
+    )
+    assert len([prompt for prompt in prompts if "Allow" in prompt]) == 2
+    assert owners[0] is not owners[-1]
+    assert source.read_text() == "value = 1\n"
+    assert protected.read_text() == "owner-owned evidence\n"
+    assert store.list_messages(session.session_id)[: len(original_messages)] == original_messages
+    assert "Owner correction: preserve protected.txt" in "\n".join(
+        message.content for message in requests[-1].messages
+    )
+    assert ACTIVE_FOREGROUND.get() is None and ACTIVE_SESSION.get() is None
 
 
 def test_actual_cli_native_turns_refresh_files_and_retain_conversation(tmp_path, monkeypatch):
@@ -527,6 +824,216 @@ def test_official_client_receives_conversation_and_new_run_scope_each_turn(tmp_p
     assert configs[0].shared_task_id == configs[1].shared_task_id
     assert configs[0].shared_run_id != configs[1].shared_run_id
     assert configs[0].shared_tool_profile == configs[1].shared_tool_profile == "coding"
+    for prompt in requests:
+        assert "codex_sandbox: read-only" in prompt
+        assert "shared_tool_profile: coding" in prompt
+        assert "shared_tool_approval_policy: interactive" in prompt
+        assert "a coding profile alone does not authorize edits" in prompt
     assert len(grants) == 2
     assert grants[0][1] != grants[1][1]
     assert all(not host.active(token) for host, token in grants)
+
+
+@pytest.mark.parametrize("continuation", ["fallback", "stale", "restart"])
+def test_semantic_preview_chat_continuation_uses_fresh_scope_and_current_files(
+    tmp_path, monkeypatch, continuation
+):
+    import io
+    import json
+    import subprocess
+
+    from ai_agent.coding_chat_input import CodingChatInput
+    from ai_agent.http_proxy import HttpMcpConnection
+    from ai_agent.shared_approvals import TerminalApproval
+    from ai_provider.agent_readiness import AgentReadiness
+    from ai_provider.external_agents import run_external_agent
+
+    pytest.importorskip("jedi", reason="approved optional rename-preview extra")
+    package = tmp_path / "sample_pkg"
+    package.mkdir()
+    (package / "__init__.py").write_text("")
+    source = package / "models.py"
+    source.write_text("class Widget:\n    pass\n")
+    caller = package / "client.py"
+    caller.write_text("from .models import Widget\nitem = Widget()\n")
+    original_source, original_caller = source.read_bytes(), caller.read_bytes()
+    catalog = tmp_path / "catalog.toml"
+    catalog.write_text("""[[models]]
+route_id = "codex"
+provider = "openai"
+product = "codex"
+model = "test"
+location = "external"
+access_method = "codex_cli"
+auth_method = "chatgpt_sign_in"
+billing_source = "chatgpt_subscription_allowance"
+cost_policy_tier = "allowances_allowed"
+quality = "high"
+[models.capabilities]
+chat = true
+tools = true
+[[models]]
+route_id = "copilot"
+provider = "github"
+product = "github_copilot"
+model = "auto"
+location = "external"
+access_method = "copilot_cli"
+auth_method = "github_account_sign_in"
+billing_source = "github_copilot_subscription_allowance"
+cost_policy_tier = "allowances_allowed"
+quality = "high"
+[models.capabilities]
+chat = true
+tools = true
+""")
+    monkeypatch.setenv("CODEX_COMMAND", "synthetic-codex")
+    monkeypatch.setenv("GITHUB_COPILOT_COMMAND", "synthetic-copilot")
+    monkeypatch.setattr(
+        "ai_provider.execution_fallback.check_agent_readiness",
+        lambda method: AgentReadiness(True, "synthetic; no account probe"),
+    )
+    inputs = iter(["/exit"] if continuation == "restart" else ["Apply that exact rename", "/exit"])
+
+    class Tty(io.StringIO):
+        def isatty(self):
+            return True
+
+    class SyntheticTerminal(CodingChatInput):
+        def read(self, prompt):
+            return next(inputs)
+
+        def in_flight(self, poll=None):
+            return super().in_flight(lambda: None)
+
+    monkeypatch.setattr(sys, "stdin", Tty())
+    monkeypatch.setattr("ai_agent.coding_chat_cli.CodingChatInput", SyntheticTerminal)
+    plan = {}
+    approvals, attempts, receipts, owners = [], [], [], []
+
+    def approve(self, call, category):
+        assert call.name == "rename_apply"
+        assert call.arguments["complete_diff"] in plan["preview"]
+        assert call.arguments["plan_sha256"] == plan["digest"]
+        approvals.append((self.run_id, call.arguments))
+        return True  # Synthetic exact-diff grant; not physical terminal evidence.
+
+    monkeypatch.setattr(TerminalApproval, "__call__", approve)
+
+    def external(prompt, config, **kwargs):
+        attempts.append(config.access_method.value)
+        owner = ACTIVE_FOREGROUND.get()
+        assert owner is not None
+        owners.append(owner)
+        if len(attempts) == 2 and continuation != "restart":
+            assert plan["id"] in prompt
+            if continuation == "stale":
+                source.write_bytes(original_source + b"# owner changed the source\n")
+            return run_external_agent(
+                prompt,
+                config,
+                runner=lambda command, **options: subprocess.CompletedProcess(
+                    command, 1, '{"type":"error","message":"usage_limit_reached"}', ""
+                ),
+                **kwargs,
+            )
+
+        def runner(command, **options):
+            assert owner.host is not None
+            token_name = next(
+                name for name in options["env"] if name.startswith("AI_PROJECTS_MCP_")
+            )
+            connection = HttpMcpConnection(owner.host.url, options["env"][token_name])
+            connection.send({"jsonrpc": "2.0", "id": 1, "method": "initialize"})
+            connection.send({"jsonrpc": "2.0", "method": "notifications/initialized"})
+            tool = "rename_apply" if plan else "rename_preview"
+            arguments = (
+                {"plan_id": plan["id"]}
+                if plan
+                else {
+                    "path": "sample_pkg/models.py",
+                    "line": 1,
+                    "column": 7,
+                    "new_name": "Gadget",
+                }
+            )
+            try:
+                reply = connection.send(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": 2,
+                        "method": "tools/call",
+                        "params": {"name": tool, "arguments": arguments},
+                    }
+                )
+                assert reply is not None
+                result = reply["result"]
+                metadata = result["structuredContent"]["metadata"]
+                receipts.append(metadata["shared_receipt"])
+                if tool == "rename_preview":
+                    assert not result["isError"]
+                    plan["id"] = metadata["plan_id"]
+                    plan["preview"] = result["content"][0]["text"]
+                    plan["digest"] = metadata["plan_sha256"]
+                    assert source.read_bytes() == original_source
+                    assert caller.read_bytes() == original_caller
+                else:
+                    assert result["isError"] == (continuation != "fallback")
+                report = (
+                    "Preview plan: " + plan["id"] if tool == "rename_preview" else "Apply inspected"
+                )
+                return subprocess.CompletedProcess(
+                    command,
+                    0,
+                    json.dumps({"type": "final_answer", "content": report}),
+                    "",
+                )
+            finally:
+                connection.close()
+
+        return run_external_agent(prompt, config, runner=runner, **kwargs)
+
+    monkeypatch.setattr(_EXAMPLE, "_run_external_agent", external)
+    arguments = [
+        "--mode",
+        "coding-chat",
+        "--execute",
+        "--repo-root",
+        str(tmp_path),
+        "--catalog",
+        str(catalog),
+        "--route-id",
+        "codex",
+        "--privacy",
+        "external_allowed",
+        "--cost-policy",
+        "allowances_allowed",
+        "--approval-policy",
+        "interactive",
+        "--skip-prompt-review",
+        "Preview Widget to Gadget; wait for my next request",
+    ]
+    assert main(arguments) == 0
+    if continuation == "restart":
+        inputs = iter(["/exit"])
+        store = SQLiteChatTranscriptStore(tmp_path / "data/repo-assistant-chats.sqlite3")
+        saved = store.latest_session(repo_root=tmp_path)
+        assert saved is not None
+        arguments[-1] = "Apply that exact rename"
+        assert main([*arguments[:-1], "--coding-session", saved.session_id, arguments[-1]]) == 0
+        assert owners[0] is not owners[1]
+    else:
+        assert owners[0] is owners[1] is owners[2]
+        assert attempts == ["codex_cli", "codex_cli", "copilot_cli"]
+    assert receipts[0]["task_id"] == receipts[1]["task_id"]
+    assert receipts[0]["run_id"] != receipts[1]["run_id"]
+    # A stale plan can still display its exact old preview for approval; execution
+    # rechecks digests and refuses all writes. Restart cannot resolve that plan.
+    assert len(approvals) == (0 if continuation == "restart" else 1)
+    if continuation == "fallback":
+        assert "Gadget" in source.read_text() and "Widget" not in source.read_text()
+        assert caller.read_text() == "from .models import Gadget\nitem = Gadget()\n"
+    else:
+        assert "class Widget" in source.read_text() and "Gadget" not in source.read_text()
+        assert caller.read_bytes() == original_caller
+    assert all(owner.host is None or owner.host.closed for owner in owners)

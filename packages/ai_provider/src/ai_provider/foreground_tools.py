@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import uuid
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import replace
@@ -33,6 +33,7 @@ class ForegroundTools:
         self.supervisor = session.supervisor if session else ProcessSupervisor(workspace)
         self.host: ForegroundMcpHost | None = None
         self.task_id: str | None = session.session_id if session else None
+        self.approval_reader: Callable[[str, Callable[[], bool]], str] | None = None
         from ai_agent.tools.refactor import RenamePlanStore
 
         self.rename_plans = RenamePlanStore(
@@ -67,6 +68,7 @@ class ForegroundTools:
                 config.shared_run_id,
                 self.workspace,
                 lambda: host.active(token),
+                self.approval_reader,
             )
             if config.shared_terminal_approvals
             else None,

@@ -25,14 +25,31 @@ class TerminalApproval:
         run_id: str,
         workspace: Path,
         is_active: Callable[[], bool] | None = None,
+        approval_reader: Callable[[str, Callable[[], bool]], str] | None = None,
     ):
         self.task_id, self.run_id, self.workspace = task_id, run_id, workspace.resolve()
         self.is_active = is_active
+        self.approval_reader = approval_reader
 
     def __call__(self, call: ToolCall, category: ToolCategory) -> bool:
         operation = json.dumps({"tool": call.name, "arguments": call.arguments}, ensure_ascii=True)
         if len(operation) > 64000:
             return False  # Never shorten the operation the human is being asked to approve.
+        if self.approval_reader is not None:
+            prompt = (
+                json.dumps(
+                    {
+                        "task": self.task_id,
+                        "run": self.run_id,
+                        "workspace": str(self.workspace),
+                        "category": category.value,
+                    }
+                )
+                + "\n"
+                + operation
+                + "\nApprove this operation once?"
+            )
+            return self.approval_reader(prompt, self.is_active or (lambda: True)) == "yes"
         reader_name, writer_name = (
             ("CONIN$", "CONOUT$") if os.name == "nt" else ("/dev/tty", "/dev/tty")
         )

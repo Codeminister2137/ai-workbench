@@ -19,6 +19,7 @@ from ai_agent.coding_chat import (
     CodingTurnResult,
     run_terminal_conversation,
 )
+from ai_agent.coding_chat_input import CodingChatInput
 from ai_agent.repo_assistant_args import (
     DEFAULT_CHAT_HISTORY_BUDGET_CHARS,
     DEFAULT_CHAT_RECENT_MESSAGE_COUNT,
@@ -144,6 +145,8 @@ def run_coding_chat(
     print(f"coding_chat_db: {database}")
     args.shared_task_id = session.session_id
     foreground = ForegroundTools(root, session)
+    terminal = CodingChatInput(stage=controller.stage)
+    foreground.approval_reader = terminal.approve_scoped
     session_token = ACTIVE_SESSION.set(session)
     foreground_token = ACTIVE_FOREGROUND.set(foreground)
 
@@ -154,12 +157,14 @@ def run_coding_chat(
         turn_args._coding_chat_history = request.history
         observed: list[CodingTurnResult] = []
         turn_args._coding_chat_observer = observed.append
+        turn_args._coding_chat_approval_read = terminal.approve
         if args.log_file is not None:
             turn_args.log_file = args.log_file.with_name(
                 f"{args.log_file.stem}.turn-{request.message_id}{args.log_file.suffix}"
             )
         # _main reloads selected files/instructions and creates fresh fallback/run scopes.
-        returncode = execute(turn_args, config)
+        with terminal.in_flight():
+            returncode = execute(turn_args, config)
         if observed:
             result = observed[-1]
             return CodingTurnResult(
@@ -172,10 +177,11 @@ def run_coding_chat(
     status = 130
     try:
         status = run_terminal_conversation(
-            controller, turn, initial_prompt=args.prompt, read=lambda prompt: input(prompt)
+            controller, turn, initial_prompt=args.prompt, read=terminal.read
         )
         return status
     finally:
+        terminal.close()
         try:
             foreground.close()
             for handle in session.supervisor.processes:
