@@ -3567,9 +3567,11 @@ def _run_native_agent(
         result.response.message.content,
         {definition.name for definition in registry.list_definitions()},
     )
+    empty_report = not result.response.message.content.strip()
     if progress_callback is not None:
+        activity_status = "incomplete" if textual_request or empty_report else "completed"
         progress_callback(
-            f"local_agent_activity: {'incomplete' if textual_request else 'completed'} "
+            f"local_agent_activity: {activity_status} "
             f"- iterations={result.iterations} "
             f"tool_results={len(result.tool_results)}"
         )
@@ -3579,6 +3581,15 @@ def _run_native_agent(
                 f"local_tool_activity: {status} - {tool_result.name}: "
                 f"{_activity_preview(tool_result.output)}"
             )
+    if empty_report:
+        raise ProviderError(
+            "Native agent returned no final report. Earlier tool effects remain; "
+            "inspect their receipts before continuing."
+            if result.tool_results
+            else "Native agent returned no final report. No action was performed.",
+            category=ProviderErrorCategory.NON_RETRYABLE,
+            provider=config.provider.value,
+        )
     if textual_request:
         message = (
             "Native agent returned an unexecuted textual tool request after earlier tools. "

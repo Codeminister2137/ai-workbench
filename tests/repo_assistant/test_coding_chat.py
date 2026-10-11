@@ -808,6 +808,77 @@ def test_actual_cli_native_turns_refresh_files_and_retain_conversation(tmp_path,
     assert "Answer 1" in second
 
 
+def test_native_chat_latest_correction_and_review_reach_ollama_payload(tmp_path, monkeypatch):
+    from ai_provider import AIMessage, AIResponse, BackendInfo, BackendLocation, MessageRole
+    from ai_provider.adapters.ollama import OllamaChatClient
+    from ai_provider.config import BackendConfig, ProviderKind
+
+    initial = "INITIAL_TASK: improve the diagnostic regression tests."
+    correction = "LATEST_CORRECTION: preserve fixed stderr and empty stdout assertions."
+    review = "LATEST_REVIEW: use supplied results only; no tools, edits or retries."
+    payloads = []
+    adapter = OllamaChatClient(BackendConfig(provider=ProviderKind.OLLAMA, model="gpt-oss:20b"))
+
+    class Client:
+        backend = BackendInfo("ollama", "gpt-oss:20b", BackendLocation.LOCAL)
+
+        def complete(self, request):
+            payloads.append(adapter._chat_payload(request, stream=False))
+            return AIResponse(
+                AIMessage(MessageRole.ASSISTANT, f"Observed report {len(payloads)}"), self.backend
+            )
+
+    (tmp_path / "AGENTS.md").write_text("Preserve existing work and report observed checks.\n")
+    (tmp_path / "module.py").write_text("fixture = 1\n")
+    monkeypatch.setattr(_EXAMPLE, "create_chat_client", lambda config: Client())
+    inputs = iter([correction, review, "/exit"])
+    monkeypatch.setattr("builtins.input", lambda prompt: next(inputs))
+    assert (
+        main(
+            [
+                "--repo-root",
+                str(tmp_path),
+                "--mode",
+                "coding-chat",
+                "--execute",
+                "--provider",
+                "ollama",
+                "--model",
+                "gpt-oss:20b",
+                "--skip-prompt-review",
+                "--file",
+                "module.py",
+                initial,
+            ]
+        )
+        == 0
+    )
+    assert len(payloads) == 3
+    for payload, latest in zip(payloads, (initial, correction, review), strict=True):
+        current = payload["messages"][-1]
+        assert current["role"] == "user"
+        request_block = (
+            current["content"]
+            .split("# User request\n", 1)[1]
+            .split("# Repository context", 1)[0]
+            .strip()
+        )
+        assert request_block == latest
+        assert "Preserve existing work" in current["content"]
+        assert "fixture = 1" in current["content"]
+        assert any(tool["function"]["name"] == "read_file" for tool in payload["tools"])
+    final = payloads[-1]["messages"][-1]["content"]
+    assert initial in final and correction in final and "Observed report 2" in final
+    assert "Original objective:" in final
+    read_schema = next(
+        tool["function"]["parameters"]
+        for tool in payloads[-1]["tools"]
+        if tool["function"]["name"] == "read_file"
+    )
+    assert read_schema["properties"]["start_line"]["type"] == "integer"
+    assert read_schema["properties"]["end_line"]["type"] == "integer"
+
+
 def test_actual_cli_closeout_observation_is_structured_not_console_parsing(tmp_path, monkeypatch):
     inputs = iter(["Follow up", "/exit"])
     monkeypatch.setattr("builtins.input", lambda prompt: next(inputs))

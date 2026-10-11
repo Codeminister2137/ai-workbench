@@ -58,6 +58,34 @@ class FakeClient:
         raise NotImplementedError
 
 
+def test_agent_loop_carries_provider_continuation_through_tool_result(tmp_path):
+    from dataclasses import replace
+
+    from ai_provider import ProviderContinuation
+
+    client = FakeClient()
+    complete = client.complete
+    state = ProviderContinuation("fake", "test", "local", {"opaque": "private-state"})
+
+    def with_state(request):
+        response = complete(request)
+        if client.calls == 1:
+            return replace(response, message=replace(response.message, continuation=state))
+        return response
+
+    client.complete = with_state
+    result = AgentLoop(
+        client,
+        default_coding_tools(),
+        ToolContext(tmp_path),
+        permissions=PermissionManager(policy=PermissionPolicy.permissive()),
+    ).run("Create the file")
+    assert result.response.message.content == "Finished"
+    assert client.requests[1].messages[1].continuation is state
+    assert client.requests[1].messages[2].role is MessageRole.TOOL
+    assert "private-state" not in repr(client.requests[1].messages)
+
+
 def test_agent_loop_executes_tools_and_returns_final_response(tmp_path: Path) -> None:
     client = FakeClient()
     tools = default_coding_tools()

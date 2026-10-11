@@ -55,6 +55,26 @@ def profile(tmp_path, monkeypatch):
     return asset, info, request, events, library
 
 
+def test_exact_review_count_refuses_continuation_instead_of_undercounting(profile):
+    from ai_provider import ProviderContinuation
+
+    asset, info, request, events, _ = profile
+    assert request.model is not None
+    message = replace(
+        request.messages[0],
+        continuation=ProviderContinuation(
+            "ollama",
+            request.model,
+            "local",
+            {"thinking": "private-state"},
+        ),
+    )
+    request = replace(request, messages=(message, request.messages[1]))
+    with pytest.raises(ValueError, match="plain system message"):
+        counter.count_review_input_tokens(request, info, asset, runtime_version="0.32.5")
+    assert "encoded_full_input" not in events
+
+
 def test_complete_verified_evidence_is_counted_without_padding_or_truncation(profile):
     asset, info, request, events, _ = profile
     assert counter.count_review_input_tokens(request, info, asset, runtime_version="0.32.5") == 3

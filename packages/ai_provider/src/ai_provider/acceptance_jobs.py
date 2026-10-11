@@ -51,8 +51,12 @@ class AcceptanceJob:
     max_iterations: int
 
     def __post_init__(self) -> None:
-        for name in ("schema_version", "harness_revision", "native_contract_version"):
-            if type(getattr(self, name)) is not int or getattr(self, name) != 1:
+        for name, expected in (
+            ("schema_version", 1),
+            ("harness_revision", 1),
+            ("native_contract_version", native_admission.NATIVE_CONTRACT_VERSION),
+        ):
+            if type(getattr(self, name)) is not int or getattr(self, name) != expected:
                 raise ValueError(f"Unsupported {name}")
         for name in (
             "task_id",

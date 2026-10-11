@@ -119,7 +119,9 @@ def render_research_review_prompt(
             or message.get("tool_calls")
             or message.get("tool_call_id")
             or message.get("name")
-            or set(message) - {"role", "content", "tool_calls", "tool_call_id", "name"}
+            or message.get("continuation")
+            or set(message)
+            - {"role", "content", "tool_calls", "tool_call_id", "name", "continuation"}
         ):
             raise ValueError(
                 "Counting requires one plain system message and one plain user message"

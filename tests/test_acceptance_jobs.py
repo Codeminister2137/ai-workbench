@@ -69,7 +69,7 @@ def job(tmp_path: Path) -> AcceptanceJob:
         evidence.model,
         evidence.runtime_version,
         evidence.model_digest,
-        1,
+        native_admission.NATIVE_CONTRACT_VERSION,
         "http://127.0.0.1:19473",
         60,
         10,
@@ -84,7 +84,8 @@ def job(tmp_path: Path) -> AcceptanceJob:
     [
         ("schema_version", True),
         ("harness_revision", 2),
-        ("native_contract_version", 2),
+        ("native_contract_version", native_admission.NATIVE_CONTRACT_VERSION + 1),
+        ("native_contract_version", True),
         ("context_tokens", True),
         ("output_tokens", 0),
         ("max_iterations", 5),
@@ -132,7 +133,9 @@ def test_route_and_active_contract_invalidation(job: AcceptanceJob, monkeypatch)
     for changed in (replace(job, route_id="unknown"), replace(job, context_tokens=999999)):
         with pytest.raises(ValueError):
             validate_route(changed)
-    monkeypatch.setattr(native_admission, "NATIVE_CONTRACT_VERSION", 2)
+    monkeypatch.setattr(
+        native_admission, "NATIVE_CONTRACT_VERSION", native_admission.NATIVE_CONTRACT_VERSION + 1
+    )
     with pytest.raises(ValueError, match="stale"):
         validate_route(job)
 

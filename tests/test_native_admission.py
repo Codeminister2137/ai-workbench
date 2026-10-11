@@ -23,6 +23,7 @@ from ai_provider import (
 from ai_provider.coding_assist import coding_task_profile
 from ai_provider.contracts import AIStreamDelta, AIStreamEvent
 from ai_provider.native_admission import (
+    NATIVE_CONTRACT_VERSION,
     NATIVE_TOOL_EVIDENCE,
     NativeCodingClient,
     native_coding_catalog,
@@ -63,6 +64,18 @@ def admitted(monkeypatch):
     return wrapper, client, diagnostics
 
 
+def test_continuation_counts_toward_complete_context_admission(admitted):
+    from ai_provider import ProviderContinuation
+
+    wrapper, client, diagnostics = admitted
+    state = ProviderContinuation("ollama", wrapper.config.model, "local", {"thinking": "x" * 20000})
+    request = AIRequest((AIMessage(MessageRole.ASSISTANT, "answer", continuation=state),))
+    with pytest.raises(ProviderError, match="does not fit"):
+        wrapper.complete(request)
+    assert not client.requests
+    assert all("xxx" not in line for line in diagnostics)
+
+
 @pytest.mark.parametrize("index", [0, 1])
 @pytest.mark.parametrize("changed", ["model", "digest", "runtime", "contract", "missing"])
 def test_positive_and_negative_evidence_invalidates(index, changed):
@@ -91,7 +104,12 @@ def test_valid_receipts_distinguish_support_from_quality():
         )
         assert (reason is None) is evidence.supported
         if reason:
-            assert "failed the runtime compatibility probe" in reason
+            expected = (
+                "failed the runtime compatibility probe"
+                if evidence.contract_version == NATIVE_CONTRACT_VERSION
+                else "stale or unverifiable"
+            )
+            assert expected in reason
 
 
 def test_automatic_catalog_prefers_tested_local_tools_preserving_explicit_choices():
@@ -396,7 +414,9 @@ def test_unknown_model_refuses_without_metadata_probe(monkeypatch):
 
 
 def test_changed_active_contract_excludes_old_positive_receipt(monkeypatch):
-    monkeypatch.setattr("ai_provider.native_admission.NATIVE_CONTRACT_VERSION", 2)
+    monkeypatch.setattr(
+        "ai_provider.native_admission.NATIVE_CONTRACT_VERSION", NATIVE_CONTRACT_VERSION + 1
+    )
     eligible = native_coding_catalog(load_model_catalog(CATALOG), coding_task_profile())
     assert all(item.backend.provider != "ollama" for item in eligible)
 

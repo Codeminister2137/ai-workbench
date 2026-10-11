@@ -20,7 +20,7 @@ from ai_provider.ollama_models import list_local_ollama_models
 from ai_provider.ollama_runtime import get_ollama_version
 
 # Bump when native request translation/tool-loop semantics invalidate the probes.
-NATIVE_CONTRACT_VERSION = 1
+NATIVE_CONTRACT_VERSION = 2
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,8 +42,10 @@ NATIVE_TOOL_EVIDENCE = (
         "17052f91a42e97930aa6e28a6c6c06a983e6a58dbb00434885a0cf5313e376f7",
         "0.32.5",
         True,
-        "2026-10-04 native-prompt-eval-gpt: actual tools on 20 paired tasks; "
-        "19/20 strict effect checks per prompt, one newline miss",
+        "2026-10-11 continuation-probe-20261011-231014: actual read/read/edit, "
+        "correct fixture effect and untouched second file, no tool errors, "
+        "thinking received/replayed; final marker-report check failed; quality unverified",
+        contract_version=2,
     ),
     NativeToolEvidence(
         "qwen2.5-coder:14b",

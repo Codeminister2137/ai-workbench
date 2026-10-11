@@ -107,6 +107,20 @@ class AIToolCall:
 
 
 @dataclass(frozen=True, slots=True)
+class ProviderContinuation:
+    """Transient adapter-owned state, replayable only to its originating target.
+
+    Callers carry this state without interpreting it. It is excluded from normal
+    representations and must not be persisted as conversation content.
+    """
+
+    provider: str
+    model: str
+    base_url: str
+    payload: dict[str, Any] = field(repr=False)
+
+
+@dataclass(frozen=True, slots=True)
 class AIMessage:
     """Single chat message in the neutral provider contract."""
 
@@ -115,6 +129,7 @@ class AIMessage:
     name: str | None = None
     tool_call_id: str | None = None
     tool_calls: tuple[AIToolCall, ...] = ()
+    continuation: ProviderContinuation | None = field(default=None, repr=False)
 
 
 @dataclass(frozen=True, slots=True)

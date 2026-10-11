@@ -8,6 +8,22 @@ from ai_provider import MessageRole, SQLiteChatTranscriptStore
 from ai_provider.chat_transcripts import messages_to_ai_messages
 
 
+def test_transcript_answer_roundtrip_does_not_persist_provider_continuation(tmp_path):
+    from ai_provider import AIMessage, ProviderContinuation
+
+    store = SQLiteChatTranscriptStore(tmp_path / "chats.sqlite3")
+    session = store.create_session(repo_root=tmp_path, title="task", privacy_class="local_only")
+    message = AIMessage(
+        MessageRole.ASSISTANT,
+        "answer",
+        continuation=ProviderContinuation("ollama", "test", "local", {"thinking": "private-state"}),
+    )
+    store.append_message(session.session_id, role=message.role, content=message.content)
+    messages = messages_to_ai_messages(store.list_messages(session.session_id))
+    assert messages == (AIMessage(MessageRole.ASSISTANT, "answer"),)
+    assert b"private-state" not in store.path.read_bytes()
+
+
 def test_transcript_store_releases_connections_after_success_and_failure(tmp_path, monkeypatch):
     connections = []
     connect = sqlite3.connect
