@@ -267,12 +267,19 @@ def run_diagnostic_command(
             capture_output=True,
             timeout=timeout_seconds,
         )
-    except (OSError, subprocess.TimeoutExpired) as exc:
+    except subprocess.TimeoutExpired:
         return {
             "ok": False,
             "returncode": None,
             "stdout": "",
-            "stderr": str(exc),
+            "stderr": "Diagnostic command timed out.",
+        }
+    except OSError:
+        return {
+            "ok": False,
+            "returncode": None,
+            "stdout": "",
+            "stderr": "Diagnostic command could not be executed.",
         }
     return {
         "ok": completed.returncode == 0,
