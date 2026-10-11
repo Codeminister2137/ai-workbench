@@ -1217,6 +1217,23 @@ def _execute_request(
         model_override=args.model,
     )
     delegated_summary = None
+    if args.shared_tools == "coding":
+        from ai_provider.foreground_tools import ACTIVE_FOREGROUND
+
+        from ai_agent.mcp_server import _local_read_only_delegated_task_runner
+
+        foreground = ACTIVE_FOREGROUND.get()
+        if foreground is not None:
+            foreground.delegation_factory = lambda active, deadline: (
+                _local_read_only_delegated_task_runner(
+                    catalog_path=args.catalog,
+                    parent_profile=profile,
+                    timeout_seconds=args.timeout_seconds,
+                    max_iterations=min(args.max_action_rounds, 8),
+                    is_active=active,
+                    deadline=deadline,
+                )
+            )
     if args.tool_profile == "research":
         profile = replace(
             profile,
@@ -2615,6 +2632,8 @@ def _run_external_agent_cli_mode(
     target = orchestration.execution_plan.target
     if args.codex_mcp_tools and delegation_status == "disabled":
         delegation_status = "enabled: external Codex MCP delegate_task available"
+    elif args.shared_tools == "coding" and delegation_status == "disabled":
+        delegation_status = "enabled: shared read-only delegate_task available"
     print("=== Repo Coding Assistant ===")
     print(f"mode: {args.mode}")
     print(f"repo_root: {repo_root}")
@@ -3270,7 +3289,9 @@ def _run_native_agent(
 
     foreground = ACTIVE_FOREGROUND.get()
     if research is None and getattr(args, "shared_tools", None) == "coding" and foreground:
-        registry = foreground.registry()
+        registry = foreground.registry(
+            deadline=getattr(getattr(args, "fallback_session", None), "deadline", None)
+        )
     if active_session is not None:
         if research is None and not getattr(args, "shared_tools", None):
             from ai_agent.processes import ProcessTool
@@ -3287,6 +3308,7 @@ def _run_native_agent(
             approval_callback=approval_callback,
         ),
         max_iterations=args.max_action_rounds,
+        deadline=getattr(getattr(args, "fallback_session", None), "deadline", None),
     )
     try:
         result = agent.run(

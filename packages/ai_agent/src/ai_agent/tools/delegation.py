@@ -12,6 +12,15 @@ from ai_agent.tools.base import BaseTool, ToolContext, ToolRegistry
 DelegatedTaskRunner = Callable[[str, ToolContext], ToolResult]
 
 
+def unavailable_delegation(task: str, context: ToolContext) -> ToolResult:
+    """Expose a capability without granting unconfigured model execution."""
+    return ToolResult(
+        name="delegate_task",
+        output="Error: bounded local delegation is not configured for this execution scope.",
+        is_error=True,
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class DelegateTaskTool(BaseTool):
     """Tool that lets a primary agent delegate bounded coding subtasks."""
@@ -23,9 +32,9 @@ class DelegateTaskTool(BaseTool):
         return ToolDefinition(
             name="delegate_task",
             description=(
-                "Delegate a bounded coding subtask to a cheaper/local child model. "
-                "Use this for focused file inspection, small code edits, test-case "
-                "drafting, or verification steps that do not need the primary model."
+                "Delegate bounded coding support to a local read-only child model. "
+                "Use this for file inspection, source summarization or test-case drafting. "
+                "Architecture, implementation decisions and edits remain with the primary."
             ),
             category=ToolCategory.CUSTOM,
             parameters=(

@@ -117,6 +117,115 @@ def test_delegation_tool_runs_bounded_child_task(tmp_path: Path) -> None:
     assert len(registry.list_definitions()) == len(default_coding_tools().list_definitions()) + 1
 
 
+@pytest.mark.parametrize("expired_at", ["initial", "response"])
+def test_deadline_prevents_initial_request_or_late_response_effects(
+    tmp_path, monkeypatch, expired_at
+):
+    from ai_provider import ProviderErrorCategory
+
+    now = 11.0 if expired_at == "initial" else 0.0
+
+    class LateClient(FakeClient):
+        def complete(self, request):
+            nonlocal now
+            response = super().complete(request)
+            now = 11.0
+            return response
+
+    monkeypatch.setattr("ai_agent.loop.time.perf_counter", lambda: now)
+    client = LateClient()
+    with pytest.raises(ProviderError) as raised:
+        AgentLoop(
+            client,
+            default_coding_tools(),
+            ToolContext(tmp_path),
+            permissions=PermissionManager(policy=PermissionPolicy.permissive()),
+            deadline=10.0,
+        ).run("Create the file")
+    assert raised.value.category is ProviderErrorCategory.TIMEOUT
+    assert len(client.requests) == (0 if expired_at == "initial" else 1)
+    assert not (tmp_path / "out.txt").exists()
+    assert raised.value.partial_messages
+
+
+def test_deadline_preserves_first_effect_and_prevents_next_tool_in_response(tmp_path, monkeypatch):
+    from ai_agent.tools.filesystem import CreateFileTool
+    from ai_provider import ProviderErrorCategory
+
+    now = 0.0
+    original = CreateFileTool.execute
+
+    def create(self, arguments, context):
+        nonlocal now
+        result = original(self, arguments, context)
+        now = 11.0
+        return result
+
+    class Client(FakeClient):
+        def complete(self, request):
+            self.requests.append(request)
+            return AIResponse(
+                AIMessage(
+                    MessageRole.ASSISTANT,
+                    "",
+                    tool_calls=tuple(
+                        AIToolCall(name, "create_file", {"path": name, "content": name})
+                        for name in ("first.txt", "second.txt")
+                    ),
+                ),
+                self.backend,
+            )
+
+    monkeypatch.setattr("ai_agent.loop.time.perf_counter", lambda: now)
+    monkeypatch.setattr(CreateFileTool, "execute", create)
+    client = Client()
+    with pytest.raises(ProviderError) as raised:
+        AgentLoop(
+            client,
+            default_coding_tools(),
+            ToolContext(tmp_path),
+            permissions=PermissionManager(policy=PermissionPolicy.permissive()),
+            deadline=10.0,
+        ).run("Create both files")
+    assert raised.value.category is ProviderErrorCategory.TIMEOUT
+    assert (tmp_path / "first.txt").read_text() == "first.txt"
+    assert not (tmp_path / "second.txt").exists()
+    assert len(client.requests) == 1
+    assert raised.value.partial_messages[-1].role is MessageRole.TOOL
+    assert raised.value.partial_messages[-1].tool_call_id == "first.txt"
+
+
+def test_approval_that_outlasts_deadline_cannot_authorize_effect(tmp_path, monkeypatch):
+    from ai_provider import ProviderErrorCategory
+
+    now = 0.0
+
+    def approve(*args):
+        nonlocal now
+        now = 11.0
+        return True
+
+    monkeypatch.setattr("ai_agent.loop.time.perf_counter", lambda: now)
+    with pytest.raises(ProviderError) as raised:
+        AgentLoop(
+            FakeClient(),
+            default_coding_tools(),
+            ToolContext(tmp_path),
+            permissions=PermissionManager(approval_callback=approve),
+            deadline=10.0,
+        ).run("Create the file")
+    assert raised.value.category is ProviderErrorCategory.TIMEOUT
+    assert not (tmp_path / "out.txt").exists()
+
+
+@pytest.mark.parametrize("deadline", [float("nan"), float("inf"), -float("inf")])
+def test_nonfinite_deadline_is_refused_before_any_execution(tmp_path, deadline):
+    client = FakeClient()
+    with pytest.raises(ValueError, match="deadline must be finite"):
+        AgentLoop(client, default_coding_tools(), ToolContext(tmp_path), deadline=deadline)
+    assert not client.requests
+
+
 def test_provider_failure_preserves_completed_tool_receipt_without_replaying(
     tmp_path: Path,
 ) -> None:
