@@ -89,4 +89,18 @@ model results, installed-client parity or lower cost. Validate representative
 multi-turn development tasks and measure API cost/allowance use separately.
 The wider migration requirement remains incomplete until that evidence exists.
 
+## Tool availability clarification - 2026-10-12
+
+The owner explicitly directed that tools remain enabled going forward, including
+development and review, and be disabled only for specific narrow cases. Reviewing
+code can require inspecting diffs, sources and results; a general tool-free review
+phase would compromise that workflow. This clarifies the existing tool-capable
+direction and does not change task scope, permissions or approvals.
+
+The earlier proposed report-only phase was not implemented and is not the chosen
+remedy for repeated reads or weak test generation. Continue investigating task
+following and prompt presentation with tools available. No automatic free-text
+classification of review requests into tool-free authority is approved. Explicit
+narrow exceptions do not justify a new mode without a concrete need.
+
 See [implementation proposal and acceptance plan](../repo-assistant/continuous-coding-chat-plan.md).

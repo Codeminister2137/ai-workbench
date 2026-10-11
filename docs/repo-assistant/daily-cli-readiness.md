@@ -73,9 +73,10 @@ declaring full migration accepted or changing the 20% target's case-by-case revi
    this pilot alone does not prove parity or economic improvement.
 5. Validate unattended operation separately. In particular, a coding-chat turn
    reaching its report returns to `You>`; it does not automatically choose the
-   next candidate. `--away-minutes` supplies a per-turn maximum execution budget,
-   not a host-enforced two-hour work window. Introducing such a controller would
-   require a concrete owner decision about continuation and approval behavior.
+   next candidate. `--away-minutes` now supplies a fixed foreground allowance
+   across turns in one launch; `--turn-timeout-seconds` bounds a single turn.
+   Explicit resume with an away option grants fresh time. Automatic task
+   selection and continuation still require a concrete owner decision.
 
 Full adoption still needs the agreed representative cases, required installed
 tool coverage, restart/fallback acceptance and measured economics. There is no

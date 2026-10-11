@@ -5,6 +5,12 @@ The repo assistant's [workflow guides](repo-coding-assistant.md) describe curren
 execution surfaces; [publication](publication.md) covers source/history privacy.
 
 ## 1. Overall direction
+Provider-neutral messages may carry optional transient ProviderContinuation
+metadata (ADR-055). Adapters own interpretation and replay only to the originating
+provider/model/endpoint. It is not answer text or durable history; input admission
+counts it. Ollama preserves multi-turn thinking without an implicit adapter cache.
+See the [high-priority conformance plan](documentation-conformance-plan.md).
+
 The projects form a small ecosystem:
 
 `Applications → AI Orchestrator decisions → execution adapter → Ollama / Requesty / direct providers`
@@ -217,11 +223,15 @@ user-preference format and alternate official CLI adapters.
 Default usage-limit fallback policy belongs to `ai_orchestrator.fallback`.
 The CLI preflights eligible executors, preserves the working tree, and supplies
 an observed-state handoff. Replacement routes stay on the same billing tier,
-retain task/privacy/approval constraints, and default to preserving the original
-declared quality grade. An explicit task-minimum preference permits a downgrade.
+retain privacy/approval constraints, and default to preserving the original/task
+declared quality floor for implementation. Default `emergency_preserve` permits
+weaker routes only for read-only inspection and reporting after saving a deterministic
+handoff. Explicit `prefer_quality` admits weaker implementation after stronger
+routes are unavailable; legacy `task_minimum` retains the task quality floor.
 Exhausted billing buckets and temporarily overloaded routes are tracked separately
 for the run; no persistent quota registry is introduced. No suitable replacement
-produces a saved handoff without invoking a weaker model. See ADR-032 and ADR-042.
+produces a saved handoff even when no model remains. Preservation reporting cannot
+turn the original failure into task success. See ADR-032, ADR-042 and ADR-052.
 
 External user authorization is a shared infrastructure concern, not a per-tool
 implementation detail. GitHub, Codex plugins/apps, cloud deployment targets,
@@ -255,6 +265,19 @@ may initially host semantic tools, but the eventual target is independent toolin
 with PyCharm serving only as human editor/viewer. Fallback should preserve access
 to the required common tools and observed task progress without broadening
 permissions or replaying uncertain effects.
+
+ADR-053 defines `--away-minutes` as one fixed foreground allowance shared by
+coding-chat turns, delegation, fallback and host stages within a launch.
+`--turn-timeout-seconds` can shorten a turn; provider request timeouts remain
+separate. Each launch explicitly supplying an away allowance grants fresh time,
+including saved-session resume. No persisted deadline or restart-reason policy
+is introduced. Expiry blocks new actions and late success; it does not forcibly
+interrupt running tools.
+
+ADR-054 keeps coding-chat's terminal reader separate from authentication:
+official-client sign-in happens outside the conversation. Readiness checks do
+not launch login or collect login answers; retry/resume/restart refreshes readiness.
+Standalone CLI preflight retains its existing interaction.
 
 Concrete session/process persistence, host lifecycle, approval transport and
 dependencies remain open decisions. No new daemon, connector, paid escalation or

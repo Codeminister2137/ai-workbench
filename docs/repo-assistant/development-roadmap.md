@@ -5,6 +5,12 @@
 
 ## Status and outcome
 
+High-priority repository-wide prerequisite:
+[official-documentation conformance](../documentation-conformance-plan.md).
+ADR-055 starts with Ollama continuation-state preservation; adapter conformance
+and tool compatibility do not establish coding-quality parity.
+
+
 The [2026-10-10 daily-use readiness report](daily-cli-readiness.md) recommends an
 attended real-work pilot as the shortest next step, while retaining the accepted
 quality/security migration gates. Full replacement remains incomplete. Usage

@@ -23,6 +23,20 @@ or implementation requests at that prompt. Available coding tools do not grant
 permission for unrequested changes. Interactive approvals identify the operation
 and are requested separately from conversation input.
 
+Tools stay enabled by default for development and review (owner clarification,
+2026-10-12). Reviews may inspect diffs, sources and actual results. Disable tools
+only for explicitly selected narrow cases; do not automatically interpret a
+review request as tool-free. Existing task scope, permissions and approvals apply.
+
+Each coding-chat turn currently uses the implement runner and its configured
+tools. A request such as "review the supplied results; no tools" reaches the
+model as an instruction, but does not remove tools or create a deterministic
+report-only phase. History is marked as earlier conversation; the latest request
+and fresh context are supplied together, followed by the session handoff with
+the original objective. Instruction-following quality and host semantic review
+remain necessary even when tests pass. A new report-only phase is not being
+introduced as the remedy for the repeated-read loop.
+
 Official-client prompts distinguish the native client sandbox from the shared
 tool host's policy. A read-only native sandbox can coexist with a coding profile
 whose shared operations have separate workspace and approval enforcement. The
@@ -91,21 +105,84 @@ Required tools must remain available during eligible fallback. Codex's native
 `--codex-resume`/`--codex-persist-session` are excluded here: the project-owned
 conversation and coding-session handoff are authoritative.
 
+The shared coding profile exposes `delegate_task` on native and official-client
+routes. The CLI binds the selected catalog and parent privacy to a bounded local
+read-only child runner. The Orchestrator selects the child independently of the
+primary model override. Children can inspect sources and draft test cases; they
+cannot edit, run commands, delegate again or own architecture/implementation
+decisions. Interactive policy requires approval of the delegation operation.
+Unavailable local execution is an explicit tool failure, not permission to use
+an external child. Each foreground invocation checks scope and deadline before
+and after child model calls; revoked child responses cannot initiate new reads.
+Bare shared-tool registries without a configured runner refuse delegation.
+`--delegate-context` remains a separate optional preparatory extraction pass.
+
+An empty or whitespace-only native final report fails the turn, including after
+successful tools. Earlier effects and their receipts remain available for host
+inspection; this failure does not automatically replay tools or retry the model.
+Tool calls containing no answer text are valid intermediate responses, but do
+not replace the final report.
+
+Fallback models are selected by the Orchestrator. Default `emergency_preserve`
+keeps the original/task quality floor for implementation. If no ready comparable
+route remains, the host first saves a metadata handoff, then eligible weaker
+routes may perform read-only inspection/reporting. They cannot edit, run commands,
+delegate or perform cleanup, and the original task remains failed/incomplete.
+Explicit `--fallback-quality-policy prefer_quality` tries stronger routes first
+and allows weaker implementation when necessary, reporting the downgrade. Both
+retain privacy, billing tier, approvals, deadlines and validation. Legacy
+`preserve_quality` and `task_minimum` remain available. See ADR-052.
+Console output failures do not prevent fallback handoff saving or replace the
+original route failure. A handoff save failure still prevents weaker reporting.
+
 `--validation-python` controls the existing default validation interpreter.
 For host-run validation/repair/scrutiny use the existing `--orchestrated` and
-`--away-minutes` options; the supplied budget applies to each turn. Regular turns
+`--away-minutes` options. The away allowance is fixed for this launch, starting
+after configuration loading and before session setup. Idle time and all turns
+count; turns, task restarts, delegation, fallback and stages cannot reset it.
+Each launch explicitly supplying the option grants fresh time, including saved
+session resume. Resume without it does not inherit an earlier allowance.
+
+Use `--turn-timeout-seconds N` for a separate maximum per turn; the effective
+deadline is the earlier of that limit and the remaining away allowance.
+`--timeout-seconds` still controls individual provider requests and is capped by
+the remaining execution time. To migrate an old per-turn away budget, select
+`--turn-timeout-seconds` explicitly. For example, `--away-minutes 30
+--turn-timeout-seconds 300 --timeout-seconds 60` allows a thirty-minute session,
+five minutes per turn and sixty seconds per request. Regular turns
 can invoke permitted validation tools, but the CLI does not claim host validation
 ran unless its deterministic stage recorded results.
 
 Conversation history retains user requests, final agent reports and the
 host-observed execution outcome, including failed validation or tool errors.
 It does not persist raw tool arguments/output as additional conversation turns.
+Bounded local delegation checks its invocation and deadline before each child
+read/search operation, including multiple tools requested in one model response.
+A tool already running may finish; expiry prevents subsequent tools and model
+requests rather than forcibly interrupting that tool.
+Native coding turns also check their absolute execution deadline around model
+responses, individual tool actions and approvals. Expiry retains completed
+effects and receipts; it does not authorize replay or turn a timeout into success.
 Private user text and final responses are stored locally, so protect that file.
 When a transcript log is enabled, each turn gets a distinct file beside the
 requested log path. Interruption closes that file and restores terminal output.
 
 ## Current limits
 
+- Expiry prevents subsequent requests, tools and approvals and rejects late
+  success. Running tools are not forcibly interrupted. Interactive idle input
+  expires automatically; blocking noninteractive input is checked when it
+  returns, so process exit can wait for input or EOF.
+- Fallback readiness preflight checks expiry before and after probes and sign-in
+  answers, preventing subsequent setup/login after expiry. A probe or login
+  already running is not forcibly interrupted. Coding-chat requires sign-in
+  outside the conversation: it displays the official-client login command but
+  never reads a login answer or launches login. Retry a turn or restart/resume
+  after signing in to refresh readiness. Retry retains the existing deadline.
+  Missing primary authentication produces a failed
+  SUMMARY without execution, including with fallback disabled. Unauthenticated
+  optional routes are excluded. Standalone requests retain interactive preflight.
+  See [ADR-054](../decisions/ADR-054-external-sign-in-for-coding-chat.md).
 - In-flight steering queues the next turn; immediate injection into an active
   model/client and preemptive cancellation by chat text are not implemented.
   Restart shows saved queued messages as unexecuted evidence, without replay.

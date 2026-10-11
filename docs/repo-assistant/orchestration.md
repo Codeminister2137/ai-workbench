@@ -11,7 +11,11 @@ while you are away. The flag prints `away_budget_*` fields in the transcript,
 adds explicit unattended-run guidance to the model prompt, and, unless
 `--timeout-seconds` is supplied, sets provider and external-agent timeouts to
 `N * 60` seconds. Add `--orchestrated` to plan or run the staged unattended
-workflow rather than only extending the timeout and prompt guidance. Orchestrated
+workflow. The away allowance fixes the execution deadline for one launch;
+coding-chat turns and task restarts share it. Explicit resume with the option
+grants a fresh allowance. `--turn-timeout-seconds` optionally limits one turn,
+capped by the remaining away time. Provider timeouts remain request-specific
+and are capped by the effective execution deadline. Orchestrated
 runs create a local SQLite run record and planned stage rows in
 `data/repo-assistant-runs.sqlite3` by default; use `--away-run-db PATH` to
 override the local database path.

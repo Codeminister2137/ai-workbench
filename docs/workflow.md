@@ -1,6 +1,12 @@
 # Development Workflow
 
 ## 1. Before starting
+High-priority cross-repository work follows the
+[official-documentation conformance plan](documentation-conformance-plan.md).
+Review integrations in bounded slices, fix demonstrated discrepancies and align
+code/guides. Intentional differences need explicit rationale; material changes
+still require the owner. This priority does not authorize a blanket rewrite.
+
 Use tiered context reading instead of rereading every document by default.
 
 If the user asks to use, check, or run a named `Codex: ...` prompt, read
