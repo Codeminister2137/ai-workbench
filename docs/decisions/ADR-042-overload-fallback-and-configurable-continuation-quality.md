@@ -3,6 +3,8 @@
 **Status:** Accepted; deterministic implementation, live acceptance deferred
 **Date:** 2026-10-04
 **Supersedes:** ADR-032's trigger restriction and default lower-grade permission.
+**Partially superseded:** ADR-052 changes the default and adds explicit weaker-model
+preservation/continuation policies. The historical decision below is retained.
 
 ## Context and owner decision
 

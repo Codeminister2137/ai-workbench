@@ -13,6 +13,19 @@ from ai_orchestrator.orchestrator import OrchestrationResult, OrchestrationStatu
 from ai_provider.orchestrated_runs import SQLiteOrchestratedRunStore
 
 
+def test_tracker_and_record_cannot_extend_outer_execution_deadline(tmp_path, monkeypatch):
+    args = _args(tmp_path)
+    args.away_minutes = 2
+    args.execute = True
+    args._execution_deadline = 70.0
+    monkeypatch.setattr("ai_agent.run_tracking.time.perf_counter", lambda: 10.0)
+    tracker, _ = run_tracking.OrchestratedRunTracker.create(
+        args=args, repo_root=tmp_path, orchestration=_orchestration(), prompt=args.prompt
+    )
+    assert tracker.deadline == 70.0
+    assert tracker.run_record.budget_seconds == 60.0
+
+
 def _args(tmp_path: Path):
     return build_argument_parser().parse_args(
         [

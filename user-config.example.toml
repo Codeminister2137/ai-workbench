@@ -18,6 +18,7 @@ max_repair_cycles = 3 # 0 disables repairs; -1 removes cycle cap, retaining time
 # Automatic same-tier fallback on usage limits and model overload is on by default.
 [fallback]
 enabled = true
-# Stop and save a handoff if no replacement matches the original declared quality.
-# Explicit alternative: "task_minimum" permits a weaker route meeting task requirements.
-quality_policy = "preserve_quality"
+# Preserve implementation quality; weaker routes may only inspect/report saved work.
+# "prefer_quality" explicitly allows weaker implementation after stronger routes fail.
+# Legacy "preserve_quality" stops; "task_minimum" retains the task's quality floor.
+quality_policy = "emergency_preserve"

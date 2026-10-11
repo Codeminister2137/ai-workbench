@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+import time
+from collections.abc import Callable, Iterator, Sequence
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from ai_orchestrator import (
@@ -24,11 +25,15 @@ from ai_orchestrator import (
 from ai_provider import (
     AIMessage,
     AIRequest,
+    AIResponse,
+    AIStreamEvent,
     BackendConfig,
+    BackendInfo,
     ChatClient,
     MessageRole,
     OllamaResourceProfile,
     ProviderError,
+    ProviderErrorCategory,
     create_chat_client,
 )
 from ai_provider import (
@@ -54,6 +59,58 @@ class AuxiliaryPanelResult:
     failure_reason: str | None = None
 
 
+class _DeadlineSupportClient:
+    """Bound tools-free support requests without imposing native tool admission."""
+
+    def __init__(
+        self, config: BackendConfig, factory: Callable[[BackendConfig], ChatClient], deadline: float
+    ) -> None:
+        self.config = config
+        self.factory = factory
+        self.deadline = deadline
+
+    def _remaining(self) -> float:
+        remaining = self.deadline - time.perf_counter()
+        if remaining <= 0:
+            raise ProviderError(
+                "Support execution allowance expired", category=ProviderErrorCategory.TIMEOUT
+            )
+        return remaining
+
+    def _client(self) -> ChatClient:
+        config = replace(
+            self.config, timeout_seconds=min(self.config.timeout_seconds, self._remaining())
+        )
+        client = self.factory(config)
+        self._remaining()
+        return client
+
+    @property
+    def backend(self) -> BackendInfo:
+        return self._client().backend
+
+    def complete(self, request: AIRequest) -> AIResponse:
+        response = self._client().complete(request)
+        self._remaining()
+        return response
+
+    def stream(self, request: AIRequest) -> Iterator[AIStreamEvent]:
+        for event in self._client().stream(request):
+            self._remaining()
+            yield event
+        self._remaining()
+
+
+def _bounded_support_factory(
+    factory: Callable[[BackendConfig], ChatClient], deadline: float | None
+) -> Callable[[BackendConfig], ChatClient]:
+    def create(config: BackendConfig) -> ChatClient:
+        assert deadline is not None
+        return _DeadlineSupportClient(config, factory, deadline)
+
+    return factory if deadline is None else create
+
+
 def run_local_context_delegation(
     context_files: Sequence[RepoContextFile],
     primary_profile: TaskProfile,
@@ -62,9 +119,12 @@ def run_local_context_delegation(
     client_factory: Callable[[BackendConfig], ChatClient] = create_chat_client,
     max_chars: int = DEFAULT_DELEGATION_CONTEXT_BUDGET_CHARS,
     progress_callback: Callable[[str], None] | None = None,
+    deadline: float | None = None,
 ) -> tuple[str | None, str]:
     """Extract source-grounded context locally for injection into a primary prompt."""
 
+    if deadline is not None and time.perf_counter() >= deadline:
+        return None, "skipped: execution allowance expired"
     if progress_callback is not None:
         progress_callback("delegated_agent_activity: started - context_extraction")
     decision = assess_delegation(
@@ -95,6 +155,11 @@ def run_local_context_delegation(
         cost_policy_tier=CostPolicyTier.LOCAL_ONLY,
     )
     config = backend_config_from_execution_target(plan.execution_plan.target)
+    if deadline is not None:
+        remaining = deadline - time.perf_counter()
+        if remaining <= 0:
+            return None, "skipped: execution allowance expired"
+        config = replace(config, timeout_seconds=min(config.timeout_seconds, remaining))
     if progress_callback is not None:
         progress_callback(
             "delegated_agent_activity: model_request - "
@@ -115,7 +180,16 @@ def run_local_context_delegation(
         model=config.model,
         privacy_class=ProviderPrivacyClass(plan.profile.privacy_class.value),
     )
-    response = client_factory(config).complete(request)
+    try:
+        response = _bounded_support_factory(client_factory, deadline)(config).complete(request)
+    except ProviderError as exc:
+        if (
+            deadline is None
+            or exc.category is not ProviderErrorCategory.TIMEOUT
+            or time.perf_counter() < deadline
+        ):
+            raise
+        return None, "failed: execution allowance expired"
     summary = response.message.content.strip()
     if not has_source_citation(summary, delegation_context):
         if progress_callback is not None:
@@ -142,9 +216,18 @@ def run_auxiliary_panel(
     ollama_resource_profile: OllamaResourceProfile | None = None,
     client_factory: Callable[[BackendConfig], ChatClient] = create_chat_client,
     progress_callback: Callable[[str], None] | None = None,
+    deadline: float | None = None,
 ) -> AuxiliaryPanelResult:
     """Run one local-first auxiliary critique pass for an orchestrated coding run."""
 
+    if deadline is not None:
+        remaining = deadline - time.perf_counter()
+        if remaining <= 0:
+            return AuxiliaryPanelResult(
+                status="failed", failure_reason="Execution allowance expired"
+            )
+        timeout_seconds = min(timeout_seconds, remaining)
+        ollama_startup_timeout_seconds = min(ollama_startup_timeout_seconds, remaining)
     decision = assess_delegation(
         task_type=primary_profile.task_type,
         delegation_kind=DelegationKind.TEST_CASE_GENERATION,
@@ -185,7 +268,7 @@ def run_auxiliary_panel(
             ollama_startup_timeout_seconds=ollama_startup_timeout_seconds,
             ollama_log_path=ollama_log_path,
             ollama_resource_profile=ollama_resource_profile,
-            client_factory=client_factory,
+            client_factory=_bounded_support_factory(client_factory, deadline),
             progress_callback=progress_callback,
             progress_prefix="auxiliary_panel_activity",
         )

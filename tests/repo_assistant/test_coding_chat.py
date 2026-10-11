@@ -347,6 +347,245 @@ def test_invalid_chat_configuration_refuses_before_storage_or_execution(tmp_path
     assert not (tmp_path / "data").exists()
 
 
+@pytest.mark.parametrize("turn_limit", [None, 10, 100])
+def test_away_allowance_is_fixed_across_turns_and_caps_turn_limits(
+    tmp_path, monkeypatch, turn_limit
+):
+    now = 0.0
+    inputs = iter(["Inspect", "Continue", "/exit"])
+    monkeypatch.setattr("ai_agent.coding_chat_cli.time.perf_counter", lambda: now)
+    monkeypatch.setattr("builtins.input", lambda prompt: next(inputs))
+    seen = []
+
+    def execute(args, config):
+        nonlocal now
+        seen.append((args._execution_deadline, args.away_minutes))
+        now += 4
+        args._coding_chat_observer(CodingTurnResult(0, "done", "completed"))
+        return 0
+
+    options = ["--away-minutes", "1"]
+    if turn_limit is not None:
+        options += ["--turn-timeout-seconds", str(turn_limit)]
+    assert run_coding_chat(arguments(tmp_path, *options), build_argument_parser(), execute) == 0
+    expected = [60, 60] if turn_limit != 10 else [10, 14]
+    assert [row[0] for row in seen] == expected
+    assert [row[1] for row in seen] == pytest.approx([1, 56 / 60])
+
+
+def test_away_expiry_stops_queued_turn_and_preserves_staged_input(tmp_path, monkeypatch):
+    from ai_agent.coding_chat_input import CodingChatInput
+
+    now = 0.0
+    terminals = []
+
+    def create_terminal(*, stage):
+        terminal = CodingChatInput(lambda text: None, stage)
+        terminals.append(terminal)
+        return terminal
+
+    monkeypatch.setattr("ai_agent.coding_chat_cli.time.perf_counter", lambda: now)
+    monkeypatch.setattr("ai_agent.coding_chat_cli.CodingChatInput", create_terminal)
+    calls = []
+
+    def execute(args, config):
+        nonlocal now
+        calls.append(args.prompt)
+        terminals[0].feed("Continue after this turn")
+        now = 61
+        args._coding_chat_observer(CodingTurnResult(0, "late success", "completed"))
+        return 0
+
+    assert (
+        run_coding_chat(
+            arguments(tmp_path, "Inspect", "--away-minutes", "1"), build_argument_parser(), execute
+        )
+        == 1
+    )
+    assert calls == ["Inspect"]
+    assert terminals[0].closed
+    store = SQLiteChatTranscriptStore(tmp_path / "data/repo-assistant-chats.sqlite3")
+    session = store.latest_session(repo_root=tmp_path)
+    assert session is not None
+    messages = store.list_messages(session.session_id)
+    assert messages[1].content == "Continue after this turn"
+    assert messages[1].metadata is not None and messages[-1].metadata is not None
+    assert messages[1].metadata["execution_status"] == "queued_not_executed"
+    assert messages[-1].metadata["execution_status"] == "failed"
+    assert "expired" in messages[-1].content
+
+
+@pytest.mark.parametrize("grant_fresh", [True, False])
+def test_resuming_with_away_minutes_starts_fresh_launch_allowance(
+    tmp_path, monkeypatch, grant_fresh
+):
+    now = 0.0
+    deadlines = []
+    monkeypatch.setattr("ai_agent.coding_chat_cli.time.perf_counter", lambda: now)
+    monkeypatch.setattr("builtins.input", lambda prompt: "/exit")
+
+    def execute(args, config):
+        deadlines.append(args._execution_deadline)
+        args._coding_chat_observer(CodingTurnResult(0, "done", "completed"))
+        return 0
+
+    options = ["Inspect", "--away-minutes", "1"]
+    assert run_coding_chat(arguments(tmp_path, *options), build_argument_parser(), execute) == 0
+    store = SQLiteChatTranscriptStore(tmp_path / "data/repo-assistant-chats.sqlite3")
+    session = store.latest_session(repo_root=tmp_path)
+    assert session is not None
+    now = 100
+    resume_options = options if grant_fresh else ["Inspect"]
+    assert (
+        run_coding_chat(
+            arguments(tmp_path, *resume_options, "--coding-session", session.session_id),
+            build_argument_parser(),
+            execute,
+        )
+        == 0
+    )
+    assert deadlines == [60, 160 if grant_fresh else None]
+
+
+def test_turn_limit_without_away_does_not_limit_idle_conversation(tmp_path, monkeypatch):
+    now = 0.0
+    inputs = iter(["Inspect", "Continue", "/exit"])
+
+    def read(prompt):
+        nonlocal now
+        now += 100
+        return next(inputs)
+
+    monkeypatch.setattr("ai_agent.coding_chat_cli.time.perf_counter", lambda: now)
+    monkeypatch.setattr("builtins.input", read)
+    deadlines = []
+
+    def execute(args, config):
+        deadlines.append(args._execution_deadline)
+        assert args.away_minutes is None
+        args._coding_chat_observer(CodingTurnResult(0, "done", "completed"))
+        return 0
+
+    assert (
+        run_coding_chat(
+            arguments(tmp_path, "--turn-timeout-seconds", "10"), build_argument_parser(), execute
+        )
+        == 0
+    )
+    assert deadlines == [110, 210]
+
+
+@pytest.mark.parametrize("value", ["0", "-1", "nan", "inf"])
+def test_invalid_turn_timeout_refuses_before_creating_session(tmp_path, value):
+    with pytest.raises(SystemExit):
+        arguments(tmp_path, "--turn-timeout-seconds", value)
+    assert not (tmp_path / "data").exists()
+
+
+def test_execution_deadline_keeps_shortest_bound_without_resetting(monkeypatch):
+    from argparse import Namespace
+
+    now = 100.0
+    monkeypatch.setattr(_EXAMPLE.time, "perf_counter", lambda: now)
+    args = Namespace(
+        away_minutes=1, turn_timeout_seconds=10, timeout_seconds=180, _execution_deadline=130
+    )
+    assert _EXAMPLE._configure_execution_deadline(args) == 110
+    assert args.timeout_seconds == 10
+    now = 105
+    assert _EXAMPLE._configure_execution_deadline(args) == 110
+    assert args.timeout_seconds == 5
+
+
+@pytest.mark.parametrize("recover", [False, True])
+def test_coding_chat_external_sign_in_and_retry_without_competing_terminal_input(
+    tmp_path, monkeypatch, capsys, recover
+):
+    from types import SimpleNamespace
+
+    from ai_agent.coding_chat_input import CodingChatInput
+    from ai_orchestrator import AccessMethod
+    from ai_provider.agent_readiness import AgentReadiness
+    from ai_provider.external_agents import ExternalAgentResult
+
+    terminals = []
+    authenticated = False
+    deadlines = []
+    now = 0.0
+
+    class Terminal(CodingChatInput):
+        def read(self, prompt):
+            nonlocal authenticated, now
+            if recover and not authenticated:
+                authenticated = True  # Synthetic external sign-in; no login process.
+                now = 5.0
+                return "Continue after external sign-in"
+            return "/exit"
+
+        def in_flight(self, poll=None):
+            terminals.append(self)
+            return super().in_flight(lambda: None)
+
+    monkeypatch.setattr(sys, "stdin", SimpleNamespace(isatty=lambda: True))
+    monkeypatch.setattr(_EXAMPLE.time, "perf_counter", lambda: now)
+    monkeypatch.setattr("ai_agent.coding_chat_cli.CodingChatInput", Terminal)
+    monkeypatch.setenv("CODEX_COMMAND", "synthetic-codex")
+    monkeypatch.setattr(
+        "ai_provider.execution_fallback.check_agent_readiness",
+        lambda method: AgentReadiness(
+            authenticated and method is AccessMethod.CODEX_CLI,
+            "synthetic sign-in needed",
+            ("fake", "login"),
+        ),
+    )
+    monkeypatch.setattr("builtins.input", lambda *args: pytest.fail("Competing stdin reader"))
+    monkeypatch.setattr(
+        "ai_provider.execution_fallback.subprocess.run",
+        lambda *args, **kwargs: pytest.fail("Inline login launched"),
+    )
+    monkeypatch.setattr(
+        _EXAMPLE, "create_chat_client", lambda config: pytest.fail("Unauthenticated model request")
+    )
+
+    def execute(prompt, config, **kwargs):
+        assert authenticated
+        deadlines.append(kwargs.get("deadline"))
+        return ExternalAgentResult(("synthetic-client",), 0, "Authenticated continuation", "")
+
+    monkeypatch.setattr(_EXAMPLE, "_run_external_agent", execute)
+    assert main(
+        [
+            "Inspect",
+            "--mode",
+            "coding-chat",
+            "--execute",
+            "--repo-root",
+            str(tmp_path),
+            "--route-id",
+            "openai-codex-gpt-5-5",
+            "--privacy",
+            "external_allowed",
+            "--cost-policy",
+            "allowances_allowed",
+            "--skip-prompt-review",
+            "--away-minutes",
+            "1",
+        ]
+    ) == (0 if recover else 1)
+    output = capsys.readouterr().out
+    assert output.count("## **SUMMARY**") == (2 if recover else 1)
+    assert "outside coding-chat" in output and "execution_status=failed" in output
+    assert "synthetic sign-in needed" in output
+    assert terminals and all(t.thread is None and t.closed for t in terminals)
+    store = SQLiteChatTranscriptStore(tmp_path / "data/repo-assistant-chats.sqlite3")
+    saved = store.latest_session(repo_root=tmp_path)
+    assert saved is not None
+    messages = store.list_messages(saved.session_id)
+    assert messages[-1].metadata is not None
+    assert messages[-1].metadata["execution_status"] == ("completed" if recover else "failed")
+    assert deadlines == ([60.0] if recover else [])
+
+
 def test_cli_restart_preserves_history_and_refuses_unreconciled_interruption(tmp_path, monkeypatch):
     def interrupted(args, config):
         raise KeyboardInterrupt

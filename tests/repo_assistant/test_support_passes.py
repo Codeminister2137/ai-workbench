@@ -120,3 +120,67 @@ def test_context_execution_uses_planned_target_configuration(monkeypatch):
     assert captured["request"].privacy_class.value == plan.profile.privacy_class.value
     assert status == f"accepted: {target.route_id}"
     assert summary == "Fact [source:a.py:1]"
+
+
+@pytest.mark.parametrize("kind", ["context", "auxiliary"])
+def test_expired_support_pass_never_starts_model_request(monkeypatch, kind):
+    monkeypatch.setattr(support_passes.time, "perf_counter", lambda: 11.0)
+
+    def forbidden(config):
+        pytest.fail("Expired support pass created a client")
+
+    parent = coding_task_profile()
+    if kind == "context":
+        summary, status = support_passes.run_local_context_delegation(
+            (), parent, (), deadline=10.0, client_factory=forbidden
+        )
+        assert summary is None and "expired" in status
+    else:
+        result = support_passes.run_auxiliary_panel(
+            "task", parent, (), deadline=10.0, client_factory=forbidden
+        )
+        assert result.failure_reason is not None
+        assert result.status == "failed" and "expired" in result.failure_reason
+
+
+@pytest.mark.parametrize("kind", ["context", "auxiliary"])
+def test_support_pass_caps_timeout_and_rejects_late_completion(monkeypatch, kind):
+    now = 0.0
+    configs = []
+    monkeypatch.setattr(support_passes.time, "perf_counter", lambda: now)
+    catalog = load_model_catalog(Path("packages/ai_orchestrator/examples/model_catalog.toml"))
+    parent = coding_task_profile()
+
+    class Client:
+        backend = BackendInfo("ollama", "unused", BackendLocation.LOCAL)
+
+        def stream(self, request):
+            raise NotImplementedError
+
+        def complete(self, request):
+            nonlocal now
+            now = 11.0
+            return AIResponse(
+                AIMessage(MessageRole.ASSISTANT, "Fact [source:a.py:1]"), self.backend
+            )
+
+    def factory(config):
+        configs.append(config)
+        return Client()
+
+    if kind == "context":
+        summary, status = support_passes.run_local_context_delegation(
+            (RepoContextFile(Path("a.py"), "a.py", "value = 1", True),),
+            parent,
+            catalog,
+            deadline=10.0,
+            client_factory=factory,
+        )
+        assert summary is None and "expired" in status
+    else:
+        result = support_passes.run_auxiliary_panel(
+            "task", parent, catalog, deadline=10.0, client_factory=factory
+        )
+        assert result.failure_reason is not None
+        assert result.status == "failed" and "expired" in result.failure_reason.lower()
+    assert configs and all(0 < config.timeout_seconds <= 10 for config in configs)

@@ -125,6 +125,46 @@ def session(monkeypatch, routes, **kwargs):
     )
 
 
+@pytest.mark.parametrize("expiry", ["before_probe", "during_probe", "during_answer"])
+def test_fallback_preflight_stops_at_deadline_without_login(monkeypatch, routes, expiry):
+    now = 11.0 if expiry == "before_probe" else 0.0
+    probes = []
+    monkeypatch.setattr("ai_provider.execution_fallback.time.perf_counter", lambda: now)
+    monkeypatch.setattr("ai_provider.execution_fallback.sys.stdin.isatty", lambda: True)
+
+    def readiness(method):
+        nonlocal now
+        probes.append(method)
+        if expiry == "during_probe":
+            now = 11.0
+        return AgentReadiness(
+            expiry != "during_answer", "synthetic readiness", ("synthetic-client", "login")
+        )
+
+    def answer(prompt):
+        nonlocal now
+        now = 11.0
+        return "yes"
+
+    monkeypatch.setattr("ai_provider.execution_fallback.check_agent_readiness", readiness)
+    monkeypatch.setattr("builtins.input", answer)
+    monkeypatch.setattr(
+        "ai_provider.execution_fallback.subprocess.run",
+        lambda *args, **kwargs: pytest.fail("Expired preflight launched login"),
+    )
+    with pytest.raises(ProviderError) as raised:
+        FallbackSession(
+            profile(),
+            routes,
+            initial(routes),
+            compatible=lambda target: True,
+            deadline=10.0,
+            progress=lambda text: None,
+        )
+    assert raised.value.category is ProviderErrorCategory.TIMEOUT
+    assert len(probes) == (0 if expiry == "before_probe" else 1)
+
+
 @pytest.mark.parametrize("status", ["available", "unknown"])
 def test_allowance_observation_is_once_per_source_and_never_routes(monkeypatch, routes, status):
     reads = []
@@ -396,10 +436,25 @@ def test_expired_deadline_refuses_initial_and_later_stage(monkeypatch, routes):
         run.run("Later stage", execute, lambda result: False, observe=str)
     assert error.value.category is ProviderErrorCategory.TIMEOUT
     assert calls == [9.0]
-    fresh = session(monkeypatch, routes, deadline=10.0)
-    with pytest.raises(ProviderError, match="no execution attempted"):
-        fresh.run("Expired first stage", execute, lambda result: False, observe=str)
+    with pytest.raises(ProviderError, match="expired during readiness preflight"):
+        session(monkeypatch, routes, deadline=10.0)
     assert calls == [9.0]
+
+
+def test_successful_response_after_deadline_is_still_timeout(monkeypatch, routes):
+    now = 0.0
+    monkeypatch.setattr("ai_provider.execution_fallback.time.perf_counter", lambda: now)
+    run = session(monkeypatch, routes, deadline=10.0)
+
+    def execute(target, prompt):
+        nonlocal now
+        now = 11.0
+        return "late success"
+
+    with pytest.raises(ProviderError, match="expired after execution") as raised:
+        run.run("Task", execute, lambda result: False, observe=str)
+    assert raised.value.category is ProviderErrorCategory.TIMEOUT
+    assert not run.attempts
 
 
 def test_deadline_after_partial_effect_preserves_handoff_without_fallback(
@@ -498,7 +553,7 @@ def test_quality_config_is_validated_and_missing_model_evidence_refuses(routes, 
 
     assert (
         load_user_config(tmp_path / "missing").fallback_quality_policy
-        is FallbackQualityPolicy.PRESERVE_QUALITY
+        is FallbackQualityPolicy.EMERGENCY_PRESERVE
     )
     config = tmp_path / "user-config.toml"
     config.write_text('[fallback]\nquality_policy = "task_minimum"\n')
@@ -510,6 +565,217 @@ def test_quality_config_is_validated_and_missing_model_evidence_refuses(routes, 
         fallback_candidates(profile(), routes, replace(initial(routes), model="ungraded-model"))
         == ()
     )
+
+
+@pytest.mark.parametrize("provider_error", [False, True])
+def test_emergency_saves_before_reporting_and_retains_original_failure(
+    monkeypatch, routes, provider_error
+):
+    weaker = replace(routes[1], quality=QualityThreshold.LOW)
+    saved = []
+    run = session(
+        monkeypatch,
+        (routes[0], weaker),
+        preservation_compatible=lambda target: True,
+        save_handoff=lambda receipt: saved.append(dict(receipt)),
+    )
+    original = ExternalAgentResult(("client",), 1, "", "usage limit reached")
+    error = ProviderError("usage limit reached", category=ProviderErrorCategory.USAGE_LIMIT)
+    executed = []
+
+    def execute(target, prompt):
+        executed.append(target.route_id)
+        if provider_error:
+            raise error
+        return original
+
+    def preserve(target, payload):
+        assert saved and "preservation_report" not in saved[0]
+        assert target.route_id == "copilot"
+        assert "PRIVATE ORIGINAL OBJECTIVE" not in payload
+        assert "Do not edit" in payload
+        return "Partial edits require owner review."
+
+    if provider_error:
+        with pytest.raises(ProviderError) as raised:
+            run.run(
+                "PRIVATE ORIGINAL OBJECTIVE",
+                execute,
+                external_usage_limit,
+                observe=str,
+                preserve=preserve,
+            )
+        assert raised.value is error
+    else:
+        assert (
+            run.run(
+                "PRIVATE ORIGINAL OBJECTIVE",
+                execute,
+                external_usage_limit,
+                observe=lambda result: "metadata",
+                preserve=preserve,
+            )
+            is original
+        )
+    assert executed == ["codex"]
+    assert run.current.route_id == "codex"
+    assert len(saved) == 2
+    assert saved[1]["status"] == "continuation_stopped"
+    assert saved[1]["preservation_route_id"] == "copilot"
+
+
+def test_emergency_save_failure_prevents_model_and_preserves_original_result(monkeypatch, routes):
+    weaker = replace(routes[1], quality=QualityThreshold.LOW)
+
+    def failed_save(receipt):
+        raise OSError("disk full")
+
+    run = session(
+        monkeypatch,
+        (routes[0], weaker),
+        preservation_compatible=lambda target: True,
+        save_handoff=failed_save,
+    )
+    result = ExternalAgentResult(("client",), 1, "", "usage limit reached")
+    assert (
+        run.run(
+            "Work",
+            lambda *args: result,
+            external_usage_limit,
+            observe=str,
+            preserve=lambda *args: pytest.fail("handoff not saved"),
+        )
+        is result
+    )
+    assert run.handoff is not None and "save_error" in run.handoff
+
+
+def test_emergency_without_durable_save_never_invokes_weaker_model(monkeypatch, routes):
+    weaker = replace(routes[1], quality=QualityThreshold.LOW)
+    run = session(monkeypatch, (routes[0], weaker), preservation_compatible=lambda target: True)
+    result = ExternalAgentResult(("client",), 1, "", "usage limit reached")
+    assert (
+        run.run(
+            "Work",
+            lambda *args: result,
+            external_usage_limit,
+            observe=str,
+            preserve=lambda *args: pytest.fail("no durable handoff"),
+        )
+        is result
+    )
+
+
+@pytest.mark.parametrize("provider_error", [False, True])
+@pytest.mark.parametrize("failed_output", ["fallback_handoff:", "fallback_exhausted:"])
+def test_console_failure_cannot_prevent_saved_handoff_or_replace_failure(
+    monkeypatch, routes, provider_error, failed_output
+):
+    saved = []
+    weaker = replace(routes[1], quality=QualityThreshold.LOW)
+
+    def progress(message):
+        if message.startswith(failed_output):
+            raise OSError("console unavailable")
+
+    run = session(monkeypatch, (routes[0], weaker), save_handoff=saved.append, progress=progress)
+    original = ExternalAgentResult(("client",), 1, "", "usage limit reached")
+    error = ProviderError("usage limit reached", category=ProviderErrorCategory.USAGE_LIMIT)
+
+    def execute(*args):
+        if provider_error:
+            raise error
+        return original
+
+    if provider_error:
+        with pytest.raises(ProviderError) as raised:
+            run.run("Work", execute, external_usage_limit, observe=lambda result: "metadata")
+        assert raised.value is error
+    else:
+        assert (
+            run.run("Work", execute, external_usage_limit, observe=lambda result: "metadata")
+            is original
+        )
+    assert len(saved) == 1 and saved[0]["status"] == "continuation_stopped"
+
+
+@pytest.mark.parametrize("failure", [KeyboardInterrupt(), ValueError("callback defect")])
+def test_progress_cancellation_and_programming_errors_still_propagate(monkeypatch, routes, failure):
+    def progress(message):
+        raise failure
+
+    with pytest.raises(type(failure)) as raised:
+        session(monkeypatch, routes, progress=progress)
+    assert raised.value is failure
+
+
+def test_prefer_quality_continues_weaker_with_explicit_downgrade(monkeypatch, routes):
+    from ai_orchestrator.fallback import FallbackQualityPolicy
+
+    weaker = replace(routes[1], quality=QualityThreshold.LOW)
+    log = []
+    run = session(
+        monkeypatch,
+        (routes[0], weaker),
+        quality_policy=FallbackQualityPolicy.PREFER_QUALITY,
+        progress=log.append,
+    )
+    executed = []
+
+    def execute(target, payload):
+        executed.append(target.route_id)
+        if target.route_id == "codex":
+            return ExternalAgentResult(("client",), 1, "", "usage limit reached")
+        return "continued implementation"
+
+    assert (
+        run.run(
+            "Work",
+            execute,
+            lambda result: isinstance(result, ExternalAgentResult) and external_usage_limit(result),
+            observe=str,
+        )
+        == "continued implementation"
+    )
+    assert executed == ["codex", "copilot"]
+    assert any(line.startswith("fallback_quality_downgrade:") for line in log)
+    assert len(run.attempts) == len(executed)
+
+
+def test_emergency_usage_failure_excludes_sibling_billing_bucket(monkeypatch, routes):
+    alternatives = (
+        routes[0],
+        replace(routes[1], quality=QualityThreshold.STANDARD),
+        entry(
+            "copilot-sibling",
+            AccessMethod.COPILOT_CLI,
+            BillingSource.GITHUB_COPILOT_SUBSCRIPTION_ALLOWANCE,
+        ),
+        replace(routes[2], quality=QualityThreshold.LOW),
+    )
+    saved = []
+    run = session(
+        monkeypatch,
+        alternatives,
+        preservation_compatible=lambda target: True,
+        save_handoff=lambda receipt: saved.append(dict(receipt)),
+    )
+    result = ExternalAgentResult(("client",), 1, "", "usage limit reached")
+    preserved = []
+
+    def preserve(target, payload):
+        preserved.append(target.access_method)
+        if target.access_method is AccessMethod.COPILOT_CLI:
+            raise ProviderError("usage limit", category=ProviderErrorCategory.USAGE_LIMIT)
+        return "handoff"
+
+    assert (
+        run.run("Work", lambda *args: result, external_usage_limit, observe=str, preserve=preserve)
+        is result
+    )
+    assert preserved == [AccessMethod.COPILOT_CLI, AccessMethod.KIRO_CLI]
+    assert len(run.attempts) == 3
+    assert saved[-1]["preservation_route_id"] == "kiro"
 
 
 def test_saved_fallback_handoff_preserves_work_and_omits_prompt(tmp_path):
@@ -640,6 +906,54 @@ def test_noninteractive_missing_auth_is_reported_before_execution(monkeypatch, r
     )
     assert not run.ready
     assert any("fallback_sign_in_needed" in message for message in messages)
+
+
+@pytest.mark.parametrize("primary_ready", [True, False])
+@pytest.mark.parametrize("fallback_enabled", [True, False])
+def test_external_sign_in_never_reads_input_or_launches_login(
+    monkeypatch, routes, primary_ready, fallback_enabled
+):
+    messages = []
+    monkeypatch.setattr("sys.stdin", SimpleNamespace(isatty=lambda: True))
+    monkeypatch.setattr(
+        "ai_provider.execution_fallback.check_agent_readiness",
+        lambda method: AgentReadiness(
+            primary_ready and method is AccessMethod.CODEX_CLI,
+            "synthetic readiness",
+            ("synthetic-client", "login"),
+        ),
+    )
+    monkeypatch.setattr("builtins.input", lambda *args: pytest.fail("Inline sign-in read stdin"))
+    monkeypatch.setattr(
+        "ai_provider.execution_fallback.subprocess.run",
+        lambda *args, **kwargs: pytest.fail("Inline login launched"),
+    )
+    run = FallbackSession(
+        profile(),
+        routes,
+        initial(routes),
+        compatible=lambda target: True,
+        interactive_login=False,
+        enabled=fallback_enabled,
+        progress=messages.append,
+    )
+    assert run.primary_ready is primary_ready
+    if not primary_ready:
+        assert run.unavailable["codex"] == "synthetic readiness"
+    assert not run.ready
+    if not primary_ready or fallback_enabled:
+        assert any("outside coding-chat" in line for line in messages)
+    if primary_ready:
+        assert run.run("Work", lambda *_: "done", lambda _: False, observe=str) == "done"
+    else:
+        with pytest.raises(ProviderError) as raised:
+            run.run(
+                "Work",
+                lambda *_: pytest.fail("Unauthenticated execution"),
+                lambda _: False,
+                observe=str,
+            )
+        assert raised.value.category is ProviderErrorCategory.AUTHENTICATION
 
 
 def test_interactive_sign_in_happens_before_execution(monkeypatch, routes):

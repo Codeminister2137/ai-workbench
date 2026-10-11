@@ -5,7 +5,7 @@ from dataclasses import replace
 from typing import Any
 
 from ai_orchestrator import ExecutionTarget, ModelCatalogEntry, TaskProfile, prepare_execution
-from ai_orchestrator.fallback import FallbackQualityPolicy, fallback_candidates
+from ai_orchestrator.fallback import FallbackQualityPolicy, fallback_candidates, fallback_profile
 
 
 def fallback_readiness_report(
@@ -16,7 +16,8 @@ def fallback_readiness_report(
     incompatibility: Callable[[ExecutionTarget], str | None],
     executable_status: Callable[[ExecutionTarget], str],
     enabled: bool = True,
-    quality_policy: FallbackQualityPolicy = FallbackQualityPolicy.PRESERVE_QUALITY,
+    quality_policy: FallbackQualityPolicy = FallbackQualityPolicy.EMERGENCY_PRESERVE,
+    preservation_incompatibility: Callable[[ExecutionTarget], str | None] | None = None,
 ) -> dict[str, Any]:
     """Explain policy/adapter exclusions without performing runtime or account probes.
 
@@ -25,11 +26,28 @@ def fallback_readiness_report(
     """
     eligible = fallback_candidates(profile, catalog, primary, quality_policy=quality_policy)
     candidates = []
-    for entry in eligible:
+    preservation_candidates = []
+    preservation = fallback_candidates(
+        profile,
+        catalog,
+        primary,
+        quality_policy=quality_policy,
+        preservation_only=True,
+    )
+    for entry in eligible + preservation:
+        preserving = entry in preservation
+        route_profile = fallback_profile(
+            profile,
+            primary,
+            catalog,
+            quality_policy=quality_policy,
+            preservation_only=preserving,
+        )
+        assert route_profile is not None
         plan = prepare_execution(
             "Fallback readiness",
             replace(
-                profile,
+                route_profile,
                 user_route_id_override=entry.backend.route_id,
                 user_access_method_override=None,
                 user_backend_override=None,
@@ -40,8 +58,14 @@ def fallback_readiness_report(
             timeout_seconds=primary.timeout_seconds,
         ).execution_plan
         assert plan is not None
-        reason = incompatibility(plan.target)
-        candidates.append(
+        reason = (
+            preservation_incompatibility(plan.target)
+            if preserving and preservation_incompatibility is not None
+            else "preservation executor not supplied"
+            if preserving
+            else incompatibility(plan.target)
+        )
+        (preservation_candidates if preserving else candidates).append(
             {
                 "route_id": plan.target.route_id,
                 "executor_compatible": reason is None,
@@ -51,9 +75,10 @@ def fallback_readiness_report(
                 "tool_connection": "not_checked",
                 "allowance": "unknown",
                 "execution_ready": False,
+                "scope": "preservation_only" if preserving else "continuation",
             }
         )
-    eligible_ids = {entry.backend.route_id for entry in eligible}
+    eligible_ids = {entry.backend.route_id for entry in eligible + preservation}
     excluded = []
     for entry in catalog:
         backend = entry.backend
@@ -76,5 +101,6 @@ def fallback_readiness_report(
         "tool_connection": "not_checked",
         "allowance": "unknown",
         "fallback_candidates": candidates,
+        "emergency_preservation_candidates": preservation_candidates,
         "policy_exclusions": excluded,
     }

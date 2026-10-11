@@ -1,6 +1,7 @@
 """Offline compatibility invalidation and complete-input refusal contracts."""
 
 from argparse import Namespace
+from collections.abc import Iterator
 from dataclasses import replace
 from types import SimpleNamespace
 
@@ -20,6 +21,7 @@ from ai_provider import (
     ProviderKind,
 )
 from ai_provider.coding_assist import coding_task_profile
+from ai_provider.contracts import AIStreamDelta, AIStreamEvent
 from ai_provider.native_admission import (
     NATIVE_TOOL_EVIDENCE,
     NativeCodingClient,
@@ -41,7 +43,7 @@ class RecordingClient:
         self.requests.append(request)
         return AIResponse(AIMessage(MessageRole.ASSISTANT, "done"), self.backend)
 
-    def stream(self, request):
+    def stream(self, request) -> Iterator[AIStreamEvent]:
         self.requests.append(request)
         return iter(())
 
@@ -217,6 +219,140 @@ def test_cli_native_boundary_enforces_guard_with_no_model_call(tmp_path, monkeyp
             tmp_path,
         )
     assert not client.requests
+
+
+def test_native_deadline_caps_each_turn_and_stops_after_tool_results(monkeypatch):
+    now = [10.0]
+    monkeypatch.setattr("ai_provider.native_admission.time.perf_counter", lambda: now[0])
+    client = RecordingClient()
+    configs = []
+
+    def factory(config):
+        configs.append(config)
+        return client
+
+    wrapper = prepare_native_coding_client(
+        client,
+        BackendConfig(ProviderKind.OPENAI, "custom", timeout_seconds=30),
+        SimpleNamespace(catalog=CATALOG, fallback_session=SimpleNamespace(deadline=20)),
+        None,
+        client_factory=factory,
+    )
+    request = AIRequest((AIMessage(MessageRole.USER, "task"),))
+    wrapper.complete(request)
+    now[0] = 17.0
+    followup = replace(request, messages=(*request.messages, AIMessage(MessageRole.TOOL, "result")))
+    wrapper.complete(followup)
+    assert [config.timeout_seconds for config in configs] == [10, 3]
+    now[0] = 20.0
+    with pytest.raises(ProviderError, match="deadline expired"):
+        wrapper.complete(followup)
+    assert len(client.requests) == 2 and len(configs) == 2
+
+
+def test_late_native_response_cannot_reach_tool_execution(monkeypatch):
+    now = [10.0]
+    monkeypatch.setattr("ai_provider.native_admission.time.perf_counter", lambda: now[0])
+
+    class LateClient(RecordingClient):
+        def complete(self, request):
+            self.requests.append(request)
+            now[0] = 21.0
+            call = AIToolCall("late", "write_file", {"path": "source.py", "content": "change"})
+            return AIResponse(
+                AIMessage(MessageRole.ASSISTANT, "", tool_calls=(call,)),
+                self.backend,
+                tool_calls=(call,),
+            )
+
+    client = LateClient()
+    wrapper = NativeCodingClient(
+        client,
+        BackendConfig(ProviderKind.OPENAI, "custom"),
+        None,
+        deadline=20,
+        client_factory=lambda config: client,
+    )
+    with pytest.raises(ProviderError, match="deadline expired"):
+        wrapper.complete(AIRequest((AIMessage(MessageRole.USER, "task"),)))
+    assert len(client.requests) == 1
+    with pytest.raises(ProviderError, match="deadline expired"):
+        wrapper.complete(AIRequest((AIMessage(MessageRole.TOOL, "late results"),)))
+    assert len(client.requests) == 1
+
+
+def test_native_admission_probe_expiry_prevents_inference(monkeypatch):
+    now = [10.0]
+    monkeypatch.setattr("ai_provider.native_admission.time.perf_counter", lambda: now[0])
+    configs = []
+    evidence = NATIVE_TOOL_EVIDENCE[0]
+
+    def identity(config):
+        configs.append(config)
+        now[0] = 20.0
+        return evidence.model_digest, evidence.runtime_version
+
+    monkeypatch.setattr("ai_provider.native_admission.installed_native_identity", identity)
+    client = RecordingClient()
+    wrapper = NativeCodingClient(
+        client,
+        BackendConfig(ProviderKind.OLLAMA, evidence.model),
+        8192,
+        deadline=11,
+        client_factory=lambda config: pytest.fail("inference client created after probe expiry"),
+    )
+    with pytest.raises(ProviderError, match="deadline expired"):
+        wrapper.complete(AIRequest((AIMessage(MessageRole.USER, "task"),)))
+    assert configs[0].timeout_seconds == 1
+    assert not client.requests
+
+
+def test_native_stream_discards_late_events(monkeypatch):
+    now = [10.0]
+    monkeypatch.setattr("ai_provider.native_admission.time.perf_counter", lambda: now[0])
+
+    class LateStream(RecordingClient):
+        def stream(self, request):
+            now[0] = 20.0
+            yield AIStreamDelta(content="late")
+
+    client = LateStream()
+    wrapper = NativeCodingClient(
+        client,
+        BackendConfig(ProviderKind.OPENAI, "custom"),
+        None,
+        deadline=11,
+        client_factory=lambda config: client,
+    )
+    with pytest.raises(ProviderError, match="deadline expired"):
+        next(wrapper.stream(AIRequest((AIMessage(MessageRole.USER, "task"),))))
+
+
+def test_cli_primary_native_attempt_uses_session_capped_timeout(tmp_path, monkeypatch):
+    from ai_agent import repo_coding_assistant as cli
+
+    config = BackendConfig(ProviderKind.OPENAI, "custom", timeout_seconds=30)
+    route = SimpleNamespace(route_id="primary", timeout_seconds=2)
+    captured = []
+    result = SimpleNamespace(response="original")
+
+    def execute_native(prompt, bounded, *args, **kwargs):
+        captured.append(bounded)
+        return result
+
+    def run(prompt, execute, *args, **kwargs):
+        return execute(route, prompt)
+
+    session = SimpleNamespace(enabled=True, initial=route, current=route, run=run)
+    monkeypatch.setattr(cli, "_run_native_agent", execute_native)
+    assert (
+        cli._run_native_agent_with_fallback(
+            "task", config, None, Namespace(fallback_session=session), tmp_path
+        )
+        is result
+    )
+    assert captured[0].timeout_seconds == 2
+    assert config.timeout_seconds == 30
 
 
 def test_cli_native_boundary_preserves_required_instructions(admitted, tmp_path, monkeypatch):

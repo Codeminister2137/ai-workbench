@@ -8,6 +8,7 @@ Only metadata endpoints are consulted; admission never probes with inference.
 from __future__ import annotations
 
 import json
+import time
 from collections.abc import Callable, Iterator
 from dataclasses import asdict, dataclass, replace
 from typing import Any
@@ -120,12 +121,14 @@ class NativeCodingClient:
     config: BackendConfig
     context_tokens: int | None
     diagnostic: Callable[[str], None] | None = None
+    deadline: float | None = None
+    client_factory: Callable[[BackendConfig], ChatClient] | None = None
 
     @property
     def backend(self) -> BackendInfo:
         return self.client.backend
 
-    def _request(self, request: AIRequest) -> AIRequest:
+    def _request(self, request: AIRequest, config: BackendConfig | None = None) -> AIRequest:
         model = request.model or self.config.model
         if model != self.config.model:
             raise ProviderError(
@@ -138,7 +141,7 @@ class NativeCodingClient:
                     f"Native tool compatibility is unknown for {model}; no model request sent",
                     category=ProviderErrorCategory.CONFIGURATION,
                 )
-            digest, version = installed_native_identity(self.config)
+            digest, version = installed_native_identity(config or self.config)
             reason = native_tool_incompatibility(
                 model, model_digest=digest, runtime_version=version
             )
@@ -191,14 +194,54 @@ class NativeCodingClient:
             self.diagnostic(message)
 
     def complete(self, request: AIRequest) -> AIResponse:
-        return self.client.complete(self._request(request))
+        admitted = self._request(request, self._bounded_config())
+        client = self._bounded_client()
+        response = client.complete(admitted)
+        self._bounded_config()
+        return response
 
     def stream(self, request: AIRequest) -> Iterator[AIStreamEvent]:
-        yield from self.client.stream(self._request(request))
+        admitted = self._request(request, self._bounded_config())
+        client = self._bounded_client()
+        for event in client.stream(admitted):
+            self._bounded_config()
+            yield event
+        self._bounded_config()
+
+    def _bounded_config(self) -> BackendConfig:
+        """Refuse expired turns and cap both admission probes and inference timeouts."""
+        if self.deadline is None:
+            return self.config
+        remaining = self.deadline - time.perf_counter()
+        if remaining <= 0:
+            raise ProviderError(
+                "Native coding deadline expired; no further model or tool actions admitted",
+                category=ProviderErrorCategory.TIMEOUT,
+            )
+        return replace(self.config, timeout_seconds=min(self.config.timeout_seconds, remaining))
+
+    def _bounded_client(self) -> ChatClient:
+        config = self._bounded_config()
+        if self.deadline is None:
+            return self.client
+        if self.client_factory is None:
+            from ai_provider.factory import create_chat_client
+
+            factory = create_chat_client
+        else:
+            factory = self.client_factory
+        client = factory(config)
+        self._bounded_config()
+        return client
 
 
 def prepare_native_coding_client(
-    client: ChatClient, config: BackendConfig, args: Any, diagnostic: Callable[[str], None] | None
+    client: ChatClient,
+    config: BackendConfig,
+    args: Any,
+    diagnostic: Callable[[str], None] | None,
+    *,
+    client_factory: Callable[[BackendConfig], ChatClient] | None = None,
 ) -> ChatClient:
     """Resolve existing catalog/resource limits for the actual selected model."""
     from pathlib import Path
@@ -231,4 +274,11 @@ def prepare_native_coding_client(
                 category=ProviderErrorCategory.CONFIGURATION,
             )
         capacity = min(capacity, runtime) if capacity else runtime
-    return NativeCodingClient(client, config, capacity, diagnostic)
+    return NativeCodingClient(
+        client,
+        config,
+        capacity,
+        diagnostic,
+        deadline=getattr(getattr(args, "fallback_session", None), "deadline", None),
+        client_factory=client_factory,
+    )

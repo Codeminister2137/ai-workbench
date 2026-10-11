@@ -52,7 +52,7 @@ def mock_native_runtime_admission(monkeypatch):
     """Legacy loop fixtures use synthetic models; admission has separate contract tests."""
     monkeypatch.setattr(
         "ai_agent.repo_coding_assistant.prepare_native_coding_client",
-        lambda client, config, args, diagnostic: client,
+        lambda client, config, args, diagnostic, *, client_factory=None: client,
     )
 
 

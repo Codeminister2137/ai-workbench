@@ -241,6 +241,36 @@ def test_native_iteration_limit_reports_observed_receipts(tmp_path, monkeypatch)
     assert any("local_tool_activity: recorded - create_file" in event for event in events)
 
 
+def test_native_failure_preserves_provider_error_when_console_quota_is_exhausted(
+    tmp_path, monkeypatch
+):
+    from ai_provider import BackendConfig, ProviderError
+
+    client = _NativeFakeClient()
+    monkeypatch.setattr(_EXAMPLE, "create_chat_client", lambda config: client)
+
+    def failed_console(message):
+        if message.startswith("local_agent_activity: failed"):
+            raise OSError(1453, "Insufficient quota to complete the requested service")
+
+    with pytest.raises(ProviderError, match="exceeded max_iterations=1") as caught:
+        _run_native_agent(
+            "Create a file",
+            BackendConfig(provider=_EXAMPLE.ProviderKind.OLLAMA, model="test"),
+            _EXAMPLE.coding_task_profile(),
+            Namespace(
+                start_ollama=False,
+                system=None,
+                max_action_rounds=1,
+                approval_policy="trusted_local",
+            ),
+            tmp_path,
+            progress_callback=failed_console,
+        )
+    assert (tmp_path / "native.txt").read_text() == "native"
+    assert any(message.role.value == "tool" for message in caught.value.partial_messages)
+
+
 def test_implement_mode_defaults_to_native_tools(capsys, monkeypatch) -> None:
     from dataclasses import replace
 

@@ -359,3 +359,6 @@ def run_terminal_conversation(
     except KeyboardInterrupt:
         write("coding_chat_interrupted: inspect effects before resuming; no actions replayed.")
         return 130
+    except TimeoutError as exc:
+        write(f"coding_chat_expired: {exc}")
+        return 1
