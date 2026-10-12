@@ -103,6 +103,12 @@ Token and provider-latency fields are `None` or `unavailable` when the backend
 does not report them. The memory metrics are Python-process memory observed by
 the CLI, not total GPU, Ollama server, IDE, or external-provider resource use.
 
+For native tool execution, primary elapsed time covers the initial agent loop,
+including tool execution and fallback attempts, rather than prompt preparation.
+Primary token usage and provider latency describe its final model response,
+not totals across tool calls, fallback attempts or later repair rounds. Failed
+native execution reports elapsed time with unavailable response usage.
+
 When using `scripts\repo-assistant.ps1`, transcript logging is on by default.
 Each run without an explicit `--log-file` writes to
 `artifacts/repo-assistant-YYYYMMDD-HHMMSS/assistant.log`. The canonical broad-analysis

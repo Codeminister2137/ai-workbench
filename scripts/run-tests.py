@@ -41,6 +41,7 @@ GROUPS = {
         "tests/test_coding_sessions.py",
         "tests/test_codex_mcp_config.py",
         "tests/test_native_admission.py",
+        "tests/test_measured_prefix_admission.py",
     ),
     "cli": (
         "tests/repo_assistant/test_*.py",

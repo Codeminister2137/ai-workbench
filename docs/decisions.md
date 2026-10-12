@@ -529,6 +529,16 @@ maintenance. Intake explicitly uses `new`; tracking never grants delivery consen
 No deployment or candidate-profile transmission is approved by this choice.
 See [ADR-051](decisions/ADR-051-openings-api-integration.md).
 
+## ADR-056 - Measured-prefix native admission prototype
+
+**Status:** Accepted prototype and explicit experimental CLI opt-in; broader validation incomplete.
+The owner approved investigating provider-reported prefix counts with strict
+identity checks, conservative appended estimates and absolute-gate fallback.
+The owner subsequently approved `--experimental-measured-prefix` for native
+Ollama coding. Production default, complete instructions/history and acceptance
+gates remain unchanged; the choice does not establish coding-quality readiness.
+See [ADR-056](decisions/ADR-056-measured-prefix-admission-prototype.md).
+
 ## ADR-055 - Explicit provider continuation metadata
 
 **Status:** Accepted and implemented (2026-10-11); coding-workflow acceptance incomplete.

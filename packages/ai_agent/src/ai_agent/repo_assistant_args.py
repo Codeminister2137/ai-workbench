@@ -606,6 +606,15 @@ def build_argument_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--experimental-measured-prefix",
+        action="store_true",
+        help=(
+            "Opt into experimental provider-reported prefix admission for executed "
+            "native Ollama coding tools. Keeps complete instructions/history, "
+            "reserves output, and disables provider truncation/context shifting."
+        ),
+    )
+    parser.add_argument(
         "--max-action-rounds",
         type=int,
         default=3,

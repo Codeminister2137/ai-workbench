@@ -76,7 +76,7 @@ def test_continuation_counts_toward_complete_context_admission(admitted):
     assert all("xxx" not in line for line in diagnostics)
 
 
-@pytest.mark.parametrize("index", [0, 1])
+@pytest.mark.parametrize("index", range(len(NATIVE_TOOL_EVIDENCE)))
 @pytest.mark.parametrize("changed", ["model", "digest", "runtime", "contract", "missing"])
 def test_positive_and_negative_evidence_invalidates(index, changed):
     evidence = NATIVE_TOOL_EVIDENCE[index]
@@ -199,6 +199,38 @@ def test_runtime_profile_is_capped_by_model_window(admitted):
     )
     assert isinstance(wrapped, NativeCodingClient)
     assert wrapped.context_tokens == 8192
+    assert wrapped.measured_prefix_prototype is False
+
+
+@pytest.mark.parametrize("enabled", [False, True])
+def test_cli_opt_in_reaches_native_admission_without_changing_capacity(admitted, enabled):
+    _, client, _ = admitted
+    wrapped = prepare_native_coding_client(
+        client,
+        BackendConfig(ProviderKind.OLLAMA, "gpt-oss:20b"),
+        Namespace(
+            catalog=CATALOG,
+            ollama_profile="balanced",
+            experimental_measured_prefix=enabled,
+        ),
+        None,
+    )
+    assert isinstance(wrapped, NativeCodingClient)
+    assert wrapped.measured_prefix_prototype is enabled
+    assert wrapped.context_tokens == 8192
+    assert not client.requests
+
+
+def test_cli_opt_in_refuses_hosted_provider_before_requests(admitted):
+    _, client, _ = admitted
+    with pytest.raises(ProviderError, match="requires native Ollama coding tools"):
+        prepare_native_coding_client(
+            client,
+            BackendConfig(ProviderKind.OPENAI, "custom"),
+            Namespace(catalog=CATALOG, experimental_measured_prefix=True),
+            None,
+        )
+    assert not client.requests
 
 
 def test_known_cloud_capacity_and_unknown_capacity_are_distinct():
@@ -266,6 +298,75 @@ def test_native_deadline_caps_each_turn_and_stops_after_tool_results(monkeypatch
     with pytest.raises(ProviderError, match="deadline expired"):
         wrapper.complete(followup)
     assert len(client.requests) == 2 and len(configs) == 2
+
+
+# Additional tests for measured_prefix metadata wiring and usage limits
+
+# Context preservation follows the opt-in; both modes retain the same context length.
+
+
+def test_measured_prefix_metadata_wiring(admitted):
+    request = AIRequest(
+        (
+            AIMessage(MessageRole.SYSTEM, "system"),
+            AIMessage(MessageRole.USER, "task"),
+        ),
+        model="gpt-oss:20b",
+        metadata={"task": "coding"},
+    )
+    # Wrapper with experimental flag disabled
+    wrapper_false = prepare_native_coding_client(
+        admitted[1],
+        BackendConfig(ProviderKind.OLLAMA, "gpt-oss:20b"),
+        Namespace(catalog=CATALOG, ollama_profile="balanced", experimental_measured_prefix=False),
+        None,
+    )
+    wrapper_false.complete(request)
+    forwarded = admitted[1].requests[-1]
+    assert forwarded.metadata["ollama_context_length"] == 8192
+    assert forwarded.metadata.get("ollama_preserve_context", False) is False
+    # Wrapper with experimental flag enabled
+    wrapper_true = prepare_native_coding_client(
+        admitted[1],
+        BackendConfig(ProviderKind.OLLAMA, "gpt-oss:20b"),
+        Namespace(catalog=CATALOG, ollama_profile="balanced", experimental_measured_prefix=True),
+        None,
+    )
+    wrapper_true.complete(request)
+    forwarded2 = admitted[1].requests[-1]
+    assert forwarded2.metadata["ollama_context_length"] == 8192
+    assert forwarded2.metadata.get("ollama_preserve_context", False) is True
+    # Original request metadata remains unchanged
+    assert request.metadata == {"task": "coding"}
+
+
+# Test that after a successful small request, a large request is refused before another client call.
+def test_unavailable_usage_refuses_before_next_call(admitted):
+    # Create a new wrapper with experimental_measured_prefix enabled
+    wrapper, client, _ = admitted
+    wrapped = prepare_native_coding_client(
+        client,
+        BackendConfig(ProviderKind.OLLAMA, "gpt-oss:20b"),
+        Namespace(catalog=CATALOG, ollama_profile="balanced", experimental_measured_prefix=True),
+        None,
+    )
+    # First request that fits balanced8192 runtime with 10 max_output_tokens
+    small_req = AIRequest(
+        (AIMessage(MessageRole.USER, "p" * 10000),),
+        max_output_tokens=10,
+    )
+    wrapped.complete(small_req)
+    assert len(client.requests) == 1
+    # Second request: same first message plus additional long user message exceeding absolute bound
+    large_msg = "x" * 6500
+    large_req = AIRequest(
+        (*small_req.messages, AIMessage(MessageRole.USER, large_msg)),
+        max_output_tokens=10,
+    )
+    with pytest.raises(ProviderError, match="does not fit"):
+        wrapped.complete(large_req)
+    # No additional request recorded after refusal
+    assert len(client.requests) == 1
 
 
 def test_late_native_response_cannot_reach_tool_execution(monkeypatch):

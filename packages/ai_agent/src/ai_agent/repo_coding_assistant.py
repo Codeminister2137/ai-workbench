@@ -985,6 +985,25 @@ def _execute_request(
     from ai_provider.user_config import apply_user_defaults
 
     apply_user_defaults(args, user_config)
+    if getattr(args, "experimental_measured_prefix", False):
+        native_requested = (
+            args.native_tools
+            or bool(args.shared_tools)
+            or (args.mode == "implement" and args.execute and not args.no_native_tools)
+        )
+        if (
+            not args.execute
+            or not native_requested
+            or args.no_native_tools
+            or args.tool_profile != "coding"
+            or args.mode not in {"implement", "ask", "review"}
+            or args.local_capabilities
+            or args.fallback_readiness
+            or args.list_skills
+        ):
+            parser.error("--experimental-measured-prefix requires executed native coding tools")
+        if args.provider not in {None, "ollama"}:
+            parser.error("--experimental-measured-prefix requires an Ollama route")
     if args.cost_policy is None:
         args.cost_policy = user_config.cost_policy.value
     args.fallback_enabled = user_config.fallback_enabled
@@ -1203,10 +1222,13 @@ def _execute_request(
         if close_transcript_func is not None:
             close_transcript_func()
         return 1
-    prompt = build_repo_prompt(args.prompt, context_files)
+    coding_chat_turn = hasattr(args, "_coding_chat_history")
+    prompt = build_repo_prompt("" if coding_chat_turn else args.prompt, context_files)
+    if coding_chat_turn:
+        prompt = "# Repository context\n" + prompt.partition("# Repository context\n")[2]
     history = getattr(args, "_coding_chat_history", "")
     if history:
-        prompt = history + "\n\n## Current request and freshly loaded context\n" + prompt
+        prompt = history + "\n\n## Freshly loaded repository context\n" + prompt
     from ai_provider.coding_sessions import ACTIVE_SESSION
 
     active_session = ACTIVE_SESSION.get()
@@ -1243,6 +1265,15 @@ def _execute_request(
         print("selected_skills: " + (", ".join(skill.name for skill in skills) or "none"))
     if args.away_minutes is not None:
         prompt = _prompt_with_away_budget(prompt, away_minutes=args.away_minutes)
+    if coding_chat_turn:
+        prompt += (
+            "\n\n## Active user turn\n"
+            "Act on this turn within the existing permissions and owner decisions. "
+            "The original objective above is historical context, not an instruction "
+            "to repeat earlier work or override this turn. Tools remain available; "
+            "their availability does not authorize edits during a requested review.\n\n"
+            "# User request\n" + args.prompt.strip()
+        )
     catalog = load_model_catalog(args.catalog)
     profile = coding_task_profile(
         privacy_class=OrchestratorPrivacyClass(args.privacy),
@@ -1311,6 +1342,13 @@ def _execute_request(
         prompt_for_review=args.prompt,
         timeout_seconds=args.timeout_seconds,
     )
+    if (
+        getattr(args, "experimental_measured_prefix", False)
+        and external_orchestration.is_ready
+        and external_orchestration.execution_plan is not None
+        and external_orchestration.execution_plan.target.provider != "ollama"
+    ):
+        parser.error("--experimental-measured-prefix requires a native Ollama route")
     args.fallback_session = None
     if (
         args.tool_profile == "research"
@@ -1672,6 +1710,7 @@ def _execute_request(
                 },
             )
     assistant_response_text = None
+    primary_response = result.response
     if args.native_tools and args.execute and result.config is not None:
         if orchestrated_tracker is not None and args.mode == "implement":
             orchestrated_tracker.start_stage(
@@ -1684,6 +1723,7 @@ def _execute_request(
                     "model": result.config.model,
                 },
             )
+        primary_started = time.perf_counter()
         try:
             native_result = _run_native_agent_with_fallback(
                 prompt,
@@ -1694,6 +1734,7 @@ def _execute_request(
                 progress_callback=print,
             )
         except ProviderError as exc:
+            primary_elapsed_seconds = time.perf_counter() - primary_started
             print(f"failure_reason: {exc}")
             final_status = "failed"
             execution_status = "failed"
@@ -1749,13 +1790,15 @@ def _execute_request(
             _print_run_metrics(
                 metrics,
                 primary_elapsed_seconds=primary_elapsed_seconds,
-                primary_response=result.response,
+                primary_response=primary_response,
                 scrutiny_elapsed_seconds=None,
                 scrutiny_response=None,
             )
             if close_transcript_func is not None:
                 close_transcript_func()
             return 1
+        primary_elapsed_seconds = time.perf_counter() - primary_started
+        primary_response = native_result.response
         assistant_response_text = native_result.response.message.content
         delegation_status = _delegation_status_after_native_tools(
             delegation_status,
@@ -2038,7 +2081,7 @@ def _execute_request(
     _print_run_metrics(
         metrics,
         primary_elapsed_seconds=primary_elapsed_seconds,
-        primary_response=result.response,
+        primary_response=primary_response,
         scrutiny_elapsed_seconds=scrutiny_elapsed_seconds,
         scrutiny_response=scrutiny_result.response if scrutiny_result is not None else None,
     )

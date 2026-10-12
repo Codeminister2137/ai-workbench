@@ -42,6 +42,21 @@ and host stages share the original deadline. Turn limits can shorten it.
 
 ## Enforcement and validation limits
 
+### Local-only pilot clarification — 2026-10-12
+
+The owner approved removing the call-count cap specifically for local-only
+pilots. Local model calls consume local compute and elapsed time rather than
+provider allowances. Retaining a six-call cap bounds repetitive generations,
+but can stop useful inspection, edits and review before the time allowance ends.
+Using the time bound permits more local generations within that same window.
+
+Use the existing run-local `--no-request-cap` option while retaining the fixed
+30-minute launch deadline, per-request timeout, two-file scope, frozen checks
+and verified cleanup. This does not change production CLI defaults, provider
+allowance controls, privacy boundaries or the validity of expired allowances.
+Approval permits this configuration; offline preparation does not establish
+successful live acceptance.
+
 Provider-neutral AgentLoop deadline enforcement now prevents requests and tool
 actions after an absolute deadline, including multiple tools in a response and
 approvals that outlast it. Completed effects/receipts remain preserved; running

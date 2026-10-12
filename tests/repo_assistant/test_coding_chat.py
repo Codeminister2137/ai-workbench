@@ -815,7 +815,7 @@ def test_native_chat_latest_correction_and_review_reach_ollama_payload(tmp_path,
 
     initial = "INITIAL_TASK: improve the diagnostic regression tests."
     correction = "LATEST_CORRECTION: preserve fixed stderr and empty stdout assertions."
-    review = "LATEST_REVIEW: use supplied results only; no tools, edits or retries."
+    review = "LATEST_REVIEW: inspect with tools; review observed results without edits or retries."
     payloads = []
     adapter = OllamaChatClient(BackendConfig(provider=ProviderKind.OLLAMA, model="gpt-oss:20b"))
 
@@ -864,6 +864,10 @@ def test_native_chat_latest_correction_and_review_reach_ollama_payload(tmp_path,
             .strip()
         )
         assert request_block == latest
+        assert current["content"].endswith("# User request\n" + latest)
+        assert current["content"].index("Original objective:") < current["content"].index(
+            "## Active user turn"
+        )
         assert "Preserve existing work" in current["content"]
         assert "fixture = 1" in current["content"]
         assert any(tool["function"]["name"] == "read_file" for tool in payload["tools"])

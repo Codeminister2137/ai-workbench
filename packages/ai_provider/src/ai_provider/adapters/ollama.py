@@ -232,6 +232,10 @@ class OllamaChatClient:
             "stream": stream,
         }
         options: dict[str, Any] = {}
+        if request.metadata.get("ollama_preserve_context") is True:
+            # Opt-in admission prototype: overflow must not discard instructions.
+            payload["truncate"] = False
+            payload["shift"] = False
         if request.temperature is not None:
             options["temperature"] = request.temperature
         if request.max_output_tokens is not None:

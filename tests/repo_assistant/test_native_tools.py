@@ -45,7 +45,11 @@ def test_native_agent_provider_failure_reports_failed_status(capsys, monkeypatch
         config=_EXAMPLE.BackendConfig(provider=_EXAMPLE.ProviderKind.OLLAMA, model="test"),
     )
 
+    clock = [10.0]
+    monkeypatch.setattr(_EXAMPLE.time, "perf_counter", lambda: clock[0])
+
     def fail_native_agent(*args, **kwargs):
+        clock[0] = 13.0
         raise ProviderError("native provider unavailable")
 
     monkeypatch.setattr(_EXAMPLE, "run_coding_prompt", lambda *args, **kwargs: prepared)
@@ -69,6 +73,8 @@ def test_native_agent_provider_failure_reports_failed_status(capsys, monkeypatch
 
     output = capsys.readouterr().out
     assert "failure_reason: native provider unavailable" in output
+    assert "primary_elapsed_seconds: 3.000" in output
+    assert "primary_usage_source: unavailable" in output
     assert "status: failed" in output
     assert "delegation: disabled" in output
     assert "execution_status: failed" in output
@@ -340,7 +346,14 @@ def test_implement_mode_defaults_to_native_tools(capsys, monkeypatch) -> None:
         tool_results=(SimpleNamespace(name="delegate_task", is_error=False),),
     )
     monkeypatch.setattr(_EXAMPLE, "run_coding_prompt", lambda *args, **kwargs: prepared)
-    monkeypatch.setattr(_EXAMPLE, "_run_native_agent", lambda *args, **kwargs: native_response)
+    clock = [10.0]
+    monkeypatch.setattr(_EXAMPLE.time, "perf_counter", lambda: clock[0])
+
+    def complete_native_agent(*args, **kwargs):
+        clock[0] = 17.0
+        return native_response
+
+    monkeypatch.setattr(_EXAMPLE, "_run_native_agent", complete_native_agent)
 
     assert (
         main(
@@ -360,6 +373,7 @@ def test_implement_mode_defaults_to_native_tools(capsys, monkeypatch) -> None:
 
     output = capsys.readouterr().out
     assert "native done" in output
+    assert "primary_elapsed_seconds: 7.000" in output
     assert "provider_native_tools: enabled" in output
     assert "provider_native_approval_policy: interactive" in output
     assert (
@@ -370,3 +384,137 @@ def test_implement_mode_defaults_to_native_tools(capsys, monkeypatch) -> None:
     assert ("provider_native_delegation: enabled: primary agent may call delegate_task") in output
     assert "delegation: completed: native delegate_task" in output
     assert "execution_status: completed" in output
+
+
+@pytest.mark.parametrize("experimental", [False, True])
+def test_cli_prints_native_usage_and_latency(capsys, monkeypatch, experimental) -> None:
+    from dataclasses import replace
+    from pathlib import Path
+    from types import SimpleNamespace
+
+    from ai_provider import (
+        AIMessage,
+        AIResponse,
+        BackendInfo,
+        BackendLocation,
+        MessageRole,
+        UsageMetadata,
+        UsageSource,
+    )
+
+    catalog = _EXAMPLE.load_model_catalog(
+        Path("packages/ai_orchestrator/examples/model_catalog.toml")
+    )
+    prepared = _EXAMPLE.run_coding_prompt(
+        "Create a helper.",
+        _EXAMPLE.coding_task_profile(model_override="qwen2.5-coder:14b"),
+        catalog,
+    )
+    prepared = replace(
+        prepared,
+        response=None,
+        config=_EXAMPLE.BackendConfig(provider=_EXAMPLE.ProviderKind.OLLAMA, model="test"),
+    )
+    native_response = SimpleNamespace(
+        response=AIResponse(
+            message=AIMessage(MessageRole.ASSISTANT, "native done"),
+            backend=BackendInfo("ollama", "test", BackendLocation.LOCAL),
+            usage=UsageMetadata(
+                source=UsageSource.PROVIDER_REPORTED,
+                input_tokens=11,
+                output_tokens=7,
+                total_tokens=18,
+            ),
+            latency_ms=125.0,
+        ),
+        tool_results=(SimpleNamespace(name="delegate_task", is_error=False),),
+    )
+    monkeypatch.setattr(_EXAMPLE, "run_coding_prompt", lambda *args, **kwargs: prepared)
+    clock = [10.0]
+    monkeypatch.setattr(_EXAMPLE.time, "perf_counter", lambda: clock[0])
+
+    def complete_native_agent(*args, **kwargs):
+        assert args[3].experimental_measured_prefix is experimental
+        clock[0] = 17.0
+        return native_response
+
+    monkeypatch.setattr(_EXAMPLE, "_run_native_agent", complete_native_agent)
+
+    assert (
+        main(
+            [
+                "--mode",
+                "implement",
+                "Create a helper.",
+                "--provider",
+                "ollama",
+                "--model",
+                "qwen2.5-coder:14b",
+                "--execute",
+                *(["--experimental-measured-prefix"] if experimental else []),
+            ]
+        )
+        == 0
+    )
+
+    output = capsys.readouterr().out
+    assert "native done" in output
+    assert "primary_elapsed_seconds: 7.000" in output
+    # usage and latency assertions
+    assert "primary_usage_source: provider_reported" in output
+    assert "primary_input_tokens: 11" in output
+    assert "primary_output_tokens: 7" in output
+    assert "primary_total_tokens: 18" in output
+    assert "primary_provider_latency_ms: 125.0" in output
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        ["--mode", "ask"],
+        ["--mode", "plan", "--native-tools"],
+        ["--mode", "chat", "--execute"],
+        ["--mode", "implement", "--execute", "--no-native-tools"],
+        ["--mode", "implement", "--execute", "--provider", "openai"],
+        ["--mode", "implement", "--execute", "--tool-profile", "research"],
+    ],
+)
+def test_experimental_prefix_rejects_incompatible_cli_before_provider_contact(
+    options, monkeypatch, capsys
+) -> None:
+    def refused(*args, **kwargs):
+        raise AssertionError("Incompatible experimental flag must refuse before provider contact")
+
+    monkeypatch.setattr(_EXAMPLE, "create_chat_client", refused)
+    monkeypatch.setattr(_EXAMPLE, "run_coding_prompt", refused)
+    with pytest.raises(SystemExit) as caught:
+        main(["Check the explicit opt-in.", "--experimental-measured-prefix", *options])
+    assert caught.value.code == 2
+    assert "--experimental-measured-prefix requires" in capsys.readouterr().err
+
+
+def test_experimental_prefix_refuses_selected_hosted_route_before_execution(
+    monkeypatch, capsys
+) -> None:
+    def refused(*args, **kwargs):
+        raise AssertionError("Selected hosted route must refuse before execution")
+
+    selected = SimpleNamespace(
+        is_ready=True,
+        execution_plan=SimpleNamespace(target=SimpleNamespace(provider="openai")),
+    )
+    monkeypatch.setattr(_EXAMPLE, "prepare_execution", lambda *args, **kwargs: selected)
+    monkeypatch.setattr(_EXAMPLE, "run_coding_prompt", refused)
+    monkeypatch.setattr(_EXAMPLE, "create_chat_client", refused)
+    with pytest.raises(SystemExit) as caught:
+        main(
+            [
+                "Check selected route.",
+                "--mode",
+                "implement",
+                "--execute",
+                "--experimental-measured-prefix",
+            ]
+        )
+    assert caught.value.code == 2
+    assert "requires a native Ollama route" in capsys.readouterr().err
