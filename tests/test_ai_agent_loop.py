@@ -106,6 +106,67 @@ def test_agent_loop_executes_tools_and_returns_final_response(tmp_path: Path) ->
     assert client.requests[1].messages[-1].role is MessageRole.TOOL
 
 
+def test_invalid_arguments_get_safe_schema_feedback_and_can_be_corrected(tmp_path):
+    class Client(FakeClient):
+        def complete(self, request):
+            self.requests.append(request)
+            self.calls += 1
+            if self.calls == 1:
+                call = AIToolCall(
+                    "bad", "create_file", {"path": "PRIVATE_FILENAME", "content": 123}
+                )
+            elif self.calls == 2:
+                feedback = request.messages[-1].content
+                assert "invalid arguments" in feedback and "content: string" in feedback
+                assert "unknown" not in feedback and "PRIVATE_FILENAME" not in feedback
+                assert not list(tmp_path.iterdir())
+                call = AIToolCall("fixed", "create_file", {"path": "out.txt", "content": "done"})
+            else:
+                return AIResponse(AIMessage(MessageRole.ASSISTANT, "Finished"), self.backend)
+            return AIResponse(
+                AIMessage(MessageRole.ASSISTANT, "", tool_calls=(call,)), self.backend
+            )
+
+    result = AgentLoop(
+        Client(),
+        default_coding_tools(),
+        ToolContext(tmp_path),
+        permissions=PermissionManager(policy=PermissionPolicy.permissive()),
+    ).run("Create one file")
+    assert [item.is_error for item in result.tool_results] == [True, False]
+    assert (tmp_path / "out.txt").read_text() == "done"
+    assert not (tmp_path / "PRIVATE_FILENAME").exists()
+
+
+@pytest.mark.parametrize("unknown", [False, True])
+def test_unknown_tool_and_permission_denial_have_distinct_feedback(tmp_path, unknown):
+    class Client(FakeClient):
+        def complete(self, request):
+            self.calls += 1
+            if self.calls > 1:
+                return AIResponse(AIMessage(MessageRole.ASSISTANT, "Stopped"), self.backend)
+            call = AIToolCall(
+                "denied",
+                "missing_tool" if unknown else "create_file",
+                {"path": "PRIVATE_FILENAME", "content": "PRIVATE_CONTENT"},
+            )
+            return AIResponse(
+                AIMessage(MessageRole.ASSISTANT, "", tool_calls=(call,)), self.backend
+            )
+
+    result = AgentLoop(
+        Client(),
+        default_coding_tools(),
+        ToolContext(tmp_path),
+        permissions=PermissionManager(policy=PermissionPolicy.read_only()),
+    ).run("Inspect only")
+    feedback = result.tool_results[0].output
+    assert result.tool_results[0].is_error
+    assert ("unknown tool" in feedback) is unknown
+    assert ("not authorized" in feedback) is not unknown
+    assert "PRIVATE" not in feedback and not list(tmp_path.iterdir())
+
+
 def test_iteration_limit_preserves_effect_and_observed_history(tmp_path: Path) -> None:
     from ai_provider import ProviderError, ProviderErrorCategory
 

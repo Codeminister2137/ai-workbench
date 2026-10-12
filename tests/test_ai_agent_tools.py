@@ -52,6 +52,76 @@ def test_create_and_read_file_tool(tmp_path: Path) -> None:
     assert "   3 | line 3" in read_res.output
 
 
+def test_read_file_literal_range_can_be_used_as_exact_edit_anchor(tmp_path: Path) -> None:
+    context = ToolContext(workspace_root=tmp_path)
+    target = tmp_path / "mod.py"
+    original = "# header\ndef first():\n    return 1\n\ndef second():\n    return 1\n"
+    target.write_text(original, encoding="utf-8")
+    read_tool = ReadFileTool()
+    raw = read_tool.run(
+        ToolCall(
+            name="read_file",
+            arguments={"path": "mod.py", "start_line": 2, "end_line": 3, "line_numbers": False},
+        ),
+        context,
+    )
+    assert not raw.is_error
+    assert raw.output == "def first():\n    return 1\n"
+    assert raw.metadata == {"path": str(target.resolve()), "lines_read": 2}
+    edited = EditFileTool().run(
+        ToolCall(
+            name="edit_file",
+            arguments={
+                "path": "mod.py",
+                "old_text": raw.output,
+                "new_text": "def first():\n    return 2\n",
+            },
+        ),
+        context,
+    )
+    assert not edited.is_error
+    assert target.read_text(encoding="utf-8") == original.replace("return 1", "return 2", 1)
+
+
+def test_read_file_numbered_default_and_explicit_true_match(tmp_path: Path) -> None:
+    context = ToolContext(workspace_root=tmp_path)
+    (tmp_path / "mod.py").write_text("one\n    two", encoding="utf-8")
+    tool = ReadFileTool()
+    for extra in ({}, {"line_numbers": True}):
+        result = tool.run(
+            ToolCall(name="read_file", arguments={"path": "mod.py", **extra}), context
+        )
+        assert not result.is_error
+        assert result.output == "   1 | one\n   2 |     two"
+    parameter = next(item for item in tool.definition.parameters if item.name == "line_numbers")
+    assert parameter.type_name == "boolean"
+    assert parameter.default is True
+    assert parameter.required is False
+
+
+def test_read_file_refuses_empty_or_reversed_ranges(tmp_path: Path) -> None:
+    context = ToolContext(workspace_root=tmp_path)
+    target = tmp_path / "lines.txt"
+    target.write_text("one\ntwo\nthree\n", encoding="utf-8")
+    for start, end in ((1, 0), (2, 1), (1, -1)):
+        for numbered in (True, False):
+            result = ReadFileTool().run(
+                ToolCall(
+                    name="read_file",
+                    arguments={
+                        "path": "lines.txt",
+                        "start_line": start,
+                        "end_line": end,
+                        "line_numbers": numbered,
+                    },
+                ),
+                context,
+            )
+            assert result.is_error
+            assert "nonempty 1-indexed range within 1..3" in result.output
+            assert target.read_text(encoding="utf-8") == "one\ntwo\nthree\n"
+
+
 def test_edit_file_tool_snippet_replacement(tmp_path: Path) -> None:
     context = ToolContext(workspace_root=tmp_path)
     edit_tool = EditFileTool()

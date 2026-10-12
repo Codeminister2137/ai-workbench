@@ -23,6 +23,11 @@ or implementation requests at that prompt. Available coding tools do not grant
 permission for unrequested changes. Interactive approvals identify the operation
 and are requested separately from conversation input.
 
+For native Ollama coding, `--experimental-measured-prefix` explicitly enables the
+[measured-prefix admission experiment](native-admission.md#approved-experiment).
+It retains complete instructions/history and the existing default when omitted.
+Select it again on each launch/resume; prefix state is local to each native loop.
+
 Tools stay enabled by default for development and review (owner clarification,
 2026-10-12). Reviews may inspect diffs, sources and actual results. Disable tools
 only for explicitly selected narrow cases; do not automatically interpret a
@@ -31,9 +36,12 @@ review request as tool-free. Existing task scope, permissions and approvals appl
 Each coding-chat turn currently uses the implement runner and its configured
 tools. A request such as "review the supplied results; no tools" reaches the
 model as an instruction, but does not remove tools or create a deterministic
-report-only phase. History is marked as earlier conversation; the latest request
-and fresh context are supplied together, followed by the session handoff with
-the original objective. Instruction-following quality and host semantic review
+report-only phase. History is marked as earlier conversation; fresh context,
+the session handoff with the original objective, skills and budget guidance
+precede the active user turn. The latest request appears at the end, explicitly
+distinguishing it from the historical objective. This framing preserves earlier
+decisions and observations without treating the initial task as a renewed edit
+instruction during review. Instruction-following quality and host semantic review
 remain necessary even when tests pass. A new report-only phase is not being
 introduced as the remedy for the repeated-read loop.
 
@@ -91,10 +99,24 @@ available under their existing logging rules.
 
 ## Tools, routes and evidence
 
+`edit_file` accepts literal file text, including indentation. Its schema now
+explicitly says to omit added patch markers, read-output line numbers and
+Markdown fences. The host preserves supplied text exactly; this clarification
+does not transform malformed edits or establish a model-quality improvement.
+
 The mode requires the common coding tool profile; existing `--skill` and `--file`
 options apply. Selected files, complete applicable repository instructions and
 skills are loaded again on every turn. Questions can use tools for inspection,
 while edits/commands remain subject to the selected permission policy.
+
+`read_file` includes line numbers by default. Set `line_numbers=False` to read
+literal text for an exact `edit_file` anchor. Selected text retains indentation
+and newline positions, using the reader's existing UTF-8 text decoding and
+universal newline handling. A missing or duplicate anchor still refuses the edit;
+reread the current range and include enough surrounding text to make it unique.
+This option does not establish a model-quality improvement on its own.
+An end bound before the resolved start bound is refused with the file's valid
+line range; it does not return an empty successful read.
 
 Existing official-client routes can also execute turns, subject to account
 readiness, route compatibility and explicit external-processing permission.

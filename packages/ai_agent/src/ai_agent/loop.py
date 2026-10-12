@@ -111,10 +111,36 @@ class AgentLoop:
                 self._check_deadline(messages)
                 agent_call = ToolCall(name=call.name, arguments=call.arguments, call_id=call.id)
                 tool = self.registry.get(call.name)
-                if tool is None or not self.permissions.check_and_authorize(tool, agent_call):
+                if tool is None:
                     result = ToolResult(
                         name=call.name,
-                        output=f"Error: tool call {call.name!r} was not authorized or is unknown.",
+                        output=f"Error: unknown tool {call.name!r}. Use the supplied tool names.",
+                        call_id=call.id,
+                        is_error=True,
+                    )
+                elif not self.permissions.check_and_authorize(tool, agent_call):
+                    try:
+                        tool.validate_arguments(agent_call.arguments)
+                    except (ValueError, OverflowError):
+                        # Schema metadata is safe feedback; argument values and exception
+                        # text may contain private data and must not be echoed here.
+                        schema = ", ".join(
+                            f"{parameter.name}: {parameter.type_name}"
+                            + (" (required)" if parameter.required else "")
+                            for parameter in tool.definition.parameters
+                        )
+                        refusal = (
+                            f"Error: invalid arguments for tool {call.name!r}. "
+                            f"Expected schema: {schema}. No operation attempted."
+                        )
+                    else:
+                        refusal = (
+                            f"Error: tool call {call.name!r} was not authorized. "
+                            "No operation attempted."
+                        )
+                    result = ToolResult(
+                        name=call.name,
+                        output=refusal,
                         call_id=call.id,
                         is_error=True,
                     )
