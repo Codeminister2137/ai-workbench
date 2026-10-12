@@ -20,6 +20,9 @@ from ai_provider.external_agents import (
     validate_codex_plugin_selector,
 )
 
+PRIVATE_COMMAND = "private_command"
+PRIVATE_ARGUMENT = "--private_arg"
+
 
 def test_completed_event_with_structured_overload_error_is_failure():
     from ai_provider.external_agents import parse_external_agent_jsonl
@@ -484,28 +487,59 @@ def test_codex_plugin_status_by_name_reports_requested_selectors() -> None:
     assert status["missing@openai-curated"]["status"] == "missing_from_plugin_list"
 
 
-def test_run_diagnostic_command_timeout(tmp_path):
-    import subprocess
-    from unittest.mock import patch
-
-    def mock_run(*args, **kwargs):
+def test_run_diagnostic_command_timeout(monkeypatch, tmp_path):
+    def mock_run(*_, **__):
         raise subprocess.TimeoutExpired(
-            cmd=["dummy"], timeout=1, output=b"private_output", stderr=b"private_stderr"
+            cmd=[PRIVATE_COMMAND, PRIVATE_ARGUMENT],
+            timeout=1,
+            output=b"private_output",
+            stderr=b"private_stderr",
         )
 
-    with patch("subprocess.run", mock_run):
-        result = run_diagnostic_command("dummy_executable", "-c", "some code", timeout_seconds=1)
+    monkeypatch.setattr(subprocess, "run", mock_run)
+    result = run_diagnostic_command(PRIVATE_COMMAND, PRIVATE_ARGUMENT, timeout_seconds=1)
     assert not result["ok"]
-    assert result["stderr"] == "Diagnostic command timed out."
+    assert result["returncode"] is None
     assert result["stdout"] == ""
+    assert result["stderr"] == "Diagnostic command timed out."
     assert set(result.keys()) == {"ok", "returncode", "stdout", "stderr"}
+    expected = {
+        "ok": False,
+        "returncode": None,
+        "stdout": "",
+        "stderr": "Diagnostic command timed out.",
+    }
+    assert result == expected
+    # Ensure no private data leaked
+    assert "private_output" not in str(result)
+    assert "private_stderr" not in str(result)
+    assert PRIVATE_COMMAND not in str(result)
+    assert PRIVATE_ARGUMENT not in str(result)
 
 
-def test_run_diagnostic_command_not_found(tmp_path):
-    result = run_diagnostic_command("nonexistentcommand", timeout_seconds=1)
+def test_run_diagnostic_command_not_found(monkeypatch, tmp_path):
+    def mock_run(*_, **__):
+        raise OSError(1, "private_error", "private_file")
+
+    monkeypatch.setattr(subprocess, "run", mock_run)
+    result = run_diagnostic_command(PRIVATE_COMMAND, PRIVATE_ARGUMENT, timeout_seconds=1)
     assert not result["ok"]
+    assert result["returncode"] is None
+    assert result["stdout"] == ""
     assert result["stderr"] == "Diagnostic command could not be executed."
     assert set(result.keys()) == {"ok", "returncode", "stdout", "stderr"}
+    expected = {
+        "ok": False,
+        "returncode": None,
+        "stdout": "",
+        "stderr": "Diagnostic command could not be executed.",
+    }
+    assert result == expected
+    # Ensure no private data leaked
+    assert "private_error" not in str(result)
+    assert "private_file" not in str(result)
+    assert PRIVATE_COMMAND not in str(result)
+    assert PRIVATE_ARGUMENT not in str(result)
 
 
 def test_run_diagnostic_command_success(tmp_path):
@@ -520,15 +554,26 @@ def test_run_diagnostic_command_completed_process(returncode: int, monkeypatch):
     fake_output = "   hello padded  \n"
     fake_error = "   err padded\n"
     completed = subprocess.CompletedProcess(
-        args=["private_arg"],
+        args=[PRIVATE_COMMAND, PRIVATE_ARGUMENT],
         returncode=returncode,
         stdout=fake_output,
         stderr=fake_error,
     )
     monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: completed)
-    result = run_diagnostic_command("dummy_executable", "--arg")
+    result = run_diagnostic_command(PRIVATE_COMMAND, PRIVATE_ARGUMENT)
     assert result["ok"] == (returncode == 0)
     assert result["returncode"] == returncode
     assert result["stdout"] == fake_output.strip()
     assert result["stderr"] == fake_error.strip()
     assert set(result.keys()) == {"ok", "returncode", "stdout", "stderr"}
+    expected = {
+        "ok": (returncode == 0),
+        "returncode": returncode,
+        "stdout": fake_output.strip(),
+        "stderr": fake_error.strip(),
+    }
+    assert result == expected
+    # Ensure no private data leaked
+    assert "private_arg" not in str(result)
+    assert PRIVATE_COMMAND not in str(result)
+    assert PRIVATE_ARGUMENT not in str(result)
