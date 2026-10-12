@@ -56,6 +56,7 @@ GROUPS = {
         "tests/test_codex_cli_executor_example.py",
         "tests/test_live_delegation_runner_example.py",
         "tests/test_test_suites.py",
+        "tests/test_workstation_resources.py",
     ),
     "research": (
         "tests/test_research_*.py",
