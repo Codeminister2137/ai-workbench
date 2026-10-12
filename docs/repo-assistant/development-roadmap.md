@@ -10,6 +10,11 @@ High-priority repository-wide prerequisite:
 ADR-055 starts with Ollama continuation-state preservation; adapter conformance
 and tool compatibility do not establish coding-quality parity.
 
+High-priority usability work also includes the
+[logging and artifact structure review](../logging-and-artifact-structure-plan.md):
+make sessions understandable to the owner, with one clear result entry point and
+organized supporting evidence. The review does not authorize deleting old artifacts.
+
 
 The [2026-10-10 daily-use readiness report](daily-cli-readiness.md) recommends an
 attended real-work pilot as the shortest next step, while retaining the accepted
