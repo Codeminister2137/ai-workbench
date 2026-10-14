@@ -18,7 +18,7 @@ not from claims in your response."""
 
 def _validation_summary(details: Mapping[str, object] | None) -> str:
     if details is None:
-        return "Not run by the CLI (no deterministic validation stage recorded)."
+        return "No separate deterministic validation stage recorded."
 
     status = str(details.get("validation_status", "not_recorded"))
     results = details.get("results")

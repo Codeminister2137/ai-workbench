@@ -168,7 +168,7 @@ def test_chat_mode_persists_and_resumes_local_transcript(
     assert f"chat_session_id: {session.session_id}" in second_output
     for output, response in ((first_output, "answer 1"), (second_output, "answer 2")):
         assert output.count("## **SUMMARY**") == 1
-        assert "- Validated: Not run by the CLI" in output
+        assert "- Validated: No separate deterministic validation stage recorded." in output
         assert f"### Agent report\n{response}" in output
     assert len(requests) == 2
     assert [message.role for message in requests[1].messages] == [

@@ -161,7 +161,7 @@ def test_cli_orchestrated_plan_prints_stage_plan_without_provider(
     assert "execution_status: planned" in output
     assert "## **SUMMARY**" in output
     assert "- Changed: No final response was captured" in output
-    assert "- Validated: Not run by the CLI" in output
+    assert "- Validated: No separate deterministic validation stage recorded." in output
     assert "### Agent report\nNo final response was captured." in output
 
     run_id = next(
