@@ -321,12 +321,12 @@ class OpenAICompatibleChatClient:
             with urlopen(request, timeout=self.config.timeout_seconds) as response:
                 for line in response:
                     raw_line = line.strip()
-                    if raw_line == b"data: [DONE]":
-                        break
                     if not raw_line or raw_line.startswith((b":", b"event:", b"id:", b"retry:")):
                         continue
-                    if raw_line.startswith(b"data: "):
-                        raw_line = raw_line.removeprefix(b"data: ")
+                    if raw_line.startswith(b"data:"):
+                        raw_line = raw_line.removeprefix(b"data:").removeprefix(b" ")
+                        if raw_line == b"[DONE]":
+                            break
                     chunk = json.loads(raw_line.decode("utf-8"))
                     if not isinstance(chunk, dict):
                         raise ProviderError(

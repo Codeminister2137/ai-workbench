@@ -263,6 +263,51 @@ def test_openai_compatible_adapter_streams_deltas_and_final_response(
     assert final.response.finish_reason is FinishReason.STOP
 
 
+@pytest.mark.parametrize("data_space", [False, True])
+@pytest.mark.parametrize("done_space", [False, True])
+def test_stream_data_and_done_allow_optional_sse_colon_space(monkeypatch, data_space, done_space):
+    class OptionalSpaceResponse(FakeStreamingHttpResponse):
+        def __iter__(self):
+            yield b": heartbeat\n"
+            yield b"event: message\n"
+            yield b"id: fixture\n"
+            for payload in self.payloads:
+                yield (
+                    b"data:" + (b" " if data_space else b"") + json.dumps(payload).encode() + b"\n"
+                )
+            yield b"data:" + (b" " if done_space else b"") + b"[DONE]\n"
+            yield b"not JSON; must not be read after DONE\n"
+
+    monkeypatch.setattr(
+        "ai_provider.adapters.openai_compatible.urlopen",
+        lambda *args, **kwargs: OptionalSpaceResponse(
+            [
+                {
+                    "choices": [{"delta": {"content": "Hello"}, "finish_reason": "stop"}],
+                    "usage": {"prompt_tokens": 3, "completion_tokens": 2, "total_tokens": 5},
+                }
+            ]
+        ),
+    )
+    client = OpenAICompatibleChatClient(
+        BackendConfig(provider=ProviderKind.REQUESTY, model="fixture", api_key="fixture")
+    )
+    events = list(
+        client.stream(
+            AIRequest(
+                messages=(AIMessage(MessageRole.USER, "synthetic"),),
+                privacy_class=PrivacyClass.PUBLIC_OR_LOW_RISK,
+            )
+        )
+    )
+    assert [event.content for event in events if isinstance(event, AIStreamDelta)] == ["Hello"]
+    final = events[-1]
+    assert isinstance(final, AIStreamFinal) and final.response.message.content == "Hello"
+    assert (
+        final.response.usage.total_tokens == 5 and final.response.finish_reason is FinishReason.STOP
+    )
+
+
 class TestStreamingCalls:
     def test_interleaved_function_fragments_and_trailing_usage_are_preserved(self, monkeypatch):
         def chunk(calls):

@@ -84,6 +84,11 @@ One normalized provider response:
 Streaming adapters must enforce the same privacy policy as non-streaming
 completion before sending the request.
 
+Hosted single-line SSE data events accept the optional space after `data:`,
+including the `[DONE]` terminator. This follows the
+[SSE field syntax](https://html.spec.whatwg.org/multipage/server-sent-events.html#parsing-an-event-stream);
+this bounded check does not establish complete EventSource parsing conformance.
+
 Final streaming responses preserve tool calls in both `message.tool_calls` and
 `tool_calls`. Hosted calls are assembled by stream index, including interleaved
 argument fragments; Ollama calls arriving before its final usage chunk remain
