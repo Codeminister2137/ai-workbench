@@ -563,8 +563,9 @@ def _zero_price_row(row: dict[str, Any]) -> bool:
             return False
         if not zero(prices.get("input_price")) or not zero(prices.get("output_price")):
             return False
-        if "cached_price" in prices and not zero(prices["cached_price"]):
-            return False
+        for field in ("cached_price", "caching_price", "caching_5m_price", "caching_1h_price"):
+            if field in prices and not zero(prices[field]):
+                return False
     return True
 
 

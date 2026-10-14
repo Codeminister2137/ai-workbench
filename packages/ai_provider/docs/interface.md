@@ -25,6 +25,14 @@ Those responsibilities belong above this package, primarily in `ai_orchestrator`
 
 ## Core Types
 
+Requesty's `require_free_model` checks the exact effective model before every
+completion or stream. Input/output prices and every advertised cache-read or
+cache-write price must be zero, including threshold pricing tiers. Nonzero or
+invalid advertised prices refuse inference; missing optional cache prices do not
+invent a charge or grant. This is a price check, not proof of remaining allowance,
+privacy entitlement or model quality. Cache fields follow the official
+[Requesty model catalog](https://docs.requesty.ai/api-reference/endpoint/models-list).
+
 Function tools use `AIToolDefinition`/`AIToolParameter`. Array parameters may set
 optional `item_type_name` (for example, `"string"` for process argument lists),
 which emits the standard JSON Schema `items` property. Omitting it preserves the
