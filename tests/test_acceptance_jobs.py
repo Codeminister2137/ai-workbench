@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import sqlite3
@@ -77,6 +78,61 @@ def job(tmp_path: Path) -> AcceptanceJob:
         512,
         4,
     )
+
+
+def test_selected_job_ignores_unrelated_stale_native_history(job, tmp_path):
+    store = AcceptanceJobStore(tmp_path / "queue.sqlite3")
+    store.plan(job)
+    historical = asdict(job)
+    historical.update(task_id="old-terminal-job", native_contract_version=1)
+    payload = json.dumps(historical, sort_keys=True)
+    with sqlite3.connect(store.path) as connection:
+        connection.execute(
+            "INSERT INTO scheduled_acceptance_tasks VALUES (?,?,?,?,?,?,?,NULL)",
+            (
+                "old-terminal-job",
+                payload,
+                hashlib.sha256(payload.encode()).hexdigest(),
+                1,
+                "completed",
+                "old",
+                "old",
+            ),
+        )
+    observed = []
+
+    def runner(selected, *args, **kwargs):
+        observed.append(selected.task_id)
+        return {"passed": True, "cleanup_verified": True}
+
+    assert execute_sequence(
+        store,
+        [job.task_id],
+        explicitly_started=True,
+        local_compute_available=True,
+        available_seconds=120,
+        runner=runner,
+    ) == (job.task_id,)
+    assert observed == [job.task_id]
+    with pytest.raises(ValueError, match="native_contract_version"):
+        store.get("old-terminal-job")
+    with sqlite3.connect(store.path) as connection:
+        assert connection.execute(
+            "SELECT definition_json,status FROM scheduled_acceptance_tasks WHERE task_id=?",
+            ("old-terminal-job",),
+        ).fetchone() == (payload, "completed")
+
+
+def test_selected_job_rejects_mismatched_persisted_identity(job, tmp_path):
+    store = AcceptanceJobStore(tmp_path / "queue.sqlite3")
+    store.plan(job)
+    with sqlite3.connect(store.path) as connection:
+        connection.execute(
+            "UPDATE scheduled_acceptance_tasks SET task_id='different' WHERE task_id=?",
+            (job.task_id,),
+        )
+    with pytest.raises(ValueError, match="task identity changed"):
+        store.get("different")
 
 
 @pytest.mark.parametrize(
