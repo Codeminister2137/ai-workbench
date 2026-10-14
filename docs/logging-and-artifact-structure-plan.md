@@ -10,6 +10,11 @@ with CLI development sessions. Existing CLI acceptance work remains incomplete.
 
 ## Current problem
 
+The first bounded [writer/reader inventory](logging-artifact-inventory.md) maps
+current CLI/provider/scheduler/Council/job-search paths and proposes a representative
+layout for owner review. It preserves existing paths and records compatibility
+and retention decisions; no replacement layout or migration is approved yet.
+
 The CLI pilot directory mixes reports, raw logs, scripts, configuration, patches,
 snapshots and databases, with several overlapping handoffs and status summaries.
 A next-session prompt was also placed there, obscuring the intended handoff entry
