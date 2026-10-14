@@ -33,7 +33,9 @@ distinguish onsite from hybrid. Tracker status never grants sending approval.
 
 The owner approved an external API bridge with a reviewed upstream mirror fix.
 `openings_api.OpeningsAPI` exports one JSON page or adds an `OpeningsPosting`
-explicitly as `new`. Configure numeric loopback host, port and an explicit token;
+explicitly as `new`. JSON response media types are matched without regard to
+case, as required by [HTTP semantics](https://www.rfc-editor.org/rfc/rfc9110.html#section-8.3.1).
+Configure numeric loopback host, port and an explicit token;
 the client discovers no credentials, starts no service and follows no redirects
 or retries. Requests/responses are capped at 2 MiB and a total socket deadline.
 Only source posting fields are accepted, with no CV/profile/delivery methods.

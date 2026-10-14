@@ -104,6 +104,20 @@ def test_export_one_page_keeps_tracking_as_metadata(wire):
     assert len(wire.calls) == 1
 
 
+def test_export_accepts_case_insensitive_json_media_type(wire):
+    wire.status = 200
+    wire.content_type = "Application/JSON; Charset=UTF-8"
+    wire.body = json.dumps(
+        [{"job_id": "canonical-7", "title": "Python Developer", "company": "Synthetic"}]
+    ).encode()
+
+    (vacancy,) = client().export_jobs(limit=1)
+
+    assert vacancy.id == "openings:canonical-7"
+    assert wire.calls[0][:2] == ("GET", "/api/export/jobs?format=json&limit=1&offset=0")
+    assert len(wire.calls) == 1 and wire.closed == 1
+
+
 @pytest.mark.parametrize("status", [301, 302, 307, 401, 409, 500])
 def test_http_failures_never_redirect_retry_or_disclose_body(wire, status):
     wire.status, wire.body = status, b"private synthetic server detail"
