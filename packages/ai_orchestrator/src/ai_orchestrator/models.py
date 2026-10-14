@@ -79,6 +79,7 @@ class AccessMethod(StrEnum):
     ANTIGRAVITY_CLI = "antigravity_cli"
     COPILOT_CLI = "copilot_cli"
     KIRO_CLI = "kiro_cli"
+    GEMINI_CLI = "gemini_cli"
 
 
 class AuthMethod(StrEnum):
@@ -99,9 +100,11 @@ class BillingSource(StrEnum):
     LOCAL_FREE = "local_free"
     OPENAI_API_BILLING = "openai_api_billing"
     REQUESTY_BILLING = "requesty_billing"
+    OPENROUTER_FREE = "openrouter_free"
     CHATGPT_SUBSCRIPTION_ALLOWANCE = "chatgpt_subscription_allowance"
     CHATGPT_WORKSPACE_CREDITS = "chatgpt_workspace_credits"
     GOOGLE_AI_STUDIO_FREE = "google_ai_studio_free"
+    GEMINI_CLI_FREE = "gemini_cli_free"
     GOOGLE_API_BILLING = "google_api_billing"
     ANTIGRAVITY_SUBSCRIPTION_ALLOWANCE = "antigravity_subscription_allowance"
     GITHUB_COPILOT_SUBSCRIPTION_ALLOWANCE = "github_copilot_subscription_allowance"

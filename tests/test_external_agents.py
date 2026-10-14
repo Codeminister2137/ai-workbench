@@ -345,6 +345,151 @@ def test_parse_external_agent_jsonl_ignores_completed_command_output_failures() 
     assert events.failure_reason is None
 
 
+@pytest.mark.parametrize(
+    "config_path", [r"C:\Users\Owner\.codex\config.toml", "/home/owner/.codex/config.toml"]
+)
+def test_codex_feature_notice_preserves_successful_answer(config_path: str) -> None:
+    notice = (
+        "Under-development features enabled: code_mode, skip_host_skill_discovery. "
+        "Under-development features are incomplete and may behave unpredictably. "
+        "To suppress this warning, set `suppress_unstable_features_warning = true` "
+        f"in {config_path}."
+    )
+    warning = {"type": "item.completed", "item": {"type": "error", "message": notice}}
+    events = parse_external_agent_jsonl(
+        "\n".join(
+            map(
+                json.dumps,
+                [
+                    warning,
+                    {
+                        "type": "item.completed",
+                        "item": {"type": "agent_message", "text": "Review complete."},
+                    },
+                    {"type": "turn.completed", "usage": {"input_tokens": 10, "output_tokens": 2}},
+                ],
+            )
+        )
+    )
+    assert events.failure_reason is None
+    assert events.final_answer == "Review complete."
+    assert events.usage == {"input_tokens": 10, "output_tokens": 2}
+    assert "failure -" not in (_external_agent_progress_line(json.dumps(warning)) or "")
+
+
+@pytest.mark.parametrize(
+    "event_type,item_status,message_suffix",
+    [
+        ("item.failed", None, ""),
+        ("item.completed", "failed", ""),
+        ("item.completed", None, " Additional fatal failure."),
+    ],
+)
+def test_codex_feature_notice_does_not_hide_failure_labels_or_extra_errors(
+    event_type: str,
+    item_status: str | None,
+    message_suffix: str,
+) -> None:
+    message = (
+        "Under-development features enabled: code_mode, skip_host_skill_discovery. "
+        "Under-development features are incomplete and may behave unpredictably. "
+        "To suppress this warning, set `suppress_unstable_features_warning = true` "
+        "in /home/owner/.codex/config.toml." + message_suffix
+    )
+    item = {"type": "error", "message": message}
+    if item_status is not None:
+        item["status"] = item_status
+    assert parse_external_agent_jsonl(json.dumps({"type": event_type, "item": item})).failure_reason
+
+
+@pytest.mark.parametrize(
+    "error_event",
+    [
+        {"type": "error", "message": "Quota exhausted."},
+        {"type": "turn.failed", "error": {"message": "Authentication failed."}},
+        {"type": "item.completed", "item": {"type": "error", "message": "Tool failed."}},
+    ],
+)
+@pytest.mark.parametrize("warning_first", [True, False])
+def test_codex_feature_notice_does_not_clear_real_stream_failure(
+    error_event: dict,
+    warning_first: bool,
+) -> None:
+    warning = {
+        "type": "item.completed",
+        "item": {
+            "type": "error",
+            "message": (
+                "Under-development features enabled: code_mode. Under-development features "
+                "are incomplete and may behave unpredictably. To suppress this warning, "
+                "set `suppress_unstable_features_warning = true` in /home/owner/.codex/config.toml."
+            ),
+        },
+    }
+    stream = [warning, error_event] if warning_first else [error_event, warning]
+    assert parse_external_agent_jsonl("\n".join(map(json.dumps, stream))).failure_reason == (
+        parse_external_agent_jsonl(json.dumps(error_event)).failure_reason
+    )
+
+
+@pytest.mark.parametrize("returncode,expected_status", [(0, "completed"), (7, "failed")])
+def test_codex_feature_notice_preserves_process_exit_and_session_receipt(
+    tmp_path: Path,
+    returncode: int,
+    expected_status: str,
+) -> None:
+    from ai_provider.coding_sessions import ACTIVE_SESSION, CodingSession
+    from ai_provider.external_agents import run_external_agent
+
+    session = CodingSession.open(tmp_path / "coding.sqlite3", "new", tmp_path, "Review", [])
+    config = ExternalAgentConfig(AccessMethod.CODEX_CLI, "codex", "fixture", tmp_path, 60.0)
+    stream = "\n".join(
+        map(
+            json.dumps,
+            [
+                {
+                    "type": "item.completed",
+                    "item": {
+                        "type": "error",
+                        "message": (
+                            "Under-development features enabled: code_mode. "
+                            "Under-development features are incomplete and may behave "
+                            "unpredictably. To suppress this warning, set "
+                            "`suppress_unstable_features_warning = true` "
+                            "in /home/owner/.codex/config.toml."
+                        ),
+                    },
+                },
+                {
+                    "type": "item.completed",
+                    "item": {"type": "agent_message", "text": "Review complete."},
+                },
+                {"type": "turn.completed"},
+            ],
+        )
+    )
+    token = ACTIVE_SESSION.set(session)
+    try:
+        result = run_external_agent(
+            "Review only",
+            config,
+            runner=lambda command, **kw: subprocess.CompletedProcess(
+                command, returncode, stream, ""
+            ),
+        )
+        assert result.returncode == returncode
+        assert result.events is not None
+        assert result.events.failure_reason is None
+        assert result.events.final_answer == "Review complete."
+        assert result.stdout == stream  # Keep the notice in the native evidence.
+        with session.connection() as connection:
+            rows = connection.execute("SELECT status FROM coding_receipts").fetchall()
+        assert [row["status"] for row in rows] == [expected_status]
+    finally:
+        ACTIVE_SESSION.reset(token)
+        session.supervisor.close()
+
+
 def test_parse_external_agent_jsonl_reports_explicit_failed_status() -> None:
     events = parse_external_agent_jsonl(
         json.dumps(

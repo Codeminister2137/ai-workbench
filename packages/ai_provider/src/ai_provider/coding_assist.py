@@ -76,7 +76,7 @@ def backend_config_from_execution_target(target: ExecutionTarget) -> BackendConf
         base_url=target.base_url,
         timeout_seconds=target.timeout_seconds,
         require_free_model=(
-            provider is ProviderKind.REQUESTY
+            provider in {ProviderKind.REQUESTY, ProviderKind.OPENROUTER}
             and target.cost_policy_tier is CostPolicyTier.FREE_ONLY
         ),
     )

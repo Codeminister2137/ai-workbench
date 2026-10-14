@@ -6,6 +6,7 @@ import argparse
 import copy
 import time
 from collections.abc import Callable
+from dataclasses import replace
 from pathlib import Path
 
 from ai_provider.chat_transcripts import DEFAULT_CHAT_TRANSCRIPT_DB, SQLiteChatTranscriptStore
@@ -188,14 +189,15 @@ def run_coding_chat(
         finally:
             terminal.deadline = session_deadline
         if returncode == 0 and turn_deadline is not None and time.perf_counter() >= turn_deadline:
-            return CodingTurnResult(
-                1, None, "failed", "Execution allowance expired; inspect completed effects."
+            return replace(
+                observed[-1] if observed else CodingTurnResult(1, None, "failed"),
+                returncode=1,
+                response_text=None,
+                execution_status="failed",
+                failure_reason="Execution allowance expired; inspect completed effects.",
             )
         if observed:
-            result = observed[-1]
-            return CodingTurnResult(
-                returncode, result.response_text, result.execution_status, result.failure_reason
-            )
+            return replace(observed[-1], returncode=returncode)
         return CodingTurnResult(
             returncode or 1, None, "failed", "Execution ended without a final CLI report"
         )

@@ -40,6 +40,8 @@ class CodingTurnResult:
     response_text: str | None
     execution_status: str
     failure_reason: str | None = None
+    effective_route_id: str | None = None
+    fallback_attempts: tuple[tuple[str, str], ...] = ()
 
 
 class CodingChatController:
@@ -116,6 +118,11 @@ class CodingChatController:
                 ),
                 "returncode": (message.metadata or {}).get("returncode"),
                 "failure_reason": (message.metadata or {}).get("failure_reason"),
+                **{
+                    key: value
+                    for key, value in (message.metadata or {}).items()
+                    if key in {"effective_route_id", "fallback_attempts"}
+                },
             }
             for message in messages
         ]
@@ -266,6 +273,21 @@ class CodingChatController:
                 "returncode": result.returncode,
                 "failure_reason": result.failure_reason,
                 "reply_to": message_id,
+                **(
+                    {"effective_route_id": result.effective_route_id}
+                    if result.effective_route_id is not None
+                    else {}
+                ),
+                **(
+                    {
+                        "fallback_attempts": [
+                            {"route_id": route_id, "status": status}
+                            for route_id, status in result.fallback_attempts
+                        ]
+                    }
+                    if result.fallback_attempts
+                    else {}
+                ),
             },
         )
         return result

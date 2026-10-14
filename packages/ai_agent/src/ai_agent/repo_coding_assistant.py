@@ -501,15 +501,31 @@ def _print_cli_closeout(
 ) -> None:
     """Print the same evidence-bounded summary for every CLI execution route."""
 
+    fallback_details = _fallback_details(args)
+    fallback_attempts = fallback_details.get("fallback_attempts", [])
+    if not isinstance(fallback_attempts, list):
+        fallback_attempts = []
     observer = getattr(args, "_coding_chat_observer", None)
     if observer is not None:
         from ai_agent.coding_chat import CodingTurnResult
 
-        observer(CodingTurnResult(0, response_text, execution_status, failure_reason))
-
-    fallback_attempts = _fallback_details(args).get("fallback_attempts", [])
-    if not isinstance(fallback_attempts, list):
-        fallback_attempts = []
+        route_id = fallback_details.get("effective_route_id")
+        observer(
+            CodingTurnResult(
+                0,
+                response_text,
+                execution_status,
+                failure_reason,
+                effective_route_id=route_id if isinstance(route_id, str) else None,
+                fallback_attempts=tuple(
+                    (attempt["route_id"], attempt["status"])
+                    for attempt in fallback_attempts
+                    if isinstance(attempt, dict)
+                    and isinstance(attempt.get("route_id"), str)
+                    and isinstance(attempt.get("status"), str)
+                ),
+            )
+        )
     print(
         format_cli_closeout(
             response_text=response_text,
@@ -1622,11 +1638,7 @@ def _execute_request(
     if args.native_tools:
         _print_provider_native_policy_diagnostics(
             args.approval_policy,
-            delegation_enabled=(
-                args.mode == "implement"
-                and not args.no_native_tools
-                and args.tool_profile == "coding"
-            ),
+            delegation_enabled=_native_delegation_available(args),
         )
     orchestrated_tracker = None
     orchestrated_deadline = None
@@ -2958,8 +2970,12 @@ def _run_external_agent_cli_mode(
             print(f"external_agent_output_schema: {config.output_schema_path}")
         print(f"external_agent_web_search: {config.web_search}")
         print(f"external_agent_mcp_tools: {config.codex_mcp_tools}")
-        print("external_agent_timeout_mode: inactivity")
-        print(f"external_agent_inactivity_timeout_seconds: {config.timeout_seconds:g}")
+        if config.access_method is AccessMethod.GEMINI_CLI:
+            print("external_agent_timeout_mode: absolute")
+            print(f"external_agent_timeout_seconds: {config.timeout_seconds:g}")
+        else:
+            print("external_agent_timeout_mode: inactivity")
+            print(f"external_agent_inactivity_timeout_seconds: {config.timeout_seconds:g}")
         if config.image_paths:
             print(
                 "external_agent_images_json: "
@@ -3717,6 +3733,19 @@ def _delegation_status_after_native_tools(
     if current_status == "disabled":
         return native_status
     return f"{current_status}; {native_status}"
+
+
+def _native_delegation_available(args: argparse.Namespace) -> bool:
+    """Respect the active foreground's actual tool set in availability diagnostics."""
+    if args.mode != "implement" or args.no_native_tools or args.tool_profile != "coding":
+        return False
+    if args.shared_tools == "coding":
+        from ai_provider.foreground_tools import ACTIVE_FOREGROUND
+
+        foreground = ACTIVE_FOREGROUND.get()
+        if foreground is not None:
+            return foreground.registry().get("delegate_task") is not None
+    return True
 
 
 def _print_provider_native_policy_diagnostics(

@@ -1,0 +1,57 @@
+# Historical Qwen candidate: absent from current public and account-filtered
+# free catalogs on 2026-10-14. Preserve the failed route; do not treat as available.
+# Runtime requires live exact free prices/tool support/account capacity.
+# STANDARD is provisional, not evaluated coding quality. Default catalog unchanged.
+[[models]]
+route_id = "openrouter-free-qwen38-27b"
+provider = "openrouter"
+product = "openrouter_free"
+model = "qwen/qwen3.8-27b:free"
+location = "external"
+access_method = "provider_api"
+auth_method = "api_key"
+billing_source = "openrouter_free"
+cost_policy_tier = "free_only"
+quality = "standard"
+latency = "interactive"
+notes = "Historical candidate, absent from live public/account free catalogs checked 2026-10-14. Runtime refuses missing exact free metadata. Quality provisional. Preserve failed receipt; select a current candidate before any pilot. data_collection=deny; no paid fallback."
+
+[models.capabilities]
+chat = true
+streaming = true
+tools = true
+
+[models.context_limits]
+context_window_tokens = 262144
+
+# Existing Requesty free route supplies a same-tier fallback when configured.
+[[models]]
+route_id = "requesty-free-gemma-4-31b"
+provider = "requesty"
+product = "requesty_free"
+model = "google/gemma-4-31b-it"
+location = "external"
+access_method = "provider_api"
+auth_method = "api_key"
+billing_source = "requesty_billing"
+cost_policy_tier = "free_only"
+quality = "standard"
+latency = "interactive"
+notes = "Requesty free-plan route. Live price verification before every request. Quality is provisional, not evaluated. API metadata checked 2026-10-01 reports no training use and 30-day retention; live tests use synthetic data."
+
+[models.capabilities]
+chat = true
+streaming = true
+tools = true
+structured_output = false
+multimodal_input = false
+embeddings = false
+
+[models.context_limits]
+context_window_tokens = 262144
+
+[models.estimate]
+input_cost_per_million_tokens = 0
+output_cost_per_million_tokens = 0
+source = "Requesty live models API checked 2026-10-01; runtime prices rechecked before inference"
+source_url = "https://router.requesty.ai/v1/models"

@@ -4,6 +4,7 @@ import json
 import math
 import os
 import queue
+import re
 import shutil
 import subprocess
 import sys
@@ -74,6 +75,7 @@ class ExternalAgentResult:
     stderr: str
     last_message: str | None = None
     events: ExternalAgentEventSummary | None = None
+    cleanup_verified: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -163,6 +165,7 @@ def is_external_agent_access_method(access_method: AccessMethod) -> bool:
         AccessMethod.ANTIGRAVITY_CLI,
         AccessMethod.COPILOT_CLI,
         AccessMethod.KIRO_CLI,
+        AccessMethod.GEMINI_CLI,
     }
 
 
@@ -196,6 +199,10 @@ def default_codex_command() -> str | None:
 def external_agent_command(access_method: AccessMethod) -> str | None:
     """Return the configured command for a supported external coding-agent route."""
 
+    if access_method is AccessMethod.GEMINI_CLI:
+        from ai_provider.gemini_cli import default_command
+
+        return default_command()
     if access_method is AccessMethod.CODEX_CLI:
         return default_codex_command()
     if access_method is AccessMethod.ANTIGRAVITY_CLI:
@@ -225,6 +232,7 @@ def external_agent_status() -> dict[str, Any]:
     antigravity_command = external_agent_command(AccessMethod.ANTIGRAVITY_CLI)
     copilot_command = external_agent_command(AccessMethod.COPILOT_CLI)
     kiro_command = external_agent_command(AccessMethod.KIRO_CLI)
+    gemini_command = external_agent_command(AccessMethod.GEMINI_CLI)
     return {
         "codex_available": codex_command is not None,
         "codex_command": codex_command,
@@ -250,6 +258,8 @@ def external_agent_status() -> dict[str, Any]:
             help_args=("chat", "--help"),
             expected_flags=("--no-interactive", "--output-format", "--trust-tools"),
         ),
+        "gemini_available": gemini_command is not None,
+        "gemini_command": gemini_command,
     }
 
 
@@ -684,6 +694,10 @@ def build_external_agent_command(
 ) -> tuple[str, ...]:
     """Build the noninteractive command for an external coding-agent client."""
 
+    if config.access_method is AccessMethod.GEMINI_CLI:
+        from ai_provider.gemini_cli import build_command
+
+        return build_command(config)
     if config.access_method is not AccessMethod.CODEX_CLI:
         return _build_alternate_agent_command(config, prompt=prompt)
 
@@ -1028,6 +1042,42 @@ def _run_external_agent_owned(
     progress_interval_seconds: float,
     deadline: float | None = None,
 ) -> ExternalAgentResult:
+    if config.access_method is AccessMethod.GEMINI_CLI:
+        from contextlib import nullcontext
+
+        from ai_provider.gemini_cli import (
+            auth_configuration,
+            invocation,
+            owned_processes,
+            verify_effective_settings,
+        )
+
+        deadline = min(
+            deadline if deadline is not None else float("inf"),
+            time.perf_counter() + config.timeout_seconds,
+        )
+
+        scope = (
+            owned_processes(popen_factory)
+            if runner is subprocess.run
+            else nullcontext(popen_factory)
+        )
+        with invocation(config) as scoped, scope as owned_factory:
+            if runner is subprocess.run:
+                ready, reason = auth_configuration()
+                if not ready:
+                    raise ValueError(reason)
+                verify_effective_settings(scoped)
+            result = _run_external_agent_process(
+                prompt,
+                scoped,
+                runner=runner,
+                popen_factory=owned_factory,
+                progress_callback=progress_callback,
+                progress_interval_seconds=progress_interval_seconds,
+                deadline=deadline,
+            )
+        return replace(result, cleanup_verified=True if runner is subprocess.run else None)
     if config.shared_tool_profile and config.access_method is AccessMethod.KIRO_CLI:
         from ai_provider.shared_client_tools import kiro_inspection_agent
 
@@ -1133,6 +1183,15 @@ def _run_external_agent_process(
     output_queue: queue.Queue[tuple[str, str]] = queue.Queue()
     stdout_lines: list[str] = []
     stderr_lines: list[str] = []
+
+    def captured_stdout() -> str:
+        value = "".join(stdout_lines)
+        if config.access_method is AccessMethod.GEMINI_CLI:
+            from ai_provider.gemini_cli import redact_user_echoes
+
+            return redact_user_echoes(value)
+        return value
+
     readers: list[threading.Thread] = []
     for label, stream in (("stdout", process.stdout), ("stderr", process.stderr)):
         if stream is None:
@@ -1165,7 +1224,7 @@ def _run_external_agent_process(
             raise subprocess.TimeoutExpired(
                 command,
                 timeout=config.timeout_seconds,
-                output="".join(stdout_lines),
+                output=captured_stdout(),
                 stderr="".join(stderr_lines),
             )
         try:
@@ -1190,7 +1249,7 @@ def _run_external_agent_process(
                 raise subprocess.TimeoutExpired(
                     command,
                     timeout=config.timeout_seconds,
-                    output="".join(stdout_lines),
+                    output=captured_stdout(),
                     stderr="".join(stderr_lines),
                 ) from None
             continue
@@ -1199,7 +1258,12 @@ def _run_external_agent_process(
         if label == "stdout":
             stdout_lines.append(line)
             if progress_callback is not None:
-                progress = _external_agent_progress_line(line)
+                if config.access_method is AccessMethod.GEMINI_CLI:
+                    from ai_provider.gemini_cli import redact_user_echoes
+
+                    progress = _external_agent_progress_line(redact_user_echoes(line))
+                else:
+                    progress = _external_agent_progress_line(line)
                 if progress is not None:
                     progress_callback(progress)
                     last_progress = now
@@ -1218,7 +1282,7 @@ def _run_external_agent_process(
     completed = subprocess.CompletedProcess(
         command,
         returncode,
-        stdout="".join(stdout_lines),
+        stdout=captured_stdout(),
         stderr="".join(stderr_lines),
     )
     return _external_agent_result_from_completed_process(command, config, completed)
@@ -1232,7 +1296,13 @@ def _external_agent_result_from_completed_process(
     """Build a stable external-agent result from captured process output."""
 
     stdout = completed.stdout or ""
-    events = parse_external_agent_jsonl(stdout) if config.json_output and stdout else None
+    if config.access_method is AccessMethod.GEMINI_CLI:
+        from ai_provider.gemini_cli import parse_events, redact_user_echoes
+
+        stdout = redact_user_echoes(stdout)
+        events = parse_events(stdout)
+    else:
+        events = parse_external_agent_jsonl(stdout) if config.json_output and stdout else None
     last_message = None
     if config.output_last_message_path is not None and config.output_last_message_path.exists():
         last_message = config.output_last_message_path.read_text(encoding="utf-8", errors="replace")
@@ -1561,7 +1631,8 @@ def _has_failure_marker(event: dict[str, Any], event_type: str) -> bool:
             labels.append(value.lower())
     nested = event.get("item")
     if isinstance(nested, dict):
-        labels.append(_event_type(nested))
+        if event_type != "item.completed" or not _is_codex_feature_warning(nested):
+            labels.append(_event_type(nested))
         status = nested.get("status")
         if isinstance(status, str):
             labels.append(status.lower())
@@ -1572,6 +1643,23 @@ def _has_failure_marker(event: dict[str, Any], event_type: str) -> bool:
         or label.endswith(".error")
         or label.endswith("_error")
         for label in labels
+    )
+
+
+def _is_codex_feature_warning(item: dict[str, Any]) -> bool:
+    """Recognize the native startup notice emitted as an error-labelled item."""
+    message = item.get("message")
+    return (
+        item.get("type") == "error"
+        and isinstance(message, str)
+        and re.fullmatch(
+            r"Under-development features enabled: [a-z][a-z0-9_]*"
+            r"(?:, [a-z][a-z0-9_]*)*\. Under-development features are incomplete "
+            r"and may behave unpredictably\. To suppress this warning, set "
+            r"`suppress_unstable_features_warning = true` in [^\r\n]+config\.toml\.",
+            message,
+        )
+        is not None
     )
 
 

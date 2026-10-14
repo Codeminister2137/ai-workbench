@@ -1,0 +1,56 @@
+# Historical experimental example. Individual Google-account access was retired
+# 2026-06-18; the adapter refuses this free route. Not a usable free candidate.
+# Preserve for offline integration evidence; do not substitute API/enterprise billing.
+[[models]]
+route_id = "gemini-cli-free-flash"
+provider = "google"
+product = "gemini_cli"
+model = "gemini-3.5-flash"
+location = "external"
+access_method = "gemini_cli"
+auth_method = "google_account_sign_in"
+billing_source = "gemini_cli_free"
+cost_policy_tier = "free_only"
+quality = "standard"
+latency = "interactive"
+notes = "Experimental Gemini CLI 0.64.0 / Google-account route. Quality provisional; remaining free allowance unknown. Shared tools required; no API-key or Vertex substitution."
+
+[models.capabilities]
+chat = true
+streaming = true
+tools = true
+structured_output = false
+multimodal_input = false
+embeddings = false
+
+# Existing Requesty free route supplies a same-tier fallback when configured.
+[[models]]
+route_id = "requesty-free-gemma-4-31b"
+provider = "requesty"
+product = "requesty_free"
+model = "google/gemma-4-31b-it"
+location = "external"
+access_method = "provider_api"
+auth_method = "api_key"
+billing_source = "requesty_billing"
+cost_policy_tier = "free_only"
+quality = "standard"
+latency = "interactive"
+notes = "Requesty free-plan route. Live price verification before every request. Quality is provisional, not evaluated. API metadata checked 2026-10-01 reports no training use and 30-day retention; live tests use synthetic data."
+
+[models.capabilities]
+chat = true
+streaming = true
+tools = true
+structured_output = false
+multimodal_input = false
+embeddings = false
+
+[models.context_limits]
+context_window_tokens = 262144
+
+[models.estimate]
+input_cost_per_million_tokens = 0
+output_cost_per_million_tokens = 0
+source = "Requesty live models API checked 2026-10-01; runtime prices rechecked before inference"
+source_url = "https://router.requesty.ai/v1/models"

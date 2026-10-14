@@ -143,6 +143,8 @@ def _default_access_method(location: BackendLocation) -> str:
 
 
 def _default_product(provider: str, access_method: AccessMethod) -> str:
+    if access_method is AccessMethod.GEMINI_CLI:
+        return "gemini_cli"
     if access_method is AccessMethod.CODEX_CLI:
         return "codex"
     if access_method is AccessMethod.ANTIGRAVITY_CLI:
@@ -159,6 +161,8 @@ def _default_product(provider: str, access_method: AccessMethod) -> str:
 
 
 def _default_auth_method(provider: str, access_method: AccessMethod) -> str:
+    if access_method is AccessMethod.GEMINI_CLI:
+        return AuthMethod.GOOGLE_ACCOUNT_SIGN_IN.value
     if access_method is AccessMethod.LOCAL_RUNTIME:
         return AuthMethod.NONE.value
     if access_method is AccessMethod.CODEX_CLI:
@@ -173,6 +177,8 @@ def _default_auth_method(provider: str, access_method: AccessMethod) -> str:
 
 
 def _default_billing_source(provider: str, access_method: AccessMethod) -> str:
+    if access_method is AccessMethod.GEMINI_CLI:
+        return BillingSource.GEMINI_CLI_FREE.value
     if access_method is AccessMethod.LOCAL_RUNTIME:
         return BillingSource.LOCAL_FREE.value
     if access_method is AccessMethod.CODEX_CLI:
@@ -185,6 +191,8 @@ def _default_billing_source(provider: str, access_method: AccessMethod) -> str:
         return BillingSource.KIRO_SUBSCRIPTION_ALLOWANCE.value
     if provider == "requesty":
         return BillingSource.REQUESTY_BILLING.value
+    if provider == "openrouter":
+        return BillingSource.OPENROUTER_FREE.value
     if provider in {"google", "gemini"}:
         return BillingSource.GOOGLE_AI_STUDIO_FREE.value
     if provider == "openai":
@@ -198,7 +206,11 @@ def _default_cost_policy_tier(
 ) -> str:
     if location is BackendLocation.LOCAL or billing_source is BillingSource.LOCAL_FREE:
         return CostPolicyTier.LOCAL_ONLY.value
-    if billing_source is BillingSource.GOOGLE_AI_STUDIO_FREE:
+    if billing_source in {
+        BillingSource.GOOGLE_AI_STUDIO_FREE,
+        BillingSource.GEMINI_CLI_FREE,
+        BillingSource.OPENROUTER_FREE,
+    }:
         return CostPolicyTier.FREE_ONLY.value
     if billing_source in {
         BillingSource.CHATGPT_SUBSCRIPTION_ALLOWANCE,

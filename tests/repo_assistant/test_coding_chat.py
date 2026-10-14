@@ -299,6 +299,106 @@ def arguments(tmp_path: Path, *options: str) -> argparse.Namespace:
     )
 
 
+@pytest.mark.parametrize("first_returncode", [0, 1])
+def test_saved_chat_retains_host_fallback_routes_across_turns_and_restart(
+    tmp_path, monkeypatch, first_returncode
+):
+    from types import SimpleNamespace
+
+    from ai_agent.repo_coding_assistant import _print_cli_closeout
+
+    prompts = iter(["First task", "Continue", "/exit"])
+    monkeypatch.setattr("builtins.input", lambda prompt: next(prompts))
+    database = tmp_path / "chat.sqlite3"
+    histories = []
+    sessions = []
+    attempts = [
+        {"route_id": "primary", "status": "usage_limit"},
+        {"route_id": "alternate", "status": "finished" if first_returncode == 0 else "failed"},
+    ]
+
+    def execute(args, config):
+        histories.append(args._coding_chat_history)
+        active_session = ACTIVE_SESSION.get()
+        assert active_session is not None
+        sessions.append(active_session.session_id)
+        first = len(histories) == 1
+        args.fallback_session = SimpleNamespace(
+            current=SimpleNamespace(route_id="alternate" if first else "primary"),
+            attempts=attempts if first else [{"route_id": "primary", "status": "finished"}],
+            handoff="PRIVATE_HANDOFF_NOT_FOR_TRANSCRIPT",
+        )
+        _print_cli_closeout(
+            args=args,
+            response_text="Report without route names",
+            status="ready",
+            execution_status="failed" if first and first_returncode else "completed",
+            failure_reason="exhausted" if first and first_returncode else None,
+        )
+        return first_returncode if first else 0
+
+    run_coding_chat(
+        arguments(tmp_path, "--coding-session-db", str(database)), build_argument_parser(), execute
+    )
+    restarted = CodingChatController(
+        SQLiteChatTranscriptStore(database), sessions[0], tmp_path, "local_only"
+    )
+    messages = restarted.store.list_messages(sessions[0])
+    first, second = messages[1], messages[3]
+    assert first.metadata is not None and second.metadata is not None
+    assert first.metadata["effective_route_id"] == "alternate"
+    assert first.metadata["fallback_attempts"] == attempts
+    assert first.metadata["returncode"] == first_returncode
+    assert second.metadata["effective_route_id"] == "primary"
+    assert second.metadata["fallback_attempts"] == [{"route_id": "primary", "status": "finished"}]
+    assert '"effective_route_id": "alternate"' in histories[1]
+    assert '"status": "usage_limit"' in restarted.history()
+    assert "PRIVATE_HANDOFF" not in restarted.history()
+    attempts[0]["route_id"] = "mutated-after-execution"
+    saved_metadata = restarted.store.list_messages(sessions[0])[1].metadata
+    assert saved_metadata is not None
+    saved_attempts = saved_metadata["fallback_attempts"]
+    assert isinstance(saved_attempts, list) and isinstance(saved_attempts[0], dict)
+    assert saved_attempts[0]["route_id"] == "primary"
+
+
+def test_expired_turn_retains_observed_route_without_recording_late_success(tmp_path, monkeypatch):
+    now = 0.0
+    monkeypatch.setattr("ai_agent.coding_chat_cli.time.perf_counter", lambda: now)
+    monkeypatch.setattr("builtins.input", lambda prompt: "/exit")
+
+    def execute(args, config):
+        nonlocal now
+        args._coding_chat_observer(
+            CodingTurnResult(
+                0,
+                "late success",
+                "completed",
+                effective_route_id="alternate",
+                fallback_attempts=(("primary", "usage_limit"), ("alternate", "finished")),
+            )
+        )
+        now = 11.0
+        return 0
+
+    assert (
+        run_coding_chat(
+            arguments(tmp_path, "Inspect", "--turn-timeout-seconds", "10"),
+            build_argument_parser(),
+            execute,
+        )
+        == 1
+    )
+    store = SQLiteChatTranscriptStore(tmp_path / "data/repo-assistant-chats.sqlite3")
+    session = store.latest_session(repo_root=tmp_path)
+    assert session is not None
+    message = store.list_messages(session.session_id)[-1]
+    assert message.metadata is not None
+    assert message.metadata["effective_route_id"] == "alternate"
+    assert message.metadata["execution_status"] == "failed" and message.metadata["returncode"] == 1
+    assert "expired" in message.content and "late success" not in message.content
+
+
 def test_cli_keeps_one_foreground_owner_fresh_turn_args_and_unique_logs(tmp_path, monkeypatch):
     prompts = iter(["First decision", "Implement with that decision", "/exit"])
     monkeypatch.setattr("builtins.input", lambda prompt: next(prompts))

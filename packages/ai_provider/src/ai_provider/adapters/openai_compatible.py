@@ -42,6 +42,7 @@ from ai_provider.privacy import enforce_privacy_policy
 _DEFAULT_BASE_URLS = {
     ProviderKind.OPENAI: "https://api.openai.com/v1",
     ProviderKind.REQUESTY: "https://router.requesty.ai/v1",
+    ProviderKind.OPENROUTER: "https://openrouter.ai/api/v1",
     ProviderKind.GOOGLE: "https://generativelanguage.googleapis.com/v1beta/openai",
 }
 
@@ -51,6 +52,14 @@ class OpenAICompatibleChatClient:
     """Chat client for OpenAI-compatible hosted Chat Completions APIs."""
 
     config: BackendConfig
+
+    def __post_init__(self) -> None:
+        if self.config.provider is ProviderKind.OPENROUTER:
+            raise ProviderError(
+                "OpenRouter requires the guarded free client; use create_chat_client.",
+                category=ProviderErrorCategory.CONFIGURATION,
+                provider=self.config.provider.value,
+            )
 
     @property
     def backend(self) -> BackendInfo:

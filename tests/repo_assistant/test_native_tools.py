@@ -386,6 +386,68 @@ def test_implement_mode_defaults_to_native_tools(capsys, monkeypatch) -> None:
     assert "execution_status: completed" in output
 
 
+@pytest.mark.parametrize("delegate_available", [False, True])
+def test_native_diagnostics_respect_filtered_foreground_registry(
+    capsys, monkeypatch, tmp_path, delegate_available
+) -> None:
+    from dataclasses import replace
+
+    from ai_provider import AIMessage, AIResponse, BackendInfo, BackendLocation, MessageRole
+    from ai_provider.foreground_tools import ForegroundTools
+
+    catalog = _EXAMPLE.load_model_catalog(
+        Path("packages/ai_orchestrator/examples/model_catalog.toml")
+    )
+    prepared = _EXAMPLE.run_coding_prompt(
+        "Inspect a helper.",
+        _EXAMPLE.coding_task_profile(model_override="qwen2.5-coder:14b"),
+        catalog,
+    )
+    prepared = replace(
+        prepared,
+        response=None,
+        config=_EXAMPLE.BackendConfig(provider=_EXAMPLE.ProviderKind.OLLAMA, model="test"),
+    )
+    monkeypatch.setattr(_EXAMPLE, "run_coding_prompt", lambda *a, **kw: prepared)
+    response = SimpleNamespace(
+        response=AIResponse(
+            message=AIMessage(MessageRole.ASSISTANT, "Inspection complete."),
+            backend=BackendInfo("ollama", "test", BackendLocation.LOCAL),
+        ),
+        tool_results=(),
+    )
+    monkeypatch.setattr(_EXAMPLE, "_run_native_agent", lambda *a, **kw: response)
+    registry = _EXAMPLE.default_coding_tools()
+    if delegate_available:
+
+        def forbidden_delegation(task, context):
+            raise AssertionError("Availability diagnostics must not execute a child task")
+
+        registry = _EXAMPLE.coding_tools_with_delegation(forbidden_delegation)
+    monkeypatch.setattr(ForegroundTools, "registry", lambda owner, **kw: registry)
+    assert (
+        main(
+            [
+                "Inspect a helper.",
+                "--mode",
+                "implement",
+                "--execute",
+                "--repo-root",
+                str(tmp_path),
+                "--provider",
+                "ollama",
+                "--model",
+                "qwen2.5-coder:14b",
+                "--shared-tools",
+                "coding",
+            ]
+        )
+        == 0
+    )
+    expected = "enabled: primary agent may call delegate_task" if delegate_available else "disabled"
+    assert f"provider_native_delegation: {expected}" in capsys.readouterr().out
+
+
 @pytest.mark.parametrize("experimental", [False, True])
 def test_cli_prints_native_usage_and_latency(capsys, monkeypatch, experimental) -> None:
     from dataclasses import replace

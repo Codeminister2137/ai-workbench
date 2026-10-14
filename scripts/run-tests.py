@@ -18,6 +18,7 @@ GROUPS = {
         "tests/test_ollama_*.py",
         "tests/test_openai_compatible_adapter.py",
         "tests/test_requesty_free_models.py",
+        "tests/test_openrouter_free_models.py",
         "tests/test_local_capabilities.py",
         "tests/test_local_ollama_latency_example.py",
         "tests/test_codex_usage.py",
@@ -46,6 +47,7 @@ GROUPS = {
     "cli": (
         "tests/repo_assistant/test_*.py",
         "tests/test_external_agents.py",
+        "tests/test_gemini_cli.py",
         "tests/test_execution_fallback.py",
         "tests/test_free_provider_fallback.py",
         "tests/test_agent_readiness_ownership.py",
