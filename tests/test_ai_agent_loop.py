@@ -398,3 +398,71 @@ def test_initial_provider_failure_preserves_prompt_without_tool_side_effects(
     assert failure.partial_messages == (AIMessage(MessageRole.USER, "Create the file"),)
     assert len(client.requests) == 1
     assert not (tmp_path / "out.txt").exists()
+
+
+def test_unknown_alias_feedback_uses_current_registry_without_execution(tmp_path):
+    from ai_agent.tools.base import ToolRegistry
+    from ai_agent.tools.filesystem import ReadFileTool
+    from ai_agent.tools.search import GrepSearchTool
+
+    class Client(FakeClient):
+        def complete(self, request):
+            self.calls += 1
+            self.requests.append(request)
+            if self.calls == 1:
+                call = AIToolCall(
+                    "unknown-call",
+                    "open_file",
+                    {"path": "PRIVATE_ARGUMENT", "content": "PRIVATE_CONTENT"},
+                )
+                return AIResponse(
+                    AIMessage(MessageRole.ASSISTANT, "", tool_calls=(call,)), self.backend
+                )
+            return AIResponse(AIMessage(MessageRole.ASSISTANT, "Stopped"), self.backend)
+
+    # Reverse insertion order verifies stable names from this registry only.
+    registry = ToolRegistry((ReadFileTool(), GrepSearchTool()))
+    client = Client()
+    result = AgentLoop(
+        client,
+        registry,
+        ToolContext(tmp_path),
+        permissions=PermissionManager(policy=PermissionPolicy.read_only()),
+    ).run("Inspect only")
+    refusal = result.tool_results[0]
+    assert refusal.is_error and refusal.call_id == "unknown-call" and refusal.name == "open_file"
+    assert "unknown tool 'open_file'" in refusal.output
+    assert "Registered tool names: 'grep_search', 'read_file'." in refusal.output
+    assert "create_file" not in refusal.output and "PRIVATE" not in refusal.output
+    assert "No operation was attempted." in refusal.output
+    assert not list(tmp_path.iterdir())
+    assert client.requests[1].messages[-1].role is MessageRole.TOOL
+    assert client.requests[1].messages[-1].content == refusal.output
+
+
+def test_empty_registry_unknown_call_retains_safe_refusal_feedback(tmp_path):
+    from ai_agent.tools.base import ToolRegistry
+
+    class Client(FakeClient):
+        def complete(self, request):
+            self.calls += 1
+            if self.calls == 1:
+                call = AIToolCall("empty-call", "search", {"query": "PRIVATE_QUERY"})
+                return AIResponse(
+                    AIMessage(MessageRole.ASSISTANT, "", tool_calls=(call,)), self.backend
+                )
+            return AIResponse(AIMessage(MessageRole.ASSISTANT, "Stopped"), self.backend)
+
+    result = AgentLoop(
+        Client(),
+        ToolRegistry(),
+        ToolContext(tmp_path),
+        permissions=PermissionManager(policy=PermissionPolicy.read_only()),
+    ).run("No tools available")
+    refusal = result.tool_results[0]
+    assert refusal.is_error and refusal.call_id == "empty-call" and refusal.name == "search"
+    assert "unknown tool 'search'" in refusal.output
+    assert "No tools are registered in this run." in refusal.output
+    assert "No operation was attempted." in refusal.output
+    assert "PRIVATE" not in refusal.output and "Registered tool names:" not in refusal.output
+    assert not list(tmp_path.iterdir())

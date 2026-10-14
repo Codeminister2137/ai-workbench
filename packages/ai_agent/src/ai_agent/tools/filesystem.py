@@ -205,10 +205,11 @@ class CreateFileTool(BaseTool):
         try:
             target_path.parent.mkdir(parents=True, exist_ok=True)
             target_path.write_text(content, encoding="utf-8")
+            size = target_path.stat().st_size
             return ToolResult(
                 name="create_file",
-                output=f"Successfully created file {raw_path} ({len(content)} bytes).",
-                metadata={"path": str(target_path), "bytes_written": len(content)},
+                output=f"Successfully created file {raw_path} ({size} bytes).",
+                metadata={"path": str(target_path), "bytes_written": size},
             )
         except Exception as exc:  # noqa: BLE001
             return ToolResult(

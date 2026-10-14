@@ -112,9 +112,19 @@ class AgentLoop:
                 agent_call = ToolCall(name=call.name, arguments=call.arguments, call_id=call.id)
                 tool = self.registry.get(call.name)
                 if tool is None:
+                    registered_names = sorted(t.name for t in self.registry.list_definitions())
+                    names_str = ", ".join(repr(name) for name in registered_names)
+                    registry_detail = (
+                        f"Registered tool names: {names_str}."
+                        if registered_names
+                        else "No tools are registered in this run."
+                    )
                     result = ToolResult(
                         name=call.name,
-                        output=f"Error: unknown tool {call.name!r}. Use the supplied tool names.",
+                        output=(
+                            f"Error: unknown tool {call.name!r}. {registry_detail} "
+                            "No operation was attempted."
+                        ),
                         call_id=call.id,
                         is_error=True,
                     )
