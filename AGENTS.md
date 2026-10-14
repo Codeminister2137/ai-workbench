@@ -209,6 +209,13 @@ checks within the already-approved task scope do not require a separate chat
 approval request or renewed readiness confirmation. Do not interrupt the owner
 to approve each such check.
 
+Owner clarification (2026-10-15): an already-authorized bounded diagnostic known
+to require no manual interaction may run without a separate readiness question.
+Use readiness confirmation when an actual console approval, sign-in or other
+owner action is expected. If an unexpected approval prompt appears, stop there
+and obtain the owner's attended approval. Scoped inference grants and actual
+CLI, sandbox and native-client approval requirements remain binding.
+
 For an operation outside that routine scope which may wait for owner approval,
 announce the request in the ordinary user-visible conversation **before calling
 the terminal tool**. State the exact command (or bounded operation), working

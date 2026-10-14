@@ -24,6 +24,12 @@ identify the reset timezone. An authenticated catalog GET returned no numeric
 reset/quota headers. UTC usage-report aggregation elsewhere would not prove the
 free allowance resets at UTC midnight. Do not invent a pre-09:00 deadline.
 
+A separately approved Requesty Nemotron Super diagnostic then completed 1/1
+attempt with HTTP200 and the correct arithmetic answer. It reported 101 tokens
+and $0, with no tool execution and verified owned cleanup. No numeric quota/reset
+headers were returned; remaining allowance and reset time are still unknown.
+This establishes access for that request, not coding quality or a free quota size.
+
 ## Required reusable workflow
 
 - Take explicitly selected routes from the existing catalog/inventory. Provider
@@ -65,6 +71,9 @@ the live sweep as a pytest test, even one enabled by a normal environment flag.
 ## Ad-hoc and scheduled use
 
 Ad-hoc runs respond to a concrete access question and a bounded owner grant.
+An approved diagnostic that needs no manual interaction does not require another
+readiness question. Expected manual approval/sign-in requires attendance; stop
+at any unexpected approval prompt. This clarification preserves scoped grants.
 Future end-of-allowance runs require verified provider/account reset evidence,
 remaining allowance, a reserve for higher-priority authorized work and an active
 execution window. Skip unknown reset/quota/privacy or unavailable approval.
