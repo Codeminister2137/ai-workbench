@@ -7,19 +7,29 @@ Only metadata endpoints are consulted; admission never probes with inference.
 
 from __future__ import annotations
 
+import hashlib
 import json
+import time
 from collections.abc import Callable, Iterator
-from dataclasses import asdict, dataclass, replace
+from dataclasses import asdict, dataclass, field, replace
 from typing import Any
 
 from ai_provider.config import BackendConfig, ProviderKind
-from ai_provider.contracts import AIRequest, AIResponse, AIStreamEvent, BackendInfo, ChatClient
+from ai_provider.contracts import (
+    AIRequest,
+    AIResponse,
+    AIStreamEvent,
+    BackendInfo,
+    ChatClient,
+    FinishReason,
+    UsageSource,
+)
 from ai_provider.errors import ProviderError, ProviderErrorCategory
 from ai_provider.ollama_models import list_local_ollama_models
 from ai_provider.ollama_runtime import get_ollama_version
 
 # Bump when native request translation/tool-loop semantics invalidate the probes.
-NATIVE_CONTRACT_VERSION = 1
+NATIVE_CONTRACT_VERSION = 2
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,8 +51,10 @@ NATIVE_TOOL_EVIDENCE = (
         "17052f91a42e97930aa6e28a6c6c06a983e6a58dbb00434885a0cf5313e376f7",
         "0.32.5",
         True,
-        "2026-10-04 native-prompt-eval-gpt: actual tools on 20 paired tasks; "
-        "19/20 strict effect checks per prompt, one newline miss",
+        "2026-10-11 continuation-probe-20261011-231014: actual read/read/edit, "
+        "correct fixture effect and untouched second file, no tool errors, "
+        "thinking received/replayed; final marker-report check failed; quality unverified",
+        contract_version=2,
     ),
     NativeToolEvidence(
         "qwen2.5-coder:14b",
@@ -50,6 +62,18 @@ NATIVE_TOOL_EVIDENCE = (
         "0.32.5",
         False,
         "2026-10-04 native-prompt-eval: textual requests, no actual tools on 20 paired tasks",
+    ),
+    NativeToolEvidence(
+        "qwen3:14b",
+        "bdbd181c33f2ed1b31c972991882db3cf4d192569092138a7d29e973cd9debe8",
+        "0.32.5",
+        True,
+        "2026-10-12 qwen-qualification-20261012-111559 (non-thinking) and "
+        "qwen-qualification-20261012-113216 (thinking): actual read/edit, exact "
+        "fixture effect, untouched second file, correct final marker, no tool errors; "
+        "thinking received/replayed when enabled. Coding quality unverified; earlier "
+        "thinking fixture duplicated a marker and another probe failed under a 120-second bound",
+        contract_version=2,
     ),
 )
 
@@ -107,6 +131,28 @@ def installed_native_identity(config: BackendConfig) -> tuple[str | None, str | 
     return digest, version
 
 
+@dataclass(frozen=True, slots=True)
+class _MeasuredPrefix:
+    scope: str
+    messages: str
+    length: int
+    input_tokens: int
+
+
+def _fingerprint(value: Any) -> str:
+    return hashlib.sha256(
+        json.dumps(value, ensure_ascii=False, sort_keys=True).encode("utf-8")
+    ).hexdigest()
+
+
+def _scope_fingerprint(value: Any) -> str | None:
+    """Unverifiable options must retain absolute admission, not create an anchor."""
+    try:
+        return _fingerprint(value)
+    except (TypeError, ValueError):
+        return None
+
+
 @dataclass(slots=True)
 class NativeCodingClient:
     """Check every turn, including history, before forwarding a coding request.
@@ -120,12 +166,19 @@ class NativeCodingClient:
     config: BackendConfig
     context_tokens: int | None
     diagnostic: Callable[[str], None] | None = None
+    deadline: float | None = None
+    client_factory: Callable[[BackendConfig], ChatClient] | None = None
+    measured_prefix_prototype: bool = False
+    _prefix: _MeasuredPrefix | None = field(default=None, init=False, repr=False)
+    _pending: tuple[str, str, int] | None = field(default=None, init=False, repr=False)
 
     @property
     def backend(self) -> BackendInfo:
         return self.client.backend
 
-    def _request(self, request: AIRequest) -> AIRequest:
+    def _request(self, request: AIRequest, config: BackendConfig | None = None) -> AIRequest:
+        self._pending = None
+        identity = None
         model = request.model or self.config.model
         if model != self.config.model:
             raise ProviderError(
@@ -138,7 +191,8 @@ class NativeCodingClient:
                     f"Native tool compatibility is unknown for {model}; no model request sent",
                     category=ProviderErrorCategory.CONFIGURATION,
                 )
-            digest, version = installed_native_identity(self.config)
+            digest, version = installed_native_identity(config or self.config)
+            identity = (digest, version)
             reason = native_tool_incompatibility(
                 model, model_digest=digest, runtime_version=version
             )
@@ -169,12 +223,46 @@ class NativeCodingClient:
             ensure_ascii=False,
         ).encode("utf-8")
         estimated = (len(serialized) + 1) // 2
+        estimate_kind = "estimated_utf8"
+        if self.measured_prefix_prototype and self.config.provider is ProviderKind.OLLAMA:
+            scope = _scope_fingerprint(
+                {
+                    "provider": self.config.provider.value,
+                    "model": model,
+                    "endpoint": self.config.base_url,
+                    "identity": identity,
+                    "contract": NATIVE_CONTRACT_VERSION,
+                    "context": context,
+                    "temperature": request.temperature,
+                    "privacy": request.privacy_class,
+                    "metadata": request.metadata,
+                    "tools": [tool.to_json_schema() for tool in request.tools],
+                }
+            )
+            messages = [asdict(message) for message in request.messages]
+            prefix = self._prefix
+            if (
+                prefix is not None
+                and scope is not None
+                and prefix.scope == scope
+                and len(messages) >= prefix.length
+                and _fingerprint(messages[: prefix.length]) == prefix.messages
+            ):
+                appended = messages[prefix.length :]
+                added_bytes = len(json.dumps(appended, ensure_ascii=False).encode("utf-8"))
+                estimated = prefix.input_tokens + (added_bytes + 1) // 2 + 256 * len(appended)
+                estimate_kind = "measured_prefix_estimated_append"
+            else:
+                self._prefix = None
+            if scope is not None:
+                self._pending = (scope, _fingerprint(messages), len(messages))
         self._report(
-            f"native_input_admission: estimated_utf8 input_tokens={estimated} "
+            f"native_input_admission: {estimate_kind} input_tokens={estimated} "
             f"output_tokens={output} framing_tokens=256 context_tokens={context}; "
             "verified_token_count=false"
         )
         if estimated + output + 256 > context:
+            self._pending = None
             raise ProviderError(
                 "Native model input does not fit the estimated context budget; "
                 "complete instructions, schemas and history were preserved; no model request sent",
@@ -184,6 +272,8 @@ class NativeCodingClient:
         metadata = dict(request.metadata)
         if self.config.provider is ProviderKind.OLLAMA:
             metadata["ollama_context_length"] = context
+            if self.measured_prefix_prototype:
+                metadata["ollama_preserve_context"] = True
         return replace(request, metadata=metadata, max_output_tokens=output)
 
     def _report(self, message: str) -> None:
@@ -191,14 +281,76 @@ class NativeCodingClient:
             self.diagnostic(message)
 
     def complete(self, request: AIRequest) -> AIResponse:
-        return self.client.complete(self._request(request))
+        try:
+            admitted = self._request(request, self._bounded_config())
+            client = self._bounded_client()
+            response = client.complete(admitted)
+            self._bounded_config()
+        except BaseException:
+            self._prefix = self._pending = None
+            raise
+        pending, self._pending = self._pending, None
+        self._prefix = None
+        count = response.usage.input_tokens
+        if (
+            pending is not None
+            and self.context_tokens is not None
+            and response.usage.source is UsageSource.PROVIDER_REPORTED
+            and type(count) is int
+            and 0 < count <= self.context_tokens - (admitted.max_output_tokens or 0) - 256
+            and response.finish_reason in (FinishReason.STOP, FinishReason.LENGTH)
+            and response.backend.provider == self.config.provider.value
+            and response.backend.model == self.config.model
+            and response.backend.base_url == self.client.backend.base_url
+        ):
+            self._prefix = _MeasuredPrefix(*pending, count)
+        return response
 
     def stream(self, request: AIRequest) -> Iterator[AIStreamEvent]:
-        yield from self.client.stream(self._request(request))
+        # Streaming remains on the absolute gate during this bounded prototype.
+        self._prefix = None
+        admitted = self._request(request, self._bounded_config())
+        self._pending = None
+        client = self._bounded_client()
+        for event in client.stream(admitted):
+            self._bounded_config()
+            yield event
+        self._bounded_config()
+
+    def _bounded_config(self) -> BackendConfig:
+        """Refuse expired turns and cap both admission probes and inference timeouts."""
+        if self.deadline is None:
+            return self.config
+        remaining = self.deadline - time.perf_counter()
+        if remaining <= 0:
+            raise ProviderError(
+                "Native coding deadline expired; no further model or tool actions admitted",
+                category=ProviderErrorCategory.TIMEOUT,
+            )
+        return replace(self.config, timeout_seconds=min(self.config.timeout_seconds, remaining))
+
+    def _bounded_client(self) -> ChatClient:
+        config = self._bounded_config()
+        if self.deadline is None:
+            return self.client
+        if self.client_factory is None:
+            from ai_provider.factory import create_chat_client
+
+            factory = create_chat_client
+        else:
+            factory = self.client_factory
+        client = factory(config)
+        self._bounded_config()
+        return client
 
 
 def prepare_native_coding_client(
-    client: ChatClient, config: BackendConfig, args: Any, diagnostic: Callable[[str], None] | None
+    client: ChatClient,
+    config: BackendConfig,
+    args: Any,
+    diagnostic: Callable[[str], None] | None,
+    *,
+    client_factory: Callable[[BackendConfig], ChatClient] | None = None,
 ) -> ChatClient:
     """Resolve existing catalog/resource limits for the actual selected model."""
     from pathlib import Path
@@ -207,6 +359,12 @@ def prepare_native_coding_client(
 
     from ai_provider.ollama_runtime import get_ollama_resource_profile
 
+    measured_prefix = bool(getattr(args, "experimental_measured_prefix", False))
+    if measured_prefix and config.provider is not ProviderKind.OLLAMA:
+        raise ProviderError(
+            "Experimental measured-prefix admission requires native Ollama coding tools",
+            category=ProviderErrorCategory.CONFIGURATION,
+        )
     catalog = load_model_catalog(
         getattr(args, "catalog", Path("packages/ai_orchestrator/examples/model_catalog.toml"))
     )
@@ -231,4 +389,12 @@ def prepare_native_coding_client(
                 category=ProviderErrorCategory.CONFIGURATION,
             )
         capacity = min(capacity, runtime) if capacity else runtime
-    return NativeCodingClient(client, config, capacity, diagnostic)
+    return NativeCodingClient(
+        client,
+        config,
+        capacity,
+        diagnostic,
+        deadline=getattr(getattr(args, "fallback_session", None), "deadline", None),
+        client_factory=client_factory,
+        measured_prefix_prototype=measured_prefix,
+    )

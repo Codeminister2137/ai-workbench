@@ -1,5 +1,31 @@
 # Resource windows, usage and completion
 
+## Periodic workstation snapshots
+
+On Windows, `scripts/workstation-resources.ps1` performs a read-only CIM snapshot.
+It reports CPU load, available physical RAM, GPU dedicated/shared memory use and
+an estimate from the busiest GPU engine. It emits no process names, commands or
+model prompts. Missing counters produce null values and explicit unavailable
+labels. Free dedicated VRAM remains unknown; these counters expose usage without
+a trustworthy allocation budget.
+
+Run once, or use `-SampleCount 60 -IntervalSeconds 60` for a bounded series of
+JSON lines. `-NotAfterUtc` stops further samples at a selected deadline. The
+collector changes no process priority, model profile or running call and starts
+no background service. A future dashboard can request snapshots independently
+of model execution. Gaming-mode transitions remain an owner decision.
+
+The owner reported gaming during the 2026-10-12 CLI pilots. Those historical
+timings are confounded and must not justify model-routing or hardware changes.
+Slow successful work under contention is acceptable; correctness, cleanup and
+deadline evidence remain distinct from speed. New evaluations record snapshots,
+which do not by themselves identify game activity or establish a controlled
+performance comparison.
+
+RAM fields use the documented [Windows operating-system counters](https://learn.microsoft.com/en-us/windows/win32/cimwin32prov/win32-operatingsystem).
+The GPU estimate aggregates each engine's process instances, then selects the
+busiest engine following the [Task Manager measurement approach](https://devblogs.microsoft.com/directx/gpus-in-the-task-manager/).
+
 ## Model usage versus process waiting
 
 In plain terms: running tests or a local Ollama model uses this PC. Asking a

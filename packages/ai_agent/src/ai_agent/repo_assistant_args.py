@@ -73,7 +73,7 @@ def build_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument("prompt", nargs="?", help="Coding prompt to prepare or execute.")
     parser.add_argument(
         "--fallback-quality-policy",
-        choices=("preserve_quality", "task_minimum"),
+        choices=("emergency_preserve", "prefer_quality", "preserve_quality", "task_minimum"),
         help="Override user fallback quality policy for this invocation.",
     )
     parser.add_argument(
@@ -315,10 +315,17 @@ def build_argument_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--turn-timeout-seconds",
+        type=_positive_finite_float,
+        help="Maximum wall-clock time for one turn, capped by the remaining away allowance.",
+    )
+    parser.add_argument(
         "--away-minutes",
         type=_away_minutes_argument,
         help=(
-            "Visible foreground work budget for unattended runs. If --timeout-seconds "
+            "Fixed foreground allowance for this launch, shared by all coding-chat turns. "
+            "A resumed session gets a fresh allowance only when this option is supplied. "
+            "If --timeout-seconds "
             "is not supplied, provider and external-agent timeouts are set to this "
             "many minutes."
         ),
@@ -596,6 +603,15 @@ def build_argument_parser() -> argparse.ArgumentParser:
         help=(
             "Disable the default provider-native tool loop and use the older "
             "single-response provider execution path."
+        ),
+    )
+    parser.add_argument(
+        "--experimental-measured-prefix",
+        action="store_true",
+        help=(
+            "Opt into experimental provider-reported prefix admission for executed "
+            "native Ollama coding tools. Keeps complete instructions/history, "
+            "reserves output, and disables provider truncation/context shifting."
         ),
     )
     parser.add_argument(

@@ -42,6 +42,7 @@ from ai_provider.privacy import enforce_privacy_policy
 _DEFAULT_BASE_URLS = {
     ProviderKind.OPENAI: "https://api.openai.com/v1",
     ProviderKind.REQUESTY: "https://router.requesty.ai/v1",
+    ProviderKind.OPENROUTER: "https://openrouter.ai/api/v1",
     ProviderKind.GOOGLE: "https://generativelanguage.googleapis.com/v1beta/openai",
 }
 
@@ -51,6 +52,14 @@ class OpenAICompatibleChatClient:
     """Chat client for OpenAI-compatible hosted Chat Completions APIs."""
 
     config: BackendConfig
+
+    def __post_init__(self) -> None:
+        if self.config.provider is ProviderKind.OPENROUTER:
+            raise ProviderError(
+                "OpenRouter requires the guarded free client; use create_chat_client.",
+                category=ProviderErrorCategory.CONFIGURATION,
+                provider=self.config.provider.value,
+            )
 
     @property
     def backend(self) -> BackendInfo:
@@ -201,7 +210,7 @@ class OpenAICompatibleChatClient:
                 catalog = json.loads(response.read().decode("utf-8"))
         except HTTPError as exc:
             raise self._http_error(exc) from exc
-        except (URLError, TimeoutError, json.JSONDecodeError) as exc:
+        except (URLError, TimeoutError, UnicodeDecodeError, json.JSONDecodeError) as exc:
             raise ProviderError(
                 "Could not verify Requesty free-model prices; inference was not sent.",
                 category=ProviderErrorCategory.CONFIGURATION,
@@ -321,12 +330,12 @@ class OpenAICompatibleChatClient:
             with urlopen(request, timeout=self.config.timeout_seconds) as response:
                 for line in response:
                     raw_line = line.strip()
-                    if raw_line == b"data: [DONE]":
-                        break
                     if not raw_line or raw_line.startswith((b":", b"event:", b"id:", b"retry:")):
                         continue
-                    if raw_line.startswith(b"data: "):
-                        raw_line = raw_line.removeprefix(b"data: ")
+                    if raw_line.startswith(b"data:"):
+                        raw_line = raw_line.removeprefix(b"data:").removeprefix(b" ")
+                        if raw_line == b"[DONE]":
+                            break
                     chunk = json.loads(raw_line.decode("utf-8"))
                     if not isinstance(chunk, dict):
                         raise ProviderError(
@@ -563,8 +572,9 @@ def _zero_price_row(row: dict[str, Any]) -> bool:
             return False
         if not zero(prices.get("input_price")) or not zero(prices.get("output_price")):
             return False
-        if "cached_price" in prices and not zero(prices["cached_price"]):
-            return False
+        for field in ("cached_price", "caching_price", "caching_5m_price", "caching_1h_price"):
+            if field in prices and not zero(prices[field]):
+                return False
     return True
 
 

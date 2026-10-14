@@ -642,6 +642,9 @@ Instructions:
 - Keep CURRENT_CONTEXT.md compact and action-oriented; it is an ignored local handoff, not an ADR or history log.
 - Preserve only information needed to restart work quickly: last completed work, validation baseline, active boundaries, open risks, and next recommended action.
 - Remove stale or duplicated details when they no longer help resumption.
+- Replace current sections in place; do not prepend a new checkpoint to the whole
+  old handoff. Put concise superseded session context in docs/session-history.md;
+  preserve detailed private receipts in ignored local artifacts, not tracked history.
 - Do not claim validation or changes that were not verified.
 
 Output:

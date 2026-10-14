@@ -68,6 +68,12 @@ do not infer verified token capacity or comparative model quality.
 
 ## Lifecycle, storage and deadline
 
+Selected-job lookup validates only that job's immutable definition and identity.
+Unrelated stale historical native-contract pins cannot block admission of a fresh
+current job. Selecting a stale job still refuses before claim/runtime launch;
+there is no automatic historical migration or replay. Queue-wide listing remains
+strict and can refuse incompatible historical definitions.
+
 - Add `scheduled_acceptance_tasks` and acceptance result/process receipt records
   to the existing SQLite database. Version their payloads explicitly. Preserve
   existing research definitions, statuses, reports and interrupted-run receipts;

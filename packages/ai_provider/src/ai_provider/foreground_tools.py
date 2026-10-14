@@ -18,6 +18,8 @@ from ai_agent.shared_approvals import TerminalApproval, scoped_registry
 from ai_agent.tool_profiles import shared_tool_registry
 
 if TYPE_CHECKING:
+    from ai_agent.tools.delegation import DelegatedTaskRunner
+
     from ai_provider.coding_sessions import CodingSession
     from ai_provider.external_agents import ExternalAgentConfig
 
@@ -34,14 +36,26 @@ class ForegroundTools:
         self.host: ForegroundMcpHost | None = None
         self.task_id: str | None = session.session_id if session else None
         self.approval_reader: Callable[[str, Callable[[], bool]], str] | None = None
+        self.delegation_factory: (
+            Callable[[Callable[[], bool], float | None], DelegatedTaskRunner] | None
+        ) = None
         from ai_agent.tools.refactor import RenamePlanStore
 
         self.rename_plans = RenamePlanStore(
             self.workspace, owner_id=uuid.uuid4().hex, task_id=self.task_id
         )
 
-    def registry(self):
-        registry = shared_tool_registry("coding", self.workspace, rename_plans=self.rename_plans)
+    def registry(
+        self, *, is_active: Callable[[], bool] | None = None, deadline: float | None = None
+    ):
+        runner = (
+            self.delegation_factory(is_active or (lambda: True), deadline)
+            if self.delegation_factory
+            else None
+        )
+        registry = shared_tool_registry(
+            "coding", self.workspace, rename_plans=self.rename_plans, delegation_runner=runner
+        )
         for operation in ("start", "status", "stop"):
             registry.register(ProcessTool(self.supervisor, operation))
         return registry
@@ -74,7 +88,7 @@ class ForegroundTools:
             else None,
         )
         registry = scoped_registry(
-            self.registry(),
+            self.registry(is_active=lambda: host.active(token), deadline=deadline),
             manager,
             self.workspace,
             config.shared_task_id,

@@ -45,6 +45,11 @@ is still incomplete; the software tests and model-quality evaluation are separat
 
 Requirements:
 
+See [installation and external runtimes](docs/installation.md) for workspace
+environment ownership and deployment prerequisites. Python dependencies use the
+project's `uv`-managed `.venv`; external runtimes and official agent clients need
+separate provisioning for the selected routes.
+
 - Python `>=3.13,<3.15`
 - `uv`
 - Optional: Ollama for local model execution

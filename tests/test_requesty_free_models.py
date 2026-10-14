@@ -137,3 +137,79 @@ def test_catalog_failure_blocks_inference(monkeypatch) -> None:
     monkeypatch.setattr("ai_provider.adapters.openai_compatible.urlopen", fail)
     with pytest.raises(ProviderError, match="inference was not sent"):
         client().complete(request())
+
+
+@pytest.mark.parametrize("price_field", ["caching_price", "caching_5m_price", "caching_1h_price"])
+@pytest.mark.parametrize("tier", [False, True])
+@pytest.mark.parametrize("stream", [False, True])
+def test_cache_write_prices_cannot_bypass_free_only_guard(monkeypatch, price_field, tier, stream):
+    calls = []
+    prices = {"input_price": 0, "output_price": 0, price_field: 0.01}
+    row = free_model(pricing=[prices]) if tier else free_model(**prices)
+
+    def catalog(http_request, **kwargs):
+        calls.append(http_request.get_method())
+        if http_request.get_method() != "GET":
+            pytest.fail("Inference sent despite a nonzero cache-write price")
+        return Response({"data": [row]})
+
+    monkeypatch.setattr("ai_provider.adapters.openai_compatible.urlopen", catalog)
+    with pytest.raises(ProviderError, match="not verified free"):
+        if stream:
+            list(client().stream(request()))
+        else:
+            client().complete(request())
+    assert calls == ["GET"]
+
+
+def test_verified_zero_cache_write_prices_still_allow_completion(monkeypatch):
+    calls = []
+    prices = {
+        "input_price": 0,
+        "output_price": 0,
+        "caching_price": 0,
+        "caching_5m_price": "0",
+        "caching_1h_price": 0,
+    }
+
+    def respond(http_request, **kwargs):
+        calls.append(http_request.get_method())
+        if http_request.get_method() == "GET":
+            return Response({"data": [free_model(**prices, pricing=[prices])]})
+        return Response(
+            {
+                "choices": [
+                    {"message": {"role": "assistant", "content": "ok"}, "finish_reason": "stop"}
+                ]
+            }
+        )
+
+    monkeypatch.setattr("ai_provider.adapters.openai_compatible.urlopen", respond)
+    assert client().complete(request()).message.content == "ok"
+    assert calls == ["GET", "POST"]
+
+
+@pytest.mark.parametrize("stream", [False, True])
+def test_invalid_catalog_utf8_refuses_with_provider_error_before_inference(monkeypatch, stream):
+    from ai_provider import ProviderErrorCategory
+
+    calls = []
+
+    class InvalidUTF8Response(Response):
+        def read(self):
+            return b'{"data": ["\xffprivate-response"]}'
+
+    def catalog(http_request, **kwargs):
+        calls.append(http_request.get_method())
+        if http_request.get_method() != "GET":
+            pytest.fail("Inference sent without verified catalog")
+        return InvalidUTF8Response({})
+
+    monkeypatch.setattr("ai_provider.adapters.openai_compatible.urlopen", catalog)
+    with pytest.raises(ProviderError, match="inference was not sent") as error:
+        if stream:
+            list(client().stream(request()))
+        else:
+            client().complete(request())
+    assert error.value.category is ProviderErrorCategory.CONFIGURATION
+    assert "private-response" not in str(error.value) and calls == ["GET"]

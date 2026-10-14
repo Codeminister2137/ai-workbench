@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import sqlite3
@@ -69,7 +70,7 @@ def job(tmp_path: Path) -> AcceptanceJob:
         evidence.model,
         evidence.runtime_version,
         evidence.model_digest,
-        1,
+        native_admission.NATIVE_CONTRACT_VERSION,
         "http://127.0.0.1:19473",
         60,
         10,
@@ -79,12 +80,68 @@ def job(tmp_path: Path) -> AcceptanceJob:
     )
 
 
+def test_selected_job_ignores_unrelated_stale_native_history(job, tmp_path):
+    store = AcceptanceJobStore(tmp_path / "queue.sqlite3")
+    store.plan(job)
+    historical = asdict(job)
+    historical.update(task_id="old-terminal-job", native_contract_version=1)
+    payload = json.dumps(historical, sort_keys=True)
+    with sqlite3.connect(store.path) as connection:
+        connection.execute(
+            "INSERT INTO scheduled_acceptance_tasks VALUES (?,?,?,?,?,?,?,NULL)",
+            (
+                "old-terminal-job",
+                payload,
+                hashlib.sha256(payload.encode()).hexdigest(),
+                1,
+                "completed",
+                "old",
+                "old",
+            ),
+        )
+    observed = []
+
+    def runner(selected, *args, **kwargs):
+        observed.append(selected.task_id)
+        return {"passed": True, "cleanup_verified": True}
+
+    assert execute_sequence(
+        store,
+        [job.task_id],
+        explicitly_started=True,
+        local_compute_available=True,
+        available_seconds=120,
+        runner=runner,
+    ) == (job.task_id,)
+    assert observed == [job.task_id]
+    with pytest.raises(ValueError, match="native_contract_version"):
+        store.get("old-terminal-job")
+    with sqlite3.connect(store.path) as connection:
+        assert connection.execute(
+            "SELECT definition_json,status FROM scheduled_acceptance_tasks WHERE task_id=?",
+            ("old-terminal-job",),
+        ).fetchone() == (payload, "completed")
+
+
+def test_selected_job_rejects_mismatched_persisted_identity(job, tmp_path):
+    store = AcceptanceJobStore(tmp_path / "queue.sqlite3")
+    store.plan(job)
+    with sqlite3.connect(store.path) as connection:
+        connection.execute(
+            "UPDATE scheduled_acceptance_tasks SET task_id='different' WHERE task_id=?",
+            (job.task_id,),
+        )
+    with pytest.raises(ValueError, match="task identity changed"):
+        store.get("different")
+
+
 @pytest.mark.parametrize(
     "field,value",
     [
         ("schema_version", True),
         ("harness_revision", 2),
-        ("native_contract_version", 2),
+        ("native_contract_version", native_admission.NATIVE_CONTRACT_VERSION + 1),
+        ("native_contract_version", True),
         ("context_tokens", True),
         ("output_tokens", 0),
         ("max_iterations", 5),
@@ -132,7 +189,9 @@ def test_route_and_active_contract_invalidation(job: AcceptanceJob, monkeypatch)
     for changed in (replace(job, route_id="unknown"), replace(job, context_tokens=999999)):
         with pytest.raises(ValueError):
             validate_route(changed)
-    monkeypatch.setattr(native_admission, "NATIVE_CONTRACT_VERSION", 2)
+    monkeypatch.setattr(
+        native_admission, "NATIVE_CONTRACT_VERSION", native_admission.NATIVE_CONTRACT_VERSION + 1
+    )
     with pytest.raises(ValueError, match="stale"):
         validate_route(job)
 

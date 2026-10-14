@@ -57,6 +57,7 @@ def test_cli_help_lists_google_provider() -> None:
     assert "--mode {ask,review,implement,plan,diagnose,chat,coding-chat}" in result.stdout
     assert "--coding-chat-history-budget-chars" in result.stdout
     assert "--scrutinize-response" in result.stdout
+    assert "--experimental-measured-prefix" in result.stdout
     assert "--approval-policy" in result.stdout
     assert "--codex-search" in result.stdout
     assert "--codex-mcp-tools" in result.stdout

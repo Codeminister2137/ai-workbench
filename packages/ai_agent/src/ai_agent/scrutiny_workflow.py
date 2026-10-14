@@ -42,6 +42,28 @@ from ai_agent.repair_workflow import format_validation_failures_for_prompt
 from ai_agent.run_tracking import OrchestratedRunTracker, remaining_orchestrated_budget_seconds
 
 
+def _print_research_admission_diagnostics(details: dict[str, Any]) -> None:
+    """Expose bounded admission facts without printing tokenizer errors or paths."""
+    review = details.get("research_review")
+    if not isinstance(review, dict):
+        return
+    method = review.get("input_bound_method")
+    if method in ("utf8_bytes_plus_framing", "verified_local_tokenizer"):
+        print(f"scrutiny_input_bound_method: {method}")
+    for key in ("input_token_upper_bound", "context_tokens"):
+        value = review.get(key)
+        if type(value) is int and value >= 0:
+            print(f"scrutiny_{key}: {value}")
+    fallback = review.get("tokenizer_fallback_reason")
+    if fallback is not None:
+        category = (
+            "dependency_unavailable"
+            if fallback == "Optional tokenizers dependency is unavailable"
+            else "profile_unverified"
+        )
+        print(f"scrutiny_tokenizer_fallback: {category}")
+
+
 def run_orchestrated_scrutiny(
     *,
     args: argparse.Namespace,
@@ -245,6 +267,7 @@ def run_orchestrated_scrutiny(
         except (ProviderError, ValueError) as exc:
             details["failure_reason"] = str(exc)
             print(f"scrutiny_failure_reason: {exc}")
+            _print_research_admission_diagnostics(details)
         else:
             stage_status = "completed"
             tracker.scrutiny_status = report.verdict

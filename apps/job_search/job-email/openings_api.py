@@ -168,7 +168,7 @@ class OpeningsAPI:
                 raise OpeningsAPIError(
                     f"Openings HTTP status {response.status}; no retry performed"
                 )
-            content_type = response.getheader("Content-Type", "").split(";", 1)[0].strip()
+            content_type = response.getheader("Content-Type", "").split(";", 1)[0].strip().lower()
             if content_type != "application/json":
                 raise OpeningsAPIError("Openings response must be JSON")
             data = bytearray()

@@ -1,5 +1,9 @@
 # Repo assistant: getting started
 
+Start with [installation and external runtimes](../installation.md): the Python
+workspace uses `.venv`, while Ollama and official agent clients require separate,
+explicit provisioning for the selected execution routes on each machine.
+
 [CLI guide](../repo-coding-assistant.md) Â· [Privacy and permissions](permissions.md)
 
 ## Moving Work From PyCharm Chat To The CLI

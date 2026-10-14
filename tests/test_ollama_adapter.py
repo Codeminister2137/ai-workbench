@@ -95,6 +95,79 @@ def test_ollama_applies_explicit_research_runtime_options():
     assert payload["think"] == "low"
 
 
+def test_ollama_replays_thinking_without_exposing_it_as_answer():
+    client = OllamaChatClient(BackendConfig(provider=ProviderKind.OLLAMA, model="test"))
+    response = client._response_from_raw(
+        {"message": {"content": "answer", "thinking": "private-state"}},
+        model="test",
+        latency_ms=0,
+    )
+    assert response.message.content == "answer"
+    assert "private-state" not in repr(response.message)
+    payload = client._chat_payload(AIRequest(messages=(response.message,)), stream=False)
+    assert payload["messages"][0]["thinking"] == "private-state"
+
+
+@pytest.mark.parametrize("target", ["provider", "model", "endpoint", "role"])
+def test_continuation_does_not_cross_target_or_role(target):
+    from dataclasses import replace
+
+    from ai_provider import ProviderContinuation
+    from ai_provider.adapters.openai_compatible import _message_to_payload
+
+    client = OllamaChatClient(BackendConfig(provider=ProviderKind.OLLAMA, model="test"))
+    state = ProviderContinuation("ollama", "test", client.base_url, {"thinking": "private-state"})
+    message = AIMessage(MessageRole.ASSISTANT, "answer", continuation=state)
+    # External adapters never serialize the Ollama continuation, even on the same message.
+    assert "private-state" not in json.dumps(_message_to_payload(message))
+    if target == "provider":
+        message = replace(message, continuation=replace(state, provider="other"))
+    elif target == "model":
+        message = replace(message, continuation=replace(state, model="other"))
+    elif target == "endpoint":
+        message = replace(message, continuation=replace(state, base_url="http://other:11434"))
+    else:
+        message = replace(message, role=MessageRole.USER)
+    payload = client._chat_payload(AIRequest(messages=(message,)), stream=False)
+    assert "thinking" not in payload["messages"][0]
+
+
+def test_stream_accumulates_thinking_before_usage_only_final_chunk(monkeypatch):
+    client = OllamaChatClient(BackendConfig(provider=ProviderKind.OLLAMA, model="test"))
+    monkeypatch.setattr(
+        OllamaChatClient,
+        "_stream_chat",
+        lambda self, payload: iter(
+            [
+                {"message": {"thinking": "private-", "content": ""}},
+                {"message": {"thinking": "state", "content": "answer"}},
+                {"done": True, "eval_count": 5},
+            ]
+        ),
+    )
+    events = list(client.stream(AIRequest(messages=(AIMessage(MessageRole.USER, "task"),))))
+    assert [event.content for event in events if isinstance(event, AIStreamDelta)] == ["answer"]
+    final = events[-1]
+    assert isinstance(final, AIStreamFinal)
+    assert final.response.message.continuation is not None
+    assert final.response.message.continuation.payload == {"thinking": "private-state"}
+    followup = client._chat_payload(AIRequest(messages=(final.response.message,)), stream=False)
+    assert followup["messages"][0]["thinking"] == "private-state"
+
+
+@pytest.mark.parametrize("stream", [False, True])
+def test_invalid_thinking_refuses_response_without_printing_it(monkeypatch, stream):
+    client = OllamaChatClient(BackendConfig(provider=ProviderKind.OLLAMA, model="test"))
+    raw = {"message": {"thinking": ["private-state"], "content": "answer"}, "done": True}
+    with pytest.raises(ProviderError, match="thinking must be a string") as caught:
+        if stream:
+            monkeypatch.setattr(OllamaChatClient, "_stream_chat", lambda self, payload: iter([raw]))
+            list(client.stream(AIRequest(messages=())))
+        else:
+            client._response_from_raw(raw, model="test", latency_ms=0)
+    assert "private-state" not in str(caught.value)
+
+
 def test_ollama_adapter_posts_neutral_request_and_normalizes_response(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

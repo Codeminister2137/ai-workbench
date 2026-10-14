@@ -298,7 +298,7 @@ Detailed checkpoint and remaining behavior choice:
 
 ## ADR-042 — Overload fallback and configurable continuation quality
 
-**Status:** Accepted
+**Status:** Accepted; default and weaker-model authority partially superseded by ADR-052
 **Date:** 2026-10-04
 
 The owner requires overload and usage fallback while preserving work quality.
@@ -308,6 +308,43 @@ its billing bucket; same-tier/privacy/tool limits remain. No suitable route prod
 a local handoff without invoking a weaker model. ADR-032 is partially superseded.
 
 Detailed ADR: [ADR-042](decisions/ADR-042-overload-fallback-and-configurable-continuation-quality.md)
+
+## ADR-052 - Configurable emergency preservation and quality-preferred fallback
+
+**Status:** Accepted; offline validation, live acceptance pending
+**Date:** 2026-10-11
+
+The owner approved both policies so the Orchestrator selects replacements without
+manual model selection. Default `emergency_preserve` keeps implementation quality,
+saves a deterministic handoff, then permits weaker read-only reporting. Explicit
+`prefer_quality` tries stronger routes first and permits weaker implementation.
+Privacy, billing tier, scoped approvals and deadlines remain enforced; downgrades
+are reported. Legacy policies remain selectable.
+
+Detailed ADR: [ADR-052](decisions/ADR-052-emergency-preservation-and-quality-preferred-fallback.md)
+
+## ADR-053 - Fixed away-session allowance
+
+**Status:** Accepted; implemented and tested offline, live pilot deferred
+**Date:** 2026-10-11
+
+The owner selected a fixed `--away-minutes` session allowance and wants separate
+turn limits named explicitly for turns (`--turn-timeout-seconds`). Each launch
+explicitly supplying the away option grants fresh time, including saved-session
+resume; turns within that launch cannot reset it. No deadline persistence or
+restart-reason exceptions are added.
+See [ADR-053](decisions/ADR-053-fixed-away-session-allowance.md).
+
+## ADR-054 - External sign-in for coding-chat
+
+**Status:** Accepted; implemented offline, live acceptance pending
+**Date:** 2026-10-11
+
+The owner selected sign-in outside continuous coding-chat to avoid competing
+terminal readers. Missing primary readiness refuses execution, including with
+fallback disabled; unauthenticated optional routes are excluded. Standalone
+requests retain existing interactive preflight. See
+[ADR-054](decisions/ADR-054-external-sign-in-for-coding-chat.md).
 
 ## Research Review Execution Preference
 **Status:** Accepted conditional authorization; current execution unchanged
@@ -451,6 +488,10 @@ comparable development quality and measured delegation economics, not merely
 passing tool fixtures. The owner also accepted deterministic local history
 reduction: preserve owner messages/host outcomes, shorten older assistant reports
 visibly, retain originals and refuse mandatory-context overflow.
+Owner clarification (2026-10-12): tools remain enabled for development and review;
+disable only for specific explicitly selected narrow cases. A general report-only
+phase is not the remedy for repeated reads or weak tests. Existing scope and
+approvals remain applicable.
 See [ADR-049](decisions/ADR-049-continuous-coding-chat.md).
 
 ## ADR-050 - Usage Measurement and Automatic Integration
@@ -487,3 +528,40 @@ keeping preparation code independent of Openings internals at the cost of patch
 maintenance. Intake explicitly uses `new`; tracking never grants delivery consent.
 No deployment or candidate-profile transmission is approved by this choice.
 See [ADR-051](decisions/ADR-051-openings-api-integration.md).
+
+## ADR-056 - Measured-prefix native admission prototype
+
+**Status:** Accepted prototype and explicit experimental CLI opt-in; broader validation incomplete.
+The owner approved investigating provider-reported prefix counts with strict
+identity checks, conservative appended estimates and absolute-gate fallback.
+The owner subsequently approved `--experimental-measured-prefix` for native
+Ollama coding. Production default, complete instructions/history and acceptance
+gates remain unchanged; the choice does not establish coding-quality readiness.
+See [ADR-056](decisions/ADR-056-measured-prefix-admission-prototype.md).
+
+## ADR-055 - Explicit provider continuation metadata
+
+**Status:** Accepted and implemented (2026-10-11); coding-workflow acceptance incomplete.
+
+Carry transient adapter-owned state on AIMessage, tagged by provider/model/endpoint.
+Replay only to that target; keep it out of answers, normal representations and
+durable conversations. Include its size in input admission. The owner chose this
+over hidden adapter caches and prioritized official-documentation conformance.
+See [ADR-055](decisions/ADR-055-explicit-provider-continuation-metadata.md) and
+the [high-priority repo-wide plan](documentation-conformance-plan.md).
+
+## ADR-057 - Free Gemini CLI And OpenRouter Access Direction
+
+**Status:** Accepted direction (2026-10-13); OpenRouter free-first prioritized and implemented offline (2026-10-14); Gemini individual-access pilot blocked
+by verified service retirement (2026-10-14). Offline integration is preserved;
+Owner subsequently selected the already requested OpenRouter free-only integration;
+no paid billing route or transfer of the unused Gemini inference grant is approved.
+
+Owner approved Gemini CLI and requested OpenRouter connection, preferring another
+free source before an explicitly deferred $10 deposit. Keep product/auth/billing
+provenance separate. Personal Requesty deposit avoidance does not remove paid
+product support. Cerebras and Zed/Delta promotions are deferred. No defaults,
+quality promotion, purchase or paid fallback approved. Owner selected project-scoped
+environment changes; Python `.venv` and external runtimes remain separate. OpenCode
+Console is deferred. See installation guidance for the project-local setup direction.
+See [ADR-057](decisions/ADR-057-free-gemini-cli-and-openrouter-direction.md).

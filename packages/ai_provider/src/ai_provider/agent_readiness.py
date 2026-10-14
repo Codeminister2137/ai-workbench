@@ -46,6 +46,15 @@ def check_agent_readiness(method: AccessMethod, *, timeout: float = 15) -> Agent
     command = external_agent_command(method)
     if command is None:
         return AgentReadiness(False, "official client is not installed/configured")
+    if method is AccessMethod.GEMINI_CLI:
+        from ai_provider.gemini_cli import auth_configuration, command_prefix
+
+        try:
+            command_prefix(command)
+        except (OSError, ValueError):
+            return AgentReadiness(False, "pinned Gemini CLI/Node command is unavailable")
+        ready, reason = auth_configuration()
+        return AgentReadiness(ready, reason)
     if method is AccessMethod.COPILOT_CLI:
         login = (command, "login")
         if any(

@@ -153,6 +153,12 @@ complete input digests are recorded, and the output remains `PROTOTYPE_ONLY` wit
 runtime compatibility unverified by the script itself. Separate recorded runtime
 comparisons supply the evidence; a diagnostic count alone cannot admit production input.
 
+When a research review fails, terminal diagnostics expose the validated input
+bound method, input bound and context size when available. A tokenizer fallback
+is classified as `dependency_unavailable` or `profile_unverified`; arbitrary
+tokenizer error text and file paths are not printed by these diagnostics.
+These facts explain a refusal without changing admission or review acceptance.
+
 Production exact counting additionally requires Ollama 0.32.5, tokenizers 0.23.2,
 the inspected GGUF blob and template digest, the pinned tokenizer digest, two plain
 system/user messages and explicit Qwen on/off. Unknown versions/assets/templates,

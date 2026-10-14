@@ -458,6 +458,31 @@ debugging state, or decisions that would be costly or risky to reconstruct.
 Recommend a new chat when the next slice is independent and the handoff can
 preserve the needed context without reducing quality.
 
+### Bounded model-quality pilots
+
+For CLI readiness, use paid inference only for a named real-model acceptance
+question. Prepare fixtures, verify settings/guards/logging and run deterministic
+checks locally first. All other testing remains local-only unless separately
+authorized. Prefer the smallest realistic task with independent pass/fail checks;
+useful production work is welcome but not required for an initial pilot.
+
+Reduce scope and repetition to save usage, never required instructions/history,
+ordinary coding/review tool access or acceptance protections. Match exposed model,
+reasoning and required capabilities where possible; record unmatched settings.
+Specify a fresh input/path/time/turn allowance and stop on the first failed phase.
+Preserve failures and investigate locally before another trial; never silently
+retry, extend expired grants or switch billing sources. Judge actual effects,
+independent host checks and substantive review, distinguishing model authorship
+from host recovery. Preserve readable evidence, reported usage and cleanup; missing
+observations remain unknown. Do not enable private reasoning/raw-prompt logging
+by default. A small success supports the next stage, not general quality parity.
+
+Avoid duplicating tasks across paid models or direct-chat/CLI arms by default.
+Use a paired comparison only when its additional relative-quality evidence is
+necessary and the owner explicitly authorizes that usage. A one-time exception
+does not authorize later paired paid trials. Reference solutions
+and local fixture oracles are not direct-chat baselines.
+
 ### Required context reading
 
 Use tiered context reading. Documentation matters, but repeated broad rereads are

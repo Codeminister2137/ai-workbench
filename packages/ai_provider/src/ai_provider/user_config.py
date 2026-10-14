@@ -40,7 +40,7 @@ class UserConfig:
 
     cost_policy: CostPolicyTier = CostPolicyTier.PREPAID_CREDITS_ALLOWED
     fallback_enabled: bool = True
-    fallback_quality_policy: FallbackQualityPolicy = FallbackQualityPolicy.PRESERVE_QUALITY
+    fallback_quality_policy: FallbackQualityPolicy = FallbackQualityPolicy.EMERGENCY_PRESERVE
     quality: QualityThreshold = QualityThreshold.STANDARD
     privacy: PrivacyClass = PrivacyClass.LOCAL_ONLY
     approval_policy: ApprovalPolicyPreset = ApprovalPolicyPreset.INTERACTIVE
@@ -123,6 +123,6 @@ def load_user_config(path: Path, *, required: bool = False) -> UserConfig:
         ),
         fallback_enabled=enabled,
         fallback_quality_policy=FallbackQualityPolicy(
-            fallback.get("quality_policy", FallbackQualityPolicy.PRESERVE_QUALITY.value)
+            fallback.get("quality_policy", base.fallback_quality_policy.value)
         ),
     )

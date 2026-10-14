@@ -4,10 +4,93 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from .support import (
     _EXAMPLE,
     main,
 )
+
+
+@pytest.mark.parametrize("late_phase", ["context", "response"])
+def test_chat_deadline_refuses_post_context_request_and_late_response(
+    tmp_path, monkeypatch, capsys, late_phase
+):
+    from ai_provider import (
+        AIMessage,
+        AIResponse,
+        BackendInfo,
+        BackendLocation,
+        MessageRole,
+        SQLiteChatTranscriptStore,
+    )
+
+    now = 0.0
+    requests = []
+    configs = []
+    monkeypatch.setattr(_EXAMPLE.time, "perf_counter", lambda: now)
+    assemble = _EXAMPLE._assemble_chat_context
+
+    def context(**kwargs):
+        nonlocal now
+        result = assemble(**kwargs)
+        if late_phase == "context":
+            now = 11.0
+        return result
+
+    class Client:
+        backend = BackendInfo("ollama", "qwen2.5-coder:14b", BackendLocation.LOCAL)
+
+        def complete(self, request):
+            nonlocal now
+            requests.append(request)
+            now = 11.0
+            return AIResponse(AIMessage(MessageRole.ASSISTANT, "late answer"), self.backend)
+
+        def stream(self, request):
+            raise NotImplementedError
+
+    def factory(config):
+        configs.append(config)
+        return Client()
+
+    monkeypatch.setattr(_EXAMPLE, "_assemble_chat_context", context)
+    monkeypatch.setattr(_EXAMPLE, "create_chat_client", factory)
+    database = tmp_path / "chat.sqlite3"
+    assert (
+        main(
+            [
+                "Inspect",
+                "--mode",
+                "chat",
+                "--execute",
+                "--repo-root",
+                str(tmp_path),
+                "--provider",
+                "ollama",
+                "--model",
+                "qwen2.5-coder:14b",
+                "--privacy",
+                "local_only",
+                "--skip-prompt-review",
+                "--turn-timeout-seconds",
+                "10",
+                "--chat-db",
+                str(database),
+            ]
+        )
+        == 1
+    )
+    output = capsys.readouterr().out
+    assert "execution_status=failed" in output and "expired" in output
+    assert len(requests) == (0 if late_phase == "context" else 1)
+    assert all(0 < config.timeout_seconds <= 10 for config in configs)
+    store = SQLiteChatTranscriptStore(database)
+    saved = store.latest_session(repo_root=tmp_path.resolve())
+    assert saved is not None
+    messages = store.list_messages(saved.session_id)
+    assert messages[-1].role == "user"
+    assert not any(message.role == "assistant" for message in messages)
 
 
 def test_chat_mode_persists_and_resumes_local_transcript(
@@ -85,7 +168,7 @@ def test_chat_mode_persists_and_resumes_local_transcript(
     assert f"chat_session_id: {session.session_id}" in second_output
     for output, response in ((first_output, "answer 1"), (second_output, "answer 2")):
         assert output.count("## **SUMMARY**") == 1
-        assert "- Validated: Not run by the CLI" in output
+        assert "- Validated: No separate deterministic validation stage recorded." in output
         assert f"### Agent report\n{response}" in output
     assert len(requests) == 2
     assert [message.role for message in requests[1].messages] == [

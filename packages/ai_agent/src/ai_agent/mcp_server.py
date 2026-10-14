@@ -5,7 +5,9 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from collections.abc import Iterable, Sequence
+import time
+from collections.abc import Callable, Iterable, Iterator, Sequence
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -23,7 +25,19 @@ from ai_orchestrator import (
 from ai_orchestrator import (
     PrivacyClass as OrchestratorPrivacyClass,
 )
-from ai_provider import BackendConfig, PrivacyClass, ProviderKind, create_chat_client
+from ai_provider import (
+    AIRequest,
+    AIResponse,
+    AIStreamEvent,
+    BackendConfig,
+    BackendInfo,
+    ChatClient,
+    PrivacyClass,
+    ProviderError,
+    ProviderErrorCategory,
+    ProviderKind,
+    create_chat_client,
+)
 
 from ai_agent.contracts import ToolCall, ToolCategory, ToolDefinition, ToolResult
 from ai_agent.loop import AgentLoop
@@ -92,29 +106,45 @@ def _local_read_only_delegated_task_runner(
     catalog_path: Path,
     timeout_seconds: float,
     max_iterations: int,
+    parent_profile: TaskProfile | None = None,
+    is_active: Callable[[], bool] | None = None,
+    deadline: float | None = None,
 ):
+    def active() -> bool:
+        return (is_active is None or is_active()) and (
+            deadline is None or time.perf_counter() < deadline
+        )
+
     def run(task: str, context: ToolContext) -> ToolResult:
-        parent_profile = TaskProfile(
+        if not active():
+            return ToolResult(
+                name="delegate_task", output="Error: delegation scope expired.", is_error=True
+            )
+        parent = parent_profile or TaskProfile(
             task_type=TaskType.CODING,
             privacy_class=OrchestratorPrivacyClass.LOCAL_ONLY,
             cost_policy_tier=CostPolicyTier.LOCAL_ONLY,
         )
         profile = derive_subtask_profile(
-            parent=parent_profile,
+            parent=parent,
             task_type=TaskType.CODING,
             required_capabilities=frozenset({TaskCapability.CHAT, TaskCapability.TOOLS}),
             quality_threshold=QualityThreshold.STANDARD,
             latency_target=LatencyTarget.BACKGROUND,
             cost_policy_tier=CostPolicyTier.LOCAL_ONLY,
-            privacy_class=OrchestratorPrivacyClass.LOCAL_ONLY,
         )
         catalog = load_model_catalog(catalog_path)
+        remaining = deadline - time.perf_counter() if deadline is not None else timeout_seconds
+        if not active() or remaining <= 0:
+            return ToolResult(
+                name="delegate_task", output="Error: delegation scope expired.", is_error=True
+            )
         orchestration = prepare_execution(
             task,
             profile,
             catalog,
             review_prompt=False,
-            timeout_seconds=timeout_seconds,
+            timeout_seconds=min(timeout_seconds, remaining),
         )
         if not orchestration.is_ready or orchestration.execution_plan is None:
             reason = orchestration.failure_reason or orchestration.status.value
@@ -141,16 +171,29 @@ def _local_read_only_delegated_task_runner(
             base_url=target.base_url,
             timeout_seconds=target.timeout_seconds,
         )
+        registry = read_search_tool_registry()
+        if is_active is not None or deadline is not None:
+            registry = scoped_registry(
+                registry,
+                PermissionManager(PermissionPolicy.read_only()),
+                context.workspace_root,
+                "bounded-child",
+                "current-invocation",
+                active,
+            )
+        client = create_chat_client(config)
+        if is_active is not None or deadline is not None:
+            client = _ScopedDelegationClient(client, config, active, deadline)
         agent = AgentLoop(
-            create_chat_client(config),
-            read_search_tool_registry(),
+            client,
+            registry,
             context,
             max_iterations=max_iterations,
         )
         result = agent.run(
             _delegated_task_prompt(task),
             model=config.model,
-            privacy_class=PrivacyClass.LOCAL_ONLY,
+            privacy_class=PrivacyClass(profile.privacy_class.value),
         )
         failed_count = sum(1 for item in result.tool_results if item.is_error)
         output = "\n".join(
@@ -180,6 +223,43 @@ def _local_read_only_delegated_task_runner(
         )
 
     return run
+
+
+class _ScopedDelegationClient:
+    """Check the invocation and remaining budget before and after each child call."""
+
+    def __init__(
+        self,
+        client: ChatClient,
+        config: BackendConfig,
+        active: Callable[[], bool],
+        deadline: float | None,
+    ):
+        self.client, self.config = client, config
+        self.active, self.deadline = active, deadline
+
+    @property
+    def backend(self) -> BackendInfo:
+        return self.client.backend
+
+    def _check(self) -> float | None:
+        remaining = self.deadline - time.perf_counter() if self.deadline is not None else None
+        if not self.active() or (remaining is not None and remaining <= 0):
+            raise ProviderError("Delegation scope expired.", category=ProviderErrorCategory.TIMEOUT)
+        return remaining
+
+    def complete(self, request: AIRequest) -> AIResponse:
+        remaining = self._check()
+        if remaining is not None:
+            self.client = create_chat_client(
+                replace(self.config, timeout_seconds=min(self.config.timeout_seconds, remaining))
+            )
+        response = self.client.complete(request)
+        self._check()
+        return response
+
+    def stream(self, request: AIRequest) -> Iterator[AIStreamEvent]:
+        raise NotImplementedError("Bounded read-only delegation uses completion requests only")
 
 
 def _delegated_task_prompt(task: str) -> str:

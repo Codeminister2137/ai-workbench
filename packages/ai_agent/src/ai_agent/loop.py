@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+import time
 from dataclasses import dataclass
 from typing import Any
 
@@ -43,14 +45,28 @@ class AgentLoop:
         *,
         permissions: PermissionManager | None = None,
         max_iterations: int = 10,
+        deadline: float | None = None,
     ) -> None:
         if max_iterations < 1:
             raise ValueError("max_iterations must be at least 1")
+        if deadline is not None and not math.isfinite(deadline):
+            raise ValueError("deadline must be finite")
         self.client = client
         self.registry = registry
         self.context = context
         self.permissions = permissions or PermissionManager()
         self.max_iterations = max_iterations
+        self.deadline = deadline
+
+    def _check_deadline(self, messages: list[AIMessage]) -> None:
+        if self.deadline is not None and time.perf_counter() >= self.deadline:
+            error = ProviderError(
+                "Agent deadline expired; earlier effects remain and must be inspected.",
+                category=ProviderErrorCategory.TIMEOUT,
+                provider=self.client.backend.provider,
+            )
+            error.partial_messages = tuple(messages)
+            raise error
 
     def run(
         self,
@@ -68,6 +84,7 @@ class AgentLoop:
         tool_results: list[ToolResult] = []
 
         for iteration in range(1, self.max_iterations + 1):
+            self._check_deadline(messages)
             try:
                 response = self.client.complete(
                     AIRequest(
@@ -83,6 +100,7 @@ class AgentLoop:
                 exc.partial_messages = tuple(messages)
                 raise
             messages.append(response.message)
+            self._check_deadline(messages)
             tool_calls = response.tool_calls or response.message.tool_calls
             if not tool_calls:
                 return AgentResult(
@@ -90,16 +108,54 @@ class AgentLoop:
                 )
 
             for call in tool_calls:
+                self._check_deadline(messages)
                 agent_call = ToolCall(name=call.name, arguments=call.arguments, call_id=call.id)
                 tool = self.registry.get(call.name)
-                if tool is None or not self.permissions.check_and_authorize(tool, agent_call):
+                if tool is None:
+                    registered_names = sorted(t.name for t in self.registry.list_definitions())
+                    names_str = ", ".join(repr(name) for name in registered_names)
+                    registry_detail = (
+                        f"Registered tool names: {names_str}."
+                        if registered_names
+                        else "No tools are registered in this run."
+                    )
                     result = ToolResult(
                         name=call.name,
-                        output=f"Error: tool call {call.name!r} was not authorized or is unknown.",
+                        output=(
+                            f"Error: unknown tool {call.name!r}. {registry_detail} "
+                            "No operation was attempted."
+                        ),
+                        call_id=call.id,
+                        is_error=True,
+                    )
+                elif not self.permissions.check_and_authorize(tool, agent_call):
+                    try:
+                        tool.validate_arguments(agent_call.arguments)
+                    except (ValueError, OverflowError):
+                        # Schema metadata is safe feedback; argument values and exception
+                        # text may contain private data and must not be echoed here.
+                        schema = ", ".join(
+                            f"{parameter.name}: {parameter.type_name}"
+                            + (" (required)" if parameter.required else "")
+                            for parameter in tool.definition.parameters
+                        )
+                        refusal = (
+                            f"Error: invalid arguments for tool {call.name!r}. "
+                            f"Expected schema: {schema}. No operation attempted."
+                        )
+                    else:
+                        refusal = (
+                            f"Error: tool call {call.name!r} was not authorized. "
+                            "No operation attempted."
+                        )
+                    result = ToolResult(
+                        name=call.name,
+                        output=refusal,
                         call_id=call.id,
                         is_error=True,
                     )
                 else:
+                    self._check_deadline(messages)
                     result = tool.run(agent_call, self.context)
                 tool_results.append(result)
                 messages.append(
@@ -110,6 +166,7 @@ class AgentLoop:
                         name=call.name,
                     )
                 )
+                self._check_deadline(messages)
 
         error = ProviderError(
             f"Agent loop exceeded max_iterations={self.max_iterations}; "
@@ -133,6 +190,7 @@ def _tool_definition(definition: Any) -> AIToolDefinition:
                 required=parameter.required,
                 default=parameter.default,
                 enum_values=parameter.enum_values,
+                item_type_name=getattr(parameter, "item_type_name", None),
             )
             for parameter in definition.parameters
         ),

@@ -143,7 +143,12 @@ class ProcessTool(BaseTool):
     def definition(self) -> ToolDefinition:
         parameters = (
             (
-                ToolParameter("argv", "array", "Executable and arguments; no implicit shell"),
+                ToolParameter(
+                    "argv",
+                    "array",
+                    "Executable and arguments; no implicit shell",
+                    item_type_name="string",
+                ),
                 ToolParameter("cwd", "string", "Workspace-relative working directory", False, "."),
             )
             if self.operation == "start"

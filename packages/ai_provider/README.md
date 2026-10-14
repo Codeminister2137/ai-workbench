@@ -17,6 +17,8 @@ answers, or implement job-search logic.
 - OpenAI-compatible Chat Completions adapter for OpenAI, Requesty, and Google
   Gemini-compatible routes.
 - Provider factory for configured chat clients.
+- Experimental, opt-in OpenRouter free-only API client with per-call exact-price,
+  tool-support and daily-quota checks; no deposit or paid fallback.
 - Local Ollama inventory, pull, runtime, and capability helpers.
 - Repo-aware coding assistant CLI support.
 - Native Codex, Copilot, Antigravity and Kiro executors for approved routes.
@@ -28,6 +30,12 @@ orchestrator policy and agent tools at an application boundary; they do not make
 provider contracts responsible for routing or report quality.
 
 See the [interface specification](docs/interface.md) for the capability matrix.
+
+See [provider source state](docs/source-state.md) for dated source limits,
+integration readiness and evaluation gaps, including Groq's token quotas. These
+findings are shared with orchestration by reference; they are not live quota or
+executable routing policy. [Installation guidance](../../docs/installation.md)
+separates the Python workspace from optional external runtimes and clients.
 
 ## Minimal Usage
 

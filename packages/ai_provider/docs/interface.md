@@ -25,6 +25,23 @@ Those responsibilities belong above this package, primarily in `ai_orchestrator`
 
 ## Core Types
 
+Requesty's `require_free_model` checks the exact effective model before every
+completion or stream. Input/output prices and every advertised cache-read or
+cache-write price must be zero, including threshold pricing tiers. Nonzero or
+invalid advertised prices refuse inference; missing optional cache prices do not
+invent a charge or grant. This is a price check, not proof of remaining allowance,
+privacy entitlement or model quality. Cache fields follow the official
+[Requesty model catalog](https://docs.requesty.ai/api-reference/endpoint/models-list).
+Malformed catalog JSON or UTF-8 also refuses before inference with a configuration
+error; response contents are not included in the user-facing error message.
+
+Function tools use `AIToolDefinition`/`AIToolParameter`. Array parameters may set
+optional `item_type_name` (for example, `"string"` for process argument lists),
+which emits the standard JSON Schema `items` property. Omitting it preserves the
+previous unconstrained-array schema. The agent's corresponding tool contract
+carries this metadata through its provider translation; tool handlers still own
+argument validation and effects.
+
 ### `AIMessage`
 
 One chat message with:
@@ -66,6 +83,11 @@ One normalized provider response:
 
 Streaming adapters must enforce the same privacy policy as non-streaming
 completion before sending the request.
+
+Hosted single-line SSE data events accept the optional space after `data:`,
+including the `[DONE]` terminator. This follows the
+[SSE field syntax](https://html.spec.whatwg.org/multipage/server-sent-events.html#parsing-an-event-stream);
+this bounded check does not establish complete EventSource parsing conformance.
 
 Final streaming responses preserve tool calls in both `message.tool_calls` and
 `tool_calls`. Hosted calls are assembled by stream index, including interleaved

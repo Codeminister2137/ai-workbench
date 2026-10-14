@@ -299,6 +299,106 @@ def arguments(tmp_path: Path, *options: str) -> argparse.Namespace:
     )
 
 
+@pytest.mark.parametrize("first_returncode", [0, 1])
+def test_saved_chat_retains_host_fallback_routes_across_turns_and_restart(
+    tmp_path, monkeypatch, first_returncode
+):
+    from types import SimpleNamespace
+
+    from ai_agent.repo_coding_assistant import _print_cli_closeout
+
+    prompts = iter(["First task", "Continue", "/exit"])
+    monkeypatch.setattr("builtins.input", lambda prompt: next(prompts))
+    database = tmp_path / "chat.sqlite3"
+    histories = []
+    sessions = []
+    attempts = [
+        {"route_id": "primary", "status": "usage_limit"},
+        {"route_id": "alternate", "status": "finished" if first_returncode == 0 else "failed"},
+    ]
+
+    def execute(args, config):
+        histories.append(args._coding_chat_history)
+        active_session = ACTIVE_SESSION.get()
+        assert active_session is not None
+        sessions.append(active_session.session_id)
+        first = len(histories) == 1
+        args.fallback_session = SimpleNamespace(
+            current=SimpleNamespace(route_id="alternate" if first else "primary"),
+            attempts=attempts if first else [{"route_id": "primary", "status": "finished"}],
+            handoff="PRIVATE_HANDOFF_NOT_FOR_TRANSCRIPT",
+        )
+        _print_cli_closeout(
+            args=args,
+            response_text="Report without route names",
+            status="ready",
+            execution_status="failed" if first and first_returncode else "completed",
+            failure_reason="exhausted" if first and first_returncode else None,
+        )
+        return first_returncode if first else 0
+
+    run_coding_chat(
+        arguments(tmp_path, "--coding-session-db", str(database)), build_argument_parser(), execute
+    )
+    restarted = CodingChatController(
+        SQLiteChatTranscriptStore(database), sessions[0], tmp_path, "local_only"
+    )
+    messages = restarted.store.list_messages(sessions[0])
+    first, second = messages[1], messages[3]
+    assert first.metadata is not None and second.metadata is not None
+    assert first.metadata["effective_route_id"] == "alternate"
+    assert first.metadata["fallback_attempts"] == attempts
+    assert first.metadata["returncode"] == first_returncode
+    assert second.metadata["effective_route_id"] == "primary"
+    assert second.metadata["fallback_attempts"] == [{"route_id": "primary", "status": "finished"}]
+    assert '"effective_route_id": "alternate"' in histories[1]
+    assert '"status": "usage_limit"' in restarted.history()
+    assert "PRIVATE_HANDOFF" not in restarted.history()
+    attempts[0]["route_id"] = "mutated-after-execution"
+    saved_metadata = restarted.store.list_messages(sessions[0])[1].metadata
+    assert saved_metadata is not None
+    saved_attempts = saved_metadata["fallback_attempts"]
+    assert isinstance(saved_attempts, list) and isinstance(saved_attempts[0], dict)
+    assert saved_attempts[0]["route_id"] == "primary"
+
+
+def test_expired_turn_retains_observed_route_without_recording_late_success(tmp_path, monkeypatch):
+    now = 0.0
+    monkeypatch.setattr("ai_agent.coding_chat_cli.time.perf_counter", lambda: now)
+    monkeypatch.setattr("builtins.input", lambda prompt: "/exit")
+
+    def execute(args, config):
+        nonlocal now
+        args._coding_chat_observer(
+            CodingTurnResult(
+                0,
+                "late success",
+                "completed",
+                effective_route_id="alternate",
+                fallback_attempts=(("primary", "usage_limit"), ("alternate", "finished")),
+            )
+        )
+        now = 11.0
+        return 0
+
+    assert (
+        run_coding_chat(
+            arguments(tmp_path, "Inspect", "--turn-timeout-seconds", "10"),
+            build_argument_parser(),
+            execute,
+        )
+        == 1
+    )
+    store = SQLiteChatTranscriptStore(tmp_path / "data/repo-assistant-chats.sqlite3")
+    session = store.latest_session(repo_root=tmp_path)
+    assert session is not None
+    message = store.list_messages(session.session_id)[-1]
+    assert message.metadata is not None
+    assert message.metadata["effective_route_id"] == "alternate"
+    assert message.metadata["execution_status"] == "failed" and message.metadata["returncode"] == 1
+    assert "expired" in message.content and "late success" not in message.content
+
+
 def test_cli_keeps_one_foreground_owner_fresh_turn_args_and_unique_logs(tmp_path, monkeypatch):
     prompts = iter(["First decision", "Implement with that decision", "/exit"])
     monkeypatch.setattr("builtins.input", lambda prompt: next(prompts))
@@ -345,6 +445,245 @@ def test_invalid_chat_configuration_refuses_before_storage_or_execution(tmp_path
             lambda args, config: pytest.fail("invalid configuration must not execute"),
         )
     assert not (tmp_path / "data").exists()
+
+
+@pytest.mark.parametrize("turn_limit", [None, 10, 100])
+def test_away_allowance_is_fixed_across_turns_and_caps_turn_limits(
+    tmp_path, monkeypatch, turn_limit
+):
+    now = 0.0
+    inputs = iter(["Inspect", "Continue", "/exit"])
+    monkeypatch.setattr("ai_agent.coding_chat_cli.time.perf_counter", lambda: now)
+    monkeypatch.setattr("builtins.input", lambda prompt: next(inputs))
+    seen = []
+
+    def execute(args, config):
+        nonlocal now
+        seen.append((args._execution_deadline, args.away_minutes))
+        now += 4
+        args._coding_chat_observer(CodingTurnResult(0, "done", "completed"))
+        return 0
+
+    options = ["--away-minutes", "1"]
+    if turn_limit is not None:
+        options += ["--turn-timeout-seconds", str(turn_limit)]
+    assert run_coding_chat(arguments(tmp_path, *options), build_argument_parser(), execute) == 0
+    expected = [60, 60] if turn_limit != 10 else [10, 14]
+    assert [row[0] for row in seen] == expected
+    assert [row[1] for row in seen] == pytest.approx([1, 56 / 60])
+
+
+def test_away_expiry_stops_queued_turn_and_preserves_staged_input(tmp_path, monkeypatch):
+    from ai_agent.coding_chat_input import CodingChatInput
+
+    now = 0.0
+    terminals = []
+
+    def create_terminal(*, stage):
+        terminal = CodingChatInput(lambda text: None, stage)
+        terminals.append(terminal)
+        return terminal
+
+    monkeypatch.setattr("ai_agent.coding_chat_cli.time.perf_counter", lambda: now)
+    monkeypatch.setattr("ai_agent.coding_chat_cli.CodingChatInput", create_terminal)
+    calls = []
+
+    def execute(args, config):
+        nonlocal now
+        calls.append(args.prompt)
+        terminals[0].feed("Continue after this turn")
+        now = 61
+        args._coding_chat_observer(CodingTurnResult(0, "late success", "completed"))
+        return 0
+
+    assert (
+        run_coding_chat(
+            arguments(tmp_path, "Inspect", "--away-minutes", "1"), build_argument_parser(), execute
+        )
+        == 1
+    )
+    assert calls == ["Inspect"]
+    assert terminals[0].closed
+    store = SQLiteChatTranscriptStore(tmp_path / "data/repo-assistant-chats.sqlite3")
+    session = store.latest_session(repo_root=tmp_path)
+    assert session is not None
+    messages = store.list_messages(session.session_id)
+    assert messages[1].content == "Continue after this turn"
+    assert messages[1].metadata is not None and messages[-1].metadata is not None
+    assert messages[1].metadata["execution_status"] == "queued_not_executed"
+    assert messages[-1].metadata["execution_status"] == "failed"
+    assert "expired" in messages[-1].content
+
+
+@pytest.mark.parametrize("grant_fresh", [True, False])
+def test_resuming_with_away_minutes_starts_fresh_launch_allowance(
+    tmp_path, monkeypatch, grant_fresh
+):
+    now = 0.0
+    deadlines = []
+    monkeypatch.setattr("ai_agent.coding_chat_cli.time.perf_counter", lambda: now)
+    monkeypatch.setattr("builtins.input", lambda prompt: "/exit")
+
+    def execute(args, config):
+        deadlines.append(args._execution_deadline)
+        args._coding_chat_observer(CodingTurnResult(0, "done", "completed"))
+        return 0
+
+    options = ["Inspect", "--away-minutes", "1"]
+    assert run_coding_chat(arguments(tmp_path, *options), build_argument_parser(), execute) == 0
+    store = SQLiteChatTranscriptStore(tmp_path / "data/repo-assistant-chats.sqlite3")
+    session = store.latest_session(repo_root=tmp_path)
+    assert session is not None
+    now = 100
+    resume_options = options if grant_fresh else ["Inspect"]
+    assert (
+        run_coding_chat(
+            arguments(tmp_path, *resume_options, "--coding-session", session.session_id),
+            build_argument_parser(),
+            execute,
+        )
+        == 0
+    )
+    assert deadlines == [60, 160 if grant_fresh else None]
+
+
+def test_turn_limit_without_away_does_not_limit_idle_conversation(tmp_path, monkeypatch):
+    now = 0.0
+    inputs = iter(["Inspect", "Continue", "/exit"])
+
+    def read(prompt):
+        nonlocal now
+        now += 100
+        return next(inputs)
+
+    monkeypatch.setattr("ai_agent.coding_chat_cli.time.perf_counter", lambda: now)
+    monkeypatch.setattr("builtins.input", read)
+    deadlines = []
+
+    def execute(args, config):
+        deadlines.append(args._execution_deadline)
+        assert args.away_minutes is None
+        args._coding_chat_observer(CodingTurnResult(0, "done", "completed"))
+        return 0
+
+    assert (
+        run_coding_chat(
+            arguments(tmp_path, "--turn-timeout-seconds", "10"), build_argument_parser(), execute
+        )
+        == 0
+    )
+    assert deadlines == [110, 210]
+
+
+@pytest.mark.parametrize("value", ["0", "-1", "nan", "inf"])
+def test_invalid_turn_timeout_refuses_before_creating_session(tmp_path, value):
+    with pytest.raises(SystemExit):
+        arguments(tmp_path, "--turn-timeout-seconds", value)
+    assert not (tmp_path / "data").exists()
+
+
+def test_execution_deadline_keeps_shortest_bound_without_resetting(monkeypatch):
+    from argparse import Namespace
+
+    now = 100.0
+    monkeypatch.setattr(_EXAMPLE.time, "perf_counter", lambda: now)
+    args = Namespace(
+        away_minutes=1, turn_timeout_seconds=10, timeout_seconds=180, _execution_deadline=130
+    )
+    assert _EXAMPLE._configure_execution_deadline(args) == 110
+    assert args.timeout_seconds == 10
+    now = 105
+    assert _EXAMPLE._configure_execution_deadline(args) == 110
+    assert args.timeout_seconds == 5
+
+
+@pytest.mark.parametrize("recover", [False, True])
+def test_coding_chat_external_sign_in_and_retry_without_competing_terminal_input(
+    tmp_path, monkeypatch, capsys, recover
+):
+    from types import SimpleNamespace
+
+    from ai_agent.coding_chat_input import CodingChatInput
+    from ai_orchestrator import AccessMethod
+    from ai_provider.agent_readiness import AgentReadiness
+    from ai_provider.external_agents import ExternalAgentResult
+
+    terminals = []
+    authenticated = False
+    deadlines = []
+    now = 0.0
+
+    class Terminal(CodingChatInput):
+        def read(self, prompt):
+            nonlocal authenticated, now
+            if recover and not authenticated:
+                authenticated = True  # Synthetic external sign-in; no login process.
+                now = 5.0
+                return "Continue after external sign-in"
+            return "/exit"
+
+        def in_flight(self, poll=None):
+            terminals.append(self)
+            return super().in_flight(lambda: None)
+
+    monkeypatch.setattr(sys, "stdin", SimpleNamespace(isatty=lambda: True))
+    monkeypatch.setattr(_EXAMPLE.time, "perf_counter", lambda: now)
+    monkeypatch.setattr("ai_agent.coding_chat_cli.CodingChatInput", Terminal)
+    monkeypatch.setenv("CODEX_COMMAND", "synthetic-codex")
+    monkeypatch.setattr(
+        "ai_provider.execution_fallback.check_agent_readiness",
+        lambda method: AgentReadiness(
+            authenticated and method is AccessMethod.CODEX_CLI,
+            "synthetic sign-in needed",
+            ("fake", "login"),
+        ),
+    )
+    monkeypatch.setattr("builtins.input", lambda *args: pytest.fail("Competing stdin reader"))
+    monkeypatch.setattr(
+        "ai_provider.execution_fallback.subprocess.run",
+        lambda *args, **kwargs: pytest.fail("Inline login launched"),
+    )
+    monkeypatch.setattr(
+        _EXAMPLE, "create_chat_client", lambda config: pytest.fail("Unauthenticated model request")
+    )
+
+    def execute(prompt, config, **kwargs):
+        assert authenticated
+        deadlines.append(kwargs.get("deadline"))
+        return ExternalAgentResult(("synthetic-client",), 0, "Authenticated continuation", "")
+
+    monkeypatch.setattr(_EXAMPLE, "_run_external_agent", execute)
+    assert main(
+        [
+            "Inspect",
+            "--mode",
+            "coding-chat",
+            "--execute",
+            "--repo-root",
+            str(tmp_path),
+            "--route-id",
+            "openai-codex-gpt-5-5",
+            "--privacy",
+            "external_allowed",
+            "--cost-policy",
+            "allowances_allowed",
+            "--skip-prompt-review",
+            "--away-minutes",
+            "1",
+        ]
+    ) == (0 if recover else 1)
+    output = capsys.readouterr().out
+    assert output.count("## **SUMMARY**") == (2 if recover else 1)
+    assert "outside coding-chat" in output and "execution_status=failed" in output
+    assert "synthetic sign-in needed" in output
+    assert terminals and all(t.thread is None and t.closed for t in terminals)
+    store = SQLiteChatTranscriptStore(tmp_path / "data/repo-assistant-chats.sqlite3")
+    saved = store.latest_session(repo_root=tmp_path)
+    assert saved is not None
+    messages = store.list_messages(saved.session_id)
+    assert messages[-1].metadata is not None
+    assert messages[-1].metadata["execution_status"] == ("completed" if recover else "failed")
+    assert deadlines == ([60.0] if recover else [])
 
 
 def test_cli_restart_preserves_history_and_refuses_unreconciled_interruption(tmp_path, monkeypatch):
@@ -567,6 +906,81 @@ def test_actual_cli_native_turns_refresh_files_and_retain_conversation(tmp_path,
     assert "before = 1" not in second
     assert "Do not add dependencies" in second
     assert "Answer 1" in second
+
+
+def test_native_chat_latest_correction_and_review_reach_ollama_payload(tmp_path, monkeypatch):
+    from ai_provider import AIMessage, AIResponse, BackendInfo, BackendLocation, MessageRole
+    from ai_provider.adapters.ollama import OllamaChatClient
+    from ai_provider.config import BackendConfig, ProviderKind
+
+    initial = "INITIAL_TASK: improve the diagnostic regression tests."
+    correction = "LATEST_CORRECTION: preserve fixed stderr and empty stdout assertions."
+    review = "LATEST_REVIEW: inspect with tools; review observed results without edits or retries."
+    payloads = []
+    adapter = OllamaChatClient(BackendConfig(provider=ProviderKind.OLLAMA, model="gpt-oss:20b"))
+
+    class Client:
+        backend = BackendInfo("ollama", "gpt-oss:20b", BackendLocation.LOCAL)
+
+        def complete(self, request):
+            payloads.append(adapter._chat_payload(request, stream=False))
+            return AIResponse(
+                AIMessage(MessageRole.ASSISTANT, f"Observed report {len(payloads)}"), self.backend
+            )
+
+    (tmp_path / "AGENTS.md").write_text("Preserve existing work and report observed checks.\n")
+    (tmp_path / "module.py").write_text("fixture = 1\n")
+    monkeypatch.setattr(_EXAMPLE, "create_chat_client", lambda config: Client())
+    inputs = iter([correction, review, "/exit"])
+    monkeypatch.setattr("builtins.input", lambda prompt: next(inputs))
+    assert (
+        main(
+            [
+                "--repo-root",
+                str(tmp_path),
+                "--mode",
+                "coding-chat",
+                "--execute",
+                "--provider",
+                "ollama",
+                "--model",
+                "gpt-oss:20b",
+                "--skip-prompt-review",
+                "--file",
+                "module.py",
+                initial,
+            ]
+        )
+        == 0
+    )
+    assert len(payloads) == 3
+    for payload, latest in zip(payloads, (initial, correction, review), strict=True):
+        current = payload["messages"][-1]
+        assert current["role"] == "user"
+        request_block = (
+            current["content"]
+            .split("# User request\n", 1)[1]
+            .split("# Repository context", 1)[0]
+            .strip()
+        )
+        assert request_block == latest
+        assert current["content"].endswith("# User request\n" + latest)
+        assert current["content"].index("Original objective:") < current["content"].index(
+            "## Active user turn"
+        )
+        assert "Preserve existing work" in current["content"]
+        assert "fixture = 1" in current["content"]
+        assert any(tool["function"]["name"] == "read_file" for tool in payload["tools"])
+    final = payloads[-1]["messages"][-1]["content"]
+    assert initial in final and correction in final and "Observed report 2" in final
+    assert "Original objective:" in final
+    read_schema = next(
+        tool["function"]["parameters"]
+        for tool in payloads[-1]["tools"]
+        if tool["function"]["name"] == "read_file"
+    )
+    assert read_schema["properties"]["start_line"]["type"] == "integer"
+    assert read_schema["properties"]["end_line"]["type"] == "integer"
 
 
 def test_actual_cli_closeout_observation_is_structured_not_console_parsing(tmp_path, monkeypatch):

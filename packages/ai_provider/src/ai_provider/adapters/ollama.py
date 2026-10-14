@@ -25,6 +25,7 @@ from ai_provider.contracts import (
     FinishReason,
     MessageRole,
     ModelCapabilities,
+    ProviderContinuation,
     UsageMetadata,
     UsageSource,
 )
@@ -136,6 +137,7 @@ class OllamaChatClient:
         payload = self._chat_payload(request, stream=True)
         started = time.perf_counter()
         content_parts: list[str] = []
+        thinking_parts: list[str] = []
         raw_tool_calls: list[Any] = []
         final_response: AIResponse | None = None
 
@@ -153,6 +155,15 @@ class OllamaChatClient:
                 )
 
             content = str(raw_message.get("content", ""))
+            thinking = raw_message.get("thinking")
+            if thinking is not None and not isinstance(thinking, str):
+                raise ProviderError(
+                    "Ollama thinking must be a string.",
+                    category=ProviderErrorCategory.NON_RETRYABLE,
+                    provider="ollama",
+                )
+            if thinking:
+                thinking_parts.append(thinking)
             chunk_calls = raw_message.get("tool_calls")
             _tool_calls_from_raw(chunk_calls)
             if isinstance(chunk_calls, list):
@@ -167,6 +178,7 @@ class OllamaChatClient:
                 final_raw["message"] = {
                     **raw_message,
                     "content": "".join(content_parts),
+                    "thinking": "".join(thinking_parts),
                     "tool_calls": raw_tool_calls,
                 }
                 final_response = self._response_from_raw(
@@ -192,6 +204,7 @@ class OllamaChatClient:
                 {
                     "role": message.role.value,
                     "content": message.content,
+                    **self._continuation_payload(message, request.model or self.config.model),
                     **(
                         {
                             "tool_calls": [
@@ -219,6 +232,10 @@ class OllamaChatClient:
             "stream": stream,
         }
         options: dict[str, Any] = {}
+        if request.metadata.get("ollama_preserve_context") is True:
+            # Opt-in admission prototype: overflow must not discard instructions.
+            payload["truncate"] = False
+            payload["shift"] = False
         if request.temperature is not None:
             options["temperature"] = request.temperature
         if request.max_output_tokens is not None:
@@ -242,6 +259,27 @@ class OllamaChatClient:
         if request.tools:
             payload["tools"] = [tool.to_json_schema() for tool in request.tools]
         return payload
+
+    def _continuation_payload(self, message: AIMessage, model: str | None) -> dict[str, str]:
+        state = message.continuation
+        if (
+            message.role is not MessageRole.ASSISTANT
+            or state is None
+            or state.provider != "ollama"
+            or state.model != model
+            or state.base_url != self.base_url
+        ):
+            return {}
+        thinking = state.payload.get("thinking")
+        if thinking is None:
+            return {}
+        if not isinstance(thinking, str):
+            raise ProviderError(
+                "Ollama thinking must be a string.",
+                category=ProviderErrorCategory.NON_RETRYABLE,
+                provider="ollama",
+            )
+        return {"thinking": thinking}
 
     def _response_from_raw(
         self,
@@ -267,11 +305,26 @@ class OllamaChatClient:
             )
 
         content = raw_message.get("content", "")
+        thinking = raw_message.get("thinking")
+        if thinking is not None and not isinstance(thinking, str):
+            raise ProviderError(
+                "Ollama thinking must be a string.",
+                category=ProviderErrorCategory.NON_RETRYABLE,
+                provider="ollama",
+            )
+        continuation = (
+            ProviderContinuation("ollama", model, self.base_url, {"thinking": thinking})
+            if thinking
+            else None
+        )
         tool_calls = _tool_calls_from_raw(raw_message.get("tool_calls"))
         done_reason = raw_response.get("done_reason")
         return AIResponse(
             message=AIMessage(
-                role=MessageRole.ASSISTANT, content=str(content), tool_calls=tool_calls
+                role=MessageRole.ASSISTANT,
+                content=str(content),
+                tool_calls=tool_calls,
+                continuation=continuation,
             ),
             backend=BackendInfo(
                 provider="ollama",

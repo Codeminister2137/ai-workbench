@@ -35,6 +35,7 @@ class ToolParameter:
     required: bool = True
     default: Any = None
     enum_values: tuple[str, ...] | None = None
+    item_type_name: str | None = None
 
     def to_json_schema(self) -> dict[str, Any]:
         """Convert parameter specification into a standard JSON schema fragment."""
@@ -46,6 +47,8 @@ class ToolParameter:
             schema["enum"] = list(self.enum_values)
         if self.default is not None:
             schema["default"] = self.default
+        if self.type_name == "array" and self.item_type_name is not None:
+            schema["items"] = {"type": self.item_type_name}
         return schema
 
 

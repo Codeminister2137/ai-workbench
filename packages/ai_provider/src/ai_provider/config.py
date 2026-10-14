@@ -14,6 +14,7 @@ class ProviderKind(StrEnum):
 
     OLLAMA = "ollama"
     REQUESTY = "requesty"
+    OPENROUTER = "openrouter"
     OPENAI = "openai"
     GOOGLE = "google"
 
@@ -30,9 +31,12 @@ class BackendConfig:
     require_free_model: bool = False
 
     def __post_init__(self) -> None:
-        if self.require_free_model and self.provider is not ProviderKind.REQUESTY:
+        if self.require_free_model and self.provider not in {
+            ProviderKind.REQUESTY,
+            ProviderKind.OPENROUTER,
+        }:
             raise ProviderError(
-                "Live free-model verification is currently supported only for Requesty.",
+                "Live free-model verification is supported for Requesty and OpenRouter.",
                 category=ProviderErrorCategory.CONFIGURATION,
                 provider=self.provider.value,
             )
@@ -94,6 +98,8 @@ def _provider_api_key(provider: ProviderKind) -> str | None:
             return os.getenv("OPENAI_API_KEY")
         case ProviderKind.REQUESTY:
             return os.getenv("REQUESTY_API_KEY")
+        case ProviderKind.OPENROUTER:
+            return os.getenv("OPENROUTER_API_KEY")
         case ProviderKind.GOOGLE:
             return os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
         case ProviderKind.OLLAMA:

@@ -150,6 +150,9 @@ def persist_orchestrated_run_plan(
 
     _check_budget(args.away_minutes)
     budget_seconds = args.away_minutes * 60
+    deadline = getattr(args, "_execution_deadline", None)
+    if args.execute and deadline is not None:
+        budget_seconds = min(budget_seconds, max(0.0, deadline - time.perf_counter()))
     _check_budget(budget_seconds)
     store = SQLiteOrchestratedRunStore(resolve_orchestrated_run_db_path(args, repo_root))
     target = (
@@ -245,10 +248,11 @@ class OrchestratedRunTracker:
             prompt=prompt,
         )
         store = SQLiteOrchestratedRunStore(resolve_orchestrated_run_db_path(args, repo_root))
-        return (
-            cls(store=store, run_record=run_record, progress_callback=progress_callback),
-            stage_records,
-        )
+        tracker = cls(store=store, run_record=run_record, progress_callback=progress_callback)
+        deadline = getattr(args, "_execution_deadline", None)
+        if deadline is not None:
+            tracker.deadline = min(tracker.deadline, deadline)
+        return tracker, stage_records
 
     def begin_run(self) -> None:
         self.initial_workspace = workspace_fingerprints(Path(self.run_record.repo_root))

@@ -12,6 +12,39 @@ from ai_agent.contracts import ToolCall, ToolCategory
 from ai_agent.shared_approvals import TerminalApproval
 
 
+def test_idle_terminal_deadline_expires_without_new_input(monkeypatch):
+    now = 0.0
+    terminal = CodingChatInput(lambda text: None)
+    terminal.deadline = 10.0
+
+    def poll():
+        nonlocal now
+        now = 11.0
+        return None
+
+    terminal.poll = poll
+    monkeypatch.setattr("ai_agent.coding_chat_input.sys.stdin.isatty", lambda: True)
+    monkeypatch.setattr("ai_agent.coding_chat_input.time.perf_counter", lambda: now)
+    monkeypatch.setattr("ai_agent.coding_chat_input.time.sleep", lambda seconds: None)
+    with pytest.raises(TimeoutError, match="allowance expired"):
+        terminal.read("You> ")
+
+
+def test_noninteractive_answer_after_deadline_cannot_approve(monkeypatch):
+    now = 0.0
+    terminal = CodingChatInput(lambda text: None)
+    terminal.deadline = 10.0
+
+    def answer(prompt):
+        nonlocal now
+        now = 11.0
+        return "yes"
+
+    monkeypatch.setattr("ai_agent.coding_chat_input.time.perf_counter", lambda: now)
+    monkeypatch.setattr("builtins.input", answer)
+    assert terminal.approve("Operation") == "no"
+
+
 def test_queued_yes_and_steering_cannot_approve_a_fresh_operation():
     output = []
     terminal = CodingChatInput(output.append)

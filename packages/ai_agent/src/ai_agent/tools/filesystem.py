@@ -15,7 +15,10 @@ class ReadFileTool(BaseTool):
     def definition(self) -> ToolDefinition:
         return ToolDefinition(
             name="read_file",
-            description="Read content from a file with optional line range (1-indexed).",
+            description=(
+                "Read content from a file with optional line range (1-indexed). "
+                "Set line_numbers=False to obtain literal text for exact edit anchors."
+            ),
             category=ToolCategory.READ,
             parameters=(
                 ToolParameter(
@@ -35,6 +38,15 @@ class ReadFileTool(BaseTool):
                     type_name="integer",
                     description="Optional ending line number (1-indexed, inclusive).",
                     required=False,
+                ),
+                ToolParameter(
+                    name="line_numbers",
+                    type_name="boolean",
+                    description=(
+                        "Include line-number prefixes (default: True). False returns literal text."
+                    ),
+                    required=False,
+                    default=True,
                 ),
             ),
         )
@@ -97,14 +109,27 @@ class ReadFileTool(BaseTool):
                 is_error=True,
             )
 
+        if e_idx < s_idx:
+            return ToolResult(
+                name="read_file",
+                output=(
+                    f"Error: end_line {e_idx} precedes start_line {s_idx}. "
+                    f"Use a nonempty 1-indexed range within 1..{total_lines}, "
+                    "or omit the optional line bounds."
+                ),
+                is_error=True,
+            )
+
         selected_lines = lines[s_idx - 1 : e_idx]
-        indexed_output = "".join(
-            f"{s_idx + i:4d} | {line}" for i, line in enumerate(selected_lines)
+        output = (
+            "".join(f"{s_idx + i:4d} | {line}" for i, line in enumerate(selected_lines))
+            if arguments.get("line_numbers", True)
+            else "".join(selected_lines)
         )
 
         return ToolResult(
             name="read_file",
-            output=indexed_output,
+            output=output,
             metadata={"path": str(target_path), "lines_read": len(selected_lines)},
         )
 
@@ -180,10 +205,11 @@ class CreateFileTool(BaseTool):
         try:
             target_path.parent.mkdir(parents=True, exist_ok=True)
             target_path.write_text(content, encoding="utf-8")
+            size = target_path.stat().st_size
             return ToolResult(
                 name="create_file",
-                output=f"Successfully created file {raw_path} ({len(content)} bytes).",
-                metadata={"path": str(target_path), "bytes_written": len(content)},
+                output=f"Successfully created file {raw_path} ({size} bytes).",
+                metadata={"path": str(target_path), "bytes_written": size},
             )
         except Exception as exc:  # noqa: BLE001
             return ToolResult(
@@ -202,6 +228,8 @@ class EditFileTool(BaseTool):
             name="edit_file",
             description=(
                 "Edit an existing file by replacing 'old_text' with 'new_text'. "
+                "Both strings are literal file text: preserve indentation and do not add "
+                "patch markers, read-output line numbers, or Markdown fences. "
                 "If old_text is omitted or empty, replaces full file content."
             ),
             category=ToolCategory.WRITE,
@@ -215,7 +243,7 @@ class EditFileTool(BaseTool):
                 ToolParameter(
                     name="new_text",
                     type_name="string",
-                    description="The new text to insert.",
+                    description="Literal replacement text, including its indentation; not a diff.",
                     required=True,
                 ),
                 ToolParameter(
@@ -284,7 +312,8 @@ class EditFileTool(BaseTool):
                 name="edit_file",
                 output=(
                     f"Error: 'old_text' was not found in {raw_path}. "
-                    "Ensure exact indentation and characters match."
+                    "Read the current range with read_file(line_numbers=False), then "
+                    "copy a unique literal anchor with exact indentation and characters."
                 ),
                 is_error=True,
             )
@@ -293,7 +322,8 @@ class EditFileTool(BaseTool):
                 name="edit_file",
                 output=(
                     f"Error: 'old_text' matches {count} occurrences in {raw_path}. "
-                    "Provide more surrounding context to make it unique."
+                    "Read more surrounding context with read_file(line_numbers=False) "
+                    "and provide a unique literal anchor."
                 ),
                 is_error=True,
             )

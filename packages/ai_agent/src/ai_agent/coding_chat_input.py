@@ -46,7 +46,15 @@ class CodingChatInput:
         self.thread: threading.Thread | None = None
         self.stop = threading.Event()
         self.reader_error: BaseException | None = None
-        self.poll = TerminalLinePoll(write)
+        self.deadline: float | None = None
+        self.poll: Callable[[], str | None] = TerminalLinePoll(write)
+
+    def _active(self) -> bool:
+        return self.deadline is None or time.perf_counter() < self.deadline
+
+    def _check_deadline(self) -> None:
+        if not self._active():
+            raise TimeoutError("Coding-chat allowance expired; no further turn admitted.")
 
     def feed(self, text: str) -> None:
         """Dispatch a complete terminal line, including explicitly scoped answers."""
@@ -103,6 +111,7 @@ class CodingChatInput:
 
     def read(self, prompt: str) -> str | StagedCodingInput:
         """Read idle chat input; queued steering has priority and remains ordered."""
+        self._check_deadline()
         with self.condition:
             if self.reader_error is not None:
                 raise self.reader_error
@@ -117,11 +126,15 @@ class CodingChatInput:
             if self.closed:
                 raise EOFError
         if not sys.stdin.isatty():
-            return input(prompt)
+            line = input(prompt)
+            self._check_deadline()
+            return line
         self.write(prompt)
         while True:
+            self._check_deadline()
             line = self.poll()
             if line is not None:
+                self._check_deadline()
                 return line
             time.sleep(0.02)
 
@@ -133,12 +146,17 @@ class CodingChatInput:
 
     def approve(self, prompt: str, active: Callable[[], bool] = lambda: True) -> str:
         """Return yes only for an answer naming this fresh, still-active prompt."""
+
+        def approval_active() -> bool:
+            return self._active() and active()
+
         with self.condition:
-            if self.closed or self.ticket is not None or not active():
+            if self.closed or self.ticket is not None or not approval_active():
                 return "no"
             if self.thread is None:
                 # Noninteractive streams/tests keep the existing sequential interface.
-                return input(prompt)
+                answer = input(prompt)
+                return answer if approval_active() else "no"
             ticket = uuid.uuid4().hex
             self.ticket, self.answer = ticket, None
             try:
@@ -146,9 +164,11 @@ class CodingChatInput:
                     prompt + f"\nReply /approve {ticket} yes (or no); other text queues steering."
                     "\nUse the complete command with this ID. Bare yes/no does not approve."
                 )
-                while not self.closed and active() and self.answer is None:
+                while not self.closed and approval_active() and self.answer is None:
                     self.condition.wait(0.05)
-                return self.answer if not self.closed and active() and self.answer else "no"
+                return (
+                    self.answer if not self.closed and approval_active() and self.answer else "no"
+                )
             finally:
                 self.ticket, self.answer = None, None
 

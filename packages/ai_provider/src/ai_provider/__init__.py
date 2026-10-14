@@ -26,6 +26,7 @@ from ai_provider.contracts import (
     MessageRole,
     ModelCapabilities,
     PrivacyClass,
+    ProviderContinuation,
     UsageMetadata,
     UsageSource,
 )
@@ -64,6 +65,7 @@ from ai_provider.ollama_runtime import (
 )
 
 __all__ = [
+    "ProviderContinuation",
     "AIMessage",
     "AIRequest",
     "AIResponse",

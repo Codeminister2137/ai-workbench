@@ -24,6 +24,13 @@ resume the latest chat for the repository, or `--chat-session <session-id>` to
 resume a specific session. `--chat-list` prints recent sessions without
 contacting a provider.
 
+`--away-minutes` grants a fixed allowance for this launch; explicit resume with
+the option grants fresh time. `--turn-timeout-seconds` optionally limits the
+current turn. Rolling-summary and completion requests share the earlier bound,
+with each request timeout capped by remaining time. Expired requests and late
+responses fail without recording a successful assistant turn; the user request
+remains in the local transcript. Running operations are not forcibly interrupted.
+
 When a resumed chat grows beyond `--chat-history-budget-chars`, the default
 `--chat-context-mode rolling_summary` stores a local rolling summary for older
 turns and sends that summary plus the recent raw transcript tail. The CLI prints
@@ -95,6 +102,12 @@ comparing CLI changes, model behavior, and local settings over time:
 Token and provider-latency fields are `None` or `unavailable` when the backend
 does not report them. The memory metrics are Python-process memory observed by
 the CLI, not total GPU, Ollama server, IDE, or external-provider resource use.
+
+For native tool execution, primary elapsed time covers the initial agent loop,
+including tool execution and fallback attempts, rather than prompt preparation.
+Primary token usage and provider latency describe its final model response,
+not totals across tool calls, fallback attempts or later repair rounds. Failed
+native execution reports elapsed time with unavailable response usage.
 
 When using `scripts\repo-assistant.ps1`, transcript logging is on by default.
 Each run without an explicit `--log-file` writes to

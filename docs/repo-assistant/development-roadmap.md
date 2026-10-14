@@ -1,9 +1,152 @@
 # CLI Development Foundation Roadmap
 
+## Current checkpoint: 2026-10-14 closeout
+
+Baseline CLI remains **INCOMPLETE**. OpenRouter free-only integration and exact
+price/quota/tool guards are implemented and checked offline; production Free-plan
+privacy refusal remains unchanged. Gemini individual access is retired and refused.
+Earlier setup/discovery checkpoints below are historical, not current readiness.
+
+Direct synthetic access succeeded on several OpenRouter routes, while Cohere and
+NVIDIA full CLI trials failed different acceptance conditions. Connection success
+does not establish coding quality. Preserve the failed runs and consumed grants.
+Next: implement offline exact-route adapter/settings conformance and cumulative
+numeric usage reporting, then prepare distinct bounded iterative coding acceptance.
+See [preserved methodology findings](agent-methodology-findings.md). Independent
+supervision remains immediately after baseline CLI; later research stays backlog.
+
+Closeout validation: 2300 passed / 3 skipped across workspace, Council and job-search;
+Ruff, formatting and Pyright passed. These checks do not complete live acceptance.
+
+## 2026-10-13 approved Gemini CLI and OpenRouter direction
+
+Owner approved Gemini CLI integration and requested OpenRouter connection with
+the $10 purchase deferred. Node/npm/Gemini were not found on PATH or in checked
+common locations. Owner subsequently selected project-scoped environment changes:
+Python uses the existing uv `.venv`; external runtimes use supported local prefixes
+with reproducible installation guidance. OpenRouter provider/free-price
+contracts and a configured key are absent from inspected current configuration.
+Neither integration is complete. Antigravity Free tier is owner-confirmed;
+connection discovery passed independently of the stricter automatic quota-reader
+isolation requirement. Requesty free allowance should be unused today according
+to owner evidence; remaining live quota is still unknown. Existing free route
+prices passed validation, with no inference or personal prepaid deposit.
+
+Groq's published 8K TPM/200K TPD limits appear unsuitable for full coding sessions:
+the focused CLI review accumulated 210,777 input tokens across rounds, including
+175,232 cached tokens. Provider cache and tokenizer differences prevent a measured
+Groq latency claim. Recommend deferring full-session use; small tasks remain a
+candidate. Cerebras and Zed/Delta are owner-deferred emergency promotions;
+OpenCode remains exploratory. See ADR-057 and private evidence at
+artifacts/provider-source-decisions-20261013/README.md.
+
+## 2026-10-13 Antigravity / Requesty and alternative-source investigation
+
+Owner confirmed both Copilot and Kiro allowances exhausted. Antigravity's
+authenticated native model discovery succeeded with verified cleanup; current
+quota remains unknown because isolated quota startup is unproved, and scoped
+shared MCP grants remain unresolved. Requesty's configured key fetched the live
+catalog: thirteen chat models passed the existing zero-price validator, including
+the approved Gemma route. Native balance was zero; free daily remaining is unknown.
+Metadata establishes neither usable inference capacity nor coding quality.
+
+Host research compared current primary-source offers for OpenRouter, Gemini CLI,
+Groq, Cerebras, OpenCode and Zed, separating recurring quotas from temporary
+promotions and integration/privacy requirements. No source was adopted, inference
+sent, permission changed or purchase/login/install performed. Requesty's existing
+standard quality declaration and the high continuation floor remain unchanged.
+Evidence and next-step trade-offs: artifacts/fallback-source-survey-20261013/README.md.
+
+## 2026-10-13 Kiro preparation after Copilot allowance exhaustion
+
+Owner confirmed Copilot Free allowance exhausted and selected Kiro. Configured
+Kiro 2.24.0 passed isolated no-inference version/usage/model discovery with owned
+cleanup verified. Native usage estimate: 50 of 50 plan credits, 100%, reset
+2026-11-01; usable capacity remains unverified and appears exhausted. Discovery
+lists nine models including explicit Claude Sonnet 4.5 and Sonnet 4; this is not
+inference access or quality acceptance. No login, inference, installation,
+purchase, defaults or quality-policy change. Capacity confirmation and explicit
+model eligibility remain boundaries before a fresh bounded acceptance.
+Evidence: artifacts/kiro-baseline-preparation-20261013/README.md.
+
+## 2026-10-13 earlier Copilot preparation
+
+Owner selected Copilot. Existing repository command override resolves Copilot1.0.90;
+bounded no-inference auth/model/quota metadata read returned authenticated status,
+only auto model, zero remaining chat and zero premium entitlement, with verified
+owned cleanup. This does not establish subscription identity/plan or model quality.
+No login/update/install/inference/default or quality-policy changes performed.
+
+Opt-in two-route catalog parsed and preserved high Codex/standard Copilot; static
+inspection confirms preservation compatibility, not implementation eligibility.
+Loading repository command overrides corrects earlier bare-module discovery:
+Copilot/Kiro preservation are available; Antigravity continuation is blocked by
+explicit MCP grants rather than executable absence. Owner subsequently confirmed
+Copilot Free allowance exhausted and moved preparation to Kiro; no login needed.
+Evidence: artifacts/copilot-baseline-preparation-20261013/README.md.
+
+## 2026-10-13 local fallback logging and operational configuration
+
+Coding-chat now persists host-observed effective route/ordered fallback attempts
+in existing message metadata and resumed history, preserving failure/expiry outcomes
+and excluding private handoff contents. Three HOST regression cases, full2188passed
+3skipped, Ruff/format/Pyright/diff passed; no live model inference or routing change.
+Local evidence: artifacts/cli-fallback-history-20261013/README.md.
+
+Offline inspection of the normal catalog identified a baseline operability gap:
+high-quality Codex has only unavailable high Antigravity as an implementation
+continuation candidate. Copilot/Kiro auto routes are standard and eligible only for
+emergency read-only preservation under current policy. This does not contradict
+earlier eligible synthetic-catalog fallback pilots. Explicit comparable-quality
+alternate-route selection/validation is needed; do not relabel auto, lower the
+quality floor, install a client or change defaults silently. Accounts/quota were
+not probed. Daily baseline automatic implementation fallback remains INCOMPLETE.
+
+## 2026-10-13 bounded Codex quality comparison
+
+An owner-authorized exceptional paired synthetic task supplied a direct-chat
+baseline and three actual CLI Codex turns: inspection, corrected implementation,
+and frozen validation/review after saved-session restart. Both source fixes agree;
+CLI authored two meaningful tests, preserved five original tests, and actually ran
+all seven through shell and owned process tools. Its factual review distinguished
+staged/unstaged state, original/added tests and host/model execution evidence.
+
+Overall live acceptance remains INCOMPLETE: the pilot's host-authored guard denied
+legitimate scoped review operations. Historical failure retained; guard repaired
+and four regression checks passed locally, with no paid rerun. All three paid
+turns consumed; the allowance is closed. Exact direct-chat model/settings and
+histories were not matched, so this is positive narrow evidence, not general parity.
+Six messages/outcomes persisted; owned host/thread/process cleanup verified.
+Local evidence: artifacts/cli-paid-quality-pilot-proposal-20261013/RESULTS.md.
+Approved AGENTS rules avoid paired paid trials by default, require bounded
+question-driven live usage, and keep other tests local-only. Next quality
+acceptance should be a focused CLI-only task under a fresh selected allowance.
+
+The owner then authorized continuation. One fresh Codex CLI-only frozen review
+selected `review-repo-change`, retained all six messages including failure, and
+completed13shared-tool observations without denial or truncated narrow diffs.
+Root inspected the substantive review and accepted accurate correction/test/Git
+and host-versus-model evidence. All eight saved messages, unchanged old failures,
+frozen files and owned cleanup were verified. The focused review is COMPLETE;
+the original guard-blocked trial remains failed and broader equivalence incomplete.
+Evidence: the same artifact root's review-20261013-2136/README.md. Both allowances
+are used/closed; no repeated pair or general parity/economics claim.
+
 [CLI guide](../repo-coding-assistant.md) ·
 [Accepted scope: ADR-040](../decisions/ADR-040-shared-agent-tools-and-cli-development-foundation.md)
 
 ## Status and outcome
+
+High-priority repository-wide prerequisite:
+[official-documentation conformance](../documentation-conformance-plan.md).
+ADR-055 starts with Ollama continuation-state preservation; adapter conformance
+and tool compatibility do not establish coding-quality parity.
+
+High-priority usability work also includes the
+[logging and artifact structure review](../logging-and-artifact-structure-plan.md):
+make sessions understandable to the owner, with one clear result entry point and
+organized supporting evidence. The review does not authorize deleting old artifacts.
+
 
 The [2026-10-10 daily-use readiness report](daily-cli-readiness.md) recommends an
 attended real-work pilot as the shortest next step, while retaining the accepted
@@ -14,6 +157,87 @@ from today's actual IDE usage-limit interruption. Tomorrow's pilot selection and
 fresh live scope remain owner decisions.
 
 **INCOMPLETE — independent foundation slices implemented; design and acceptance gaps remain.**
+
+The 2026-10-13 attended public coding-chat slice completed literal-reader
+regression authoring, host validation and frozen model review with verified owned
+runtime cleanup. Two model-authored tests cover Unicode/CRLF/no-final-newline
+exact editing and literal-mode file/workspace/range/schema refusals. Production
+source and all ten original tests were preserved. Full offline gate: 2,158 passed,
+three skipped; Ruff, formatting, Pyright and diff checks passed.
+
+This was host-guided recovery: two failed drafts, missed requested corrections,
+unnecessary reads, refused tools and a false high-severity review finding required
+host feedback. The corrected review read the validation source and retracted that
+finding. Shell/process tools were omitted for this narrow authoring case; testing
+was host-run. Resume, skills, process control, fallback and representative daily
+coding quality remain separate acceptance gaps. This slice establishes neither
+autonomous parity nor speed improvement.
+
+The subsequent attended real-task slice corrected `CreateFileTool` byte-count
+reporting for UTF-8 text and platform newline translation. Four model-authored
+regressions passed after host-guided newline-expectation repair; all twelve
+launch-baseline tests and source outside `CreateFileTool.execute` were preserved.
+The model ran the scoped tests through shell and owned process start/status tools,
+both with exit 0 and 16 passing tests. Independent full validation passed 2,162
+tests with three skips; static and old-behavior counterfactual checks passed.
+
+The owner excluded physical-interaction testing, authorizing the exact inspected
+commands without manual prompts for this invocation. Default policies stayed
+unchanged. A host receipt BOM-loading failure interrupted review startup; recovery
+retained the saved conversation and immutable original deadline. The resumed CLI
+selected `review-repo-change` and inspected the actual scoped diffs/source/tests.
+Code review found no defect, but repeated inaccurate test attribution and handoff
+claims required host correction and remained unreliable. Owned cleanup was verified.
+Real-task code/test acceptance is complete; continuity-reporting quality and the
+broader representative migration assessment remain incomplete.
+
+A subsequent offline reconstruction retained every earlier owner message,
+the active correction, review skill and explicit correction-precedence guidance
+through the native request-assembly path. No history-delivery defect was
+reproduced. A bounded read-only low/medium reasoning comparison used matching
+conversation/file/task fixtures; both reports still omitted or misattributed
+required validation/recovery facts. No default setting change or broader quality
+claim follows from this single case. An independent external-route comparison
+requires explicit owner approval for its outbound context.
+
+The owner subsequently authorized one subscription-only installed-Codex read-only
+comparison with the scoped files, complete saved conversation and host facts.
+Current-client offline containment passed. The native client returned a
+substantive, factually reconciled review and exited successfully, but the public
+CLI classified its startup feature warning as failure. The same error-labelled
+warning was reproduced with synthetic loopback responses; no cloud retry followed.
+The review also identified missing success-message/full-file-byte assertions in
+the byte-count tests. Existing passing checks remain valid, but those requested
+assertion gaps reopen complete test acceptance. Files/history were preserved and
+owned cleanup verified. This case changes no defaults and establishes no parity.
+
+An offline follow-up now recognizes the complete known Codex startup notice in
+its completed error-item shape, preserving raw evidence, genuine errors and failed
+process exits. Host-authored regressions include successful/failed session receipts;
+the old-classifier counterfactual rejects the new acceptance checks. Installed-client
+synthetic responses confirm that the notice is benign while an intentional denied
+read still fails. Full host gate: 2,175 passed, three skipped; Ruff/format/Pyright
+and preservation checks passed. No cloud retry or model-authored review of this
+fix occurred. Earlier live failure evidence and missing byte-count assertions remain.
+
+Three additional model-authored companion tests now close the ASCII overwrite
+success-message and complete platform-newline raw-byte assertion gaps. All sixteen
+launch-original test functions/imports and production source were preserved.
+Host-guided recovery was needed for an incorrect ASCII count and missing byte
+assertion; the host formatted but did not semantically repair the tests. Model
+shell and owned process tools actually ran nineteen passing scoped tests. The old
+source counterfactual fails five regressions. A usage-limit interruption left no
+observed historical cleanup transition; stopped state was reconciled separately.
+A fresh full-history local review inspected the diff but failed factual acceptance.
+Its owned cleanup was verified. This live slice remains incomplete.
+
+Two bounded host fixes now distinguish an absent separate deterministic validation
+stage from actual model tool execution, and report native delegation availability
+from the foreground tool registry. Integration checks cover the reported behavior
+without invoking a child. The combined host gate is 2,182 passed, three skipped;
+Ruff, formatting and Pyright passed. These fixes have no new model review and
+establish neither broader CLI quality nor cross-agent parity.
+
 Decision and milestone recording is complete as of 2026-10-04. Verified tools and
 fallback are foundations; they do not constitute completed cross-agent parity.
 
@@ -614,6 +838,16 @@ provider-reported reset before retry. The latest focused independent-tools,
 fallback and refinement regression batch passed: 93 passed, 1 skipped; Ruff,
 formatting, Pyright and `git diff --check` passed.
 
+## Coding-agent methodology follow-up
+
+The owner accepted the 2026-10-14 review's direction: offline adapter/settings
+conformance and cumulative numeric usage reporting first, retaining strict
+authoring/correction/freeze evidence alongside a separate bounded iterative
+test/repair acceptance. Concrete live bounds and fresh grant/readiness remain
+required. [Preserved findings and research sources](agent-methodology-findings.md)
+record the observations, limits and studies for later research. That follow-up
+does not displace baseline CLI or the independent-supervision priority below.
+
 ## Optional capabilities: unselected
 
 Browser/UI testing, notebooks, debugger control, GitHub issues/PR/CI, visual
@@ -622,7 +856,59 @@ outside the selected foundation. Present a concrete need and bounded integration
 before adding one. Their research options are preserved in private local plans,
 when available; this public roadmap is sufficient to resume the approved work.
 
+## Next priority after baseline CLI: independent unattended supervision
+
+Owner direction (2026-10-14): finish the established baseline CLI goals first;
+independent unattended supervision is the next priority immediately afterward.
+This does not change existing baseline acceptance conditions or authorize a new
+service, general scheduler or persistence contract during baseline work.
+
+Compose the existing supported job runners with an independently running work-window
+supervisor. It should survive chat usage-limit interruptions, retain the selected
+deadline and authorized task scopes, record completed/failed/interrupted/blocked
+outcomes, stop admitting work in time for cleanup, and leave a readable handoff.
+Sleep must record the actual work outcome; a deadline timer alone is not completion
+evidence. Review/validation and any permitted commit policy must be explicit, with
+inherited dirty work preserved and no automatic approval bypass or grant renewal.
+
+Start by reviewing the existing research/fixed-acceptance runners and the one-off
+deadline helper. Define the smallest supported coordination slice and acceptance
+checks before implementation; ask at new task-kind, storage, service, recovery or
+approval boundaries. Do not put arbitrary coding commands into existing queue rows.
+Test chat interruption, first failure, uncertain cleanup and deadline closeout with
+local deterministic fixtures before an explicitly granted live window. Planning is
+approved; broader rollout and material implementation choices remain to be reviewed.
+
 ## Resource and scheduling constraints
+
+Owner-requested backlog (2026-10-14): add a low-priority provider-route access
+sweep to the independent supervisor workflow after baseline CLI goals. When no
+higher-priority authorized work needs the expiring daily allowance, consider one
+simple public/synthetic request per explicitly allowed route about one hour before
+its verified provider reset. Store the provider's UTC reset and convert local time
+using the time-zone database; OpenRouter's current UTC-day allowance resets at
+00:00 UTC (02:00 Warsaw on October 15, 2026), so its one-hour-before slot is
+23:00 UTC (01:00 Warsaw on that date). Other providers' resets must be verified
+separately; do not assume a shared reset or independent per-model allowances.
+
+Before admission, refresh remaining quota, preserve a reserve for planned
+acceptance, and check price, entitlement, capability and data-policy readiness.
+Allow at most one completion attempt per selected route per authorized run, with
+bounded output/time, pacing, no automatic retries or paid/model fallback. Save
+attempt/cap, actual answer/correctness, HTTP/provider error evidence, usage/cost,
+quota observations and cleanup independently. Connection/access is not model
+quality or CLI acceptance. Unknown quota/reset/privacy or missing unattended grant
+defers that route. Do not reuse consumed trials, wake/sleep the workstation or
+create recurring tasks just because this workflow is in the backlog. Scheduler
+implementation and future live windows still need their normal approved scope.
+
+Source-checking rule: investigate the failure boundary before treating a provider
+issue as source-wide. Gateway model availability can differ by upstream provider;
+check alternative models/endpoints/options using current official metadata and
+safe diagnostics, then bounded live comparisons only within the owner-authorized
+scope. Preserve separate gateway/model/upstream/account findings and do not infer
+quality or automatically alter routing. The shared source-state reference records
+the diagnostic workflow and admission constraints.
 
 Live acceptance requires an explicitly selected compute window. Do not start
 inference, clients for model work, runtimes or sustained local workloads merely

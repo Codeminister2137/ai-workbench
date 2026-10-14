@@ -506,6 +506,86 @@ def test_opt_in_unsupported_reviewer_is_recorded_as_failure_without_a_call(
     assert "failure_reason" in _stage(research_run, "scrutiny").details
 
 
+def test_research_admission_diagnostics_expose_safe_bounds(capsys):
+    from ai_agent.scrutiny_workflow import _print_research_admission_diagnostics
+
+    _print_research_admission_diagnostics(
+        {
+            "research_review": {
+                "input_bound_method": "utf8_bytes_plus_framing",
+                "input_token_upper_bound": 40154,
+                "context_tokens": 32768,
+                "tokenizer_fallback_reason": "Optional tokenizers dependency is unavailable",
+            }
+        }
+    )
+    assert capsys.readouterr().out.splitlines() == [
+        "scrutiny_input_bound_method: utf8_bytes_plus_framing",
+        "scrutiny_input_token_upper_bound: 40154",
+        "scrutiny_context_tokens: 32768",
+        "scrutiny_tokenizer_fallback: dependency_unavailable",
+    ]
+
+
+def test_failed_research_review_prints_admission_diagnostics(research_run, monkeypatch, capsys):
+    from ai_provider import research_execution, research_review
+
+    args, tracker, validation, root = research_run
+    args.research_review_policy = "quality_first"
+    args.research_review_model = "qwen3:14b"
+    monkeypatch.setattr(research_execution, "_validate_local_runtime", lambda *a, **k: None)
+
+    class RefusedReview:
+        def __init__(self, *a, details, **k):
+            self.details = details
+
+        def complete(self, request):
+            self.details.update(
+                input_bound_method="utf8_bytes_plus_framing",
+                input_token_upper_bound=40154,
+                context_tokens=32768,
+                tokenizer_fallback_reason="Optional tokenizers dependency is unavailable",
+            )
+            raise ProviderError("Insufficient context headroom")
+
+    monkeypatch.setattr(research_review, "ResearchReviewClient", RefusedReview)
+    catalog = cli.load_model_catalog(Path("packages/ai_orchestrator/examples/model_catalog.toml"))
+    status = cli._run_orchestrated_scrutiny(
+        args=args,
+        tracker=tracker,
+        repo_root=root,
+        profile=cli.coding_task_profile(),
+        catalog=catalog,
+        validation_stage=validation,
+        assistant_response_text="done",
+        execution_status="completed",
+        deadline=tracker.deadline,
+    )
+    assert status == "completed_with_scrutiny_errors"
+    output = capsys.readouterr().out
+    assert "scrutiny_input_token_upper_bound: 40154" in output
+    assert "scrutiny_context_tokens: 32768" in output
+    assert "scrutiny_tokenizer_fallback: dependency_unavailable" in output
+    assert _stage(research_run, "scrutiny").status == "failed"
+
+
+def test_research_admission_diagnostics_do_not_expose_unverified_values(capsys):
+    from ai_agent.scrutiny_workflow import _print_research_admission_diagnostics
+
+    _print_research_admission_diagnostics(
+        {
+            "research_review": {
+                "input_bound_method": "PRIVATE_METHOD",
+                "input_token_upper_bound": True,
+                "context_tokens": "PRIVATE_CONTEXT",
+                "tokenizer_fallback_reason": "PRIVATE_ERROR C:/private/tokenizer.json",
+            }
+        }
+    )
+    _print_research_admission_diagnostics({})
+    assert capsys.readouterr().out == "scrutiny_tokenizer_fallback: profile_unverified\n"
+
+
 def test_opt_in_final_review_reserve_is_used_by_refinement(research_run, monkeypatch):
     args, tracker, _, _ = research_run
     args.research_review_policy = "quality_first"

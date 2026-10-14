@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import argparse
 import copy
+import time
 from collections.abc import Callable
+from dataclasses import replace
 from pathlib import Path
 
 from ai_provider.chat_transcripts import DEFAULT_CHAT_TRANSCRIPT_DB, SQLiteChatTranscriptStore
@@ -70,7 +72,7 @@ def run_coding_chat(
             "coding-chat uses --coding-session, not independent native Codex session history"
         )
     if args.orchestrated and args.away_minutes is None:
-        parser.error("--orchestrated requires --away-minutes (a per-turn budget)")
+        parser.error("--orchestrated requires --away-minutes (a fixed session allowance)")
     if args.max_repair_cycles < -1:
         parser.error("--max-repair-cycles must be -1 or greater")
     root = (args.repo_root or find_repo_root(Path.cwd())).resolve()
@@ -81,6 +83,9 @@ def run_coding_chat(
         parser.error(f"Invalid user config {config_path}: {exc}")
     apply_user_defaults(args, config)
     args.cost_policy = args.cost_policy or config.cost_policy.value
+    session_deadline = (
+        time.perf_counter() + args.away_minutes * 60 if args.away_minutes is not None else None
+    )
     args.shared_tools = "coding"
     args.repo_root = root
     args.system = (
@@ -146,12 +151,26 @@ def run_coding_chat(
     args.shared_task_id = session.session_id
     foreground = ForegroundTools(root, session)
     terminal = CodingChatInput(stage=controller.stage)
+    terminal.deadline = session_deadline
+    if args.away_minutes is not None:
+        print(f"coding_chat_away_minutes: {args.away_minutes:g}")
+        print("coding_chat_away_scope: fixed_launch; resume_requires_explicit_new_allowance")
     foreground.approval_reader = terminal.approve_scoped
     session_token = ACTIVE_SESSION.set(session)
     foreground_token = ACTIVE_FOREGROUND.set(foreground)
 
     def turn(request: CodingTurnRequest) -> CodingTurnResult:
+        now = time.perf_counter()
+        if session_deadline is not None and now >= session_deadline:
+            return CodingTurnResult(1, None, "failed", "Coding-chat allowance expired.")
         turn_args = copy.deepcopy(args)
+        limits = [session_deadline] if session_deadline is not None else []
+        if args.turn_timeout_seconds is not None:
+            limits.append(now + args.turn_timeout_seconds)
+        turn_deadline = min(limits) if limits else None
+        turn_args._execution_deadline = turn_deadline
+        if session_deadline is not None:
+            turn_args.away_minutes = (session_deadline - now) / 60
         turn_args.mode = "implement"
         turn_args.prompt = request.text
         turn_args._coding_chat_history = request.history
@@ -163,13 +182,22 @@ def run_coding_chat(
                 f"{args.log_file.stem}.turn-{request.message_id}{args.log_file.suffix}"
             )
         # _main reloads selected files/instructions and creates fresh fallback/run scopes.
-        with terminal.in_flight():
-            returncode = execute(turn_args, config)
-        if observed:
-            result = observed[-1]
-            return CodingTurnResult(
-                returncode, result.response_text, result.execution_status, result.failure_reason
+        terminal.deadline = turn_deadline
+        try:
+            with terminal.in_flight():
+                returncode = execute(turn_args, config)
+        finally:
+            terminal.deadline = session_deadline
+        if returncode == 0 and turn_deadline is not None and time.perf_counter() >= turn_deadline:
+            return replace(
+                observed[-1] if observed else CodingTurnResult(1, None, "failed"),
+                returncode=1,
+                response_text=None,
+                execution_status="failed",
+                failure_reason="Execution allowance expired; inspect completed effects.",
             )
+        if observed:
+            return replace(observed[-1], returncode=returncode)
         return CodingTurnResult(
             returncode or 1, None, "failed", "Execution ended without a final CLI report"
         )

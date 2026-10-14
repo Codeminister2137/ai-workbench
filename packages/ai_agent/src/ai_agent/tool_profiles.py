@@ -20,6 +20,11 @@ from ai_agent.tools import (
     RunCommandTool,
     ToolRegistry,
 )
+from ai_agent.tools.delegation import (
+    DelegatedTaskRunner,
+    DelegateTaskTool,
+    unavailable_delegation,
+)
 
 
 @dataclass(frozen=True)
@@ -43,6 +48,7 @@ CODING_PROFILE = SharedToolProfile(
         "python_navigate",
         "rename_preview",
         "rename_apply",
+        "delegate_task",
     ),
 )
 
@@ -60,6 +66,7 @@ def shared_tool_registry(
     workspace: Path | None = None,
     *,
     rename_plans: RenamePlanStore | None = None,
+    delegation_runner: DelegatedTaskRunner | None = None,
 ) -> ToolRegistry:
     """Use the same implementations for provider-native execution and MCP."""
     shared_tool_profile(name)
@@ -86,6 +93,7 @@ def shared_tool_registry(
         plans = rename_plans or RenamePlanStore(workspace)
         registry.register(RenamePreviewTool(plans))
         registry.register(RenameApplyTool(plans))
+        registry.register(DelegateTaskTool(delegation_runner or unavailable_delegation))
     if workspace is not None:
         from ai_agent.ide_bridge import add_ide_tools
 

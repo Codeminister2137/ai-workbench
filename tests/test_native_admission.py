@@ -1,6 +1,7 @@
 """Offline compatibility invalidation and complete-input refusal contracts."""
 
 from argparse import Namespace
+from collections.abc import Iterator
 from dataclasses import replace
 from types import SimpleNamespace
 
@@ -20,7 +21,9 @@ from ai_provider import (
     ProviderKind,
 )
 from ai_provider.coding_assist import coding_task_profile
+from ai_provider.contracts import AIStreamDelta, AIStreamEvent
 from ai_provider.native_admission import (
+    NATIVE_CONTRACT_VERSION,
     NATIVE_TOOL_EVIDENCE,
     NativeCodingClient,
     native_coding_catalog,
@@ -41,7 +44,7 @@ class RecordingClient:
         self.requests.append(request)
         return AIResponse(AIMessage(MessageRole.ASSISTANT, "done"), self.backend)
 
-    def stream(self, request):
+    def stream(self, request) -> Iterator[AIStreamEvent]:
         self.requests.append(request)
         return iter(())
 
@@ -61,7 +64,19 @@ def admitted(monkeypatch):
     return wrapper, client, diagnostics
 
 
-@pytest.mark.parametrize("index", [0, 1])
+def test_continuation_counts_toward_complete_context_admission(admitted):
+    from ai_provider import ProviderContinuation
+
+    wrapper, client, diagnostics = admitted
+    state = ProviderContinuation("ollama", wrapper.config.model, "local", {"thinking": "x" * 20000})
+    request = AIRequest((AIMessage(MessageRole.ASSISTANT, "answer", continuation=state),))
+    with pytest.raises(ProviderError, match="does not fit"):
+        wrapper.complete(request)
+    assert not client.requests
+    assert all("xxx" not in line for line in diagnostics)
+
+
+@pytest.mark.parametrize("index", range(len(NATIVE_TOOL_EVIDENCE)))
 @pytest.mark.parametrize("changed", ["model", "digest", "runtime", "contract", "missing"])
 def test_positive_and_negative_evidence_invalidates(index, changed):
     evidence = NATIVE_TOOL_EVIDENCE[index]
@@ -89,7 +104,12 @@ def test_valid_receipts_distinguish_support_from_quality():
         )
         assert (reason is None) is evidence.supported
         if reason:
-            assert "failed the runtime compatibility probe" in reason
+            expected = (
+                "failed the runtime compatibility probe"
+                if evidence.contract_version == NATIVE_CONTRACT_VERSION
+                else "stale or unverifiable"
+            )
+            assert expected in reason
 
 
 def test_automatic_catalog_prefers_tested_local_tools_preserving_explicit_choices():
@@ -179,6 +199,38 @@ def test_runtime_profile_is_capped_by_model_window(admitted):
     )
     assert isinstance(wrapped, NativeCodingClient)
     assert wrapped.context_tokens == 8192
+    assert wrapped.measured_prefix_prototype is False
+
+
+@pytest.mark.parametrize("enabled", [False, True])
+def test_cli_opt_in_reaches_native_admission_without_changing_capacity(admitted, enabled):
+    _, client, _ = admitted
+    wrapped = prepare_native_coding_client(
+        client,
+        BackendConfig(ProviderKind.OLLAMA, "gpt-oss:20b"),
+        Namespace(
+            catalog=CATALOG,
+            ollama_profile="balanced",
+            experimental_measured_prefix=enabled,
+        ),
+        None,
+    )
+    assert isinstance(wrapped, NativeCodingClient)
+    assert wrapped.measured_prefix_prototype is enabled
+    assert wrapped.context_tokens == 8192
+    assert not client.requests
+
+
+def test_cli_opt_in_refuses_hosted_provider_before_requests(admitted):
+    _, client, _ = admitted
+    with pytest.raises(ProviderError, match="requires native Ollama coding tools"):
+        prepare_native_coding_client(
+            client,
+            BackendConfig(ProviderKind.OPENAI, "custom"),
+            Namespace(catalog=CATALOG, experimental_measured_prefix=True),
+            None,
+        )
+    assert not client.requests
 
 
 def test_known_cloud_capacity_and_unknown_capacity_are_distinct():
@@ -217,6 +269,209 @@ def test_cli_native_boundary_enforces_guard_with_no_model_call(tmp_path, monkeyp
             tmp_path,
         )
     assert not client.requests
+
+
+def test_native_deadline_caps_each_turn_and_stops_after_tool_results(monkeypatch):
+    now = [10.0]
+    monkeypatch.setattr("ai_provider.native_admission.time.perf_counter", lambda: now[0])
+    client = RecordingClient()
+    configs = []
+
+    def factory(config):
+        configs.append(config)
+        return client
+
+    wrapper = prepare_native_coding_client(
+        client,
+        BackendConfig(ProviderKind.OPENAI, "custom", timeout_seconds=30),
+        SimpleNamespace(catalog=CATALOG, fallback_session=SimpleNamespace(deadline=20)),
+        None,
+        client_factory=factory,
+    )
+    request = AIRequest((AIMessage(MessageRole.USER, "task"),))
+    wrapper.complete(request)
+    now[0] = 17.0
+    followup = replace(request, messages=(*request.messages, AIMessage(MessageRole.TOOL, "result")))
+    wrapper.complete(followup)
+    assert [config.timeout_seconds for config in configs] == [10, 3]
+    now[0] = 20.0
+    with pytest.raises(ProviderError, match="deadline expired"):
+        wrapper.complete(followup)
+    assert len(client.requests) == 2 and len(configs) == 2
+
+
+# Additional tests for measured_prefix metadata wiring and usage limits
+
+# Context preservation follows the opt-in; both modes retain the same context length.
+
+
+def test_measured_prefix_metadata_wiring(admitted):
+    request = AIRequest(
+        (
+            AIMessage(MessageRole.SYSTEM, "system"),
+            AIMessage(MessageRole.USER, "task"),
+        ),
+        model="gpt-oss:20b",
+        metadata={"task": "coding"},
+    )
+    # Wrapper with experimental flag disabled
+    wrapper_false = prepare_native_coding_client(
+        admitted[1],
+        BackendConfig(ProviderKind.OLLAMA, "gpt-oss:20b"),
+        Namespace(catalog=CATALOG, ollama_profile="balanced", experimental_measured_prefix=False),
+        None,
+    )
+    wrapper_false.complete(request)
+    forwarded = admitted[1].requests[-1]
+    assert forwarded.metadata["ollama_context_length"] == 8192
+    assert forwarded.metadata.get("ollama_preserve_context", False) is False
+    # Wrapper with experimental flag enabled
+    wrapper_true = prepare_native_coding_client(
+        admitted[1],
+        BackendConfig(ProviderKind.OLLAMA, "gpt-oss:20b"),
+        Namespace(catalog=CATALOG, ollama_profile="balanced", experimental_measured_prefix=True),
+        None,
+    )
+    wrapper_true.complete(request)
+    forwarded2 = admitted[1].requests[-1]
+    assert forwarded2.metadata["ollama_context_length"] == 8192
+    assert forwarded2.metadata.get("ollama_preserve_context", False) is True
+    # Original request metadata remains unchanged
+    assert request.metadata == {"task": "coding"}
+
+
+# Test that after a successful small request, a large request is refused before another client call.
+def test_unavailable_usage_refuses_before_next_call(admitted):
+    # Create a new wrapper with experimental_measured_prefix enabled
+    wrapper, client, _ = admitted
+    wrapped = prepare_native_coding_client(
+        client,
+        BackendConfig(ProviderKind.OLLAMA, "gpt-oss:20b"),
+        Namespace(catalog=CATALOG, ollama_profile="balanced", experimental_measured_prefix=True),
+        None,
+    )
+    # First request that fits balanced8192 runtime with 10 max_output_tokens
+    small_req = AIRequest(
+        (AIMessage(MessageRole.USER, "p" * 10000),),
+        max_output_tokens=10,
+    )
+    wrapped.complete(small_req)
+    assert len(client.requests) == 1
+    # Second request: same first message plus additional long user message exceeding absolute bound
+    large_msg = "x" * 6500
+    large_req = AIRequest(
+        (*small_req.messages, AIMessage(MessageRole.USER, large_msg)),
+        max_output_tokens=10,
+    )
+    with pytest.raises(ProviderError, match="does not fit"):
+        wrapped.complete(large_req)
+    # No additional request recorded after refusal
+    assert len(client.requests) == 1
+
+
+def test_late_native_response_cannot_reach_tool_execution(monkeypatch):
+    now = [10.0]
+    monkeypatch.setattr("ai_provider.native_admission.time.perf_counter", lambda: now[0])
+
+    class LateClient(RecordingClient):
+        def complete(self, request):
+            self.requests.append(request)
+            now[0] = 21.0
+            call = AIToolCall("late", "write_file", {"path": "source.py", "content": "change"})
+            return AIResponse(
+                AIMessage(MessageRole.ASSISTANT, "", tool_calls=(call,)),
+                self.backend,
+                tool_calls=(call,),
+            )
+
+    client = LateClient()
+    wrapper = NativeCodingClient(
+        client,
+        BackendConfig(ProviderKind.OPENAI, "custom"),
+        None,
+        deadline=20,
+        client_factory=lambda config: client,
+    )
+    with pytest.raises(ProviderError, match="deadline expired"):
+        wrapper.complete(AIRequest((AIMessage(MessageRole.USER, "task"),)))
+    assert len(client.requests) == 1
+    with pytest.raises(ProviderError, match="deadline expired"):
+        wrapper.complete(AIRequest((AIMessage(MessageRole.TOOL, "late results"),)))
+    assert len(client.requests) == 1
+
+
+def test_native_admission_probe_expiry_prevents_inference(monkeypatch):
+    now = [10.0]
+    monkeypatch.setattr("ai_provider.native_admission.time.perf_counter", lambda: now[0])
+    configs = []
+    evidence = NATIVE_TOOL_EVIDENCE[0]
+
+    def identity(config):
+        configs.append(config)
+        now[0] = 20.0
+        return evidence.model_digest, evidence.runtime_version
+
+    monkeypatch.setattr("ai_provider.native_admission.installed_native_identity", identity)
+    client = RecordingClient()
+    wrapper = NativeCodingClient(
+        client,
+        BackendConfig(ProviderKind.OLLAMA, evidence.model),
+        8192,
+        deadline=11,
+        client_factory=lambda config: pytest.fail("inference client created after probe expiry"),
+    )
+    with pytest.raises(ProviderError, match="deadline expired"):
+        wrapper.complete(AIRequest((AIMessage(MessageRole.USER, "task"),)))
+    assert configs[0].timeout_seconds == 1
+    assert not client.requests
+
+
+def test_native_stream_discards_late_events(monkeypatch):
+    now = [10.0]
+    monkeypatch.setattr("ai_provider.native_admission.time.perf_counter", lambda: now[0])
+
+    class LateStream(RecordingClient):
+        def stream(self, request):
+            now[0] = 20.0
+            yield AIStreamDelta(content="late")
+
+    client = LateStream()
+    wrapper = NativeCodingClient(
+        client,
+        BackendConfig(ProviderKind.OPENAI, "custom"),
+        None,
+        deadline=11,
+        client_factory=lambda config: client,
+    )
+    with pytest.raises(ProviderError, match="deadline expired"):
+        next(wrapper.stream(AIRequest((AIMessage(MessageRole.USER, "task"),))))
+
+
+def test_cli_primary_native_attempt_uses_session_capped_timeout(tmp_path, monkeypatch):
+    from ai_agent import repo_coding_assistant as cli
+
+    config = BackendConfig(ProviderKind.OPENAI, "custom", timeout_seconds=30)
+    route = SimpleNamespace(route_id="primary", timeout_seconds=2)
+    captured = []
+    result = SimpleNamespace(response="original")
+
+    def execute_native(prompt, bounded, *args, **kwargs):
+        captured.append(bounded)
+        return result
+
+    def run(prompt, execute, *args, **kwargs):
+        return execute(route, prompt)
+
+    session = SimpleNamespace(enabled=True, initial=route, current=route, run=run)
+    monkeypatch.setattr(cli, "_run_native_agent", execute_native)
+    assert (
+        cli._run_native_agent_with_fallback(
+            "task", config, None, Namespace(fallback_session=session), tmp_path
+        )
+        is result
+    )
+    assert captured[0].timeout_seconds == 2
+    assert config.timeout_seconds == 30
 
 
 def test_cli_native_boundary_preserves_required_instructions(admitted, tmp_path, monkeypatch):
@@ -260,7 +515,9 @@ def test_unknown_model_refuses_without_metadata_probe(monkeypatch):
 
 
 def test_changed_active_contract_excludes_old_positive_receipt(monkeypatch):
-    monkeypatch.setattr("ai_provider.native_admission.NATIVE_CONTRACT_VERSION", 2)
+    monkeypatch.setattr(
+        "ai_provider.native_admission.NATIVE_CONTRACT_VERSION", NATIVE_CONTRACT_VERSION + 1
+    )
     eligible = native_coding_catalog(load_model_catalog(CATALOG), coding_task_profile())
     assert all(item.backend.provider != "ollama" for item in eligible)
 

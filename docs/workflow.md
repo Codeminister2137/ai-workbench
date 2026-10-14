@@ -1,6 +1,18 @@
 # Development Workflow
 
 ## 1. Before starting
+High-priority cross-repository work follows the
+[official-documentation conformance plan](documentation-conformance-plan.md).
+Review integrations in bounded slices, fix demonstrated discrepancies and align
+code/guides. Intentional differences need explicit rationale; material changes
+still require the owner. This priority does not authorize a blanket rewrite.
+
+The [logging and artifact structure review](logging-and-artifact-structure-plan.md)
+is high-priority usability work across the repository. Keep the active local
+handoff and copy-paste next-session prompt in `CURRENT_CONTEXT.md`; run artifacts
+are evidence, not a separate required handoff entry point. Reusable prompts remain
+in `docs/prompt-library.md`. Historical artifact prompts are not current instructions.
+
 Use tiered context reading instead of rereading every document by default.
 
 If the user asks to use, check, or run a named `Codex: ...` prompt, read

@@ -15,6 +15,51 @@ from .support import (
 )
 
 
+def test_cli_expired_fallback_preflight_has_failed_summary_without_execution(
+    capsys, monkeypatch, tmp_path
+):
+    from ai_provider import ProviderError, ProviderErrorCategory
+
+    def expired(*args, **kwargs):
+        raise ProviderError(
+            "Continuation deadline expired during readiness preflight",
+            category=ProviderErrorCategory.TIMEOUT,
+        )
+
+    monkeypatch.setattr(_EXAMPLE, "FallbackSession", expired)
+    monkeypatch.setattr(
+        _EXAMPLE,
+        "create_chat_client",
+        lambda config: pytest.fail("Expired readiness reached model execution"),
+    )
+    assert (
+        main(
+            [
+                "Inspect",
+                "--mode",
+                "ask",
+                "--execute",
+                "--repo-root",
+                str(tmp_path),
+                "--provider",
+                "ollama",
+                "--model",
+                "gpt-oss:20b",
+                "--privacy",
+                "local_only",
+                "--skip-prompt-review",
+                "--away-minutes",
+                "1",
+            ]
+        )
+        == 1
+    )
+    output = capsys.readouterr().out
+    assert output.count("## **SUMMARY**") == 1
+    assert "execution_status=failed" in output
+    assert "expired during readiness preflight" in output
+
+
 def test_cli_away_minutes_sets_visible_foreground_budget(capsys, monkeypatch) -> None:
     monkeypatch.setenv("CODEX_COMMAND", "codex-test")
 
@@ -116,7 +161,7 @@ def test_cli_orchestrated_plan_prints_stage_plan_without_provider(
     assert "execution_status: planned" in output
     assert "## **SUMMARY**" in output
     assert "- Changed: No final response was captured" in output
-    assert "- Validated: Not run by the CLI" in output
+    assert "- Validated: No separate deterministic validation stage recorded." in output
     assert "### Agent report\nNo final response was captured." in output
 
     run_id = next(

@@ -51,8 +51,12 @@ class AcceptanceJob:
     max_iterations: int
 
     def __post_init__(self) -> None:
-        for name in ("schema_version", "harness_revision", "native_contract_version"):
-            if type(getattr(self, name)) is not int or getattr(self, name) != 1:
+        for name, expected in (
+            ("schema_version", 1),
+            ("harness_revision", 1),
+            ("native_contract_version", native_admission.NATIVE_CONTRACT_VERSION),
+        ):
+            if type(getattr(self, name)) is not int or getattr(self, name) != expected:
                 raise ValueError(f"Unsupported {name}")
         for name in (
             "task_id",
@@ -230,10 +234,27 @@ class AcceptanceJobStore(SQLiteOrchestratedRunStore):
         return tuple(records)
 
     def get(self, task_id: str) -> AcceptanceRecord:
-        for record in self.list_jobs():
-            if record.job.task_id == task_id:
-                return record
-        raise KeyError(task_id)
+        """Validate only the selected record; unrelated stale history cannot block it."""
+        self.initialize()
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT definition_json,definition_sha256,schema_version,status,result_json "
+                "FROM scheduled_acceptance_tasks WHERE task_id=?",
+                (task_id,),
+            ).fetchone()
+        if row is None:
+            raise KeyError(task_id)
+        payload, digest, version, status, result = row
+        if version != 1 or hashlib.sha256(payload.encode()).hexdigest() != digest:
+            raise ValueError("Unsupported or changed persisted acceptance definition")
+        job = AcceptanceJob.from_json(payload)
+        if job.task_id != task_id:
+            raise ValueError("Persisted acceptance task identity changed")
+        return AcceptanceRecord(
+            job,
+            ScheduledTaskStatus(status),
+            json.loads(result) if result is not None else None,
+        )
 
     def transition(
         self,
