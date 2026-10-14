@@ -633,6 +633,29 @@ outside the selected foundation. Present a concrete need and bounded integration
 before adding one. Their research options are preserved in private local plans,
 when available; this public roadmap is sufficient to resume the approved work.
 
+## Next priority after baseline CLI: independent unattended supervision
+
+Owner direction (2026-10-14): finish the established baseline CLI goals first;
+independent unattended supervision is the next priority immediately afterward.
+This does not change existing baseline acceptance conditions or authorize a new
+service, general scheduler or persistence contract during baseline work.
+
+Compose the existing supported job runners with an independently running work-window
+supervisor. It should survive chat usage-limit interruptions, retain the selected
+deadline and authorized task scopes, record completed/failed/interrupted/blocked
+outcomes, stop admitting work in time for cleanup, and leave a readable handoff.
+Sleep must record the actual work outcome; a deadline timer alone is not completion
+evidence. Review/validation and any permitted commit policy must be explicit, with
+inherited dirty work preserved and no automatic approval bypass or grant renewal.
+
+Start by reviewing the existing research/fixed-acceptance runners and the one-off
+deadline helper. Define the smallest supported coordination slice and acceptance
+checks before implementation; ask at new task-kind, storage, service, recovery or
+approval boundaries. Do not put arbitrary coding commands into existing queue rows.
+Test chat interruption, first failure, uncertain cleanup and deadline closeout with
+local deterministic fixtures before an explicitly granted live window. Planning is
+approved; broader rollout and material implementation choices remain to be reviewed.
+
 ## Resource and scheduling constraints
 
 Live acceptance requires an explicitly selected compute window. Do not start

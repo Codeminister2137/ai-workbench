@@ -47,6 +47,7 @@ GROUPS = {
         "tests/repo_assistant/test_*.py",
         "tests/test_external_agents.py",
         "tests/test_execution_fallback.py",
+        "tests/test_free_provider_fallback.py",
         "tests/test_agent_readiness_ownership.py",
         "tests/test_alternate_agent_routes.py",
         "tests/test_fallback*.py",
