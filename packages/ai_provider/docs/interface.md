@@ -32,6 +32,8 @@ invalid advertised prices refuse inference; missing optional cache prices do not
 invent a charge or grant. This is a price check, not proof of remaining allowance,
 privacy entitlement or model quality. Cache fields follow the official
 [Requesty model catalog](https://docs.requesty.ai/api-reference/endpoint/models-list).
+Malformed catalog JSON or UTF-8 also refuses before inference with a configuration
+error; response contents are not included in the user-facing error message.
 
 Function tools use `AIToolDefinition`/`AIToolParameter`. Array parameters may set
 optional `item_type_name` (for example, `"string"` for process argument lists),

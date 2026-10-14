@@ -201,7 +201,7 @@ class OpenAICompatibleChatClient:
                 catalog = json.loads(response.read().decode("utf-8"))
         except HTTPError as exc:
             raise self._http_error(exc) from exc
-        except (URLError, TimeoutError, json.JSONDecodeError) as exc:
+        except (URLError, TimeoutError, UnicodeDecodeError, json.JSONDecodeError) as exc:
             raise ProviderError(
                 "Could not verify Requesty free-model prices; inference was not sent.",
                 category=ProviderErrorCategory.CONFIGURATION,
