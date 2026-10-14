@@ -140,6 +140,21 @@ must refuse or report its limitation, not silently downgrade the contract.
 
 ## Primary references
 
+2026-10-15 access-check follow-up: OpenRouter's official limit schema defines free
+requests per UTC day. Requesty's free-model documentation confirms a daily
+organization-wide limit but does not specify the reset timezone; the inspected
+catalog response supplied no numeric reset/quota headers. Do not schedule its
+pre-reset allowance use from an inferred midnight. See
+[reusable access-check requirements](../../../docs/repo-assistant/provider-access-checks.md).
+Allowance-consuming probes belong in a separate explicit live command, outside
+pytest and Git hooks; deterministic receipt/selection tests remain mocked.
+
+Current [Requesty terms](https://www.requesty.ai/terms) distinguish free-account
+Training Permitted Models from paid-account protections. Historical catalog
+no-training observations are not a blanket guarantee for current free routes;
+recheck exact model/account treatment before admitting private workloads. This
+follow-up admits no new private context or billing source.
+
 Checked 2026-10-13; verify again before choosing or activating a source.
 
 - [Antigravity plans](https://antigravity.google/docs/plans/)

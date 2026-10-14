@@ -840,6 +840,15 @@ formatting, Pyright and `git diff --check` passed.
 
 ## Coding-agent methodology follow-up
 
+Owner additionally requested reusable catalog-based access checks (2026-10-15):
+select only missing/stale matching receipts, with explicit freshness/cooldown and
+route/account/contract identity. Allowance-consuming checks run through a separate
+live command, never the normal pytest suite or hooks. Support ad-hoc investigation
+and future authorized pre-reset useful-work selection without automatic retries
+or quota burning. [Access-check workflow](provider-access-checks.md) preserves
+the requirements and remaining storage/scheduler decisions. Baseline CLI and the
+immediate supervision priority are unchanged.
+
 The owner accepted the 2026-10-14 review's direction: offline adapter/settings
 conformance and cumulative numeric usage reporting first, retaining strict
 authoring/correction/freeze evidence alongside a separate bounded iterative
