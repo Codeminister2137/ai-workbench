@@ -48,3 +48,27 @@ gain is inferred solely from documentation alignment.
 
 Sources: [Ollama tool calling](https://docs.ollama.com/capabilities/tool-calling),
 [Ollama thinking](https://docs.ollama.com/capabilities/thinking).
+
+## Subsequent bounded findings
+
+The shared process tool advertised argv as an unconstrained array even though its
+handler accepts only strings. Optional neutral array-element metadata now survives
+agent/provider translation and advertises `items: {type: string}` for that tool.
+Existing callers omitting metadata keep their schema. This corrects the published
+tool contract; it does not establish the cause of a gateway400 or coding quality.
+
+Requesty's current model catalog exposes cache-write `caching_price`,
+`caching_5m_price` and `caching_1h_price` alongside cache-read prices. The existing
+free-only checker ignored those write prices. It now checks every advertised
+cache price at both model and threshold tiers before completion or streaming;
+offline regressions refuse a nonzero price before POST and retain zero-price
+behavior. No new account, source, billing fallback or transmission is activated.
+Malformed catalog UTF-8 now produces the existing configuration refusal before
+inference instead of escaping as an unhandled decoder exception.
+Source: [Requesty List Models](https://docs.requesty.ai/api-reference/endpoint/models-list).
+
+Council declared a message-to-conversation foreign key but never enabled SQLite
+enforcement. It now enables the existing constraint on every store connection.
+Offline checks reject new orphan messages, preserve normal/resumed history, and
+retain historical orphan rows without migration or deletion. This changes no
+schema or application workflow; [SQLite requires per-connection enablement](https://www.sqlite.org/foreignkeys.html#fk_enable).
