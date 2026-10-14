@@ -549,3 +549,19 @@ durable conversations. Include its size in input admission. The owner chose this
 over hidden adapter caches and prioritized official-documentation conformance.
 See [ADR-055](decisions/ADR-055-explicit-provider-continuation-metadata.md) and
 the [high-priority repo-wide plan](documentation-conformance-plan.md).
+
+## ADR-057 - Free Gemini CLI And OpenRouter Access Direction
+
+**Status:** Accepted direction (2026-10-13); OpenRouter free-first prioritized and implemented offline (2026-10-14); Gemini individual-access pilot blocked
+by verified service retirement (2026-10-14). Offline integration is preserved;
+Owner subsequently selected the already requested OpenRouter free-only integration;
+no paid billing route or transfer of the unused Gemini inference grant is approved.
+
+Owner approved Gemini CLI and requested OpenRouter connection, preferring another
+free source before an explicitly deferred $10 deposit. Keep product/auth/billing
+provenance separate. Personal Requesty deposit avoidance does not remove paid
+product support. Cerebras and Zed/Delta promotions are deferred. No defaults,
+quality promotion, purchase or paid fallback approved. Owner selected project-scoped
+environment changes; Python `.venv` and external runtimes remain separate. OpenCode
+Console is deferred. See installation guidance for the project-local setup direction.
+See [ADR-057](decisions/ADR-057-free-gemini-cli-and-openrouter-direction.md).

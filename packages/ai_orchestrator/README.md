@@ -1,5 +1,12 @@
 # ai-orchestrator
 
+The experimental [OpenRouter free catalog](examples/openrouter_free_catalog.toml)
+is opt-in, with distinct `openrouter_free` provenance and provisional STANDARD
+quality. Its provider adapter checks fresh free prices/tool support/daily capacity
+before each call. Existing fallback admission preserves quality, privacy, required
+capabilities and exhausted-source boundaries. Default catalog unchanged; offline
+checks do not establish available endpoints or coding quality.
+
 Transparent orchestration primitives for AI prompt review, model selection, and
 execution planning.
 
@@ -27,6 +34,13 @@ Current non-goals:
 The orchestrator owns decision contracts, not provider execution. Callers may adapt
 an `ExecutionTarget` to `ai_provider`, direct Ollama calls, or another executor.
 It must not implement provider APIs directly.
+
+The shared [provider source-state reference](../ai_provider/docs/source-state.md)
+records dated provider limits and integration findings. Provider adapters own
+observations; applications can pass neutral facts to orchestration policy without
+introducing a mandatory dependency on `ai_provider`. Published token throughput,
+model context, current account quota and evaluated quality remain separate.
+This documentation does not add quota-aware routing or a new runtime data contract.
 
 Catalog entries and execution targets are access-route oriented. Keep these
 concepts separate:

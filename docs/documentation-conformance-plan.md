@@ -57,6 +57,16 @@ agent/provider translation and advertises `items: {type: string}` for that tool.
 Existing callers omitting metadata keep their schema. This corrects the published
 tool contract; it does not establish the cause of a gateway400 or coding quality.
 
+The 2026-10-13 Codex0.160.1 startup feature notice was classified as fatal despite
+its native warning shape. A narrow known-notice fix is implemented and tested;
+broader nonfatal-item policy remains an owner decision. See the
+[CLI roadmap](repo-assistant/development-roadmap.md).
+
+The Openings bridge rejected valid mixed-case JSON media types. Normalization and
+a public export regression now follow [RFC9110 section8.3.1](https://www.rfc-editor.org/rfc/rfc9110.html#section-8.3.1).
+This changes no endpoint, credential, posting, approval or persistence boundary.
+Whole-repository conformance remains incomplete.
+
 Requesty's current model catalog exposes cache-write `caching_price`,
 `caching_5m_price` and `caching_1h_price` alongside cache-read prices. The existing
 free-only checker ignored those write prices. It now checks every advertised

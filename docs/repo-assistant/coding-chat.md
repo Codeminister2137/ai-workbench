@@ -78,7 +78,17 @@ to use; the bare text remains queued chat and does not grant permission.
 
 The session ID printed at startup links conversation turns and coding receipts
 in `data/repo-assistant-chats.sqlite3`. Choose another existing-storage location
-with `--coding-session-db PATH`. Resume with the same privacy/cost boundaries:
+with `--coding-session-db PATH`.
+
+Saved assistant outcomes also retain the host-observed effective route ID and
+ordered fallback attempts when available. `/history MESSAGE_ID` displays that
+metadata; subsequent turns and restart retain it even if the agent's report omits
+route names. A failed or expired outcome remains failed alongside any observed
+route attempts. These records identify execution routes, not guaranteed answer
+authorship or current account allowance. Private fallback handoff contents are
+not copied into this metadata; older messages without route evidence stay unknown.
+
+Resume with the same privacy/cost boundaries:
 
 ```powershell
 .\scripts\repo-assistant.ps1 --mode coding-chat --execute `

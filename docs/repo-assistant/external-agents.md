@@ -108,6 +108,63 @@ verified. Never substitute
 
 ## External Coding Agent Routes
 
+### Experimental Gemini CLI
+
+**Blocked individual route, 2026-10-14:** Google stopped serving Gemini CLI
+individual free/Pro/Ultra accounts on 2026-06-18. The adapter remains as offline
+integration evidence, but readiness/execution refuse the individual free route
+and offer no sign-in retry. Updating the client or using a cached token does not
+restore this access. Enterprise/API paths are separate and unmapped; Antigravity
+is not silently substituted. See the
+[official announcement](https://github.com/google-gemini/gemini-cli/discussions/28017).
+
+Gemini CLI is a distinct Google-account route (`gemini_cli`, billing source
+`gemini_cli_free`), separate from Antigravity and the Gemini API. The adapter
+requires CLI 0.64.0 and Node 24.21.0. It discovers the project-local `.tools`
+installation, or accepts `GEMINI_CLI_COMMAND` pointing to the official JS entry
+or npm shim and `GEMINI_NODE_COMMAND` pointing to Node. It executes the JS entry
+directly, passing complete instructions/history on stdin. Echoed user input is
+redacted from native event logs; host conversation history is preserved.
+
+The separate `packages/ai_orchestrator/examples/gemini_cli_catalog.toml` is an
+explicit opt-in; it is not included in the default catalog. It also retains the
+existing Requesty free entry as a same-tier fallback when that API route is
+configured. Its live zero-price checks and normal privacy/quality gates still
+apply. Neither route certifies remaining allowance. Gemini's STANDARD quality
+is provisional, not evaluated. A planning-only check from the repository root:
+
+```powershell
+.\scripts\repo-assistant.ps1 --mode plan `
+    --catalog packages/ai_orchestrator/examples/gemini_cli_catalog.toml `
+    --route-id gemini-cli-free-flash --cost-policy free_only `
+    --privacy public_or_low_risk --quality standard `
+    --shared-tools coding 'Inspect the selected route.'
+```
+
+The owner's attempted native Google sign-in returned the retirement error.
+Readiness now refuses this free route without reading credentials or starting
+login. API-key, Vertex and auth/system-settings overrides also refuse. The
+planning example renders configuration only; no sign-in or model call occurs.
+
+Execution requires shared inspection/coding tools. Generated project settings
+disable native tools, hooks, extensions, updates, IDE integration and prompt
+telemetry. Existing `.gemini/settings.json` is refused rather than overwritten;
+only an unchanged generated file is removed. Effective client settings are
+checked before inference, including conflicts with administrator settings.
+Native MCP confirmations are bypassed only for the shared server, whose host
+continues to enforce per-call workspace/approval policy. Native resume, images,
+search flags and other Codex-specific options are unmapped and refuse; host-owned
+coding-chat history and fallback handoffs retain their existing contracts.
+
+The adapter normalizes assistant deltas, tool events, failed error channels and
+reported session usage. Gemini execution has an absolute deadline and retained
+process-tree ownership. Same-tier free fallback uses existing orchestration
+policy, but readiness excludes the retired Gemini candidate. HIGH, local-only
+and paid-route constraints are preserved. Connection and
+offline MCP success do not establish live quality or general chat parity.
+
+### Other external routes
+
 The catalog includes subscription/client-backed coding-agent routes alongside
 provider API routes:
 
@@ -278,8 +335,8 @@ commits or remote operations. Native provider coding tools expose the same Git
 implementations under the existing READ permission category. The default Codex
 MCP/delegation profile keeps its original tool set.
 
-The PyCharm-bundled Codex CLI verified in this repository is `codex-cli
-0.137.0`. On 2026-09-26, `gpt-5.5` completed a low-risk JSONL execution through
+The 2026-09-26 PyCharm-bundled Codex checkpoint used `codex-cli 0.137.0`.
+On that date, `gpt-5.5` completed a low-risk JSONL execution through
 ChatGPT sign-in, while `gpt-5.1` returned an upstream invalid-request error for
 this account. Keep both facts in mind when selecting routes.
 
@@ -312,9 +369,21 @@ wrapper does not create a transcript log for these auth-refresh commands.
 This is not full parity with the Codex IDE/ChatGPT environment: app/plugin
 tools, document-control tools, IDE-private state, and managed IDE
 approval surface are not automatically available through `codex exec`.
-Antigravity, Copilot, and Kiro are represented for route planning and
-diagnostics, but their execution adapters remain disabled until their official
-noninteractive command contracts and local executable paths are confirmed.
+Antigravity, Copilot, and Kiro have execution adapters; their supported approval
+and shared-tool mappings are described above. Executable availability, compatible
+client flags, authentication, allowance and scoped permission readiness still
+need verification for the selected route. Antigravity shared-tool execution
+remains refused until the required narrow MCP grants are configured. Adapter
+presence does not establish current account readiness or daily coding quality.
+
+The 2026-10-13 scoped comparison used an explicitly selected PyCharm ACP-bundled
+Codex `0.160.1`. Its native read-only review completed, but the public CLI initially
+treated its startup feature notice as failure. The adapter now recognizes only
+the complete known notice in its completed error-item shape; genuine failure
+labels and failed process exits remain failures. Raw notice evidence is retained.
+Matching-version source also labels other error items as nonfatal; broader
+classification is an unresolved owner decision, not part of this narrow fix.
+See the [readiness roadmap](development-roadmap.md) for acceptance limits.
 
 The accepted parity direction is recorded in
 `docs/decisions/ADR-024-codex-cli-parity-authorization-and-dev-tool-policy.md`.

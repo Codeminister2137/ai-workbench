@@ -1,5 +1,27 @@
 # Session History
 
+## 2026-10-14 free-source integration and methodology closeout
+
+Guarded, opt-in OpenRouter integration and Gemini historical transport contracts
+were completed offline. Gemini individual access is retired and refused; the
+OpenRouter production Free-plan privacy refusal remains unchanged. Neither route
+was promoted to a default or certified for general coding quality.
+
+Direct synthetic checks and full CLI acceptance were kept separate. Cohere's
+CLI trial produced an incorrect solution; NVIDIA's produced a correct source
+edit but omitted required companion tests and did not complete review. Preserved
+independent checks and cleanup establish those limited outcomes, not model ranks.
+
+The owner accepted offline adapter/settings conformance and cumulative numeric
+usage work next, retaining strict authoring/correction/freeze evidence alongside
+a distinct bounded iterative test/repair acceptance. Findings and 18 research
+links are preserved in [the methodology record](repo-assistant/agent-methodology-findings.md).
+Future research does not displace baseline CLI or its next supervision priority.
+
+Fresh closeout validation passed 2300 tests, with 3 skipped; Ruff, formatting and
+Pyright passed. Prior dirty work was retained in focused commits. Detailed local
+trial receipts, consumed grants and current account observations remain private.
+
 This file preserves historical session handoffs from `CURRENT_CONTEXT.md`.
 It is an archive — do not use it to direct new work. For current state and
 next actions, read `CURRENT_CONTEXT.md`.
@@ -277,3 +299,48 @@ Earlier session records are available in git log messages on commits before
 - `f86aca5` CLI defaults (D1 complete offline)
 - `72c2d81` fixed acceptance jobs (D3 complete offline, ADR-043)
 - Initial orchestrator, provider, agent, and Council foundation commits
+
+---
+
+## Session - CLI usability and immediate handoff repair (2026-10-13)
+
+The attended CLI work corrected actual byte-count reporting, added model-authored
+assertion coverage after host-guided recovery, and repaired narrow startup-warning
+classification and validation/delegation diagnostic wording. Host checks passed
+2,182 tests with three skips; Ruff, formatting and Pyright passed. Model test tools
+ran 19 scoped tests successfully. The subsequent local factual review failed
+acceptance; daily CLI quality remains incomplete. Interrupted cleanup evidence was
+reconciled separately, rather than rewritten as an observed historical transition.
+
+Repeatedly prepending new checkpoints to the entire old CURRENT_CONTEXT.md caused
+historical state to accumulate despite this archive. The full 101,393-byte local
+snapshot is preserved in ignored evidence at
+artifacts/attended-bytecount-assertions-20261013/current-context-before-20261013-1545.md.
+It contains private session context and is deliberately kept out of tracked history.
+CURRENT_CONTEXT.md was replaced with immediate state, remaining decisions and a
+candidate ledger. Future updates should replace its current sections in place and
+archive concise material history here, retaining private evidence locally.
+
+The owner authorized a continuous 3.5-hour work window from 15:45 to 19:15 Warsaw
+(13:45 to 17:15 UTC), with independent tasks selected when a candidate blocks.
+Sleep is conditional on completion and the fixed deadline. No merge or promotion
+was authorized; outbound model review remains a separate scoped decision.
+
+## OpenRouter free-first integration (2026-10-14)
+
+After Gemini individual sign-in refused due to verified service retirement, the
+owner approved prioritizing the already requested OpenRouter free API connection.
+Implemented distinct free-only provider identity/provenance and an opt-in catalog,
+reusing the shared chat/tool loop and fallback admission. Every call verifies exact
+free model/prices/tools and observed daily remaining requests; zero price caps,
+required parameters and deny-data-collection filters are mandatory. No paid retry,
+deposit, default change or quality promotion. Qwen candidate endpoint availability
+unverified (public listing empty); no live key check or inference ran. Gemini grant
+remains unused and does not transfer. Original tests/effects preserved in offline
+host-tool checks, including interruption after quota exhaustion. Canonical full
+validation2268 passed/3 skipped; affected Ruff/format/Pyright and diff checks passed.
+Final source check found Free-plan data-policy-routing entitlement contradicts
+unqualified routing documentation. Free/unknown-tier metadata therefore refuses
+inference; existing non-free-tier account mocks validate free-model transport.
+No account funding or privacy-policy weakening is implemented.
+Current handoff owns next attended metadata check and fresh bounded acceptance.
