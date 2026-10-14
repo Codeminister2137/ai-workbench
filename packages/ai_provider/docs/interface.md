@@ -25,6 +25,13 @@ Those responsibilities belong above this package, primarily in `ai_orchestrator`
 
 ## Core Types
 
+Function tools use `AIToolDefinition`/`AIToolParameter`. Array parameters may set
+optional `item_type_name` (for example, `"string"` for process argument lists),
+which emits the standard JSON Schema `items` property. Omitting it preserves the
+previous unconstrained-array schema. The agent's corresponding tool contract
+carries this metadata through its provider translation; tool handlers still own
+argument validation and effects.
+
 ### `AIMessage`
 
 One chat message with:

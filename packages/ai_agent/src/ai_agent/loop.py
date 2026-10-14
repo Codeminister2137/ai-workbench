@@ -180,6 +180,7 @@ def _tool_definition(definition: Any) -> AIToolDefinition:
                 required=parameter.required,
                 default=parameter.default,
                 enum_values=parameter.enum_values,
+                item_type_name=getattr(parameter, "item_type_name", None),
             )
             for parameter in definition.parameters
         ),

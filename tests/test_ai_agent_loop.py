@@ -106,6 +106,26 @@ def test_agent_loop_executes_tools_and_returns_final_response(tmp_path: Path) ->
     assert client.requests[1].messages[-1].role is MessageRole.TOOL
 
 
+def test_shared_process_argv_element_type_survives_provider_translation(tmp_path):
+    from ai_provider.foreground_tools import ForegroundTools
+
+    client = FakeClient()
+    owner = ForegroundTools(tmp_path)
+    try:
+        AgentLoop(
+            client,
+            owner.registry(),
+            ToolContext(tmp_path),
+            permissions=PermissionManager(policy=PermissionPolicy.permissive()),
+        ).run("Create the file")
+        for request in client.requests:
+            process = next(tool for tool in request.tools if tool.name == "process_start")
+            argv = process.to_json_schema()["function"]["parameters"]["properties"]["argv"]
+            assert argv["type"] == "array" and argv["items"] == {"type": "string"}
+    finally:
+        owner.close()
+
+
 def test_invalid_arguments_get_safe_schema_feedback_and_can_be_corrected(tmp_path):
     class Client(FakeClient):
         def complete(self, request):
