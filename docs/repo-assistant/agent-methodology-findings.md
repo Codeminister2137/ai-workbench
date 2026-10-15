@@ -147,6 +147,15 @@ predict a real model's call count. Preserve the failed run and seek a fresh owne
 decision before increasing the allowance. Do not borrow the review reserve,
 truncate instructions/history or weaken acceptance to make a small budget pass.
 
+With the subsequently approved 24-call allowance, the edit/report phase passed
+and frozen review reached all required tool observations before repeating reads.
+Local replay reproduced the checkpoint after the third unchanged test-file read;
+no tool/schema error explains this review stall. The original review deadline
+expired before the owner's continuation could be applied. A later chat approval
+does not renew an expired checkpoint or a consumed trial. Preserve that timing
+separately from the model's repeated reads. Passing source/oracle checks and
+completed review tools still cannot replace a missing substantive model report.
+
 2026-10-15 offline implementation follow-up: fresh acceptance preparation now
 returns ordinary tool/schema failures for correction, requires observing actual
 effects before another write, detects equivalent failures at unchanged state,

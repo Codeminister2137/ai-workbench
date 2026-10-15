@@ -1058,6 +1058,17 @@ do not confuse the configured total with the smaller coding allowance. A modest
 increase to the total call allowance is proposed for owner decision, retaining
 the review reserve, tool/time bounds and quality floor. No grant is extended.
 
+The owner approved a fresh 24-call attempt with unchanged tool/time bounds and
+review reserve. Its edit phase completed with a report, preserved original tests,
+three companion tests, independent six-test/oracle passes and one repair cycle.
+Frozen review performed the required reads, status/diff inspection and passing
+test run, then repeated unchanged reads without producing its substantive report.
+The attended continuation checkpoint expired at the original review deadline;
+later chat approval was not applied and did not renew the attempt. All owned
+children exited with verified cleanup. Acceptance remains failed/incomplete.
+Local trace replay confirms required review observations preceded the repeated
+reads; it does not establish why the model repeated them or prove quality parity.
+
 The fallback audit identified ADR-032's counts-only contract. The owner then chose
 context-aware transfer in ADR-059: eligible native coding routes receive complete
 observable mid-turn history only with at least 20% destination headroom after input,
