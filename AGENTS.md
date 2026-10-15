@@ -839,6 +839,12 @@ Unless explicitly waived:
 
 Be concise and technically precise.
 
+Every final response must give a concise, informative account of the verified
+outcome, relevant checks and remaining limitations. For material decisions,
+distinguish accepted choices from pending recommendations and state the viable
+options' pros and cons, recommendation and any owner question. A handoff link
+does not replace this user-facing summary.
+
 When the owner requests PC sleep at the end of work, include the date and time
 in Warsaw time (`Europe/Warsaw`, accounting for daylight saving) in the final
 report. Clearly distinguish scheduled sleep, the sleep request, and a verified
@@ -925,10 +931,31 @@ scoped approvals, live usage limits and owner authority. While the owner is away
 queue unresolved decisions and continue independent work; do not manufacture
 human approvals or broaden authorization to keep busy.
 
-Sleep remains separately authorized. Do not request it before the agreed deadline
-merely because a slice finished. For timed runs pass the recorded deadline to
-`scripts/workstation-sleep.ps1` using `-NotBeforeUtc`. Distinguish work time from
-waiting time, and scheduled sleep from a verified sleep transition.
+Every unattended closeout must state the actual work start and stop date/time in
+UTC and Europe/Warsaw, the original deadline, elapsed work versus known waiting
+or interruption time, and the reason for an early stop. Preserve these in the
+handoff before any power action. If the exact last-action time was not recorded,
+label the estimate and cite the last reliable timestamp; do not invent precision.
+Include completed work, checks, remaining limitations and pending decision briefs
+with each viable option's pros and cons and the technical recommendation.
+
+Sleep remains separately authorized. Finishing one slice does not justify an
+early stop or sleep. Once the window legitimately ends early, however, an owner
+instruction to sleep on early termination must be executed after saving the
+handoff and safely closing owned operations. This includes an evidenced stop
+because all remaining authorized work is blocked: an incomplete baseline or a
+blocked goal does not cancel that sleep instruction or become COMPLETE.
+For sleep authorized only at the deadline, pass the original UTC deadline to
+`scripts/workstation-sleep.ps1` using `-NotBeforeUtc`. For explicitly authorized
+early sleep, record the original deadline and early-stop evidence, then use the
+helper's immediate-sleep mode without that deadline argument. Never remove a
+time guard without the corresponding owner authorization. Report whether sleep
+was scheduled, requested, rejected or subsequently verified; a failed request
+must be reported, not silently treated as success.
+
+An explicit switch back to an attended session cancels pending unattended sleep
+that has not been requested. Do not issue a delayed sleep action to compensate
+for an earlier omission while the owner is using the computer.
 
 If the owner returns abruptly, including after a usage-limit interruption, switch
 to attended communication and verify actual queued task and process state. When

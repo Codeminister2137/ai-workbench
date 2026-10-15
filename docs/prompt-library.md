@@ -292,13 +292,27 @@ Instructions:
   waiting. Explain an early stop with candidate evidence and remaining time.
 - At closeout review diff/status, update the handoff's task status, validation,
   blockers and imperative next action/completion condition, and provide a
-  copy-ready new-session prompt. Sleep is a separate owner instruction.
+  copy-ready new-session prompt. Record actual start/stop date/time in UTC and
+  Europe/Warsaw, original deadline, elapsed work versus known waiting/interruption
+  time, and any early-stop reason. Label estimates when exact evidence is absent.
+- Sleep is separately authorized. If the owner authorized sleep on early
+  termination, execute it after a legitimate early closeout, saved handoff and
+  safe closure of owned operations, including when remaining work is blocked.
+  An incomplete baseline does not cancel that instruction. Use the sleep helper's
+  immediate mode for this explicit early authorization; retain -NotBeforeUtc with
+  the original deadline when sleep is authorized only at that deadline. Report
+  scheduled/requested/rejected/verified accurately. An explicit switch to attended
+  mode cancels unattended sleep not yet requested; do not sleep retrospectively.
 
 Output:
 Implement useful approved work throughout the window. Give concise progress at
 material phase changes and the runtime-required intervals. Finish with a verified
-visible report of completed work, checks, elapsed time, remaining candidates and
-any concrete blockers; do not claim the whole roadmap complete after one slice.
+visible report of completed work, checks, actual start/stop times, original
+deadline, elapsed work/waiting, early-stop reason, sleep outcome, remaining
+candidates and concrete blockers. Include concise material decision briefs:
+viable options, each option's pros and cons, recommendation and owner question;
+distinguish accepted decisions from pending proposals. Do not claim the whole
+roadmap complete after one slice or leave the summary only in a handoff file.
 ```
 
 ## `Codex: Session Boundary Check`

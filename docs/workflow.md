@@ -218,6 +218,18 @@ specific blockers and elapsed/remaining time. Preserve the original deadline
 through compaction and intermediate handoffs. Never pad a run with redundant
 checks or speculative changes; never bypass privacy, approval or usage limits.
 
+The visible final report must include actual start/stop date and time in UTC and
+Europe/Warsaw, the original deadline, elapsed work versus known waiting or
+interruption time, and the reason for stopping early. Label uncertain timestamps.
+Summarize material decisions with viable options, each option's pros and cons,
+recommendation and any owner question. Save this evidence before a power action.
+If the owner authorized sleep on early termination, a legitimate early stop with
+all remaining work blocked still requires that sleep action after safe cleanup;
+an incomplete product is not an exemption. Follow the sleep helper's immediate
+mode for explicit early authorization, or its original-deadline guard when sleep
+is authorized only at that deadline. Report the actual power-action outcome.
+Switching explicitly to attended mode cancels unattended sleep not yet requested.
+
 ### Persistent improvement goal: reliable unattended execution
 
 **OPEN, owner requested 2026-10-10.** Repeated attempts have not established a

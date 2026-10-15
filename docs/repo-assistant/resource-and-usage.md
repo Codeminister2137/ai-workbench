@@ -412,10 +412,19 @@ automatic task-completion hook or global power setting is installed.
 .\scripts\workstation-sleep.ps1 -Sleep -ReceiptPath artifacts\sleep-receipt.json
 ```
 
-For a timed unattended run, also pass its recorded UTC deadline using
+For a timed unattended run with sleep authorized only at its deadline, pass that
+recorded UTC deadline using
 `-NotBeforeUtc 'YYYY-MM-DDTHH:MM:SSZ'`. The helper refuses an early request rather
 than waiting or sleeping. The deadline is preserved in the receipt; the default
 without this argument retains explicitly authorized immediate sleep behavior.
+
+If the owner explicitly authorizes sleep when work ends early, use that immediate
+mode after a legitimate early closeout and safe cleanup, preserving the original
+deadline, actual stop time and reason in the handoff. Remaining blocked work or
+an incomplete baseline does not cancel this authorization. Do not omit the guard
+merely because one slice finished. An explicit return to attended mode cancels
+unattended sleep not yet requested; never issue retrospective sleep while the
+owner is using the PC.
 
 Save repository files and the handoff, finish or stop owned operations, inspect
 Git status/diff and preserve validation evidence before executing. This helper does
