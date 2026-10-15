@@ -76,9 +76,16 @@ The owner must select the convention and any path/retention changes before rollo
 
 ## Review limits and next slice
 
+The 2026-10-15 follow-up prepared browseable failed/passed CLI examples and a
+per-file metadata inventory in the local unattended-window evidence. The failed
+example separates an unapplied edit and safety stop from source correctness; the
+passed example labels simulated exhaustion and actual fallback effects. Original
+paths, databases and historical receipts remain unchanged. Owner selection of the
+entry-point/latest-run convention and separate reuse/retention policies is still
+required before producer rollout; the active handoff links the concrete examples.
+
 This inventory covers the main current writers/readers, not every example,
-private pilot script, sidecar, model-download log or consumer. Next: inspect a
-representative failed and successful CLI run against this proposal, enumerate
-their exact files and readers, and obtain the owner's layout choice. Separately
-resolve transcript path-reuse behavior and external raw-event retention; neither
+private pilot script, sidecar, model-download log or consumer. Next: obtain the
+owner's layout choice using the prepared examples and their file/reader inventory.
+Separately resolve transcript path-reuse behavior and external raw-event retention; neither
 is silently changed by a readability review.
