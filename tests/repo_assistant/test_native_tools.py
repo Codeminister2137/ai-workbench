@@ -80,6 +80,82 @@ def test_native_agent_provider_failure_reports_failed_status(capsys, monkeypatch
     assert "execution_status: failed" in output
 
 
+def test_cli_failure_keeps_cumulative_numeric_usage(tmp_path, capsys, monkeypatch):
+    import json
+    from dataclasses import replace
+
+    from ai_provider import AIMessage, AIRequest, MessageRole, PrivacyClass, ProviderError
+    from ai_provider.adapters.openai_compatible import OpenAICompatibleChatClient
+
+    catalog = _EXAMPLE.load_model_catalog(
+        Path("packages/ai_orchestrator/examples/model_catalog.toml")
+    )
+    prepared = _EXAMPLE.run_coding_prompt(
+        "Create a helper.",
+        _EXAMPLE.coding_task_profile(model_override="qwen2.5-coder:14b"),
+        catalog,
+    )
+    prepared = replace(
+        prepared,
+        response=None,
+        config=_EXAMPLE.BackendConfig(provider=_EXAMPLE.ProviderKind.OLLAMA, model="test"),
+    )
+    raw = {
+        "choices": [{"message": {"content": "ok"}, "finish_reason": "stop"}],
+        "usage": {"total_tokens": 13, "cost": 0},
+    }
+    monkeypatch.setattr(OpenAICompatibleChatClient, "_post_chat", lambda *args: raw)
+
+    def fail_after_observed_call(*args, **kwargs):
+        adapter = OpenAICompatibleChatClient(
+            _EXAMPLE.BackendConfig(
+                provider=_EXAMPLE.ProviderKind.REQUESTY, model="synthetic", api_key="fake"
+            )
+        )
+        request = AIRequest(
+            (AIMessage(MessageRole.USER, "public synthetic"),),
+            privacy_class=PrivacyClass.PUBLIC_OR_LOW_RISK,
+        )
+        adapter.complete(request)
+
+        def fail(*args):
+            raise ProviderError("synthetic disconnect")
+
+        monkeypatch.setattr(OpenAICompatibleChatClient, "_post_chat", fail)
+        adapter.complete(request)
+
+    monkeypatch.setattr(_EXAMPLE, "run_coding_prompt", lambda *args, **kwargs: prepared)
+    monkeypatch.setattr(_EXAMPLE, "_run_native_agent", fail_after_observed_call)
+    assert (
+        main(
+            [
+                "--mode",
+                "implement",
+                "Create a helper.",
+                "--repo-root",
+                str(tmp_path),
+                "--provider",
+                "ollama",
+                "--model",
+                "qwen2.5-coder:14b",
+                "--execute",
+            ]
+        )
+        == 1
+    )
+    output = capsys.readouterr().out
+    encoded = next(
+        line.split(": ", 1)[1]
+        for line in output.splitlines()
+        if line.startswith("cumulative_usage_json: ")
+    )
+    usage = json.loads(encoded)
+    assert usage["attempts"] == 2 and usage["responses"] == 1
+    assert usage["total_tokens"] == {"known_sum": 13, "observed_calls": 1, "coverage": "partial"}
+    assert usage["reported_cost_usd"]["coverage"] == "partial"
+    assert "primary_usage_source: unavailable" in output
+
+
 def test_native_agent_mode_executes_provider_tool_calls(tmp_path: Path, monkeypatch) -> None:
     from ai_orchestrator import PrivacyClass as OrchestratorPrivacyClass
 

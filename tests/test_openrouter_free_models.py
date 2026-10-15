@@ -24,6 +24,185 @@ from ai_provider.errors import ProviderErrorCategory
 MODEL = "qwen/qwen3.8-27b:free"
 
 
+@pytest.mark.parametrize("structured", [False, True])
+def test_continuation_roundtrip_is_transient_and_origin_bound(monkeypatch, tmp_path, structured):
+    from dataclasses import replace
+
+    from ai_provider import ProviderContinuation, SQLiteChatTranscriptStore
+    from ai_provider.adapters.openai_compatible import OpenAICompatibleChatClient
+    from ai_provider.chat_transcripts import messages_to_ai_messages
+    from ai_provider.native_admission import NativeCodingClient
+
+    secret = "synthetic-private-continuation"
+    state = (
+        {
+            "reasoning_details": [
+                {
+                    "type": "reasoning.encrypted",
+                    "data": secret,
+                    "id": "r1",
+                    "format": "test",
+                    "index": 0,
+                }
+            ]
+        }
+        if structured
+        else {"reasoning": secret}
+    )
+    raw = {"choices": [{"message": {"content": "answer", **state}, "finish_reason": "stop"}]}
+    calls = transport(monkeypatch, response=raw)
+    adapter = client()
+    assert isinstance(adapter, OpenRouterFreeChatClient)
+    answer = adapter.complete(request())
+    assert answer.message.continuation is not None
+    assert answer.message.continuation.payload == state
+    followup = AIRequest(
+        (answer.message,),
+        privacy_class=PrivacyClass.PUBLIC_OR_LOW_RISK,
+        temperature=1.0,
+        max_output_tokens=123,
+    )
+    adapter.complete(followup)
+    sent = json.loads(calls[-1].data)
+    assert sent["messages"][0] == {"role": "assistant", "content": "answer", **state}
+    assert sent["temperature"] == 1.0 and sent["max_tokens"] == 123
+    assert "reasoning" not in sent  # No unrequested generation setting.
+    assert secret not in repr(answer)
+    for changed in (
+        {"provider": "requesty"},
+        {"model": "other:free"},
+        {"base_url": "https://elsewhere.invalid/v1"},
+    ):
+        foreign = replace(
+            answer.message, continuation=replace(answer.message.continuation, **changed)
+        )
+        assert adapter._message_payload(foreign, MODEL) == {
+            "role": "assistant",
+            "content": "answer",
+        }
+    for role in (MessageRole.USER, MessageRole.TOOL, MessageRole.SYSTEM):
+        assert secret not in repr(
+            adapter._message_payload(replace(answer.message, role=role), MODEL)
+        )
+    other = OpenAICompatibleChatClient(BackendConfig(ProviderKind.REQUESTY, MODEL))
+    assert secret not in repr(other._message_payload(answer.message, MODEL))
+
+    oversized = replace(
+        answer.message,
+        continuation=ProviderContinuation(
+            "openrouter", MODEL, adapter.base_url, {"reasoning": secret * 1000}
+        ),
+    )
+    diagnostics = []
+    admitted = NativeCodingClient(adapter, adapter.config, 2048, diagnostics.append)
+    before = len(calls)
+    with pytest.raises(ProviderError, match="does not fit"):
+        admitted.complete(AIRequest((oversized,), privacy_class=PrivacyClass.PUBLIC_OR_LOW_RISK))
+    assert len(calls) == before and secret not in repr(diagnostics)
+    store = SQLiteChatTranscriptStore(tmp_path / "chat.sqlite3")
+    session = store.create_session(
+        repo_root=tmp_path, title="test", privacy_class="public_or_low_risk"
+    )
+    store.append_message(
+        session.session_id, role=answer.message.role, content=answer.message.content
+    )
+    assert messages_to_ai_messages(store.list_messages(session.session_id))[0].continuation is None
+    assert secret.encode() not in store.path.read_bytes()
+
+
+def test_stream_continuation_preserves_order_fragments_and_hides_metadata(monkeypatch):
+    chunks = [
+        {
+            "choices": [
+                {
+                    "delta": {
+                        "reasoning_details": [
+                            {"type": "reasoning.text", "index": 0, "text": "private-"}
+                        ]
+                    }
+                }
+            ]
+        },
+        {
+            "choices": [
+                {
+                    "delta": {
+                        "content": "ok",
+                        "reasoning_details": [
+                            {"index": 0, "text": "state"},
+                            {"type": "reasoning.encrypted", "index": 1, "data": "opaque"},
+                        ],
+                    }
+                }
+            ]
+        },
+        {"choices": [{"delta": {}, "finish_reason": "stop"}]},
+    ]
+    transport(monkeypatch, response=chunks)
+    adapter = client()
+    assert isinstance(adapter, OpenRouterFreeChatClient)
+    events = list(adapter.stream(request()))
+    final = events[-1]
+    assert isinstance(final, AIStreamFinal)
+    answer = final.response
+    assert answer.message.continuation is not None
+    assert answer.message.continuation.payload == {
+        "reasoning_details": [
+            {"type": "reasoning.text", "index": 0, "text": "private-state"},
+            {"type": "reasoning.encrypted", "index": 1, "data": "opaque"},
+        ]
+    }
+    assert "private-" not in repr(events) and "opaque" not in repr(events)
+    assert (
+        adapter._message_payload(answer.message, MODEL)["reasoning_details"]
+        == (answer.message.continuation.payload["reasoning_details"])
+    )
+
+
+def test_real_tool_loop_replays_continuation_and_tool_ids(monkeypatch, tmp_path):
+    from ai_agent import AgentLoop, ToolContext, default_coding_tools
+
+    (tmp_path / "public.txt").write_text("public fixture", encoding="utf-8")
+    replies = iter(
+        [
+            {
+                "choices": [
+                    {
+                        "message": {
+                            "content": "",
+                            "reasoning": "private-loop-state",
+                            "tool_calls": [
+                                {
+                                    "id": "call1",
+                                    "type": "function",
+                                    "function": {
+                                        "name": "read_file",
+                                        "arguments": '{"path": "public.txt"}',
+                                    },
+                                }
+                            ],
+                        },
+                        "finish_reason": "tool_calls",
+                    }
+                ]
+            },
+            {"choices": [{"message": {"content": "reviewed"}, "finish_reason": "stop"}]},
+        ]
+    )
+    calls = transport(monkeypatch, response=lambda: next(replies))
+    result = AgentLoop(client(), default_coding_tools(), ToolContext(tmp_path)).run(
+        "Read public.txt", privacy_class=PrivacyClass.PUBLIC_OR_LOW_RISK
+    )
+    assert result.response.message.content == "reviewed"
+    assert not result.tool_results[0].is_error
+    posts = [json.loads(call.data) for call in calls if call.get_method() == "POST"]
+    assistant, observation = posts[1]["messages"][-2:]
+    assert assistant["reasoning"] == "private-loop-state"
+    assert assistant["tool_calls"][0]["id"] == observation["tool_call_id"] == "call1"
+    assert "public fixture" in observation["content"]
+    assert "private-loop-state" not in repr(result)
+
+
 class Response:
     def __init__(self, payload):
         self.payload = payload

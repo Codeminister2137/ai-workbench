@@ -9,6 +9,7 @@ OpenAI-specific Responses API features are needed.
 from __future__ import annotations
 
 import json
+import math
 import socket
 import time
 from collections.abc import Iterator
@@ -32,12 +33,14 @@ from ai_provider.contracts import (
     FinishReason,
     MessageRole,
     ModelCapabilities,
+    ProviderContinuation,
     UsageMetadata,
     UsageSource,
 )
 from ai_provider.errors import ProviderError, ProviderErrorCategory
 from ai_provider.http_transport import urlopen
 from ai_provider.privacy import enforce_privacy_policy
+from ai_provider.turn_usage import observe_completion, observe_stream, observe_usage
 
 _DEFAULT_BASE_URLS = {
     ProviderKind.OPENAI: "https://api.openai.com/v1",
@@ -94,6 +97,7 @@ class OpenAICompatibleChatClient:
             provider=self.config.provider.value,
         )
 
+    @observe_completion
     def complete(self, request: AIRequest) -> AIResponse:
         """Execute a non-streaming Chat Completions request."""
 
@@ -103,10 +107,13 @@ class OpenAICompatibleChatClient:
         payload = self._chat_payload(request, stream=False)
         started = time.perf_counter()
         raw_response = self._post_chat(payload)
+        if isinstance(raw_response, dict):
+            observe_usage(self._usage_from_response(raw_response))
         latency_ms = (time.perf_counter() - started) * 1000
 
         return self._response_from_raw(raw_response, model=model, latency_ms=latency_ms)
 
+    @observe_stream
     def stream(self, request: AIRequest) -> Iterator[AIStreamEvent]:
         """Execute a streaming Chat Completions request and yield neutral events."""
 
@@ -120,8 +127,11 @@ class OpenAICompatibleChatClient:
         last_raw: dict[str, Any] | None = None
         usage_chunk: dict[str, Any] | None = None
         tool_fragments: dict[int, dict[str, Any]] = {}
+        continuation: dict[str, Any] = {}
 
         for raw_chunk in self._stream_chat(payload):
+            if isinstance(raw_chunk.get("usage"), dict):
+                observe_usage(self._usage_from_response(raw_chunk))
             last_raw = raw_chunk
             if raw_chunk.get("choices") == [] and isinstance(raw_chunk.get("usage"), dict):
                 usage_chunk = raw_chunk
@@ -137,10 +147,11 @@ class OpenAICompatibleChatClient:
             delta = choice.get("delta")
             if not isinstance(delta, dict):
                 delta = {}
+            self._collect_continuation(continuation, delta)
             content = delta.get("content")
             if isinstance(content, str) and content:
                 content_parts.append(content)
-                yield AIStreamDelta(content=content, raw_metadata=raw_chunk)
+                yield AIStreamDelta(content=content, raw_metadata=self._safe_metadata(raw_chunk))
             _collect_tool_fragments(
                 delta.get("tool_calls"), tool_fragments, provider=self.config.provider.value
             )
@@ -168,6 +179,7 @@ class OpenAICompatibleChatClient:
                 role=MessageRole.ASSISTANT,
                 content="".join(content_parts),
                 tool_calls=tool_calls,
+                continuation=self._continuation(continuation, model),
             ),
             backend=self._backend_for_model(model),
             usage=self._usage_from_response(usage_chunk or final_raw),
@@ -176,7 +188,7 @@ class OpenAICompatibleChatClient:
             ),
             latency_ms=(time.perf_counter() - started) * 1000,
             tool_calls=tool_calls,
-            raw_metadata=metadata,
+            raw_metadata=self._safe_metadata(metadata),
         )
         yield AIStreamFinal(response=final_response)
 
@@ -185,7 +197,10 @@ class OpenAICompatibleChatClient:
             self._verify_free_model(request.model or self.config.model)
         payload: dict[str, Any] = {
             "model": request.model or self.config.model,
-            "messages": [_message_to_payload(message) for message in request.messages],
+            "messages": [
+                self._message_payload(message, request.model or self.config.model)
+                for message in request.messages
+            ],
             "stream": stream,
         }
         if request.temperature is not None:
@@ -195,6 +210,18 @@ class OpenAICompatibleChatClient:
         if request.tools:
             payload["tools"] = [tool.to_json_schema() for tool in request.tools]
         return payload
+
+    def _message_payload(self, message: AIMessage, model: str) -> dict[str, Any]:
+        return _message_to_payload(message)
+
+    def _continuation(self, message: dict[str, Any], model: str) -> ProviderContinuation | None:
+        return None
+
+    def _collect_continuation(self, state: dict[str, Any], delta: dict[str, Any]) -> None:
+        """Collect only fields supported by the exact provider adapter."""
+
+    def _safe_metadata(self, raw: dict[str, Any]) -> dict[str, Any]:
+        return raw
 
     def _verify_free_model(self, model: str) -> None:
         """Fail closed if the exact Requesty model is absent or no longer zero-priced.
@@ -252,14 +279,17 @@ class OpenAICompatibleChatClient:
         )
         return AIResponse(
             message=AIMessage(
-                role=MessageRole.ASSISTANT, content=str(content), tool_calls=tool_calls
+                role=MessageRole.ASSISTANT,
+                content=str(content),
+                tool_calls=tool_calls,
+                continuation=self._continuation(raw_message, model),
             ),
             backend=self._backend_for_model(model),
             usage=self._usage_from_response(raw_response),
             finish_reason=self._finish_reason(choice.get("finish_reason")),
             latency_ms=latency_ms,
             tool_calls=tool_calls,
-            raw_metadata=raw_response,
+            raw_metadata=self._safe_metadata(raw_response),
         )
 
     def _backend_for_model(self, model: str) -> BackendInfo:
@@ -413,6 +443,15 @@ class OpenAICompatibleChatClient:
         input_tokens = raw_usage.get("prompt_tokens")
         output_tokens = raw_usage.get("completion_tokens")
         total_tokens = raw_usage.get("total_tokens")
+        cost = raw_usage.get("cost")
+        reported_cost = None
+        if isinstance(cost, (int, float)) and not isinstance(cost, bool) and cost >= 0:
+            try:
+                candidate = float(cost)
+                if math.isfinite(candidate):
+                    reported_cost = candidate
+            except OverflowError:
+                pass
         return UsageMetadata(
             source=UsageSource.PROVIDER_REPORTED,
             input_tokens=input_tokens if type(input_tokens) is int and input_tokens >= 0 else None,
@@ -420,6 +459,7 @@ class OpenAICompatibleChatClient:
             if type(output_tokens) is int and output_tokens >= 0
             else None,
             total_tokens=total_tokens if type(total_tokens) is int and total_tokens >= 0 else None,
+            reported_cost_usd=reported_cost,
         )
 
     @staticmethod

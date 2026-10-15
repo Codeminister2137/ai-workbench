@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from ai_provider import AIResponse
+from ai_provider.turn_usage import ACTIVE_USAGE
 
 
 @dataclass(frozen=True)
@@ -135,6 +136,9 @@ def print_run_metrics(
     _print_response_usage("primary", primary_response)
     print(f"scrutiny_elapsed_seconds: {_format_optional_seconds(scrutiny_elapsed_seconds)}")
     _print_response_usage("scrutiny", scrutiny_response)
+    ledger = ACTIVE_USAGE.get()
+    if ledger is not None:
+        print("cumulative_usage_json: " + json.dumps(ledger.summary(), sort_keys=True))
     if metrics.tracemalloc_started:
         tracemalloc.stop()
 
@@ -146,9 +150,11 @@ def _print_response_usage(prefix: str, response: AIResponse | None) -> None:
         print(f"{prefix}_usage_source: unavailable")
         return
     print(f"{prefix}_usage_source: {response.usage.source.value}")
+    print(f"{prefix}_usage_scope: final_response")
     print(f"{prefix}_input_tokens: {response.usage.input_tokens}")
     print(f"{prefix}_output_tokens: {response.usage.output_tokens}")
     print(f"{prefix}_total_tokens: {response.usage.total_tokens}")
+    print(f"{prefix}_reported_cost_usd: {response.usage.reported_cost_usd}")
     print(f"{prefix}_provider_latency_ms: {response.latency_ms}")
 
 

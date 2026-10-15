@@ -169,6 +169,7 @@ from ai_provider.transcripts import (
 from ai_provider.transcripts import (
     write_transcript_only as _write_transcript_only,
 )
+from ai_provider.turn_usage import usage_scope
 
 from ai_agent import (
     AgentLoop,
@@ -957,6 +958,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             ACTIVE_FOREGROUND.reset(foreground_token)
 
 
+@usage_scope
 def _main(
     argv: Sequence[str] | None = None,
     *,

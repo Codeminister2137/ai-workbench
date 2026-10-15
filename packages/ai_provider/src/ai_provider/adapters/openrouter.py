@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterator
+from copy import deepcopy
 from decimal import Decimal, InvalidOperation
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -16,9 +17,10 @@ from urllib.request import Request
 
 from ai_provider.adapters.openai_compatible import OpenAICompatibleChatClient
 from ai_provider.config import ProviderKind
-from ai_provider.contracts import AIRequest
+from ai_provider.contracts import AIMessage, AIRequest, MessageRole, ProviderContinuation
 from ai_provider.errors import ProviderError, ProviderErrorCategory
 from ai_provider.http_transport import urlopen
+from ai_provider.turn_usage import observe_usage
 
 BASE_URL = "https://openrouter.ai/api/v1"
 
@@ -29,6 +31,72 @@ class OpenRouterFreeChatClient(OpenAICompatibleChatClient):
     def __post_init__(self) -> None:
         if self.config.provider is not ProviderKind.OPENROUTER or self.base_url != BASE_URL:
             raise self._refusal("OpenRouter free access requires its official API endpoint.")
+
+    def _continuation(self, message: dict[str, Any], model: str) -> ProviderContinuation | None:
+        details = message.get("reasoning_details")
+        reasoning = message.get("reasoning")
+        if isinstance(details, list) and details:
+            payload = {"reasoning_details": deepcopy(details)}
+        elif isinstance(reasoning, str) and reasoning:
+            payload = {"reasoning": reasoning}
+        else:
+            return None
+        return ProviderContinuation(self.backend.provider, model, self.base_url, payload)
+
+    def _message_payload(self, message: AIMessage, model: str) -> dict[str, Any]:
+        payload = super()._message_payload(message, model)
+        state = message.continuation
+        if (
+            message.role is MessageRole.ASSISTANT
+            and state is not None
+            and (state.provider, state.model, state.base_url)
+            == (self.backend.provider, model, self.base_url)
+        ):
+            # Whitelist fields; adapter-owned state cannot replace role/content/tools.
+            for key in ("reasoning_details", "reasoning"):
+                if key in state.payload:
+                    payload[key] = deepcopy(state.payload[key])
+        return payload
+
+    def _collect_continuation(self, state: dict[str, Any], delta: dict[str, Any]) -> None:
+        reasoning = delta.get("reasoning")
+        if isinstance(reasoning, str):
+            state["reasoning"] = state.get("reasoning", "") + reasoning
+        details = delta.get("reasoning_details")
+        if not isinstance(details, list):
+            return
+        blocks = state.setdefault("reasoning_details", [])
+        for fragment in details:
+            if not isinstance(fragment, dict):
+                raise self._refusal("Invalid streamed reasoning detail; continuation unavailable.")
+            index = fragment.get("index")
+            previous = next(
+                (item for item in blocks if index is not None and item.get("index") == index), None
+            )
+            if previous is None:
+                blocks.append(deepcopy(fragment))
+                continue
+            for key, value in fragment.items():
+                if key in {"text", "data", "signature"} and isinstance(value, str):
+                    previous[key] = previous.get(key, "") + value
+                elif key in previous and previous[key] != value:
+                    raise self._refusal("Inconsistent streamed reasoning detail.")
+                else:
+                    previous[key] = deepcopy(value)
+
+    def _safe_metadata(self, raw: dict[str, Any]) -> dict[str, Any]:
+        def clean(value: Any) -> Any:
+            if isinstance(value, dict):
+                return {
+                    key: clean(item)
+                    for key, item in value.items()
+                    if key not in {"reasoning", "reasoning_details", "reasoning_content"}
+                }
+            if isinstance(value, list):
+                return [clean(item) for item in value]
+            return value
+
+        return clean(raw)
 
     def _refusal(self, message: str) -> ProviderError:
         return ProviderError(
@@ -113,6 +181,8 @@ class OpenRouterFreeChatClient(OpenAICompatibleChatClient):
 
     def _post_chat(self, payload: dict[str, Any]) -> dict[str, Any]:
         raw = super()._post_chat(payload)
+        if isinstance(raw, dict):
+            observe_usage(self._usage_from_response(raw))
         self._check_error(raw)
         return raw
 
@@ -128,6 +198,8 @@ class OpenRouterFreeChatClient(OpenAICompatibleChatClient):
     def _stream_chat(self, payload: dict[str, Any]) -> Iterator[dict[str, Any]]:
         finished: object = None
         for raw in super()._stream_chat(payload):
+            if isinstance(raw.get("usage"), dict):
+                observe_usage(self._usage_from_response(raw))
             self._check_error(raw)
             choices = raw.get("choices")
             if isinstance(choices, list) and len(choices) == 1:

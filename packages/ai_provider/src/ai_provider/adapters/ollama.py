@@ -31,6 +31,7 @@ from ai_provider.contracts import (
 )
 from ai_provider.errors import ProviderError, ProviderErrorCategory
 from ai_provider.privacy import enforce_privacy_policy
+from ai_provider.turn_usage import observe_completion, observe_stream, observe_usage
 
 
 def _tool_calls_from_raw(raw_calls: object) -> tuple[AIToolCall, ...]:
@@ -114,6 +115,7 @@ class OllamaChatClient:
 
         return (self.config.base_url or "http://localhost:11434").rstrip("/")
 
+    @observe_completion
     def complete(self, request: AIRequest) -> AIResponse:
         """Execute a non-streaming Ollama chat request."""
 
@@ -124,10 +126,13 @@ class OllamaChatClient:
 
         started = time.perf_counter()
         raw_response = self._post_chat(payload)
+        if isinstance(raw_response, dict):
+            observe_usage(self._usage_from_response(raw_response))
         latency_ms = (time.perf_counter() - started) * 1000
 
         return self._response_from_raw(raw_response, model=model, latency_ms=latency_ms)
 
+    @observe_stream
     def stream(self, request: AIRequest) -> Iterator[AIStreamEvent]:
         """Execute a streaming Ollama chat request and yield neutral events."""
 
@@ -142,6 +147,8 @@ class OllamaChatClient:
         final_response: AIResponse | None = None
 
         for raw_chunk in self._stream_chat(payload):
+            if raw_chunk.get("done") is True:
+                observe_usage(self._usage_from_response(raw_chunk))
             raw_message = raw_chunk.get("message")
             is_done = raw_chunk.get("done") is True
             if raw_message is None and is_done:
