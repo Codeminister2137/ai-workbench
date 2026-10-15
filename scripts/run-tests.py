@@ -24,6 +24,7 @@ GROUPS = {
         "tests/test_codex_usage.py",
         "tests/test_copilot_usage.py",
         "tests/test_kiro_usage.py",
+        "tests/test_turn_usage.py",
     ),
     "orchestrator": (
         "tests/test_orchestrator_*.py",
@@ -60,6 +61,8 @@ GROUPS = {
         "tests/test_live_delegation_runner_example.py",
         "tests/test_test_suites.py",
         "tests/test_workstation_resources.py",
+        "tests/test_workstation_sleep.py",
+        "tests/test_sampling_controls.py",
     ),
     "research": (
         "tests/test_research_*.py",
