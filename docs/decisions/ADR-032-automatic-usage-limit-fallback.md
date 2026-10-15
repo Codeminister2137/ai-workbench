@@ -3,6 +3,13 @@
 **Status:** Accepted
 **Date:** 2026-10-01
 
+**Partially superseded on 2026-10-15:**
+[ADR-059](ADR-059-context-aware-observable-fallback-history.md) permits transient
+full observable history for eligible native coding fallback when the destination
+retains 20% headroom; otherwise the bounded handoff remains. Provider-private
+reasoning and saved/emergency handoffs remain excluded. Historical rationale below
+is preserved.
+
 **Partially superseded on 2026-10-04:**
 [ADR-042](ADR-042-overload-fallback-and-configurable-continuation-quality.md)
 adds overload fallback and defaults to preserving original declared quality,

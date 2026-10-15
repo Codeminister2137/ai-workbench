@@ -11,6 +11,13 @@ provider/model/endpoint. It is not answer text or durable history; input admissi
 counts it. Ollama preserves multi-turn thinking without an implicit adapter cache.
 See the [high-priority conformance plan](documentation-conformance-plan.md).
 
+Native coding fallback may transfer complete observable messages/tool history
+transiently when the destination request leaves at least 20% context headroom
+after input, tools, reserved output and framing (ADR-059). Otherwise retain the
+bounded observed-state handoff, including unknown effective capacity. Provider
+continuation, saved handoffs and weaker preservation prompts remain excluded;
+privacy, billing, quality and approval gates still precede implementation fallback.
+
 The projects form a small ecosystem:
 
 `Applications → AI Orchestrator decisions → execution adapter → Ollama / Requesty / direct providers`

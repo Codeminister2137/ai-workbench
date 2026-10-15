@@ -1011,13 +1011,15 @@ oracle and cleanup. The unattended branch records a slice blocker requiring
 wider-plan selection; this is not an independent work supervisor. Live entry
 remains disabled pending fresh route/privacy authorization and launch sealing.
 
-The fallback audit confirmed an unresolved contract boundary: ADR-032 retains
-native mid-turn checkpoints locally but forwards counts instead of raw tool
-arguments/results. Full required instructions and ordinary conversation do not
-establish full observable mid-turn history transfer. An owner decision is needed
-before changing that data boundary. Existing quality/privacy/billing/approval
-gates passed deterministic checks. Baseline remains INCOMPLETE; no live quality,
-availability, default promotion or new inference grant follows from these checks.
+The fallback audit identified ADR-032's counts-only contract. The owner then chose
+context-aware transfer in ADR-059: eligible native coding routes receive complete
+observable mid-turn history only with at least 20% destination headroom after input,
+tools, output and framing; otherwise retain the bounded handoff. Unknown effective
+capacity, including unmeasured external-client context, uses the bounded handoff.
+Provider-private reasoning and saved/emergency handoffs remain excluded. Existing
+quality/privacy/billing/approval gates still apply. Implementation is validated
+offline; baseline remains INCOMPLETE. No live quality, availability, default
+promotion or new inference grant follows from these checks.
 
 At the 2026-10-04 implementation checkpoint, the full offline suite passed:
 857 tests, seven live checks skipped. Ruff and Pyright passed. Separate live checks

@@ -1312,6 +1312,46 @@ def test_native_loop_preserves_tool_history_on_provider_limit(tmp_path):
     assert error.value.partial_messages[-2].tool_calls[0].name == "create_file"
 
 
+def test_transient_checkpoints_accumulate_across_routes_but_never_enter_saved_handoff(
+    monkeypatch, routes
+):
+    from ai_provider import AIMessage, MessageRole, ProviderContinuation
+
+    saved = []
+    reports = []
+    run = session(monkeypatch, routes, save_handoff=saved.append, progress=reports.append)
+    observed_lengths = []
+
+    def execute(target, prompt):
+        observed_lengths.append(len(run.continuation_messages))
+        assert "PRIVATE_OBSERVABLE_RESULT" not in prompt
+        error = ProviderError("quota", category=ProviderErrorCategory.USAGE_LIMIT)
+        error.partial_messages = (
+            AIMessage(
+                MessageRole.TOOL,
+                "PRIVATE_OBSERVABLE_RESULT",
+                name="edit_file",
+                continuation=ProviderContinuation(
+                    "source", "model", "endpoint", {"reasoning": "PRIVATE_REASONING"}
+                ),
+            ),
+        )
+        raise error
+
+    with pytest.raises(ProviderError, match="quota"):
+        run.run("Original objective", execute, lambda result: False, observe=str)
+    assert observed_lengths == [0, 1, 2]
+    assert len(run.continuation_messages) == 3
+    assert all(message.continuation is None for message in run.continuation_messages)
+    assert "PRIVATE_OBSERVABLE_RESULT" not in json.dumps(saved)
+    assert "PRIVATE_REASONING" not in json.dumps(saved)
+    assert not any("PRIVATE_" in line for line in reports)
+
+    with pytest.raises(ProviderError, match="No ready continuation"):
+        run.run("New invocation", execute, lambda result: False, observe=str)
+    assert run.continuation_messages == ()
+
+
 def test_handoff_omits_raw_external_tool_payload():
     from ai_agent.repo_coding_assistant import _fallback_observed
 

@@ -575,3 +575,14 @@ preserved. Forward explicit values through task API/native loops and compatible
 fallback; refuse external clients without a verified mapping. No automatic model
 preset, template override, persisted default or fresh live grant is implied.
 See [ADR-058](decisions/ADR-058-opt-in-task-sampling-controls.md).
+
+## ADR-059 - Context-aware observable fallback history
+
+**Status:** Accepted (2026-10-15); implemented offline, live acceptance incomplete.
+
+Owner selected full observable history for eligible native coding fallback only
+when input, tools, output and framing leave at least 20% destination headroom.
+Otherwise retain the bounded handoff, including unknown effective capacity.
+Provider-private reasoning, weaker preservation prompts and saved handoffs remain
+excluded. Rationale: replacement models have different context limits.
+See [ADR-059](decisions/ADR-059-context-aware-observable-fallback-history.md).

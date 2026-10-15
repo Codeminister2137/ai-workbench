@@ -159,6 +159,16 @@ context_window_tokens = 262144
         elif counts[host] == 0:
             assert "Route-failure continuation" in messages
             assert source.read_text() == "value = 1\n"
+            history_message = payload["messages"][-1]["content"]
+            history = json.loads(history_message.split("\n", 1)[1])
+            assert history[-1]["role"] == "tool"
+            assert history[-1]["tool_call_id"] == "openrouter.ai-1"
+            assert history[-2]["tool_calls"][0]["arguments"] == {
+                "path": "source.py",
+                "old_text": "value = 0",
+                "new_text": "value = 1",
+            }
+            assert all(item["continuation"] is None for item in history)
         index = counts[host]
         expected_values = (0, 0, 1) if host == "openrouter.ai" else (1, 1, 2)
         assert source.read_text() == f"value = {expected_values[index]}\n"

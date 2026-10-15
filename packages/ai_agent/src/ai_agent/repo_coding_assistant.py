@@ -2767,8 +2767,17 @@ def _execute_fallback_route(
         )
     config = backend_config_from_execution_target(target)
     if args.mode == "implement" or getattr(args, "shared_tools", None):
+        continuation_args = argparse.Namespace(**vars(args))
+        continuation_args._fallback_history = getattr(
+            getattr(args, "fallback_session", None), "continuation_messages", ()
+        )
         return _run_native_agent(
-            prompt, config, profile, args, repo_root, progress_callback=progress_callback
+            prompt,
+            config,
+            profile,
+            continuation_args,
+            repo_root,
+            progress_callback=progress_callback,
         )
     from ai_provider.coding_assist import coding_request_from_prompt
 
@@ -3595,13 +3604,24 @@ def _run_native_agent(
         system_prompt = RESEARCH_SYSTEM_PROMPT + ("\n" + args.system if args.system else "")
     else:
         system_prompt = build_native_tool_system_prompt(args.system)
-        client = prepare_native_coding_client(
+        native_client = prepare_native_coding_client(
             client,
             config,
             args,
             progress_callback or print,
             client_factory=create_chat_client,
         )
+        client = native_client
+        fallback_history = getattr(args, "_fallback_history", ())
+        if fallback_history:
+            from ai_provider.fallback_context import FallbackHistoryClient
+
+            client = FallbackHistoryClient(
+                native_client,
+                fallback_history,
+                getattr(native_client, "context_tokens", None),
+                progress_callback or print,
+            )
         away_minutes = getattr(args, "away_minutes", None)
         if away_minutes is not None:
             system_prompt = _system_prompt_with_away_budget(

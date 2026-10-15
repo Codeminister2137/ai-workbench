@@ -53,6 +53,16 @@ An existing explicit request output limit is respected and reserved. Overflow
 refuses before the next inference call; earlier effects and complete loop receipts
 remain available for reconciliation.
 
+For native coding fallback, ADR-059 additionally requires 20% spare destination
+context before adding complete observable prior-route messages/tool history.
+This uses the same complete-request estimate, output reservation and 256 framing
+tokens, and is rechecked as tool results grow. Near the limit or with unknown
+effective capacity, use the existing bounded handoff. External clients' internal
+context cannot be assessed here and retains bounded handoff behavior. Provider
+continuation is excluded from cross-route history, and no raw checkpoint is saved
+in the metadata handoff. Neither mode trims required instructions or bypasses
+hard input admission, privacy, quality, billing or approval gates.
+
 Diagnostics label this `estimated_utf8` and `verified_token_count=false`. This
 heuristic can reject inputs an exact tokenizer would fit and cannot prove actual
 native capacity. It must not be reported as a verified token count. The verified

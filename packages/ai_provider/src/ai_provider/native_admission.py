@@ -153,6 +153,18 @@ def _scope_fingerprint(value: Any) -> str | None:
         return None
 
 
+def estimate_coding_input_tokens(request: AIRequest) -> int:
+    """Estimate complete coding input, including message metadata and tool schemas."""
+    serialized = json.dumps(
+        {
+            "messages": [asdict(message) for message in request.messages],
+            "tools": [tool.to_json_schema() for tool in request.tools],
+        },
+        ensure_ascii=False,
+    ).encode("utf-8")
+    return (len(serialized) + 1) // 2
+
+
 @dataclass(slots=True)
 class NativeCodingClient:
     """Check every turn, including history, before forwarding a coding request.
@@ -215,14 +227,7 @@ class NativeCodingClient:
             raise ProviderError(
                 "Invalid native output budget", category=ProviderErrorCategory.CONFIGURATION
             )
-        serialized = json.dumps(
-            {
-                "messages": [asdict(message) for message in request.messages],
-                "tools": [tool.to_json_schema() for tool in request.tools],
-            },
-            ensure_ascii=False,
-        ).encode("utf-8")
-        estimated = (len(serialized) + 1) // 2
+        estimated = estimate_coding_input_tokens(request)
         estimate_kind = "estimated_utf8"
         if self.measured_prefix_prototype and self.config.provider is ProviderKind.OLLAMA:
             scope = _scope_fingerprint(

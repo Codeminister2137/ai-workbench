@@ -120,11 +120,14 @@ test inventory/oracle, substantive host review and owned cleanup; 80 combined
 guard/progress checks and 207 existing fallback contract checks passed. This is
 software evidence only. Strict historical evaluations remain separate and unchanged.
 
-Cross-route history has a narrower existing contract than full parity: ADR-032
-keeps native checkpoints locally and forwards a counts-only handoff. Whether to
-transfer ordinary mid-turn messages/tool calls/results transiently to an already
-eligible implementation route is pending owner choice. Provider-private reasoning
-remains excluded by ADR-055; no data-boundary change is implemented by this audit.
+The owner subsequently selected context-aware observable-history transfer in
+ADR-059, partially superseding ADR-032's counts-only handoff. Native coding routes
+use full ordinary mid-turn messages/tool calls/results only with 20% destination
+headroom after the complete input, tools, output and framing; otherwise use the
+bounded handoff. Unknown effective capacity also selects bounded mode. This is
+implemented offline, without provider-private reasoning transfer, raw checkpoint
+persistence or changes to privacy/quality/billing/approval gates. External native
+clients retain bounded mode while their full request remains unmeasured.
 Independent unattended supervision remains after baseline parity.
 
 | Source | Why retain it / question to revisit |

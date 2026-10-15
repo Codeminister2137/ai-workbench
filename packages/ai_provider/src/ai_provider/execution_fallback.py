@@ -12,6 +12,7 @@ from ai_orchestrator import ExecutionTarget, ModelCatalogEntry, TaskProfile, pre
 from ai_orchestrator.fallback import FallbackQualityPolicy, fallback_candidates, fallback_profile
 
 from ai_provider.agent_readiness import AgentReadiness, check_agent_readiness
+from ai_provider.contracts import AIMessage
 from ai_provider.errors import ProviderError, ProviderErrorCategory
 from ai_provider.external_agents import ExternalAgentResult, is_external_agent_access_method
 
@@ -108,6 +109,7 @@ class FallbackSession:
         self.preservation_ready: dict[str, ExecutionTarget] = {}
         self.unavailable: dict[str, str] = {}
         self.primary_ready = True
+        self.continuation_messages: tuple[AIMessage, ...] = ()
         checked: dict[Any, AgentReadiness] = {}
         if not enabled and interactive_login:
             return
@@ -260,6 +262,7 @@ class FallbackSession:
         """Continue comparable work after usage/availability failure; never replay effects."""
 
         current_prompt = prompt
+        self.continuation_messages = ()
         observed_history: list[str] = []
         if not self.primary_ready:
             raise ProviderError(
@@ -327,6 +330,9 @@ class FallbackSession:
                 error = exc
                 limited = not overload
                 messages = exc.partial_messages
+                self.continuation_messages += tuple(
+                    replace(message, continuation=None) for message in messages
+                )
                 tool_count = sum(message.role.value == "tool" for message in messages)
                 observed = (
                     "Provider reported a route failure. "
