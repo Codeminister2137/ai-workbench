@@ -1032,6 +1032,22 @@ no-network process tests exercise both that gate and real seal validation before
 a local sink. Consumed evidence remains unchanged; any successor needs a fresh
 input/path/attempt grant. Baseline remains INCOMPLETE.
 
+The next approved public/synthetic attempt reached 14 completions and one repair
+cycle, with five visible tests passing. It stopped before executing a proposed
+tool outside the fixture scope. No final model report or frozen review completed;
+the exact refused tool name was not retained. All owned children exited with
+verified cleanup. Separate poststop host checks passed the five tests and bounded
+oracle, preserving three original methods, but do not complete the missing model
+phases. This is partial coding evidence and a failed acceptance, not parity.
+
+Poststop investigation also reproduced a verifier defect: the oracle reloaded
+original methods from the edited live test file, losing the companion-test
+baseline. Separate local repair verifies the prepared Git-index snapshot against
+the sealed input hash before reusing AST inspection and the existing oracle.
+A fresh offline successor also retains refused tool name/phase without arguments
+or raw continuation. Safety boundaries remain unchanged; consumed evidence is
+immutable. Another live attempt requires fresh inputs, sealing and a one-use grant.
+
 The fallback audit identified ADR-032's counts-only contract. The owner then chose
 context-aware transfer in ADR-059: eligible native coding routes receive complete
 observable mid-turn history only with at least 20% destination headroom after input,

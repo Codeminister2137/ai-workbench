@@ -123,6 +123,21 @@ test must exercise the actual child process chain, guard and real seal checks,
 with a local sink replacing the network operation. Preserve the consumed attempt;
 do not infer that a zero-completion failure authorizes an automatic retry.
 
+The subsequent approved attempt made 14 completions, repaired the source and
+passed five visible tests, then stopped on a proposed tool outside fixture scope.
+The receipt retained no tool name; its identity remains unknown. Preserve the
+refusal and missing final report/frozen review as failed acceptance even when
+poststop host tests and the bounded oracle pass. Record minimal rejected-tool
+identity in future receipts without saving arguments or private continuation.
+
+Poststop checks exposed another false-positive preflight gap: the oracle read
+its original-test baseline from the now-edited live file. Scripted workflows in
+separate workspaces left that baseline untouched and missed the defect. Verify
+the prepared original snapshot against its manifest, then compare the final AST
+against that immutable baseline. A regression must exercise added companions in
+the same mutable fixture and reject changed originals/index content. Keep host
+verifier failures separate from model correctness and missing model phases.
+
 2026-10-15 offline implementation follow-up: fresh acceptance preparation now
 returns ordinary tool/schema failures for correction, requires observing actual
 effects before another write, detects equivalent failures at unchanged state,
