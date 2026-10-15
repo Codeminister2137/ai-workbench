@@ -111,6 +111,22 @@ INCOMPLETE; this decision authorizes no inference or general quality promotion.
 
 ## Source index for later research
 
+2026-10-15 offline implementation follow-up: fresh acceptance preparation now
+returns ordinary tool/schema failures for correction, requires observing actual
+effects before another write, detects equivalent failures at unchanged state,
+and preserves attended continuation within the original envelope. Syntax feedback
+does not execute uninspected code. The scripted full workflow passed independent
+test inventory/oracle, substantive host review and owned cleanup; 80 combined
+guard/progress checks and 207 existing fallback contract checks passed. This is
+software evidence only. Strict historical evaluations remain separate and unchanged.
+
+Cross-route history has a narrower existing contract than full parity: ADR-032
+keeps native checkpoints locally and forwards a counts-only handoff. Whether to
+transfer ordinary mid-turn messages/tool calls/results transiently to an already
+eligible implementation route is pending owner choice. Provider-private reasoning
+remains excluded by ADR-055; no data-boundary change is implemented by this audit.
+Independent unattended supervision remains after baseline parity.
+
 | Source | Why retain it / question to revisit |
 | --- | --- |
 | [OpenRouter reasoning documentation](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens) | Returned reasoning exclusion differs from disabling generation; investigate documented continuation through tool turns and exact route requirements. |

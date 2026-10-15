@@ -1002,6 +1002,23 @@ cases as pending work, rather than presenting them as executable queue entries.
 
 ## Session handoff and milestone updates
 
+2026-10-15 attended follow-up: a fresh successor acceptance preparation implements
+ordinary tool/schema correction, syntax feedback without executing uninspected
+code, effect inspection before another write, and equivalent-error stall detection
+using the existing CLI/owned-process components. Its complete scripted offline
+edit/test/repair/report/frozen-review workflow passed independent tests, the host
+oracle and cleanup. The unattended branch records a slice blocker requiring
+wider-plan selection; this is not an independent work supervisor. Live entry
+remains disabled pending fresh route/privacy authorization and launch sealing.
+
+The fallback audit confirmed an unresolved contract boundary: ADR-032 retains
+native mid-turn checkpoints locally but forwards counts instead of raw tool
+arguments/results. Full required instructions and ordinary conversation do not
+establish full observable mid-turn history transfer. An owner decision is needed
+before changing that data boundary. Existing quality/privacy/billing/approval
+gates passed deterministic checks. Baseline remains INCOMPLETE; no live quality,
+availability, default promotion or new inference grant follows from these checks.
+
 At the 2026-10-04 implementation checkpoint, the full offline suite passed:
 857 tests, seven live checks skipped. Ruff and Pyright passed. Separate live checks
 described above ran only during the owner-selected compute window. No new runtime
