@@ -50,13 +50,21 @@ Its later host oracle pass is diagnostic only; acceptance remains failed.
 
 The owner approved preparing a fresh 16-edit/4-review trial and requested an
 alternative to repeated hard iteration cutoffs without allowing indefinite loops.
-Progress-aware checkpoints are under investigation; no warning, recovery or stop
-policy is selected or implemented. Distinguish resource exhaustion from observed
-incorrectness, while preserving raw CLI status and strict historical outcomes.
-Any alternative must retain explicit privacy, authorization and resource ceilings,
-independent acceptance, fresh live grants and verified cleanup. Review allowance
-must support serial tool use rather than relying on model batching. Thresholds,
-attended versus automatic recovery and flexible phase allocation remain decisions.
+The owner subsequently approved attended stall checkpoints and flexible phase
+allocation. An isolated acceptance harness now pauses before another provider
+call on repeated unchanged reads or repeated failed tests at the same file state.
+It reuses the existing deadline-bound terminal approval channel; no answer closes
+the run, and a late approval cannot renew the grant. No-op edits and A/B/A state
+oscillation do not erase the observations. Automatic recovery is not selected.
+
+One total resource envelope and a serial-review reserve replace independent phase
+call caps for this experiment. Deterministic checks cover serial inspection/repair/
+review, checkpoint refusal, history/continuation preservation, expiry and cleanup.
+Separate acceptance outcomes distinguish resource exhaustion from correctness,
+provider and safety failures while preserving raw CLI status and strict historical
+outcomes. Privacy/authorization guards, independent acceptance and fresh live
+grants remain required. This test harness does not change normal CLI defaults or
+establish live quality, unattended checkpointing or general anti-loop coverage.
 
 ## Source index for later research
 
