@@ -1076,6 +1076,16 @@ there is no fabricated coding history or model authorship. This is a proposed
 narrow acceptance question, with no live entry point or inference grant. A
 review-only success would not pass the consumed workflow or establish parity.
 
+The owner subsequently approved one focused review attempt. It completed in seven
+replies with six tool calls, a substantive final report, six passing tests, no
+writes or stall checkpoint, unchanged frozen inputs and verified owned cleanup.
+Independent host assessment accepted the report against the actual source, diff
+and observations. This answers the narrow review question only; the earlier
+workflow remains failed, and neither prompt causality nor general parity is
+established. A fresh integrated preparation retains complete coding history and
+adds the explicit review completion instruction. Its live execution needs a new
+one-use grant; no model grade, production default or fallback quality is promoted.
+
 The fallback audit identified ADR-032's counts-only contract. The owner then chose
 context-aware transfer in ADR-059: eligible native coding routes receive complete
 observable mid-turn history only with at least 20% destination headroom after input,

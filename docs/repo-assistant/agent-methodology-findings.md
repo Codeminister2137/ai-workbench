@@ -156,6 +156,14 @@ does not renew an expired checkpoint or a consumed trial. Preserve that timing
 separately from the model's repeated reads. Passing source/oracle checks and
 completed review tools still cannot replace a missing substantive model report.
 
+A separately authorized standalone frozen review subsequently completed with a
+substantive report, required tool observations, six passing tests, no writes or
+stall and verified cleanup. Independent inspection accepted this narrow result.
+It used an explicit completion instruction and a fresh task without a coding
+conversation, so it does not isolate the cause of the earlier stall. Carry that
+instruction into a fresh integrated preparation while retaining all required
+coding history; do not infer that history may be dropped or prior failures passed.
+
 2026-10-15 offline implementation follow-up: fresh acceptance preparation now
 returns ordinary tool/schema failures for correction, requires observing actual
 effects before another write, detects equivalent failures at unchanged state,
