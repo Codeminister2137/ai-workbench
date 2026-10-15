@@ -1,5 +1,55 @@
 # Resource windows, usage and completion
 
+## CLI response and cumulative usage
+
+Provider CLI metrics label `primary` and `scrutiny` usage as `final_response`.
+Those numbers describe the selected response, not every call made to obtain it.
+`cumulative_usage_json` separately covers instrumented Ollama and compatible
+provider adapter calls within one CLI invocation (one coding-chat turn), including
+prompt preparation, tool turns, support calls and fallback when they use those
+adapters. External native-client allowance receipts remain separately reported;
+this ledger does not claim their usage or the account's remaining allowance.
+
+The transient ledger stores numeric per-call observations only. Each field has
+`known_sum`, `observed_calls` and `coverage`: `complete`, `partial` or `unknown`.
+No observations gives null, never zero. A reported zero cost is a known zero;
+zero-price admission alone does not prove that an unobserved failed call cost zero.
+Token and cost coverage can differ. Estimated tokens do not become provider totals.
+`reported_cost_usd` normalizes a finite nonnegative numeric `usage.cost`, without
+estimating prices. [Requesty documents this field as USD](https://docs.requesty.ai/).
+
+Attempts count adapter invocations, including admission or transport failures;
+they are not certified HTTP POST counts. Responses count normalized responses.
+Numeric usage received before a malformed final response or stream failure remains
+observed, with partial coverage even if every call supplied some numbers. Complete
+coverage requires a normalized response and that field for every adapter call;
+it does not certify tool/task success. Missing failed-call usage makes coverage
+partial or unknown. The scope ends even on errors; no cross-turn cumulative
+session total or new storage is introduced.
+
+## Hosted continuation and settings conformance
+
+The OpenRouter adapter reuses ADR-055's transient `ProviderContinuation`: preserve
+the full `reasoning_details` sequence when present, otherwise the returned
+`reasoning` text. Stream fragments are assembled before replay. Only assistant
+messages sent back to the same provider/model/endpoint replay these fields;
+other targets omit them. Raw response/delta metadata excludes those fields, and
+ordinary representations, numeric receipts and persisted answer history omit them.
+Complete-input admission includes continuation; unsupported exact-count profiles
+refuse it. This follows the [OpenRouter continuation contract](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens).
+
+This is offline protocol conformance, not proof of changed model quality or a
+reasoning-generation setting. It leaves the Production Free privacy guard intact.
+Requesty/OpenAI/Google continuation remains unsupported pending exact-route
+contract investigation. Temperature and output limits round-trip when provided;
+the native loop currently leaves sampling to the endpoint. `top_p` and native
+template settings remain unmatched. NVIDIA recommends [temperature 1.0 and
+top_p 0.95](https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-BF16);
+the [Cohere card](https://huggingface.co/CohereLabs/North-Mini-Code-1.0) gives the
+same recommendation. Native template options are not assumed to be gateway
+options. Opt-in sampling controls versus retained endpoint defaults is an owner
+decision; no new default or template override has been selected here.
+
 ## Periodic workstation snapshots
 
 On Windows, `scripts/workstation-resources.ps1` performs a read-only CIM snapshot.

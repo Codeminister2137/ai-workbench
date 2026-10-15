@@ -1,6 +1,33 @@
 # CLI Development Foundation Roadmap
 
-## Current checkpoint: 2026-10-14 closeout
+## 2026-10-15 offline conformance and usage slice
+
+OpenRouter now carries transient, exact-origin continuation on ordinary and
+streamed tool turns under ADR-055. Synthetic checks cover replay, route/role
+isolation, complete-input admission, hidden metadata and answer-only persistence.
+Other hosted continuation contracts remain unverified. Temperature/output
+forwarding is verified; sampling defaults and native template parity remain
+unmatched pending the owner sampling-control choice. No privacy guard changed.
+
+The CLI reports numeric per-call/cumulative observations independently of final
+response metrics, with field-level complete/partial/unknown coverage on success
+and failure. Missing cost stays unknown; this adds no account quota monitor,
+reasoning logging, persistence or allowance-consuming test. See
+[usage and conformance semantics](resource-and-usage.md).
+
+Fresh iterative acceptance preparation retains strict safety/correction/freeze
+evidence and separately permits bounded model-run test/repair feedback. Baseline
+CLI remains **INCOMPLETE**: no new live grant or model-quality acceptance follows
+from these offline changes. Independent unattended coordination remains the next
+priority after baseline, with supported job runners reused and new coordination,
+storage/recovery and task-kind choices reviewed before implementation.
+
+Validation: the affected CLI/provider gate passed 653 tests; subsequent focused
+checks passed 92 after final accounting guards and integration tests. Full Pyright
+and final targeted Pyright passed; commit hooks passed Ruff and formatting. These
+are overlapping software checks, not a combined count or model-quality result.
+
+## Previous checkpoint: 2026-10-14 closeout
 
 Baseline CLI remains **INCOMPLETE**. OpenRouter free-only integration and exact
 price/quota/tool guards are implemented and checked offline; production Free-plan

@@ -47,6 +47,13 @@ See [conformance plan](../documentation-conformance-plan.md) and
 
 ## Validation
 
+2026-10-15 extension within the existing decision: OpenRouter captures and replays
+its documented reasoning fields using the same explicit transient origin-bound
+contract, including streaming. Returned raw metadata excludes those fields.
+Synthetic route/role isolation, admission and answer-only persistence checks pass.
+Other hosted routes are not assumed compatible. No live quality or privacy
+promotion is implied; settings gaps are tracked in the CLI roadmap.
+
 Offline adapter/loop/admission/history/counting and CLI checks passed: 166 tests,
 three existing skips; a separate adapter/chat/counting slice passed 33 tests.
 Ruff, formatting and targeted type checks passed. A bounded local fixture received
