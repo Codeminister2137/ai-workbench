@@ -884,6 +884,14 @@ Use this loop:
    candidate. A live allowance, attended approval or architecture blocker applies
    to that candidate, not independent authorized implementation or preparation.
    Missing evidence means investigation is needed, not that the task is blocked.
+   Ordinary tool-use and test failures permit correction within the authorized
+   scope and total resource envelope. A repeated blocker without relevant state
+   changes or new evidence triggers a slice-level stall checkpoint. While
+   unattended, preserve the failed attempts and effects, record that slice's
+   blocker and unlock condition, safely close its owned operations, and select
+   another useful approved slice from the wider plan. Do not wait for absent
+   owner approval, repeatedly retry the stalled slice, or end the window solely
+   because it stalled. Early closeout requires the full exhaustion review below.
 5. Before reporting everything blocked or complete, freshly compare the wider
    relevant plans with current code and tests. Account for every remaining
    candidate with concrete completion evidence or a specific blocker and the
@@ -987,6 +995,15 @@ finish with one ordinary visible assistant response; do not call
 `task_complete` before or after it.
 
 ### User-visible closeout and decision boundary
+
+For attended iterative coding, a repeated-blocker checkpoint may request one
+bounded continuation within the original authorization and resource envelope.
+Ordinary correction is the default, not a one-anchor exception. Safety, privacy,
+authorization, protected-file and frozen-review boundaries remain binding; check
+actual effects before repeating an operation whose outcome is uncertain. Retain
+first-attempt errors, recovery effectiveness, final correctness and consumption
+as separate evaluation observations. Progress monitoring and the total outer
+allowance bound recovery; file changes alone do not prove progress.
 
 Repository state, handoff files, tool results, and completion-tool payloads do
 not replace a user-facing assistant response. When work reaches a material

@@ -911,6 +911,17 @@ required. [Preserved findings and research sources](agent-methodology-findings.m
 record the observations, limits and studies for later research. That follow-up
 does not displace baseline CLI or the independent-supervision priority below.
 
+Owner update (2026-10-15): ordinary tool/test error correction is the default
+for iterative coding acceptance, within scope and a total resource envelope;
+the one-anchor exception proposal is superseded. Retain strict safety/correction/
+freeze evaluation separately and report errors, recovery, correctness and usage
+independently. Repeated lack of progress triggers an attended bounded-continuation
+checkpoint. Unattended, record the slice blocker/evidence and continue another
+useful approved slice from the wider plan; only verified exhaustion justifies
+early closeout. This does not renew live grants or implement general unattended
+supervision. Concrete successor bounds and deterministic recovery/stall checks
+remain preparation work; consumed trials remain unchanged.
+
 ## Optional capabilities: unselected
 
 Browser/UI testing, notebooks, debugger control, GitHub issues/PR/CI, visual

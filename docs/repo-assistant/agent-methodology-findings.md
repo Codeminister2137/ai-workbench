@@ -55,7 +55,8 @@ allocation. An isolated acceptance harness now pauses before another provider
 call on repeated unchanged reads or repeated failed tests at the same file state.
 It reuses the existing deadline-bound terminal approval channel; no answer closes
 the run, and a late approval cannot renew the grant. No-op edits and A/B/A state
-oscillation do not erase the observations. Automatic recovery is not selected.
+oscillation do not erase the observations. That experiment did not select
+automatic recovery; the subsequent accepted default is recorded below.
 
 One total resource envelope and a serial-review reserve replace independent phase
 call caps for this experiment. Deterministic checks cover serial inspection/repair/
@@ -68,10 +69,45 @@ establish live quality, unattended checkpointing or general anti-loop coverage.
 
 The subsequent approved live trial stopped on an exact-text edit mismatch before
 any checkpoint: the anchor contained an extra blank line and no edit was applied.
-Owned cleanup was verified, and the grant is consumed. A bounded correction of
-this ordinary tool error remains an owner decision; the failed run must not be
+Owned cleanup was verified, and the grant is consumed. The owner subsequently
+approved ordinary error recovery by default; the failed run must not be
 relabelled or resumed. Its uncaught host exception exposed a separate usage-footer
 gap, now repaired without changing execution failure or acceptance semantics.
+
+### Accepted recovery default and slice-level stalls (2026-10-15)
+
+The owner approved ordinary tool-use and test correction as normal iterative
+coding behavior, rather than a one-anchor exception, to evaluate Codex quality
+parity. Return actionable errors, preserve history and inspect actual effects
+before repeating an operation that might have partially succeeded. Corrections
+consume the existing total allowance; they do not gain a separate retry budget.
+Retain strict safety/correction/freeze evaluation separately. Safety, privacy,
+authorization, protected-file and frozen-review boundaries remain binding.
+
+Detect repeated equivalent failures without relevant state changes or new
+evidence, including no-op edits and state cycling. At an attended checkpoint,
+request bounded continuation. During an unattended window, record the stalled
+slice's evidence, effects, blocker and unlock condition, safely close its owned
+operations and continue another useful approved slice from the wider plan.
+Only a fresh review establishing all remaining useful authorized work complete
+or blocked permits early closeout and the owner's applicable sleep policy.
+Switching slices never renews a grant, deadline or permission.
+
+Default recovery gives realistic development evidence and avoids truncating
+recoverable mistakes; it can consume more allowance and requires progress
+monitoring that may falsely flag a useful investigation. Report first-attempt
+tool errors, recovery effectiveness, final correctness and total consumption
+separately. First-error stopping remains useful strict diagnostic evidence,
+but is not the default iterative coding acceptance criterion.
+
+This is an accepted policy, not evidence that a new acceptance harness or
+independent unattended supervisor is implemented. Existing production-loop
+tests cover model continuation after a tool error; the consumed acceptance
+harness stopped on non-test tool errors. Preserve that harness and its receipts.
+Prepare fresh inputs/paths and explicit attempt/per-turn/time/tool bounds,
+deterministically test recovery/stall/cleanup behavior, then seek a fresh live
+grant. Ask readiness only for known required owner input. Baseline remains
+INCOMPLETE; this decision authorizes no inference or general quality promotion.
 
 ## Source index for later research
 

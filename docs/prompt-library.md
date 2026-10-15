@@ -266,6 +266,14 @@ Instructions:
   blocker, update that candidate and select the next useful authorized action.
   Missing evidence requires investigation; one blocked live/attended/decision
   candidate does not block independent work.
+- Ordinary tool/test errors permit correction within scope and the total
+  allowance. A repeated blocker without relevant changes or new evidence blocks
+  that slice: preserve effects/failure evidence and its unlock condition, safely
+  close owned operations, then select and continue another useful approved slice
+  from the wider plan. Do not wait for an absent owner or end the window at that
+  checkpoint. Only the full exhaustion review below permits early closeout.
+  Never reset a deadline, renew a consumed live grant or broaden permissions
+  when switching slices. Safety/privacy/protected-file/freeze stops still bind.
 - Preserve material decision, privacy, scoped approval and live-usage boundaries.
   Queue owner decisions while absent; do not invent consent or implement proposals
   as though already approved. Continue independent authorized work.

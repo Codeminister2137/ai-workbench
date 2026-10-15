@@ -212,6 +212,16 @@ independent work. Inspect relevant private plans and current implementation befo
 concluding that no useful work remains; proposals still require their existing
 approvals. Do not substitute an old handoff's blanket blocker for this review.
 
+Ordinary coding/tool failures permit correction by default within scope and the
+total allowance. If repeated equivalent failures show no relevant change or new
+evidence, record a slice-level blocker, failed attempts/effects and the unlock
+condition. While unattended, safely close that slice's owned operations and
+continue another useful approved slice from the wider plan; only verified
+exhaustion of useful authorized work permits early closeout. While attended,
+request a bounded continuation at the checkpoint. Neither path renews a grant,
+resets the original deadline or relaxes safety/privacy/protected-file/freeze
+boundaries. File changes alone are not evidence of progress.
+
 At the deadline (with approximately five minutes reserved for closeout), or an
 evidenced early stop, report work completed, validation, remaining candidates,
 specific blockers and elapsed/remaining time. Preserve the original deadline
