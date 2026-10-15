@@ -66,6 +66,13 @@ outcomes. Privacy/authorization guards, independent acceptance and fresh live
 grants remain required. This test harness does not change normal CLI defaults or
 establish live quality, unattended checkpointing or general anti-loop coverage.
 
+The subsequent approved live trial stopped on an exact-text edit mismatch before
+any checkpoint: the anchor contained an extra blank line and no edit was applied.
+Owned cleanup was verified, and the grant is consumed. A bounded correction of
+this ordinary tool error remains an owner decision; the failed run must not be
+relabelled or resumed. Its uncaught host exception exposed a separate usage-footer
+gap, now repaired without changing execution failure or acceptance semantics.
+
 ## Source index for later research
 
 | Source | Why retain it / question to revisit |

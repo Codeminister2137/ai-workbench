@@ -1,5 +1,29 @@
 # CLI Development Foundation Roadmap
 
+## 2026-10-15 live follow-up and interrupted-usage repair
+
+Baseline CLI remains **INCOMPLETE**. Two fresh owner-approved OpenRouter iterative
+trials failed different conditions. The first repaired source and passed original
+tests but exhausted its eight edit calls before companion tests or frozen review.
+The later trial used the accepted flexible total envelope and attended checkpoint
+policy; it stopped after five requests because an exact-text edit anchor contained
+an extra blank line. No edit was applied and no checkpoint or frozen review was
+reached. Owned cleanup was verified. Preserve both failures and consumed grants;
+neither an unapplied proposed fix nor a later host diagnostic rescues acceptance.
+
+The host exception also exposed a reporting gap: an unexpected exit could bypass
+the normal metrics footer. The CLI now prints unreported cumulative numeric usage
+before transcript cleanup, preserves the exception and unknown cost, and avoids
+duplicating a normal report. The affected gate passed 528 tests; final focused
+checks passed 17, with targeted Pyright and Ruff/formatting clean. These are
+overlapping correctness checks, not model-quality or complete-baseline evidence.
+
+Next decision: whether the separate iterative evaluation permits one bounded
+literal-anchor correction, or retains its immediate stop on non-test tool errors.
+No policy change or successor grant is inferred. Independent supervision remains
+immediately after baseline. No production privacy guard, normal approval default,
+quality declaration, billing source or source activation changed.
+
 ## 2026-10-15 offline conformance and usage slice
 
 OpenRouter now carries transient, exact-origin continuation on ordinary and
