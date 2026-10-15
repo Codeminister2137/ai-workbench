@@ -941,21 +941,30 @@ with each viable option's pros and cons and the technical recommendation.
 
 Sleep remains separately authorized. Finishing one slice does not justify an
 early stop or sleep. Once the window legitimately ends early, however, an owner
-instruction to sleep on early termination must be executed after saving the
-handoff and safely closing owned operations. This includes an evidenced stop
+instruction to sleep on early termination must be scheduled for ten minutes
+after safe closeout, unless the owner specifies a different delay. Save the
+handoff and safely close owned operations first. This includes an evidenced stop
 because all remaining authorized work is blocked: an incomplete baseline or a
 blocked goal does not cancel that sleep instruction or become COMPLETE.
 For sleep authorized only at the deadline, pass the original UTC deadline to
 `scripts/workstation-sleep.ps1` using `-NotBeforeUtc`. For explicitly authorized
 early sleep, record the original deadline and early-stop evidence, then use the
-helper's immediate-sleep mode without that deadline argument. Never remove a
-time guard without the corresponding owner authorization. Report whether sleep
-was scheduled, requested, rejected or subsequently verified; a failed request
+helper with `-Sleep -DelaySeconds 600`, a fresh `-ReceiptPath` and a fresh
+`-CancelPath`, without that deadline argument. Start the helper using
+`Start-Process -WindowStyle Hidden`; do not block the conversation for ten minutes.
+Report the scheduled local time and exact cancellation marker path/command in
+the visible closeout and handoff, so the owner can intervene while still nearby.
+Never remove a time guard without the corresponding owner authorization.
+Report whether sleep was scheduled, requested, rejected or subsequently verified;
+a failed request
 must be reported, not silently treated as success.
 
-An explicit switch back to an attended session cancels pending unattended sleep
-that has not been requested. Do not issue a delayed sleep action to compensate
-for an earlier omission while the owner is using the computer.
+New owner instructions or an explicit switch back to an attended session cancel
+pending unattended sleep that has not been requested: create the recorded
+cancellation marker and verify the helper's `sleep_cancelled` receipt before
+resuming work. Merely stating cancellation does not stop a scheduled helper.
+Do not issue a delayed sleep action to compensate for an earlier omission while
+the owner is using the computer.
 
 If the owner returns abruptly, including after a usage-limit interruption, switch
 to attended communication and verify actual queued task and process state. When

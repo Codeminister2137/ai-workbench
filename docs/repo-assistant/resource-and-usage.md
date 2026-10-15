@@ -418,21 +418,32 @@ recorded UTC deadline using
 than waiting or sleeping. The deadline is preserved in the receipt; the default
 without this argument retains explicitly authorized immediate sleep behavior.
 
-If the owner explicitly authorizes sleep when work ends early, use that immediate
-mode after a legitimate early closeout and safe cleanup, preserving the original
+If the owner explicitly authorizes sleep when work ends early, schedule it ten
+minutes after legitimate early closeout and safe cleanup, preserving the original
 deadline, actual stop time and reason in the handoff. Remaining blocked work or
 an incomplete baseline does not cancel this authorization. Do not omit the guard
 merely because one slice finished. An explicit return to attended mode cancels
-unattended sleep not yet requested; never issue retrospective sleep while the
-owner is using the PC.
+unattended sleep not yet requested: create its cancellation marker and verify
+the helper records `sleep_cancelled` before resuming work. New owner instructions
+during the grace period require the same cancellation. Never issue retrospective
+sleep while the owner is using the PC.
 
 Save repository files and the handoff, finish or stop owned operations, inspect
 Git status/diff and preserve validation evidence before executing. This helper does
 not save editor buffers, commit files, kill other applications or stop unrelated
 jobs. Use it only when the owner has authorized sleeping this computer.
 
-An optional delay of up to 60 seconds permits a hidden helper to start after final
-reporting. The optional receipt is written before the request; success can return
+An optional delay of up to 600 seconds permits a hidden helper to start after final
+reporting. For authorized early sleep use `-Sleep -DelaySeconds 600 -ReceiptPath
+<fresh-receipt.json> -CancelPath <fresh-cancel-marker>` with absolute paths and
+`Start-Process -WindowStyle Hidden`. Save the helper identity, receipt and marker
+paths in the handoff. Report the scheduled local time and an exact PowerShell
+cancellation command, such as `New-Item -ItemType File -Path '<absolute-marker>'`.
+The helper checks the marker each second and immediately before requesting sleep;
+an existing marker cancels even a zero-delay request. Do not delete or reuse a
+marker from another run. This is a bounded helper process, not a scheduled task
+or service. During the grace period report sleep as scheduled, not requested.
+The optional receipt is written before the request; success can return
 only after wake. Report a scheduled/requested action honestly rather than claiming
 sleep was observed before the PC resumes.
 

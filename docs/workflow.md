@@ -224,11 +224,15 @@ interruption time, and the reason for stopping early. Label uncertain timestamps
 Summarize material decisions with viable options, each option's pros and cons,
 recommendation and any owner question. Save this evidence before a power action.
 If the owner authorized sleep on early termination, a legitimate early stop with
-all remaining work blocked still requires that sleep action after safe cleanup;
-an incomplete product is not an exemption. Follow the sleep helper's immediate
-mode for explicit early authorization, or its original-deadline guard when sleep
-is authorized only at that deadline. Report the actual power-action outcome.
-Switching explicitly to attended mode cancels unattended sleep not yet requested.
+all remaining work blocked still requires scheduling sleep ten minutes after safe
+closeout, unless the owner specifies otherwise; an incomplete product is not an
+exemption. Use the sleep helper's -DelaySeconds 600 with fresh receipt/cancellation
+paths, launched hidden without blocking the conversation, for explicit early
+authorization, or its original-deadline guard when sleep is authorized only at
+that deadline. Report the actual power-action outcome.
+Report the scheduled local time and exact cancellation command. New owner
+instructions or an explicit switch to attended mode require creating the recorded
+cancellation marker and verifying sleep_cancelled before resuming work.
 
 ### Persistent improvement goal: reliable unattended execution
 

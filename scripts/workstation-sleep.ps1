@@ -4,9 +4,10 @@
 [CmdletBinding(SupportsShouldProcess = $true)]
 param(
     [switch]$Sleep,
-    [ValidateRange(0, 60)]
+    [ValidateRange(0, 600)]
     [int]$DelaySeconds = 0,
     [string]$ReceiptPath = "",
+    [string]$CancelPath = "",
     [datetimeoffset]$NotBeforeUtc = [datetimeoffset]::MinValue
 )
 
@@ -63,6 +64,7 @@ function Write-SleepReceipt([string]$Status) {
             transition_times_utc = $sleepTransitionTimesUtc
             transition_times_warsaw = $sleepTransitionTimesWarsaw
             process_id = $PID
+            cancel_path = $CancelPath
             force = $false
             wake_events_disabled = $false
         } | ConvertTo-Json | Set-Content -LiteralPath $receiptFile -Encoding utf8
@@ -71,8 +73,18 @@ function Write-SleepReceipt([string]$Status) {
 
 Write-SleepReceipt "sleep_scheduled"
 Write-Output "sleep_planned_warsaw: $plannedSleepWarsaw (Europe/Warsaw; estimated)"
-if ($DelaySeconds) {
-    Start-Sleep -Seconds $DelaySeconds
+for ($remainingSeconds = $DelaySeconds; $remainingSeconds -gt 0; $remainingSeconds--) {
+    if ($CancelPath -and (Test-Path -LiteralPath $CancelPath)) {
+        Write-SleepReceipt "sleep_cancelled"
+        Write-Output "sleep_status: cancelled"
+        return
+    }
+    Start-Sleep -Seconds 1
+}
+if ($CancelPath -and (Test-Path -LiteralPath $CancelPath)) {
+    Write-SleepReceipt "sleep_cancelled"
+    Write-Output "sleep_status: cancelled"
+    return
 }
 Assert-WorkWindowEnded
 Write-SleepReceipt "sleep_requested"

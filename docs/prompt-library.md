@@ -296,13 +296,19 @@ Instructions:
   Europe/Warsaw, original deadline, elapsed work versus known waiting/interruption
   time, and any early-stop reason. Label estimates when exact evidence is absent.
 - Sleep is separately authorized. If the owner authorized sleep on early
-  termination, execute it after a legitimate early closeout, saved handoff and
-  safe closure of owned operations, including when remaining work is blocked.
+  termination, schedule it ten minutes after a legitimate early closeout, saved
+  handoff and safe closure of owned operations, including when remaining work
+  is blocked.
   An incomplete baseline does not cancel that instruction. Use the sleep helper's
-  immediate mode for this explicit early authorization; retain -NotBeforeUtc with
-  the original deadline when sleep is authorized only at that deadline. Report
-  scheduled/requested/rejected/verified accurately. An explicit switch to attended
-  mode cancels unattended sleep not yet requested; do not sleep retrospectively.
+  -Sleep -DelaySeconds 600 with fresh receipt/cancellation paths for this explicit
+  early authorization, launched hidden without blocking the conversation;
+  retain -NotBeforeUtc with the original deadline when sleep is authorized only
+  at that deadline. Report scheduled/requested/rejected/verified accurately.
+  An explicit switch to attended
+  mode or new owner instructions cancel unattended sleep not yet requested:
+  create its cancellation marker and verify sleep_cancelled before resuming.
+  Report the scheduled local time and exact cancellation command in the final
+  response and handoff. Do not sleep retrospectively.
 
 Output:
 Implement useful approved work throughout the window. Give concise progress at
