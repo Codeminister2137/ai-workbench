@@ -111,6 +111,18 @@ INCOMPLETE; this decision authorizes no inference or general quality promotion.
 
 ## Source index for later research
 
+Live-launch follow-up (2026-10-15): the approved attempt failed in a host metadata
+worker before any completion/tool effects, with unchanged inputs and verified
+cleanup. The original stderr/metadata observation is unavailable; this is not a
+model-quality or service-availability result. A real Windows venv process test
+exposed an intermediate Python launcher that violates the immediate-parent guard.
+Fake provider replies alone had not exercised this live-only admission branch.
+The separate repair retains job ownership, verifies controller birth and permits
+only direct parentage or one verified Python-launcher hop. A no-network smoke
+test must exercise the actual child process chain, guard and real seal checks,
+with a local sink replacing the network operation. Preserve the consumed attempt;
+do not infer that a zero-completion failure authorizes an automatic retry.
+
 2026-10-15 offline implementation follow-up: fresh acceptance preparation now
 returns ordinary tool/schema failures for correction, requires observing actual
 effects before another write, detects equivalent failures at unchanged state,

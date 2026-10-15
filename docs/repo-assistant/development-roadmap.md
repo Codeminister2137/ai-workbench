@@ -1014,11 +1014,23 @@ requires fresh route/privacy authorization and launch sealing.
 A separate launch successor now pins a clean production HEAD, fresh original
 inputs and unchanged recovery/owned-process code. Default execution is offline;
 the launcher creates no grant. Date expiry, an exclusive attempt sentinel,
-active-parent worker binding and the original total deadline prevent automatic
+birth-matched controller checks and the original total deadline prevent automatic
 replay or renewal. A complete scripted offline workflow and launch refusal checks
 passed with owned cleanup. The proposed existing-source public/synthetic trial
 still needs a fresh data-collection exception and exact live grant. No provider
 request, account scan or production runtime change follows from this preparation.
+
+The subsequently approved live attempt stopped in its first metadata worker:
+zero completion posts, responses or tool effects, unchanged original inputs and
+verified owned cleanup. It supplies no coding-quality or availability result;
+the original metadata HTTP observation/stderr is unavailable. Local process tests
+found the launch guard's direct-parent assumption incompatible with this Windows
+virtual-environment launcher. Its fake offline workflow had missed the positive
+live-only process branch. A separate successor now verifies controller birth and
+allows one verified Python-launcher hop, retaining WindowsJob ownership. Actual
+no-network process tests exercise both that gate and real seal validation before
+a local sink. Consumed evidence remains unchanged; any successor needs a fresh
+input/path/attempt grant. Baseline remains INCOMPLETE.
 
 The fallback audit identified ADR-032's counts-only contract. The owner then chose
 context-aware transfer in ADR-059: eligible native coding routes receive complete
