@@ -1069,6 +1069,13 @@ children exited with verified cleanup. Acceptance remains failed/incomplete.
 Local trace replay confirms required review observations preceded the repeated
 reads; it does not establish why the model repeated them or prove quality parity.
 
+A fresh standalone frozen-review fixture is now prepared locally to isolate the
+missing report, with an explicit completion instruction, six passing tests,
+bounded oracle and write refusal checks. Source and tests are host-prepared;
+there is no fabricated coding history or model authorship. This is a proposed
+narrow acceptance question, with no live entry point or inference grant. A
+review-only success would not pass the consumed workflow or establish parity.
+
 The fallback audit identified ADR-032's counts-only contract. The owner then chose
 context-aware transfer in ADR-059: eligible native coding routes receive complete
 observable mid-turn history only with at least 20% destination headroom after input,
