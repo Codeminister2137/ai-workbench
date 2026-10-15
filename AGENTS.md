@@ -211,12 +211,13 @@ to approve each such check.
 
 Owner clarification (2026-10-15): an already-authorized bounded diagnostic known
 to require no manual interaction may run without a separate readiness question.
-Use readiness confirmation when an actual console approval, sign-in or other
-owner action is expected. If an unexpected approval prompt appears, stop there
+Use readiness confirmation only when an actual console approval, sign-in or other
+owner input is known to be required. A merely possible prompt is not a reason for
+a readiness check. If an unexpected approval prompt appears, stop there
 and obtain the owner's attended approval. Scoped inference grants and actual
 CLI, sandbox and native-client approval requirements remain binding.
 
-For an operation outside that routine scope which may wait for owner approval,
+For an operation outside that routine scope known to require owner input,
 announce the request in the ordinary user-visible conversation **before calling
 the terminal tool**. State the exact command (or bounded operation), working
 directory, expected effects, the approval prompt the owner should expect, and
