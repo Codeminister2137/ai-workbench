@@ -136,11 +136,18 @@ def print_run_metrics(
     _print_response_usage("primary", primary_response)
     print(f"scrutiny_elapsed_seconds: {_format_optional_seconds(scrutiny_elapsed_seconds)}")
     _print_response_usage("scrutiny", scrutiny_response)
-    ledger = ACTIVE_USAGE.get()
-    if ledger is not None:
-        print("cumulative_usage_json: " + json.dumps(ledger.summary(), sort_keys=True))
+    print_cumulative_usage()
     if metrics.tracemalloc_started:
         tracemalloc.stop()
+
+
+def print_cumulative_usage(*, unreported_only: bool = False) -> None:
+    """Preserve numeric receipts when a CLI exit bypasses the normal metrics footer."""
+    ledger = ACTIVE_USAGE.get()
+    if ledger is None or (unreported_only and (not ledger.attempts or ledger.report_printed)):
+        return
+    print("cumulative_usage_json: " + json.dumps(ledger.summary(), sort_keys=True))
+    ledger.report_printed = True
 
 
 def _print_response_usage(prefix: str, response: AIResponse | None) -> None:

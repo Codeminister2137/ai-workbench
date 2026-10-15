@@ -29,6 +29,7 @@ class TurnUsage:
     attempts: int = 0
     responses: int = 0
     calls: list[dict[str, int | float]] = field(default_factory=list)
+    report_printed: bool = False
 
     def record(self, usage: UsageMetadata, index: int) -> None:
         if usage.source is not UsageSource.PROVIDER_REPORTED:

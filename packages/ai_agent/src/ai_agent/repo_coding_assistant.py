@@ -152,6 +152,9 @@ from ai_provider.transcripts import (
     TeeOutput as _TeeOutput,
 )
 from ai_provider.transcripts import (
+    print_cumulative_usage as _print_cumulative_usage,
+)
+from ai_provider.transcripts import (
     print_external_agent_input as _print_external_agent_input,
 )
 from ai_provider.transcripts import (
@@ -973,9 +976,16 @@ def _main(
     try:
         return _execute_request(argv, parsed_args=args, user_config_override=user_config_override)
     finally:
-        cleanup = getattr(args, "_transcript_cleanup", None)
-        if cleanup is not None:
-            cleanup()
+        try:
+            try:
+                _print_cumulative_usage(unreported_only=True)
+            except (OSError, ValueError):
+                # A closed/broken output must not replace the original host failure.
+                pass
+        finally:
+            cleanup = getattr(args, "_transcript_cleanup", None)
+            if cleanup is not None:
+                cleanup()
 
 
 def _execute_request(

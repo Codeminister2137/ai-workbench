@@ -27,6 +27,12 @@ it does not certify tool/task success. Missing failed-call usage makes coverage
 partial or unknown. The scope ends even on errors; no cross-turn cumulative
 session total or new storage is introduced.
 
+If an unexpected host/tool exception bypasses the normal metrics footer, the CLI
+still prints any unreported cumulative numeric observations before transcript
+cleanup. The exception remains a failure; no final response usage is invented.
+An already printed report is not duplicated at exit, and broken output does not
+replace the original error. This fallback introduces no reasoning or prompt logging.
+
 ## Hosted continuation and settings conformance
 
 The OpenRouter adapter reuses ADR-055's transient `ProviderContinuation`: preserve
