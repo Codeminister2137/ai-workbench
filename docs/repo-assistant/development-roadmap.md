@@ -1009,7 +1009,16 @@ using the existing CLI/owned-process components. Its complete scripted offline
 edit/test/repair/report/frozen-review workflow passed independent tests, the host
 oracle and cleanup. The unattended branch records a slice blocker requiring
 wider-plan selection; this is not an independent work supervisor. Live entry
-remains disabled pending fresh route/privacy authorization and launch sealing.
+requires fresh route/privacy authorization and launch sealing.
+
+A separate launch successor now pins a clean production HEAD, fresh original
+inputs and unchanged recovery/owned-process code. Default execution is offline;
+the launcher creates no grant. Date expiry, an exclusive attempt sentinel,
+active-parent worker binding and the original total deadline prevent automatic
+replay or renewal. A complete scripted offline workflow and launch refusal checks
+passed with owned cleanup. The proposed existing-source public/synthetic trial
+still needs a fresh data-collection exception and exact live grant. No provider
+request, account scan or production runtime change follows from this preparation.
 
 The fallback audit identified ADR-032's counts-only contract. The owner then chose
 context-aware transfer in ADR-059: eligible native coding routes receive complete
