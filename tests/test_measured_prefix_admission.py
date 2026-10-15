@@ -60,7 +60,7 @@ def test_prefix_reduces_false_refusal_and_preserves_full_input(experiment):
 
 
 @pytest.mark.parametrize(
-    "change", ["prefix", "metadata", "thinking", "temperature", "tools", "endpoint"]
+    "change", ["prefix", "metadata", "thinking", "temperature", "top_p", "tools", "endpoint"]
 )
 def test_changed_scope_uses_absolute_gate(experiment, change):
     from ai_provider import AIToolDefinition
@@ -75,6 +75,8 @@ def test_changed_scope_uses_absolute_gate(experiment, change):
         )
     elif change == "temperature":
         request = replace(request, temperature=0.7)
+    elif change == "top_p":
+        request = replace(request, top_p=0.95)
     elif change == "tools":
         request = replace(request, tools=(AIToolDefinition("read", "new schema"),))
     else:

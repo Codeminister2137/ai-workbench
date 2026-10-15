@@ -40,15 +40,31 @@ refuse it. This follows the [OpenRouter continuation contract](https://openroute
 
 This is offline protocol conformance, not proof of changed model quality or a
 reasoning-generation setting. It leaves the Production Free privacy guard intact.
-Requesty/OpenAI/Google continuation remains unsupported pending exact-route
-contract investigation. Temperature and output limits round-trip when provided;
-the native loop currently leaves sampling to the endpoint. `top_p` and native
-template settings remain unmatched. NVIDIA recommends [temperature 1.0 and
+Requesty/OpenAI/Google continuation remains unverified. Inspection of Requesty's
+[reasoning guidance](https://docs.requesty.ai/features/reasoning) and
+[Chat Completions reference](https://docs.requesty.ai/api-reference/endpoint/chat-completions-create)
+did not establish the named Nemotron route's continuation replay contract; do not
+infer that contract from OpenRouter or general protocol compatibility.
+
+Under [ADR-058](../decisions/ADR-058-opt-in-task-sampling-controls.md), opt-in
+`--temperature` (finite 0–2) and `--top-p` (finite 0–1) configure task requests for
+one invocation, including native tool turns, task repairs, scrutiny, provider chat
+and API/native fallback or preservation. For example, append
+`--temperature 1.0 --top-p 0.95` to an existing provider-native invocation.
+Omitted flags preserve omission on the wire; explicit zero is forwarded. Native
+delegated loops inherit the task options; separately configured context delegation
+and rolling summaries retain their own behavior. External native-agent clients
+are refused with explicit sampling because equivalent mappings are unverified.
+`requested_sampling_json` records requested values, not confirmed effective hosted
+settings. These options are not persisted defaults and confer no model-quality
+or live-trial approval. Temperature/top_p/output forwarding is tested; native
+template settings and the hosted endpoint's actual behavior remain unmatched.
+NVIDIA recommends [temperature 1.0 and
 top_p 0.95](https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-BF16);
 the [Cohere card](https://huggingface.co/CohereLabs/North-Mini-Code-1.0) gives the
 same recommendation. Native template options are not assumed to be gateway
-options. Opt-in sampling controls versus retained endpoint defaults is an owner
-decision; no new default or template override has been selected here.
+options. The owner accepted opt-in controls with existing defaults preserved;
+no automatic preset or template override has been selected here.
 
 ## Periodic workstation snapshots
 

@@ -205,6 +205,8 @@ class OpenAICompatibleChatClient:
         }
         if request.temperature is not None:
             payload["temperature"] = request.temperature
+        if request.top_p is not None:
+            payload["top_p"] = request.top_p
         if request.max_output_tokens is not None:
             payload["max_tokens"] = request.max_output_tokens
         if request.tools:

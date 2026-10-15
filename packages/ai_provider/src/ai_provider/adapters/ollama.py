@@ -245,6 +245,8 @@ class OllamaChatClient:
             payload["shift"] = False
         if request.temperature is not None:
             options["temperature"] = request.temperature
+        if request.top_p is not None:
+            options["top_p"] = request.top_p
         if request.max_output_tokens is not None:
             options["num_predict"] = request.max_output_tokens
         context_length = request.metadata.get("ollama_context_length")

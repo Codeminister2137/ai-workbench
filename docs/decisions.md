@@ -565,3 +565,13 @@ quality promotion, purchase or paid fallback approved. Owner selected project-sc
 environment changes; Python `.venv` and external runtimes remain separate. OpenCode
 Console is deferred. See installation guidance for the project-local setup direction.
 See [ADR-057](decisions/ADR-057-free-gemini-cli-and-openrouter-direction.md).
+
+## ADR-058 — Opt-in task sampling controls
+
+**Status:** Accepted (2026-10-15); implemented offline, live acceptance incomplete.
+
+Owner accepted opt-in per-run temperature/top_p controls with existing defaults
+preserved. Forward explicit values through task API/native loops and compatible
+fallback; refuse external clients without a verified mapping. No automatic model
+preset, template override, persisted default or fresh live grant is implied.
+See [ADR-058](decisions/ADR-058-opt-in-task-sampling-controls.md).

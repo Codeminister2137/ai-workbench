@@ -156,7 +156,10 @@ def test_cli_failure_keeps_cumulative_numeric_usage(tmp_path, capsys, monkeypatc
     assert "primary_usage_source: unavailable" in output
 
 
-def test_native_agent_mode_executes_provider_tool_calls(tmp_path: Path, monkeypatch) -> None:
+@pytest.mark.parametrize("sampling", [{}, {"temperature": 0.0, "top_p": 0.95}])
+def test_native_agent_mode_executes_provider_tool_calls(
+    tmp_path: Path, monkeypatch, sampling
+) -> None:
     from ai_orchestrator import PrivacyClass as OrchestratorPrivacyClass
 
     coding_task_profile = _EXAMPLE.coding_task_profile
@@ -183,6 +186,7 @@ def test_native_agent_mode_executes_provider_tool_calls(tmp_path: Path, monkeypa
             "approval_policy": "trusted_local",
             "ollama_log_file": None,
             "ollama_profile": None,
+            **sampling,
         }
     )
     profile = coding_task_profile(privacy_class=OrchestratorPrivacyClass.LOCAL_ONLY)
@@ -201,6 +205,8 @@ def test_native_agent_mode_executes_provider_tool_calls(tmp_path: Path, monkeypa
 
     assert requests[0].messages[0].content == NATIVE_TOOL_SYSTEM_PROMPT
     assert requests[0].tools
+    assert all(request.temperature == sampling.get("temperature") for request in requests)
+    assert all(request.top_p == sampling.get("top_p") for request in requests)
     assert (tmp_path / "native.txt").read_text(encoding="utf-8") == "native"
     assert result.tool_results[0].is_error is False
     assert events[0] == "local_agent_activity: model_request - provider=ollama model=test"

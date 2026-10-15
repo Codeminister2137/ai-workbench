@@ -288,6 +288,7 @@ from ai_agent.repo_assistant_args import (
 )
 from ai_agent.repo_assistant_args import (
     build_argument_parser,
+    sampling_kwargs,
 )
 from ai_agent.run_tracking import (
     ORCHESTRATED_STAGE_PLAN as _ORCHESTRATED_STAGE_PLAN,  # noqa: F401 - compatibility export
@@ -720,6 +721,7 @@ def _run_chat_mode(
     request = AIRequest(
         messages=(),
         model=config.model,
+        **sampling_kwargs(args),
         privacy_class=privacy_class,
         metadata={
             "task_type": profile.task_type.value,
@@ -769,6 +771,7 @@ def _run_chat_mode(
         request = AIRequest(
             messages=context.messages,
             model=config.model,
+            **sampling_kwargs(args),
             privacy_class=privacy_class,
             metadata={
                 **request.metadata,
@@ -1223,6 +1226,8 @@ def _execute_request(
         return 0
 
     metrics = _start_run_metrics()
+    if sampling_kwargs(args):
+        print("requested_sampling_json: " + json.dumps(sampling_kwargs(args), sort_keys=True))
     context_budget_chars = None if args.context_budget_chars == 0 else args.context_budget_chars
     try:
         context_files = load_prompt_context(
@@ -1360,6 +1365,17 @@ def _execute_request(
         prompt_for_review=args.prompt,
         timeout_seconds=args.timeout_seconds,
     )
+    if (
+        sampling_kwargs(args)
+        and external_orchestration.execution_plan is not None
+        and _is_external_agent_access_method(
+            external_orchestration.execution_plan.target.access_method
+        )
+    ):
+        parser.error(
+            "--temperature/--top-p require a provider-native route; "
+            "external clients cannot preserve them"
+        )
     if (
         getattr(args, "experimental_measured_prefix", False)
         and external_orchestration.is_ready
@@ -1913,6 +1929,7 @@ def _execute_request(
                 start_ollama=False,
                 progress_callback=print,
                 progress_prefix="scrutiny_activity",
+                **sampling_kwargs(args),
             )
             scrutiny_elapsed_seconds = time.perf_counter() - scrutiny_started
         except ProviderError as exc:
@@ -2273,6 +2290,7 @@ def _run_coding_prompt_with_fallback(
     repo_root: Path,
     **kwargs: Any,
 ) -> Any:
+    kwargs = {**kwargs, **sampling_kwargs(args)}
     session = getattr(args, "fallback_session", None)
     if not kwargs.get("execute") or session is None or not session.enabled:
         return run_coding_prompt(prompt, profile, catalog, **kwargs)
@@ -2378,6 +2396,8 @@ def _preservation_target_incompatibility(
     probe_provider: bool = True,
 ) -> str | None:
     """Explain an unavailable restricted executor without exposing configuration values."""
+    if sampling_kwargs(args) and _is_external_agent_access_method(target.access_method):
+        return "external preservation cannot preserve requested sampling settings"
     if target.access_method is AccessMethod.CODEX_CLI:
         return "Codex read-only sandbox does not establish suppression of native shell tools"
     try:
@@ -2464,6 +2484,7 @@ def _preserve_fallback_work(
         privacy_class=PrivacyClass(profile.privacy_class.value),
         max_output_tokens=2000,
         metadata={"purpose": "emergency_preservation"},
+        **sampling_kwargs(args),
     )
     response = create_chat_client(backend_config_from_execution_target(target)).complete(request)
     return response.message.content
@@ -2498,6 +2519,8 @@ def _fallback_target_incompatibility(
 ) -> str | None:
     """Explain a refusal; offline declarations never establish authenticated readiness."""
     if _is_external_agent_access_method(target.access_method):
+        if sampling_kwargs(args):
+            return "external executor cannot preserve requested sampling settings"
         if getattr(args, "tool_profile", "coding") == "research":
             return "research tools require provider-native execution"
         if args.no_native_tools or args.apply_actions:
@@ -2742,7 +2765,7 @@ def _execute_fallback_route(
     from ai_agent.loop import AgentResult
 
     response = create_chat_client(config).complete(
-        coding_request_from_prompt(prompt, profile, config)
+        coding_request_from_prompt(prompt, profile, config, **sampling_kwargs(args))
     )
     return AgentResult(response=response)
 
@@ -3602,6 +3625,7 @@ def _run_native_agent(
         ),
         max_iterations=args.max_action_rounds,
         deadline=getattr(getattr(args, "fallback_session", None), "deadline", None),
+        **sampling_kwargs(args),
     )
     try:
         result = agent.run(
@@ -3820,6 +3844,7 @@ def _run_action_loop(
             ollama_log_path=args.ollama_log_file if args.start_ollama else None,
             progress_callback=print,
             progress_prefix="local_tool_activity",
+            **sampling_kwargs(args),
         )
         if result.response is None:
             if result.orchestration.failure_reason:

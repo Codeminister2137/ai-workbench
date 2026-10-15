@@ -6,8 +6,11 @@ OpenRouter now carries transient, exact-origin continuation on ordinary and
 streamed tool turns under ADR-055. Synthetic checks cover replay, route/role
 isolation, complete-input admission, hidden metadata and answer-only persistence.
 Other hosted continuation contracts remain unverified. Temperature/output
-forwarding is verified; sampling defaults and native template parity remain
-unmatched pending the owner sampling-control choice. No privacy guard changed.
+forwarding is verified; the owner subsequently accepted opt-in temperature/top_p
+controls with existing defaults preserved (ADR-058). Explicit settings now survive
+task tool turns, repairs and provider fallback; incompatible external native
+clients refuse them. Native template parity and effective hosted settings remain
+unverified. No privacy guard changed.
 
 The CLI reports numeric per-call/cumulative observations independently of final
 response metrics, with field-level complete/partial/unknown coverage on success

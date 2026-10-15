@@ -234,6 +234,7 @@ class NativeCodingClient:
                     "contract": NATIVE_CONTRACT_VERSION,
                     "context": context,
                     "temperature": request.temperature,
+                    "top_p": request.top_p,
                     "privacy": request.privacy_class,
                     "metadata": request.metadata,
                     "tools": [tool.to_json_schema() for tool in request.tools],

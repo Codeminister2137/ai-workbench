@@ -60,12 +60,14 @@ def test_continuation_roundtrip_is_transient_and_origin_bound(monkeypatch, tmp_p
         (answer.message,),
         privacy_class=PrivacyClass.PUBLIC_OR_LOW_RISK,
         temperature=1.0,
+        top_p=0.95,
         max_output_tokens=123,
     )
     adapter.complete(followup)
     sent = json.loads(calls[-1].data)
     assert sent["messages"][0] == {"role": "assistant", "content": "answer", **state}
     assert sent["temperature"] == 1.0 and sent["max_tokens"] == 123
+    assert sent["top_p"] == 0.95
     assert "reasoning" not in sent  # No unrequested generation setting.
     assert secret not in repr(answer)
     for changed in (

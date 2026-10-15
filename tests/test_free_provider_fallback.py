@@ -125,7 +125,7 @@ context_window_tokens = 262144
                             {
                                 "id": "google/gemma-4-31b-it:free",
                                 "pricing": {"prompt": "0", "completion": "0"},
-                                "supported_parameters": ["tools"],
+                                "supported_parameters": ["tools", "temperature", "top_p"],
                             }
                         ]
                     }
@@ -146,6 +146,7 @@ context_window_tokens = 262144
                 }
             )
         payload = json.loads(request.data)
+        assert payload["temperature"] == 1.0 and payload["top_p"] == 0.95
         messages = "\n".join(message.get("content", "") or "" for message in payload["messages"])
         assert instructions.strip() in messages
         assert len(payload["tools"]) == 18
@@ -243,6 +244,10 @@ context_window_tokens = 262144
             "100000",
             "--max-action-rounds",
             "6",
+            "--temperature",
+            "1.0",
+            "--top-p",
+            "0.95",
         ]
     )
     assert status == (0 if continues else 1)

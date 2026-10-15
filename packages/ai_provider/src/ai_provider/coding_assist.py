@@ -88,6 +88,8 @@ def coding_request_from_prompt(
     config: BackendConfig,
     *,
     system_prompt: str | None = None,
+    temperature: float | None = None,
+    top_p: float | None = None,
 ) -> AIRequest:
     """Build a provider-neutral request for a coding prompt."""
 
@@ -101,6 +103,8 @@ def coding_request_from_prompt(
     return AIRequest(
         messages=messages,
         model=config.model,
+        temperature=temperature,
+        top_p=top_p,
         privacy_class=PrivacyClass(profile.privacy_class.value),
         metadata={
             "task_type": profile.task_type.value,
@@ -120,6 +124,8 @@ def run_coding_prompt(
     timeout_seconds: float = 60.0,
     execute: bool = False,
     system_prompt: str | None = None,
+    temperature: float | None = None,
+    top_p: float | None = None,
     start_ollama: bool = False,
     ollama_command: str = "ollama",
     ollama_startup_timeout_seconds: float = 10.0,
@@ -150,6 +156,8 @@ def run_coding_prompt(
         profile,
         config,
         system_prompt=system_prompt,
+        temperature=temperature,
+        top_p=top_p,
     )
     if not execute:
         if progress_callback is not None:

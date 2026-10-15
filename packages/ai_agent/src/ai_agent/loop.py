@@ -46,6 +46,8 @@ class AgentLoop:
         permissions: PermissionManager | None = None,
         max_iterations: int = 10,
         deadline: float | None = None,
+        temperature: float | None = None,
+        top_p: float | None = None,
     ) -> None:
         if max_iterations < 1:
             raise ValueError("max_iterations must be at least 1")
@@ -57,6 +59,8 @@ class AgentLoop:
         self.permissions = permissions or PermissionManager()
         self.max_iterations = max_iterations
         self.deadline = deadline
+        self.temperature = temperature
+        self.top_p = top_p
 
     def _check_deadline(self, messages: list[AIMessage]) -> None:
         if self.deadline is not None and time.perf_counter() >= self.deadline:
@@ -90,6 +94,8 @@ class AgentLoop:
                     AIRequest(
                         messages=tuple(messages),
                         model=model,
+                        temperature=self.temperature,
+                        top_p=self.top_p,
                         privacy_class=privacy_class,
                         tools=tuple(
                             _tool_definition(tool) for tool in self.registry.list_definitions()

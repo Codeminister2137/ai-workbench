@@ -180,6 +180,7 @@ class AIRequest:
     privacy_class: PrivacyClass = PrivacyClass.LOCAL_ONLY
     tools: tuple[AIToolDefinition, ...] = ()
     metadata: dict[str, Any] = field(default_factory=dict)
+    top_p: float | None = None
 
 
 @dataclass(frozen=True, slots=True)

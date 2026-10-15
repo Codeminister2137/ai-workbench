@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import math
 from pathlib import Path
+from typing import TypedDict
 
 from ai_orchestrator import AccessMethod, CostPolicyTier, QualityThreshold
 from ai_orchestrator import PrivacyClass as OrchestratorPrivacyClass
@@ -63,6 +64,40 @@ def _away_minutes_argument(value: str) -> float:
     if not math.isfinite(minutes * 60):
         raise argparse.ArgumentTypeError("must produce a finite work budget in seconds")
     return minutes
+
+
+def _sampling_argument(value: str, maximum: float) -> float:
+    message = f"must be a finite number between 0 and {maximum:g}"
+    try:
+        number = float(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(message) from exc
+    if not math.isfinite(number) or not 0 <= number <= maximum:
+        raise argparse.ArgumentTypeError(message)
+    return number
+
+
+def _temperature_argument(value: str) -> float:
+    return _sampling_argument(value, 2)
+
+
+def _top_p_argument(value: str) -> float:
+    return _sampling_argument(value, 1)
+
+
+class _SamplingKwargs(TypedDict, total=False):
+    temperature: float
+    top_p: float
+
+
+def sampling_kwargs(args: argparse.Namespace) -> _SamplingKwargs:
+    """Forward explicit task sampling only, preserving omission and zero values."""
+    values: _SamplingKwargs = {}
+    if (temperature := getattr(args, "temperature", None)) is not None:
+        values["temperature"] = temperature
+    if (top_p := getattr(args, "top_p", None)) is not None:
+        values["top_p"] = top_p
+    return values
 
 
 def build_argument_parser() -> argparse.ArgumentParser:
@@ -274,6 +309,16 @@ def build_argument_parser() -> argparse.ArgumentParser:
         help="Hard provider override.",
     )
     parser.add_argument("--route-id", help="Hard access-route override.")
+    parser.add_argument(
+        "--temperature",
+        type=_temperature_argument,
+        help="Task provider sampling temperature (0–2); omitted uses provider defaults.",
+    )
+    parser.add_argument(
+        "--top-p",
+        type=_top_p_argument,
+        help="Task provider nucleus sampling probability (0–1); omitted uses provider defaults.",
+    )
     parser.add_argument(
         "--access-method",
         choices=[item.value for item in AccessMethod],
