@@ -1048,6 +1048,16 @@ A fresh offline successor also retains refused tool name/phase without arguments
 or raw continuation. Safety boundaries remain unchanged; consumed evidence is
 immutable. Another live attempt requires fresh inputs, sealing and a one-use grant.
 
+The next approved attempt recovered from a real edit-anchor error after reading
+actual effects, repaired the source and passed five visible tests. It stopped at
+14 coding completions because six of the 20 total calls were reserved for review.
+No final report or frozen review completed; this is failed acceptance despite
+passing poststop tests/oracle and verified owned cleanup. No tool was refused.
+The observed sequence needed another coding completion before entering review;
+do not confuse the configured total with the smaller coding allowance. A modest
+increase to the total call allowance is proposed for owner decision, retaining
+the review reserve, tool/time bounds and quality floor. No grant is extended.
+
 The fallback audit identified ADR-032's counts-only contract. The owner then chose
 context-aware transfer in ADR-059: eligible native coding routes receive complete
 observable mid-turn history only with at least 20% destination headroom after input,

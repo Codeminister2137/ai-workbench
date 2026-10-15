@@ -138,6 +138,15 @@ against that immutable baseline. A regression must exercise added companions in
 the same mutable fixture and reject changed originals/index content. Keep host
 verifier failures separate from model correctness and missing model phases.
 
+The next bounded run demonstrated ordinary recovery: a failed literal edit was
+followed by reads of actual effects, a corrected edit and passing tests. It then
+exhausted its 14-call coding allowance while six of 20 total calls remained
+reserved for review. No final report or frozen review completed. Report a total
+budget and its phase reserves together; a scripted batch of tool calls does not
+predict a real model's call count. Preserve the failed run and seek a fresh owner
+decision before increasing the allowance. Do not borrow the review reserve,
+truncate instructions/history or weaken acceptance to make a small budget pass.
+
 2026-10-15 offline implementation follow-up: fresh acceptance preparation now
 returns ordinary tool/schema failures for correction, requires observing actual
 effects before another write, detects equivalent failures at unchanged state,
