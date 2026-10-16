@@ -82,6 +82,30 @@ def test_duplicate_detection_normalizes_legal_suffixes_and_titles(
     assert is_duplicate_vacancy(variant, [sample_vacancy]) is True
 
 
+@pytest.mark.parametrize(
+    "recorded,requested",
+    [
+        ("Großrechner", "GROSSRECHNER"),
+        ("GROSSRECHNER", "Großrechner"),
+    ],
+)
+def test_skill_lookup_matches_vacancy_caseless_normalization(
+    sample_profile: CandidateProfile, sample_vacancy: JobVacancy, recorded: str, requested: str
+) -> None:
+    from evidence import analyze_vacancy_fit
+
+    profile = replace(
+        sample_profile, skills={recorded: SkillEvidence(recorded, EvidenceStatus.DEMONSTRATED)}
+    )
+    vacancy = replace(sample_vacancy, required_skills=(recorded, requested), preferred_skills=())
+    result = analyze_vacancy_fit(vacancy, profile)
+    assert result.matched_skills == (requested,)
+    assert result.missing_requirements == ()
+    assert result.match_score == 1.0 and not result.has_critical_gaps
+    assert verify_application_claims([requested], profile).is_valid
+    assert profile.get_skill_status(recorded + "++") is EvidenceStatus.ABSENT
+
+
 def test_deduplicate_vacancies_preserves_first_occurrence(sample_vacancy: JobVacancy) -> None:
     duplicate = JobVacancy(
         id="vac-103",

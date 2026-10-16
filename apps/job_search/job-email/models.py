@@ -88,10 +88,10 @@ class CandidateProfile:
     cv_variants: dict[str, CVVariant] = field(default_factory=dict)
 
     def get_skill_status(self, skill_name: str) -> EvidenceStatus:
-        """Return the evidence status for a skill, defaulting to ABSENT if unrecorded."""
-        key = skill_name.strip().lower()
+        """Use vacancy matching's caseless skill lookup; unrecorded skills are ABSENT."""
+        key = skill_name.strip().casefold()
         for name, evidence in self.skills.items():
-            if name.strip().lower() == key:
+            if name.strip().casefold() == key:
                 return evidence.status
         return EvidenceStatus.ABSENT
 
