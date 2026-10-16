@@ -350,6 +350,57 @@ def test_native_agent_rejects_empty_final_report_without_replaying_effects(
     assert not any("local_agent_activity: completed" in event for event in events)
 
 
+@pytest.mark.parametrize("earlier_effect", [False, True])
+def test_native_output_limit_preserves_partial_report_without_claiming_completion(
+    earlier_effect, tmp_path, monkeypatch
+):
+    from ai_provider import AIMessage, AIResponse, BackendConfig, MessageRole, ProviderError
+    from ai_provider.contracts import FinishReason
+
+    client = _NativeFakeClient()
+    complete = client.complete
+    requests = []
+    partial_report = "Implemented the helper. Remaining validation:"
+
+    def limited_final(request):
+        requests.append(request)
+        if earlier_effect and len(requests) == 1:
+            return complete(request)
+        return AIResponse(
+            message=AIMessage(MessageRole.ASSISTANT, partial_report),
+            backend=client.backend,
+            finish_reason=FinishReason.LENGTH,
+        )
+
+    monkeypatch.setattr(client, "complete", limited_final)
+    monkeypatch.setattr(_EXAMPLE, "create_chat_client", lambda config: client)
+    events = []
+    with pytest.raises(ProviderError, match="output limit") as raised:
+        _run_native_agent(
+            "Create native.txt and report the result",
+            BackendConfig(provider=_EXAMPLE.ProviderKind.OLLAMA, model="test"),
+            _EXAMPLE.coding_task_profile(),
+            Namespace(
+                start_ollama=False,
+                system=None,
+                max_action_rounds=3,
+                approval_policy="trusted_local",
+            ),
+            tmp_path,
+            progress_callback=events.append,
+        )
+    assert len(requests) == (2 if earlier_effect else 1)
+    assert raised.value.category is _EXAMPLE.ProviderErrorCategory.NON_RETRYABLE
+    assert raised.value.partial_messages[:-1] == requests[-1].messages
+    assert raised.value.partial_messages[-1].content == partial_report
+    assert (tmp_path / "native.txt").exists() == earlier_effect
+    if earlier_effect:
+        assert (tmp_path / "native.txt").read_text() == "native"
+        assert any("local_tool_activity: ok - create_file" in event for event in events)
+    assert any("local_agent_activity: incomplete" in event for event in events)
+    assert not any("local_agent_activity: completed" in event for event in events)
+
+
 def test_native_iteration_limit_reports_observed_receipts(tmp_path, monkeypatch):
     from argparse import Namespace
 

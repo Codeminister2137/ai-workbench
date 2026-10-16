@@ -62,6 +62,7 @@ from ai_provider.coding_assist import (
     coding_task_profile,
     run_coding_prompt,
 )
+from ai_provider.contracts import FinishReason
 from ai_provider.execution_fallback import FallbackSession, external_usage_limit
 from ai_provider.external_agents import (
     ExternalAgentConfig as ExternalAgentConfig,  # noqa: F401 - compatibility export
@@ -3683,8 +3684,11 @@ def _run_native_agent(
         {definition.name for definition in registry.list_definitions()},
     )
     empty_report = not result.response.message.content.strip()
+    output_limited = result.response.finish_reason is FinishReason.LENGTH
     if progress_callback is not None:
-        activity_status = "incomplete" if textual_request or empty_report else "completed"
+        activity_status = (
+            "incomplete" if textual_request or empty_report or output_limited else "completed"
+        )
         progress_callback(
             f"local_agent_activity: {activity_status} "
             f"- iterations={result.iterations} "
@@ -3696,6 +3700,19 @@ def _run_native_agent(
                 f"local_tool_activity: {status} - {tool_result.name}: "
                 f"{_activity_preview(tool_result.output)}"
             )
+    if output_limited:
+        error = ProviderError(
+            "Native agent reached the output limit before completing its final report. "
+            "Earlier tool effects remain; inspect their receipts and the partial report "
+            "before continuing."
+            if result.tool_results
+            else "Native agent reached the output limit before completing its final report. "
+            "No action was performed; inspect the partial report before continuing.",
+            category=ProviderErrorCategory.NON_RETRYABLE,
+            provider=config.provider.value,
+        )
+        error.partial_messages = result.messages
+        raise error
     if empty_report:
         error = ProviderError(
             "Native agent returned no final report. Earlier tool effects remain; "

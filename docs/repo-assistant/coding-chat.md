@@ -155,6 +155,11 @@ inspection; this failure does not automatically replay tools or retry the model.
 Tool calls containing no answer text are valid intermediate responses, but do
 not replace the final report.
 
+A native final report stopped by the provider's output limit also fails the turn,
+even when it contains text. Its partial answer and earlier tool receipts remain
+available for inspection. This does not automatically extend the output allowance,
+retry the model, switch routes or replay tools.
+
 Fallback models are selected by the Orchestrator. Default `emergency_preserve`
 keeps the original/task quality floor for implementation. If no ready comparable
 route remains, the host first saves a metadata handoff, then eligible weaker
