@@ -17,6 +17,18 @@ AST inspection is a task check, not an OS sandbox; the production command
 runner's workspace working-directory check is not OS isolation either.
 Preserve consumed failures and distinguish offline validation from live quality.
 
+The owner also clarified that local models should not inherit hosted speed
+limits. The local gpt-oss trial was cancelled at its 60-second request cap while
+numeric runtime telemetry still showed generation. Record this as an incomplete
+trial under an unsuitable resource envelope, not an empty terminal response or
+proof of model-quality failure. Prepare subsequent local allowances from measured
+hardware throughput, output budget, prompt processing and complete workflow needs;
+merely extending a request inside the same short total may still starve review.
+Report latency separately from correctness and completion. Keep finite compute
+grants, cancellation, cleanup, privacy and substantive review. Local execution
+avoids hosted request quotas and remote-service dependencies; this does not yet
+establish comparative model quality or end-to-end reliability.
+
 The native model/tool/observation loop follows conventional agent architecture.
 A new agent framework is not needed to address the identified gaps.
 

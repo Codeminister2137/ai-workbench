@@ -25,6 +25,14 @@ and standard data-type method support while retaining task scope, protected
 tests, approval/privacy rules and frozen review. These are fixture changes and
 failure observations, not evidence of improved real-model completion.
 
+The owner subsequently clarified that local execution needs allowances suited
+to the PC's throughput rather than hosted speed limits. The fresh local trial
+timed out on its fourth request before edits or reports; the previous three
+responses contained valid tool calls. Prepare both request and overall local
+compute allowances accordingly, leaving realistic room for repair and frozen
+review. Record latency separately from quality; retain finite grants, cancellation
+and all acceptance protections. The consumed timeout remains historical evidence.
+
 Continue transparent, fresh, bounded edit/test/report/frozen-review acceptance
 when its inference allocation is justified. Retain complete instructions/history,
 tools, approval/privacy/quality boundaries and separate strict evaluation.
