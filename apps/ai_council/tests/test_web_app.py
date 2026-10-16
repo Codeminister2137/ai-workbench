@@ -68,11 +68,17 @@ def test_ask_endpoint_rejects_empty_prompt(council_server) -> None:
     raised.value.close()
 
 
-def test_ask_endpoint_streams_server_sent_events(council_server, monkeypatch) -> None:
+@pytest.mark.parametrize(
+    "request_content_type",
+    ["application/json", "Application/JSON", " APPLICATION/Json ; charset=UTF-8"],
+)
+def test_ask_endpoint_streams_server_sent_events(
+    council_server, monkeypatch, request_content_type
+) -> None:
     request = Request(
         f"{council_server}/api/ask",
         data=json.dumps({"prompt": "Question?"}).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
+        headers={"Content-Type": request_content_type},
         method="POST",
     )
 

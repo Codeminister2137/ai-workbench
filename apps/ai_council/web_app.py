@@ -104,7 +104,8 @@ class CouncilRequestHandler(SimpleHTTPRequestHandler):
             store.close()
 
     def _read_json_body(self) -> dict:
-        if self.headers.get("Content-Type", "").split(";")[0].strip() != "application/json":
+        media_type = self.headers.get("Content-Type", "").split(";", 1)[0].strip().lower()
+        if media_type != "application/json":
             raise InvalidRequest(415, "Content-Type must be application/json")
         lengths = self.headers.get_all("Content-Length", [])
         if self.headers.get("Transfer-Encoding") or len(lengths) != 1:

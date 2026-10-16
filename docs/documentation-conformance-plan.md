@@ -75,6 +75,12 @@ a public export regression now follow [RFC9110 section8.3.1](https://www.rfc-edi
 This changes no endpoint, credential, posting, approval or persistence boundary.
 Whole-repository conformance remains incomplete.
 
+The Council ask endpoint had the same case-sensitive JSON media-type comparison
+as the Openings bridge. It now accepts valid mixed-case `application/json`,
+including parameters, under the same RFC9110 rule. Real loopback HTTP regressions
+retain the streaming contract and existing rejection checks. This changes no
+origin, model, persistence or approval boundary.
+
 Requesty's current model catalog exposes cache-write `caching_price`,
 `caching_5m_price` and `caching_1h_price` alongside cache-read prices. The existing
 free-only checker ignored those write prices. It now checks every advertised
