@@ -72,6 +72,12 @@ One normalized provider response:
 - `latency_ms`: measured adapter latency when available;
 - `raw_metadata`: original provider metadata retained for diagnostics.
 
+Raw metadata is omitted from the default representations of `AIResponse` and
+`AIStreamDelta`: provider diagnostics can contain private thinking or continuation
+state. Explicit field access and serialization retain their existing contents;
+they are diagnostic operations, not a sanitized logging format. This does not
+change answer text, usage, tool calls or exact-origin continuation replay.
+
 ### Streaming
 
 `ChatClient.stream(request)` yields `AIStreamEvent` values:

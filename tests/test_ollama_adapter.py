@@ -104,6 +104,8 @@ def test_ollama_replays_thinking_without_exposing_it_as_answer():
     )
     assert response.message.content == "answer"
     assert "private-state" not in repr(response.message)
+    assert "private-state" not in repr(response)
+    assert response.raw_metadata["message"]["thinking"] == "private-state"
     payload = client._chat_payload(AIRequest(messages=(response.message,)), stream=False)
     assert payload["messages"][0]["thinking"] == "private-state"
 
@@ -151,6 +153,11 @@ def test_stream_accumulates_thinking_before_usage_only_final_chunk(monkeypatch):
     assert isinstance(final, AIStreamFinal)
     assert final.response.message.continuation is not None
     assert final.response.message.continuation.payload == {"thinking": "private-state"}
+    assert "private-state" not in repr(final)
+    delta = events[0]
+    assert isinstance(delta, AIStreamDelta)
+    assert "thinking" not in repr(delta)
+    assert delta.raw_metadata["message"]["thinking"] == "state"
     followup = client._chat_payload(AIRequest(messages=(final.response.message,)), stream=False)
     assert followup["messages"][0]["thinking"] == "private-state"
 

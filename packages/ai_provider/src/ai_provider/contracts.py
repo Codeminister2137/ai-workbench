@@ -193,7 +193,7 @@ class AIResponse:
     finish_reason: FinishReason = FinishReason.UNKNOWN
     latency_ms: float | None = None
     tool_calls: tuple[AIToolCall, ...] = ()
-    raw_metadata: dict[str, Any] = field(default_factory=dict)
+    raw_metadata: dict[str, Any] = field(default_factory=dict, repr=False)
 
 
 @dataclass(frozen=True, slots=True)
@@ -201,7 +201,7 @@ class AIStreamDelta:
     """Incremental text emitted by a streaming provider response."""
 
     content: str
-    raw_metadata: dict[str, Any] = field(default_factory=dict)
+    raw_metadata: dict[str, Any] = field(default_factory=dict, repr=False)
 
 
 @dataclass(frozen=True, slots=True)
