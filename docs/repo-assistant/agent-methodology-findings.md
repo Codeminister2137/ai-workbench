@@ -40,6 +40,16 @@ supervised small tasks while end-to-end acceptance remains incomplete.
 The native model/tool/observation loop follows conventional agent architecture.
 A new agent framework is not needed to address the identified gaps.
 
+The owner clarified that Codex should operate the CLI as a delegation coordinator,
+rather than merely hand the owner a manual command. Existing read-only approval
+policy permits headless review tasks without a physical prompt while retaining
+the full tool definitions; shell/write/custom operations remain denied. A local
+review completed on a supplied real patch, but its inaccurate line references
+and missed exit-code bug required host verification. Earlier attempts failed on
+oversized listing output and an incomplete file snapshot. Supply complete task
+dependencies, preserve failures and separate model review from host authorship,
+testing and repair. This does not establish quality parity or measured Codex savings.
+
 | Finding | Evidence and limits | Engineering implication |
 | --- | --- | --- |
 | Gateway, model and upstream availability are separate | A direct Gemma request returned upstream throttling; other free routes answered small requests. Neither establishes enduring availability or coding quality. | Investigate alternate models/upstreams before making a provider-wide claim. Separate access checks from quality evaluations. |
