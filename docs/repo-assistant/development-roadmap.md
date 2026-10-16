@@ -1,6 +1,34 @@
 # CLI Development Foundation Roadmap
 
-## 2026-10-15 live follow-up and interrupted-usage repair
+## Current checkpoint: 2026-10-16
+
+Baseline CLI and reliable fallback remain **INCOMPLETE**. Ordinary tool/test
+correction is accepted; older pending one-anchor choices below are historical.
+Recent iterative trials produced correct effects in some runs but did not finish
+both the substantive edit report and frozen review. Passing code checks alone
+does not complete those acceptance phases or establish parity.
+
+An observed provider `error` finish was normalized as a blank response. The owner
+approved recognizing OpenRouter choice-level errors with the existing root-error
+categories; an error finish without usable details is non-retryable. Existing
+quota/rate-limit fallback eligibility remains guarded. This does not identify
+the cause of earlier empty responses whose raw shape was not captured.
+
+Bounded successor preparation now discloses the coding allowance separately from
+the total and retains remaining-allowance notices in ordinary tool history. The
+unattended path records a stalled slice instead of prompting an absent owner.
+A later trial stopped before executing source containing a call outside the
+synthetic fixture's inspected language. Local investigation now discloses those
+existing restrictions without relaxing the guard. These are preparation and
+failure observations, not evidence of improved real-model completion.
+
+Continue transparent, fresh, bounded edit/test/report/frozen-review acceptance
+when its inference allocation is justified. Retain complete instructions/history,
+tools, approval/privacy/quality boundaries and separate strict evaluation.
+Independent unattended coordination remains the next priority after baseline;
+deadline-only sleep scheduling does not implement that supervisor.
+
+## Historical 2026-10-15 live follow-up and interrupted-usage repair
 
 Baseline CLI remains **INCOMPLETE**. Two fresh owner-approved OpenRouter iterative
 trials failed different conditions. The first repaired source and passed original

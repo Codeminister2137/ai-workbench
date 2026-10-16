@@ -111,6 +111,15 @@ INCOMPLETE; this decision authorizes no inference or general quality promotion.
 
 ## Interrupted-run closeout (2026-10-16)
 
+Subsequent observations must remain distinct: one run captured a provider error
+finish, another reached its coding-call ceiling without a report, and a fresh
+unattended run stopped at the fixture-language guard before running newly edited
+source. None establishes the cause of an earlier unobserved blank response.
+Allowance and language restrictions must be explicit in the task, while complete
+history and ordinary tool access remain available. Local disclosure tests do not
+establish that the model will finish its report or review. Do not relax safety
+checks or resume a consumed attempt to turn correct-looking effects into acceptance.
+
 The integrated successor repaired its implementation and an incorrect new test
 expectation, preserved original tests, and passed seven tests and the independent
 bounded oracle. It produced no final edit report or frozen review, so integrated

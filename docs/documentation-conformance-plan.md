@@ -51,6 +51,14 @@ Sources: [Ollama tool calling](https://docs.ollama.com/capabilities/tool-calling
 
 ## Subsequent bounded findings
 
+Ollama thinking was hidden on `AIMessage` continuation but remained visible in
+default `AIResponse` and streaming-event representations through raw metadata.
+Those diagnostic fields are now omitted from default representations, preserving
+explicit field access, serialization, answers, usage and exact-origin replay.
+Regression checks cover both final responses and mixed thinking/text deltas.
+This is representation privacy, not deletion of explicit diagnostic data or
+proof of live coding quality. See the [interface contract](../packages/ai_provider/docs/interface.md).
+
 The shared process tool advertised argv as an unconstrained array even though its
 handler accepts only strings. Optional neutral array-element metadata now survives
 agent/provider translation and advertises `items: {type: string}` for that tool.
