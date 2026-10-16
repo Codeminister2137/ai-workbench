@@ -98,6 +98,13 @@ class ReadFileTool(BaseTool):
         start_line = arguments.get("start_line")
         end_line = arguments.get("end_line")
 
+        if total_lines == 0 and start_line is None and end_line is None:
+            return ToolResult(
+                name="read_file",
+                output="",
+                metadata={"path": str(target_path), "lines_read": 0},
+            )
+
         s_idx = max(1, int(start_line)) if isinstance(start_line, (int, float)) else 1
         e_idx = (
             min(total_lines, int(end_line)) if isinstance(end_line, (int, float)) else total_lines

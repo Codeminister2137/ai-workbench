@@ -127,6 +127,8 @@ reread the current range and include enough surrounding text to make it unique.
 This option does not establish a model-quality improvement on its own.
 An end bound before the resolved start bound is refused with the file's valid
 line range; it does not return an empty successful read.
+An empty file read without line bounds succeeds with empty output and zero lines
+read in either display mode. An explicit line request on an empty file is refused.
 
 Existing official-client routes can also execute turns, subject to account
 readiness, route compatibility and explicit external-processing permission.
