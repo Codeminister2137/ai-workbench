@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from ai_provider import (
@@ -32,6 +32,8 @@ class AgentResult:
     response: AIResponse
     tool_results: tuple[ToolResult, ...] = ()
     iterations: int = 1
+    # Transient only, like ProviderError.partial_messages; never log/persist raw continuation.
+    messages: tuple[AIMessage, ...] = field(default=(), repr=False, compare=False)
 
 
 class AgentLoop:
@@ -110,7 +112,10 @@ class AgentLoop:
             tool_calls = response.tool_calls or response.message.tool_calls
             if not tool_calls:
                 return AgentResult(
-                    response=response, tool_results=tuple(tool_results), iterations=iteration
+                    response=response,
+                    tool_results=tuple(tool_results),
+                    iterations=iteration,
+                    messages=tuple(messages),
                 )
 
             for call in tool_calls:

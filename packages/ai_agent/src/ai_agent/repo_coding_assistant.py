@@ -3697,7 +3697,7 @@ def _run_native_agent(
                 f"{_activity_preview(tool_result.output)}"
             )
     if empty_report:
-        raise ProviderError(
+        error = ProviderError(
             "Native agent returned no final report. Earlier tool effects remain; "
             "inspect their receipts before continuing."
             if result.tool_results
@@ -3705,6 +3705,8 @@ def _run_native_agent(
             category=ProviderErrorCategory.NON_RETRYABLE,
             provider=config.provider.value,
         )
+        error.partial_messages = result.messages
+        raise error
     if textual_request:
         message = (
             "Native agent returned an unexecuted textual tool request after earlier tools. "
@@ -3713,11 +3715,13 @@ def _run_native_agent(
             else "Native agent returned a textual tool request without executing any tools. "
             "No action was performed; this response cannot count as completed implementation."
         )
-        raise ProviderError(
+        error = ProviderError(
             message,
             category=ProviderErrorCategory.NON_RETRYABLE,
             provider=config.provider.value,
         )
+        error.partial_messages = result.messages
+        raise error
     return result
 
 

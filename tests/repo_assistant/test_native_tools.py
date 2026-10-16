@@ -282,7 +282,7 @@ def test_native_agent_preserves_earlier_effect_when_final_request_is_textual(tmp
     monkeypatch.setattr(client, "complete", incomplete)
     monkeypatch.setattr(_EXAMPLE, "create_chat_client", lambda config: client)
     events = []
-    with pytest.raises(ProviderError, match="Earlier tool effects remain"):
+    with pytest.raises(ProviderError, match="Earlier tool effects remain") as raised:
         _run_native_agent(
             "Create two files",
             BackendConfig(provider=_EXAMPLE.ProviderKind.OLLAMA, model="test"),
@@ -298,6 +298,8 @@ def test_native_agent_preserves_earlier_effect_when_final_request_is_textual(tmp
         )
     assert (tmp_path / "native.txt").read_text() == "native"
     assert not (tmp_path / "missing.txt").exists()
+    assert raised.value.partial_messages[-1].content.startswith('{"name":"create_file"')
+    assert any(message.role is MessageRole.TOOL for message in raised.value.partial_messages)
     assert any("local_tool_activity: ok - create_file" in event for event in events)
     assert any("local_agent_activity: incomplete" in event for event in events)
 
@@ -322,7 +324,7 @@ def test_native_agent_rejects_empty_final_report_without_replaying_effects(
     monkeypatch.setattr(client, "complete", empty_final)
     monkeypatch.setattr(_EXAMPLE, "create_chat_client", lambda config: client)
     events = []
-    with pytest.raises(ProviderError, match="no final report"):
+    with pytest.raises(ProviderError, match="no final report") as raised:
         _run_native_agent(
             "Create native.txt and report the result",
             BackendConfig(provider=_EXAMPLE.ProviderKind.OLLAMA, model="test"),
@@ -337,6 +339,9 @@ def test_native_agent_rejects_empty_final_report_without_replaying_effects(
             progress_callback=events.append,
         )
     assert len(requests) == (2 if earlier_effect else 1)
+    assert raised.value.category is _EXAMPLE.ProviderErrorCategory.NON_RETRYABLE
+    assert raised.value.partial_messages[:-1] == requests[-1].messages
+    assert raised.value.partial_messages[-1] == AIMessage(MessageRole.ASSISTANT, content)
     assert (tmp_path / "native.txt").exists() == earlier_effect
     if earlier_effect:
         assert (tmp_path / "native.txt").read_text() == "native"

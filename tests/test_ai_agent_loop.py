@@ -84,6 +84,10 @@ def test_agent_loop_carries_provider_continuation_through_tool_result(tmp_path):
     assert client.requests[1].messages[1].continuation is state
     assert client.requests[1].messages[2].role is MessageRole.TOOL
     assert "private-state" not in repr(client.requests[1].messages)
+    assert result.messages == (*client.requests[-1].messages, result.response.message)
+    assert result.messages[1].continuation is state
+    assert "Create the file" not in repr(result)
+    assert "private-state" not in repr(result)
 
 
 def test_agent_loop_executes_tools_and_returns_final_response(tmp_path: Path) -> None:

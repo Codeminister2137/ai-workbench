@@ -1083,8 +1083,21 @@ Independent host assessment accepted the report against the actual source, diff
 and observations. This answers the narrow review question only; the earlier
 workflow remains failed, and neither prompt causality nor general parity is
 established. A fresh integrated preparation retains complete coding history and
-adds the explicit review completion instruction. Its live execution needs a new
-one-use grant; no model grade, production default or fallback quality is promoted.
+adds the explicit review completion instruction. The subsequently approved
+integrated attempt repaired the source and a mistaken new test expectation,
+preserved the original tests, and passed seven tests plus the independent bounded
+oracle. It returned no final edit report, so frozen review never completed and
+acceptance failed. Passing code checks do not supply those missing model phases.
+
+A fresh history diagnostic then refused at the exhausted-quota guard before any
+completion request. It provides no live history-interpretation or model-quality
+evidence. Both attempts and their grants are consumed. On 2026-10-16, closeout
+preserved their receipts and verified owned cleanup without further inference.
+The local CLI fix retains transient full loop messages on empty or textual final
+report errors, preserving instructions, tool receipts and earlier effects for
+inspection. These errors remain non-retryable; no recovery, routing, privacy or
+quality policy changed. Baseline remains INCOMPLETE, with no model grade,
+production default or fallback quality promotion.
 
 The fallback audit identified ADR-032's counts-only contract. The owner then chose
 context-aware transfer in ADR-059: eligible native coding routes receive complete

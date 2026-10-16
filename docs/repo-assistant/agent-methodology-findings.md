@@ -109,6 +109,25 @@ deterministically test recovery/stall/cleanup behavior, then seek a fresh live
 grant. Ask readiness only for known required owner input. Baseline remains
 INCOMPLETE; this decision authorizes no inference or general quality promotion.
 
+## Interrupted-run closeout (2026-10-16)
+
+The integrated successor repaired its implementation and an incorrect new test
+expectation, preserved original tests, and passed seven tests and the independent
+bounded oracle. It produced no final edit report or frozen review, so integrated
+acceptance failed. The provider finish reason and raw terminal response shape were
+not retained; the cause of the empty normalized response remains unknown. A
+separate history diagnostic stopped at the quota guard before any completion
+request, providing no model response or usage observations. Consumed attempts
+remain immutable; a daily allowance reset does not renew their grants.
+
+Post-loop validation exposed a separate deterministic continuity gap: successful
+loop return followed by CLI report rejection lost the transient conversation,
+although earlier tool effects remained. The local fix carries complete loop
+messages into these errors without changing their non-retryable classification,
+replaying tools, logging raw history or adding another loop. Tests check retained
+history, actual effects and representation privacy. This does not repair empty
+model reports or establish live fallback quality.
+
 ## Source index for later research
 
 Live-launch follow-up (2026-10-15): the approved attempt failed in a host metadata
