@@ -52,6 +52,11 @@ Depth is not an entry or character cap: choose a focused path when a broad
 directory could produce a large result. Native input admission still preserves
 the complete resulting history and refuses overflow rather than trimming it.
 
+`grep_search` discovers files as it scans them and stops requesting further
+workspace entries once `max_matches` is reached. It retains existing traversal
+order, file-only filtering and workspace boundaries; an explicit file path skips
+workspace enumeration. This limit does not bound the size of an individual file.
+
 Common MCP configuration is passed per run. Kiro needs a generated project-local
 agent file; the adapter uses a unique name and removes its unchanged file afterward,
 including on failure. Existing configuration and changed generated files are

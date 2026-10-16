@@ -197,18 +197,16 @@ class GrepSearchTool(BaseTool):
                 is_error=True,
             )
 
-        files_to_search: list[Path] = []
+        # Stop discovery when the content scan reaches the match limit.
         if target_path.is_file():
-            files_to_search.append(target_path)
+            paths_iter = [target_path]
         else:
-            for p in _workspace_entries(target_path, context):
-                if p.is_file():
-                    files_to_search.append(p)
+            paths_iter = (p for p in _workspace_entries(target_path, context) if p.is_file())
 
         results: list[str] = []
         match_count = 0
 
-        for file_path in files_to_search:
+        for file_path in paths_iter:
             try:
                 resolved = file_path.resolve()
                 if not context.is_within_workspace(resolved):
