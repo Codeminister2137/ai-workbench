@@ -7,6 +7,16 @@ exact hosted route before implementation. Historical failures remain evidence.
 
 ## Findings to retain
 
+The owner clarified on 2026-10-16 that ordinary Python constructs belong in
+CLI parity evaluation. A synthetic fixture rejected `int()` before execution
+because its handwritten language allowlist was too narrow; that was not a
+production CLI permission restriction. Fresh fixture preparation accepts public
+builtins and standard numeric/string/container methods while retaining its
+no-I/O task scope, protected tests, approval/privacy rules and frozen review.
+AST inspection is a task check, not an OS sandbox; the production command
+runner's workspace working-directory check is not OS isolation either.
+Preserve consumed failures and distinguish offline validation from live quality.
+
 The native model/tool/observation loop follows conventional agent architecture.
 A new agent framework is not needed to address the identified gaps.
 

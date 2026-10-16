@@ -18,8 +18,11 @@ Bounded successor preparation now discloses the coding allowance separately from
 the total and retains remaining-allowance notices in ordinary tool history. The
 unattended path records a stalled slice instead of prompting an absent owner.
 A later trial stopped before executing source containing a call outside the
-synthetic fixture's inspected language. Local investigation now discloses those
-existing restrictions without relaxing the guard. These are preparation and
+synthetic fixture's inspected language. A subsequent local trial hit the same
+artificial restriction on `int()`. The owner clarified that ordinary Python
+capabilities should be supported. Fresh fixture preparation broadens builtin
+and standard data-type method support while retaining task scope, protected
+tests, approval/privacy rules and frozen review. These are fixture changes and
 failure observations, not evidence of improved real-model completion.
 
 Continue transparent, fresh, bounded edit/test/report/frozen-review acceptance
