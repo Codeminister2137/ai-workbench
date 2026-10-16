@@ -425,21 +425,89 @@ def test_stream_usage_receipt_and_tool_fragments(monkeypatch):
 
 
 @pytest.mark.parametrize("stream", [False, True])
+@pytest.mark.parametrize("location", ["root", "choice"])
 @pytest.mark.parametrize(
     "code,category",
     [
+        (401, ProviderErrorCategory.AUTHENTICATION),
+        (403, ProviderErrorCategory.AUTHENTICATION),
         (402, ProviderErrorCategory.USAGE_LIMIT),
         (429, ProviderErrorCategory.RATE_LIMIT),
         (503, ProviderErrorCategory.RETRYABLE),
+        (400, ProviderErrorCategory.NON_RETRYABLE),
     ],
 )
-def test_embedded_errors_normalized_without_remote_text(monkeypatch, stream, code, category):
+def test_embedded_errors_normalized_without_remote_text(
+    monkeypatch, stream, location, code, category
+):
     error = {"error": {"code": code, "message": "secret input echo"}}
+    if location == "choice":
+        error = {"choices": [{**error, "finish_reason": "error"}]}
     transport(monkeypatch, response=[error] if stream else error)
     with pytest.raises(ProviderError) as result:
         list(client().stream(request())) if stream else client().complete(request())
     assert result.value.category == category
+    assert result.value.retryable == (
+        category in {ProviderErrorCategory.RATE_LIMIT, ProviderErrorCategory.RETRYABLE}
+    )
     assert "secret" not in str(result.value)
+
+
+@pytest.mark.parametrize("stream", [False, True])
+@pytest.mark.parametrize("error", [None, {}, "secret", False, {"code": "429"}])
+def test_choice_error_without_usable_code_refuses_partial_output(monkeypatch, stream, error):
+    choice = {
+        "finish_reason": "error",
+        "error": error,
+        "delta" if stream else "message": {
+            "content": "secret partial answer",
+            "tool_calls": [
+                {
+                    "id": "c1",
+                    "function": {"name": "create_file", "arguments": '{"path":"unwanted.txt"}'},
+                }
+            ],
+        },
+    }
+    raw = {"choices": [choice]}
+    transport(monkeypatch, response=[raw] if stream else raw)
+    with pytest.raises(ProviderError) as result:
+        list(client().stream(request())) if stream else client().complete(request())
+    assert result.value.category is ProviderErrorCategory.NON_RETRYABLE
+    assert not result.value.retryable
+    assert "secret" not in str(result.value)
+
+
+def test_root_error_takes_precedence_over_choice_error(monkeypatch):
+    transport(
+        monkeypatch,
+        response={
+            "error": {"code": 401},
+            "choices": [{"error": {"code": 429}, "finish_reason": "error"}],
+        },
+    )
+    with pytest.raises(ProviderError) as result:
+        client().complete(request())
+    assert result.value.category is ProviderErrorCategory.AUTHENTICATION
+
+
+@pytest.mark.parametrize("finish", [None, "stop"])
+def test_choice_error_refuses_even_without_error_finish(monkeypatch, finish):
+    transport(
+        monkeypatch,
+        response={
+            "choices": [
+                {
+                    "message": {"content": "partial"},
+                    "finish_reason": finish,
+                    "error": {"code": 429},
+                }
+            ]
+        },
+    )
+    with pytest.raises(ProviderError) as result:
+        client().complete(request())
+    assert result.value.category is ProviderErrorCategory.RATE_LIMIT
 
 
 def test_opt_in_catalog_provenance_and_existing_fallback():
@@ -496,10 +564,8 @@ def test_free_or_unknown_plan_privacy_entitlement_refuses(monkeypatch, is_free_t
     assert [call.get_method() for call in calls] == ["GET"]
 
 
-@pytest.mark.parametrize("exhaust_after_tool", [False, True])
-def test_shared_tool_loop_preserves_effects_and_rechecks_quota(
-    monkeypatch, tmp_path, exhaust_after_tool
-):
+@pytest.mark.parametrize("stop_kind", ["complete", "quota", "choice_error"])
+def test_shared_tool_loop_preserves_effects_and_rechecks_quota(monkeypatch, tmp_path, stop_kind):
     from ai_agent import (
         AgentLoop,
         PermissionManager,
@@ -534,12 +600,14 @@ def test_shared_tool_loop_preserves_effects_and_rechecks_quota(
                     }
                 ]
             },
-            {"choices": [{"message": {"content": "Finished"}, "finish_reason": "stop"}]},
+            {"choices": [{"error": {"code": 429, "message": "secret"}, "finish_reason": "error"}]}
+            if stop_kind == "choice_error"
+            else {"choices": [{"message": {"content": "Finished"}, "finish_reason": "stop"}]},
         ]
     )
 
     def next_reply():
-        if exhaust_after_tool:
+        if stop_kind == "quota":
             quota.update(used=50, remaining=0)
         return next(replies)
 
@@ -551,16 +619,25 @@ def test_shared_tool_loop_preserves_effects_and_rechecks_quota(
         permissions=PermissionManager(policy=PermissionPolicy.permissive()),
         max_iterations=2,
     )
-    if exhaust_after_tool:
+    if stop_kind != "complete":
         with pytest.raises(ProviderError) as result:
             loop.run(
                 "Create result.txt",
                 system_prompt="Preserve original tests",
                 privacy_class=PrivacyClass.PUBLIC_OR_LOW_RISK,
             )
-        assert result.value.category is ProviderErrorCategory.USAGE_LIMIT
+        assert result.value.category is (
+            ProviderErrorCategory.USAGE_LIMIT
+            if stop_kind == "quota"
+            else ProviderErrorCategory.RATE_LIMIT
+        )
+        assert result.value.partial_messages[0].content == "Preserve original tests"
+        assert result.value.partial_messages[1].content == "Create result.txt"
         assert result.value.partial_messages[-1].role is MessageRole.TOOL
-        assert [call.get_method() for call in calls] == ["GET", "GET", "POST", "GET", "GET"]
+        expected_methods = ["GET", "GET", "POST", "GET", "GET"]
+        if stop_kind == "choice_error":
+            expected_methods.append("POST")
+        assert [call.get_method() for call in calls] == expected_methods
     else:
         result = loop.run(
             "Create result.txt",

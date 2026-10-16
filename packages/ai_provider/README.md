@@ -31,6 +31,12 @@ provider contracts responsible for routing or report quality.
 
 See the [interface specification](docs/interface.md) for the capability matrix.
 
+OpenRouter root and choice-level errors use the same sanitized provider error
+categories. An `error` finish without usable details is non-retryable; partial
+answers and tool calls from that failed response are rejected. Existing eligible
+quota/rate-limit fallback remains subject to routing, privacy and quality guards;
+an unclassified error does not trigger fallback.
+
 See [provider source state](docs/source-state.md) for dated source limits,
 integration readiness and evaluation gaps, including Groq's token quotas. These
 findings are shared with orchestration by reference; they are not live quota or

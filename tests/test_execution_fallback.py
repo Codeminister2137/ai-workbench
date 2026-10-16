@@ -125,6 +125,40 @@ def session(monkeypatch, routes, **kwargs):
     )
 
 
+@pytest.mark.parametrize("code", [402, 429, 401, 502, None])
+def test_openrouter_choice_errors_use_existing_fallback_eligibility(monkeypatch, routes, code):
+    from ai_provider import BackendConfig, ProviderKind
+    from ai_provider.adapters.openrouter import OpenRouterFreeChatClient
+
+    # Exercise the adapter/policy boundary without transport or an external client.
+    adapter = OpenRouterFreeChatClient(
+        BackendConfig(provider=ProviderKind.OPENROUTER, model="synthetic:free", api_key="test")
+    )
+    run = session(monkeypatch, routes)
+    calls = []
+
+    def execute(target, prompt):
+        calls.append(target.route_id)
+        if len(calls) == 1:
+            adapter._check_error(
+                {
+                    "choices": [
+                        {"finish_reason": "error", "error": {"code": code, "message": "secret"}}
+                    ]
+                }
+            )
+        return "continued"
+
+    if code in {402, 429}:
+        assert run.run("Task", execute, lambda value: False, observe=str) == "continued"
+        assert calls == ["codex", "copilot"]
+    else:
+        with pytest.raises(ProviderError) as result:
+            run.run("Task", execute, lambda value: False, observe=str)
+        assert calls == ["codex"]
+        assert "secret" not in str(result.value)
+
+
 @pytest.mark.parametrize("expiry", ["before_probe", "during_probe", "during_answer"])
 def test_fallback_preflight_stops_at_deadline_without_login(monkeypatch, routes, expiry):
     now = 11.0 if expiry == "before_probe" else 0.0

@@ -566,6 +566,15 @@ environment changes; Python `.venv` and external runtimes remain separate. OpenC
 Console is deferred. See installation guidance for the project-local setup direction.
 See [ADR-057](decisions/ADR-057-free-gemini-cli-and-openrouter-direction.md).
 
+Provider-contract clarification accepted (2026-10-16): the owner approved using
+the existing sanitized root-error categories for OpenRouter choice-level errors
+(option A), with non-retryable classification for an error finish lacking usable
+details. This preserves provider distinctions over the alternative of stopping
+every such error as non-retryable. Newly recognized quota/rate-limit errors enter
+only existing eligible fallback; privacy, billing sources, quality floors and
+context-headroom policy are unchanged. This is an adapter conformance fix, not
+general CLI/model-quality acceptance or permission for a new inference source.
+
 ## ADR-058 — Opt-in task sampling controls
 
 **Status:** Accepted (2026-10-15); implemented offline, live acceptance incomplete.

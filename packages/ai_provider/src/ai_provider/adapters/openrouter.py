@@ -228,7 +228,20 @@ class OpenRouterFreeChatClient(OpenAICompatibleChatClient):
             )
         error = raw.get("error")
         if error is None:
-            return
+            choices = raw.get("choices")
+            if isinstance(choices, list):
+                for choice in choices:
+                    if not isinstance(choice, dict):
+                        continue
+                    error = choice.get("error")
+                    if error is not None:
+                        break
+                    if choice.get("finish_reason") == "error":
+                        # An error finish without details still refuses partial output.
+                        error = {}
+                        break
+            if error is None:
+                return
         code = error.get("code") if isinstance(error, dict) else None
         category = (
             ProviderErrorCategory.AUTHENTICATION
