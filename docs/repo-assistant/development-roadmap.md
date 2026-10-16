@@ -1013,6 +1013,18 @@ approved; broader rollout and material implementation choices remain to be revie
 
 ## Resource and scheduling constraints
 
+Owner authorization (2026-10-16, attended): for the current near-end-of-day
+workflow, use the remaining allowance of already approved sources whose verified
+reset occurs before 10:00 local time, including repetitive access checks. This
+supersedes the one-attempt limit and preference to stop after a useful matrix
+for this authorization. Prefer useful authorized work, then bounded, paced
+public/synthetic checks; stop at exhaustion, reset, account refusal, uncertain
+price/privacy, or the run's explicit attempt/time bound. Do not consume the new
+post-reset allowance under an expiring-allowance grant. Existing source admission,
+zero-price, privacy, approval and Production Free guards remain. This does not
+renew consumed acceptance trials, authorize paid fallback, or install a recurring
+scheduler, unattended window or sleep action.
+
 Owner-requested backlog (2026-10-14): add a low-priority provider-route access
 sweep to the independent supervisor workflow after baseline CLI goals. When no
 higher-priority authorized work needs the expiring daily allowance, consider one
