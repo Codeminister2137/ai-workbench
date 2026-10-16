@@ -33,6 +33,17 @@ compute allowances accordingly, leaving realistic room for repair and frozen
 review. Record latency separately from quality; retain finite grants, cancellation
 and all acceptance protections. The consumed timeout remains historical evidence.
 
+The longer local attempt reached seven model requests and source/test edits,
+then stalled after two command errors. The owner reported no visible approval
+console; the owned tree was stopped with independent cleanup verification.
+Read-only review also found invalid test indentation and removal of the original
+test inventory, so the incomplete result is not solely a launcher failure.
+An opt-in local manual-launch packet now checks for redirected terminal I/O
+before inference. It supports supervised experimentation, not accepted migration
+or quality promotion. The owner reports roughly 20% of the weekly Codex allowance
+remaining; prioritize a usable local handoff and reserve Codex for diagnosis and
+review rather than repeated broad inference sweeps.
+
 Continue transparent, fresh, bounded edit/test/report/frozen-review acceptance
 when its inference allocation is justified. Retain complete instructions/history,
 tools, approval/privacy/quality boundaries and separate strict evaluation.

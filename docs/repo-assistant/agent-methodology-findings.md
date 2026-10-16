@@ -29,6 +29,14 @@ grants, cancellation, cleanup, privacy and substantive review. Local execution
 avoids hosted request quotas and remote-service dependencies; this does not yet
 establish comparative model quality or end-to-end reliability.
 
+Check the actual attended input/output path before a live launch. A Windows
+console handle can exist without a visible approval prompt in a piped launcher.
+Chat approval does not constitute a physical console answer. The longer local
+trial exposed that mismatch; it also left malformed tests with missing originals.
+Keep both findings, verify cleanup independently after an external stop, and
+leave unflushed usage unknown. A visible-terminal manual launcher can support
+supervised small tasks while end-to-end acceptance remains incomplete.
+
 The native model/tool/observation loop follows conventional agent architecture.
 A new agent framework is not needed to address the identified gaps.
 
