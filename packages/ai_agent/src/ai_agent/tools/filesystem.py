@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from ai_agent.contracts import ToolCategory, ToolDefinition, ToolParameter, ToolResult
@@ -383,24 +384,57 @@ class ListDirTool(BaseTool):
                 is_error=True,
             )
 
-        entries: list[str] = []
-        base_depth = len(target_path.parts)
+        # Depth 0 or negative depth means nothing should be scanned.
+        if max_depth <= 0:
+            return ToolResult(
+                name="list_dir",
+                output="(empty directory)",
+                metadata={"path": str(target_path), "count": 0},
+            )
 
-        for item in sorted(target_path.rglob("*")):
-            # Skip hidden dirs like .git, .venv, __pycache__
-            if any(part.startswith(".") or part == "__pycache__" for part in item.parts):
-                continue
-            item_depth = len(item.parts) - base_depth
-            if item_depth > max_depth:
-                continue
+        entries: list[Path] = []
 
-            rel_path = item.relative_to(target_path)
-            prefix = "📁 " if item.is_dir() else "📄 "
-            indent = "  " * (item_depth - 1)
-            entries.append(f"{indent}{prefix}{rel_path}")
+        # DFS stack: (current_path, depth_from_root)
+        stack: list[tuple[Path, int]] = [(target_path, 0)]
+        while stack:
+            current, depth = stack.pop()
+            try:
+                for child in sorted(current.iterdir()):
+                    # Skip hidden children or __pycache__ directories.
+                    if child.name.startswith(".") or child.name == "__pycache__":
+                        continue
+                    # Ensure we stay inside the workspace.
+                    if not context.is_within_workspace(child):
+                        continue
 
+                    rel = child.relative_to(target_path)
+                    entries.append(rel)
+
+                    # Recurse into directories if depth allows.
+                    if (
+                        child.is_dir()
+                        and depth + 1 < max_depth
+                        and not child.is_symlink()
+                        and not child.is_junction()
+                    ):
+                        stack.append((child, depth + 1))
+            except PermissionError:
+                # Skip directories that cannot be accessed; continue traversal.
+                pass
+
+        # Retain the original global Path ordering across directory levels.
+        entries.sort()
+
+        lines = []
+        for rel in entries:
+            abs_path = target_path / rel
+            prefix = "📁 " if abs_path.is_dir() else "📄 "
+            indent = "  " * (len(rel.parts) - 1)
+            lines.append(f"{indent}{prefix}{rel}")
+
+        output = "\n".join(lines) if lines else "(empty directory)"
         return ToolResult(
             name="list_dir",
-            output="\n".join(entries) if entries else "(empty directory)",
+            output=output,
             metadata={"path": str(target_path), "count": len(entries)},
         )

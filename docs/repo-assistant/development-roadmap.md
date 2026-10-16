@@ -50,6 +50,14 @@ tools, approval/privacy/quality boundaries and separate strict evaluation.
 Independent unattended coordination remains the next priority after baseline;
 deadline-only sleep scheduling does not implement that supervisor.
 
+The first useful delegated implementation slice corrects `list_dir` traversal:
+the local model supplied the iterative method, and host review corrected output
+indentation, typing and junction handling before validation. Depth/hidden pruning
+now occurs before descent. Six new regressions and extended boundary checks are
+included; the full root suite passed 2,297 tests with nine skipped. This is a
+verified software fix with mixed model/host authorship, not full coding parity
+or proof of Codex savings. Large shallow listings can still exceed context.
+
 ## Historical 2026-10-15 live follow-up and interrupted-usage repair
 
 Baseline CLI remains **INCOMPLETE**. Two fresh owner-approved OpenRouter iterative

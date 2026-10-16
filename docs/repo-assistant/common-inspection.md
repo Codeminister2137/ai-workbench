@@ -43,6 +43,15 @@ per-file limits. An instruction overflow or unreadable instructions refuses befo
 route preparation. Character limits alone do not establish model token capacity.
 Native repairs and delegated requests retain the loaded instructions.
 
+`list_dir` applies `max_depth` while traversing: depth 1 lists direct children,
+and nonpositive depth returns an empty listing without scanning. Hidden children
+and `__pycache__` are pruned before descent; hidden ancestors outside the selected
+target do not suppress its contents. Directory links and Windows junctions are
+not traversed. Visible results retain their sorted paths, indentation and count.
+Depth is not an entry or character cap: choose a focused path when a broad
+directory could produce a large result. Native input admission still preserves
+the complete resulting history and refuses overflow rather than trimming it.
+
 Common MCP configuration is passed per run. Kiro needs a generated project-local
 agent file; the adapter uses a unique name and removes its unchanged file afterward,
 including on failure. Existing configuration and changed generated files are

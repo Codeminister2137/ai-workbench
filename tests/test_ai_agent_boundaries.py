@@ -13,6 +13,7 @@ from ai_agent import (
     ToolContext,
 )
 from ai_agent.tools.base import ToolRegistry
+from ai_agent.tools.filesystem import ListDirTool
 from ai_agent.tools.search import FindFilesTool, GrepSearchTool
 
 
@@ -78,7 +79,7 @@ def test_search_never_returns_outside_link_contents(tmp_path, link_kind):
                 pytest.skip("Windows file symlinks require developer mode or privilege")
             raise
     try:
-        registry = ToolRegistry((GrepSearchTool(), FindFilesTool()))
+        registry = ToolRegistry((GrepSearchTool(), FindFilesTool(), ListDirTool()))
         context = ToolContext(workspace)
         grep = registry.execute(ToolCall("grep_search", {"query": "MARKER"}), context)
         assert not grep.is_error
@@ -87,6 +88,9 @@ def test_search_never_returns_outside_link_contents(tmp_path, link_kind):
         find = registry.execute(ToolCall("find_files", {"pattern": "*"}), context)
         assert "secret.txt" not in find.output
         assert "linked" not in find.output
+        listing = registry.execute(ToolCall("list_dir", {"max_depth": 3}), context)
+        assert not listing.is_error
+        assert "secret.txt" not in listing.output
     finally:
         if junction:
             link.rmdir()
