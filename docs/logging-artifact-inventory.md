@@ -66,6 +66,23 @@ contract decision. Preserve existing public categories, fallback/privacy rules,
 storage paths and historical artifacts while investigating. This review does not
 approve a new schema, logging service, raw-prompt capture or broad refactor.
 
+The first targeted local injection now confirms the agent-to-closeout gap: two
+synthetic `ProviderError` instances with identical generic messages and different
+provider identities retain their exception identity, chained cause, provider,
+category and retryability through the real agent loop, but yield identical CLI
+closeouts when route/fallback details are absent. The observed `CodingTurnResult`
+contains the failure string and no provider/category fields. This used real loop/
+closeout code with injected clients and an empty fallback-details fixture; it is
+not an end-to-end routing or service failure test. Provider-specific message text
+or effective-route metadata can still identify services in other cases.
+
+The terminal turn runner replaces the closeout observer's placeholder return code
+with the actual execution return code, so the placeholder alone is not a confirmed
+status-propagation defect. Existing loop/closeout/coding-chat checks pass (74 tests).
+Next: extend the composed trace through native execution, fallback and persisted
+chat before choosing between richer safe message context and a structured error
+contract. That public/persisted-contract decision has not been made by this review.
+
 ## Layout proposal for owner review
 
 Recommendation: retain current roots and durable database paths. First add a
