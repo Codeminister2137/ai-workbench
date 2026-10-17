@@ -44,6 +44,28 @@ and operational databases also need explicit retention decisions, independent
 from generated diagnostic logs. Raw external JSONL needs a field-level retention
 review; this inventory did not inspect private contents or claim redaction.
 
+## Initial error-propagation source trace — 2026-10-17
+
+This starts the wider owner-requested review. It is source evidence, not a complete
+failure-injection audit or a selected public error schema. Existing logs can still
+identify some providers by their message text; the finding below is about which
+structured facts cross each boundary, not a claim that every error is opaque.
+
+| Boundary | Current evidence | Review finding / next check |
+| --- | --- | --- |
+| Ollama HTTP to provider exception | `adapters/ollama.py` wraps HTTP failures with provider, category, retryable flag, original exception and exception chaining; message includes provider/status | Reported server error detail is not in the normalized message. Test safe body-detail preservation and closure without leaking echoed prompts or reasoning. The private pilot's bounded diagnostics are not a production-wide repair. |
+| Provider exception to agent loop | `ai_agent/loop.py` attaches transient partial messages and re-raises the same `ProviderError` | Cause/provider metadata remain available here. Verify this invariant across composed native/fallback paths and keep transient continuation out of durable diagnostics. |
+| Native execution failure to CLI closeout | `repo_coding_assistant.py` catches `ProviderError` and passes `str(exc)` as `failure_reason`; orchestrated stage details also receive this string and available fallback details | Structured exception metadata is not passed through this closeout parameter. Check effective route/service attribution, including fallback, rather than assuming the initially printed plan identifies the failing service. |
+| CLI closeout to coding-chat history | `coding_chat.py` stores failure reason/status/return code and optional route/fallback attempts from `CodingTurnResult` | Do not dump raw exceptions into persisted history. Determine the smallest safe attribution/cause information needed; a material contract or persisted-format change needs owner selection before implementation. |
+| Foreground child process to status | `processes.py` returns process handle/PID, status, return code, bounded output and truncation markers | Useful process evidence already exists. Verify callers preserve it and distinguish a worker failure, failed tool command and later cleanup failure. |
+| External client diagnostics | `external_reporting.py` separately reports event failure and hints, and suppresses command arguments in timeout reasons | Verify partial output, parser failures and external-service attribution across client-specific wrappers; bounded text alone is not proof of field-level redaction. |
+
+Next bounded review: deterministic failure injection through provider/native/CLI/
+coding-chat boundaries, identifying what is safely retained and what requires a
+contract decision. Preserve existing public categories, fallback/privacy rules,
+storage paths and historical artifacts while investigating. This review does not
+approve a new schema, logging service, raw-prompt capture or broad refactor.
+
 ## Layout proposal for owner review
 
 Recommendation: retain current roots and durable database paths. First add a

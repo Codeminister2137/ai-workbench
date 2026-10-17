@@ -96,6 +96,20 @@ without independently attributing workspace changes. This wrapper enforces a
 consistent CLI surface even when an agent's response format varies; agent
 prompts also say not to emit a duplicate summary.
 
+Place supporting-artifact links beside the information they support, not
+automatically at the start of a summary. Use descriptive Markdown links with
+verified absolute local file targets. A title that fails to render as a link
+is insufficient; links do not replace the actual outcome and limitations.
+
+### Investigating unexplained errors
+
+Whenever an encountered error has no established cause, begin investigation
+immediately: preserve the first failure/effects, trace the relevant component
+boundaries and pause repetition of that operation. Report any unavailable cause
+and missing evidence explicitly. Follow the
+[wider error-propagation review](logging-and-artifact-structure-plan.md#wider-error-propagation-review--owner-direction-2026-10-17)
+and AGENTS.md; diagnostics stay within existing scope, privacy and resource bounds.
+
 ### Human-approved terminal operations
 
 Routine, bounded, repository-local inspection, tests, lint, formatting, and type

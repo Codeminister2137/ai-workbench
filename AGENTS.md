@@ -618,6 +618,29 @@ If Codex discovers that a claimed or intended change did not happen, it must say
 
 Do not rely on intention, patch output, or memory alone as proof that the final state matches the report.
 
+### Investigate unexplained errors immediately
+
+Owner direction (2026-10-17): whenever an encountered error has no established
+cause, start investigation immediately rather than recording it only as a future
+follow-up or retrying the same operation. Preserve the first failure and actual
+effects, inspect the relevant logs/code/configuration, and trace the error across
+component boundaries. Identify the failing operation, the component reporting it,
+the originating service/runtime when evidenced, and the underlying cause. A generic
+HTTP status or wrapper message alone does not establish the underlying cause.
+
+Pause repetition of the affected operation while investigating. A fresh bounded
+diagnostic may run under existing authorization when it answers a concrete question;
+it must not silently replay a consumed trial, extend bounds or bypass safeguards.
+Known ordinary coding/tool errors can still be corrected within their approved scope.
+
+If available evidence cannot establish the cause, report it explicitly as unknown,
+explain what is missing or was discarded, and identify the next diagnostic action.
+Do not invent a cause or attribute a wrapper failure to a downstream service without
+evidence. Address missing error propagation/logging in scope; material privacy,
+public-contract, dependency, persistence or architecture choices still need the owner.
+Use the wider error-propagation review in
+`docs/logging-and-artifact-structure-plan.md`, prioritizing the CLI/agent paths.
+
 ## Scope discipline
 
 Do not:
@@ -1076,6 +1099,12 @@ Use `## **SUMMARY**` for normal task completion reports unless a simpler
 one-line answer is clearly better. The marker should catch the eye; the rest of
 the report can stay flexible. Do not force the body into a rigid template when
 a simpler sentence is clearer. The format is a readability aid, not ceremony.
+
+Optional supporting-artifact links belong beside the information they support,
+not automatically at the start of a summary. Use descriptive Markdown links and
+absolute local file targets, verifying that the target exists; a report-title
+fragment that fails to render as a link is insufficient. These are evidence
+links, not summary-type labels, and do not replace the actual outcome or limits.
 
 The repo-assistant CLI enforces this closeout structure for provider, native,
 chat, external-agent, and fallback execution paths. It preserves the selected

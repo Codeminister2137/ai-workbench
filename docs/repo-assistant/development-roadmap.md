@@ -1,6 +1,23 @@
 # CLI Development Foundation Roadmap
 
-## Current checkpoint: 2026-10-16
+## Current checkpoint: 2026-10-17
+
+Owner direction: add a repository-wide error-propagation review, prioritizing the
+CLI/agent and its provider/tool/worker boundaries. Preserve known causes through
+translation and make the failing service/stage easy to identify. Every encountered
+unexplained error starts immediate investigation; generic statuses and wrappers
+must not masquerade as root causes. The bounded review and acceptance requirements
+are in [the logging/error review plan](../logging-and-artifact-structure-plan.md#wider-error-propagation-review--owner-direction-2026-10-17).
+This adds a review requirement, not a new service, error schema or automatic retry.
+
+Latest local investigation repaired the private pilot's discarded HTTP-error
+diagnostics; deterministic loopback/privacy checks pass. A fresh eleven-request
+probe did not reproduce the old500, passed a delegated user-role checkpoint, then
+failed a separate invalid-input oracle in model-authored code. Exact old500cause
+remains unknown because its body was discarded. Preserve all consumed failures,
+full instructions/history/tools and independent acceptance protections. Local tests
+are authorized without per-run chat grants except announced gaming/resource mode;
+hosted/paid and new scope/privacy decisions retain their existing boundaries.
 
 Baseline CLI and reliable fallback remain **INCOMPLETE**. Ordinary tool/test
 correction is accepted; older pending one-anchor choices below are historical.
