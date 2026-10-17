@@ -34,6 +34,17 @@ local engine HTTP500 occurred before a checkpoint, so live delegated continuatio
 remains unobserved. Preserve that distinction and do not repeat trials blindly
 when the engine error's exact cause was not retained by the private transport.
 
+The local HTTP500 investigation found that the private pilot worker closed the
+HTTP error without reading its JSON error message. A fresh preparation now reads
+bounded error bodies and persists redacted status/cause categories, parser error
+kinds, timing and worker/controller correlation before returning. Arbitrary error
+text, echoed prompts/tool arguments and private thinking remain excluded; unknown
+categories remain unknown. Real loopback500 and privacy tests verify the path.
+The fresh model probe completed eleven requests without500, passed an automated
+checkpoint, then failed a separate source-correctness oracle. This does not prove
+the earlier500cause or a runtime fix. Reuse the improved diagnostics for justified
+future local work rather than repeating unchanged trials to force reproduction.
+
 The aw receipts verified initial physical confirmation and three current
 continuation answers; they do not establish every interactive denial/expiry path
 on real hardware. Coding passed host tests/oracle, but review command failures,
