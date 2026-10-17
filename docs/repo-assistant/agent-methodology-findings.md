@@ -24,6 +24,16 @@ inference retains its separate grant requirements. Announced gaming mode means
 the owner needs PC resources: do not start heavy local tests and safely wind down
 owned tests. No automatic gaming-mode detection or new supervisor is implied.
 
+Automated pilot callbacks must carry already-checked launch authority across the
+existing environment sanitizer without restoring grants to model/tool variables.
+The first delegated pilot incorrectly rechecked a deliberately removed variable
+and refused an ordinary continuation. A regression reproduced this with the live
+flag and real sanitizer; a fresh successor captures authority transiently before
+sanitation and preserves scope, guard, deadline and phase limits. Its subsequent
+local engine HTTP500 occurred before a checkpoint, so live delegated continuation
+remains unobserved. Preserve that distinction and do not repeat trials blindly
+when the engine error's exact cause was not retained by the private transport.
+
 The aw receipts verified initial physical confirmation and three current
 continuation answers; they do not establish every interactive denial/expiry path
 on real hardware. Coding passed host tests/oracle, but review command failures,
