@@ -7,6 +7,25 @@ exact hosted route before implementation. Historical failures remain evidence.
 
 ## Findings to retain
 
+On 2026-10-17 the owner accepted the visible-console interaction evidence from
+the local aw pilot and authorized Codex to take the user role in subsequent
+similar synthetic pilots, avoiding repeated physical `yes` input. Reuse the
+existing harness checkpoint callback and label its answers as automated pilot
+continuations, never physical human approvals. This is scoped pilot automation:
+it does not change production approval policy, create an unattended work window,
+renew consumed inference grants or authorize new data/providers. Prepare fresh
+finite bounds and deterministic checks before each named live grant. Safety,
+scope, expiry, protected tests, frozen review and independent acceptance remain.
+
+The aw receipts verified initial physical confirmation and three current
+continuation answers; they do not establish every interactive denial/expiry path
+on real hardware. Coding passed host tests/oracle, but review command failures,
+missing diff inspection and unsupported report claims still failed acceptance.
+Its harness reserved six review calls/tools without enforcing the published
+phase ceilings; overall totals stayed bounded, but future preparation must align
+the written phase limits with actual admission checks. Preserve the consumed
+failure rather than relabel it after changing the harness.
+
 The owner clarified on 2026-10-16 that ordinary Python constructs belong in
 CLI parity evaluation. A synthetic fixture rejected `int()` before execution
 because its handwritten language allowlist was too narrow; that was not a
