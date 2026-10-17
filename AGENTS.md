@@ -468,6 +468,19 @@ preserve the needed context without reducing quality.
 
 ### Bounded model-quality pilots
 
+Owner clarification (2026-10-17): local-only tests, including bounded local-model
+pilots within approved task scope, have standing authorization and do not need
+per-run chat approval. Prepare fresh named bounds and preserve failed/consumed
+runs; the name identifies a finite allowance rather than requiring a new owner
+grant each time. Hosted/paid inference and new provider/data/scope decisions keep
+their existing authorization requirements. When the owner announces "gaming
+mode" or says they need PC resources, do not start resource-heavy local tests and
+safely wind down owned test work. This is a conversational resource constraint,
+not a new automatic machine mode, scheduler or background service. For synthetic
+pilots, Codex may take the user role through the existing checkpoint callback;
+label these answers as automated pilot continuations, never physical human input.
+Production approval policy is unchanged.
+
 For CLI readiness, use paid inference only for a named real-model acceptance
 question. Prepare fixtures, verify settings/guards/logging and run deterministic
 checks locally first. All other testing remains local-only unless separately

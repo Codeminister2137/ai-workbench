@@ -14,8 +14,15 @@ existing harness checkpoint callback and label its answers as automated pilot
 continuations, never physical human approvals. This is scoped pilot automation:
 it does not change production approval policy, create an unattended work window,
 renew consumed inference grants or authorize new data/providers. Prepare fresh
-finite bounds and deterministic checks before each named live grant. Safety,
+finite bounds and deterministic checks before each live pilot. Safety,
 scope, expiry, protected tests, frozen review and independent acceptance remain.
+
+The owner then granted standing authorization for local-only tests, including
+local-model pilots in the approved scope. Fresh named finite allowances are
+prepared and checked locally without asking for per-run approval. Hosted/paid
+inference retains its separate grant requirements. Announced gaming mode means
+the owner needs PC resources: do not start heavy local tests and safely wind down
+owned tests. No automatic gaming-mode detection or new supervisor is implied.
 
 The aw receipts verified initial physical confirmation and three current
 continuation answers; they do not establish every interactive denial/expiry path
