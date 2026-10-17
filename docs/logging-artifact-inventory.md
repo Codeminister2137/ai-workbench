@@ -66,7 +66,7 @@ contract decision. Preserve existing public categories, fallback/privacy rules,
 storage paths and historical artifacts while investigating. This review does not
 approve a new schema, logging service, raw-prompt capture or broad refactor.
 
-The first targeted local injection now confirms the agent-to-closeout gap: two
+The first targeted local injection confirmed the agent-to-closeout gap: two
 synthetic `ProviderError` instances with identical generic messages and different
 provider identities retain their exception identity, chained cause, provider,
 category and retryability through the real agent loop, but yield identical CLI
@@ -79,9 +79,46 @@ or effective-route metadata can still identify services in other cases.
 The terminal turn runner replaces the closeout observer's placeholder return code
 with the actual execution return code, so the placeholder alone is not a confirmed
 status-propagation defect. Existing loop/closeout/coding-chat checks pass (74 tests).
-Next: extend the composed trace through native execution, fallback and persisted
-chat before choosing between richer safe message context and a structured error
-contract. That public/persisted-contract decision has not been made by this review.
+
+## Composed trace through native execution, fallback, and persisted coding chat
+
+Deterministic multi-boundary failure injection (`artifacts/cli-error-propagation-review-20261017/trace_errors.py`,
+`failure-injection.json`) tested four concrete scenarios without network, inference, or subprocesses:
+
+1. **Direct native failure without fallback**: `ProviderError` preserves exception identity,
+   provider, category, retryability, transient messages, and chained cause through `AgentLoop`
+   and `_run_native_agent_with_fallback`. However, at CLI closeout, only `str(exc)` reaches
+   `failure_reason`. `CodingTurnResult` retains only `failure_reason` and lacks `provider`,
+   `category`, and `cause` fields. `CodingChatController` persists `metadata`: `execution_status`,
+   `returncode`, `failure_reason`, `reply_to`. When `CodingChatController.history()` formats
+   past turns for the next model turn, provider identity, error category, and chained cause
+   are completely absent from the rendered JSON.
+2. **Fallback switch with secondary failure**: Primary route fails with `RETRYABLE` model overload
+   (`503 Service Unavailable`). `FallbackSession` captures the attempt (`primary: model_overload`),
+   switches to secondary route, which subsequently fails with `TIMEOUT` (`Socket timeout`).
+   `_print_cli_closeout`, `CodingTurnResult`, and persisted SQLite metadata retain
+   `effective_route_id: secondary` and `fallback_attempts: [primary: model_overload]`.
+   However, the initial failure reason and HTTP 503 cause are completely discarded from
+   `CodingTurnResult` (only the `model_overload` status string is kept in `fallback_attempts`).
+   The secondary failure's provider name (`openrouter_alt`), error category (`TIMEOUT`), and
+   chained cause (`Socket timeout`) are discarded; only the raw message string is stored.
+3. **Fallback exhaustion and handoff**: Primary route fails with `USAGE_LIMIT` (`429 Too Many Requests`).
+   With no secondary route available, `FallbackSession` creates a structured `handoff` receipt
+   (`status: continuation_stopped`, `reason`, `failure_kind: usage_limit`, `observed`).
+   While `_fallback_details(args)` holds `fallback_handoff`, `format_cli_closeout` does not format
+   or display it, `CodingTurnResult` has no `fallback_handoff` field, SQLite message metadata
+   omits it, and `CodingChatController.history()` excludes it from subsequent turn context.
+4. **Concrete compatibility/privacy options for owner review**:
+   - **Option A (Safe context in `failure_reason` string)**: Format `failure_reason` at CLI closeout
+     with a safe, bounded prefix: `[{stage}:{provider}:{category}] {safe_message} (cause: {safe_cause_kind})`.
+     This preserves existing public contracts, database schemas, and readers without breaking changes.
+     Requires verifying that `safe_cause_kind` never echoes raw exception messages containing secrets.
+   - **Option B (Structured error contract evolution)**: Add optional structured fields to
+     `CodingTurnResult` and SQLite message metadata: `provider: str | None`, `category: str | None`,
+     `cause_kind: str | None`, `fallback_handoff: Mapping[str, Any] | None`. This provides clean
+     programmatic querying but requires backward-compatibility guards across transcript stores,
+     database migrations, and history rendering.
+   *Decision is reserved for the owner; no schema change has been applied.*
 
 ## Layout proposal for owner review
 
