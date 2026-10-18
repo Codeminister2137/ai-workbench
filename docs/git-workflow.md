@@ -59,6 +59,21 @@ git push origin master
 Do not promote to `master` mid-feature or to satisfy a deadline. The goal
 is that `master` always reflects a coherent, working state.
 
+### Retiring working branches
+
+Use commit ancestry and the current roadmap, rather than age alone. A merged
+branch with a completed purpose can be removed locally with `git branch -d`
+after verifying its tip is contained in `develop`. Preserve `develop` and
+`master`. A branch still representing an active milestone may be fast-forwarded
+to `develop` and retained; incomplete goals belong in the roadmap and handoff,
+not in divergent stale branches.
+
+Remote deletion needs an explicit owner request and a fresh remote/ref check.
+Publish reviewed integration work before removing its old remote branch names.
+Do not delete a branch with unique work, an active worktree, or an unresolved
+review. Detached review snapshots and private backup refs are separate from
+completed feature branches and must not be included in automatic cleanup.
+
 ## Commits
 
 Commit often enough that each commit has one coherent purpose. Prefer several

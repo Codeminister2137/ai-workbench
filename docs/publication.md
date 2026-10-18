@@ -42,6 +42,11 @@ History cleanup requires an agreed scope, a protected local backup, branch/ref
 verification and explicit owner approval. Coordinate rewritten published history
 with collaborators. Never silently force-push or delete remote branches.
 
+The owner accepted retention of the previously published nonconfidential planning
+history on 2026-10-03. Preserve that ancestry and keep private paths out of branch
+tips; a presentation pass does not authorize rewriting it. This does not waive
+credential review or permit publishing new private configuration or artifacts.
+
 Rewriting branch history cannot erase other people's clones or forks. Cached
 GitHub views and pull-request references may also require separate handling.
 See [GitHub's sensitive-data removal guidance](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/removing-sensitive-data-from-a-repository).

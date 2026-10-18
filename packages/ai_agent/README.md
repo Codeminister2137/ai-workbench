@@ -4,6 +4,17 @@ Agentic tool execution loop, tool registry, permission policies, and
 multi-turn coding session management built on top of `ai_orchestrator` and
 `ai_provider`.
 
+From the workspace root, inspect the CLI without inference:
+
+```powershell
+python -m uv run --no-sync ai-assistant --help
+python -m uv run --no-sync ai-assistant --mode plan "Explain this workspace."
+```
+
+See [workspace setup](../../CONTRIBUTING.md) before running examples. End-to-end
+coding/model-quality acceptance remains incomplete; offline contracts and tests
+are separate from live quality evidence.
+
 ## Repository assistant CLI
 
 This package owns the `ai-assistant` command. The workspace launcher remains:
@@ -116,15 +127,15 @@ src/ai_agent/
 | Tool | Category | Description |
 | --- | --- | --- |
 | `ReadFileTool` | READ | Read file lines with optional offset/limit |
-| `EditFileTool` | WRITE | Replace exact line ranges in an existing file |
-| `CreateFileTool` | WRITE | Create or overwrite a file |
+| `EditFileTool` | WRITE | Replace a unique literal text match, or explicitly replace full file content |
+| `CreateFileTool` | WRITE | Create a file; overwriting requires an explicit option |
 | `ListDirTool` | READ | List directory contents within the workspace |
-| `GrepSearchTool` | READ | Regex search across workspace files |
-| `FindFilesTool` | READ | Find files matching a glob pattern |
+| `GrepSearchTool` | SEARCH | Regex search across workspace files |
+| `FindFilesTool` | SEARCH | Find files matching a glob pattern |
 | `GitStatusTool` | READ | Bounded `git status` output |
 | `GitDiffTool` | READ | Bounded `git diff` output |
 | `RunCommandTool` | SHELL | Run a shell command with workspace containment |
-| `DelegateTaskTool` | DELEGATE | Delegate a subtask to a separate agent invocation |
+| `DelegateTaskTool` | CUSTOM | Delegate a subtask through an explicitly configured runner |
 | `PythonRuntimeTool` | READ | Report the active Python interpreter and workspace hints |
 | `PythonNavigateTool` | READ | Find Python symbol definitions and references (requires optional Jedi) |
 | `RenamePreviewTool` | READ | Preview a Python symbol rename as a reviewable diff (requires optional Jedi) |
@@ -136,7 +147,7 @@ src/ai_agent/
 from pathlib import Path
 from ai_provider.config import BackendConfig, ProviderKind
 from ai_provider.factory import create_chat_client
-from ai_agent import AgentLoop, ApprovalPolicyPreset, PermissionManager
+from ai_agent import AgentLoop, ApprovalPolicyPreset, PermissionManager, PermissionPolicy, ToolContext
 from ai_agent.tools import default_coding_tools
 
 client = create_chat_client(
@@ -144,23 +155,25 @@ client = create_chat_client(
 )
 
 permissions = PermissionManager(
-    preset=ApprovalPolicyPreset.READ_ONLY,
-    workspace_root=Path("."),
+    policy=PermissionPolicy.from_approval_preset(ApprovalPolicyPreset.READ_ONLY),
 )
 
 tools = default_coding_tools()
-loop = AgentLoop(client, tools, permissions, workspace_root=Path("."))
+loop = AgentLoop(client, tools, ToolContext(workspace_root=Path.cwd()), permissions=permissions)
 result = loop.run("List the top-level Python files in this workspace.")
-print(result.final_response)
+print(result.response.message.content)
 ```
+
+This example requests local inference from an already configured Ollama runtime.
+It neither starts the runtime nor downloads a model.
 
 ## Approval policies
 
 | Preset | Allowed operations |
 | --- | --- |
 | `READ_ONLY` | Read, search, Git status/diff, Python runtime/navigation |
-| `WORKSPACE_WRITE` | Above + file create/edit; shell requires interactive approval |
-| `INTERACTIVE` | Above + interactive human approval for shell and destructive writes |
+| `WORKSPACE_WRITE` | Read/search/write allowed; shell and custom tools require approval |
+| `INTERACTIVE` | Read/search allowed; writes, shell and custom tools require approval |
 | `TRUSTED_LOCAL` | All tools without interactive prompts |
 
 ## Optional dependencies

@@ -1,3 +1,11 @@
+# Repository context
+
+Follow [AGENTS.md](../AGENTS.md) for owner decisions, investigation, authorization
+and resource boundaries. Start with [CONTRIBUTING.md](../CONTRIBUTING.md) for
+setup/checks and [the project map](../docs/project-map.md) for component ownership.
+Verify Git state and any local handoff against the diff before resuming work.
+These shared documents are authoritative; do not duplicate or weaken their rules.
+
 # Copilot chat closeout
 
 In Copilot Chat for this repository, never call `task_complete` or another

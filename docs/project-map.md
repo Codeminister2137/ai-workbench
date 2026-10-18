@@ -6,6 +6,7 @@ Use this file to decide where a change belongs before adding new abstractions.
 - `artifacts/<run>/` — ignored generated reports, logs, acceptance workspaces,
   and dedicated run databases; shared ongoing state remains in `data/`.
 - `AGENTS.md` — general Codex rules; especially the requirement to ask the user at material decision boundaries.
+- `CONTRIBUTING.md` — contributor/AI entry point for setup, checks, ownership and publication.
 - `CURRENT_CONTEXT.md` — local ignored immediate handoff, when present: last completed work, open conflicts/risks, validation status, and next plan.
   Its bottom contains the current copy-paste next-session prompt; this is the
   handoff entry point rather than a prompt hidden among run artifacts.
@@ -86,7 +87,7 @@ translation in `ai_provider` and high-level route selection in
 ### AI Council
 Location: `apps/ai_council/`
 
-Owns multi-model querying, raw response preservation, comparison/synthesis, and local/cloud/hybrid user-facing behavior. It is an application, not the provider layer. The current implementation is a prototype to migrate after the provider contract exists.
+Owns multi-model querying, raw response preservation and local conversation/browser workflows. It is an application, not the provider layer. The current prototype uses local Ollama through `ai_provider`; broader cloud/hybrid workflows are future scope.
 It should be able to use ordinary provider connections or orchestrator-guided
 routing through the provider/orchestrator boundaries, without provider-specific
 logic leaking into Council business logic.

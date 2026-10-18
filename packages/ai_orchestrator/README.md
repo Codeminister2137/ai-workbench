@@ -1,12 +1,5 @@
 # ai-orchestrator
 
-The experimental [OpenRouter free catalog](examples/openrouter_free_catalog.toml)
-is opt-in, with distinct `openrouter_free` provenance and provisional STANDARD
-quality. Its provider adapter checks fresh free prices/tool support/daily capacity
-before each call. Existing fallback admission preserves quality, privacy, required
-capabilities and exhausted-source boundaries. Default catalog unchanged; offline
-checks do not establish available endpoints or coding quality.
-
 Transparent orchestration primitives for AI prompt review, model selection, and
 execution planning.
 
@@ -79,6 +72,13 @@ it meets the task's minimum. The composing CLI preflights authentication and
 continues partial work by default; see ADR-032 and the CLI runbook.
 
 ## Model Catalog
+
+The experimental [OpenRouter free catalog](examples/openrouter_free_catalog.toml)
+is opt-in, with distinct `openrouter_free` provenance and provisional STANDARD
+quality. Its provider adapter checks fresh free prices/tool support/daily capacity
+before each call. Existing fallback admission preserves quality, privacy, required
+capabilities and exhausted-source boundaries. Default catalog unchanged; offline
+checks do not establish available endpoints or coding quality.
 
 Research-specific neutral contracts also live here:
 
@@ -221,7 +221,11 @@ if refinement.requires_user_approval:
 ```
 
 ```python
-from ai_orchestrator import TaskProfile, TaskType, load_model_catalog, plan_delegated_subtask
+from pathlib import Path
+
+from ai_orchestrator import (
+    PrivacyClass, TaskProfile, TaskType, load_model_catalog, plan_delegated_subtask,
+)
 
 catalog = load_model_catalog(Path("packages/ai_orchestrator/examples/model_catalog.toml"))
 parent_profile = TaskProfile(privacy_class=PrivacyClass.EXTERNAL_ALLOWED)

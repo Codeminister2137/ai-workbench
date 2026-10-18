@@ -49,8 +49,9 @@ Gemini CLI execution is experimental and opt-in. Its documented prerequisite is 
 20 or newer; the selected release's actual package requirements must also be
 checked. Before installation, pin runtime/client versions and record the source
 and verification procedure. Use explicit paths or a process-local PATH; avoid
-global PATH changes. Obtain attended readiness before any operation that may pause
-for terminal approval, as required by AGENTS.md.
+global PATH changes. Obtain attended readiness when an operation is known to
+require owner input. Routine approved checks need no separate readiness request;
+stop at an unexpected approval prompt, as required by AGENTS.md.
 
 For another machine, the installation recipe must identify:
 

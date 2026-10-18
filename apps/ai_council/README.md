@@ -4,11 +4,6 @@ A local-first prototype that sends one prompt to multiple configured council
 members, streams their separate answers, and stores conversation history in a
 local SQLite database.
 
-Messages require an existing conversation. The store enables its declared SQLite
-foreign key on every connection, including resumed databases. Historical rows
-are preserved; this enforcement does not repair or delete old orphan rows.
-See [SQLite's enforcement requirement](https://www.sqlite.org/foreignkeys.html#fk_enable).
-
 The current execution path uses `ai_provider` with local Ollama. Council owns
 the application workflow: loading member configuration, preserving raw member
 responses, streaming browser events, and storing history. Provider-specific API
@@ -135,6 +130,13 @@ Example member:
 The model names live in `council.json`; prompts and answers live in
 `data/council.sqlite3`. You can swap local Ollama models without losing
 conversation history.
+
+## Persistence
+
+Messages require an existing conversation. The store enables its declared SQLite
+foreign key on every connection, including resumed databases. Historical rows
+are preserved; this enforcement does not repair or delete old orphan rows.
+See [SQLite's enforcement requirement](https://www.sqlite.org/foreignkeys.html#fk_enable).
 
 ## Privacy
 

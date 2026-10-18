@@ -1,7 +1,6 @@
 # ai-provider
 
-Provider-agnostic AI request contracts, adapters, runtime helpers, and coding
-assistant support.
+Provider-agnostic AI request contracts, adapters, runtime and execution helpers.
 
 This package is the infrastructure layer below orchestration and applications.
 It owns provider-specific API calls, request/response translation, backend
@@ -20,14 +19,15 @@ answers, or implement job-search logic.
 - Experimental, opt-in OpenRouter free-only API client with per-call exact-price,
   tool-support and daily-quota checks; no deposit or paid fallback.
 - Local Ollama inventory, pull, runtime, and capability helpers.
-- Repo-aware coding assistant CLI support.
+- Compatibility imports for the agent-owned CLI and shared execution/storage helpers.
 - Native Codex, Copilot, Antigravity and Kiro executors for approved routes.
 - Same-tier usage fallback and explicit private configuration at the CLI boundary.
 - Local chat transcripts, supervised research workers and foreground scheduling.
 
-The adapters implement provider behavior. The repo-assistant modules compose
-orchestrator policy and agent tools at an application boundary; they do not make
-provider contracts responsible for routing or report quality.
+The adapters implement provider behavior. `ai_agent` owns the repository assistant
+CLI and composes routing policy and tools. Existing research, transcript and
+fallback helpers remain here; provider contracts do not own model selection or
+report quality.
 
 See the [interface specification](docs/interface.md) for the capability matrix.
 

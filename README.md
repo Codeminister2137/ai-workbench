@@ -6,14 +6,22 @@ transparent orchestration, and small AI-assisted applications.
 The repository is organized as a modular monorepo. Reusable libraries live under
 `packages/`; applications and prototypes live under `apps/`.
 
+## Explore the Project
+
+- **Review the design:** [architecture](docs/architecture.md),
+  [package ownership](docs/project-map.md), and [recorded decisions](docs/decisions.md).
+- **Try it locally:** the offline quick start below needs no model or credentials.
+- **Develop or use an AI coding assistant:** start with
+  [contributing](CONTRIBUTING.md) and the [repository instructions](AGENTS.md).
+
 ## Current Status
 
 | Area | Location | Status |
 | --- | --- | --- |
-| Provider layer | [ai-provider](packages/ai_provider/README.md) | Local and hosted adapters, streaming, native-client executors, persistent chat, and CLI composition. |
+| Provider layer | [ai-provider](packages/ai_provider/README.md) | Provider-neutral contracts, local and hosted adapters, streaming, native-client executors and usage metadata. |
 | Orchestrator | [ai-orchestrator](packages/ai_orchestrator/README.md) | Neutral routing, same-tier fallback, reviewer selection, repair progress and time-admission contracts. |
-| Agent tooling | [ai-agent](packages/ai_agent/README.md) | Permission-controlled coding tools, protected public research, report validation and source evidence. |
-| AI Council | `apps/ai_council/` | Local prototype using Ollama through the provider layer, with browser and CLI entry points. |
+| Agent and CLI | [ai-agent](packages/ai_agent/README.md) | Repository assistant CLI, permission-controlled tools, conversational coding, protected public research and report validation. |
+| AI Council | [Local AI Council](apps/ai_council/README.md) | Local prototype using Ollama through the provider layer, with browser and CLI entry points. |
 | Job search automation | [Job-search prototypes](apps/job_search/README.md) | Early email prototype only; broader automation is not production-ready. |
 
 ## What Works Today
@@ -41,6 +49,20 @@ Research quality-first review remains opt-in. Deterministic validation establish
 structure and executed receipts, not factual accuracy. Sustained live acceptance
 is still incomplete; the software tests and model-quality evaluation are separate.
 
+## Engineering Focus and Limits
+
+Provider APIs, routing decisions and tool execution have separate contracts.
+The orchestrator can return an execution target without importing a provider
+adapter; applications choose how to execute it. Coding tools enforce permissions
+and workspace boundaries, while foreground processes and fallback preserve
+observable receipts rather than treating a model's success claim as validation.
+
+This is an actively developed portfolio project. The CLI's end-to-end coding
+and frozen-review acceptance remains incomplete; configured native clients are
+not evidence of equal model quality. AI Council and job-search workflows remain
+prototypes. The [CLI roadmap](docs/repo-assistant/development-roadmap.md) records
+completed software slices and outstanding acceptance separately.
+
 ## Quick Start
 
 Requirements:
@@ -57,11 +79,15 @@ separate provisioning for the selected routes.
 Install and validate:
 
 ```powershell
-python -m uv sync
-python -m uv run pytest
-python -m uv run ruff check .
-python -m uv run pyright
+python -m uv sync --locked
+python -m uv run --no-sync python scripts/run-tests.py full -- -q
+python -m uv run --no-sync ruff check .
+python -m uv run --no-sync pyright
 ```
+
+The full offline runner covers workspace, Council and job-search tests in
+separate processes. Live model tests require explicit opt-in; installation and
+the checks above do not start inference. See [test selection](docs/test-workflow.md).
 
 Run a dry repo-assistant request:
 
@@ -92,13 +118,13 @@ Then open `http://127.0.0.1:8765`.
 Applications
   AI Council
   Job Search Automation
-  Future tools
+  Repository assistant CLI (ai-agent)
     |
     v
-AI Orchestrator
+AI Orchestrator (optional routing and planning)
     |
     v
-Provider-Agnostic AI Infrastructure
+Provider-Agnostic AI Infrastructure (ai-provider)
   Ollama
   Requesty
   Direct provider APIs
@@ -143,13 +169,14 @@ docs/                # architecture, decisions, and runbooks
 Useful commands:
 
 ```powershell
-python -m uv run pytest
-python -m uv run ruff check .
-python -m uv run ruff format --check .
-python -m uv run pyright
+python -m uv run --no-sync python scripts/run-tests.py full -- -q
+python -m uv run --no-sync ruff check .
+python -m uv run --no-sync ruff format --check .
+python -m uv run --no-sync pyright
 ```
 
-For contributor and agent workflow rules, see `AGENTS.md`.
+See [contributing](CONTRIBUTING.md) for setup, checks and branch workflow, and
+[AGENTS.md](AGENTS.md) for the owner's decision and AI-assistant boundaries.
 
 ## License
 
