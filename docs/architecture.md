@@ -115,6 +115,13 @@ evidence remain intact; older assistant reports become marked excerpts with
 references to unchanged SQLite originals. Mandatory-context overflow refuses
 execution, including after restart; no additional inference or summary store.
 
+ADR-060 adds optional error provider/category/cause-kind and a bounded fallback
+control receipt to the existing coding-chat metadata. The CLI renders the same
+attribution and distinguishes unknown provider/cause from the effective route.
+History includes only recognized handoff control facts, never raw observations,
+save-error text or transient provider continuation. Cause type alone is not a
+root-cause diagnosis; no SQL migration or fallback policy change is introduced.
+
 The repo-assistant CLI owns shared direct-child processes through one foreground
 supervisor. Its per-client MCP adapters forward to an authenticated ephemeral
 loopback MCP host with invocation-scoped credentials and sessions (ADR-044).

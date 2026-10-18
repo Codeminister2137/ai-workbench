@@ -55,7 +55,11 @@ from ai_provider.chat_transcripts import (
     ChatSessionRecord,
     SQLiteChatTranscriptStore,
 )
-from ai_provider.closeout import FINAL_RESPONSE_INSTRUCTION, format_cli_closeout
+from ai_provider.closeout import (
+    FINAL_RESPONSE_INSTRUCTION,
+    format_cli_closeout,
+    safe_fallback_handoff,
+)
 from ai_provider.codex_mcp import setup_project_codex_mcp
 from ai_provider.coding_assist import (
     backend_config_from_execution_target,
@@ -496,6 +500,14 @@ def _execution_status_with_auxiliary_result(
     return execution_status
 
 
+def _error_cause_kind(exc: BaseException | None) -> str | None:
+    """Report the explicit cause/raw type without copying its message or context."""
+    if exc is None:
+        return None
+    cause = getattr(exc, "__cause__", None) or getattr(exc, "raw_error", None)
+    return type(cause).__name__ if cause is not None else None
+
+
 def _print_cli_closeout(
     *,
     args: argparse.Namespace,
@@ -504,6 +516,9 @@ def _print_cli_closeout(
     execution_status: str,
     validation_stage: OrchestratedStageRecord | None = None,
     failure_reason: str | None = None,
+    provider: str | None = None,
+    category: str | None = None,
+    cause_kind: str | None = None,
 ) -> None:
     """Print the same evidence-bounded summary for every CLI execution route."""
 
@@ -511,11 +526,14 @@ def _print_cli_closeout(
     fallback_attempts = fallback_details.get("fallback_attempts", [])
     if not isinstance(fallback_attempts, list):
         fallback_attempts = []
+    raw_handoff = fallback_details.get("fallback_handoff")
+    fallback_handoff = safe_fallback_handoff(raw_handoff if isinstance(raw_handoff, dict) else None)
+    route_id = fallback_details.get("effective_route_id")
+
     observer = getattr(args, "_coding_chat_observer", None)
     if observer is not None:
         from ai_agent.coding_chat import CodingTurnResult
 
-        route_id = fallback_details.get("effective_route_id")
         observer(
             CodingTurnResult(
                 0,
@@ -530,6 +548,10 @@ def _print_cli_closeout(
                     and isinstance(attempt.get("route_id"), str)
                     and isinstance(attempt.get("status"), str)
                 ),
+                provider=provider,
+                category=category,
+                cause_kind=cause_kind,
+                fallback_handoff=fallback_handoff,
             )
         )
     print(
@@ -540,6 +562,11 @@ def _print_cli_closeout(
             validation_details=validation_stage.details if validation_stage is not None else None,
             fallback_attempts=fallback_attempts,
             failure_reason=failure_reason,
+            provider=provider,
+            category=category,
+            cause_kind=cause_kind,
+            effective_route_id=route_id if isinstance(route_id, str) else None,
+            fallback_handoff=fallback_handoff,
         ),
         end="",
     )
@@ -809,6 +836,9 @@ def _run_chat_mode(
             status="failed",
             execution_status="failed",
             failure_reason=str(exc),
+            provider=exc.provider,
+            category=exc.category.value if exc.category else None,
+            cause_kind=_error_cause_kind(exc),
         )
         _print_run_metrics(
             metrics,
@@ -1439,6 +1469,9 @@ def _execute_request(
                 status="failed",
                 execution_status="failed",
                 failure_reason=str(exc),
+                provider=exc.provider,
+                category=exc.category.value if exc.category else None,
+                cause_kind=_error_cause_kind(exc),
             )
             return 1
         if not args.fallback_session.primary_ready:
@@ -1608,6 +1641,9 @@ def _execute_request(
             status="failed",
             execution_status="failed",
             failure_reason=str(exc),
+            provider=exc.provider,
+            category=exc.category.value,
+            cause_kind=_error_cause_kind(exc),
         )
         _print_run_metrics(
             metrics,
@@ -1827,6 +1863,9 @@ def _execute_request(
                 execution_status=execution_status,
                 validation_stage=validation_stage,
                 failure_reason=str(exc),
+                provider=exc.provider,
+                category=exc.category.value if exc.category else None,
+                cause_kind=_error_cause_kind(exc),
             )
             _print_run_metrics(
                 metrics,

@@ -1,6 +1,16 @@
 # CLI Development Foundation Roadmap
 
-## Current checkpoint: 2026-10-17
+## Current checkpoint: 2026-10-18
+
+Owner approved structured CLI error attribution with a bounded safe fallback
+control receipt ([ADR-060](../decisions/ADR-060-structured-cli-error-attribution.md)).
+Provider/category/cause type now survive the covered ProviderError closeout and
+coding-chat boundaries and appear in terminal summaries. Deterministic checks
+exercise actual native/fallback/CLI execution and reopened transcript storage;
+no live inference was needed. Original trace coverage claims were corrected in
+[the inventory](../logging-artifact-inventory.md#verified-cli-error-attribution--2026-10-18).
+The wider review remains open for provider bodies, tool/worker/scrutiny paths
+and complete primary/recovery cause chains. Baseline parity is still incomplete.
 
 Owner direction: add a repository-wide error-propagation review, prioritizing the
 CLI/agent and its provider/tool/worker boundaries. Preserve known causes through

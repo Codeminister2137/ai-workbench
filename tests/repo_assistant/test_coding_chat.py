@@ -1451,3 +1451,86 @@ tools = true
         assert "class Widget" in source.read_text() and "Gadget" not in source.read_text()
         assert caller.read_bytes() == original_caller
     assert all(owner.host is None or owner.host.closed for owner in owners)
+
+
+def test_turn_preserves_structured_error_and_fallback_handoff(tmp_path: Path) -> None:
+    chat = controller(tmp_path)
+    handoff_receipt = {
+        "status": "continuation_stopped",
+        "reason": "deadline_or_no_eligible_compatible_route",
+        "observed": ["test observation"],
+    }
+    turn_result = CodingTurnResult(
+        1,
+        None,
+        "failed",
+        "Synthetic provider timeout",
+        effective_route_id="ollama/qwen",
+        fallback_attempts=(("openrouter/free", "usage_limit"),),
+        provider="ollama",
+        category="timeout",
+        cause_kind="TimeoutError",
+        fallback_handoff=handoff_receipt,
+    )
+
+    chat.turn("Run task", lambda req: turn_result)
+    messages = chat.store.list_messages("conversation")
+    assert len(messages) == 2
+    metadata = messages[1].metadata
+    assert metadata is not None
+    assert metadata["provider"] == "ollama"
+    assert metadata["category"] == "timeout"
+    assert metadata["cause_kind"] == "TimeoutError"
+    assert metadata["fallback_handoff"] == {
+        "status": "continuation_stopped",
+        "reason": "deadline_or_no_eligible_compatible_route",
+    }
+    assert metadata["effective_route_id"] == "ollama/qwen"
+    assert metadata["fallback_attempts"] == [
+        {"route_id": "openrouter/free", "status": "usage_limit"}
+    ]
+
+    history = chat.history()
+    assert '"provider": "ollama"' in history
+    assert '"category": "timeout"' in history
+    assert '"cause_kind": "TimeoutError"' in history
+    assert '"effective_route_id": "ollama/qwen"' in history
+    assert "continuation_stopped" in history
+    assert "test observation" not in history
+
+
+def test_print_cli_closeout_populates_structured_error_fields() -> None:
+    from unittest.mock import patch
+
+    from ai_agent import repo_coding_assistant as cli
+
+    observed = []
+    args = argparse.Namespace(_coding_chat_observer=observed.append)
+    handoff_data = {"status": "continuation_stopped", "reason": "quota"}
+    with patch.object(
+        cli,
+        "_fallback_details",
+        lambda a: {
+            "effective_route_id": "openrouter/free",
+            "fallback_attempts": [{"route_id": "openrouter/free", "status": "usage_limit"}],
+            "fallback_handoff": handoff_data,
+        },
+    ):
+        cli._print_cli_closeout(
+            args=args,
+            response_text=None,
+            status="failed",
+            execution_status="failed",
+            failure_reason="Quota spent",
+            provider="openrouter",
+            category="usage_limit",
+            cause_kind="HTTPStatusError",
+        )
+    assert len(observed) == 1
+    res = observed[0]
+    assert res.provider == "openrouter"
+    assert res.category == "usage_limit"
+    assert res.cause_kind == "HTTPStatusError"
+    assert res.effective_route_id == "openrouter/free"
+    assert res.fallback_attempts == (("openrouter/free", "usage_limit"),)
+    assert res.fallback_handoff == {"status": "continuation_stopped"}

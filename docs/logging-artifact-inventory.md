@@ -44,9 +44,9 @@ and operational databases also need explicit retention decisions, independent
 from generated diagnostic logs. Raw external JSONL needs a field-level retention
 review; this inventory did not inspect private contents or claim redaction.
 
-## Initial error-propagation source trace — 2026-10-17
+## Initial error-propagation source trace — 2026-10-17 (historical)
 
-This starts the wider owner-requested review. It is source evidence, not a complete
+This started the wider owner-requested review. It is source evidence, not a complete
 failure-injection audit or a selected public error schema. Existing logs can still
 identify some providers by their message text; the finding below is about which
 structured facts cross each boundary, not a claim that every error is opaque.
@@ -80,45 +80,44 @@ The terminal turn runner replaces the closeout observer's placeholder return cod
 with the actual execution return code, so the placeholder alone is not a confirmed
 status-propagation defect. Existing loop/closeout/coding-chat checks pass (74 tests).
 
-## Composed trace through native execution, fallback, and persisted coding chat
+## Verified CLI error attribution — 2026-10-18
 
-Deterministic multi-boundary failure injection (`artifacts/cli-error-propagation-review-20261017/trace_errors.py`,
-`failure-injection.json`) tested four concrete scenarios without network, inference, or subprocesses:
+The resumption audit corrected the earlier composed-trace claim: the private
+`trace_errors.py` calls AgentLoop in a separate case, but does not invoke native
+execution wrappers in its named native/chat case. It connects synthetic
+FallbackSession callbacks to closeout/chat and does not reopen SQLite. Its edited
+version also contains a mismatched result key; its historical JSON receipt cannot
+validate later edits. Preserve that evidence without treating it as native
+integration acceptance.
 
-1. **Direct native failure without fallback**: `ProviderError` preserves exception identity,
-   provider, category, retryability, transient messages, and chained cause through `AgentLoop`
-   and `_run_native_agent_with_fallback`. However, at CLI closeout, only `str(exc)` reaches
-   `failure_reason`. `CodingTurnResult` retains only `failure_reason` and lacks `provider`,
-   `category`, and `cause` fields. `CodingChatController` persists `metadata`: `execution_status`,
-   `returncode`, `failure_reason`, `reply_to`. When `CodingChatController.history()` formats
-   past turns for the next model turn, provider identity, error category, and chained cause
-   are completely absent from the rendered JSON.
-2. **Fallback switch with secondary failure**: Primary route fails with `RETRYABLE` model overload
-   (`503 Service Unavailable`). `FallbackSession` captures the attempt (`primary: model_overload`),
-   switches to secondary route, which subsequently fails with `TIMEOUT` (`Socket timeout`).
-   `_print_cli_closeout`, `CodingTurnResult`, and persisted SQLite metadata retain
-   `effective_route_id: secondary` and `fallback_attempts: [primary: model_overload]`.
-   However, the initial failure reason and HTTP 503 cause are completely discarded from
-   `CodingTurnResult` (only the `model_overload` status string is kept in `fallback_attempts`).
-   The secondary failure's provider name (`openrouter_alt`), error category (`TIMEOUT`), and
-   chained cause (`Socket timeout`) are discarded; only the raw message string is stored.
-3. **Fallback exhaustion and handoff**: Primary route fails with `USAGE_LIMIT` (`429 Too Many Requests`).
-   With no secondary route available, `FallbackSession` creates a structured `handoff` receipt
-   (`status: continuation_stopped`, `reason`, `failure_kind: usage_limit`, `observed`).
-   While `_fallback_details(args)` holds `fallback_handoff`, `format_cli_closeout` does not format
-   or display it, `CodingTurnResult` has no `fallback_handoff` field, SQLite message metadata
-   omits it, and `CodingChatController.history()` excludes it from subsequent turn context.
-4. **Concrete compatibility/privacy options for owner review**:
-   - **Option A (Safe context in `failure_reason` string)**: Format `failure_reason` at CLI closeout
-     with a safe, bounded prefix: `[{stage}:{provider}:{category}] {safe_message} (cause: {safe_cause_kind})`.
-     This preserves existing public contracts, database schemas, and readers without breaking changes.
-     Requires verifying that `safe_cause_kind` never echoes raw exception messages containing secrets.
-   - **Option B (Structured error contract evolution)**: Add optional structured fields to
-     `CodingTurnResult` and SQLite message metadata: `provider: str | None`, `category: str | None`,
-     `cause_kind: str | None`, `fallback_handoff: Mapping[str, Any] | None`. This provides clean
-     programmatic querying but requires backward-compatibility guards across transcript stores,
-     database migrations, and history rendering.
-   *Decision is reserved for the owner; no schema change has been applied.*
+The owner subsequently selected optional structured diagnostics and readable
+terminal attribution, with a bounded safe handoff projection. See
+[ADR-060](decisions/ADR-060-structured-cli-error-attribution.md). This supersedes
+the historical native-to-closeout/chat gaps in the table above for the covered
+ProviderError catch paths. It does not complete the wider error review.
+
+- CLI failure summaries now show the caught error's provider/category/cause_kind;
+  absent values are unknown. Effective route is separate and is not evidence of
+  the reporting provider or underlying service cause.
+- CodingTurnResult and existing transcript JSON metadata retain these optional
+  identifiers and a handoff projection. Only recognized status/reason/failure_kind/
+  quality_policy and a bounded failed_route_id survive. Observations, objectives,
+  raw causes, save-error text and arbitrary keys are excluded. History reprojects
+  older experimental records before sending the new metadata to subsequent turns.
+- No SQL schema migration is required for additive JSON keys. Existing records
+  without new fields remain readable; provider categories/routing are unchanged.
+- `tests/repo_assistant/test_error_propagation.py` exercises the actual CLI,
+  native wrappers, AgentLoop, FallbackSession, terminal observer/return code and
+  reopened SQLite. Transport/client admission/readiness are synthetic. Cases:
+  direct failure, overload then secondary timeout, exhaustion, unknown attribution
+  and successful recovery. Separate checks cover privacy sentinels, bounds and
+  older records; `test_cli_basics.py` covers the ordinary request catch path.
+
+Limits: cause_kind is a type, not a root-cause diagnosis. Existing failure_reason
+text is unchanged. Earlier fallback attempts retain route/status, not a complete
+chain of their causes. Provider-body diagnostics, tools/workers/scrutiny paths
+remain wider-review work. The discarded historical HTTP500 body remains unknown;
+no inference, live-service or model-quality acceptance follows from these tests.
 
 ## Layout proposal for owner review
 

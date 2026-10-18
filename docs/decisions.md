@@ -595,3 +595,14 @@ Otherwise retain the bounded handoff, including unknown effective capacity.
 Provider-private reasoning, weaker preservation prompts and saved handoffs remain
 excluded. Rationale: replacement models have different context limits.
 See [ADR-059](decisions/ADR-059-context-aware-observable-fallback-history.md).
+
+## ADR-060 — Structured CLI error attribution
+
+**Status:** Accepted (2026-10-18).
+
+Owner approved optional structured error metadata and readable terminal
+attribution, with a bounded safe fallback-handoff projection. Reuse ProviderError
+and existing transcript JSON metadata; no SQL migration or raw-cause logging.
+Missing attribution remains unknown, and effective route is separate from the
+error's reporting provider. Existing fallback/privacy/approval policies remain.
+See [ADR-060](decisions/ADR-060-structured-cli-error-attribution.md).

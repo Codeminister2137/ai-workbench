@@ -361,10 +361,15 @@ def test_command_belongs_to_agent_without_reverse_provider_dependency():
 
 def test_stable_cli_reports_provider_failures(capsys, monkeypatch) -> None:
     from ai_agent import repo_coding_assistant as stable_cli
-    from ai_provider import ProviderError
+    from ai_provider import ProviderError, ProviderErrorCategory
 
     def fail_request(*args, **kwargs):
-        raise ProviderError("provider unavailable")
+        raise ProviderError(
+            "provider unavailable",
+            provider="ollama",
+            category=ProviderErrorCategory.TIMEOUT,
+            raw_error=TimeoutError("PRIVATE_CAUSE_SENTINEL"),
+        )
 
     monkeypatch.setattr(stable_cli, "run_coding_prompt", fail_request)
 
@@ -387,6 +392,8 @@ def test_stable_cli_reports_provider_failures(capsys, monkeypatch) -> None:
     assert "status: failed" in output
     assert "failure_reason: provider unavailable" in output
     assert "execution_status: failed" in output
+    assert "provider=ollama; category=timeout; cause_kind=TimeoutError" in output
+    assert "PRIVATE_CAUSE_SENTINEL" not in output
 
 
 def test_tee_output_writes_to_terminal_and_transcript() -> None:

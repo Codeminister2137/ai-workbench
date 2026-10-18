@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping, Sequence
 
 FINAL_RESPONSE_INSTRUCTION = """\
@@ -14,6 +15,39 @@ Do not emit a duplicate summary; answer the request normally and clearly
 distinguish proposed or agent-reported changes from independently verified
 results. The CLI's validation and execution fields come from recorded evidence,
 not from claims in your response."""
+
+
+def safe_diagnostic_label(value: object) -> str | None:
+    """Accept bounded identifiers, never exception text or multiline diagnostics."""
+    if isinstance(value, str) and re.fullmatch(r"[A-Za-z0-9_.:/@+\-]{1,160}", value):
+        return value
+    return None
+
+
+def safe_fallback_handoff(value: object) -> dict[str, str] | None:
+    """Project a handoff onto bounded control facts; omit observations and errors."""
+    if not isinstance(value, Mapping):
+        return None
+    allowed = {
+        "status": {"continuation_stopped"},
+        "reason": {"deadline_or_no_eligible_compatible_route"},
+        "failure_kind": {"usage_limit", "model_overload"},
+        "quality_policy": {
+            "preserve_quality",
+            "task_minimum",
+            "emergency_preserve",
+            "prefer_quality",
+        },
+    }
+    result = {
+        key: item
+        for key, choices in allowed.items()
+        if isinstance(item := value.get(key), str) and item in choices
+    }
+    route = safe_diagnostic_label(value.get("failed_route_id"))
+    if route is not None:
+        result["failed_route_id"] = route
+    return result or None
 
 
 def _validation_summary(details: Mapping[str, object] | None) -> str:
@@ -64,6 +98,11 @@ def format_cli_closeout(
     validation_details: Mapping[str, object] | None = None,
     fallback_attempts: Sequence[Mapping[str, str]] = (),
     failure_reason: str | None = None,
+    provider: str | None = None,
+    category: str | None = None,
+    cause_kind: str | None = None,
+    effective_route_id: str | None = None,
+    fallback_handoff: Mapping[str, object] | None = None,
 ) -> str:
     """Render the fixed CLI summary envelope around any agent's final response."""
 
@@ -78,6 +117,18 @@ def format_cli_closeout(
         notes.append("fallback_attempts=none")
     if failure_reason:
         notes.append(f"failure_reason={failure_reason.replace(chr(10), ' ').strip()}")
+        for key, value in (
+            ("provider", provider),
+            ("category", category),
+            ("cause_kind", cause_kind),
+        ):
+            notes.append(f"{key}={safe_diagnostic_label(value) or 'unknown'}")
+    if route := safe_diagnostic_label(effective_route_id):
+        notes.append(f"effective_route_id={route}")
+    if handoff := safe_fallback_handoff(fallback_handoff):
+        notes.append(
+            "fallback_handoff=" + ", ".join(f"{key}:{value}" for key, value in handoff.items())
+        )
 
     response = response_text.strip() if response_text and response_text.strip() else None
     report = response if response is not None else "No final response was captured."

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -13,6 +13,7 @@ from ai_provider.chat_transcripts import (
     ChatSessionRecord,
     SQLiteChatTranscriptStore,
 )
+from ai_provider.closeout import safe_diagnostic_label, safe_fallback_handoff
 
 from ai_agent.coding_chat_input import StagedCodingInput
 
@@ -42,6 +43,16 @@ class CodingTurnResult:
     failure_reason: str | None = None
     effective_route_id: str | None = None
     fallback_attempts: tuple[tuple[str, str], ...] = ()
+    provider: str | None = None
+    category: str | None = None
+    cause_kind: str | None = None
+    fallback_handoff: Mapping[str, object] | None = None
+
+    def __post_init__(self) -> None:
+        """Keep additive diagnostics bounded before observers or stores consume them."""
+        for field in ("provider", "category", "cause_kind"):
+            object.__setattr__(self, field, safe_diagnostic_label(getattr(self, field)))
+        object.__setattr__(self, "fallback_handoff", safe_fallback_handoff(self.fallback_handoff))
 
 
 class CodingChatController:
@@ -123,6 +134,21 @@ class CodingChatController:
                     for key, value in (message.metadata or {}).items()
                     if key in {"effective_route_id", "fallback_attempts"}
                 },
+                **{
+                    key: label
+                    for key in ("provider", "category", "cause_kind")
+                    if (label := safe_diagnostic_label((message.metadata or {}).get(key)))
+                    is not None
+                },
+                **(
+                    {"fallback_handoff": handoff}
+                    if (
+                        handoff := safe_fallback_handoff(
+                            (message.metadata or {}).get("fallback_handoff")
+                        )
+                    )
+                    else {}
+                ),
             }
             for message in messages
         ]
@@ -286,6 +312,14 @@ class CodingChatController:
                         ]
                     }
                     if result.fallback_attempts
+                    else {}
+                ),
+                **({"provider": result.provider} if result.provider else {}),
+                **({"category": result.category} if result.category else {}),
+                **({"cause_kind": result.cause_kind} if result.cause_kind else {}),
+                **(
+                    {"fallback_handoff": handoff}
+                    if (handoff := safe_fallback_handoff(result.fallback_handoff))
                     else {}
                 ),
             },
