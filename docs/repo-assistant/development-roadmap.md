@@ -2,6 +2,15 @@
 
 ## Current checkpoint: 2026-10-18
 
+A subsequent local slice made source/test edits but removed an original test;
+preservation checks stopped execution before tests or either report. Owned
+cleanup was independently verified. Offline private-launcher fixes now preserve
+safe error locations, native output/exit codes and populated stop reasons, with
+116 guards and an independently checked scripted workflow. The edit tool's
+description now explains insertion by retaining the original anchor in the
+replacement. This general interface clarification leaves edit semantics and
+strict acceptance unchanged; its effect on model adherence is unverified.
+
 A fresh local acceptance slice stopped on its ninth request when the owned
 Ollama runtime rejected generated tool-call JSON. Eight responses and one source
 edit were observed; no tests, final coding report or frozen review completed.
