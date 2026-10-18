@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -18,9 +19,12 @@ from ai_provider import (
     PrivacyClass,
     ProviderError,
     ProviderErrorCategory,
+    ToolCallFormatError,
 )
+from ai_provider.closeout import safe_diagnostic_label
 
 from ai_agent.contracts import ToolCall, ToolResult
+from ai_agent.model_output_recovery import ModelOutputRecovery
 from ai_agent.permissions import PermissionManager
 from ai_agent.tools.base import ToolContext, ToolRegistry
 
@@ -34,6 +38,7 @@ class AgentResult:
     iterations: int = 1
     # Transient only, like ProviderError.partial_messages; never log/persist raw continuation.
     messages: tuple[AIMessage, ...] = field(default=(), repr=False, compare=False)
+    model_output_errors: int = 0
 
 
 class AgentLoop:
@@ -50,6 +55,7 @@ class AgentLoop:
         deadline: float | None = None,
         temperature: float | None = None,
         top_p: float | None = None,
+        diagnostic: Callable[[str], None] | None = None,
     ) -> None:
         if max_iterations < 1:
             raise ValueError("max_iterations must be at least 1")
@@ -63,6 +69,7 @@ class AgentLoop:
         self.deadline = deadline
         self.temperature = temperature
         self.top_p = top_p
+        self.diagnostic = diagnostic
 
     def _check_deadline(self, messages: list[AIMessage]) -> None:
         if self.deadline is not None and time.perf_counter() >= self.deadline:
@@ -88,6 +95,8 @@ class AgentLoop:
             messages.append(AIMessage(MessageRole.SYSTEM, system_prompt))
         messages.append(AIMessage(MessageRole.USER, prompt))
         tool_results: list[ToolResult] = []
+        recovery = ModelOutputRecovery(self.context.workspace_root)
+        model_output_errors = 0
 
         for iteration in range(1, self.max_iterations + 1):
             self._check_deadline(messages)
@@ -104,6 +113,44 @@ class AgentLoop:
                         ),
                     )
                 )
+            except ToolCallFormatError as exc:
+                model_output_errors += 1
+                self._check_deadline(messages)
+                allowed = iteration < self.max_iterations and recovery.allow_feedback()
+                if self.diagnostic:
+                    cause = exc.__cause__ or exc.raw_error
+                    cause_kind = safe_diagnostic_label(type(cause).__name__) if cause else "unknown"
+                    self.diagnostic(
+                        "model_output_error: "
+                        f"provider={safe_diagnostic_label(exc.provider) or 'unknown'} "
+                        f"category={exc.category.value} "
+                        f"cause_kind={cause_kind}"
+                    )
+                    self.diagnostic(
+                        f"model_output_recovery: errors={model_output_errors} "
+                        f"action={'feedback' if allowed else 'stop'}"
+                    )
+                if not allowed:
+                    error = ProviderError(
+                        "Malformed tool arguments repeated without observed file progress, "
+                        "or the turn allowance ended. Earlier effects remain; inspect them "
+                        "and continue only unfinished work in an explicitly resumed turn.",
+                        category=ProviderErrorCategory.NON_RETRYABLE,
+                        provider=exc.provider,
+                    )
+                    error.partial_messages = tuple(messages)
+                    raise error from exc
+                messages.append(
+                    AIMessage(
+                        MessageRole.USER,
+                        "Host execution feedback: the last response's tool arguments could not "
+                        "be decoded. No tool from that response executed. Earlier tool effects "
+                        "remain recorded above; do not replay them. Correct the arguments using "
+                        "the declared schemas and inspect existing effects when needed. "
+                        "The original permissions, task and remaining allowance still apply.",
+                    )
+                )
+                continue
             except ProviderError as exc:
                 exc.partial_messages = tuple(messages)
                 raise
@@ -116,6 +163,7 @@ class AgentLoop:
                     tool_results=tuple(tool_results),
                     iterations=iteration,
                     messages=tuple(messages),
+                    model_output_errors=model_output_errors,
                 )
 
             for call in tool_calls:
@@ -169,6 +217,7 @@ class AgentLoop:
                     self._check_deadline(messages)
                     result = tool.run(agent_call, self.context)
                 tool_results.append(result)
+                recovery.observe(result)
                 messages.append(
                     AIMessage(
                         role=MessageRole.TOOL,

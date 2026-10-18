@@ -7,6 +7,49 @@ exact hosted route before implementation. Historical failures remain evidence.
 
 ## Findings to retain
 
+On 2026-10-18 the owner reaffirmed that ordinary correction belongs in the
+agent's coding turn and requested comparison with established agent practices
+before choosing further loop controls. A proposed single correction per turn
+was not established as policy. OpenAI documents
+[bounded recovery with effect checks](https://developers.openai.com/api/docs/guides/agents-api/errors)
+and [model feedback after recoverable tool failures](https://developers.openai.com/api/docs/guides/tools-computer-use-sdk-drivers).
+These sources support feedback, finite resources and explicit failure handling;
+they do not establish a universal correction count or reveal internal Codex
+retry policy. Production's provider-error boundary and the private pilot's
+repeated-blocker callbacks are different surfaces; do not claim their parity.
+
+The owner subsequently approved implementing selective recovery in the shared
+agent, with the instruction to execute a small change or plan a larger one. The
+investigation found coordinated adapter, error-contract, loop, checkpoint and
+reporting work. The implementation is now checked offline and documented in
+[the CLI roadmap](development-roadmap.md#approved-next-baseline-slice-shared-model-output-recovery).
+Follow the documented expert approach: safe actionable feedback, observed-effect
+checks, original resource limits, preserved history and escalation for repeated
+lack of progress. These are design requirements to validate locally, not a claim
+that our implementation already matches OpenAI or that every service failure is
+recoverable. Keep ordinary tool correction, malformed model output, transport
+retries and safety/approval failures distinct. Do not replace those distinctions
+with a universal retry count, blindly replay tools or weaken acceptance to match
+an external example. Recheck relevant official guidance during implementation;
+reuse this repository's components rather than adding an agent SDK/framework.
+
+The initial shared implementation chooses an actionable stop for repeated output
+failures at the same observed file state, as permitted by the plan, rather than
+adding a production approval prompt. Known pre-tool argument failures receive
+safe host feedback within existing iteration/deadline limits. The neutral error
+signal remains non-retryable for transport/fallback purposes. File observations
+are bounded and conservative; this is not a general supervisor or proof of model
+quality. [ADR-061](../decisions/ADR-061-shared-model-output-recovery.md) records the
+contract, consequences and offline validation. Fresh live acceptance remains open.
+
+The owner also approved a narrow future-fixture exception for read-only
+`type(value).__name__`, because ordinary error formatting should not fail a coding
+evaluation. Inspect the builtin one-argument expression precisely; keep other
+dunder access, calling/mutating that attribute, shadowed type functions, dynamic
+class construction, reflection, I/O, protected originals and frozen-review
+restrictions. This changes a synthetic fixture check, not production permissions.
+Consumed fixtures and their failed outcomes remain unchanged.
+
 On 2026-10-17 the owner accepted the visible-console interaction evidence from
 the local aw pilot and authorized Codex to take the user role in subsequent
 similar synthetic pilots, avoiding repeated physical `yes` input. Reuse the

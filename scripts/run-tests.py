@@ -35,6 +35,7 @@ GROUPS = {
     ),
     "agent": (
         "tests/test_ai_agent_*.py",
+        "tests/test_model_output_recovery.py",
         "tests/test_ide_bridge*.py",
         "tests/test_foreground*.py",
         "tests/test_python_runtime_tool.py",

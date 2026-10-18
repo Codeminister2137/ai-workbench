@@ -5,6 +5,13 @@ The repo assistant's [workflow guides](repo-coding-assistant.md) describe curren
 execution surfaces; [publication](publication.md) covers source/history privacy.
 
 ## 1. Overall direction
+
+Known malformed generated tool arguments may use the neutral ToolCallFormatError
+signal for shared-loop correction within the original allowance (ADR-061). This
+is separate from transport retry/fallback. The initial production path stops on
+repeated failures at the same observed file state, preserving prior effects and
+history; it adds no live approval prompt or private-pilot approval substitution.
+
 Provider-neutral messages may carry optional transient ProviderContinuation
 metadata (ADR-055). Adapters own interpretation and replay only to the originating
 provider/model/endpoint. It is not answer text or durable history; input admission

@@ -2,6 +2,24 @@
 
 ## Current checkpoint: 2026-10-18
 
+A fresh local acceptance slice stopped on its ninth request when the owned
+Ollama runtime rejected generated tool-call JSON. Eight responses and one source
+edit were observed; no tests, final coding report or frozen review completed.
+Protected inputs and originals stayed unchanged, and owned cleanup was verified.
+The exact malformed bytes and generation-versus-parser cause remain unknown.
+Immediate offline work separates parser error suffixes from echoed arguments and
+restores known provider attribution in a fresh private shim. The owner approved
+the narrow read-only `type(value).__name__` fixture exception and reaffirmed
+ordinary correction within existing resource/approval boundaries. A universal
+one-correction-per-turn cap is not an accepted decision. Shared selective recovery
+is now implemented offline under ADR-061; baseline live acceptance is INCOMPLETE.
+
+The owner approved shared-agent selective recovery and asked that a larger change
+be planned rather than implemented as a small retry patch. The subsequent bounded
+implementation below passes software checks; approval and software checks do not
+complete live acceptance. The documented OpenAI approach and its limits remain in
+[methodology findings](agent-methodology-findings.md#findings-to-retain).
+
 Owner approved structured CLI error attribution with a bounded safe fallback
 control receipt ([ADR-060](../decisions/ADR-060-structured-cli-error-attribution.md)).
 Provider/category/cause type now survive the covered ProviderError closeout and
@@ -84,6 +102,93 @@ now occurs before descent. Six new regressions and extended boundary checks are
 included; the full root suite passed 2,297 tests with nine skipped. This is a
 verified software fix with mixed model/host authorship, not full coding parity
 or proof of Codex savings. Large shallow listings can still exceed context.
+
+## Approved next baseline slice: shared model-output recovery
+
+**Status: implemented offline; live acceptance INCOMPLETE (2026-10-18).** The owner
+prefers recovery in the actual shared agent over a private-pilot-only experiment
+and requested alignment with established expert methodology. Investigation found
+a coordinated change, so it was planned first under the owner's small-change/large-change
+instruction, then implemented after the owner requested continuation. The shared path now uses
+the actionable-stop option specified below; it adds no live approval prompt and
+no global one-correction-per-turn cap. Detailed local context remains in the
+private CLI parity plan. See [ADR-061](../decisions/ADR-061-shared-model-output-recovery.md).
+
+Offline verification: full gate 2,450 passed / 3 skipped (workspace 2,328, Council 38,
+job-search 84), full Pyright and Ruff lint/format pass. The production adapter,
+shared loop and native CLI activity paths are exercised; failed request usage
+stays partial/unknown. First validation failures exposed a Windows oversized test
+ID, older result stubs missing the additive count and an unregistered test module;
+all were investigated, fixed and verified. No new inference or quality promotion.
+
+OpenAI's [recovery guidance](https://developers.openai.com/api/docs/guides/agents-api/errors)
+checks completed effects and bounds attempts/deadlines. Its
+[tool-runner example](https://developers.openai.com/api/docs/guides/tools-computer-use-sdk-drivers)
+provides safe feedback for recoverable failures while stopping on invalid state.
+Apply those principles to our observed failure modes; neither source specifies a
+universal correction count or proves equivalence to internal Codex behavior.
+
+At approval, ordinary tool/schema errors already returned actionable feedback, but
+`AgentLoop` propagates every `ProviderError`. Ollama's generated-tool JSON parser
+can fail before a usable call reaches the host. The private pilot has repeated-
+blocker observations and a scoped callback; production lacked that composed path.
+Merely marking all HTTP500 errors retryable or catching them in an unobserved
+transport retry would conceal failures and risk wasted work.
+
+Implemented in bounded steps on existing boundaries:
+
+1. **Classify known pre-tool output failures.** Inspect existing provider errors,
+   Ollama parsing/HTTP handling and admission/accounting. Define the smallest
+   neutral signal proving that no executable call was delivered; adapters own
+   provider-specific recognition. ADR-061 selects the additive `ToolCallFormatError`
+   subtype. Unknown, truncated or spoofed error details must
+   not enable correction. Keep raw payloads/reasoning out of messages and logs.
+2. **Compose correction and stall handling.** Feed safe host feedback through the
+   existing shared loop, preserving full history, instructions, settings, tools
+   and privacy. Every failed or corrective request consumes the original turn,
+   phase, time and review reserve. Reuse the pilot's useful progress/checkpoint
+   principles in production-owned code; do not import private artifact modules.
+   Repeated equivalent failures without new evidence trigger a bounded checkpoint
+   or actionable stop. Do not create a separate retry allowance or new supervisor.
+3. **Preserve approval and evidence boundaries.** Never replay completed tools or
+   invent assistant/tool output for a call that could not be decoded. Preserve
+   earlier effects and first-error attribution. Production approvals remain human
+   or existing authorized policy decisions; automated synthetic callbacks remain
+   confined to their named pilot. Unknown effects require reconciliation. During
+   an authorized unattended window, stalled-slice evidence/cleanup and wider-plan
+   continuation follow existing policy; no unattended window is granted here.
+4. **Report and verify the composed behavior.** Distinguish failed requests,
+   corrected output, substantive model work and host recovery. Reuse usage/error
+   receipts; failed-call usage and cost stay partial/unknown when unobserved.
+   Test actual provider/loop/CLI boundaries before preparing any fresh inference.
+
+Required deterministic acceptance:
+
+- Known malformed arguments produce safe feedback, then a corrected call can run
+  exactly once and return a substantive report with full earlier context intact.
+- Several ordinary corrections can occur within one turn; no global one-correction
+  cap is silently introduced. Repeated unchanged failures/no-op or cycling states
+  reach a checkpoint/stop instead of an invisible retry loop.
+- Unknown errors, denied approval, privacy/safety violations, expired bounds and
+  frozen/protected-input violations cannot be converted into automatic recovery.
+- Failed or interrupted operations preserve known effects and error attribution;
+  no replay occurs when execution is uncertain. Generic HTTP500 is insufficient.
+- Original request/tool/time limits and review reserve remain enforced, including
+  at checkpoints; truthful numeric usage and unknown coverage survive closeout.
+- Parser payload spoofing cannot supply cause labels or leak arbitrary text into
+  host feedback, terminal reports, transcripts or safe diagnostic fields.
+
+Only after these checks pass, prepare one fresh bounded local coding/test/report/
+frozen-review slice with new inputs, seals, independent oracle and cleanup checks.
+Preserve all consumed failures. Baseline completion still requires model-authored
+correct effects and both substantive reports, not merely a successful retry.
+New dependencies/services, provider/model/runtime changes, privacy/logging changes
+or materially different public-contract choices retain the normal decision gate.
+
+Next: align a fresh private pilot's transport shim with the neutral signal, retain
+its durable diagnostics, refresh all guards/workflow/oracle/cleanup evidence and
+seal against a clean reviewed source checkpoint. Existing consumed ba and prior
+seals remain evidence. Do not claim live acceptance from this software change.
 
 ## Historical 2026-10-15 live follow-up and interrupted-usage repair
 

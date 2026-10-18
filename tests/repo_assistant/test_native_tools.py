@@ -26,6 +26,43 @@ def test_review_mode_rejects_native_tools_before_provider_contact(monkeypatch) -
         main(["--mode", "review", "Review code.", "--native-tools"])
 
 
+def test_native_execution_reports_recovered_model_error_without_replaying_tools(
+    tmp_path, monkeypatch
+):
+    from ai_orchestrator import PrivacyClass as OrchestratorPrivacyClass
+    from ai_provider import BackendConfig, ProviderKind, ToolCallFormatError
+
+    client = _NativeFakeClient()
+    complete = client.complete
+    failures = [True]
+
+    def first_error(request):
+        if failures:
+            failures.pop()
+            raise ToolCallFormatError(provider="ollama")
+        return complete(request)
+
+    monkeypatch.setattr(client, "complete", first_error)
+    monkeypatch.setattr(_EXAMPLE, "create_chat_client", lambda config: client)
+    args = Namespace(
+        start_ollama=False, system=None, max_action_rounds=4, approval_policy="trusted_local"
+    )
+    events = []
+    result = _run_native_agent(
+        "Create native.txt",
+        BackendConfig(ProviderKind.OLLAMA, "test"),
+        _EXAMPLE.coding_task_profile(privacy_class=OrchestratorPrivacyClass.LOCAL_ONLY),
+        args,
+        tmp_path,
+        progress_callback=events.append,
+    )
+    assert result.model_output_errors == 1 and len(result.tool_results) == 1
+    assert (tmp_path / "native.txt").read_text() == "native"
+    assert "model_output_recovery: errors=1 action=feedback" in events
+    assert "model_output_errors: 1" in events
+    assert any("completed - iterations=3" in event for event in events)
+
+
 def test_native_agent_provider_failure_reports_failed_status(capsys, monkeypatch) -> None:
     from dataclasses import replace
 

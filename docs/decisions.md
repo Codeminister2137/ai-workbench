@@ -606,3 +606,14 @@ and existing transcript JSON metadata; no SQL migration or raw-cause logging.
 Missing attribution remains unknown, and effective route is separate from the
 error's reporting provider. Existing fallback/privacy/approval policies remain.
 See [ADR-060](decisions/ADR-060-structured-cli-error-attribution.md).
+
+## ADR-061 — Shared model-output correction
+
+**Status:** Accepted and implemented offline (2026-10-18); live acceptance incomplete.
+
+Owner chose shared-agent recovery guided by expert feedback/effect-check/resource-
+bound principles. Known pre-tool argument failures use a neutral error signal and
+safe correction feedback; repeated failures without observed progress stop with
+an actionable handoff. No universal one-correction-per-turn cap, tool replay,
+transport retry, new service or approval weakening. See
+[ADR-061](decisions/ADR-061-shared-model-output-recovery.md).

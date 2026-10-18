@@ -1896,6 +1896,7 @@ def _execute_request(
                 details={
                     "tool_results": len(native_result.tool_results),
                     "tool_errors": sum(1 for item in native_result.tool_results if item.is_error),
+                    "model_output_errors": getattr(native_result, "model_output_errors", None),
                     **_fallback_details(args),
                 },
             )
@@ -3695,6 +3696,7 @@ def _run_native_agent(
         ),
         max_iterations=args.max_action_rounds,
         deadline=getattr(getattr(args, "fallback_session", None), "deadline", None),
+        diagnostic=progress_callback,
         **sampling_kwargs(args),
     )
     try:
@@ -3733,6 +3735,8 @@ def _run_native_agent(
             f"- iterations={result.iterations} "
             f"tool_results={len(result.tool_results)}"
         )
+        if result.model_output_errors:
+            progress_callback(f"model_output_errors: {result.model_output_errors}")
         for tool_result in result.tool_results:
             status = "error" if tool_result.is_error else "ok"
             progress_callback(

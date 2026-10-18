@@ -29,9 +29,46 @@ from ai_provider.contracts import (
     UsageMetadata,
     UsageSource,
 )
-from ai_provider.errors import ProviderError, ProviderErrorCategory
+from ai_provider.errors import ProviderError, ProviderErrorCategory, ToolCallFormatError
 from ai_provider.privacy import enforce_privacy_policy
 from ai_provider.turn_usage import observe_completion, observe_stream, observe_usage
+
+
+def _known_tool_argument_failure(error: HTTPError) -> bool:
+    """Recognize a bounded Harmony JSON-decoder error without retaining its body."""
+    try:
+        body = error.read(65537)
+        if error.code != 500 or len(body) > 65536:
+            return False
+        payload = json.loads(body)
+        message = payload.get("error") if isinstance(payload, dict) else None
+        prefix = "error parsing tool call: raw='"
+        if not isinstance(message, str) or not message.startswith(prefix):
+            return False
+        _, separator, cause = message[len(prefix) :].rpartition("', err=")
+        if not separator:
+            return False
+        # Never scan the quoted model arguments for diagnostic keywords.
+        return cause == "unexpected end of JSON input" or (
+            cause.startswith("invalid character ")
+            and cause.endswith(
+                (
+                    "looking for beginning of value",
+                    "looking for object key string",
+                    "looking for beginning of object key string",
+                    "after top-level value",
+                    "after object key:value pair",
+                    "after array element",
+                    "after object key",
+                    "in string literal",
+                    "in string escape code",
+                )
+            )
+        )
+    except (OSError, ValueError, RecursionError):
+        return False
+    finally:
+        error.close()
 
 
 def _tool_calls_from_raw(raw_calls: object) -> tuple[AIToolCall, ...]:
@@ -70,17 +107,9 @@ def _tool_calls_from_raw(raw_calls: object) -> tuple[AIToolCall, ...]:
             try:
                 arguments = json.loads(arguments)
             except json.JSONDecodeError as error:
-                raise ProviderError(
-                    "Ollama tool arguments returned invalid JSON; no executable call was produced.",
-                    category=ProviderErrorCategory.NON_RETRYABLE,
-                    provider="ollama",
-                ) from error
+                raise ToolCallFormatError(provider="ollama") from error
         if not isinstance(arguments, dict):
-            raise ProviderError(
-                "Ollama tool arguments must be a JSON object; no executable call was produced.",
-                category=ProviderErrorCategory.NON_RETRYABLE,
-                provider="ollama",
-            )
+            raise ToolCallFormatError(provider="ollama")
         calls.append(
             AIToolCall(
                 id=str(raw_call.get("id") or f"tool-call-{index}"),
@@ -377,6 +406,8 @@ class OllamaChatClient:
                 raw_error=exc,
             ) from exc
         except HTTPError as exc:
+            if payload.get("tools") and _known_tool_argument_failure(exc):
+                raise ToolCallFormatError(provider="ollama") from exc
             category = (
                 ProviderErrorCategory.RETRYABLE
                 if 500 <= exc.code < 600
