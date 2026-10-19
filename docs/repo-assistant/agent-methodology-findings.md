@@ -9,6 +9,17 @@ exact hosted route before implementation. Historical failures remain evidence.
 
 ### Owner-directed behavioral baseline — 2026-10-19
 
+Later attended `cc`/`ce` evidence repeats the report-fidelity failure under coherent
+instructions. The isolated diagnostic disclosed supplied synthetic facts but omitted
+its actual refused search; the fresh integrated fallback produced independently
+correct effects/tests/oracle yet omitted its recovered command refusal. The exact
+coding report was rejected before frozen review. A predeclared independent report
+gate contains false completion; it does not improve report authorship or replace a
+missing second report. Full context/tool access and correct host metadata did not
+establish faithful prose. Preserve the failures and avoid another blind prompt-only
+trial or speculative generic grader. Public completion/report contract changes
+remain owner decisions. See `artifacts/cli-report-fidelity-integrated-20261019ce/live-review.md`.
+
 The fresh integrated `by` run completed both structural phases with independently
 correct model-authored effects, but did not establish strict acceptance. Its
 coding report omitted the required recovered-command disclosure. Postflight

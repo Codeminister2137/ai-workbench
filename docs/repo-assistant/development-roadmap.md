@@ -2,6 +2,20 @@
 
 ## Current checkpoint: 2026-10-19
 
+Latest attended evidence: isolated report diagnostic `cc` and fresh integrated
+fallback `ce` are consumed and failed report fidelity. `ce` used a coherent final
+task and full committed instructions; model-only source/two meaningful companions,
+three preserved originals, five passing model/independent tests and 3,616 oracle
+cases were verified. Its coding report again omitted its recovered command refusal.
+An independent report gate stopped before frozen review; no second report exists.
+Eight calls/seven accurate tool notices, 139 dependencies, five original index
+entries, protected inputs and eleven owned-child cleanup receipts pass. This is
+failed disclosure, not an inferred algorithmic or transport failure. `cc` likewise
+omitted an actual refusal despite describing the synthetic one. Baseline remains
+**INCOMPLETE**; preserve both reports and all acceptance requirements. Further
+report-contract changes need owner selection, not speculative prose grading or
+another blind prompt-only retry. See `artifacts/cli-report-fidelity-integrated-20261019ce/live-review.md`.
+
 Fresh `by` completed both structural phases in thirteen local model calls:
 model-authored source and four companion tests, three preserved originals,
 seven passing tests per phase, independent tests and 3,616 oracle cases, both

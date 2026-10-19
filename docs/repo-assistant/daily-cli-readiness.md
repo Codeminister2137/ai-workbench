@@ -2,6 +2,21 @@
 
 ## Current assessment — 2026-10-19
 
+Latest attended follow-up: the isolated `cc` report diagnostic and the owner-authorized
+fresh integrated `ce` fallback both failed required error disclosure. `ce` produced
+correct model-only effects, preserved three originals, added two meaningful companions,
+and passed five model tests plus independent tests and the 3,616-case oracle. Its
+coding report omitted the recovered command refusal despite coherent task instructions
+and an explicit report reminder. Independent review rejected that exact report before
+frozen review; no second report or integrated acceptance followed. All eight calls,
+seven tool notices, sealed inputs/dependencies and owned cleanup were verified.
+
+`cc` separately disclosed its labelled synthetic refusal but omitted its actual
+refused search and claimed an unobserved hash verification. Neither result justifies
+another blind prompt-only trial, a host-written replacement or waived reporting rules.
+Baseline remains **INCOMPLETE**. Evidence: `artifacts/cli-report-fidelity-acceptance-20261019cc/live-review.md`
+and `artifacts/cli-report-fidelity-integrated-20261019ce/live-review.md`.
+
 The fresh `by` integrated slice completed coding and frozen review in thirteen
 local model calls. Model-only edits preserve all three original tests and add four
 meaningful companions; seven tests pass in each phase, and independent tests and
