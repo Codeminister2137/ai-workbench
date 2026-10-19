@@ -1,3 +1,9 @@
+> 2026-10-19 bp offline follow-up: a private known exception now preserves fixed
+> fixture origin/rule/missing-check labels through the existing safe failure
+> projection. Fourteen regressions include failed/unknown observations and raw
+> sentinel exclusion. This prepared helper does not change consumed bo evidence,
+> production contracts or loop policy; broader propagation remains planned.
+>
 > 2026-10-19 bo review diagnostic: the successful-observation gate correctly
 > rejected missing git_diff. Its outer ValueError preserves locations but loses
 > the fixed missing-check label. Plan a narrow private fixture-origin/rule/missing

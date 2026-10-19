@@ -1,4 +1,41 @@
-# Daily CLI readiness — 2026-10-10
+# Daily CLI readiness
+
+## Current assessment — 2026-10-19
+
+The CLI foundation is substantially implemented. Reliable completion and factual
+reporting remain the immediate blockers to baseline acceptance. This is not a
+percentage-complete estimate or a migration approval: basic capabilities working
+individually do not prove a dependable primary development assistant.
+
+| Area | Evidence available | What still blocks acceptance |
+| --- | --- | --- |
+| CLI, coding tools, instructions and history | Interactive sessions and common tools implemented; fresh actual entry-point help passes; previous bounded turn/restart checks | Representative daily-work continuity and required installed-client coverage |
+| Model-authored code and tests | Recent local fixtures passed independent tests and 3,616-case oracle; some coding reports were accurate | Consistent correctness across a complete workflow; prior successes do not rescue failed runs |
+| Final completion and review | Frozen review reached both reads and passing tests; independent gate detects missing Git diff | Premature final reports and unsupported authorship/diff claims; no recent full local coding/report/frozen-review acceptance |
+| Errors, usage and containment | Structured attribution, per-attempt usage and guarded owned cleanup; latest live cleanup verified | Preserve fixed missing-check labels through private closeout; broader error-propagation review remains planned |
+| Fallback, skills and semantic tools | Implemented with bounded offline and selected installed-client evidence | Current eligible-route availability, broader installed-client/approval coverage and IDE-independent C1-C6 acceptance remain separate |
+
+The shortest path to the next baseline checkpoint is to address premature
+completion, validate that mechanism in a fresh targeted case, then complete a
+fresh integrated coding/test/accurate-report/frozen-review run. Both substantive
+reports, independently correct model effects and verified cleanup remain required.
+One such success would establish a bounded workflow result, not representative
+quality parity, measured savings or complete daily migration under ADR-049/050.
+
+The latest investigation reproduces the omission deterministically in the actual
+shared loop: it returns the candidate before the task-specific acceptance gate
+runs. An optional shared completion-feedback contract is proposed, with the
+original bounds and permissions retained; owner selection is pending. The
+alternative is smaller pilot-only feedback, which would leave daily CLI behavior
+unchanged. No production recovery behavior or extra inference was activated.
+Local evidence: `artifacts/cli-completion-investigation-20261019bp/README.md`.
+
+The broader roadmap still records M1 complete offline, M2/M3 partially accepted,
+M4 in progress and M5 pending. Full IDE replacement and independent unattended
+supervision must not be presented as one successful toy review away. See the
+[current roadmap](development-roadmap.md#milestones).
+
+## Historical assessment — 2026-10-10
 
 **Attended pilot: recommended. Full daily replacement and unattended migration:
 INCOMPLETE.** This is an engineering recommendation, not an owner waiver of

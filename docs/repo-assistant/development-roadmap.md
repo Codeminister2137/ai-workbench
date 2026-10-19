@@ -2,6 +2,14 @@
 
 ## Current checkpoint: 2026-10-19
 
+Offline continuation reproduced premature completion in the unchanged shared
+loop, with original history preserved and spare request budget. Fourteen new
+diagnostic regressions pass; prepared fixed origin/rule/missing-check projection
+retains the cause safely. Shared optional completion feedback versus private
+pilot-only feedback is an owner decision pending public-loop-contract review;
+neither is activated. See [daily readiness](daily-cli-readiness.md#current-assessment--2026-10-19)
+for implemented capabilities and the separate remaining workflow/migration gates.
+
 The approved isolated frozen-review diagnostic reached review and failed for a
 specific omission: no Git diff before the final report, despite unused call/tool
 capacity. Its report also misattributed copied input as current implementation
