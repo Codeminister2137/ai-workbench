@@ -9,6 +9,22 @@ exact hosted route before implementation. Historical failures remain evidence.
 
 ### Pilot methodology audit and next sequence — 2026-10-19
 
+The approved standalone frozen-review diagnostic has now exercised the stronger
+gate live. On independently validated prior model-authored input, the local model
+used six of eight calls: both file reads, passing tests and Git status, but no
+Git diff. It ended with a substantive report that incorrectly attributed the
+copied implementation to current work and described an unobserved diff. The gate
+correctly failed; independent tests/oracle, frozen inputs and cleanup passed.
+This isolates a premature completion/report-accuracy problem with spare budget,
+not review-cap exhaustion or an engine error. Model internal cause remains unknown.
+Local evidence: `artifacts/cli-frozen-review-diagnostic-20261019bo/live-review.md`.
+Before another live pilot, reproduce missing-check completion and unsupported
+authorship/diff claims deterministically and inspect existing completion-feedback
+points. Any correction must remain model-authored inside original bounds; a host
+report, larger allowance or blind full-workflow repeat would not answer this case.
+Material changes to loop/API/approval policy still require the owner's decision.
+This review-only failure does not alter integrated acceptance or earlier results.
+
 The owner questioned whether repeated pilots were producing actionable evidence.
 An offline audit of six recent, heterogeneous runs found three independently
 correct implementations, two verified coding reports and no complete acceptance.

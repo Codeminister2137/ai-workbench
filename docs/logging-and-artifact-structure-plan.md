@@ -1,3 +1,10 @@
+> 2026-10-19 bo review diagnostic: the successful-observation gate correctly
+> rejected missing git_diff. Its outer ValueError preserves locations but loses
+> the fixed missing-check label. Plan a narrow private fixture-origin/rule/missing
+> check projection before generic closeout; reuse known labels, no raw exception
+> text/prompt capture. Independent trace review established this cause immediately.
+> Do not change consumed harnesses or broaden public contracts for this finding.
+>
 > 2026-10-19 pilot audit: existing receipts preserve useful stage evidence, but
 > exact rejected-command spelling and older discarded engine bodies cannot be
 > recovered. Do not describe generic wrappers as root causes. Future private

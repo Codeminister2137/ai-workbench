@@ -2,6 +2,16 @@
 
 ## Current checkpoint: 2026-10-19
 
+The approved isolated frozen-review diagnostic reached review and failed for a
+specific omission: no Git diff before the final report, despite unused call/tool
+capacity. Its report also misattributed copied input as current implementation
+and described an unobserved diff. The stronger gate caught this; independent
+tests/oracle, frozen inputs and owned cleanup passed. Baseline remains INCOMPLETE.
+Next: deterministic completion/report-accuracy regressions and inspection of
+existing bounded feedback points before another fresh live question. Preserve
+model authorship and original limits; do not increase caps or repeat integrated
+coding merely to reach review. See [methodology findings](agent-methodology-findings.md).
+
 The owner requested a pilot-methodology audit. Recent runs have provided useful
 stage evidence but no complete acceptance; several proposed changes were never
 exercised before an earlier phase failed. The revised sequence uses deterministic
