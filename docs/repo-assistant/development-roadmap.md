@@ -5,9 +5,11 @@
 Offline continuation reproduced premature completion in the unchanged shared
 loop, with original history preserved and spare request budget. Fourteen new
 diagnostic regressions pass; prepared fixed origin/rule/missing-check projection
-retains the cause safely. Shared optional completion feedback versus private
-pilot-only feedback is an owner decision pending public-loop-contract review;
-neither is activated. See [daily readiness](daily-cli-readiness.md#current-assessment--2026-10-19)
+retains the cause safely. The owner selected shared optional completion feedback
+in ADR-062. Implementation passes88focused tests and the full offline gate of
+2,474passed/3skipped, with full Pyright and Ruff passing. Default completion is
+unchanged without caller-declared requirements; live acceptance remains incomplete.
+See [daily readiness](daily-cli-readiness.md#current-assessment--2026-10-19)
 for implemented capabilities and the separate remaining workflow/migration gates.
 
 The approved isolated frozen-review diagnostic reached review and failed for a

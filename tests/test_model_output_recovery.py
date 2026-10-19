@@ -121,6 +121,40 @@ def test_two_corrections_in_one_turn_preserve_effects_history_and_partial_usage(
     assert summary["reported_cost_usd"]["coverage"] == "unknown"
 
 
+def test_completion_and_argument_corrections_share_original_bounds_and_usage(tmp_path, monkeypatch):
+    from ai_agent import CompletionRequirement
+
+    model, requests = client(
+        monkeypatch,
+        [parser_error(), FINAL, tool("create_file", path="out.txt", content="done"), FINAL],
+    )
+    ledger = TurnUsage()
+    token = ACTIVE_USAGE.set(ledger)
+    try:
+        result = loop(
+            model,
+            tmp_path,
+            max_iterations=4,
+            completion_requirements=(
+                CompletionRequirement(
+                    "file_created",
+                    lambda results: any(
+                        item.name == "create_file" and not item.is_error for item in results
+                    ),
+                ),
+            ),
+        ).run("Create file and report")
+    finally:
+        ACTIVE_USAGE.reset(token)
+    assert result.iterations == len(requests) == 4
+    assert result.model_output_errors == result.completion_failures == 1
+    assert len(result.tool_results) == 1 and (tmp_path / "out.txt").read_text() == "done"
+    assert requests[-1]["messages"][: len(requests[-2]["messages"])] == requests[-2]["messages"]
+    assert ledger.summary()["attempts"] == 4 and ledger.summary()["responses"] == 3
+    assert ledger.summary()["input_tokens"]["coverage"] == "partial"
+    assert ledger.summary()["reported_cost_usd"]["coverage"] == "unknown"
+
+
 def test_repeated_parse_failures_stop_without_new_calls_or_fake_tool_results(tmp_path, monkeypatch):
     model, requests = client(monkeypatch, [parser_error(), parser_error(), FINAL])
     with pytest.raises(ProviderError, match="without observed file progress") as caught:

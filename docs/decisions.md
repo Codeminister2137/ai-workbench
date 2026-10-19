@@ -617,3 +617,15 @@ safe correction feedback; repeated failures without observed progress stop with
 an actionable handoff. No universal one-correction-per-turn cap, tool replay,
 transport retry, new service or approval weakening. See
 [ADR-061](decisions/ADR-061-shared-model-output-recovery.md).
+
+## ADR-062 — Optional task-completion evidence
+
+**Status:** Accepted and implemented offline (2026-10-19),
+live acceptance incomplete.
+
+Owner selected optional shared-agent completion evidence over private pilot-only
+feedback. Caller-declared objective checks may return fixed host feedback before
+final completion, retaining model candidates, history and original limits.
+Repeated missing evidence at the same observed state stops; no permissions,
+generic prose grading, storage or default policy change. See
+[ADR-062](decisions/ADR-062-optional-completion-evidence.md).

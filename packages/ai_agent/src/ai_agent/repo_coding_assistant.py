@@ -182,6 +182,7 @@ from ai_provider.turn_usage import usage_scope
 from ai_agent import (
     AgentLoop,
     ApprovalPolicyPreset,
+    CompletionRequirement,
     PermissionManager,
     PermissionPolicy,
     ToolCategory,
@@ -3449,6 +3450,7 @@ def _run_native_agent(
     repo_root: Path,
     *,
     progress_callback: Callable[[str], None] | None = None,
+    completion_requirements: tuple[CompletionRequirement, ...] = (),
 ) -> Any:
     """Run the provider-native agent loop inside the repository boundary."""
     for instructions in (
@@ -3697,6 +3699,7 @@ def _run_native_agent(
         max_iterations=args.max_action_rounds,
         deadline=getattr(getattr(args, "fallback_session", None), "deadline", None),
         diagnostic=progress_callback,
+        completion_requirements=completion_requirements,
         **sampling_kwargs(args),
     )
     try:
@@ -3737,6 +3740,8 @@ def _run_native_agent(
         )
         if result.model_output_errors:
             progress_callback(f"model_output_errors: {result.model_output_errors}")
+        if result.completion_failures:
+            progress_callback(f"completion_failures: {result.completion_failures}")
         for tool_result in result.tool_results:
             status = "error" if tool_result.is_error else "ok"
             progress_callback(

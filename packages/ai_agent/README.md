@@ -15,6 +15,27 @@ See [workspace setup](../../CONTRIBUTING.md) before running examples. End-to-end
 coding/model-quality acceptance remains incomplete; offline contracts and tests
 are separate from live quality evidence.
 
+## Optional completion evidence for task controllers
+
+`AgentLoop(..., completion_requirements=(CompletionRequirement("git_diff", check),))`
+lets a Python caller declare an objective requirement. `check` receives the tuple
+of completed `ToolResult` objects and must return bool. For Git, require a matching
+successful result with an integer exit code0; failed or unknown metadata is not
+proof. Callers must state the actual requirement in their task instructions.
+The native task runner also accepts explicit `completion_requirements`.
+
+A premature nonblank report receives fixed host feedback in the same conversation,
+preserving the model candidate, tool observations and continuation. Corrections
+consume the original bounds and use unchanged permissions. Repeated missing
+evidence at an already failed observed state stops; no-op edits and cycles do not
+renew the allowance. Predicate failures stop without echoing raw exception text.
+With no requirements, completion behavior is unchanged. `completion_failures`
+reports rejected candidates separately from malformed model-output errors.
+
+This is a trusted task-controller API, not a new CLI option, arbitrary code from
+configuration, a factual prose grader or an external-client fallback mapping.
+See [ADR-062](../../docs/decisions/ADR-062-optional-completion-evidence.md).
+
 ## Repository assistant CLI
 
 This package owns the `ai-assistant` command. The workspace launcher remains:

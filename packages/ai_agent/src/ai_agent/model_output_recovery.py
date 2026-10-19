@@ -34,7 +34,8 @@ class ModelOutputRecovery:
         if path.is_relative_to(self.root):
             self.paths.add(path)
 
-    def allow_feedback(self) -> bool:
+    def observed_state(self) -> tuple[tuple[str, str], ...]:
+        """Fingerprint bounded observed paths without changing failure counters."""
         state = []
         for path in sorted(self.paths):
             try:
@@ -56,6 +57,9 @@ class ModelOutputRecovery:
             except OSError:
                 value = "unknown"
             state.append((str(path.relative_to(self.root)), value))
-        key = tuple(state)
+        return tuple(state)
+
+    def allow_feedback(self) -> bool:
+        key = self.observed_state()
         self.failures[key] += 1
         return self.failures[key] < 2

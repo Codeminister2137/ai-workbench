@@ -24,11 +24,12 @@ quality parity, measured savings or complete daily migration under ADR-049/050.
 
 The latest investigation reproduces the omission deterministically in the actual
 shared loop: it returns the candidate before the task-specific acceptance gate
-runs. An optional shared completion-feedback contract is proposed, with the
-original bounds and permissions retained; owner selection is pending. The
-alternative is smaller pilot-only feedback, which would leave daily CLI behavior
-unchanged. No production recovery behavior or extra inference was activated.
-Local evidence: `artifacts/cli-completion-investigation-20261019bp/README.md`.
+runs. The owner selected optional shared completion feedback, now implemented
+under ADR-062 with original bounds and permissions retained. The full offline
+gate passes2,474tests/3skipped; full Pyright and Ruff pass. Task controllers opt in
+through the Python API; no default CLI policy, flag or external-client mapping
+changed. Fresh live acceptance is still required. Local implementation evidence:
+`artifacts/cli-completion-implementation-20261019bq/README.md`.
 
 The broader roadmap still records M1 complete offline, M2/M3 partially accepted,
 M4 in progress and M5 pending. Full IDE replacement and independent unattended
