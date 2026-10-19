@@ -8,10 +8,14 @@ component before trustworthy final delivery. Separate primary accuracy, successf
 bounded recovery, safe incomplete outcomes and material false claims escaping to
 the user. Do not reject harmless recovered friction or require flawless drafts.
 Preserve meaningful validation, provenance and hard safety/resource boundaries.
-Existing historical trial verdicts remain unchanged. Next evaluate existing
-repair/scrutiny and final reporting against the revised calibration cases;
-structured-report API changes are deferred pending demonstrated need and owner
-decision. General baseline readiness remains unestablished.
+Existing historical trial verdicts remain unchanged. Seven-case offline calibration
+now demonstrates that validation-driven repair can correct a scripted defect, but
+a scrutiny warning/proposed revision does not replace or explicitly qualify the
+original claim in final delivery. Next: owner choice between explicit final
+qualification and a bounded correction stage, then focused delivery regressions.
+See [the measured limits](agent-methodology-findings.md#offline-workflow-calibration--2026-10-19).
+Structured-report API changes remain deferred. General baseline readiness remains
+unestablished.
 
 Latest attended evidence: isolated report diagnostic `cc` and fresh integrated
 fallback `ce` are consumed and failed report fidelity. `ce` used a coherent final

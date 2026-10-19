@@ -11,10 +11,18 @@ a clearly contained stop is useful safety evidence, but the task remains incompl
 
 The historical results below retain their original criteria. In particular,
 `ce` cannot be promoted to a completed workflow: its frozen review never ran.
-`cc`'s unsupported hash-verification claim remains a substantive concern. Next
-evaluate the existing correction/scrutiny/final-delivery workflow under the revised
-criteria before selecting a new report API or another prompt-only trial. No new
-live acceptance or automatic scrutiny guarantee is claimed.
+`cc`'s unsupported hash-verification claim remains a substantive concern.
+
+Offline calibration `cg` exercised seven scripted cases through actual validation,
+repair, scrutiny and final rendering, with eight real three-test executions and
+zero model calls. Validation-driven correction worked under scripted replies;
+harmless recovered friction did not corrupt the report. When scrutiny flagged a
+false hash claim and proposed a correction, the final preview and Agent report
+still repeated the original claim. A deliberately missed review also retained it.
+This demonstrates a delivery gap, not real-model detection rates. A final
+qualification versus bounded correction decision is pending; no production
+reporting behavior changed. No new live acceptance or automatic truth guarantee
+is claimed. See [the methodology findings](agent-methodology-findings.md#offline-workflow-calibration--2026-10-19).
 
 Latest attended follow-up: the isolated `cc` report diagnostic and the owner-authorized
 fresh integrated `ce` fallback both failed required error disclosure. `ce` produced

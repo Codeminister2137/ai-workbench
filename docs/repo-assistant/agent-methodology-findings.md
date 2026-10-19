@@ -7,6 +7,39 @@ exact hosted route before implementation. Historical failures remain evidence.
 
 ## Findings to retain
 
+### Offline workflow calibration — 2026-10-19
+
+Seven scripted cases exercised the actual orchestrated CLI validation,
+repair/revalidation, scrutiny and final rendering paths. Fifteen boundary requests
+were scripted; eight actual validation processes each ran three unittest cases.
+No real model calls occurred. Auxiliary support was stubbed and prompt review
+skipped. A separate read-only audit matched terminal reports, SQLite stages,
+validation histories, source effects, protected tests/instructions and reference
+hashes; all eight recorded validation processes were absent at postflight.
+
+Actual failing validation triggered the existing repair loop, which accepted a
+scripted correction and reran passing validation. Correct drafts, honest uncertainty
+and harmless recovered friction produced appropriate final reports. Failed required
+validation with an explicit incomplete report demonstrated containment, not task
+completion; CLI return code zero alone is not quality acceptance.
+
+The material gap is final delivery after scrutiny: a scripted reviewer explicitly
+flagged an unsupported hash-verification claim and proposed a truthful revision,
+but the final Changed preview and Agent report repeated the false claim. The earlier
+warning and recorded findings establish detection; effective final qualification
+or correction remains unestablished. A deliberately scripted reviewer miss left
+the same false claim unqualified. This negative control does not estimate any
+real model's detection rate; external reference checks are not CLI protections.
+
+Recommend first making unresolved findings explicit beside a clearly identified
+draft in final delivery, preserving provenance and scoped validation, rather than
+silently adopting a reviewer rewrite. This is pending owner choice against adding
+a bounded correction/revalidation/review stage now: qualification is smaller and
+adds no inference but leaves the task incomplete; correction may finish it at the
+cost of more control flow/calls and still requires evidence. No new production
+contract, review default, semantic grader or model allowance has been introduced.
+Local preparation and receipts: artifacts/cli-workflow-calibration-20261019cg/.
+
 ### Outcome-based acceptance reassessment — 2026-10-19
 
 Owner clarified that a model mistake may be caught by scrutiny, the main model
