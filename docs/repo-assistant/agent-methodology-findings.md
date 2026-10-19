@@ -9,6 +9,32 @@ exact hosted route before implementation. Historical failures remain evidence.
 
 ### Pilot methodology audit and next sequence — 2026-10-19
 
+The fresh integrated continuation established a specific earlier-stage failure:
+model-authored source imported `typing` despite the task's explicit no-import
+scope. The fixture guard refused its phase-one test proposal before execution.
+All nine responses were HTTP200; no live tests, oracle or reports completed.
+Protected inputs, originals, sealed code, model-only edit attribution and owned
+cleanup pass. An ordinary failed text replacement was successfully corrected
+after an unnumbered reread. The shared review completion mechanism was never
+reached; do not credit or blame it for this outcome. Correctness remains unknown.
+Evidence: `artifacts/cli-integrated-completion-acceptance-20261019bu/live-review.md`.
+
+Before another integrated trial, reproduce this exact pre-execution refusal
+offline. Investigate safe actionable code-conformance feedback while preserving
+the no-import execution guard, original limits and hard protected-input/path/
+reflection/approval boundaries. This is proposed follow-up, not an adopted change
+to safety recovery. Retain a fixed originating rule in private closeout rather
+than logging raw rejected content. Do not relax scope after observing a failure
+or execute rejected source merely to obtain an oracle score.
+
+A separate fresh frozen review passed with a true accepted report, accurate
+notices and independently verified tests/oracle/cleanup. It used prior
+model-authored input, so it does not establish new authorship or a full workflow
+pass. No completion feedback was needed in that run; a causal improvement is
+unproven. Evidence: `artifacts/cli-budget-notice-acceptance-20261019bt/live-review.md`.
+
+Earlier diagnostic findings follow; their outcomes remain unchanged.
+
 The approved standalone frozen-review diagnostic has now exercised the stronger
 gate live. On independently validated prior model-authored input, the local model
 used six of eight calls: both file reads, passing tests and Git status, but no

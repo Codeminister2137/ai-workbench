@@ -2,12 +2,20 @@
 
 ## Current assessment — 2026-10-19
 
-Latest local result: shared completion feedback caught missing Git diff and the
-model completed that action, but a failed empty-path attempt used the last spare
-call and no corrected final report followed. Independent validation and cleanup
-passed. A stale private remaining-budget notice was also found; its correction
-must be composed and checked before another live run. This is partial mechanism
-evidence, not completed review or baseline acceptance.
+Latest integrated local result: the model authored source and two companion tests,
+preserved all three originals, and recovered a failed text edit. It also added a
+forbidden source import; the fixture guard blocked its test command before
+execution. No tests or either final report completed. The cause is established,
+all nine requests returned HTTP200, and independent integrity/cleanup checks pass.
+Correctness remains unvalidated. Evidence:
+`artifacts/cli-integrated-completion-acceptance-20261019bu/live-review.md`.
+
+Separately, a fresh bounded frozen review passed with accurate budget notices and
+an accepted substantive report on existing model-authored input. Its six tests,
+3,616-case oracle, frozen inputs and cleanup pass; source-only Git diff and
+paraphrased test output are recorded scope notes. It supplies no new coding
+authorship or full integrated acceptance. Evidence:
+`artifacts/cli-budget-notice-acceptance-20261019bt/live-review.md`.
 
 The CLI foundation is substantially implemented. Reliable completion and factual
 reporting remain the immediate blockers to baseline acceptance. This is not a
@@ -18,13 +26,14 @@ individually do not prove a dependable primary development assistant.
 | --- | --- | --- |
 | CLI, coding tools, instructions and history | Interactive sessions and common tools implemented; fresh actual entry-point help passes; previous bounded turn/restart checks | Representative daily-work continuity and required installed-client coverage |
 | Model-authored code and tests | Recent local fixtures passed independent tests and 3,616-case oracle; some coding reports were accurate | Consistent correctness across a complete workflow; prior successes do not rescue failed runs |
-| Final completion and review | Frozen review reached both reads and passing tests; independent gate detects missing Git diff | Premature final reports and unsupported authorship/diff claims; no recent full local coding/report/frozen-review acceptance |
+| Final completion and review | A bounded frozen review passed; actual notices and accepted/candidate reports are checked separately | No recent complete fresh coding/test/report/frozen-review acceptance; latest integrated run stopped before tests |
 | Errors, usage and containment | Structured attribution, per-attempt usage and guarded owned cleanup; latest live cleanup verified | Preserve fixed missing-check labels through private closeout; broader error-propagation review remains planned |
 | Fallback, skills and semantic tools | Implemented with bounded offline and selected installed-client evidence | Current eligible-route availability, broader installed-client/approval coverage and IDE-independent C1-C6 acceptance remain separate |
 
-The shortest path to the next baseline checkpoint is to address premature
-completion, validate that mechanism in a fresh targeted case, then complete a
-fresh integrated coding/test/accurate-report/frozen-review run. Both substantive
+The next step is an offline investigation of the exact pre-execution source-scope
+refusal, before another integrated trial. Preserve the import/execution guards;
+distinguish code-conformance feedback from permission to run rejected code.
+Then complete a fresh coding/test/accurate-report/frozen-review run. Both substantive
 reports, independently correct model effects and verified cleanup remain required.
 One such success would establish a bounded workflow result, not representative
 quality parity, measured savings or complete daily migration under ADR-049/050.

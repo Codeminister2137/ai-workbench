@@ -1,3 +1,13 @@
+> 2026-10-19 bu integrated trial: exact root cause established from safe source
+> locations plus independent static inspection: fixture_validator rejects a typing
+> import before run_command execution. Wrapper retains generic acceptance_exception
+> while fixed source_import_forbidden is absent from original closeout; preserve
+> that known origin/rule in future private diagnostics, not raw exception/model text.
+> Exact rejected command spelling is unknown. Keep execution/admission distinct.
+> bt proved actual budget notices and accepted-versus-candidate report separation
+> in a bounded frozen review; bu verified all eight observed notices independently.
+> No new logging service, artifact-layout migration or production contract needed.
+>
 > 2026-10-19 br: shared completion feedback was observed live; the model performed
 > missing Gitdiff but exhausted the original bound before final report. Existing
 > private reports[2] retains the rejected candidate; readers must distinguish it

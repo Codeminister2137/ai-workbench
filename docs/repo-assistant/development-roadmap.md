@@ -2,14 +2,33 @@
 
 ## Current checkpoint: 2026-10-19
 
+The fresh integrated slice stopped at the fixture's source-import rule before
+tests: model-authored code imported `typing` despite the explicit no-import scope.
+The model preserved three originals, added two companion tests, and recovered one
+failed text edit. Nine requests returned HTTP200; no test execution, coding report
+or frozen review completed. Independent source attribution, protected inputs,
+original indexed content, 131 sealed dependencies and owned cleanup pass. Live
+correctness is unvalidated and baseline acceptance remains INCOMPLETE. Next:
+investigate this exact refusal offline, keeping rejected code unexecuted and
+distinguishing conformance feedback from safety authorization. No blind replay.
+Local evidence: `artifacts/cli-integrated-completion-acceptance-20261019bu/live-review.md`.
+
+A preceding fresh bounded frozen review passed on existing model-authored input:
+both reads, Git status/diff, six passing tests, accurate notices and an accepted
+substantive final report. Independent 3,616-case oracle and cleanup pass; source-only
+diff and paraphrased output are recorded scope notes. This supplies no fresh coding
+authorship. `artifacts/cli-budget-notice-acceptance-20261019bt/live-review.md`.
+
+Earlier diagnostic evidence follows; its consumed allowance remains closed.
+
 The fresh native review diagnostic exercised ADR-062 live: missing Git diff
 triggered shared feedback; the model then corrected an invalid empty-path call
 and successfully inspected the diff. The original eight-call ceiling stopped
 before a corrected final report, so acceptance still failed. All independent
 tests/oracle, frozen inputs and owned cleanup passed. A retained private wrapper
 also displayed obsolete24/32ceilings despite correct8/8enforcement. Its effect
-on model choice is unknown; an offline correction passes eight tests. Compose
-and verify all displayed counters against enforced limits before more inference.
+on model choice is unknown; the correction subsequently passed offline composition
+and the bounded live review above. All displayed counters must match active limits.
 The retained candidate is not an accepted report. Local evidence:
 `artifacts/cli-completion-acceptance-20261019br/live-review.md`.
 
