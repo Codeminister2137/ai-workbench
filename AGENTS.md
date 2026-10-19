@@ -926,10 +926,16 @@ Use this loop:
    implementation. Interpret "around two hours" as two hours from execution
    start, unless the owner specifies otherwise. Never reuse an expired deadline
    for a new run or silently reset it after compaction.
-2. Maintain a compact candidate ledger in local `CURRENT_CONTEXT.md`. For each
-   candidate record its authoritative plan/accepted requirement, authorization
-   boundary, current code/test evidence, concrete next action and status:
-   `READY`, `NEEDS_INVESTIGATION`, `IN_PROGRESS`, `COMPLETE` or `BLOCKED`.
+2. Before implementation, write the active session plan to local
+   `docs/plans/unattended-work-plan.md`, using
+   `docs/unattended-work-plan-template.md`. Link it from `CURRENT_CONTEXT.md`.
+   Read the immediate task and wider approved goals/plans before choosing the
+   ordered steps. Record their source files, concrete actions, authorization
+   boundaries, rough time estimates, validation and completion conditions, and
+   fallback work that can proceed independently. Maintain the candidate ledger
+   in that plan, with `READY`, `NEEDS_INVESTIGATION`, `IN_PROGRESS`, `COMPLETE`
+   or `BLOCKED` status; keep the current action and plan link in the handoff.
+   A list of broad milestone gaps is not an executable plan.
 3. Prioritize the current objective and prerequisites, then remaining approved
    roadmap work, then other approved repository goals, following the current
    owner priorities in docs/workflow.md. Inspect applicable private
@@ -957,11 +963,59 @@ Use this loop:
 6. Preserve the original deadline, candidate ledger, active reasoning and next
    action across context changes. Apply the session-boundary workflow when
    needed; a checkpoint or compaction does not cancel the active work window.
+   Reassess actual time and update the plan after each completed/blocked step,
+   before a long-running operation, and at least every thirty minutes while
+   work is progressing. Record the checkpoint time, time remaining, closeout
+   reserve, observed progress and next action. An operation's full execution,
+   verification and cleanup envelope must fit before the work cutoff. Replan
+   the remaining steps when estimates or evidence change; do not reset time.
 7. Reserve approximately five minutes before the deadline for safe closeout:
    bounded cleanup, validation status, diff/status review, handoff and final
    report. Do not start operations likely to exceed the remaining time. If all
    useful authorized work is genuinely exhausted earlier, record the candidate
    evidence, blockers and remaining time and explain the early stop.
+
+If the entire current plan finishes or stalls while useful work time remains,
+reopen the recorded wider-goal source files and replenish the plan with concrete
+authorized next actions. Then execute the next step. Completing the written plan
+does not complete the unattended window. A restriction on additional model pilots
+does not prohibit independent inspection, implementation, deterministic testing
+or preparation. Do not turn "no demonstrated defect" into proof that all planned
+requirements or investigations are complete.
+
+Before an early-stop decision, every `READY` action must have been executed or
+given a specific evidenced blocker, and every `NEEDS_INVESTIGATION` action must
+have been investigated. For each alleged blocker, actively check whether a smaller
+independent action can still advance the same approved goal. Record the actual
+attempt/result or the concrete restriction that prevents it. If this evidence
+is missing, continue investigation and plan selection. Do not write a retrospective
+ledger merely to justify a decision to stop already made.
+
+Every plan must contain the same mandatory final step for deadline and early
+closeout: stop admitting work in time, clean up owned processes, independently
+verify the final state, save the handoff, schedule default PC sleep for ten minutes
+after finishing, verify the scheduling receipt, and issue the existing final
+report. Reserve enough time for all of these operations; increase the normal
+five-minute reserve when cleanup or verification needs longer. Success, failure,
+blocked work and incomplete baseline acceptance do not remove this final step.
+
+Owner clarification (2026-10-19): individual plan durations are estimates, not
+automatic task timeouts. Allow reasonable headroom for useful coding, correction,
+testing and review instead of giving each step only its minimum expected time.
+Reallocate the remaining planned time at checkpoints when useful progress warrants
+it. The session deadline, cleanup reserve and explicitly declared inference,
+call/tool/resource limits remain hard boundaries. Prepare any new pilot's finite
+allowance with its headroom before launch; never extend or repurpose a consumed
+or active acceptance allowance to compensate for an optimistic estimate.
+
+Here a step is a meaningful work unit, not every tool operation or model call.
+Keep reassessment brief within the existing turn: reuse current evidence and
+combine clock checks with normal progress monitoring. A checkpoint does not
+require another model/reviewer invocation, a full plan/documentation reread, or
+repeated passing checks. Do not interrupt healthy work merely because its estimate
+elapsed; retain the required time checkpoints and actual hard limits. Track
+avoidable reassessment, context-read and tool-call overhead as a separate backlog
+investigation rather than adding costly evaluation calls during each session.
 
 Apply completion and blockers to concrete slices, not whole project names. A
 passing suite establishes its covered contracts; it does not establish that all
@@ -1004,19 +1058,27 @@ label the estimate and cite the last reliable timestamp; do not invent precision
 Include completed work, checks, remaining limitations and pending decision briefs
 with each viable option's pros and cons and the technical recommendation.
 
-Sleep remains separately authorized. Finishing one slice does not justify an
-early stop or sleep. Once the window legitimately ends early, however, an owner
-instruction to sleep on early termination must be scheduled for ten minutes
-after safe closeout, unless the owner specifies a different delay. Save the
-handoff and safely close owned operations first. This includes an evidenced stop
-because all remaining authorized work is blocked: an incomplete baseline or a
-blocked goal does not cancel that sleep instruction or become COMPLETE.
-For sleep authorized only at the deadline, pass the original UTC deadline to
-`scripts/workstation-sleep.ps1` using `-NotBeforeUtc`. For explicitly authorized
-early sleep, record the original deadline and early-stop evidence, then use the
-helper with `-Sleep -DelaySeconds 600`, a fresh `-ReceiptPath` and a fresh
-`-CancelPath`, without that deadline argument. Start the helper using
+Owner clarification (2026-10-19): unattended work includes standing authorization
+to put the PC to sleep ten minutes after finishing, whether finishing at the
+deadline or ending early. This is the default unless the owner explicitly
+overrides it. Missing sleep wording in a launch prompt or saved handoff is not
+a cancellation or a reason to seek repeated authorization; a workflow recording
+no default sleep is incorrect. Finishing one slice still does not justify ending
+the window. The sleep obligation also applies after a mistaken early stop; do
+not compound a continuation failure by omitting the required closeout action.
+
+Save the handoff and safely close owned operations first. For either deadline
+or early closeout, use `scripts/workstation-sleep.ps1` with
+`-Sleep -DelaySeconds 600`, a fresh `-ReceiptPath` and a fresh `-CancelPath`.
+Record the original deadline and any early-stop evidence; default early sleep
+does not require `-NotBeforeUtc`. If the owner explicitly restricts sleep to
+the deadline or later, retain that restriction using `-NotBeforeUtc` with the
+original UTC deadline. Start the helper using
 `Start-Process -WindowStyle Hidden`; do not block the conversation for ten minutes.
+Read the fresh receipt and verify `sleep_scheduled` with the intended time and
+cancellation path before treating scheduling as complete. If launching fails,
+investigate immediately and correct it within the closeout reserve; do not
+silently omit sleep. Actual platform approval requirements still apply.
 Report the scheduled local time and exact cancellation marker path/command in
 the visible closeout and handoff, so the owner can intervene while still nearby.
 Never remove a time guard without the corresponding owner authorization.

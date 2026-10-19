@@ -72,6 +72,8 @@ For an unattended work window:
 1. `Codex: Unattended Work Window`
 2. Supply the duration and current objective; preserve existing approval and
    live-usage boundaries.
+   Save the timed plan at `docs/plans/unattended-work-plan.md` using the repository
+   template; include wider approved goals and time-reassessment checkpoints.
 3. Continue the selection/investigation/implementation/validation loop across
    completed and blocked slices until the recorded deadline or an evidenced
    exhaustion of useful authorized work.
@@ -256,9 +258,13 @@ Instructions:
 - Record execution start, duration and deadline in UTC and Europe/Warsaw before
   implementation. "Around two hours" means two hours from execution start.
   Never reuse an expired window or reset its deadline after compaction.
-- Maintain a compact candidate ledger in CURRENT_CONTEXT.md: authoritative plan/
-  accepted requirement, authorization boundary, current evidence, next action,
-  and READY/NEEDS_INVESTIGATION/IN_PROGRESS/COMPLETE/BLOCKED status.
+- Before implementation, create docs/plans/unattended-work-plan.md from
+  docs/unattended-work-plan-template.md and link it in CURRENT_CONTEXT.md.
+  Read the immediate slice and wider approved goal/plan files. Order concrete
+  steps with rough durations, authorization boundaries, validation/completion
+  conditions, independent fallback work and the candidate ledger using
+  READY/NEEDS_INVESTIGATION/IN_PROGRESS/COMPLETE/BLOCKED statuses.
+  Keep the original start/deadline and current action in CURRENT_CONTEXT.md.
 - Prioritize current work and prerequisites, then approved roadmap work and other
   approved repository goals. Inspect relevant private plans, including extracting
   relevant .docx text; verify plan statements against current code and tests.
@@ -287,6 +293,31 @@ Instructions:
   missing exhaustion evidence means NEEDS_INVESTIGATION, not BLOCKED.
 - Preserve deadline, reasoning and ledger across context changes. Reserve about
   five minutes for safe closeout; do not start operations likely to overrun.
+- Reassess the clock and plan after every completed/blocked step, before a long
+  operation, and at least every thirty minutes during ongoing work. Record time
+  remaining, closeout reserve, actual progress and the next action. Adjust the
+  remaining steps without resetting the deadline; require each operation's full
+  execution/verification/cleanup envelope to fit.
+- Treat step durations as estimates with reasonable headroom, not minimum-time
+  hard stops. Reallocate remaining plan time for useful progress at checkpoints.
+  Keep the session cutoff, closeout reserve and explicit resource/pilot limits
+  hard; declare headroom for fresh allowances before launch, never extend active
+  or consumed trials. A step is a meaningful work unit, not each tool/model call.
+  Reassess briefly in the existing turn using current evidence and normal clock
+  monitoring; no extra model/reviewer call or full-document reread is required
+  solely for a checkpoint. Avoid redundant checks and context/tool overhead.
+- If the whole plan finishes or stalls with useful time left, reopen the wider
+  goal/plan files, investigate independent next actions, replenish the plan and
+  execute it. Restrictions on more pilots do not prohibit offline work. Before
+  early closeout, execute or specifically block each READY action and investigate
+  every NEEDS_INVESTIGATION action, including smaller work allowed by a blocker.
+  Record actual attempts/results or the concrete restriction; do not construct a
+  retrospective ledger to justify a stopping decision already made.
+- Include the mandatory final plan step for every ending: owned-process cleanup,
+  independent verification, saved handoff, sleep scheduled ten minutes after
+  finishing, verified scheduling receipt and the existing final report. Increase
+  the normal closeout reserve when those operations need longer. Failed, blocked
+  or incomplete work does not remove this step.
 - Treat slice results and queued decisions as intermediate commentary. A final
   closeout ends the work window and needs one of the permitted stop conditions;
   "requested work verified" does not mean only the initial named slice passed.
@@ -303,15 +334,15 @@ Instructions:
   copy-ready new-session prompt. Record actual start/stop date/time in UTC and
   Europe/Warsaw, original deadline, elapsed work versus known waiting/interruption
   time, and any early-stop reason. Label estimates when exact evidence is absent.
-- Sleep is separately authorized. If the owner authorized sleep on early
-  termination, schedule it ten minutes after a legitimate early closeout, saved
-  handoff and safe closure of owned operations, including when remaining work
-  is blocked.
-  An incomplete baseline does not cancel that instruction. Use the sleep helper's
-  -Sleep -DelaySeconds 600 with fresh receipt/cancellation paths for this explicit
-  early authorization, launched hidden without blocking the conversation;
-  retain -NotBeforeUtc with the original deadline when sleep is authorized only
-  at that deadline. Report scheduled/requested/rejected/verified accurately.
+- PC sleep ten minutes after finishing unattended work is the standing default
+  for deadline and early endings, unless the owner explicitly overrides it.
+  Missing sleep wording is not cancellation. Even a mistaken early stop must
+  not also omit sleep. After saving the handoff and closing owned operations,
+  use the sleep helper's -Sleep -DelaySeconds 600 with fresh receipt/cancellation
+  paths, launched hidden without blocking the conversation; verify sleep_scheduled
+  in its fresh receipt. Retain -NotBeforeUtc with the original deadline only when
+  the owner explicitly restricts sleep to that deadline or later.
+  Report scheduled/requested/rejected/verified accurately.
   An explicit switch to attended
   mode or new owner instructions cancel unattended sleep not yet requested:
   create its cancellation marker and verify sleep_cancelled before resuming.
