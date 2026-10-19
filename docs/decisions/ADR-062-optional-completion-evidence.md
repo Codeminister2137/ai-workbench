@@ -84,3 +84,11 @@ Validation:88focused tests passed; full offline gate2,474passed/3skipped
 Unknown finish metadata bypass in the initial native test was corrected and
 retained as a regression. These checks establish software behavior, not model
 quality or complete baseline acceptance.
+
+One fresh local native review subsequently exercised missing-evidence feedback
+and performed the requested Git diff after correcting an invalid empty path.
+The original eight-call bound stopped before a final report. Independent code
+validation and owned cleanup passed; live complete-workflow acceptance remains
+incomplete. A retained private budget notice displayed obsolete ceilings despite
+correct enforcement, limiting interpretation of model quality. Correct that
+notice in a new harness before further inference; never regrade the consumed run.

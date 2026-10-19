@@ -2,6 +2,17 @@
 
 ## Current checkpoint: 2026-10-19
 
+The fresh native review diagnostic exercised ADR-062 live: missing Git diff
+triggered shared feedback; the model then corrected an invalid empty-path call
+and successfully inspected the diff. The original eight-call ceiling stopped
+before a corrected final report, so acceptance still failed. All independent
+tests/oracle, frozen inputs and owned cleanup passed. A retained private wrapper
+also displayed obsolete24/32ceilings despite correct8/8enforcement. Its effect
+on model choice is unknown; an offline correction passes eight tests. Compose
+and verify all displayed counters against enforced limits before more inference.
+The retained candidate is not an accepted report. Local evidence:
+`artifacts/cli-completion-acceptance-20261019br/live-review.md`.
+
 Offline continuation reproduced premature completion in the unchanged shared
 loop, with original history preserved and spare request budget. Fourteen new
 diagnostic regressions pass; prepared fixed origin/rule/missing-check projection

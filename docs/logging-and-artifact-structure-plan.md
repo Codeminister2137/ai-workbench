@@ -1,3 +1,11 @@
+> 2026-10-19 br: shared completion feedback was observed live; the model performed
+> missing Gitdiff but exhausted the original bound before final report. Existing
+> private reports[2] retains the rejected candidate; readers must distinguish it
+> from an accepted phase report. A historical notice also advertised24/32caps
+> while8/8were enforced. bs prepares an eight-test counterexample/fix; future
+> preflight must check actual emitted notices against active total/phase limits.
+> Preserve consumed evidence; no raw model reasoning or artifact-layout migration.
+>
 > 2026-10-19 bp offline follow-up: a private known exception now preserves fixed
 > fixture origin/rule/missing-check labels through the existing safe failure
 > projection. Fourteen regressions include failed/unknown observations and raw

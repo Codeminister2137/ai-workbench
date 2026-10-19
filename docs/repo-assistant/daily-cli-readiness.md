@@ -2,6 +2,13 @@
 
 ## Current assessment — 2026-10-19
 
+Latest local result: shared completion feedback caught missing Git diff and the
+model completed that action, but a failed empty-path attempt used the last spare
+call and no corrected final report followed. Independent validation and cleanup
+passed. A stale private remaining-budget notice was also found; its correction
+must be composed and checked before another live run. This is partial mechanism
+evidence, not completed review or baseline acceptance.
+
 The CLI foundation is substantially implemented. Reliable completion and factual
 reporting remain the immediate blockers to baseline acceptance. This is not a
 percentage-complete estimate or a migration approval: basic capabilities working
