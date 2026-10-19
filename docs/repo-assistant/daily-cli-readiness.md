@@ -2,6 +2,11 @@
 
 ## Current assessment — 2026-10-19
 
+For the remaining distance and ordered acceptance gates, see
+[distance to baseline usability](baseline-gap.md). The foundation is substantially
+implemented; complete small-workflow, representative continuity, selected-route
+capability/approval and IDE-host-independence acceptance remain distinct gaps.
+
 Owner-directed reassessment now evaluates the whole intended workflow using
 [materiality and recovery criteria](acceptance-criteria.md). Harmless corrected
 command refusals need not appear in the final report; their omission alone is
@@ -95,11 +100,11 @@ individually do not prove a dependable primary development assistant.
 | Errors, usage and containment | Structured attribution, per-attempt usage and guarded owned cleanup; latest live cleanup verified | Preserve fixed missing-check labels through private closeout; broader error-propagation review remains planned |
 | Fallback, skills and semantic tools | Implemented with bounded offline and selected installed-client evidence | Current eligible-route availability, broader installed-client/approval coverage and IDE-independent C1-C6 acceptance remain separate |
 
-The next step is to integrate the offline task clarification into future
-preparation and check the fully composed task, rather than the root snapshot alone.
-Investigate the missed error disclosure using the preserved report/tool evidence
-before selecting further live scope. Preserve the remaining execution,
-protected-input and approval boundaries. Both substantive
+The next step is fresh coherent preparation under the revised criteria, checking
+the fully composed task and actual scrutiny wiring as well as root instructions.
+The recovered-error investigation and offline final-qualification fix are complete;
+do not repeat them or treat harmless omission alone as a new failure gate.
+Preserve execution, protected-input and approval boundaries. Both substantive
 reports, independently correct model effects and verified cleanup remain required.
 One such success would establish a bounded workflow result, not representative
 quality parity, measured savings or complete daily migration under ADR-049/050.

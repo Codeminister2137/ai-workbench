@@ -1,6 +1,7 @@
 """Scripted review controls exercise final delivery after real local validation."""
 
 from dataclasses import replace
+from io import StringIO
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -20,8 +21,9 @@ from .support import _EXAMPLE, main
 
 
 @pytest.mark.parametrize("review", ["needs_revision", "fail", "pass", "invalid", "unavailable"])
+@pytest.mark.parametrize("mode", ["implement", "coding-chat"])
 def test_native_final_delivery_preserves_draft_and_actual_validation(
-    review: str, capsys, monkeypatch, tmp_path: Path
+    review: str, mode: str, capsys, monkeypatch, tmp_path: Path
 ) -> None:
     """A scripted pass is a negative control, not evidence of semantic detection."""
     draft = "I independently verified the supplied hash."
@@ -86,11 +88,15 @@ def test_native_final_delivery_preserves_draft_and_actual_validation(
         lambda *a, **k: pytest.fail("Offline control attempted real model creation"),
     )
     database = tmp_path / "run.sqlite3"
+    if mode == "coding-chat":
+        # Automated fixture continuation, never physical owner input.
+        monkeypatch.setattr("sys.stdin", StringIO("/exit\n"))
+        monkeypatch.setattr("builtins.input", lambda *a: "/exit")
     assert (
         main(
             [
                 "--mode",
-                "implement",
+                mode,
                 "Scripted offline delivery control.",
                 "--provider",
                 "ollama",
@@ -107,6 +113,8 @@ def test_native_final_delivery_preserves_draft_and_actual_validation(
                 str(tmp_path / "user-config.toml"),
                 "--away-run-db",
                 str(database),
+                "--coding-session-db",
+                str(tmp_path / "coding.sqlite3"),
                 "--max-repair-cycles",
                 "0",
                 "--validation-command",
