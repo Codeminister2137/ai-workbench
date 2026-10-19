@@ -519,6 +519,17 @@ from host recovery. Preserve readable evidence, reported usage and cleanup; miss
 observations remain unknown. Do not enable private reasoning/raw-prompt logging
 by default. A small success supports the next stage, not general quality parity.
 
+Owner clarification (2026-10-19): assess the complete intended workflow as well
+as the primary model. A mistake caught and corrected by the main model, scrutiny
+or another declared component within the original bounds is acceptable when the
+final effects and report are sound. Harmless fully recovered friction need not
+be listed in the completion report. Material false claims must be corrected or
+clearly blocked before delivery; a safely stopped task is not a completed task.
+Use `docs/repo-assistant/acceptance-criteria.md` for materiality, evidence and
+recovery criteria. Preserve original trial results; apply changed criteria only
+to fresh preparation. A recoverable candidate error is not itself a terminal
+phase failure, and this clarification does not relax hard safety/approval limits.
+
 Avoid duplicating tasks across paid models or direct-chat/CLI arms by default.
 Use a paired comparison only when its additional relative-quality evidence is
 necessary and the owner explicitly authorizes that usage. A one-time exception

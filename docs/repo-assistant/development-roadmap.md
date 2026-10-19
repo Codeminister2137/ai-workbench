@@ -2,6 +2,17 @@
 
 ## Current checkpoint: 2026-10-19
 
+Current direction: [reassess acceptance around the full workflow](acceptance-criteria.md).
+Owner accepts mistakes caught by scrutiny, the main model or another declared
+component before trustworthy final delivery. Separate primary accuracy, successful
+bounded recovery, safe incomplete outcomes and material false claims escaping to
+the user. Do not reject harmless recovered friction or require flawless drafts.
+Preserve meaningful validation, provenance and hard safety/resource boundaries.
+Existing historical trial verdicts remain unchanged. Next evaluate existing
+repair/scrutiny and final reporting against the revised calibration cases;
+structured-report API changes are deferred pending demonstrated need and owner
+decision. General baseline readiness remains unestablished.
+
 Latest attended evidence: isolated report diagnostic `cc` and fresh integrated
 fallback `ce` are consumed and failed report fidelity. `ce` used a coherent final
 task and full committed instructions; model-only source/two meaningful companions,

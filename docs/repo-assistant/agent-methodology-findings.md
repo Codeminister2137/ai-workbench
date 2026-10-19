@@ -7,6 +7,23 @@ exact hosted route before implementation. Historical failures remain evidence.
 
 ## Findings to retain
 
+### Outcome-based acceptance reassessment — 2026-10-19
+
+Owner clarified that a model mistake may be caught by scrutiny, the main model
+or another declared workflow component. Evaluate the trustworthy final outcome
+and meaningful validation; record the primary mistake separately. Harmless
+recovered command friction need not be disclosed in prose, while an unsupported
+claim of hash/test/diff verification is material. A clear stop is containment,
+not successful completion. External evaluator detection does not by itself prove
+the normal CLI would catch the issue. The canonical [acceptance criteria](acceptance-criteria.md)
+include positive and negative calibration cases and retain all safety boundaries.
+
+This supersedes using every recovered-error omission as a future usability gate.
+It withdraws the immediate recommendation to introduce structured report
+submission before assessing existing workflow safeguards. Historical `by`/`cc`/`ce`
+results remain unchanged under their original rules. No production contract,
+review default, live allowance or automatic report rewrite has been introduced.
+
 ### Owner-directed behavioral baseline — 2026-10-19
 
 Later attended `cc`/`ce` evidence repeats the report-fidelity failure under coherent
