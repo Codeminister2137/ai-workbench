@@ -2,6 +2,15 @@
 
 ## Current checkpoint: 2026-10-19
 
+The owner requested a pilot-methodology audit. Recent runs have provided useful
+stage evidence but no complete acceptance; several proposed changes were never
+exercised before an earlier phase failed. The revised sequence uses deterministic
+reproductions and targeted stage diagnostics before another integrated trial.
+Stronger successful-observation gates and usage/execution distinctions are
+implemented and checked offline. See
+[the methodology findings](agent-methodology-findings.md#pilot-methodology-audit-and-next-sequence--2026-10-19).
+No historical outcome is regraded and baseline acceptance remains INCOMPLETE.
+
 A bounded local slice produced model-authored changes that passed six tests and
 3,616 independent oracle cases, with an accurate coding report. Frozen review
 exhausted its allowance after an invalid empty-path Git diff and separate file

@@ -1,3 +1,12 @@
+> 2026-10-19 pilot audit: existing receipts preserve useful stage evidence, but
+> exact rejected-command spelling and older discarded engine bodies cannot be
+> recovered. Do not describe generic wrappers as root causes. Future private
+> pilot diagnostics should carry fixed originating component/rule labels before
+> discarding rejected content, distinguish execution from admission/refusal and
+> separate usage coverage from workflow completion. Current bm/bn prototypes
+> implement narrow safe labels/readers offline; broader command classification,
+> incremental live observations and harness consolidation remain this plan's
+> work, without raw logging or selecting a new persistence/layout contract.
 # Logging and artifact structure review
 
 **Priority: High. Scope: whole repository. Status: planned; layout not yet selected.**

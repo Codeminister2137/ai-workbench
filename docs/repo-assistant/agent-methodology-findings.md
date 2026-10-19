@@ -7,6 +7,79 @@ exact hosted route before implementation. Historical failures remain evidence.
 
 ## Findings to retain
 
+### Pilot methodology audit and next sequence — 2026-10-19
+
+The owner questioned whether repeated pilots were producing actionable evidence.
+An offline audit of six recent, heterogeneous runs found three independently
+correct implementations, two verified coding reports and no complete acceptance.
+Four runs did not exercise the mechanism their proposed change targeted. These
+counts describe investigations, not a controlled model pass rate or a measured
+quality improvement. See the local entry point
+`artifacts/cli-pilot-methodology-audit-20261019bn/pilot-audit.md`.
+
+The pilots have found real defects and limits: discarded diagnostic detail,
+syntax admission mistaken for executed tests, repeated synthetic approvals,
+fixture rules that prematurely stop ordinary correction, and inadequate review
+headroom. However, changing fixtures and several controls between full workflows
+does not isolate which change helped. A guard-test count is software evidence,
+not model-quality evidence. Successful transport is not successful task execution.
+
+Current official OpenAI guidance supports defining an objective, dataset and
+metrics before comparison, evaluating workflow stages, and grading observable
+traces against explicit criteria:
+[evaluation best practices](https://developers.openai.com/api/docs/guides/evaluation-best-practices),
+[trace grading](https://developers.openai.com/api/docs/guides/trace-grading), and
+[lightweight agent evals](https://developers.openai.com/blog/eval-skills).
+We apply these principles locally; no OpenAI evaluation service, SDK dependency,
+data upload, private-reasoning logging or internal-Codex-equivalence claim follows.
+
+Small improvements implemented offline now:
+
+- A stage audit distinguishes correct code, report accuracy, review progress,
+  intervention exposure and unchanged unknowns. Consumed receipts stay untouched.
+- A stronger private review gate requires successful reads of both final files,
+  successful Git status/diff and a successful executed test observation. Tool
+  names alone do not suffice. Counterexamples demonstrate the old gate's gap;
+  the existing scripted happy path already contained all required actions.
+- Test-command refusal, syntax admission and reported execution are separate.
+  Execution counts are cross-checked against owned test-child receipts.
+- Provider-usage observation coverage is independent of workflow completion;
+  missing totals remain unknown rather than becoming invented provider totals.
+- The prepared failed-write feedback reports a fixed originating component and
+  rule, without retaining rejected content or permitting a write before reread.
+
+The strengthened controller and helpers are prepared and checked offline in the
+same artifact root. They must be composed into a fresh live harness before they
+can be claimed as live behavior. All existing acceptance requirements remain.
+
+Next bounded sequence:
+
+1. Before inference, write a short case card: one question, fixed case version,
+   changed factor, trigger proving it was exercised, expected observations,
+   independent checks, stop/falsifier, bounds and the action each outcome enables.
+2. Use deterministic reproductions first. For remaining model questions, target
+   the affected stage. The next live diagnostic should review a fresh, frozen,
+   independently validated public fixture with meaningful diffs. This isolates
+   tool-argument use, review headroom and report completion from coding failures.
+   Mark it review-only; it cannot pass the integrated coding/review baseline.
+3. Keep task content and settings stable across comparisons. Fresh paths,
+   immutable snapshots and finite named allowances do not require changing task
+   semantics. Record unavoidable differences and do not infer causal gains.
+4. Every failed phase needs the failing operation/component/rule, actual effects,
+   evidence, remaining unknowns, a smallest reproducer and a proposed correction.
+   Distinguish the primary failure from a secondary controller closeout error.
+   Exact historical rejected-command spelling remains unknown when discarded.
+5. Return to a fresh integrated coding/test/report/frozen-review slice after the
+   targeted diagnostic answers its question. Both substantive true reports,
+   model authorship, unchanged protections/oracle and verified cleanup remain
+   mandatory. Never resume a consumed allowance or rescue model code on the host.
+
+Larger follow-ups belong to the existing CLI and logging plans: consolidate the
+historical harness-import chain, add reviewed privacy-safe rejection-rule facts,
+and maintain a small fixed regression case set with predeclared comparisons.
+Do not build a new evaluation framework, migrate artifacts, change public data
+contracts or collect raw rejected commands/prompts merely to improve diagnostics.
+
 On 2026-10-18 the owner reaffirmed that ordinary correction belongs in the
 agent's coding turn and requested comparison with established agent practices
 before choosing further loop controls. A proposed single correction per turn
