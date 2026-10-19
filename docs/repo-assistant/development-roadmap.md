@@ -2,16 +2,32 @@
 
 ## Current checkpoint: 2026-10-19
 
+Fresh `by` completed both structural phases in thirteen local model calls:
+model-authored source and four companion tests, three preserved originals,
+seven passing tests per phase, independent tests and 3,616 oracle cases, both
+returned reports and eleven accurate tool notices. All 135 sealed dependencies,
+protected inputs, original index and owned cleanup pass. Strict integrated
+acceptance remains **INCOMPLETE**: the coding report omits a required recovered
+command refusal, and postflight found stale blanket import clauses beside the
+approved typing scope. Full root instructions were correct; composed task
+coherence was insufficiently checked. No imports were used, so typing was not
+exercised live. Source-only review diff and ambiguous test-preservation wording
+are explicit scope notes, not grounds to invent an algorithmic failure.
+The consumed run remains unchanged; a separate offline clarification and seventeen
+regressions address the task contradiction without new inference or production
+changes. Evidence: `artifacts/cli-typing-integrated-acceptance-20261019by/live-review.md`
+and `artifacts/cli-instruction-coherence-20261019bz/README.md`.
+
 The owner approved reviewed standard-library imports such as `typing` in future
 pilots and clarified that repository agent instructions are the CLI behavioral
 baseline. The blanket source-import ban was too narrow for representative Python
 usability. A prepared private profile permits fourteen reviewed typing names,
 aliases and type expressions while retaining existing effect/protected-test
 guards. Required instruction loading and actual guarded test execution are checked
-offline; consumed outcomes are unchanged and fresh model acceptance is pending.
+offline; consumed outcomes are unchanged and strict fresh acceptance remains pending.
 See [the behavioral baseline and declared test deviations](agent-methodology-findings.md#owner-directed-behavioral-baseline--2026-10-19).
 
-The fresh integrated slice stopped at the fixture's source-import rule before
+The preceding `bu` integrated slice stopped at the fixture's source-import rule before
 tests: model-authored code imported `typing` despite the explicit no-import scope.
 The model preserved three originals, added two companion tests, and recovered one
 failed text edit. Nine requests returned HTTP200; no test execution, coding report

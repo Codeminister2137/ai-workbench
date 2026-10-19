@@ -9,6 +9,20 @@ exact hosted route before implementation. Historical failures remain evidence.
 
 ### Owner-directed behavioral baseline — 2026-10-19
 
+The fresh integrated `by` run completed both structural phases with independently
+correct model-authored effects, but did not establish strict acceptance. Its
+coding report omitted the required recovered-command disclosure. Postflight
+also found two inherited blanket import clauses in the actual composed task,
+despite the correct full root snapshot and approved typing inspector. The
+preflight's check for one obsolete spelling did not detect these other clauses.
+No imports were used, so this supplies no live typing exposure or causal gain.
+Preserve the consumed evidence; clarify only the known stale clauses before a
+future seal and check the complete composed task. Seventeen new offline regressions
+include the actual counterexample. Do not turn structural report acceptance into
+independent report approval or replace the model's report on the host.
+Evidence: `artifacts/cli-typing-integrated-acceptance-20261019by/live-review.md` and
+`artifacts/cli-instruction-coherence-20261019bz/README.md`.
+
 The owner clarified that [AGENTS.md](../../AGENTS.md) and other applicable
 repository instruction files are the behavioral baseline for our CLI agents.
 Ordinary inspection, coding, testing and correction should have the same

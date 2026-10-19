@@ -2,14 +2,30 @@
 
 ## Current assessment — 2026-10-19
 
-The owner approved correcting the artificial import restriction for future
-fixtures: reviewed `typing` names and aliases are now prepared and checked offline.
-Repository agent instructions are the common behavioral baseline; test deviations
-must be explicit and justified. The next acceptance slice must compose and seal
-this profile in fresh inputs. No new model inference or historical regrade follows
-from those offline checks.
+The fresh `by` integrated slice completed coding and frozen review in thirteen
+local model calls. Model-only edits preserve all three original tests and add four
+meaningful companions; seven tests pass in each phase, and independent tests and
+the 3,616-case oracle pass. Both reports returned through the structural gate;
+eleven actual budget notices, protected inputs, the original index, 135 sealed
+dependencies and owned cleanup are verified.
 
-Latest integrated local result: the model authored source and two companion tests,
+Strict integrated acceptance remains **INCOMPLETE**. The coding report omits its
+required recovered-command disclosure. Postflight also found two stale blanket
+import restrictions alongside the approved typing permission in the composed
+task. Preflight verified the complete root instructions but missed that task
+contradiction. The model used no imports, so live typing support was not exercised.
+The review's source-only diff and ambiguous "tests remain unchanged" statement
+limit its coverage; they do not invalidate the independently correct effects.
+Structural report acceptance is distinct from independent substantive acceptance.
+Evidence: `artifacts/cli-typing-integrated-acceptance-20261019by/live-review.md`.
+
+A separate offline clarification changes only the two stale task clauses.
+Seventeen regressions cover the actual composition and preserve the consumed run.
+No new inference, report replacement, guard relaxation or production change follows.
+Repository instructions remain the common CLI behavioral baseline; fixture
+deviations must be explicit and justified.
+
+The preceding `bu` integrated result: the model authored source and two companion tests,
 preserved all three originals, and recovered a failed text edit. It also added a
 forbidden source import; the fixture guard blocked its test command before
 execution. No tests or either final report completed. The cause is established,
@@ -33,13 +49,14 @@ individually do not prove a dependable primary development assistant.
 | --- | --- | --- |
 | CLI, coding tools, instructions and history | Interactive sessions and common tools implemented; fresh actual entry-point help passes; previous bounded turn/restart checks | Representative daily-work continuity and required installed-client coverage |
 | Model-authored code and tests | Recent local fixtures passed independent tests and 3,616-case oracle; some coding reports were accurate | Consistent correctness across a complete workflow; prior successes do not rescue failed runs |
-| Final completion and review | A bounded frozen review passed; actual notices and accepted/candidate reports are checked separately | No recent complete fresh coding/test/report/frozen-review acceptance; latest integrated run stopped before tests |
+| Final completion and review | Latest integrated run completed both structural phases; actual notices and accepted/candidate reports are checked separately | Strict acceptance still needs coherent task instructions and both reports meeting the reporting requirements |
 | Errors, usage and containment | Structured attribution, per-attempt usage and guarded owned cleanup; latest live cleanup verified | Preserve fixed missing-check labels through private closeout; broader error-propagation review remains planned |
 | Fallback, skills and semantic tools | Implemented with bounded offline and selected installed-client evidence | Current eligible-route availability, broader installed-client/approval coverage and IDE-independent C1-C6 acceptance remain separate |
 
-The next step is to compose the approved typing profile in a fresh controller,
-verify the declared restrictions against actual guards, then complete a fresh
-coding/test/accurate-report/frozen-review run. Preserve the remaining execution,
+The next step is to integrate the offline task clarification into future
+preparation and check the fully composed task, rather than the root snapshot alone.
+Investigate the missed error disclosure using the preserved report/tool evidence
+before selecting further live scope. Preserve the remaining execution,
 protected-input and approval boundaries. Both substantive
 reports, independently correct model effects and verified cleanup remain required.
 One such success would establish a bounded workflow result, not representative
