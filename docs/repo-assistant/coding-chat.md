@@ -192,6 +192,14 @@ five minutes per turn and sixty seconds per request. Regular turns
 can invoke permitted validation tools, but the CLI does not claim host validation
 ran unless its deterministic stage recorded results.
 
+When requested scrutiny reports unresolved findings or cannot complete, the final
+CLI closeout labels the original answer as a draft and shows the concrete findings
+or review limitation beside it. The Changed preview withholds an accepted outcome;
+passing validation applies only to its recorded checks. Proposed reviewer revisions
+are labelled as not applied or independently verified. Review findings are advisory:
+this does not automatically rewrite the answer or prove every concern is valid.
+Passing-review and no-review output retain the ordinary Agent report presentation.
+
 Conversation history retains user requests, final agent reports and the
 host-observed execution outcome, including failed validation or tool errors.
 It does not persist raw tool arguments/output as additional conversation turns.

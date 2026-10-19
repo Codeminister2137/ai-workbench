@@ -276,6 +276,7 @@ def run_orchestrated_scrutiny(
                 score=report.score,
                 issues=report.issues,
                 next_action=report.recommended_next_action,
+                revised_response=report.revised_response,
             )
             print(report.raw_text)
     details["scrutiny_status"] = tracker.scrutiny_status

@@ -31,14 +31,18 @@ or correction remains unestablished. A deliberately scripted reviewer miss left
 the same false claim unqualified. This negative control does not estimate any
 real model's detection rate; external reference checks are not CLI protections.
 
-Recommend first making unresolved findings explicit beside a clearly identified
-draft in final delivery, preserving provenance and scoped validation, rather than
-silently adopting a reviewer rewrite. This is pending owner choice against adding
-a bounded correction/revalidation/review stage now: qualification is smaller and
-adds no inference but leaves the task incomplete; correction may finish it at the
-cost of more control flow/calls and still requires evidence. No new production
-contract, review default, semantic grader or model allowance has been introduced.
-Local preparation and receipts: artifacts/cli-workflow-calibration-20261019cg/.
+The owner selected explicit final qualification first because it is a smaller
+delivery fix without additional inference. The CLI now shows concrete unresolved
+findings or review failure beside the preserved draft, withholds an accepted
+Changed preview, and labels proposed reviewer revisions as not applied or
+independently verified. Scoped host validation remains separate. This contains
+unresolved review without automatically adopting a correction or deciding every
+finding is valid/material. Passing-review and no-review output remain unchanged.
+Focused offline tests cover direct and orchestrated delivery, actual local
+validation, malformed/unavailable review and a deliberate reviewer miss. Automatic
+correction, a semantic grader, new review defaults and live detection guarantees
+were not added. Preparation/receipts: artifacts/cli-workflow-calibration-20261019cg/
+and artifacts/cli-scrutiny-delivery-20261019ch/; consumed results remain unchanged.
 
 ### Outcome-based acceptance reassessment — 2026-10-19
 

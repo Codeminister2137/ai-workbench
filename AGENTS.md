@@ -1209,6 +1209,13 @@ edits the CLI cannot independently identify. Agent prompt instructions say the
 CLI owns the closeout and to avoid a duplicate; the CLI envelope, not model
 compliance, is the consistency guarantee.
 
+Owner-approved scrutiny qualification (2026-10-19): when requested scrutiny has
+unresolved findings or cannot complete, the final closeout preserves the original
+response as a draft, shows concrete findings or the review limitation beside it,
+and withholds an accepted outcome preview. Reviewer-proposed revisions are labelled
+as not applied or independently verified. Passing deterministic checks establish
+only those checks. This adds no automatic rewrite, review default or truth guarantee.
+
 For subsection labels inside a summary, avoid run-in bold labels that are
 followed immediately by a sentence on the same rendered line. Prefer a short
 Markdown header, a bullet label with a colon, or put the explanatory sentence on

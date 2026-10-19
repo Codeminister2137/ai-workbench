@@ -19,10 +19,15 @@ zero model calls. Validation-driven correction worked under scripted replies;
 harmless recovered friction did not corrupt the report. When scrutiny flagged a
 false hash claim and proposed a correction, the final preview and Agent report
 still repeated the original claim. A deliberately missed review also retained it.
-This demonstrates a delivery gap, not real-model detection rates. A final
-qualification versus bounded correction decision is pending; no production
-reporting behavior changed. No new live acceptance or automatic truth guarantee
-is claimed. See [the methodology findings](agent-methodology-findings.md#offline-workflow-calibration--2026-10-19).
+This demonstrated a delivery gap, not real-model detection rates. The owner chose
+explicit final qualification first. The CLI now preserves the original response
+as a draft when scrutiny is unresolved/unavailable, shows concrete findings and
+labelled reviewer proposals beside it, and withholds an accepted outcome preview.
+Passing host checks remain scoped to those commands. Automatic correction and
+live-model detection remain unestablished; no extra inference or review default
+was added. See [the methodology findings](agent-methodology-findings.md#offline-workflow-calibration--2026-10-19).
+Final focused validation: 105 passed, including five scripted native delivery
+controls with actual subprocess validation. Ruff/format/Pyright pass; no inference.
 
 Latest attended follow-up: the isolated `cc` report diagnostic and the owner-authorized
 fresh integrated `ce` fallback both failed required error disclosure. `ce` produced

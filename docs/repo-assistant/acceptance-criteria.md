@@ -135,3 +135,13 @@ No structured report API, mandatory new reviewer, generic semantic grader or
 extra inference follows from this reassessment. Consider a production change only
 if the existing workflow demonstrably leaves a material gap; bring any resulting
 report/public-contract/privacy/provider decision to the owner first.
+
+Owner-approved follow-up: offline calibration demonstrated scrutiny detecting a
+false hash claim while the final preview/report repeated it. The owner selected
+explicit final qualification first: preserve the original as a draft, show unresolved
+findings or unavailable review beside it, and withhold an accepted outcome preview.
+Label reviewer-proposed revisions as not applied or independently verified; passing
+host checks certify only their recorded scope. This small delivery change adds no
+inference. It contains unresolved review but does not complete a correction or
+establish that every finding is valid/material. Passing-review and no-review output
+remain unchanged; a reviewer miss still cannot be inferred into automatic detection.

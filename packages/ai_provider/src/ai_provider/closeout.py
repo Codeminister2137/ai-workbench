@@ -96,6 +96,7 @@ def format_cli_closeout(
     status: str,
     execution_status: str,
     validation_details: Mapping[str, object] | None = None,
+    scrutiny_details: Mapping[str, object] | None = None,
     fallback_attempts: Sequence[Mapping[str, str]] = (),
     failure_reason: str | None = None,
     provider: str | None = None,
@@ -130,16 +131,63 @@ def format_cli_closeout(
             "fallback_handoff=" + ", ".join(f"{key}:{value}" for key, value in handoff.items())
         )
 
+    unresolved_review = scrutiny_details is not None and scrutiny_details.get("verdict") != "pass"
+    review_lines: list[str] = []
+    if unresolved_review:
+        assert scrutiny_details is not None
+        notes.append("completion=not_established; scrutiny=unresolved")
+        review_lines = [
+            "### Unresolved scrutiny",
+            "The draft below is not an accepted completion report. "
+            "Resolve the review findings or missing review before treating the task as complete.",
+            "Review findings are advisory; they are not independent verification.",
+        ]
+        for key, label in (
+            ("verdict", "Reviewer verdict"),
+            ("issues", "Reviewer issues"),
+            ("next_action", "Reviewer next action"),
+            ("failure_reason", "Review failure"),
+            ("skip_reason", "Review not completed"),
+        ):
+            value = scrutiny_details.get(key)
+            if isinstance(value, str) and value.strip():
+                review_lines.extend([f"#### {label}", value.strip()])
+        revision = scrutiny_details.get("revised_response")
+        if isinstance(revision, str) and revision.strip().lower() not in {
+            "",
+            "none",
+            "none.",
+            "null",
+        }:
+            review_lines.extend(
+                [
+                    "#### Reviewer-proposed revision (not applied or independently verified)",
+                    revision,
+                ]
+            )
+        review_lines.append("")
+
     response = response_text.strip() if response_text and response_text.strip() else None
     report = response if response is not None else "No final response was captured."
+    outcome = (
+        "Agent draft retained below; unresolved scrutiny prevents an accepted outcome summary."
+        if unresolved_review
+        else _agent_outcome(response)
+    )
+    validation = _validation_summary(validation_details)
+    if unresolved_review:
+        validation += " (Recorded checks only; this does not verify the draft's other claims.)"
     return "\n".join(
         [
             "## **SUMMARY**",
-            f"- Changed: {_agent_outcome(response)}",
-            f"- Validated: {_validation_summary(validation_details)}",
+            f"- Changed: {outcome}",
+            f"- Validated: {validation}",
             f"- Notes: {'; '.join(notes)}",
             "",
-            "### Agent report",
+            *review_lines,
+            "### Agent report — draft with unresolved scrutiny"
+            if unresolved_review
+            else "### Agent report",
             report,
             "",
         ]

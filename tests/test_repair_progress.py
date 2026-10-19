@@ -323,7 +323,14 @@ def test_initial_validation_does_not_consume_review_reserve(run, monkeypatch):
     assert stage.details["validation_status"] == "timeout"
 
 
-def test_scrutiny_provider_failure_is_visible(run, monkeypatch):
+@pytest.mark.parametrize("previous_verdict", [None, "pass", "needs_revision"])
+def test_scrutiny_provider_failure_is_visible(run, monkeypatch, previous_verdict):
+    if previous_verdict is not None:
+        run[1].complete_stage(
+            "scrutiny",
+            details={"verdict": previous_verdict, "revised_response": "Stale revision."},
+        )
+
     def review(*a, **kw):
         raise ProviderError("local reviewer unavailable")
 
@@ -341,6 +348,17 @@ def test_scrutiny_provider_failure_is_visible(run, monkeypatch):
     )
     assert status == "completed_with_scrutiny_errors"
     assert _stage(run, "scrutiny").details["failure_reason"] == "local reviewer unavailable"
+    from ai_provider.closeout import format_cli_closeout
+
+    output = format_cli_closeout(
+        response_text="done",
+        status="ready",
+        execution_status=status,
+        scrutiny_details=run[1].scrutiny_details,
+    )
+    assert "completion=not_established" in output
+    assert "local reviewer unavailable" in output
+    assert "Stale revision." not in output
 
 
 @pytest.mark.parametrize(

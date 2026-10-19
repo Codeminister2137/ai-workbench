@@ -66,3 +66,63 @@ def test_final_response_instruction_requires_the_same_schema() -> None:
     assert "- Changed: ..." in FINAL_RESPONSE_INSTRUCTION
     assert "- Validated: ..." in FINAL_RESPONSE_INSTRUCTION
     assert "- Notes: ..." in FINAL_RESPONSE_INSTRUCTION
+
+
+@pytest.mark.parametrize("verdict", ["needs_revision", "fail"])
+def test_unresolved_scrutiny_qualifies_claims_without_replacing_the_draft(verdict: str) -> None:
+    draft = "I independently verified the supplied hash."
+    output = format_cli_closeout(
+        response_text=draft,
+        status="ready",
+        execution_status="completed_with_tool_errors",
+        validation_details={"validation_status": "passed"},
+        scrutiny_details={
+            "verdict": verdict,
+            "issues": "No hash verification was observed.",
+            "next_action": "Verify it or retract that claim.",
+            "revised_response": "The supplied hash remains unverified.",
+        },
+    )
+
+    assert output.count(draft) == 1
+    assert output.endswith(f"### Agent report — draft with unresolved scrutiny\n{draft}\n")
+    assert "#### Reviewer issues\nNo hash verification was observed." in output
+    assert "#### Reviewer next action\nVerify it or retract that claim." in output
+    assert "Reviewer-proposed revision (not applied or independently verified)" in output
+    assert "completion=not_established" in output
+    assert "execution_status=completed_with_tool_errors" in output
+    changed = next(line for line in output.splitlines() if line.startswith("- Changed:"))
+    assert draft not in changed and "unresolved scrutiny" in changed
+    assert "- Validated: passed (Recorded checks only;" in output
+
+
+@pytest.mark.parametrize(
+    "details",
+    [
+        {"failure_reason": "Reviewer timed out."},
+        {"failure_reason": "Invalid reviewer response."},
+        {"skip_reason": "Budget exhausted before scrutiny."},
+    ],
+)
+def test_unavailable_review_does_not_look_like_success(details: dict[str, object]) -> None:
+    output = format_cli_closeout(
+        response_text="Draft answer.",
+        status="ready",
+        execution_status="completed_with_scrutiny_errors",
+        scrutiny_details=details,
+    )
+    assert "completion=not_established" in output
+    assert "The draft below is not an accepted completion report." in output
+    assert str(next(iter(details.values()))) in output
+    assert "Reviewer-proposed revision" not in output
+
+
+def test_passing_review_does_not_silently_adopt_a_proposed_rewrite() -> None:
+    assert format_cli_closeout(
+        response_text="Original answer.",
+        status="ready",
+        execution_status="completed",
+        scrutiny_details={"verdict": "pass", "revised_response": "Reviewer rewrite."},
+    ) == format_cli_closeout(
+        response_text="Original answer.", status="ready", execution_status="completed"
+    )

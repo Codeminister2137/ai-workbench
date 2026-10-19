@@ -11,7 +11,7 @@ import shutil
 import subprocess
 import sys
 import time
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import replace
 from io import TextIOWrapper
 from pathlib import Path
@@ -516,6 +516,7 @@ def _print_cli_closeout(
     status: str,
     execution_status: str,
     validation_stage: OrchestratedStageRecord | None = None,
+    scrutiny_details: Mapping[str, object] | None = None,
     failure_reason: str | None = None,
     provider: str | None = None,
     category: str | None = None,
@@ -561,6 +562,7 @@ def _print_cli_closeout(
             status=status,
             execution_status=execution_status,
             validation_details=validation_stage.details if validation_stage is not None else None,
+            scrutiny_details=scrutiny_details,
             fallback_attempts=fallback_attempts,
             failure_reason=failure_reason,
             provider=provider,
@@ -1863,6 +1865,9 @@ def _execute_request(
                 status=final_status,
                 execution_status=execution_status,
                 validation_stage=validation_stage,
+                scrutiny_details=orchestrated_tracker.scrutiny_details
+                if orchestrated_tracker is not None
+                else None,
                 failure_reason=str(exc),
                 provider=exc.provider,
                 category=exc.category.value if exc.category else None,
@@ -1940,6 +1945,7 @@ def _execute_request(
         execution_status = "failed"
     scrutiny_result = None
     scrutiny_elapsed_seconds = None
+    scrutiny_stage_details: dict[str, object] | None = None
     if (
         args.scrutinize_response
         and assistant_response_text is not None
@@ -1948,7 +1954,7 @@ def _execute_request(
         print("\n=== Response scrutiny ===")
         scrutiny_failed = False
         scrutiny_stage_status = "completed"
-        scrutiny_stage_details: dict[str, object] = {"route_policy": "derived_local_cheap"}
+        scrutiny_stage_details = {"route_policy": "derived_local_cheap"}
         if orchestrated_tracker is not None:
             if orchestrated_tracker.run_record.status == "planned":
                 orchestrated_tracker.begin_run()
@@ -2008,6 +2014,9 @@ def _execute_request(
                     print("scrutiny_status: completed")
                     scrutiny_stage_details["verdict"] = scrutiny_report.verdict
                     scrutiny_stage_details["score"] = scrutiny_report.score
+                    scrutiny_stage_details["issues"] = scrutiny_report.issues
+                    scrutiny_stage_details["next_action"] = scrutiny_report.recommended_next_action
+                    scrutiny_stage_details["revised_response"] = scrutiny_report.revised_response
                     if scrutiny_report.verdict != "pass" and execution_status == "completed":
                         execution_status = "completed_with_scrutiny_findings"
             else:
@@ -2174,6 +2183,9 @@ def _execute_request(
         status=final_status,
         execution_status=execution_status,
         validation_stage=validation_stage if orchestrated_tracker is not None else None,
+        scrutiny_details=orchestrated_tracker.scrutiny_details
+        if orchestrated_tracker is not None
+        else scrutiny_stage_details,
         failure_reason=result.orchestration.failure_reason,
     )
     if close_transcript_func is not None:
@@ -3364,6 +3376,9 @@ def _run_external_agent_cli_mode(
         status="failed" if exit_code else "ready",
         execution_status=execution_status,
         validation_stage=validation_stage,
+        scrutiny_details=orchestrated_tracker.scrutiny_details
+        if orchestrated_tracker is not None
+        else None,
         failure_reason=failure_reason,
     )
     if close_transcript is not None:

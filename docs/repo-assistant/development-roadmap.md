@@ -11,8 +11,10 @@ Preserve meaningful validation, provenance and hard safety/resource boundaries.
 Existing historical trial verdicts remain unchanged. Seven-case offline calibration
 now demonstrates that validation-driven repair can correct a scripted defect, but
 a scrutiny warning/proposed revision does not replace or explicitly qualify the
-original claim in final delivery. Next: owner choice between explicit final
-qualification and a bounded correction stage, then focused delivery regressions.
+original claim in final delivery. Owner selected explicit final qualification;
+the implementation now preserves a labelled draft beside concrete findings or
+review limitations and withholds an accepted outcome preview. Automatic correction
+was not added. Focused offline regressions cover final delivery and real validation.
 See [the measured limits](agent-methodology-findings.md#offline-workflow-calibration--2026-10-19).
 Structured-report API changes remain deferred. General baseline readiness remains
 unestablished.

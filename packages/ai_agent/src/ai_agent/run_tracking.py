@@ -229,6 +229,7 @@ class OrchestratedRunTracker:
         self._progress_callback = progress_callback
         self.initial_workspace: dict[str, str] = {}
         self.scrutiny_status = "not_run"
+        self.scrutiny_details: dict[str, object] | None = None
         self.deadline = time.perf_counter() + run_record.budget_seconds
 
     @classmethod
@@ -298,6 +299,10 @@ class OrchestratedRunTracker:
             status=status,
             details=details,
         )
+        if stage_name == "scrutiny":
+            # Persisted stage details merge across attempts; final delivery must
+            # use only this attempt, never a stale pass or proposed revision.
+            self.scrutiny_details = dict(details or {})
         self._progress_callback(
             f"away_stage_status: {stage_name} status={status} "
             f"completed_at={record.completed_at_utc}"
