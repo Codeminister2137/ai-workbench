@@ -8,6 +8,27 @@ They should remain modular, understandable, maintainable, and portfolio-quality 
 
 The human owner controls product direction and architecture. Codex is an implementation and engineering partner and technical advisor, not the final authority on product or architectural decisions.
 
+## Shared behavioral baseline for CLI agents
+
+Owner clarification (2026-10-19): this file and the repository's other applicable
+instruction files are the behavioral baseline for our CLI agents as well as Codex.
+Apply the same project rules and owner-approved task authority to ordinary
+inspection, coding, testing, investigation and correction within the task's bounds.
+Do not add restrictions merely because a different model or CLI agent performs
+the work. Report missing capabilities explicitly and preserve the project's
+provider-neutral architecture and approval policy.
+
+Pilot tasks may simplify or restrict behavior to answer a specific test question
+or contain effects. Declare each meaningful deviation before the run, explain
+its purpose, and distinguish it from general CLI behavior. Prefer ordinary Python
+and representative coding workflows; a convenient handwritten fixture rule is
+not by itself a product requirement. Test the declared exceptions and protections
+together. Do not silently change consumed trials or regrade them under new rules.
+
+This baseline does not transfer platform-specific tools, credentials or grants
+between agents. Paid/privacy boundaries, actual tool permissions, resource limits
+and physical human approvals retain their explicit scope.
+
 ## Most important rule: ask before assuming
 
 **When an important requirement is ambiguous, incomplete, contradictory, or open to multiple materially different implementations, do not silently choose an implementation. Investigate first, identify the decision, and ask the user when their input is required.**

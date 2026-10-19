@@ -2,6 +2,13 @@
 
 ## Current assessment — 2026-10-19
 
+The owner approved correcting the artificial import restriction for future
+fixtures: reviewed `typing` names and aliases are now prepared and checked offline.
+Repository agent instructions are the common behavioral baseline; test deviations
+must be explicit and justified. The next acceptance slice must compose and seal
+this profile in fresh inputs. No new model inference or historical regrade follows
+from those offline checks.
+
 Latest integrated local result: the model authored source and two companion tests,
 preserved all three originals, and recovered a failed text edit. It also added a
 forbidden source import; the fixture guard blocked its test command before
@@ -30,10 +37,10 @@ individually do not prove a dependable primary development assistant.
 | Errors, usage and containment | Structured attribution, per-attempt usage and guarded owned cleanup; latest live cleanup verified | Preserve fixed missing-check labels through private closeout; broader error-propagation review remains planned |
 | Fallback, skills and semantic tools | Implemented with bounded offline and selected installed-client evidence | Current eligible-route availability, broader installed-client/approval coverage and IDE-independent C1-C6 acceptance remain separate |
 
-The next step is an offline investigation of the exact pre-execution source-scope
-refusal, before another integrated trial. Preserve the import/execution guards;
-distinguish code-conformance feedback from permission to run rejected code.
-Then complete a fresh coding/test/accurate-report/frozen-review run. Both substantive
+The next step is to compose the approved typing profile in a fresh controller,
+verify the declared restrictions against actual guards, then complete a fresh
+coding/test/accurate-report/frozen-review run. Preserve the remaining execution,
+protected-input and approval boundaries. Both substantive
 reports, independently correct model effects and verified cleanup remain required.
 One such success would establish a bounded workflow result, not representative
 quality parity, measured savings or complete daily migration under ADR-049/050.

@@ -7,6 +7,52 @@ exact hosted route before implementation. Historical failures remain evidence.
 
 ## Findings to retain
 
+### Owner-directed behavioral baseline — 2026-10-19
+
+The owner clarified that [AGENTS.md](../../AGENTS.md) and other applicable
+repository instruction files are the behavioral baseline for our CLI agents.
+Ordinary inspection, coding, testing and correction should have the same
+owner-approved scope as Codex. This reinforces ADR-024's project-owned,
+provider-neutral policy rather than transferring platform tools or credentials.
+The existing context loader retains required root/nested instructions completely;
+an additional check verifies the actual updated root file loads without truncation.
+
+Pilot restrictions may simplify a question or contain effects, but must be
+declared and justified before inference. Do not turn a convenient fixture rule
+into a product restriction. The latest `typing` failure exposed such an overly
+narrow rule: it is a scope-compliance failure under the original task, not proof
+that the library is unsafe or the algorithm incorrect. The owner approved reviewed
+standard-library imports for future fixtures. The consumed result is unchanged.
+
+The prepared profile admits `import typing`, module aliases and explicit imports
+of fourteen reviewed type names, including the failing `Iterable`, `Tuple` and
+`List`, plus ordinary annotations/type aliases. It does not admit all standard
+library modules, runtime typing helpers or calls on imported typing objects.
+Existing no-I/O/reflection/original-test protections remain; AST checks are a
+fixture check, not an OS sandbox. Local implementation and exact name list:
+`artifacts/cli-typing-fixture-policy-20261019bw/README.md`.
+
+| Behavioral baseline | Current arithmetic pilot deviation and purpose |
+| --- | --- |
+| Complete applicable instructions and observable history | Retain them; do not shorten them to save inference usage |
+| Ordinary Python and useful standard-library code | Review typing expressions explicitly; other source imports/runtime helpers remain outside this small no-I/O fixture |
+| Inspect, edit, test and correct within authorized bounds | Two editable files and exact test command contain effects; bounded ordinary correction remains available |
+| Meaningful tests and honest validation | Protect original assertions and test-framework semantics; require companion tests and an independent oracle |
+| Review based on observed changes and tests | Freeze writes during the review phase; require real reads, Git observations, test execution and a substantive report |
+| Owner authority and actual approval policy | Label synthetic callbacks explicitly; they never supply physical approval, paid/privacy permission or new provider authority |
+
+Before the next fresh live slice, compose the profile into a new controller and
+verify its actual task text, worker/command guard, instruction snapshot, seals,
+successful-observation gates and owned cleanup. Do not edit consumed harnesses or
+infer a model-quality improvement from deterministic checks. The next unattended
+session requires the owner's separate session prompt; it has not started here.
+
+An extra pre-seal check caught a preparation-order error: the existing builder
+intentionally snapshots committed `HEAD:AGENTS.md`, so a fixture prepared before
+committing the instruction clarification contained the preceding rules. No
+inference ran. Preserve that preparation, commit the approved instructions first,
+and create fresh inputs with explicit committed/working/snapshot equality checks.
+
 ### Pilot methodology audit and next sequence — 2026-10-19
 
 The fresh integrated continuation established a specific earlier-stage failure:
@@ -19,6 +65,8 @@ after an unnumbered reread. The shared review completion mechanism was never
 reached; do not credit or blame it for this outcome. Correctness remains unknown.
 Evidence: `artifacts/cli-integrated-completion-acceptance-20261019bu/live-review.md`.
 
+The subsequent owner decision above supersedes retaining the blanket import ban
+for future fixtures. The following investigation proposal records the earlier scope.
 Before another integrated trial, reproduce this exact pre-execution refusal
 offline. Investigate safe actionable code-conformance feedback while preserving
 the no-import execution guard, original limits and hard protected-input/path/

@@ -2,15 +2,24 @@
 
 ## Current checkpoint: 2026-10-19
 
+The owner approved reviewed standard-library imports such as `typing` in future
+pilots and clarified that repository agent instructions are the CLI behavioral
+baseline. The blanket source-import ban was too narrow for representative Python
+usability. A prepared private profile permits fourteen reviewed typing names,
+aliases and type expressions while retaining existing effect/protected-test
+guards. Required instruction loading and actual guarded test execution are checked
+offline; consumed outcomes are unchanged and fresh model acceptance is pending.
+See [the behavioral baseline and declared test deviations](agent-methodology-findings.md#owner-directed-behavioral-baseline--2026-10-19).
+
 The fresh integrated slice stopped at the fixture's source-import rule before
 tests: model-authored code imported `typing` despite the explicit no-import scope.
 The model preserved three originals, added two companion tests, and recovered one
 failed text edit. Nine requests returned HTTP200; no test execution, coding report
 or frozen review completed. Independent source attribution, protected inputs,
 original indexed content, 131 sealed dependencies and owned cleanup pass. Live
-correctness is unvalidated and baseline acceptance remains INCOMPLETE. Next:
-investigate this exact refusal offline, keeping rejected code unexecuted and
-distinguishing conformance feedback from safety authorization. No blind replay.
+correctness is unvalidated and baseline acceptance remains INCOMPLETE. That failure
+led to the approved future-profile correction above; it supplies no algorithmic
+failure or new execution authority. No blind replay or historical regrade.
 Local evidence: `artifacts/cli-integrated-completion-acceptance-20261019bu/live-review.md`.
 
 A preceding fresh bounded frozen review passed on existing model-authored input:
