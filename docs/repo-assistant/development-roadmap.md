@@ -1,5 +1,15 @@
 # CLI Development Foundation Roadmap
 
+## Current checkpoint: 2026-10-19
+
+A bounded local slice produced model-authored changes that passed six tests and
+3,616 independent oracle cases, with an accurate coding report. Frozen review
+exhausted its allowance after an invalid empty-path Git diff and separate file
+diffs; its test run and report remain missing. Cleanup was verified. Baseline
+acceptance remains INCOMPLETE. The Git diff tool now explains that callers should
+omit `path` for all changes and supply a nonempty path when narrowing the diff;
+execution semantics and workspace protections are unchanged.
+
 ## Current checkpoint: 2026-10-18
 
 A subsequent local slice made source/test edits but removed an original test;
