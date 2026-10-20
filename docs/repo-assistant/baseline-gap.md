@@ -61,6 +61,11 @@ continuity. Preserve the accepted privacy/approval/security bar in every gate.
    Preserve final task coherence, root snapshots, actual orchestration and all
    finite review/cleanup reserves in fresh preparation. Historical trials stay
    consumed with their original inputs and verdicts.
+   The narrow offline calibration now passes three scripted conflict controls:
+   correcting a wrong companion, correcting source and companion, and containing
+   an unresolved conflict. Six actual validation processes and separate oracle
+   checks verify those software paths. Real-model repair quality remains untested
+   with the new trusted originals; this does not complete live acceptance.
 2. Resolve the first evidenced gap, then complete a small realistic multi-turn
    development case against the existing required continuity/tool outcomes.
 3. Finish selected-route approval/tool checks and IDE-host-independent C1-C6
@@ -77,3 +82,5 @@ Local next-slice preparation: artifacts/cli-baseline-next-slice-20261019ci/.
 Latest consumed trial: artifacts/cli-notice-integrated-20261020cn/;
 independent postflight and bounded forensic diagnosis:
 artifacts/cli-notice-postflight-20261020co/. Prior cj/cl/cm evidence is preserved.
+Owner-approved trusted-regression offline calibration:
+artifacts/cli-trusted-regression-calibration-20261020cp/.
