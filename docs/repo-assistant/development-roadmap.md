@@ -852,6 +852,15 @@ PowerShell needs to classify and resolve native executables. A real Python
 invocation verifies this without forwarding provider credentials or changing
 the caller's interpreter choice.
 
+A narrow standalone offline acceptance now combines `python_runtime`, real pytest
+and default/explicit interpreter selection in a workspace with spaces, a
+conflicting PATH and a misleading `.venv` hint. Separate subprocesses run without
+loading the IDE bridge or MCP server; actual interpreter markers and owned cleanup
+are checked. Explicit Ruff/Pyright commands accept valid code and reject seeded
+lint/type errors. Both interpreter selections use the same installed executable;
+this does not establish a second interpreter's compatibility or complete M5.
+Evidence: `artifacts/cli-python-vertical-20261020do/`.
+
 ## Approved capability set
 
 | ID | Capability | Required outcome |

@@ -22,6 +22,11 @@ or fixed number of remaining runs: the next checks can reveal implementation wor
   Windows worker environments retain executable-extension discovery while still
   filtering provider credentials. These are offline C3/C6 improvements, not full
   IDE independence or model report-fidelity acceptance.
+- A standalone offline Python case now verifies real default/explicit pytest
+  execution against interpreter markers despite conflicting PATH/venv hints,
+  without loading IDE transports. Explicit Ruff/Pyright commands also pass valid
+  code and reject seeded errors. This covers one C3 workflow with one installed
+  interpreter; full C1-C6/M5 acceptance remains pending.
 
 ## Remaining acceptance work
 
