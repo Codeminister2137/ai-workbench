@@ -19,13 +19,22 @@ or fixed number of remaining runs: the next checks can reveal implementation wor
 
 ## Remaining acceptance work
 
-The latest orchestrated local trial stopped before tests or either final report.
-A private checker mistook a quoted search label for a duplicate budget notice;
-separately, tool-free auxiliary advice displayed unsupported edit/test claims.
-The prospective checker correction preserves the numerical limits. Auxiliary
-output now explicitly identifies its lack of execution evidence. Offline controls
-cover these fixes; they do not establish live report fidelity or complete the task.
-The consumed trial and its original evidence remain unchanged.
+The notice/receipt fixes were integrated into a fresh controller and verified with
+297 offline checks, a complete scripted workflow and a zero-network launch smoke.
+The subsequent bounded local trial ran actual tests and produced a coding draft,
+but failed independent correctness acceptance before frozen review. The model's
+initial implementation satisfied the independent oracle; its new companion test
+had a wrong adjacency expectation. Repair changed the implementation to match that
+test, making five visible tests pass while breaking the specification. Passing
+model-authored tests did not establish correctness.
+
+Scrutiny separately omitted required heading colons, so final delivery correctly
+qualified the report as an unresolved draft. A diagnostic copy with those colons
+added still says pass: formatting tolerance alone would not fix the correctness
+failure. The independent acceptance oracle caught the regression; this is not proof
+of automatic semantic scrutiny. Both faithful accepted reports remain missing.
+Owned cleanup, protected originals and model-only effects were verified. The trial
+is consumed/failed; earlier trials and their verdicts remain unchanged.
 
 | Gate | Current evidence and remaining distance |
 | --- | --- |
@@ -41,12 +50,12 @@ continuity. Preserve the accepted privacy/approval/security bar in every gate.
 
 ## Shortest responsible sequence
 
-1. Incorporate the verified notice/receipt corrections into fresh preparation,
-   then validate a bounded integrated task using the revised criteria.
-   Verify the actual final task, root snapshot and live stage wiring. The old
-   private integrated runner did not enable orchestration: copying it unchanged
-   would not exercise the newly qualified scrutiny closeout. Continuous coding-chat
-   already supports orchestration; no new production review default is needed.
+1. Resolve the demonstrated specification-versus-companion-test repair gap before
+   another full integrated pilot. Decide whether trusted specification checks
+   should participate in the existing validation/repair loop while separate
+   acceptance checks remain independent. That is a proposed next slice, not an
+   adopted workflow change. Preserve final task coherence, root snapshots, actual
+   orchestration and all finite review/cleanup reserves in fresh preparation.
 2. Resolve the first evidenced gap, then complete a small realistic multi-turn
    development case against the existing required continuity/tool outcomes.
 3. Finish selected-route approval/tool checks and IDE-host-independent C1-C6
@@ -60,6 +69,6 @@ document, and no economics claim can be made from local token counts alone.
 Independent unattended supervision remains after baseline, as already prioritized.
 
 Local next-slice preparation: artifacts/cli-baseline-next-slice-20261019ci/.
-Latest consumed trial: artifacts/cli-orchestrated-integrated-20261019cj/;
-independent postflight: artifacts/cli-orchestrated-postflight-20261020cl/;
-prospective offline fixes: artifacts/cli-report-fidelity-repair-20261020cm/.
+Latest consumed trial: artifacts/cli-notice-integrated-20261020cn/;
+independent postflight and bounded forensic diagnosis:
+artifacts/cli-notice-postflight-20261020co/. Prior cj/cl/cm evidence is preserved.

@@ -7,6 +7,47 @@ exact hosted route before implementation. Historical failures remain evidence.
 
 ## Findings to retain
 
+### Specification regression during test repair — 2026-10-20
+
+Fresh `cn` integrated the notice/receipt corrections and passed 297 offline checks,
+a complete scripted workflow and zero-network launch smoke before inference.
+The bounded live trial is consumed/failed: sixteen HTTP 200 responses (fourteen
+coding-role, one auxiliary, one scrutiny), thirteen tools and actual test exit
+codes `[1, 0]`. Three original tests remain unchanged and two companion methods
+were added. The coding draft was delivered with explicit unresolved-review
+qualification; frozen review and accepted coding/review reports were not reached.
+
+The primary model wrote an incorrect companion expectation: `[(1,5),(3,7),(8,10)]`
+should merge to `[(1,10)]`, but the companion expected two intervals. The original
+implementation failed that test. Instead of correcting the expected result, the
+model changed the algorithm to stop merging adjacency after an overlap. Visible
+tests then passed, and its draft claimed all requirements were satisfied while
+describing that conflicting rule. The independent acceptance oracle rejected it
+on duplicate spans followed by an adjacent singleton. This was the first failed
+controller gate, not an engine/transport or private notice-checker failure.
+
+Separate forensic copies reconstructed only successful recorded writes. Four
+bounded owned children confirmed: initial implementation passes the 3,616-case
+oracle but fails visible tests; final implementation passes visible tests but
+fails the oracle. This establishes the regression's cause without repairing the
+consumed candidate, replaying inference or changing its verdict.
+
+Scrutiny returned `pass`/8 with Markdown `STRENGTHS` and `ISSUES` headings missing
+the explicitly required colons. Parsing failed, and the CLI withheld an accepted
+outcome. Adding only those colons to a diagnostic copy parses the same pass; it
+does not resolve the false correctness assessment. Keep format compliance,
+semantic review quality, independent acceptance and final containment distinct.
+Do not treat parser tolerance as the correctness fix or visible test success as
+an independent specification check.
+
+Postflight verified 162 sealed dependencies at `da93a87`, protected inputs,
+model-only effects and cleanup of 21 owned children, controller, runtime and
+listeners. Independent tests pass; the independent oracle fails. Observed usage
+is 270,924 input and 14,182 output tokens; their derived sum is 285,106, with
+reported total/cost unknown in the underlying attempt receipts. Evidence remains
+local in `artifacts/cli-notice-integrated-20261020cn/` and
+`artifacts/cli-notice-postflight-20261020co/`. Baseline remains incomplete.
+
 ### Orchestrated local trial — 2026-10-20
 
 `cj` enabled actual continuous coding-chat orchestration with all support calls
