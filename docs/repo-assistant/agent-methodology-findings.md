@@ -7,6 +7,36 @@ exact hosted route before implementation. Historical failures remain evidence.
 
 ## Findings to retain
 
+### Owner-directed correction and a history-checker false positive — 2026-10-20
+
+The owner selected ordinary corrective follow-up through the existing CLI. Fresh
+read-only `db` supplied the prior review as labelled historical model output in
+the owner message, then planned to resume its new session at the same workspace.
+Nine requests and seven tools produced actual eight-test validation and one final
+report. It recognized modified files and the invalid `(1, 3)` rejection, but still
+called the wrong model companion a legacy trusted regression. It also promoted
+source docstring wording to a formal requirement and misstated test coverage.
+Explicit steering did not establish faithful correction in that delivered report.
+
+The second turn stopped before transport: the private guard searched for the raw
+multiline report inside JSON-escaped history. Read-only reconstruction with the
+production renderer confirms exact prior owner/model contents after decoding;
+the saved database was unchanged. This establishes a checker false positive,
+not missing production history or successful live model continuity. A fresh
+offline tree uses role-ordered exact JSON contents, with 33 guards and actual
+two-turn scripted CLI execution, real tests, both scripted reports and independent
+session/input/cleanup checks. No model request from turn two, replacement model
+report, automatic correction stage or production default was added.
+
+The consumed run remains failed. Independent audit at clean `81f8557` verified
+155 dependencies, five frozen inputs/index, nine request workers plus one test
+child, controller/runtime/listeners and two independent children clean. The
+unchanged finite oracle still misses the known defect. Observed usage: 162,464
+input plus 3,184 output tokens; 165,648 is derived, reported total/cost unknown.
+Evidence: `artifacts/cli-owner-followup-postflight-20261020dc/` and
+`artifacts/cli-owner-history-repair-20261020dd/`. Verify a correction actually
+occurred before a later task asks the model to retain it. Baseline is incomplete.
+
 ### Standalone conflict review and report fidelity — 2026-10-20
 
 Fresh read-only `cz` used the same local model/runtime/context and full ordinary

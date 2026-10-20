@@ -61,6 +61,18 @@ The standalone refusal-notice path also has actual offline recovery coverage.
 These corrections add no automatic review-to-code repair policy or production
 review default, and cannot resolve model report fidelity by themselves.
 
+The owner then chose an explicitly assisted corrective conversation using the
+existing CLI. Its first live report retained false legacy-test provenance and
+unsupported requirement/coverage claims despite actual reads, diffs and tests.
+Turn two stopped at a private guard that incorrectly matched raw multiline text
+against JSON-escaped history. Read-only diagnosis confirms exact saved messages;
+a fresh offline controller fixes that guard and completes both scripted CLI turns,
+with 33 guards, real tests, independent checks and owned cleanup. No second live
+report or real-model continuity acceptance exists. This does not justify an
+automatic correction default or regrade the consumed trial. Evidence:
+`artifacts/cli-owner-followup-postflight-20261020dc/`. Any next follow-up must
+verify factual correction before treating it as preserved in a later turn.
+
 | Gate | Current evidence and remaining distance |
 | --- | --- |
 | Complete trustworthy small workflow | Immediate gap: fresh coherent task, model-authored coding/tests, actual execution, substantive frozen review, both faithful reports, independent checks and cleanup together. The revised criteria allow harmless recovered friction and supported corrections. A contained stop remains incomplete. |
