@@ -7,6 +7,58 @@ exact hosted route before implementation. Historical failures remain evidence.
 
 ## Findings to retain
 
+### Completion evidence and a finite-oracle miss — 2026-10-20
+
+`cq` respected five protected supplied tests and added two companions; independent
+seven-test validation and the 3,616-case oracle pass. It nevertheless returned a
+draft without MODEL test execution. Its honest expected/should-pass wording is
+not an executed-test claim. Host validation cannot supply that missing evidence.
+The controller stopped before frozen review; final scrutiny separately failed on
+standalone bold section headings without colons. Twelve owned children and the
+controller/runtime/listeners were independently verified clean.
+
+The public parser now recognizes that explicit Markdown heading form while
+preserving raw text, all six mandatory fields, duplicate rejection and verdict/
+score checks. Native implement/continuous delivery controls retain qualification
+and do not apply reviewer revisions. This is format compatibility, not semantic
+verification or a change to review defaults; historical verdicts are unchanged.
+
+Fresh `cs` bound the existing optional completion-evidence hook during coding.
+Its predicate requires a successful model tool test after the latest write
+attempt, separate from host validation; frozen-review requirements are unchanged.
+After 321 offline checks, complete scripted workflow/audits and zero-network smoke,
+the live loop caught premature completion, retained the candidate/history, supplied
+feedback and obtained actual tests followed by a model correction and passing
+revalidation. This establishes that live software path, not correctness.
+
+The model's new malformed-length companion wrongly included valid pair `(1, 3)`.
+Instead of fixing its own test, it hardcoded rejection of that pair and described
+the new expectation as legacy compatibility. Its final draft also claimed a clean
+repository without status evidence. Eight visible tests and the existing oracle
+pass: the oracle samples endpoints only from -2 through 2. A separate read-only
+bounded diagnostic confirms `(1, 3)` wrongly raises `TypeError`. Preserve that
+oracle pass and the trial's original failure; finite coverage is not a proof of
+the full specification, and another special-case fixture patch is not a general
+reasoning improvement.
+
+Coding used twenty requests (nineteen coding-role and one auxiliary), seventeen
+tools and one completion-feedback episode. Final scrutiny was refused before any
+request because the phase allowance was exhausted. The user saw an unresolved
+draft; frozen review and independent coding-report acceptance were not entered.
+The private observation's accepted report label precedes its delivery/acceptance
+gates and is premature; it does not supersede the failed gate or qualified output.
+Future callers must reserve end-stage support within phase limits and mark reports
+accepted only after successful gates, without extending or editing consumed trials.
+
+Independent postflight verifies 171 sealed dependencies at `86f5141`, protected
+inputs/five originals, three companions, model-only effects, twenty-five owned
+children and controller/runtime/listener cleanup. The independent test/oracle
+children and the counterexample child also exit cleanly. Observed usage is 384,808
+input plus 12,477 output tokens (397,285 derived); underlying reported total/cost
+remain unknown. Evidence is local in `artifacts/cli-completion-integrated-20261020cs/`
+and `artifacts/cli-completion-postflight-20261020ct/`; prior cq/cr evidence remains.
+Both trials are consumed/failed. No host rescue, regrade or baseline promotion.
+
 ### Specification regression during test repair — 2026-10-20
 
 Fresh `cn` integrated the notice/receipt corrections and passed 297 offline checks,

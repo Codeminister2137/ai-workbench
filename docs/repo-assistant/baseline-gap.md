@@ -19,26 +19,29 @@ or fixed number of remaining runs: the next checks can reveal implementation wor
 
 ## Remaining acceptance work
 
-The trusted-regression controller passed 302 offline checks and complete scripted
-workflow/oracle/cleanup and zero-network launch checks before its bounded live
-trial. Its model-authored implementation, five protected originals and two
-companions pass independent seven-test validation and the 3,616-case oracle.
-However, the model returned a draft without executing its required test command.
-Host validation passed but does not supply model execution evidence. The trial
-stopped before frozen review; both faithful accepted reports remain missing.
-No conflicting expectation occurred, so this does not establish conflict recovery.
+The fresh completion-bound controller passed 321 offline checks and complete
+scripted workflow/oracle/cleanup and zero-network launch checks. Its bounded live
+trial demonstrated the existing completion-evidence hook requesting missing model
+tests, followed by actual model execution, a correction and passing revalidation.
+However, the model again changed source to satisfy its own wrong companion test,
+this time rejecting valid span `(1, 3)` as a special case. Five protected originals
+and eight visible tests pass. The 3,616-case oracle also passes because its endpoint
+range does not include 3; a separate bounded diagnostic establishes the defect.
+Passing a finite oracle does not establish the full specification.
 
-Scrutiny again used standalone bold section headings without colons. Final
-delivery qualified the draft and withheld an accepted outcome. The parser now
-recognizes those explicit Markdown headings, retains the original report text and
-still requires all six fields and valid verdict/score values. This compatibility
-fix is not semantic verification: the earlier incorrect implementation also
-received a pass review, and its independent oracle failure remains unchanged.
-The next fresh caller should use the existing optional completion-evidence hook
-to request missing model test execution before completion, within original limits;
-host validation remains separate. No new production review default is selected.
-Owned cleanup, protected originals and model-only effects were verified. These
-trials are consumed/failed; historical inputs and verdicts remain unchanged.
+Coding consumed its 20-call phase allowance, leaving no request for final scrutiny.
+The CLI qualified the draft as unresolved and stopped before frozen review. Both
+faithful accepted reports remain missing. A private observation labels the draft
+accepted before delivery/independent gates; that premature metadata does not
+override the failed gate or qualified output. Future controllers must record
+accepted status after their gates and reserve support-review capacity within each
+phase. Neither issue is corrected by extending or replaying the consumed trial.
+
+The standalone-bold scrutiny parser fix remains covered offline, with original
+text and all mandatory fields/verdict/score protections preserved. It is not
+semantic verification and was not exercised live in the latest trial because no
+scrutiny request was admitted. Owned cleanup, protected originals and model-only
+effects were verified. Historical inputs, evidence and verdicts remain unchanged.
 
 | Gate | Current evidence and remaining distance |
 | --- | --- |
@@ -83,8 +86,8 @@ document, and no economics claim can be made from local token counts alone.
 Independent unattended supervision remains after baseline, as already prioritized.
 
 Local next-slice preparation: artifacts/cli-baseline-next-slice-20261019ci/.
-Latest consumed trial: artifacts/cli-trusted-integrated-20261020cq/;
-independent postflight and prospective completion controls:
-artifacts/cli-trusted-postflight-20261020cr/. Prior cn/co/cj/cl/cm evidence is preserved.
+Latest consumed trial: artifacts/cli-completion-integrated-20261020cs/;
+independent postflight and bounded counterexample:
+artifacts/cli-completion-postflight-20261020ct/. Prior cq/cr/cn/co/cj/cl/cm evidence is preserved.
 Owner-approved trusted-regression offline calibration:
 artifacts/cli-trusted-regression-calibration-20261020cp/.
