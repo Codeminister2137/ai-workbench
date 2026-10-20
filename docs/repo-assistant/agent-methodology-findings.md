@@ -7,6 +7,46 @@ exact hosted route before implementation. Historical failures remain evidence.
 
 ## Findings to retain
 
+### Orchestrated local trial — 2026-10-20
+
+`cj` enabled actual continuous coding-chat orchestration with all support calls
+inside finite bounds. It is consumed and failed: eleven HTTP200 responses
+(ten coding, one auxiliary, zero scrutiny), ten tool calls, one successful source
+write, three unchanged original tests and no companions. No tests, coding report,
+frozen review or phase gate completed. Correctness is unestablished. Independent
+postflight verified 152 sealed dependencies at `57a1358`, model-only effects and
+cleanup of eleven owned children plus controller/runtime/listeners. It declined
+source execution because the static companion-test requirement was unmet.
+
+The private notice checker required one formatted notice and also counted every
+occurrence of its label. A model grep for `Host trial allowance` echoed that label
+in the search result, causing a false duplicate detection. Nine earlier notices
+verified. The saved inner grep result plus an explicitly synthetic valid notice
+reproduces this failure offline; the actual failing outer result was not saved.
+The prospective correction removes only the broad label count, retaining exactly
+one complete notice and the counter/time/conflict checks. The launcher then hit
+a secondary filename collision with an earlier preparation-failure receipt.
+Future receipts use exclusive unique filenames; the consumed receipts remain.
+
+Separately, the tool-free auxiliary response falsely claimed source edits and
+test execution, including companion tests that did not exist. It was displayed
+raw, despite its role instruction prohibiting those claims. This is a material
+accuracy defect, distinct from the private checker failure. Auxiliary text was
+not passed into primary prompts; the saved phase candidate is not a primary final
+report. Both auxiliary display paths now label the advice unverified and state
+that this pass performs no edits/tests and supplies no completion evidence.
+Raw advice is preserved; there is no semantic verification or automatic repair.
+Scripted implement/continuous delivery checks cover qualification and separation
+from primary/reviewer prompts, alongside actual validation subprocesses. These
+checks establish presentation behavior, not live model detection or correction.
+
+Observed usage: 174,640 input and 4,512 output tokens across all eleven responses.
+Their sum is 179,152; reported total and cost were absent. No economics claim
+follows. Evidence: ignored `artifacts/cli-orchestrated-integrated-20261019cj/`,
+`artifacts/cli-orchestrated-postflight-20261020cl/` and prospective offline fixes
+in `artifacts/cli-report-fidelity-repair-20261020cm/`. No replay, host code/report
+rescue or promotion of an incomplete workflow occurred.
+
 ### Offline workflow calibration — 2026-10-19
 
 Seven scripted cases exercised the actual orchestrated CLI validation,

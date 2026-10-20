@@ -1,6 +1,6 @@
 # Distance to established baseline CLI usability
 
-Checkpoint: 2026-10-19. The foundation is substantially implemented, but baseline
+Checkpoint: 2026-10-20. The foundation is substantially implemented, but baseline
 usability is not yet established. Successful components and one small successful
 task do not establish the whole daily workflow. There is no defensible percentage
 or fixed number of remaining runs: the next checks can reveal implementation work.
@@ -19,6 +19,14 @@ or fixed number of remaining runs: the next checks can reveal implementation wor
 
 ## Remaining acceptance work
 
+The latest orchestrated local trial stopped before tests or either final report.
+A private checker mistook a quoted search label for a duplicate budget notice;
+separately, tool-free auxiliary advice displayed unsupported edit/test claims.
+The prospective checker correction preserves the numerical limits. Auxiliary
+output now explicitly identifies its lack of execution evidence. Offline controls
+cover these fixes; they do not establish live report fidelity or complete the task.
+The consumed trial and its original evidence remain unchanged.
+
 | Gate | Current evidence and remaining distance |
 | --- | --- |
 | Complete trustworthy small workflow | Immediate gap: fresh coherent task, model-authored coding/tests, actual execution, substantive frozen review, both faithful reports, independent checks and cleanup together. The revised criteria allow harmless recovered friction and supported corrections. A contained stop remains incomplete. |
@@ -33,7 +41,8 @@ continuity. Preserve the accepted privacy/approval/security bar in every gate.
 
 ## Shortest responsible sequence
 
-1. Prepare and validate a fresh, bounded integrated task using the revised criteria.
+1. Incorporate the verified notice/receipt corrections into fresh preparation,
+   then validate a bounded integrated task using the revised criteria.
    Verify the actual final task, root snapshot and live stage wiring. The old
    private integrated runner did not enable orchestration: copying it unchanged
    would not exercise the newly qualified scrutiny closeout. Continuous coding-chat
@@ -51,3 +60,6 @@ document, and no economics claim can be made from local token counts alone.
 Independent unattended supervision remains after baseline, as already prioritized.
 
 Local next-slice preparation: artifacts/cli-baseline-next-slice-20261019ci/.
+Latest consumed trial: artifacts/cli-orchestrated-integrated-20261019cj/;
+independent postflight: artifacts/cli-orchestrated-postflight-20261020cl/;
+prospective offline fixes: artifacts/cli-report-fidelity-repair-20261020cm/.

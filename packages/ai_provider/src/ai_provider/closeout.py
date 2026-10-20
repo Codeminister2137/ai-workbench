@@ -5,6 +5,11 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping, Sequence
 
+AUXILIARY_RESPONSE_NOTICE = (
+    "Auxiliary advice (unverified). This pass does not edit files or run tests; "
+    "claims below are not completion or validation evidence."
+)
+
 FINAL_RESPONSE_INSTRUCTION = """\
 The CLI wraps your final response in this fixed user-visible closeout:
 ## **SUMMARY**

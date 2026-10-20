@@ -6,6 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from ai_provider.closeout import AUXILIARY_RESPONSE_NOTICE
 from ai_provider.orchestrated_runs import SQLiteOrchestratedRunStore
 
 from .support import (
@@ -300,7 +301,7 @@ def test_cli_orchestrated_implement_updates_stage_statuses(
             route_id="ollama-qwen2.5-coder:14b",
             provider="ollama",
             model="qwen2.5-coder:14b",
-            response_text="auxiliary done",
+            response_text="SYNTHETIC auxiliary claim: edits and all tests completed.",
         ),
     )
     monkeypatch.setattr(_EXAMPLE, "_run_native_agent", lambda *args, **kwargs: native_response)
@@ -341,7 +342,9 @@ def test_cli_orchestrated_implement_updates_stage_statuses(
 
     output = capsys.readouterr().out
     assert "=== Auxiliary panel ===" in output
-    assert "auxiliary done" in output
+    auxiliary_claim = "SYNTHETIC auxiliary claim: edits and all tests completed."
+    assert auxiliary_claim in output
+    assert output.index(AUXILIARY_RESPONSE_NOTICE) < output.index(auxiliary_claim)
     assert "away_stage_status: auxiliary_panel status=running" in output
     assert "away_stage_status: auxiliary_panel status=completed" in output
     assert "away_stage_status: implementation status=running" in output

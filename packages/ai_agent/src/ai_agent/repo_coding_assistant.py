@@ -56,6 +56,7 @@ from ai_provider.chat_transcripts import (
     SQLiteChatTranscriptStore,
 )
 from ai_provider.closeout import (
+    AUXILIARY_RESPONSE_NOTICE,
     FINAL_RESPONSE_INSTRUCTION,
     format_cli_closeout,
     safe_fallback_handoff,
@@ -1743,6 +1744,7 @@ def _execute_request(
                 details={"route_policy": "derived_local_cheap"},
             )
             print("\n=== Auxiliary panel ===")
+            print(AUXILIARY_RESPONSE_NOTICE)
             auxiliary_result = run_auxiliary_panel(
                 prompt
                 + (
@@ -3101,6 +3103,7 @@ def _run_external_agent_cli_mode(
                     details={"route_policy": "derived_local_cheap"},
                 )
                 print("\n=== Auxiliary panel ===")
+                print(AUXILIARY_RESPONSE_NOTICE)
                 auxiliary_result = run_auxiliary_panel(
                     prompt,
                     profile,

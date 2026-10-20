@@ -1,6 +1,14 @@
 # CLI Development Foundation Roadmap
 
-## Current checkpoint: 2026-10-19
+## Current checkpoint: 2026-10-20
+
+The latest integrated orchestrated local trial stopped on a private budget-notice
+false positive before tests or either final report. An auxiliary pass also
+displayed unsupported edit/test claims. Presentation now explicitly qualifies
+tool-free advice; focused offline controls cover that delivery and prospective
+notice/receipt corrections. The consumed trial remains failed and unchanged.
+No milestone is promoted. See [current acceptance gaps](baseline-gap.md) and
+[trial evidence and limits](agent-methodology-findings.md#orchestrated-local-trial--2026-10-20).
 
 Current direction: [reassess acceptance around the full workflow](acceptance-criteria.md).
 Owner accepts mistakes caught by scrutiny, the main model or another declared

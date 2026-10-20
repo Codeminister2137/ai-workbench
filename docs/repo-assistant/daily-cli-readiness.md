@@ -1,11 +1,23 @@
 # Daily CLI readiness
 
-## Current assessment — 2026-10-19
+## Current assessment — 2026-10-20
 
 For the remaining distance and ordered acceptance gates, see
 [distance to baseline usability](baseline-gap.md). The foundation is substantially
 implemented; complete small-workflow, representative continuity, selected-route
 capability/approval and IDE-host-independence acceptance remain distinct gaps.
+
+2026-10-20 update: the fresh orchestrated local `cj` trial is consumed and failed.
+Its private notice checker counted a quoted search label as a duplicate notice.
+It completed no tests or coding/frozen reports. Independent postflight verified
+model-only effects, three unchanged originals, no companion tests and cleanup of
+all eleven owned children plus runtime/listeners. Separately, the tool-free
+auxiliary pass displayed unsupported completion/test claims. Both auxiliary
+presentation paths now explicitly identify the advice as unverified and lacking
+edit/test execution evidence; its text is preserved. Prospective private fixes
+accept quoted labels while retaining complete-notice/counter checks and prevent
+failure-receipt collisions. Offline evidence is not live acceptance. See
+[the methodology record](agent-methodology-findings.md#orchestrated-local-trial--2026-10-20).
 
 Owner-directed reassessment now evaluates the whole intended workflow using
 [materiality and recovery criteria](acceptance-criteria.md). Harmless corrected

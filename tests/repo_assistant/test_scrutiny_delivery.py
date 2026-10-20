@@ -15,6 +15,7 @@ from ai_provider import (
     ProviderError,
 )
 from ai_provider.acceptance_processes import process_identity
+from ai_provider.closeout import AUXILIARY_RESPONSE_NOTICE
 from ai_provider.orchestrated_runs import SQLiteOrchestratedRunStore
 
 from .support import _EXAMPLE, main
@@ -27,6 +28,7 @@ def test_native_final_delivery_preserves_draft_and_actual_validation(
 ) -> None:
     """A scripted pass is a negative control, not evidence of semantic detection."""
     draft = "I independently verified the supplied hash."
+    auxiliary_claim = "SYNTHETIC auxiliary claim: edits and all tests completed."
     revision = "The supplied hash remains unverified."
     issue = "No hash verification was observed."
     validator = (
@@ -57,6 +59,7 @@ def test_native_final_delivery_preserves_draft_and_actual_validation(
     calls = []
 
     def coding(prompt, profile, catalog, **kwargs):
+        assert auxiliary_claim not in prompt
         if kwargs.get("progress_prefix") != "scrutiny_activity":
             return prepared
         calls.append(prompt)
@@ -80,7 +83,9 @@ def test_native_final_delivery_preserves_draft_and_actual_validation(
     monkeypatch.setattr(
         _EXAMPLE,
         "run_auxiliary_panel",
-        lambda *a, **k: _EXAMPLE.AuxiliaryPanelResult(status="completed"),
+        lambda *a, **k: _EXAMPLE.AuxiliaryPanelResult(
+            status="completed", response_text=auxiliary_claim
+        ),
     )
     monkeypatch.setattr(
         _EXAMPLE,
@@ -126,6 +131,7 @@ def test_native_final_delivery_preserves_draft_and_actual_validation(
         == 0
     )
     output = capsys.readouterr().out
+    assert output.index(AUXILIARY_RESPONSE_NOTICE) < output.index(auxiliary_claim)
     final = output.rsplit("## **SUMMARY**", 1)[1]
     assert len(calls) == 1
     assert (tmp_path / "validate.py").read_text(encoding="utf-8") == validator
