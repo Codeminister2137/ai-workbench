@@ -55,8 +55,14 @@ and report remain unchanged. See `artifacts/cli-conflict-review-assessment-20261
 
 A new private controller now delays accepted metadata until delivery/exact-report
 gates pass and reserves existing support calls inside phase caps. Its 337 offline
-checks and complete scripted coding/review workflow pass. Support time inside
-phase deadlines remains a prerequisite before another integrated live pilot.
+checks and complete scripted coding/review workflow pass. A fresh offline successor
+also reserves time inside phase deadlines: 600 seconds for each unspent support
+role and 180 for validation/verification/delivery. Primary requests, loop and tools
+share the earlier cutoff. Its 354 checks, actual scripted coding/repair/review,
+real tests, both reports, independent audit and zero-network launch smoke pass.
+This closes that private timing prerequisite offline; it does not resolve model
+report fidelity or authorize a blind integrated retry. The successor disables live
+launch. See `artifacts/cli-support-time-reserve-20261020df/`.
 The standalone refusal-notice path also has actual offline recovery coverage.
 These corrections add no automatic review-to-code repair policy or production
 review default, and cannot resolve model report fidelity by themselves.
