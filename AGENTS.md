@@ -923,6 +923,14 @@ timestamps in the handoff/receipt before requesting sleep.
 
 ### Unattended work windows
 
+Owner update (2026-10-20): before implementation in a NEW unattended window,
+launch and verify the deadline sleep fallback using `-SleepAtUtc`. Follow
+`docs/unattended-sleep.md` for startup, owner-visible cancellation, safe timer
+replacement at closeout and interruption handling. This adds startup scheduling
+to the closeout rules below; do not leave duplicate active timers. An explicit
+no-sleep override still applies. A rolling timer remains a proposal pending the
+owner's decision. Never schedule an expired window retrospectively.
+
 An unattended duration authorizes a continuous work window across useful,
 already-authorized tasks. Completing or blocking the current slice triggers
 selection of the next task; it does not end the run. Continue until the deadline,

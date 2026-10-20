@@ -219,6 +219,13 @@ concrete actions with rough durations, validation, completion conditions and
 independent fallback work. Keep its candidate ledger current. No active unattended
 session means the saved plan is inactive; do not reuse an old time allowance.
 
+Before starting a new unattended window's implementation, also launch and verify
+the absolute deadline sleep fallback, unless explicitly overridden. Follow the
+[sleep timer procedure](unattended-sleep.md), including the startup receipt and
+owner-visible exact cancellation command. At normal closeout replace this timer
+with the ten-minute completion timer and verify cancellation of the old one;
+never leave duplicate active timers. A rolling timer is pending owner decision.
+
 Time checkpoints are required after every completed or blocked step, before a
 long operation, and at least every thirty minutes during ongoing work. Read the
 clock, record remaining time and closeout reserve, assess actual progress, and

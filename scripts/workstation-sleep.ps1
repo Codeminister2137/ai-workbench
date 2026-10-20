@@ -6,6 +6,7 @@ param(
     [switch]$Sleep,
     [ValidateRange(0, 600)]
     [int]$DelaySeconds = 0,
+    [datetimeoffset]$SleepAtUtc = [datetimeoffset]::MinValue,
     [string]$ReceiptPath = "",
     [string]$CancelPath = "",
     [datetimeoffset]$NotBeforeUtc = [datetimeoffset]::MinValue
@@ -25,7 +26,26 @@ function Assert-WorkWindowEnded {
     }
 }
 
-Assert-WorkWindowEnded
+$absoluteSchedule = $PSBoundParameters.ContainsKey('SleepAtUtc')
+if ($absoluteSchedule) {
+    if ($PSBoundParameters.ContainsKey('DelaySeconds')) {
+        throw 'Choose SleepAtUtc or DelaySeconds, not both.'
+    }
+    if ($SleepAtUtc -le [datetimeoffset]::UtcNow) {
+        throw 'SleepAtUtc must be a future timestamp; expired windows cannot be scheduled.'
+    }
+    if ($SleepAtUtc -lt $NotBeforeUtc) {
+        throw 'SleepAtUtc cannot precede NotBeforeUtc.'
+    }
+    if (-not $ReceiptPath -or -not $CancelPath) {
+        throw 'Absolute scheduling requires ReceiptPath and CancelPath.'
+    }
+} else {
+    Assert-WorkWindowEnded
+}
+$dueUtc = if ($absoluteSchedule) { $SleepAtUtc.ToUniversalTime() } else {
+    [datetimeoffset]::UtcNow.AddSeconds($DelaySeconds)
+}
 Add-Type -AssemblyName System.Windows.Forms
 if (-not $PSCmdlet.ShouldProcess("This Windows computer", "Request sleep without forcing applications or disabling wake events")) {
     return
@@ -39,7 +59,7 @@ $warsawTimeZone = [TimeZoneInfo]::FindSystemTimeZoneById("Central European Stand
 $sleepTransitionTimesUtc = [ordered]@{}
 $sleepTransitionTimesWarsaw = [ordered]@{}
 $plannedSleepWarsaw = [TimeZoneInfo]::ConvertTimeFromUtc(
-    [datetime]::UtcNow.AddSeconds($DelaySeconds), $warsawTimeZone
+    $dueUtc.UtcDateTime, $warsawTimeZone
 ).ToString("yyyy-MM-dd HH:mm:ss")
 
 function Write-SleepReceipt([string]$Status) {
@@ -56,6 +76,7 @@ function Write-SleepReceipt([string]$Status) {
             recorded_utc = $transitionUtc.ToString("o")
             time_zone = "Europe/Warsaw"
             planned_sleep_warsaw = $plannedSleepWarsaw
+            planned_sleep_utc = $dueUtc.ToString("o")
             not_before_utc = if ($NotBeforeUtc -eq [datetimeoffset]::MinValue) {
                 $null
             } else {
@@ -73,7 +94,7 @@ function Write-SleepReceipt([string]$Status) {
 
 Write-SleepReceipt "sleep_scheduled"
 Write-Output "sleep_planned_warsaw: $plannedSleepWarsaw (Europe/Warsaw; estimated)"
-for ($remainingSeconds = $DelaySeconds; $remainingSeconds -gt 0; $remainingSeconds--) {
+while ([datetimeoffset]::UtcNow -lt $dueUtc) {
     if ($CancelPath -and (Test-Path -LiteralPath $CancelPath)) {
         Write-SleepReceipt "sleep_cancelled"
         Write-Output "sleep_status: cancelled"

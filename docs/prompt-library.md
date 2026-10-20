@@ -258,6 +258,13 @@ Instructions:
 - Record execution start, duration and deadline in UTC and Europe/Warsaw before
   implementation. "Around two hours" means two hours from execution start.
   Never reuse an expired window or reset its deadline after compaction.
+- At startup, before implementation, launch and verify the deadline sleep
+  fallback using -SleepAtUtc as specified in docs/unattended-sleep.md, unless
+  explicitly overridden. Save timer ownership and show the owner the exact
+  cancellation command immediately. At closeout safely replace it with the
+  completion timer and verify cancellation of the startup timer; never leave
+  duplicate active timers. Do not schedule retrospectively. Rolling renewal
+  remains a proposal pending owner decision.
 - Before implementation, create docs/plans/unattended-work-plan.md from
   docs/unattended-work-plan-template.md and link it in CURRENT_CONTEXT.md.
   Read the immediate slice and wider approved goal/plan files. Order concrete

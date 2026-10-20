@@ -15,6 +15,10 @@ inference, external access, dependencies, infrastructure or expanded task scope.
 - Live/resource/privacy/approval limits and independently available offline work:
 - Closeout reserve and work-admission cutoff; increase reserve for expected cleanup:
 - Sleep: DEFAULT, ten minutes after finishing; record any explicit owner override:
+- Startup fallback: fixed deadline due time, fresh receipt/cancel paths, PID,
+  verified sleep_scheduled receipt and owner-visible exact cancellation command:
+  Follow docs/unattended-sleep.md before implementation. At closeout replace the
+  fallback with the completion timer and verify cancellation; no duplicate timers.
 - Next timed checkpoint: after each step/blocker, before long work, and no later
   than thirty minutes from the previous checkpoint during ongoing work.
 
