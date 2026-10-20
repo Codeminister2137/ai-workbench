@@ -79,6 +79,18 @@ automatic correction default or regrade the consumed trial. Evidence:
 `artifacts/cli-owner-followup-postflight-20261020dc/`. Any next follow-up must
 verify factual correction before treating it as preserved in a later turn.
 
+A fresh offline successor now supplies explicit, inspectable original/companion
+provenance and gates each exact report before admitting the next turn or recording
+it accepted. Its 58 guards, complete two-turn scripted CLI run, real eight-test
+execution, separate audit and zero-network admission smoke pass. The audit checks
+both report hashes, same-session continuity, frozen inputs and owned cleanup;
+364 historical preparation/evidence files remain unchanged. Decisions in this
+offline run are scripted, not measured semantic reviewer judgments. This closes
+the interrupted offline preparation, not real-model report fidelity or baseline
+acceptance. Live entry remains refused. See
+`artifacts/cli-provenance-contract-20261020dk/`. A separate formatting-contaminated
+preparation was stopped and preserved without a model run or historical repair.
+
 | Gate | Current evidence and remaining distance |
 | --- | --- |
 | Complete trustworthy small workflow | Immediate gap: fresh coherent task, model-authored coding/tests, actual execution, substantive frozen review, both faithful reports, independent checks and cleanup together. The revised criteria allow harmless recovered friction and supported corrections. A contained stop remains incomplete. |
