@@ -5,18 +5,21 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from ai_agent.contracts import ToolCall
 from ai_agent.skills import (
     discover_development_skills,
     load_development_skills,
     skill_prompt,
 )
 from ai_agent.tool_profiles import INSPECTION_PROFILE, shared_tool_registry
+from ai_agent.tools import ToolContext
 from ai_orchestrator import AccessMethod
 from ai_provider.external_agents import (
     ExternalAgentConfig,
     build_external_agent_command,
     run_external_agent,
 )
+from ai_provider.repo_context import build_repo_prompt, load_prompt_context
 
 
 def config(path: Path, method: AccessMethod) -> ExternalAgentConfig:
@@ -185,3 +188,77 @@ def test_skill_selection_refuses_when_git_executable_is_missing(tmp_path, monkey
             [tmp_path],
             available_tools=frozenset(INSPECTION_PROFILE.tool_names),
         )
+
+
+def test_portable_review_skill_inspects_actual_git_and_working_instructions(tmp_path):
+    workspace = tmp_path / "review workspace"
+    workspace.mkdir()
+
+    def git(*arguments):
+        return subprocess.run(
+            [
+                "git",
+                "-c",
+                "core.hooksPath=" + str(workspace / "no-hooks"),
+                "-c",
+                "commit.gpgsign=false",
+                "-c",
+                "user.name=Offline Fixture",
+                "-c",
+                "user.email=fixture@example.invalid",
+                *arguments,
+            ],
+            cwd=workspace,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=10,
+        ).stdout
+
+    git("init", "--template=")
+    source = workspace / "total.py"
+    source.write_text("def total(values):\n    return sum(values)\n", encoding="utf-8")
+    instructions = workspace / "AGENTS.md"
+    instructions.write_text("Original committed instructions.\n", encoding="utf-8")
+    git("add", "--", "total.py", "AGENTS.md")
+    git("commit", "-m", "Public synthetic baseline")
+    source.write_text("def total(values):\n    return len(values)\n", encoding="utf-8")
+    git("add", "--", "total.py")
+    source.write_text("def total(values):\n    return sum(values) + 1\n", encoding="utf-8")
+    instructions.write_text("Working instructions: inspect both Git snapshots.\n", encoding="utf-8")
+    index_before = git("write-tree")
+    original_bytes = {path: path.read_bytes() for path in (source, instructions)}
+    registry = shared_tool_registry("inspection", workspace)
+    available = frozenset(item.name for item in registry.list_definitions())
+    skill_directory = Path(__file__).resolve().parents[1] / "packages/ai_agent/skills"
+    selected = load_development_skills(
+        ["review-repo-change"],
+        [skill_directory],
+        available_tools=available,
+    )
+    context = load_prompt_context(workspace, [source], context_budget_chars=1)
+    prompt = (
+        build_repo_prompt("Inspect the current change.", context) + "\n" + skill_prompt(selected)
+    )
+    assert instructions.read_text(encoding="utf-8").strip() in prompt
+    assert "Original committed instructions." not in prompt
+    assert selected[0].instructions in prompt
+    assert any(item.required_instruction and item.path == instructions for item in context)
+    calls = [
+        ToolCall("git_status", {}),
+        ToolCall("git_diff", {"path": "total.py", "staged": True}),
+        ToolCall("git_diff", {"path": "total.py"}),
+        ToolCall("read_file", {"path": "total.py"}),
+        ToolCall("find_files", {"pattern": "*.py"}),
+        ToolCall("grep_search", {"query": "sum(values)", "path": "total.py"}),
+    ]
+    results = [registry.execute(call, ToolContext(workspace)) for call in calls]
+    assert all(not result.is_error for result in results), results
+    assert "MM total.py" in results[0].output
+    assert "+    return len(values)" in results[1].output
+    assert "+    return sum(values) + 1" in results[2].output
+    assert "len(values)" not in results[3].output
+    assert "sum(values) + 1" in results[3].output
+    assert "total.py" in results[4].output and results[5].metadata["matches"] == 1
+    assert git("write-tree") == index_before
+    assert all(path.read_bytes() == content for path, content in original_bytes.items())

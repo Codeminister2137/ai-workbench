@@ -27,6 +27,11 @@ or fixed number of remaining runs: the next checks can reveal implementation wor
   without loading IDE transports. Explicit Ruff/Pyright commands also pass valid
   code and reject seeded errors. This covers one C3 workflow with one installed
   interpreter; full C1-C6/M5 acceptance remains pending.
+- A standalone portable review case now loads the canonical skill and working
+  repository instructions, distinguishes staged/unstaged content through actual
+  shared Git/read/search tools, and verifies unchanged files/index without an IDE
+  endpoint. This is deterministic C1/C2 composition evidence; selected-route
+  model review quality remains a separate acceptance question.
 
 ## Remaining acceptance work
 

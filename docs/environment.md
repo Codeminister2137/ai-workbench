@@ -59,6 +59,28 @@ The wrapper script:
 This means you normally do not need to manually run separate `.env` loading
 commands.
 
+Owner clarification (2026-10-20): agents must not display or directly inspect
+`.env` contents. Running an authorized tool that loads credentials internally
+is permitted. Service authentication and connections belong in `ai_provider`;
+one-off task scripts should use that infrastructure rather than duplicate HTTP
+clients or credential parsers. Loading a key grants no inference, billing or
+private-data transmission authority beyond the requested operation.
+
+For a read-only OpenRouter quota observation through the provider package:
+
+```powershell
+python -m uv run --offline --no-sync --env-file .env python -m ai_provider.openrouter_usage
+```
+
+Add `--include-models` to list account-visible exact free variants with zero
+advertised prices and their declared tool support. This makes only metadata GETs,
+uses the existing redirect-rejecting provider transport, and prints selected
+quota/model fields without credentials, account labels or raw response bodies.
+Unknown or cached counters remain unknown. Model visibility is not evidence of
+successful inference or permission to weaken production privacy guards. The
+timeout bounds individual I/O; automated callers must also own a total process
+deadline and cleanup, as for the existing account probes.
+
 ## Manual `.env` Loading
 
 Python does not automatically read `.env` in this repository right now. The
@@ -106,6 +128,7 @@ Provider-specific API keys:
 ```text
 OPENAI_API_KEY=
 REQUESTY_API_KEY=
+OPENROUTER_API_KEY=
 GEMINI_API_KEY=
 GOOGLE_API_KEY=
 ```
