@@ -91,6 +91,19 @@ acceptance. Live entry remains refused. See
 `artifacts/cli-provenance-contract-20261020dk/`. A separate formatting-contaminated
 preparation was stopped and preserved without a model run or historical repair.
 
+The owner-approved local follow-up then tested those explicit provenance facts
+with the existing model/runtime/context. Ten model requests and nine tool calls
+produced actual reads, staged/unstaged diffs and eight passing tests. The report
+correctly identified companion additions in its Git description, but still
+called the `(1, 3)` expectation legacy and treated source-docstring `Iterable`
+wording as grounds for an unapproved API expansion. The external exact-report
+gate rejected it before turn two; no report was accepted and retention remains
+untested. This is successful containment of a material report-quality failure,
+not a completed diagnostic or baseline acceptance. Independent checks verified
+162 sealed dependencies, frozen inputs, 429 historical files and owned cleanup.
+See `artifacts/cli-provenance-postflight-20261020dm/`. Explicit provenance alone
+did not resolve this model's report-fidelity gap; the allowance is consumed.
+
 | Gate | Current evidence and remaining distance |
 | --- | --- |
 | Complete trustworthy small workflow | Immediate gap: fresh coherent task, model-authored coding/tests, actual execution, substantive frozen review, both faithful reports, independent checks and cleanup together. The revised criteria allow harmless recovered friction and supported corrections. A contained stop remains incomplete. |
