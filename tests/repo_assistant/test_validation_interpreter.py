@@ -17,7 +17,7 @@ def test_default_pytest_validation_uses_current_agent_interpreter(tmp_path, monk
         captured.update(kwargs)
         return SimpleNamespace(returncode=0, stdout="passed", stderr="")
 
-    monkeypatch.setattr(cli.subprocess, "run", run)
+    monkeypatch.setattr("ai_agent.validation.run_validation_process", run)
 
     results = cli._run_validation_commands(
         (cli.DEFAULT_VALIDATION_COMMAND,),
@@ -51,7 +51,7 @@ def test_explicit_validation_python_overrides_only_default_pytest(tmp_path, monk
         captured["arguments"] = arguments
         return SimpleNamespace(returncode=0, stdout="passed", stderr="")
 
-    monkeypatch.setattr(cli.subprocess, "run", run)
+    monkeypatch.setattr("ai_agent.validation.run_validation_process", run)
     selected_python = str(tmp_path / "selected python.exe")
     args = cli.build_argument_parser().parse_args(["--validation-python", selected_python])
 
@@ -75,7 +75,7 @@ def test_custom_validation_command_keeps_selected_executable(tmp_path, monkeypat
         captured["arguments"] = arguments
         return SimpleNamespace(returncode=0, stdout="", stderr="")
 
-    monkeypatch.setattr(cli.subprocess, "run", run)
+    monkeypatch.setattr("ai_agent.validation.run_validation_process", run)
     custom_python = str(tmp_path / "python.exe")
     command = f"{custom_python} -m pytest tests -q"
 
@@ -98,7 +98,7 @@ def test_validation_python_does_not_rewrite_explicit_commands(tmp_path, monkeypa
         captured["arguments"] = arguments
         return SimpleNamespace(returncode=0, stdout="", stderr="")
 
-    monkeypatch.setattr(cli.subprocess, "run", run)
+    monkeypatch.setattr("ai_agent.validation.run_validation_process", run)
     args = cli.build_argument_parser().parse_args(
         ["--validation-command", "python -m pytest -q", "--validation-python", "selected-python"]
     )

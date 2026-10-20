@@ -47,6 +47,13 @@ the repo-assistant process interpreter. This option does not rewrite explicit
 plan and the executable used is recorded in validation results. On Windows,
 quoted executable/argument paths are unquoted for direct process execution while
 backslashes are preserved.
+Validation owns a Windows job or POSIX process group and closes it after the
+validator exits, times out or is interrupted. Descendants cannot keep inherited
+output pipes open past the command timeout. Cleanup has a separate two-second
+bound. If cleanup cannot be verified, validation reports failure and admits no
+further validation commands. Interpreter selection and explicit commands retain
+the behavior described above; this does not add process-wide cancellation of the
+whole orchestrated workflow.
 Ruff and Pyright remain available through the repository's pre-commit hooks;
 pass a pre-commit command explicitly when an orchestrated run should include
 that broader gate. The final handoff stage

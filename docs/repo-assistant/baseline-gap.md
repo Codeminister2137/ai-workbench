@@ -16,6 +16,12 @@ or fixed number of remaining runs: the next checks can reveal implementation wor
   and tested. Ten scripted delivery controls include actual validation processes
   through both implement and continuous coding-chat with orchestration enabled.
   This is software-path evidence, not a measured real-reviewer detection rate.
+- Standalone validation now closes its owned command tree after completion,
+  timeout or interruption, with bounded cleanup and an explicit failure if cleanup
+  is unverified. This fixes a reproduced inherited-output-pipe timeout overrun.
+  Windows worker environments retain executable-extension discovery while still
+  filtering provider credentials. These are offline C3/C6 improvements, not full
+  IDE independence or model report-fidelity acceptance.
 
 ## Remaining acceptance work
 

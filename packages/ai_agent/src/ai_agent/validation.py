@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ai_agent.repo_assistant_args import DEFAULT_VALIDATION_COMMAND
+from ai_agent.validation_process import ValidationCleanupError, run_validation_process
 
 
 @dataclass(frozen=True, slots=True)
@@ -92,7 +93,7 @@ def run_validation_commands(
     if not valid_timeout:
         raise ValueError("Validation timeout must be a finite positive number")
     results: list[ValidationCommandResult] = []
-    execute = subprocess.run if runner is None else runner
+    execute = run_validation_process if runner is None else runner
     for index, command in enumerate(commands, start=1):
         progress_callback(f"validation_command: {command}")
         started = time.perf_counter()
@@ -112,6 +113,19 @@ def run_validation_commands(
                 timeout=timeout_seconds,
                 check=False,
             )
+        except ValidationCleanupError as exc:
+            results.append(
+                ValidationCommandResult(
+                    command=command,
+                    executable=executable,
+                    returncode=None,
+                    status="failed",
+                    elapsed_seconds=time.perf_counter() - started,
+                    failure_reason=str(exc),
+                )
+            )
+            progress_callback(f"validation_result: {index} status=failed cleanup=unverified")
+            break
         except subprocess.TimeoutExpired as exc:
             elapsed = time.perf_counter() - started
             stdout = _captured_text(exc.stdout)

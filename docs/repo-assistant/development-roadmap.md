@@ -839,6 +839,19 @@ unwrapped without losing backslashes. The default remains pytest only;
 Ruff/Pyright are available through explicit commands or pre-commit, without
 expanding default validation policy.
 
+Standalone validation also retains command-tree ownership through completion,
+timeout and interruption. A finite local reproduction showed a 0.5-second timeout
+waiting 4.13 seconds for a descendant's inherited output pipes. The runner now
+uses the existing Windows job support or a POSIX process group, closes owned
+descendants even after successful parent exit, and stops further validation when
+cleanup is unverified. Interpreter choice and validation receipt fields remain
+unchanged. This advances the C3/C6 offline contract; it does not establish full
+M5 or real-model report fidelity.
+The credential-filtered worker environment also retains Windows `PATHEXT`, which
+PowerShell needs to classify and resolve native executables. A real Python
+invocation verifies this without forwarding provider credentials or changing
+the caller's interpreter choice.
+
 ## Approved capability set
 
 | ID | Capability | Required outcome |
