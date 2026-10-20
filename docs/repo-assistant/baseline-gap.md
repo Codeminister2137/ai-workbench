@@ -19,22 +19,26 @@ or fixed number of remaining runs: the next checks can reveal implementation wor
 
 ## Remaining acceptance work
 
-The notice/receipt fixes were integrated into a fresh controller and verified with
-297 offline checks, a complete scripted workflow and a zero-network launch smoke.
-The subsequent bounded local trial ran actual tests and produced a coding draft,
-but failed independent correctness acceptance before frozen review. The model's
-initial implementation satisfied the independent oracle; its new companion test
-had a wrong adjacency expectation. Repair changed the implementation to match that
-test, making five visible tests pass while breaking the specification. Passing
-model-authored tests did not establish correctness.
+The trusted-regression controller passed 302 offline checks and complete scripted
+workflow/oracle/cleanup and zero-network launch checks before its bounded live
+trial. Its model-authored implementation, five protected originals and two
+companions pass independent seven-test validation and the 3,616-case oracle.
+However, the model returned a draft without executing its required test command.
+Host validation passed but does not supply model execution evidence. The trial
+stopped before frozen review; both faithful accepted reports remain missing.
+No conflicting expectation occurred, so this does not establish conflict recovery.
 
-Scrutiny separately omitted required heading colons, so final delivery correctly
-qualified the report as an unresolved draft. A diagnostic copy with those colons
-added still says pass: formatting tolerance alone would not fix the correctness
-failure. The independent acceptance oracle caught the regression; this is not proof
-of automatic semantic scrutiny. Both faithful accepted reports remain missing.
-Owned cleanup, protected originals and model-only effects were verified. The trial
-is consumed/failed; earlier trials and their verdicts remain unchanged.
+Scrutiny again used standalone bold section headings without colons. Final
+delivery qualified the draft and withheld an accepted outcome. The parser now
+recognizes those explicit Markdown headings, retains the original report text and
+still requires all six fields and valid verdict/score values. This compatibility
+fix is not semantic verification: the earlier incorrect implementation also
+received a pass review, and its independent oracle failure remains unchanged.
+The next fresh caller should use the existing optional completion-evidence hook
+to request missing model test execution before completion, within original limits;
+host validation remains separate. No new production review default is selected.
+Owned cleanup, protected originals and model-only effects were verified. These
+trials are consumed/failed; historical inputs and verdicts remain unchanged.
 
 | Gate | Current evidence and remaining distance |
 | --- | --- |
@@ -79,8 +83,8 @@ document, and no economics claim can be made from local token counts alone.
 Independent unattended supervision remains after baseline, as already prioritized.
 
 Local next-slice preparation: artifacts/cli-baseline-next-slice-20261019ci/.
-Latest consumed trial: artifacts/cli-notice-integrated-20261020cn/;
-independent postflight and bounded forensic diagnosis:
-artifacts/cli-notice-postflight-20261020co/. Prior cj/cl/cm evidence is preserved.
+Latest consumed trial: artifacts/cli-trusted-integrated-20261020cq/;
+independent postflight and prospective completion controls:
+artifacts/cli-trusted-postflight-20261020cr/. Prior cn/co/cj/cl/cm evidence is preserved.
 Owner-approved trusted-regression offline calibration:
 artifacts/cli-trusted-regression-calibration-20261020cp/.

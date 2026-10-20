@@ -91,10 +91,16 @@ _RESPONSE_SCRUTINY_HEADINGS = (
     "REVISED_RESPONSE",
 )
 _RESPONSE_SCRUTINY_VERDICTS = {"pass", "needs_revision", "fail"}
+_RESPONSE_SCRUTINY_HEADING_NAMES = (
+    r"VERDICT|SCORE|STRENGTHS|ISSUES|RECOMMENDED[ _]NEXT[ _]ACTION|REVISED[ _]RESPONSE"
+)
 _RESPONSE_SCRUTINY_HEADING_PATTERN = (
     r"(?mi)^[ \t]*(?:#{1,6}[ \t]+)?(?:\*\*)?"
-    r"(VERDICT|SCORE|STRENGTHS|ISSUES|RECOMMENDED[ _]NEXT[ _]ACTION|REVISED[ _]RESPONSE)"
+    rf"({_RESPONSE_SCRUTINY_HEADING_NAMES})"
     r"(?:\*\*)?:(?:\*\*)?[ \t]*(.*)$"
+)
+_RESPONSE_SCRUTINY_BOLD_HEADING_PATTERN = (
+    rf"(?mi)^([ \t]*(?:#{{1,6}}[ \t]+)?)\*\*({_RESPONSE_SCRUTINY_HEADING_NAMES})\*\*[ \t]*$"
 )
 _FENCED_JSON_PATTERN = re.compile(r"```(?:json)?\s*(\{.*?\})\s*```", re.DOTALL)
 
@@ -185,7 +191,9 @@ def parse_response_scrutiny_report(text: str) -> ResponseScrutinyReport:
 
 
 def _parse_response_scrutiny_heading_sections(text: str) -> dict[str, str] | None:
-    """Parse report sections from canonical heading lines."""
+    """Parse canonical or standalone bold headings without changing the raw report."""
+
+    text = re.sub(_RESPONSE_SCRUTINY_BOLD_HEADING_PATTERN, r"\1**\2:**", text)
 
     matches = list(
         re.finditer(

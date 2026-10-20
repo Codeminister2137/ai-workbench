@@ -21,7 +21,9 @@ from ai_provider.orchestrated_runs import SQLiteOrchestratedRunStore
 from .support import _EXAMPLE, main
 
 
-@pytest.mark.parametrize("review", ["needs_revision", "fail", "pass", "invalid", "unavailable"])
+@pytest.mark.parametrize(
+    "review", ["needs_revision", "bold_needs_revision", "fail", "pass", "invalid", "unavailable"]
+)
 @pytest.mark.parametrize("mode", ["implement", "coding-chat"])
 def test_native_final_delivery_preserves_draft_and_actual_validation(
     review: str, mode: str, capsys, monkeypatch, tmp_path: Path
@@ -69,10 +71,17 @@ def test_native_final_delivery_preserves_draft_and_actual_validation(
         text = (
             "VERDICT: pass\nSCORE: 8"
             if review == "invalid"
-            else f"VERDICT: {review}\nSCORE: 4\nSTRENGTHS: helper checks pass\n"
+            else f"VERDICT: {'needs_revision' if review == 'bold_needs_revision' else review}\n"
+            "SCORE: 4\nSTRENGTHS: helper checks pass\n"
             f"ISSUES: {issue}\nRECOMMENDED_NEXT_ACTION: Retract the unsupported claim.\n"
             f"REVISED_RESPONSE: {revision}"
         )
+        if review == "bold_needs_revision":
+            text = (
+                text.replace("STRENGTHS: ", "**STRENGTHS**\n")
+                .replace("ISSUES: ", "**ISSUES**\n")
+                .replace("REVISED_RESPONSE: ", "**REVISED_RESPONSE**\n")
+            )
         return replace(
             prepared,
             response=replace(native.response, message=AIMessage(MessageRole.ASSISTANT, text)),
@@ -155,7 +164,7 @@ def test_native_final_delivery_preserves_draft_and_actual_validation(
         assert f"### Agent report — draft with unresolved scrutiny\n{draft}" in final
         assert final.count(draft) == 1
         assert "Agent-reported outcome:" not in final
-        if review in {"needs_revision", "fail"}:
+        if review in {"needs_revision", "bold_needs_revision", "fail"}:
             assert issue in final and revision in final
             assert "Reviewer-proposed revision (not applied or independently verified)" in final
             scrutiny_details = stages["scrutiny"].details

@@ -36,6 +36,43 @@ def test_scrutiny_rejects_invalid_score_scales(score):
         parse_response_scrutiny_report(text)
 
 
+@pytest.mark.parametrize("prefix", ["", "### "])
+def test_scrutiny_accepts_standalone_bold_sections_preserving_raw_text(prefix):
+    text = (
+        "**VERDICT:** needs_revision\n**SCORE:** 4/10\n"
+        f"{prefix}**STRENGTHS**  \nVisible tests pass.\n"
+        f"{prefix}**ISSUES**\nNo model test execution was observed.\n"
+        "**RECOMMENDED_NEXT_ACTION:** Run the required command.\n"
+        f"{prefix}**REVISED_RESPONSE**\nNone"
+    )
+    result = parse_response_scrutiny_report(text)
+    assert result.verdict == "needs_revision" and result.score == 4
+    assert result.strengths == "Visible tests pass."
+    assert result.issues == "No model test execution was observed."
+    assert result.revised_response == "None"
+    assert result.raw_text == text
+
+
+@pytest.mark.parametrize("heading", ["STRENGTHS", "Review **STRENGTHS**", "**STRENGTHS** inline"])
+def test_colonless_prose_is_not_a_scrutiny_section(heading):
+    text = (
+        f"VERDICT: pass\nSCORE: 8\n{heading}\nVisible tests pass.\n"
+        "ISSUES: None\nRECOMMENDED_NEXT_ACTION: None\nREVISED_RESPONSE: None"
+    )
+    with pytest.raises(ValueError, match="missing scrutiny heading.*STRENGTHS"):
+        parse_response_scrutiny_report(text)
+
+
+def test_mixed_bold_and_canonical_duplicate_sections_remain_invalid():
+    text = (
+        "VERDICT: pass\nSCORE: 8\nSTRENGTHS: Tests pass.\n"
+        "**STRENGTHS**\nDuplicate.\nISSUES: None\n"
+        "RECOMMENDED_NEXT_ACTION: None\nREVISED_RESPONSE: None"
+    )
+    with pytest.raises(ValueError, match="duplicate scrutiny heading: STRENGTHS"):
+        parse_response_scrutiny_report(text)
+
+
 @pytest.mark.parametrize("orchestrated", [False, True])
 def test_cli_can_scrutinize_completed_response(
     capsys, monkeypatch, tmp_path: Path, orchestrated: bool
