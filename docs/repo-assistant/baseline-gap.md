@@ -43,6 +43,24 @@ semantic verification and was not exercised live in the latest trial because no
 scrutiny request was admitted. Owned cleanup, protected originals and model-only
 effects were verified. Historical inputs, evidence and verdicts remain unchanged.
 
+A later standalone frozen review inspected both files, their diffs and Git status,
+then ran all eight tests. It noticed the invalid `(1, 3)` rejection, but its final
+report incorrectly called the new companion a legacy trusted regression and
+claimed no changes since a commit despite the observed diffs and untracked session
+database. This is partial defect detection with a material report-fidelity failure,
+not a trustworthy review. The declared standalone diagnostic omitted orchestrated
+scrutiny and correction, so it does not establish their outcome or complete the
+integrated workflow. Frozen inputs and owned cleanup passed; the original trial
+and report remain unchanged. See `artifacts/cli-conflict-review-assessment-20261020da/`.
+
+A new private controller now delays accepted metadata until delivery/exact-report
+gates pass and reserves existing support calls inside phase caps. Its 337 offline
+checks and complete scripted coding/review workflow pass. Support time inside
+phase deadlines remains a prerequisite before another integrated live pilot.
+The standalone refusal-notice path also has actual offline recovery coverage.
+These corrections add no automatic review-to-code repair policy or production
+review default, and cannot resolve model report fidelity by themselves.
+
 | Gate | Current evidence and remaining distance |
 | --- | --- |
 | Complete trustworthy small workflow | Immediate gap: fresh coherent task, model-authored coding/tests, actual execution, substantive frozen review, both faithful reports, independent checks and cleanup together. The revised criteria allow harmless recovered friction and supported corrections. A contained stop remains incomplete. |

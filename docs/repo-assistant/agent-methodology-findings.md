@@ -7,6 +7,39 @@ exact hosted route before implementation. Historical failures remain evidence.
 
 ## Findings to retain
 
+### Standalone conflict review and report fidelity — 2026-10-20
+
+Fresh read-only `cz` used the same local model/runtime/context and full ordinary
+tool/instruction/history delivery on the unchanged bad `cs` source and tests.
+Seven model requests and six successful tools covered both file reads, status,
+separate diffs for both files and an actual eight-test run. No source/test edits,
+premature completion or live command refusal occurred. The missing-notice refusal
+fix was exercised offline, not causally demonstrated by this successful live path.
+
+The review identified that rejecting valid `(1, 3)` violates the contract. Its
+final report nevertheless attributed the wrong newly added test to legacy trusted
+regressions and described no changes since a commit despite nonempty diffs and
+an untracked session database. It mixed useful detection with material false
+provenance and Git claims. The claimed iterable type appears in the source
+docstring; that observation is not evidence of an owner-approved API expansion.
+Do not count structural report acceptance or passing tests as semantic acceptance.
+
+Independent assessment binds the verbatim report to session storage and final
+delivery, verifies 156 sealed dependencies, five frozen inputs/original index,
+53 historical preparation files and exact prior-model source/tests. Eight workflow
+children, controller/runtime/listeners and two independent postflight children
+were verified clean. The existing 3,616-case oracle still passes the known bad
+input because its endpoints range only from -2 through 2. Observed usage is
+117,567 input plus 3,403 output tokens; 120,970 is derived, with underlying reported
+total/cost unknown. Evidence: `artifacts/cli-conflict-review-assessment-20261020da/`.
+
+The preceding `cv` standalone attempt stopped after four requests when its copied
+wrapper omitted a budget notice on a refused command. No model tests or report
+completed. Preserve that consumed failure; a new tree integrated the already-tested
+early-return notice path and verified refusal → completion feedback → corrected
+test → report offline before the later live diagnostic. Baseline remains incomplete;
+standalone review neither repairs nor regrades the integrated coding trial.
+
 ### Completion evidence and a finite-oracle miss — 2026-10-20
 
 `cq` respected five protected supplied tests and added two companions; independent
