@@ -1331,6 +1331,15 @@ using the time-zone database; OpenRouter's current UTC-day allowance resets at
 23:00 UTC (01:00 Warsaw on that date). Other providers' resets must be verified
 separately; do not assume a shared reset or independent per-model allowances.
 
+Owner clarification (2026-10-20): automatic awareness of available allowances and
+approaching resets belongs in `ai_orchestrator`, after the CLI baseline. Reuse
+provider-owned quota observations; keep provider authentication and HTTP access
+in `ai_provider`. Future orchestration should surface useful authorized work
+before an allowance expires, preserve planned reserves, and distinguish metadata
+checks from requests that generate model output. This is a backlog priority, not
+authorization to implement a scheduler, recurring checks or automatic spending
+during the baseline work. Existing source, privacy and billing gates still apply.
+
 Before admission, refresh remaining quota, preserve a reserve for planned
 acceptance, and check price, entitlement, capability and data-policy readiness.
 Allow at most one completion attempt per selected route per authorized run, with
