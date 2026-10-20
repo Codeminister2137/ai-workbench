@@ -51,11 +51,16 @@ continuity. Preserve the accepted privacy/approval/security bar in every gate.
 ## Shortest responsible sequence
 
 1. Resolve the demonstrated specification-versus-companion-test repair gap before
-   another full integrated pilot. Decide whether trusted specification checks
-   should participate in the existing validation/repair loop while separate
-   acceptance checks remain independent. That is a proposed next slice, not an
-   adopted workflow change. Preserve final task coherence, root snapshots, actual
-   orchestration and all finite review/cleanup reserves in fresh preparation.
+   another full integrated pilot. The owner selected trusted specification
+   regressions in the next fresh fixture's protected original tests, using the
+   existing validation/repair path while the independent oracle remains separate.
+   Preserve the prior three originals and add overlap-then-adjacency and
+   duplicate-then-adjacency cases. Prepare a narrow offline conflict calibration
+   first. This changes future fixture evidence, not a production review default;
+   success would support supplied-test development, not unaided test design.
+   Preserve final task coherence, root snapshots, actual orchestration and all
+   finite review/cleanup reserves in fresh preparation. Historical trials stay
+   consumed with their original inputs and verdicts.
 2. Resolve the first evidenced gap, then complete a small realistic multi-turn
    development case against the existing required continuity/tool outcomes.
 3. Finish selected-route approval/tool checks and IDE-host-independent C1-C6
