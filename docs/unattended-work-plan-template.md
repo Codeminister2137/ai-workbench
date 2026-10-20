@@ -19,6 +19,10 @@ inference, external access, dependencies, infrastructure or expanded task scope.
   verified sleep_scheduled receipt and owner-visible exact cancellation command:
   Follow docs/unattended-sleep.md before implementation. At closeout replace the
   fallback with the completion timer and verify cancellation; no duplicate timers.
+- Rolling renewal: use -Rolling; next refresh no more than ten minutes away;
+  protect remaining hard task bounds + cleanup + working headroom before long
+  work, verify acknowledged due time, never extend deadline. Owner command:
+  `.\cancel-sleep.cmd` cancels all repository timers; no silent rearm afterwards.
 - Next timed checkpoint: after each step/blocker, before long work, and no later
   than thirty minutes from the previous checkpoint during ongoing work.
 

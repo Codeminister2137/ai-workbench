@@ -928,8 +928,13 @@ launch and verify the deadline sleep fallback using `-SleepAtUtc`. Follow
 `docs/unattended-sleep.md` for startup, owner-visible cancellation, safe timer
 replacement at closeout and interruption handling. This adds startup scheduling
 to the closeout rules below; do not leave duplicate active timers. An explicit
-no-sleep override still applies. A rolling timer remains a proposal pending the
-owner's decision. Never schedule an expired window retrospectively.
+no-sleep override still applies. Owner approved rolling renewal: use `-Rolling`,
+renew about every ten minutes and before long work, protect remaining hard task
+bounds plus cleanup/headroom without extending the deadline, and verify the
+updated receipt before admission. Show the fixed owner cancellation command
+`.\cancel-sleep.cmd` at startup and closeout. It cancels all repository helper
+timers; do not rearm after owner cancellation without direction. Never schedule
+an expired window retrospectively.
 
 An unattended duration authorizes a continuous work window across useful,
 already-authorized tasks. Completing or blocking the current slice triggers
@@ -1098,16 +1103,18 @@ Read the fresh receipt and verify `sleep_scheduled` with the intended time and
 cancellation path before treating scheduling as complete. If launching fails,
 investigate immediately and correct it within the closeout reserve; do not
 silently omit sleep. Actual platform approval requirements still apply.
-Report the scheduled local time and exact cancellation marker path/command in
-the visible closeout and handoff, so the owner can intervene while still nearby.
+Report the scheduled local time and fixed `.\cancel-sleep.cmd` command in the
+visible startup/closeout and handoff, so the owner can intervene. Retain individual
+marker paths in the handoff for internal timer replacement, not as the owner's
+required cancellation command.
 Never remove a time guard without the corresponding owner authorization.
 Report whether sleep was scheduled, requested, rejected or subsequently verified;
 a failed request
 must be reported, not silently treated as success.
 
 New owner instructions or an explicit switch back to an attended session cancel
-pending unattended sleep that has not been requested: create the recorded
-cancellation marker and verify the helper's `sleep_cancelled` receipt before
+pending unattended sleep that has not been requested: run `.\cancel-sleep.cmd`
+and verify the helpers' `sleep_cancelled` receipts before
 resuming work. Merely stating cancellation does not stop a scheduled helper.
 Do not issue a delayed sleep action to compensate for an earlier omission while
 the owner is using the computer.

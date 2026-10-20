@@ -263,8 +263,12 @@ Instructions:
   explicitly overridden. Save timer ownership and show the owner the exact
   cancellation command immediately. At closeout safely replace it with the
   completion timer and verify cancellation of the startup timer; never leave
-  duplicate active timers. Do not schedule retrospectively. Rolling renewal
-  remains a proposal pending owner decision.
+  duplicate active timers. Do not schedule retrospectively. Use owner-approved
+  -Rolling renewal about every ten minutes and before long work. Cover remaining
+  hard task bounds, cleanup and working headroom without extending the deadline;
+  verify receipt acknowledgement before admission. Show .\cancel-sleep.cmd as
+  the fixed command cancelling all repository timers. Do not rearm after owner
+  cancellation without direction.
 - Before implementation, create docs/plans/unattended-work-plan.md from
   docs/unattended-work-plan-template.md and link it in CURRENT_CONTEXT.md.
   Read the immediate slice and wider approved goal/plan files. Order concrete
@@ -352,8 +356,8 @@ Instructions:
   Report scheduled/requested/rejected/verified accurately.
   An explicit switch to attended
   mode or new owner instructions cancel unattended sleep not yet requested:
-  create its cancellation marker and verify sleep_cancelled before resuming.
-  Report the scheduled local time and exact cancellation command in the final
+  run .\cancel-sleep.cmd and verify sleep_cancelled before resuming.
+  Report the scheduled local time and fixed .\cancel-sleep.cmd command in the final
   response and handoff. Do not sleep retrospectively.
 
 Output:

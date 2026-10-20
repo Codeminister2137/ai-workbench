@@ -224,7 +224,11 @@ the absolute deadline sleep fallback, unless explicitly overridden. Follow the
 [sleep timer procedure](unattended-sleep.md), including the startup receipt and
 owner-visible exact cancellation command. At normal closeout replace this timer
 with the ten-minute completion timer and verify cancellation of the old one;
-never leave duplicate active timers. A rolling timer is pending owner decision.
+never leave duplicate active timers. Rolling renewal is owner-approved: use
+`-Rolling`, refresh about every ten minutes and before long work, verify the due
+time and preserve the hard deadline. Show `.\cancel-sleep.cmd` as the fixed owner
+command cancelling all repository sleep timers. Follow the procedure's bounded
+work/headroom and cancellation rules; never rearm after cancellation silently.
 
 Time checkpoints are required after every completed or blocked step, before a
 long operation, and at least every thirty minutes during ongoing work. Read the
@@ -302,9 +306,9 @@ not also omit sleep. Use the sleep helper's -Sleep -DelaySeconds 600 with fresh
 receipt/cancellation paths, launched hidden without blocking the conversation.
 Verify its sleep_scheduled receipt. Use the original-deadline guard only when
 the owner explicitly restricts sleep to that deadline or later. Report the actual power-action outcome.
-Report the scheduled local time and exact cancellation command. New owner
-instructions or an explicit switch to attended mode require creating the recorded
-cancellation marker and verifying sleep_cancelled before resuming work.
+Report the scheduled local time and fixed `.\cancel-sleep.cmd` command at startup
+and closeout. New owner instructions or an explicit switch to attended mode
+require running that command and verifying sleep_cancelled before resuming work.
 
 ### Persistent improvement goal: reliable unattended execution
 
