@@ -100,6 +100,11 @@ The goal is that the user can say "DoD closeout" instead of separately asking
 for commits, context handoff, prompt-library review, ADR review, and final
 validation every time.
 
+For useful work with allowances approaching reset, say **"End of day"** or
+`Use Codex: End of Day`. This runs the prompt below; it does not mean stopping,
+switching to unattended mode, or scheduling sleep. Add an explicit unattended
+deadline separately when wanted.
+
 For architecture-heavy work:
 
 - `Codex: ADR Gap Check` checks for missing or stale ADR coverage.
@@ -117,6 +122,7 @@ For scope control:
 - `Codex: Closeout Helper Set`
 - `Codex: Session Boundary Check`
 - `Codex: Unattended Work Window`
+- `Codex: End of Day`
 - `Codex: MVP/Stop Review`
 - `Codex: Job Search Task`
 - `Codex: AI Council Task`
@@ -369,6 +375,65 @@ candidates and concrete blockers. Include concise material decision briefs:
 viable options, each option's pros and cons, recommendation and owner question;
 distinguish accepted decisions from pending proposals. Do not claim the whole
 roadmap complete after one slice or leave the summary only in a handoff file.
+```
+
+## `Codex: End of Day`
+
+Short invocation: **End of day**.
+
+```text
+Task:
+Continue useful approved work and use eligible expiring allowances where that
+helps, then leave an accurate checkpoint. Preserve the current session mode.
+
+Context:
+$SELECTION
+
+Instructions:
+- Read CURRENT_CONTEXT.md, Git status and current applicable instructions. Use
+  Codex: Session Boundary Check cheaply; preserve active debugging context when
+  continuing is better. Baseline CLI remains first until complete.
+- Invoking this prompt authorizes a fresh bounded batch on already-approved
+  allowance/free routes within existing privacy, quality and billing limits.
+  It never authorizes buying credits, metered/prepaid fallback, new providers,
+  model/runtime changes, installations, or wider external data transmission.
+- Use ai_provider's existing credential-loading and safe account observations;
+  do not inspect .env. Verify quota, freshness, reset UTC/local time, current
+  zero-price/allowance admission and suitable capabilities. Unknown means defer.
+  Do not confuse an account reset with restored model capacity or access.
+- Default batch bound: at most 30 minutes and 10 execution attempts in total,
+  including correction/review calls, with a fresh name and saved bounds. Declare
+  the measurable unit: provider completion requests or native CLI launches.
+  Native internal model calls remain separate and unknown unless observed;
+  never describe a launch cap as a verified internal request cap.
+  Stop sooner at the verified reset, an existing work cutoff, or exhausted quota;
+  preserve a reserve for planned higher-priority work. Smaller task-specific
+  bounds govern. Allocate cleanup headroom and admit only tasks that fit.
+  Do not renew this batch or spend post-reset allowance under this invocation.
+- Prefer useful implementation, focused advisory review or already-needed
+  research suited to the route. Do not generate busywork to empty a counter.
+  Advisory output is unverified advice until checked; it is not edit/test/review
+  acceptance evidence. Do not lower the baseline's quality floor to use quota.
+- Prepare and test deterministic guards before generation. Keep each task's
+  original tests, genuine execution, report/review requirements, frozen inputs
+  and independent validation. Never replay or regrade a consumed trial.
+- On unexpected failure, preserve actual effects and investigate before any
+  further affected call. Do not silently retry, broaden permissions, switch
+  billing sources or bypass privacy/price/clean-checkout/snapshot guards.
+- No recurring scheduler, wake task, automatic sleep or unattended switch is
+  implied. If an unattended deadline is explicitly supplied, compose with Codex:
+  Unattended Work Window and its timer/closeout requirements; otherwise remain
+  attended. Previously cancelled timers stay cancelled.
+- Save safe usage/cost coverage, outcome, evidence paths and owned cleanup.
+  Update CURRENT_CONTEXT.md with unfinished work and an imperative next action.
+  Use relevant DoD Closeout helpers when actually stopping; do not claim a
+  completed baseline merely because this batch ended.
+
+Output:
+Start with ## **SUMMARY**. State useful work completed, validation, actual
+attempts and observed allowance/usage (unknown where missing), remaining work,
+session mode and any material decision. Link concrete evidence. If no eligible
+useful task fits, explain why and continue independent authorized baseline work.
 ```
 
 ## `Codex: Session Boundary Check`

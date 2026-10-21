@@ -396,6 +396,14 @@ git status
 Check for unrelated edits, secrets, generated files, accidental config changes, and incomplete migrations. Never reset/delete user work without approval.
 
 ## 9. Session boundaries
+For late-day continuation with expiring approved allowances, use **"End of day"**
+([Codex: End of Day](prompt-library.md#codex-end-of-day)). It defines a fresh
+finite batch, verifies current allowance/price/privacy readiness and prioritizes
+useful baseline work. It preserves attended mode unless an unattended deadline
+is explicitly supplied; it schedules no wake or sleep action by itself. Ordinary
+DoD Closeout remains the stopping workflow. The repository prompt is canonical;
+using its short name here does not require changing PyCharm's separate library.
+
 Use `Codex: Session Boundary Check` between work sessions, after a commit, before
 switching to a distinct task, or after compaction/context errors.
 

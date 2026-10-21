@@ -1330,6 +1330,67 @@ Test chat interruption, first failure, uncertain cleanup and deadline closeout w
 local deterministic fixtures before an explicitly granted live window. Planning is
 approved; broader rollout and material implementation choices remain to be reviewed.
 
+### Owner-requested direction: allowance-aware sleep, wake and continuation
+
+Owner clarification (2026-10-21, attended): the eventual goal is a local work
+supervisor that schedules useful authorized work across suitable paid-agent
+allowances, can sleep between work windows, and wakes to continue when resources
+are available again. Record this direction now; prioritize the established CLI
+baseline and reuse its conversation/fallback infrastructure rather than building
+a separate PyCharm-chat recovery system. This is a planning requirement, not
+approval to register wake tasks, start a daemon, change power settings, select a
+local supervisor model, or spend newly refreshed allowances automatically.
+
+The smallest useful progression is:
+
+1. Finish the baseline's demonstrated command/prompt blockers and verify ordinary
+   conversation, saved continuation and selected fallback. Preserve meaningful
+   validation/review; do not expand baseline acceptance into a general scheduler.
+2. Reuse the existing provider-neutral transcript store (ADR-030), conditional
+   observable fallback history (ADR-059), ownership receipts and bounded runners.
+   Establish what each external client actually retains before promising complete
+   history. Saved conversation still needs current repository state, approvals,
+   partial effects and test evidence; never invent missing context or persist
+   provider-private reasoning. Summarization must disclose omitted context.
+3. Add the smallest independently running, finite closeout coordinator after
+   baseline: deterministic owned cleanup and evidence capture, readable handoff,
+   explicit incomplete/unknown outcomes. An optional model may summarize or
+   propose next work; process ownership, spending and power decisions retain
+   deterministic enforcement. A local generative model is not a prerequisite.
+4. Extend coordination to explicitly authorized future work windows. Distinguish
+   using expiring allowance BEFORE reset from resuming on replenished allowance
+   AFTER reset. A provider reset is neither proof of restored model capacity nor
+   authority to start work. Refresh provider-owned observations, check freshness,
+   entitlement, quality, privacy and budget, then admit only useful planned tasks
+   whose complete bounds plus cleanup fit the approved window. Defer unknowns;
+   no generation-only availability polling or unbounded retry loops.
+5. Add an opt-in Windows wake/sleep adapter around that policy. Windows Task
+   Scheduler supports `WakeToRun` from sleep/hibernation; verify this machine's
+   sleep state, wake-timer/power policy and task execution identity before claiming
+   support. Do not assume shutdown wake, unlocked desktop, network readiness or
+   native-client authentication. Waking Windows does not resume a cut-off PyCharm
+   agent; a separate authorized CLI worker must load the saved task/context.
+
+Keep neutral admission/resource policy in `ai_orchestrator`, source-specific
+authentication/quota access in `ai_provider`, and Windows power/process execution
+in the application/OS adapter. Reuse ADR-039's supported scheduling contracts and
+existing application-owned persistence where applicable; its current foreground,
+research-first scope does not authorize arbitrary background coding jobs. New
+task types, recovery behavior, persisted contracts and autonomous power/spending
+authority require explicit design and owner approval before implementation.
+
+Acceptance should cover chat/controller interruption, retained running tasks,
+stale/reused process identities, concurrent writers, missed wakes, stale or wrong
+reset metadata, capacity still unavailable after reset, expired grants, owner
+return/cancellation and bounded cleanup failure. Never resume a consumed trial
+or convert missing tests/reports into success. Before rollout, decide one simple
+owner command that cancels both pending work and power actions; today's
+`cancel-sleep.cmd` cancels repository sleep timers only.
+
+Windows references: [WakeToRun](https://learn.microsoft.com/en-us/windows/win32/taskschd/tasksettings-waketorun)
+and [system wake-up events](https://learn.microsoft.com/en-us/windows/win32/power/system-wake-up-events).
+These establish OS mechanisms, not verified workstation readiness.
+
 ## Resource and scheduling constraints
 
 Owner authorization (2026-10-16, attended): for the current near-end-of-day
