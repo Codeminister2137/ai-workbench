@@ -551,6 +551,14 @@ Always start with cheap state:
 
 Then read targeted authoritative docs for the task:
 
+For provider access, pricing, allowances, model capabilities or data handling,
+first consult `packages/ai_provider/docs/source-state.md` and its linked sources.
+Assess each finding's checked date, account/route scope and unresolved conflicts;
+refresh volatile or consequential facts from official sources when needed. Append
+verified dated findings there rather than leaving reusable knowledge only in chat
+or run artifacts. Live account observations remain private runtime evidence, not
+durable public pricing facts. This reference never replaces live admission guards.
+
 * relevant sections of `AGENTS.md` and nested `AGENTS.md` files, if any;
 * relevant sections of `docs/architecture.md`, `docs/decisions.md`,
   `docs/workflow.md`, `docs/project-map.md`, and `docs/definition-of-done.md`;

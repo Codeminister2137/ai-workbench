@@ -3,11 +3,56 @@
 **Checked:** 2026-10-13; Gemini individual-access retirement verified 2026-10-14.
 Published limits and account observations can expire.
 
+**Latest scoped update:** 2026-10-21, OpenRouter limits/privacy and Codex data-policy
+scope. This does not refresh every historical offer in the table below.
+
 This is the shared reference for provider access findings, integration gaps and
 evaluation limits. It is documentation, not a live quota registry or executable
 routing configuration. The [model catalog](../../ai_orchestrator/examples/model_catalog.toml)
 contains declared route capabilities; native readers report supported account
 observations. Neither establishes coding quality by itself.
+
+## Reading and refreshing provider knowledge
+
+This file is the repository agent's first provider-knowledge entry point. Keep
+reusable facts with their official source, checked date, provider/account/route
+scope, evidence type and unresolved limitations. Distinguish published policy,
+implementation behavior, live observation and inference. Refresh affected entries
+when official information changes; preserve superseded findings as historical.
+A date alone does not make a fact currently reliable: prices, model availability,
+quota and entitlement need fresh admission evidence before execution. Unknown or
+contradictory evidence remains explicit. Account balances, credentials, prompts
+and private transcripts do not belong in this public reference.
+
+### OpenRouter — checked 2026-10-21
+
+- Published limits: the [limits reference](https://openrouter.ai/docs/api_reference/limits)
+  defines free-model usage per UTC day and exposes the daily counter through
+  `GET /api/v1/key`. Read the actual account counter; a published ceiling is not
+  remaining quota, model capacity or execution authority.
+- Published privacy: [provider logging](https://openrouter.ai/docs/guides/privacy/provider-logging)
+  describes downstream policies and separate paid/free training controls. Training
+  permission, prompt retention and zero-data-retention routing are distinct claims.
+- Unresolved documentation conflict: [pricing](https://openrouter.ai/pricing)
+  excludes Free-plan data-policy routing in its feature table, while its privacy
+  FAQ says ZDR routing is available on every plan. Provider-logging guidance also
+  describes per-request policy filtering. These statements do not establish which
+  exact request filters are enforced for this Free account; do not assume parity.
+- Current implementation: `adapters/openrouter.py` refuses Free-plan accounts
+  with unverified privacy-filter entitlement before admitting model inference.
+  A free daily counter does not override that guard. Any public/synthetic-only
+  exception is a separate owner-controlled privacy-policy decision, not approved
+  merely by an end-of-day allowance grant.
+
+### Codex and cross-provider privacy — checked 2026-10-21
+
+[Codex authentication documentation](https://learn.chatgpt.com/docs/auth) distinguishes
+ChatGPT workspace policies from API-organization retention/data-sharing settings.
+Do not infer an individual's effective controls from a product name or subscription
+alone. This repository has not inspected the owner's account data controls.
+Using an external model means selected input is sent outside the workstation;
+it does not establish public disclosure, training permission or equivalent handling
+by every other processor. Evaluate the task data and each additional recipient.
 
 ## Sources and readiness
 

@@ -33,6 +33,31 @@ an update after each sub-step. Keep investigation and implementation internal
 unless the user asks for an interim report; communicate only at material phase
 changes, long-running waits, blockers, or the final verified closeout.
 
+## Reusable workflows and automation candidates
+
+Reviewed 2026-10-21: retain the useful checks rather than requiring the owner to
+manually chain prompts. Under ordinary authorized implementation, investigation,
+relevant validation, diff review, documentation and context updates already apply.
+The package-specific task templates are optional reminders, not additional gates.
+
+- **Closeout + context capture:** reuse as one evidence-based stopping workflow;
+  save completed/failed checks, partial effects, decisions and next action. A future
+  supervisor can reuse this contract after baseline; a prompt alone cannot survive
+  interruption or prove process cleanup.
+- **Session Boundary Check:** use the existing cheap script and current task state;
+  recommend a new chat at a useful checkpoint, without guessing IDE context usage.
+- **MVP/Stop Review:** trigger when scope grows or repeated attempts stop producing
+  new evidence; defer extra infrastructure and return to the smallest useful task.
+- **Decision Brief / ADR Gap Check:** preserve pending material choices and approved
+  rationale. Raise only relevant boundaries; do not create ADRs for routine details.
+- **Weekly Review:** optional periodic prioritization across projects, using actual
+  outcomes. This is a planning aid, not an automatically scheduled job.
+
+For provider research, consult `packages/ai_provider/docs/source-state.md` first,
+assess per-finding freshness and refresh official sources where necessary. Record
+reusable findings there; current account/runtime observations remain separate.
+No recurring automation, new persistence or IDE settings are introduced here.
+
 ## PyCharm Sync
 
 The PyCharm Prompt Library is separate IDE state. To use the same prompts there:
