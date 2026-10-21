@@ -1309,6 +1309,14 @@ when available; this public roadmap is sufficient to resume the approved work.
 
 ## Next priority after baseline CLI: independent unattended supervision
 
+Reuse the Prompt Library's [workflow and automation assessment](../prompt-library.md#reusable-workflows-and-automation-candidates):
+closeout/context capture, cheap session-boundary checks, scope/stall review and
+pending-decision tracking are inputs to this work, not separate prompt-engine
+projects. Most routine checks already belong in authorized implementation;
+independent execution after interruption remains future supervisor work. Weekly
+prioritization is optional. [End of Day](../prompt-library.md#codex-end-of-day)
+adds bounded useful allowance work and preserves existing Git/power authority.
+
 Owner direction (2026-10-14): finish the established baseline CLI goals first;
 independent unattended supervision is the next priority immediately afterward.
 This does not change existing baseline acceptance conditions or authorize a new

@@ -453,6 +453,14 @@ Instructions:
   Update CURRENT_CONTEXT.md with unfinished work and an imperative next action.
   Use relevant DoD Closeout helpers when actually stopping; do not claim a
   completed baseline merely because this batch ended.
+- Assess logical commit grouping and create focused local commits only when
+  the changes are coherent, validated and already authorized. Preserve unrelated
+  or incomplete saved work; never stage it merely to make the checkout clean.
+  Assess merge/push readiness, but perform integration or publication only under
+  explicit applicable owner authorization and the normal branch/review/check
+  rules. "End of day" alone grants neither merge nor push permission and never
+  overrides an existing prohibition. Record the next integration action when
+  authorization or validation is missing.
 
 Output:
 Start with ## **SUMMARY**. State useful work completed, validation, actual
