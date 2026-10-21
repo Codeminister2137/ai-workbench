@@ -18,6 +18,8 @@ from typing import Any
 
 from ai_orchestrator import AccessMethod, ExecutionTarget, OrchestrationResult
 
+from ai_provider.diagnostic_process import run_owned_diagnostic
+
 
 @dataclass(frozen=True)
 class ExternalAgentConfig:
@@ -271,12 +273,7 @@ def run_diagnostic_command(
     """Run a read-only local diagnostic command and return redacted process metadata."""
 
     try:
-        completed = subprocess.run(
-            (command, *args),
-            text=True,
-            capture_output=True,
-            timeout=timeout_seconds,
-        )
+        completed = run_owned_diagnostic((command, *args), timeout=timeout_seconds)
     except subprocess.TimeoutExpired:
         return {
             "ok": False,
@@ -619,6 +616,12 @@ def parse_external_agent_jsonl(text: str) -> ExternalAgentEventSummary:
     usage = None
     failure_reason = None
     answer_chunks: list[str] = []
+    mcp_failures: list[tuple[tuple[str, str, str] | None, str]] = []
+    pending_mcp: set[str] = set()
+    recovered_turn_completed = False
+    recovered_answer = False
+    unidentified_pending_mcp = False
+    had_mcp_failure = False
     parse_errors: list[str] = []
     for line_number, line in enumerate(text.splitlines(), start=1):
         stripped = line.strip()
@@ -670,11 +673,70 @@ def parse_external_agent_jsonl(text: str) -> ExternalAgentEventSummary:
         if event_usage is not None:
             usage = event_usage
         event_failure = _find_failure_reason(event, event_type)
-        if event_failure is not None:
+        item = event.get("item")
+        is_mcp = (
+            event_type in {"item.started", "item.updated", "item.completed"}
+            and isinstance(item, dict)
+            and item.get("type") == "mcp_tool_call"
+        )
+        if is_mcp and not _has_failure_marker(
+            {key: value for key, value in event.items() if key != "item"}, event_type
+        ):
+            assert isinstance(item, dict)
+            call_id = item.get("id")
+            server, tool = item.get("server"), item.get("tool")
+            key = (
+                (server, tool, call_id)
+                if isinstance(server, str)
+                and server
+                and isinstance(tool, str)
+                and tool
+                and isinstance(call_id, str)
+                and call_id
+                else None
+            )
+            if not isinstance(call_id, str) or not call_id:
+                if event_type != "item.completed":
+                    # No later event can prove which unidentified call finished.
+                    unidentified_pending_mcp = True
+            else:
+                if event_type == "item.completed":
+                    pending_mcp.discard(call_id)
+                else:
+                    pending_mcp.add(call_id)
+            if event_failure is not None:
+                had_mcp_failure = True
+                mcp_failures.append((key, event_failure))
+                recovered_turn_completed = False
+                recovered_answer = False
+            elif (
+                event_type == "item.completed"
+                and item.get("status") == "completed"
+                and not item.get("error")
+                and key is not None
+            ):
+                # Only an update to the same identified call establishes recovery.
+                # A different call to the same tool may affect unrelated data.
+                mcp_failures = [
+                    (identity, reason) for identity, reason in mcp_failures if identity != key
+                ]
+                recovered_turn_completed = False
+                recovered_answer = False
+        elif event_failure is not None:
             failure_reason = event_failure
+        if event_type == "turn.completed" and event_failure is None:
+            recovered_turn_completed = True
         event_answer = _find_final_answer(event, event_type)
         if event_answer:
             final_answer = event_answer
+            recovered_answer = True
+    if failure_reason is None:
+        if mcp_failures:
+            failure_reason = mcp_failures[0][1]
+        elif pending_mcp or unidentified_pending_mcp:
+            failure_reason = "incomplete MCP tool call"
+        elif had_mcp_failure and not (recovered_turn_completed and recovered_answer):
+            failure_reason = "MCP recovery lacks completed turn or final answer"
     return ExternalAgentEventSummary(
         final_answer=final_answer,
         command_events=tuple(command_events),

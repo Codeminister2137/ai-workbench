@@ -60,6 +60,7 @@ def test_backend_config_loads_provider_specific_api_key(
 ) -> None:
     monkeypatch.setenv("AI_PROVIDER_KIND", "requesty")
     monkeypatch.setenv("AI_PROVIDER_MODEL", "openai/gpt-5.1")
+    monkeypatch.delenv("AI_PROVIDER_API_KEY", raising=False)
     monkeypatch.setenv("REQUESTY_API_KEY", "requesty-key")
 
     config = BackendConfig.from_env()
@@ -73,6 +74,7 @@ def test_backend_config_loads_gemini_api_key_for_google(
 ) -> None:
     monkeypatch.setenv("AI_PROVIDER_KIND", "google")
     monkeypatch.setenv("AI_PROVIDER_MODEL", "gemini-3.1-pro")
+    monkeypatch.delenv("AI_PROVIDER_API_KEY", raising=False)
     monkeypatch.setenv("GEMINI_API_KEY", "gemini-test-key")
 
     config = BackendConfig.from_env()

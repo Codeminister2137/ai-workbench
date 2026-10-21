@@ -18,6 +18,7 @@ _EXAMPLE_PATH = (
 def patch_external_runner(monkeypatch, runner):
     """Inject only process execution; retain production scopes and receipts."""
     monkeypatch.setattr(_EXAMPLE.subprocess, "run", runner)
+    monkeypatch.setattr("ai_provider.external_agents.run_owned_diagnostic", runner)
     monkeypatch.setattr("ai_agent.validation.run_validation_process", runner)
     monkeypatch.setattr(
         _EXAMPLE,
