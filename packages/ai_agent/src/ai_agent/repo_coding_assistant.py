@@ -126,6 +126,15 @@ from ai_provider.repo_actions import (
     format_action_results as _format_action_results,
 )
 from ai_provider.repo_context import (
+    ANSWER_ONLY_SYSTEM_PROMPT,
+    TOOL_SYSTEM_PROMPT,
+    build_default_system_prompt,
+    build_native_tool_system_prompt,
+    build_repo_prompt,
+    find_repo_root,
+    load_prompt_context,
+)
+from ai_provider.repo_context import (
     DEFAULT_CONTEXT_BUDGET_CHARS as DEFAULT_CONTEXT_BUDGET_CHARS,
 )
 from ai_provider.repo_context import (
@@ -133,13 +142,6 @@ from ai_provider.repo_context import (
 )
 from ai_provider.repo_context import (
     RepoContextFile as RepoContextFile,  # noqa: F401 - compatibility export
-)
-from ai_provider.repo_context import (
-    build_default_system_prompt,
-    build_native_tool_system_prompt,
-    build_repo_prompt,
-    find_repo_root,
-    load_prompt_context,
 )
 from ai_provider.scrutiny import (
     RESPONSE_SCRUTINY_SYSTEM_PROMPT as _RESPONSE_SCRUTINY_SYSTEM_PROMPT,
@@ -3400,6 +3402,16 @@ def _external_agent_prompt_with_execution_metadata(
     shared_approval_policy: str | None = None,
 ) -> str:
     """Describe native and shared enforcement without granting tool authority."""
+
+    if shared_tool_profile in {"coding", "inspection"}:
+        # Replace only our system prefix; caller additions, budgets, history and
+        # quoted repository text must remain verbatim.
+        for legacy_prompt in (ANSWER_ONLY_SYSTEM_PROMPT, TOOL_SYSTEM_PROMPT):
+            if system_prompt.startswith(legacy_prompt):
+                system_prompt = (
+                    build_native_tool_system_prompt() + system_prompt[len(legacy_prompt) :]
+                )
+                break
 
     shared_note = ""
     if shared_tool_profile is not None:

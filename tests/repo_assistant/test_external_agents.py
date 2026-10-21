@@ -8,6 +8,11 @@ from typing import Any
 import pytest
 from ai_provider.agent_readiness import AgentReadiness
 from ai_provider.orchestrated_runs import SQLiteOrchestratedRunStore
+from ai_provider.repo_context import (
+    ANSWER_ONLY_SYSTEM_PROMPT,
+    NATIVE_TOOL_SYSTEM_PROMPT,
+    build_default_system_prompt,
+)
 
 from .support import (
     _EXAMPLE,
@@ -39,6 +44,32 @@ def test_external_prompt_distinguishes_native_sandbox_from_shared_policy(profile
     assert "Do not retry a denied operation" in prompt
     assert "do not request broader permissions" in prompt
     assert "Inspect the code; do not edit it." in prompt
+
+
+@pytest.mark.parametrize("profile", ["coding", "inspection", None])
+@pytest.mark.parametrize("legacy_actions", [False, True])
+def test_shared_system_instructions_use_actual_tools_without_rewriting_quoted_context(
+    profile, legacy_actions
+):
+    additional = "Keep the caller's constraints and finite task budget."
+    system = build_default_system_prompt(additional, actions_enabled=legacy_actions)
+    system += "\n\nExisting final-response and away-budget instructions."
+    quoted_task = "Quoted historical instructions:\n" + ANSWER_ONLY_SYSTEM_PROMPT
+    prompt = _EXAMPLE._external_agent_prompt_with_execution_metadata(
+        quoted_task,
+        system_prompt=system,
+        approval_policy="workspace_write",
+        sandbox="read-only",
+        mode="implement",
+        shared_tool_profile=profile,
+        shared_approval_policy="workspace_write" if profile == "coding" else "read_only",
+    )
+    expected = NATIVE_TOOL_SYSTEM_PROMPT if profile else system
+    assert prompt.startswith("# Repo assistant system prompt\n" + expected)
+    assert additional in prompt
+    assert "Existing final-response and away-budget instructions." in prompt
+    assert quoted_task in prompt
+    assert "codex_sandbox: read-only" in prompt
 
 
 def test_cli_plans_codex_external_agent_route(capsys, monkeypatch) -> None:
