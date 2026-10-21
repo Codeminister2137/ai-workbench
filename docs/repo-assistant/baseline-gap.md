@@ -40,10 +40,11 @@ blocker: the service rejects the catalog's `gpt-5.5` model for ChatGPT accounts.
 No tool calls, source edits, tests or reports completed; cleanup and unchanged
 source/test/index checks passed. A non-inference native `model/list` observation
 advertises `gpt-6.1-sol` as default and does not list `gpt-5.5`. Updating the active
-route requires owner approval under the task's model-change constraint. Preserve
+route was approved by the owner: `openai-codex-gpt-6-1-sol` is now the first current
+Codex catalog entry; the old route remains for history. Preserve
 the failed trial; do not classify it as a coding-quality failure or replay it.
 
-Next: approve/configure a currently advertised Codex route, then exercise ordinary coding,
+Next: exercise ordinary coding on the currently advertised Codex route,
 tests, saved continuation and fallback on those selected routes. Use a fresh
 bounded acceptance question, with original tests, meaningful companions, actual
 execution, faithful coding/review reports, frozen inputs, independent validation

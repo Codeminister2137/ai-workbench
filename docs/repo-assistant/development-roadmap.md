@@ -1,5 +1,16 @@
 # CLI Development Foundation Roadmap
 
+## Planned: reliable model availability across sources
+
+Owner direction, 2026-10-21: plan a reliable way to check model availability for
+every configured source. Defer implementation while completing the paid-native
+CLI baseline. The stale `gpt-5.5` ChatGPT route demonstrates why executable/auth
+readiness and a static catalog entry are insufficient. Use source-appropriate
+metadata where available, preserve capability/entitlement distinctions and
+freshness, and report unknowns explicitly. Do not use model generation as an
+availability probe or silently switch models, providers or billing tiers.
+This planned work adds no service, recurring monitor, dependency or paid usage.
+
 ## Current checkpoint: 2026-10-20
 
 The latest integrated orchestrated local trial stopped on a private budget-notice
