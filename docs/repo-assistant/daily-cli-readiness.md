@@ -18,7 +18,19 @@ because its configured `gpt-5.5` model is unsupported for the ChatGPT account.
 Native metadata advertises `gpt-6.1-sol` as default. No coding/test/report phase
 completed. This is a route-configuration failure, not a model-quality result.
 
-## Current assessment — 2026-10-20
+## Current paid-native checkpoint — 2026-10-21
+
+The approved `gpt-6.1-sol` route now produced useful diagnostic ownership and
+test-integration fixes, committed as `c3b4ba9`. Independent full registered checks
+passed **2,604 tests with 3 skips**, Ruff/format/Pyright passed, and final frozen
+review found no concrete change-induced defect. This is reviewed source evidence,
+not successful completion of every CLI invocation: both coding calls retained
+MCP failure status, and the corrective model's full test command timed out before
+the independent passing run. Conservative cross-call recovery remains unchanged.
+Command timeout/ownership is the next demonstrated execution gap; selected-route
+fallback and actual POSIX runtime acceptance remain unestablished.
+
+## Historical assessment — 2026-10-20
 
 For the remaining distance and ordered acceptance gates, see
 [distance to baseline usability](baseline-gap.md). The foundation is substantially

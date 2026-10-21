@@ -44,8 +44,26 @@ route was approved by the owner: `openai-codex-gpt-6-1-sol` is now the first cur
 Codex catalog entry; the old route remains for history. Preserve
 the failed trial; do not classify it as a coding-quality failure or replay it.
 
-Next: exercise ordinary coding on the currently advertised Codex route,
-tests, saved continuation and fallback on those selected routes. Use a fresh
+Current-route coding has now delivered useful production fixes in `c3b4ba9`:
+native diagnostic process-tree ownership, cancellation/cleanup handling, conservative
+MCP failure correlation and test integration. Independent registered validation
+passed **2,604 tests with 3 skips**, plus Ruff, formatting and Pyright. A final
+frozen model review found no concrete change-induced defect. Original test bodies
+were independently compared, allowing only declared mock/key-fixture wiring edits.
+Actual POSIX execution remains unverified; Linux state controls were mocked.
+
+This does not complete the configured CLI workflow. Both coding invocations
+returned CLI failure after native success because MCP failures remain unresolved
+across differently identified retries. The corrective coding report also honestly
+records a full-test timeout at 150 seconds; the independent full run took 193
+seconds. Failed outcomes and original reports are preserved. A tool-warning versus
+strict-failure policy is pending owner selection; no warning default was enabled.
+A separate bounded local probe also found that a shell command's one-second
+timeout had not returned after eight seconds; independent outer ownership cleaned
+up the probe. Command timeout/ownership is the next demonstrated tool gap.
+
+Next: fix demonstrated command execution blockers, then exercise useful ordinary
+conversation, saved continuation and fallback on selected routes. Use a fresh
 bounded acceptance question, with original tests, meaningful companions, actual
 execution, faithful coding/review reports, frozen inputs, independent validation
 and owned cleanup. Fix demonstrated blockers; do not require a general local/free

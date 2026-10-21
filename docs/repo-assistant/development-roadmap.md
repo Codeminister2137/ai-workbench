@@ -11,7 +11,19 @@ freshness, and report unknowns explicitly. Do not use model generation as an
 availability probe or silently switch models, providers or billing tiers.
 This planned work adds no service, recurring monitor, dependency or paid usage.
 
-## Current checkpoint: 2026-10-20
+## Current paid-native checkpoint: 2026-10-21
+
+Prioritize ordinary development through established paid clients with fallback.
+Current-route work delivered reviewed diagnostic process ownership, conservative
+MCP failure tracking and test integration in `c3b4ba9`; independent registered
+validation passed 2,604 tests with 3 skips, lint/types passed and final frozen
+review found no concrete defect. Coding CLI failures and a model test timeout
+remain preserved; they are not retroactively promoted by host validation.
+The [current baseline assessment](baseline-gap.md) records the remaining command
+timeout/ownership gap, pending MCP error-semantics decision and unverified selected
+fallback. Broader local-model parity and availability automation remain separate.
+
+## Historical checkpoint: 2026-10-20
 
 The latest integrated orchestrated local trial stopped on a private budget-notice
 false positive before tests or either final report. An auxiliary pass also

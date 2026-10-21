@@ -9,6 +9,21 @@ Comparable model quality and delegation savings have not yet been established.
 
 ## Start and continue
 
+For the current Codex catalog route, with an installed signed-in client and
+available subscription allowance:
+
+```powershell
+.\scripts\repo-assistant.ps1 --mode coding-chat --execute `
+  --route-id openai-codex-gpt-6-1-sol --shared-tools coding `
+  --privacy public_or_low_risk --cost-policy allowances_allowed `
+  --approval-policy interactive --skip-prompt-review
+```
+
+This explicitly permits the selected low-risk repository context and subscription
+allowance. Confirm the effective route and scope; client availability, allowance
+and fallback readiness are separate from catalog eligibility. Tools still require
+the selected approvals. See the [current readiness limits](baseline-gap.md).
+
 For an already available, compatible local model:
 
 ```powershell
