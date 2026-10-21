@@ -27,7 +27,23 @@ executable for coding continuation. Copilot is eligible by policy but its
 executable is unavailable, as is Antigravity. Authentication, allowances and tool
 connections remain unverified; static eligibility is not live execution readiness.
 
-Next: verify selected paid native routes' live readiness and exercise ordinary coding,
+Later October 21 checks corrected the executable-discovery assessment: standalone
+`.tools/copilot/copilot.exe` and `.tools/antigravity/agy.exe` both exist and
+authenticate when explicitly selected. Normal environment/PATH discovery had
+missed them. Copilot reports its 200-request chat entitlement fully used and no
+premium-interaction entitlement; Antigravity's shared permission mapping remains
+unresolved. Kiro reports 50/50 plan credits and 100%, with no verified spare plan
+allowance. Authentication and static eligibility are therefore insufficient.
+
+The approved Codex coding task then exposed a more immediate configuration
+blocker: the service rejects the catalog's `gpt-5.5` model for ChatGPT accounts.
+No tool calls, source edits, tests or reports completed; cleanup and unchanged
+source/test/index checks passed. A non-inference native `model/list` observation
+advertises `gpt-6.1-sol` as default and does not list `gpt-5.5`. Updating the active
+route requires owner approval under the task's model-change constraint. Preserve
+the failed trial; do not classify it as a coding-quality failure or replay it.
+
+Next: approve/configure a currently advertised Codex route, then exercise ordinary coding,
 tests, saved continuation and fallback on those selected routes. Use a fresh
 bounded acceptance question, with original tests, meaningful companions, actual
 execution, faithful coding/review reports, frozen inputs, independent validation

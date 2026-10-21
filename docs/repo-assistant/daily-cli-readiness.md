@@ -10,6 +10,14 @@ unprobed. Additional native tools require equivalent permission enforcement and
 observable effects; none are enabled by this configuration change. Historical
 trial verdicts and approval/quality requirements are unchanged.
 
+Later October 21: project-local Copilot/Antigravity executables were found and
+authenticated; ordinary command discovery had missed them. Copilot chat capacity
+is exhausted, Kiro has no verified spare plan credits, and Antigravity's shared
+permission mapping remains unresolved. The attempted Codex coding task stopped
+because its configured `gpt-5.5` model is unsupported for the ChatGPT account.
+Native metadata advertises `gpt-6.1-sol` as default. No coding/test/report phase
+completed. This is a route-configuration failure, not a model-quality result.
+
 ## Current assessment — 2026-10-20
 
 For the remaining distance and ordered acceptance gates, see
