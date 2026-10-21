@@ -1,5 +1,57 @@
 # Distance to established baseline CLI usability
 
+## Immediate paid-agent baseline — 2026-10-21
+
+Owner clarification: the immediate baseline is ordinary development with paid
+agents through this CLI, with fallback. Local/free-model quality experiments,
+allowance-reset automation and eventual IDE-host independence are separate work;
+their unfinished results must not become prerequisites for this narrower goal.
+Historical trials retain their original verdicts and broader milestones remain open.
+
+The native-client path already has useful live evidence: the October 13 Codex
+task produced a correct change, meaningful companion tests and real execution;
+its later focused frozen review was accepted. Copilot and Kiro have continued
+partial edits and observed the same running process after simulated primary
+exhaustion. This establishes components, not today's complete configured workflow.
+
+The current normal configuration has a concrete blocker. A fresh offline
+`--fallback-readiness --mode implement --shared-tools coding` check with Codex,
+`allowances_allowed` and `workspace_write` finds no available coding continuation:
+the eligible high-quality Antigravity executable is unavailable. Kiro's `auto`
+route is available only for emergency preservation under the existing quality
+policy; Copilot's restricted preservation executor is unavailable. Authentication,
+allowances and tool connections were not checked. Do not relabel `auto` as high
+quality or weaken permissions to make a candidate eligible.
+
+Next: identify and agree an explicit, available paid native alternate, preserving
+the quality/privacy/approval/billing requirements; then exercise ordinary coding,
+tests, saved continuation and fallback on those selected routes. Use a fresh
+bounded acceptance question, with original tests, meaningful companions, actual
+execution, faithful coding/review reports, frozen inputs, independent validation
+and owned cleanup. Fix demonstrated blockers; do not require a general local/free
+model parity campaign before evaluating this path. No new inference is authorized
+by this assessment.
+
+Capabilities depend on the harness and route, not just the model. Shared Copilot
+and Kiro profiles expose only the selected project tool set. Shared Codex uses a
+read-only native sandbox and project-owned tools for scoped mutations. Project
+tools include file/Git work, commands, Python validation/navigation and process
+continuity; IDE tools require their configured bridge. Native search is optional;
+public URL fetch is not equivalent to this host's complete web tool. This host's
+plugins, image tools, notebook/debugger integration and skill catalog do not
+automatically transfer. Native session resume and model/reasoning settings also
+need route-specific verification. Fallback carries observable context and effects,
+not hidden native session state. No model/settings parity is established merely
+by selecting a paid route.
+
+Evidence: `artifacts/cli-free-skill-postflight-20261021dt/paid-native-fallback-readiness-workspace-write.txt`,
+the October 13 paid-quality evidence indexed in the roadmap, and current
+`external_agents.py` / `shared_client_tools.py`. The approved DS free-route review
+stopped at its first generation POST with HTTP 429, zero tools and no report;
+the underlying cause is unknown. It does not establish paid-native usability.
+
+## Broader assessment and historical acceptance work
+
 Checkpoint: 2026-10-20. The foundation is substantially implemented, but baseline
 usability is not yet established. Successful components and one small successful
 task do not establish the whole daily workflow. There is no defensible percentage
