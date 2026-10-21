@@ -462,8 +462,10 @@ objective, observations and next action, not private reasoning or full instructi
 packets. A weaker model is not called solely to summarize. Save failures are reported
 explicitly. Login/readiness is not proof of remaining credits or actual quality.
 
-Only `trusted_local` currently permits cross-client fallback to Copilot,
-Antigravity, and Kiro; their other approval mappings remain unavailable.
+Without shared tools, alternate clients require `trusted_local`; their other
+native approval mappings remain unavailable. Shared coding maps scoped approvals
+through the project permission manager for supported Copilot/Kiro adapters.
+Antigravity's shared mapping remains unavailable.
 Required client-specific capabilities/options also restrict eligibility.
 Provider-native coding and one-shot coding modes participate; external-client
 chat and recovery after process restart remain deferred.
@@ -477,6 +479,23 @@ quality_policy = "preserve_quality"
 ```
 
 Use `--fallback-quality-policy task_minimum` for an explicit per-run override.
+For daily coding that permits a modest declared-quality downgrade, the owner
+selected these private preferences on 2026-10-21:
+
+```toml
+[defaults]
+quality = "standard"
+
+[fallback]
+enabled = true
+quality_policy = "task_minimum"
+```
+
+This ranks stronger eligible candidates first, permits standard coding
+continuation and excludes low-grade candidates. An explicit `--quality high`
+retains a high floor. Same-tier, privacy, capability and approval requirements
+still apply. This is a task floor, not a measured distance between models.
+
 These preferences apply to both usage-limit and overload continuation. Catalog
 quality grades are declared estimates; they do not substitute for representative
 model evaluations. See ADR-042 for the updated decision.

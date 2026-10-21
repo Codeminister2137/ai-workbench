@@ -321,6 +321,12 @@ saves a deterministic handoff, then permits weaker read-only reporting. Explicit
 Privacy, billing tier, scoped approvals and deadlines remain enforced; downgrades
 are reported. Legacy policies remain selectable.
 
+2026-10-21: the owner selected existing `task_minimum` with a `standard` task
+floor for private daily use, permitting Kiro/Copilot coding continuation below
+Codex's declared grade. The shipped default is unchanged. Native capabilities
+may be added with verified equivalent permissions and observable effects;
+shared approval enforcement remains required. See the ADR's dated selection.
+
 Detailed ADR: [ADR-052](decisions/ADR-052-emergency-preservation-and-quality-preferred-fallback.md)
 
 ## ADR-053 - Fixed away-session allowance

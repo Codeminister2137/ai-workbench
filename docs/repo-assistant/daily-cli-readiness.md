@@ -3,9 +3,11 @@
 2026-10-21 owner clarification: prioritize ordinary paid native agents through
 the CLI with fallback. The [current paid-agent assessment](baseline-gap.md#immediate-paid-agent-baseline--2026-10-21)
 separates its concrete configuration and acceptance gaps from the broader
-local/free-model and IDE-independence work below. Today's offline check finds no
-available coding continuation for the configured high-quality Codex route;
-authentication, allowance and tool connectivity remain unprobed. Historical
+local/free-model and IDE-independence work below. The owner selected private
+`task_minimum` fallback with a `standard` floor. Kiro is now eligible for coding
+continuation offline; authentication, allowance and tool connectivity remain
+unprobed. Additional native tools require equivalent permission enforcement and
+observable effects; none are enabled by this configuration change. Historical
 trial verdicts and approval/quality requirements are unchanged.
 
 ## Current assessment — 2026-10-20

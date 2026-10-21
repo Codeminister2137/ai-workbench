@@ -14,17 +14,20 @@ its later focused frozen review was accepted. Copilot and Kiro have continued
 partial edits and observed the same running process after simulated primary
 exhaustion. This establishes components, not today's complete configured workflow.
 
-The current normal configuration has a concrete blocker. A fresh offline
-`--fallback-readiness --mode implement --shared-tools coding` check with Codex,
-`allowances_allowed` and `workspace_write` finds no available coding continuation:
-the eligible high-quality Antigravity executable is unavailable. Kiro's `auto`
-route is available only for emergency preservation under the existing quality
-policy; Copilot's restricted preservation executor is unavailable. Authentication,
-allowances and tool connections were not checked. Do not relabel `auto` as high
-quality or weaken permissions to make a candidate eligible.
+The owner selected existing `task_minimum` fallback with a `standard` task floor
+for the private daily-use configuration. Stronger eligible routes rank first;
+standard routes may continue coding and low routes are excluded. This replaces
+the private default's original-grade restriction without relabeling `auto` models.
+The shipped default remains `emergency_preserve`. Explicit task/CLI overrides can
+change the selected floor; this is not a relative capability-distance metric.
 
-Next: identify and agree an explicit, available paid native alternate, preserving
-the quality/privacy/approval/billing requirements; then exercise ordinary coding,
+The offline `--fallback-readiness --mode implement --shared-tools coding` check
+with Codex, `allowances_allowed` and `workspace_write` admits the available Kiro
+executable for coding continuation. Copilot is eligible by policy but its
+executable is unavailable, as is Antigravity. Authentication, allowances and tool
+connections remain unverified; static eligibility is not live execution readiness.
+
+Next: verify selected paid native routes' live readiness and exercise ordinary coding,
 tests, saved continuation and fallback on those selected routes. Use a fresh
 bounded acceptance question, with original tests, meaningful companions, actual
 execution, faithful coding/review reports, frozen inputs, independent validation
@@ -44,7 +47,17 @@ need route-specific verification. Fallback carries observable context and effect
 not hidden native session state. No model/settings parity is established merely
 by selecting a paid route.
 
-Evidence: `artifacts/cli-free-skill-postflight-20261021dt/paid-native-fallback-readiness-workspace-write.txt`,
+The owner also approved adding useful native capabilities where equivalent
+permission enforcement and observable effects can be verified. Shared approval
+enforcement remains required: a native shell/editor must not bypass a shared
+denial. This direction does not itself enable unmapped native tools. Assess
+individual capabilities and add only verified mappings rather than disabling
+the shared-mode restrictions wholesale.
+
+Evidence: `artifacts/cli-fallback-policy-configuration-20261021dv/configured-readiness.json`
+and its explicit-high override control. The preceding original-grade restriction
+is preserved in `artifacts/cli-free-skill-postflight-20261021dt/paid-native-fallback-readiness-workspace-write.txt`.
+Additional evidence includes
 the October 13 paid-quality evidence indexed in the roadmap, and current
 `external_agents.py` / `shared_client_tools.py`. The approved DS free-route review
 stopped at its first generation POST with HTTP 429, zero tools and no report;
