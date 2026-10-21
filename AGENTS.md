@@ -1195,7 +1195,7 @@ verified final summary rather than requiring the user to restate these rules in
 each task prompt.
 
 Completion reports at the end of a task should be visually obvious at a glance.
-Start them with a loud Markdown marker, preferably:
+Start every task completion or stopped-work summary with this Markdown marker:
 
 ```text
 ## **SUMMARY**
@@ -1204,10 +1204,12 @@ Start them with a loud Markdown marker, preferably:
 - Notes: ...
 ```
 
-Use `## **SUMMARY**` for normal task completion reports unless a simpler
-one-line answer is clearly better. The marker should catch the eye; the rest of
-the report can stay flexible. Do not force the body into a rigid template when
-a simpler sentence is clearer. The format is a readability aid, not ceremony.
+Use `## **SUMMARY**` even for a concise task closeout or a summary that requests
+a decision before work can continue. Ordinary answers that are not task closeouts
+do not need the marker. Before sending a closeout, verify that its first visible
+line is exactly `## **SUMMARY**`. Keep the body flexible and concise. When the
+CLI supplies this heading in its own envelope, the enclosed agent report must
+continue to avoid a duplicate heading.
 
 Optional supporting-artifact links belong beside the information they support,
 not automatically at the start of a summary. Use descriptive Markdown links and

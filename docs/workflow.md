@@ -88,7 +88,11 @@ These files reinforce the required behavior; they cannot technically disable a
 runtime-provided tool. A guaranteed prohibition would require a chat/runtime
 setting that removes or blocks that tool, which this repository cannot provide.
 
-The repo-assistant CLI also prints one fixed `## **SUMMARY**` closeout for
+Every user-visible task completion or stopped-work summary starts with
+`## **SUMMARY**`, including concise reports and summaries that need an owner
+decision. Check the first visible line before sending the report. Ordinary
+non-closeout answers need no marker. The repo-assistant CLI also prints one
+fixed `## **SUMMARY**` closeout for
 provider, native, chat, external-agent, and fallback runs. The selected agent's
 response is retained under `Agent report`; validation and execution fields use
 CLI-recorded evidence. `Changed` previews the first agent-reported outcome line
