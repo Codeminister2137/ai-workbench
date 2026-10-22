@@ -1,6 +1,7 @@
 """OpenCode Go metadata collection tests; no network or real credentials."""
 
 import json
+from email.message import Message
 from io import BytesIO
 from urllib.error import HTTPError
 
@@ -88,9 +89,9 @@ def test_list_models_without_key_is_unavailable(monkeypatch):
 def test_list_models_failures_are_sanitized(monkeypatch, failure):
     def open_request(request, *, timeout):
         if failure == "http_401":
-            raise HTTPError(request.full_url, 401, "secret", {}, None)
+            raise HTTPError(request.full_url, 401, "secret", Message(), None)
         if failure == "http_403":
-            raise HTTPError(request.full_url, 403, "secret", {}, None)
+            raise HTTPError(request.full_url, 403, "secret", Message(), None)
         if failure == "oversize":
             return Response(b"x" * (2_097_152 + 1))
         if failure == "bad_json":
@@ -109,6 +110,7 @@ def test_account_allowance_is_explicitly_unavailable():
     allowance = collector.account_allowance(timeout_seconds=4)
     assert allowance.status == "unavailable"
     assert allowance.source == "opencode_go"
+    assert allowance.reason is not None
     assert "no_official_account_allowance_endpoint" in allowance.reason
 
 
@@ -145,7 +147,13 @@ def test_usage_from_response_missing_usage_is_unknown():
 
 
 def test_account_usage_dispatcher_routes_go_to_source_info(monkeypatch):
-    from ai_orchestrator import AccessMethod, BillingSource, ExecutionTarget
+    from ai_orchestrator import (
+        AccessMethod,
+        AuthMethod,
+        BillingSource,
+        CostPolicyTier,
+        ExecutionTarget,
+    )
     from ai_provider import account_usage
 
     target = ExecutionTarget(
@@ -154,9 +162,9 @@ def test_account_usage_dispatcher_routes_go_to_source_info(monkeypatch):
         product="opencode_go",
         model="kimi-k2.7-code",
         access_method=AccessMethod.PROVIDER_API,
-        auth_method="api_key",
+        auth_method=AuthMethod.API_KEY,
         billing_source=BillingSource.OPENCODE_GO_SUBSCRIPTION_ALLOWANCE,
-        cost_policy_tier="allowances_allowed",
+        cost_policy_tier=CostPolicyTier.ALLOWANCES_ALLOWED,
         timeout_seconds=10,
     )
     result = account_usage.read_execution_allowance(target)
@@ -167,7 +175,13 @@ def test_account_usage_dispatcher_routes_go_to_source_info(monkeypatch):
 
 
 def test_account_usage_dispatcher_returns_none_for_non_go_sources():
-    from ai_orchestrator import AccessMethod, BillingSource, ExecutionTarget
+    from ai_orchestrator import (
+        AccessMethod,
+        AuthMethod,
+        BillingSource,
+        CostPolicyTier,
+        ExecutionTarget,
+    )
     from ai_provider import account_usage
 
     target = ExecutionTarget(
@@ -176,9 +190,9 @@ def test_account_usage_dispatcher_returns_none_for_non_go_sources():
         product="openai",
         model="gpt-5-mini",
         access_method=AccessMethod.PROVIDER_API,
-        auth_method="api_key",
+        auth_method=AuthMethod.API_KEY,
         billing_source=BillingSource.OPENAI_API_BILLING,
-        cost_policy_tier="billing_allowed",
+        cost_policy_tier=CostPolicyTier.BILLING_ALLOWED,
         timeout_seconds=10,
     )
     assert account_usage.read_execution_allowance(target) is None
@@ -191,11 +205,11 @@ def test_select_probe_models():
         status="observed",
         source="opencode_go",
         observed_at_utc="now",
-        models=[
+        models=(
             ModelInventoryItem(id="kimi-k2.7-code", source="opencode_go", endpoint="x"),
             ModelInventoryItem(id="beam-free", source="opencode_go", endpoint="x"),
             ModelInventoryItem(id="minimax-m3.1-flash-free", source="opencode_go", endpoint="x"),
-        ],
+        ),
     )
     assert go._select_probe_models(inventory, "all") == [
         "kimi-k2.7-code",
