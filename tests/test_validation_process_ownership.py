@@ -37,12 +37,16 @@ def test_validation_closes_its_tree_before_return(tmp_path, monkeypatch, mode):
     script.write_text(
         "import subprocess,sys,time\n"
         "from pathlib import Path\n"
+        "def _publish_pid(path,pid):\n"
+        "    tmp=Path(str(path)+'.tmp')\n"
+        "    tmp.write_text(str(pid))\n"
+        "    tmp.replace(path)\n"
         "while not Path('release').exists(): time.sleep(.01)\n"
         "mode=sys.argv[1]\n"
         "kwargs={} if mode=='inherited_output' else "
         "dict(stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)\n"
         "p=subprocess.Popen([sys.executable,'-c','import time;time.sleep(6)'],**kwargs)\n"
-        "Path('child.pid').write_text(str(p.pid))\n"
+        "_publish_pid(Path('child.pid'),p.pid)\n"
         "print('validator started',flush=True)\n"
         "print('diagnostic stderr',file=sys.stderr,flush=True)\n"
         "if mode=='root_failure': sys.exit(3)\n"
@@ -72,8 +76,11 @@ def test_validation_closes_its_tree_before_return(tmp_path, monkeypatch, mode):
             nonlocal interrupted
             if not interrupted:
                 interrupted = True
-                until = time.monotonic() + 3
-                while not (tmp_path / "child.pid").exists() and time.monotonic() < until:
+                deadline = time.monotonic() + 3
+                while time.monotonic() < deadline:
+                    pid_file = tmp_path / "child.pid"
+                    if pid_file.exists() and pid_file.read_text().strip():
+                        break
                     time.sleep(0.01)
                 raise KeyboardInterrupt
             return original_wait(process, *args, **kwargs)
@@ -99,7 +106,8 @@ def test_validation_closes_its_tree_before_return(tmp_path, monkeypatch, mode):
                 progress_callback=lambda _: None,
             )[0]
         elapsed = time.monotonic() - started
-        child_pid = int((tmp_path / "child.pid").read_text())
+        pid_text = (tmp_path / "child.pid").read_text().strip()
+        child_pid = int(pid_text)
         until = time.monotonic() + 0.5
         while descendant_running(child_pid) and time.monotonic() < until:
             time.sleep(0.01)
@@ -195,3 +203,42 @@ def test_ownership_failure_does_not_execute_workspace_code(tmp_path, monkeypatch
     ) in result.failure_reason
     assert len(processes) == 1 and processes[0].poll() is not None
     assert not (tmp_path / "executed").exists()
+
+
+def test_owned_runner_environment_and_bounded_capture_without_real_child(tmp_path, monkeypatch):
+    from ai_agent import validation_process
+
+    class Process:
+        pid = 123
+        returncode = -1
+
+        def wait(self, **kwargs):
+            raise subprocess.TimeoutExpired("synthetic", 1)
+
+    process = Process()
+    stopped = []
+
+    def start(arguments, **kwargs):
+        assert kwargs["env"] == {"OWNED_TEST_VALUE": "context-value"}
+        kwargs["stdout"].write(b"x" * 20_000 + b"final progress")
+        kwargs["stderr"].write(b"stderr progress")
+        return process
+
+    monkeypatch.setattr(subprocess, "Popen", start)
+    monkeypatch.setattr(validation_process, "_stop", lambda p, job: stopped.append(p))
+    # Exercise the platform-independent capture path without a native process.
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(
+        validation_process, "os", SimpleNamespace(name="posix", SEEK_END=os.SEEK_END)
+    )
+    with pytest.raises(subprocess.TimeoutExpired) as caught:
+        validation_process.run_validation_process(
+            ["synthetic"], cwd=tmp_path, timeout=1, env={"OWNED_TEST_VALUE": "context-value"}
+        )
+    assert stopped == [process]
+    output = cast(str, caught.value.stdout)
+    assert isinstance(output, str)
+    assert len(output.encode()) <= 16_000
+    assert "final progress" in output
+    assert caught.value.stderr == "stderr progress"

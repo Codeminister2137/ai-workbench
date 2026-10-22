@@ -52,12 +52,14 @@ def run_validation_process(
     capture_output: bool = True,
     text: bool = True,
     check: bool = False,
+    env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Keep descendants owned until cleanup, including after their root exits.
 
     Temporary capture files avoid waiting on inherited output pipes. The command
     deadline includes launch/ownership setup; cleanup has a separate two-second
-    bound. No shell, model, IDE host or environment selection is involved.
+    bound. The caller selects the executable and optional environment. Timeout
+    output retains at most the last 16,000 bytes of each stream.
     """
     if not capture_output or not text or check:
         raise ValueError("Validation requires text capture and explicit return-code handling")
@@ -68,6 +70,7 @@ def run_validation_process(
         process = subprocess.Popen(
             arguments,
             cwd=cwd,
+            env=env,
             stdout=stdout,
             stderr=stderr,
             shell=False,
@@ -104,10 +107,14 @@ def run_validation_process(
                 else:
                     raise
         encoding = "utf-8" if sys.flags.utf8_mode else locale.getencoding()
-        stdout.seek(0)
-        stderr.seek(0)
-        output = stdout.read().decode(encoding)
-        errors = stderr.read().decode(encoding)
+        captured = []
+        for stream in (stdout, stderr):
+            size = stream.seek(0, os.SEEK_END)
+            stream.seek(max(0, size - 16_000) if timed_out else 0)
+            captured.append(
+                stream.read().decode(encoding, errors="replace" if timed_out else "strict")
+            )
+        output, errors = captured
     if timed_out:
         raise subprocess.TimeoutExpired(arguments, timeout, output=output, stderr=errors)
     return subprocess.CompletedProcess(arguments, process.returncode, output, errors)

@@ -152,13 +152,17 @@ def test_diagnostic_owns_descendants(monkeypatch, tmp_path, mode):
     script.write_text(
         "import subprocess, sys, time\n"
         "from pathlib import Path\n"
+        "def _publish_pid(path,pid):\n"
+        "    tmp=Path(str(path)+'.tmp')\n"
+        "    tmp.write_text(str(pid))\n"
+        "    tmp.replace(path)\n"
         "ready, pid_file, mode = map(str, sys.argv[1:])\n"
         "deadline = time.monotonic() + 5\n"
         "while not Path(ready).exists():\n"
         "    if time.monotonic() >= deadline: sys.exit(3)\n"
         "    time.sleep(.01)\n"
         "child = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(15)'])\n"
-        "Path(pid_file).write_text(str(child.pid))\n"
+        "_publish_pid(Path(pid_file),child.pid)\n"
         "print('hello', flush=True)\n"
         "if mode == 'timeout' or mode.startswith(('interrupt', 'exit_cleanup')): time.sleep(15)\n",
         encoding="utf-8",
@@ -183,7 +187,9 @@ def test_diagnostic_owns_descendants(monkeypatch, tmp_path, mode):
 
             def interrupt_wait(timeout=None):
                 deadline = time.monotonic() + 3
-                while not pid_file.exists() and time.monotonic() < deadline:
+                while time.monotonic() < deadline:
+                    if pid_file.exists() and pid_file.read_text().strip():
+                        break
                     time.sleep(0.01)
                 process.wait = original_wait
                 if mode.startswith("exit_cleanup"):

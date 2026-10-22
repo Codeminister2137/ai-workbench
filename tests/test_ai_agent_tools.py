@@ -202,6 +202,82 @@ def test_run_command_tool(tmp_path: Path) -> None:
     assert "hello_agent_cli" in res.output
 
 
+def test_shell_preserves_output_and_empty_success(tmp_path, monkeypatch):
+    import subprocess
+
+    from ai_agent.tools import shell
+
+    def runner(arguments, **kwargs):
+        assert kwargs["cwd"] == tmp_path
+        assert kwargs["env"]["SHELL_OVERRIDE"] == "context"
+        assert kwargs["env"]["SHELL_INHERITED"] == "parent"
+        return subprocess.CompletedProcess(arguments, 9, " out\r\nnext \r", " err \n")
+
+    monkeypatch.setenv("SHELL_OVERRIDE", "parent")
+    monkeypatch.setenv("SHELL_INHERITED", "parent")
+    monkeypatch.setattr(shell, "run_validation_process", runner)
+    result = RunCommandTool().execute(
+        {"command": "synthetic"}, ToolContext(tmp_path, env={"SHELL_OVERRIDE": "context"})
+    )
+    assert result.is_error
+    assert result.output == "out\nnext\n\n[STDERR]\nerr\n\n[Process exited with code 9]"
+    assert result.metadata == {"command": "synthetic", "exit_code": 9, "cwd": str(tmp_path)}
+    monkeypatch.setattr(
+        shell,
+        "run_validation_process",
+        lambda *a, **k: subprocess.CompletedProcess(a[0], 0, "", ""),
+    )
+    empty = RunCommandTool().execute({"command": "synthetic"}, ToolContext(tmp_path))
+    assert not empty.is_error
+    assert empty.output == "(No output)"
+
+
+def test_shell_timeout_progress_is_bounded_and_does_not_render_arguments(tmp_path, monkeypatch):
+    import subprocess
+
+    from ai_agent.tools import shell
+
+    def runner(*args, **kwargs):
+        raise subprocess.TimeoutExpired(
+            ["private-command-argument"],
+            1,
+            output=b"x" * 20_000 + b"progress",
+            stderr="diagnostic",
+        )
+
+    monkeypatch.setattr(shell, "run_validation_process", runner)
+    result = RunCommandTool().execute(
+        {"command": "synthetic", "timeout_seconds": 1}, ToolContext(tmp_path)
+    )
+    assert result.is_error
+    assert len(result.output) < 16_200
+    assert "progress" in result.output
+    assert "[STDERR]\ndiagnostic" in result.output
+    assert "timed out after 1.0 seconds" in result.output
+    assert "private-command-argument" not in result.output
+
+
+def test_shell_interrupt_propagates_and_start_error_hides_command(tmp_path, monkeypatch):
+    import pytest
+    from ai_agent.tools import shell
+
+    def interrupt(*args, **kwargs):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(shell, "run_validation_process", interrupt)
+    with pytest.raises(KeyboardInterrupt):
+        RunCommandTool().execute({"command": "synthetic"}, ToolContext(tmp_path))
+
+    def failed_start(*args, **kwargs):
+        raise OSError("private-command-argument")
+
+    monkeypatch.setattr(shell, "run_validation_process", failed_start)
+    result = RunCommandTool().execute({"command": "synthetic"}, ToolContext(tmp_path))
+    assert result.is_error
+    assert "OSError" in result.output
+    assert "private-command-argument" not in result.output
+
+
 def test_default_coding_tools_and_json_schemas() -> None:
     registry = default_coding_tools()
     schemas = registry.export_json_schemas()
