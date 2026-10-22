@@ -4,7 +4,8 @@
 Published limits and account observations can expire.
 
 **Latest scoped update:** 2026-10-22, capacity comparison below; OpenRouter
-limits/privacy and Codex data-policy scope were also checked 2026-10-21.
+limits/privacy, Codex data-policy scope and the OpenRouter request-contract
+refresh were also checked 2026-10-21 and 2026-10-22.
 This does not refresh every historical offer in the table below.
 
 This is the shared reference for provider access findings, integration gaps and
@@ -48,6 +49,57 @@ and private transcripts do not belong in this public reference.
   retention/training. Unattested/private inputs retain their gate. Every call
   still requires zero prices and valid remaining quota, and requests
   `data_collection=deny`. No automatic CLI classification or privacy guarantee.
+
+### OpenRouter — refreshed 2026-10-22
+
+Official pages re-read 2026-10-22. The 2026-10-21 findings above stand; the
+Free-plan conflict is still open.
+
+- **The Free-plan conflict is unchanged.** The [pricing feature table](https://openrouter.ai/pricing)
+  lists "Data Policy-Based Routing" as **No** for Free and **Yes** from
+  Standard upward, while the same page's privacy FAQ states that "Zero Data
+  Retention routing is available on every plan". Both statements are current.
+  The documentation still does not establish which request filters are enforced
+  for this Free account, so the local guard remains a refusal, not evidence of
+  provider denial.
+- [Provider routing](https://openrouter.ai/docs/guides/routing/provider-selection)
+  documents the `provider` request object. This repository sends
+  `require_parameters: true`, `data_collection: "deny"` and `max_price` with
+  `prompt`, `completion`, `request` and `image` all zero. Those are the
+  documented field names, types and price attributes, and the request guards
+  are already locked by offline regressions.
+- The same page documents a **distinct** `provider.zdr` boolean that routes only
+  to Zero-Data-Retention endpoints. It is not the same claim as
+  `data_collection: "deny"`: `deny` excludes providers that store data
+  non-transiently or may train on it, while `zdr` excludes any provider that
+  retains data at all, even for abuse scanning or legal reasons. The
+  [ZDR guide](https://openrouter.ai/docs/guides/features/zdr) states that a
+  request-level `zdr` ORs with account and guardrail settings and can only
+  add enforcement. This repository deliberately does not request `zdr`: the
+  Free-plan data-policy entitlement is unresolved, and requiring ZDR could
+  leave the free route with no eligible endpoint. Recorded departure, not a
+  defect; changing it is a material privacy/routing decision.
+- Upstream takes a conservative stance for endpoints whose policy it cannot
+  establish: they are treated as retaining **and** training on data. A `deny`
+  filter therefore excludes exactly those endpoints.
+- `GET /api/v1/endpoints/zdr` publishes the current ZDR endpoint list, so ZDR
+  eligibility can be checked without inference.
+- The [limits reference](https://openrouter.ai/docs/api_reference/limits)
+  confirms the `GET /api/v1/key` shape this repository reads: `is_free_tier`
+  ("whether the user has paid for credits before") and
+  `free_model_daily_requests.{used, limit, remaining}`. The daily `limit` tier
+  is selected by all-time credits purchased **independently** of
+  `is_free_tier`, and an account below the credit threshold reports
+  `is_free_tier: false` together with the lower daily ceiling. `is_free_tier`
+  is therefore a credits-purchased proxy, not a statement of data-policy
+  entitlement; the local guard uses it only as evidence of a paying account.
+- Free limits are unchanged: 20 requests/minute and 50/day, rising to
+  1,000/day at $10 all-time credits. The per-minute limit is not reported by
+  the key endpoint, and the daily counter does not apply to accounts or
+  endpoints exempt from free-model limits.
+- The [pricing page](https://openrouter.ai/pricing) now names
+  `GET /api/v1/models?output_modalities=all` as the per-model price source
+  ("no API key required") and publishes a per-model `llms.txt` guide.
 
 ### Codex and cross-provider privacy — checked 2026-10-21
 
@@ -344,6 +396,11 @@ exception described above; unattested/private inputs retain that refusal. Earlie
 successful mocks represented an already non-free-tier account calling only
 zero-priced models; they did not establish free-account entitlement. No deposit
 or additional policy weakening follows from this observation.
+
+Re-confirmed 2026-10-22 against the current pricing page; see the dated refresh
+above. Upstream treats an endpoint whose policy it cannot establish as
+retaining **and** training, and its separate `zdr` filter is stronger than the
+`data_collection=deny` this adapter requests.
 
 Current official public free-model metadata (2026-10-14) lists alternatives such
 as `google/gemma-4-31b-it:free`, `thinkingmachines/inkling-small:free` and
