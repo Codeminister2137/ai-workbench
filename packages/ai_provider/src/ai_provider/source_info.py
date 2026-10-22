@@ -225,6 +225,113 @@ class EndpointInventory:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class CapabilityScore:
+    """One public benchmark result for one model under one agent scaffold.
+
+    A published benchmark result is almost never a property of the model
+    alone: the same model appears under several agent scaffolds with different
+    scores. The scaffold is therefore part of the record, and a score must
+    never be read as a model-only claim.
+
+    ``model`` is a comparable key derived from the published display name;
+    ``model_display`` keeps the source's own spelling. Both are recorded so
+    the normalization stays auditable. ``scale`` names the unit of ``score``.
+
+    These are published, dated, third-party observations. They are a selection
+    prior, not acceptance evidence for this repository.
+    """
+
+    source: str
+    benchmark: str
+    split: str
+    model: str
+    model_display: str
+    agent: str | None = None
+    agent_org: str | None = None
+    score: float | None = None
+    scale: str | None = None
+    measured_at: str | None = None
+    verified: bool | None = None
+    cost_usd: float | None = None
+    warning: str | None = None
+    source_url: str | None = None
+    observed_at_utc: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return a JSON-safe representation of one published result."""
+
+        return {
+            "source": self.source,
+            "benchmark": self.benchmark,
+            "split": self.split,
+            "model": self.model,
+            "model_display": self.model_display,
+            "agent": self.agent,
+            "agent_org": self.agent_org,
+            "score": self.score,
+            "scale": self.scale,
+            "measured_at": self.measured_at,
+            "verified": self.verified,
+            "cost_usd": self.cost_usd,
+            "warning": self.warning,
+            "source_url": self.source_url,
+            "observed_at_utc": self.observed_at_utc,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class CapabilityPrior:
+    """Published capability results collected for one benchmark split.
+
+    ``status`` is one of ``observed``, ``unavailable``, ``unknown``. The
+    records are safe to persist: each carries its source URL and the time it
+    was observed, so a stored prior stays dated.
+    """
+
+    status: str
+    source: str
+    benchmark: str
+    split: str
+    scores: tuple[CapabilityScore, ...] = ()
+    observed_at_utc: str | None = None
+    reason: str | None = None
+    source_url: str | None = None
+
+    def summary(self) -> dict[str, Any]:
+        """Return counts and the strongest published row for this split.
+
+        The strongest row keeps its agent attached, so the number is never
+        read as a model-only claim.
+        """
+
+        scored = [score for score in self.scores if score.score is not None]
+        best = max(scored, key=lambda score: score.score or 0.0, default=None)
+        return {
+            "row_count": len(self.scores),
+            "model_count": len({score.model for score in self.scores}),
+            "agent_count": len({score.agent for score in self.scores if score.agent}),
+            "best_score": best.score if best is not None else None,
+            "best_score_model": best.model if best is not None else None,
+            "best_score_agent": best.agent if best is not None else None,
+        }
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return a JSON-safe representation of the collected prior."""
+
+        return {
+            "status": self.status,
+            "source": self.source,
+            "benchmark": self.benchmark,
+            "split": self.split,
+            "observed_at_utc": self.observed_at_utc,
+            "reason": self.reason,
+            "source_url": self.source_url,
+            "summary": self.summary(),
+            "scores": [score.to_dict() for score in self.scores],
+        }
+
+
 class SourceInfo(Protocol):
     """On-demand collector for a single source's metadata."""
 

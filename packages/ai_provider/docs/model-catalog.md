@@ -82,6 +82,30 @@ achieved **33 ok / 3 error**; `gemini-4-argon-contributor` remains unsupported o
 all three endpoints, `mimo-v2.5-pro` remains upstream-unsupported, and
 `longcat-2.0` remains unavailable.
 
+## Capability prior coverage — checked 2026-10-22
+
+Where an *internet* capability prior exists for the routes above, and where it
+does not. The prior is a selection aid, never acceptance evidence: a public
+benchmark scores a model under a particular agent scaffold, not our CLI.
+
+Two public sources were checked:
+
+| Source | Shape | Coverage of our routes | Limitation |
+| --- | --- | --- | --- |
+| [SWE-bench Verified](https://www.swebench.com/) | One row per **(model, agent scaffold)** pair; 180 rows, 84 distinct model names, 77 distinct scaffolds | 17 of the 36 Go routes have a *family* match, always across a version gap; the 17 OpenRouter free variants have **none** | Scaffold-confounded: the same model appears under many agents with different scores. Covers mostly frontier models |
+| [Aider polyglot](https://aider.chat/docs/leaderboards/) | One row per model under **a single consistent harness**; 52 distinct model ids | Covers the gateway-served open-weight families we actually have: `gpt-oss-120b`, `kimi-k2`, `qwen3-32b`, `gemma-3-27b-it`, `grok-3/4`, plus `deepseek`, `gemini`, `claude`, `gpt` | Also has version gaps, and is a code-**editing** benchmark rather than repo-level issue resolution |
+
+**No public leaderboard covers the newest route ids.** Qwen 3.6+/3.7+/3.8+,
+Kimi K2.7, GLM 5.1-5.3, Grok 4.6/4.7, MiMo 2.5/2.6, LongCat 2.0, Beam,
+Muse Spark, Omen Alpha and the Hy previews have no published internet prior at
+all. For those routes the internet prior is **absent**, not merely weaker,
+which is the strongest practical argument for judging them from our own CLI
+transcripts.
+
+Readers: `ai_provider.openrouter_endpoints` (route availability) and
+`ai_provider.swe_bench_scores` (published capability prior). The shared
+records are documented in [the interface contract](interface.md).
+
 ## Adding other providers
 
 Add recommendations as they are investigated, recording exact model/access route,

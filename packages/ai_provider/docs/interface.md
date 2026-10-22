@@ -167,6 +167,32 @@ acceptance evidence for this repository.
 the public OpenRouter endpoints API for one model id. It sends no prompt, calls
 no model, needs no credential, and never discovers credential files.
 
+### `CapabilityScore` and `CapabilityPrior`
+
+Published, dated capability results used as a **selection prior**. They are not
+acceptance evidence for this repository, and a published score is almost never
+a property of the model alone: the same model appears under several agent
+scaffolds with different scores. The scaffold is therefore part of every
+record, and a score must never be read as a model-only claim.
+
+`CapabilityScore` holds one published result: `source`, `benchmark`, `split`,
+`model` (a comparable key derived from the published name), `model_display`
+(the source's own spelling, kept so the normalization stays auditable),
+`agent`, `agent_org`, `score`, `scale` (the unit of `score`), `measured_at`,
+`verified`, `cost_usd`, `warning`, `source_url` and `observed_at_utc`.
+
+`CapabilityPrior` is the per-split envelope: `status` (`observed`,
+`unavailable`, `unknown`), `source`, `benchmark`, `split`, `scores`,
+`observed_at_utc`, `reason` and `source_url`. Its `summary()` reports the row,
+model and agent counts and the strongest published row, with that row's agent
+still attached. The record is JSON-safe and safe to persist, so a stored prior
+stays dated; the caller owns any cache.
+
+`ai_provider.swe_bench_scores.read_swe_bench_scores` reads the public
+SWE-bench leaderboard data for one split. It needs no credential, sends no
+prompt and calls no model. A missing split is reported as unavailable rather
+than guessed.
+
 ## Capability Matrix
 
 | Capability | Ollama | Requesty | OpenRouter | OpenAI | Google | OpenCode Go |
