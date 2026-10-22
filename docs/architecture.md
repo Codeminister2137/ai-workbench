@@ -398,6 +398,13 @@ Prototype privacy classes are currently:
 
 These labels are provisional until cloud routing and real external provider adapters are implemented.
 
+ADR-063 adds an opt-in OpenRouter exception for explicitly public/synthetic
+requests: the low-risk class alone is insufficient; the caller must attest the
+complete input through exact boolean request metadata. Only uncertain privacy-
+filter entitlement is relaxed; private/default request gates, zero-price/quota
+checks and requested data-policy filters remain. This is not automatic CLI
+classification, persistent consent or a guarantee of provider retention terms.
+
 ## 10. Shared code
 Share code only when multiple projects genuinely need the same stable behavior. Good candidates are common AI contracts, provider adapters, and stable usage/configuration primitives. Avoid shared packages for experimental or application-specific logic.
 

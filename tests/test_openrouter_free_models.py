@@ -532,6 +532,120 @@ def test_conventional_environment_key(monkeypatch):
     assert BackendConfig.from_env().api_key == "test-key"
 
 
+def _public_account_transport(monkeypatch, *, quota=None, rows=None, stream=False):
+    """Exercise complete provider requests with unverified Free-plan entitlement."""
+    from ai_provider.adapters import openrouter
+
+    response = (
+        [{"choices": [{"delta": {"content": "ok"}, "finish_reason": "stop"}]}] if stream else None
+    )
+    calls = transport(monkeypatch, quota=quota, rows=rows, response=response)
+    original = openrouter.urlopen
+
+    def send(http_request, **kwargs):
+        if http_request.full_url.endswith("/key"):
+            calls.append(http_request)
+            return Response(
+                {
+                    "data": {
+                        "is_free_tier": True,
+                        "free_model_daily_requests": quota
+                        if quota is not None
+                        else {"used": 0, "limit": 50, "remaining": 50},
+                    }
+                }
+            )
+        return original(http_request, **kwargs)
+
+    monkeypatch.setattr("ai_provider.adapters.openrouter.urlopen", send)
+    monkeypatch.setattr("ai_provider.adapters.openai_compatible.urlopen", send)
+    return calls
+
+
+@pytest.mark.parametrize("stream", [False, True])
+@pytest.mark.parametrize("require_free_model", [False, True])
+def test_explicit_public_input_admits_free_account_without_relaxing_payload_guards(
+    monkeypatch, stream, require_free_model
+):
+    calls = _public_account_transport(monkeypatch, stream=stream)
+    chat = client(require_free_model=require_free_model)
+    public = request(metadata={"public_or_synthetic": True})
+    list(chat.stream(public)) if stream else chat.complete(public)
+    assert [call.get_method() for call in calls] == ["GET", "GET", "POST"]
+    payload = json.loads(calls[-1].data)
+    assert payload["provider"] == {
+        "require_parameters": True,
+        "data_collection": "deny",
+        "max_price": {"prompt": 0, "completion": 0, "request": 0, "image": 0},
+    }
+    assert "metadata" not in payload
+
+
+@pytest.mark.parametrize("stream", [False, True])
+@pytest.mark.parametrize(
+    "privacy,attestation",
+    [
+        (PrivacyClass.PUBLIC_OR_LOW_RISK, None),
+        (PrivacyClass.PUBLIC_OR_LOW_RISK, False),
+        (PrivacyClass.PUBLIC_OR_LOW_RISK, "true"),
+        (PrivacyClass.PUBLIC_OR_LOW_RISK, 1),
+        (PrivacyClass.EXTERNAL_ALLOWED, True),
+        (PrivacyClass.LOCAL_ONLY, True),
+        (PrivacyClass.SENSITIVE_REVIEW_REQUIRED, True),
+    ],
+)
+def test_public_exception_requires_exact_attestation_and_matching_privacy(
+    monkeypatch, stream, privacy, attestation
+):
+    calls = _public_account_transport(monkeypatch, stream=stream)
+    value = AIRequest(
+        (AIMessage(MessageRole.USER, "Synthetic input"),),
+        privacy_class=privacy,
+        metadata={"public_or_synthetic": attestation},
+    )
+    with pytest.raises(ProviderError):
+        list(client().stream(value)) if stream else client().complete(value)
+    assert all(call.get_method() == "GET" for call in calls)
+
+
+@pytest.mark.parametrize("stream", [False, True])
+@pytest.mark.parametrize(
+    "quota",
+    [
+        {},
+        {"used": 2, "limit": 50, "remaining": 50},
+        {"used": 0, "limit": 50, "remaining": True},
+        {"used": 50, "limit": 50, "remaining": 0},
+    ],
+)
+def test_public_exception_still_refuses_invalid_or_exhausted_quota(monkeypatch, stream, quota):
+    calls = _public_account_transport(monkeypatch, stream=stream, quota=quota)
+    public = request(metadata={"public_or_synthetic": True})
+    with pytest.raises(ProviderError):
+        list(client().stream(public)) if stream else client().complete(public)
+    assert [call.get_method() for call in calls] == ["GET", "GET"]
+
+
+@pytest.mark.parametrize("stream", [False, True])
+def test_public_exception_still_refuses_nonzero_prices(monkeypatch, stream):
+    calls = _public_account_transport(
+        monkeypatch, stream=stream, rows=[row(pricing={"prompt": "0", "completion": "0.01"})]
+    )
+    public = request(metadata={"public_or_synthetic": True})
+    with pytest.raises(ProviderError, match="not verified free"):
+        list(client().stream(public)) if stream else client().complete(public)
+    assert [call.get_method() for call in calls] == ["GET"]
+
+
+def test_public_attestation_does_not_persist_to_next_request(monkeypatch):
+    calls = _public_account_transport(monkeypatch)
+    chat = client()
+    chat.complete(request(metadata={"public_or_synthetic": True}))
+    with pytest.raises(ProviderError, match="privacy-filter entitlement"):
+        chat.complete(request())
+    assert [call.get_method() for call in calls] == ["GET", "GET", "POST", "GET", "GET"]
+
+
 def test_generic_transport_cannot_bypass_guards():
     from ai_provider.adapters.openai_compatible import OpenAICompatibleChatClient
 

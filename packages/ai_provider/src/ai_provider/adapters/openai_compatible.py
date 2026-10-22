@@ -193,8 +193,7 @@ class OpenAICompatibleChatClient:
         yield AIStreamFinal(response=final_response)
 
     def _chat_payload(self, request: AIRequest, *, stream: bool) -> dict[str, Any]:
-        if self.config.require_free_model:
-            self._verify_free_model(request.model or self.config.model)
+        self._verify_request_model(request)
         payload: dict[str, Any] = {
             "model": request.model or self.config.model,
             "messages": [
@@ -224,6 +223,11 @@ class OpenAICompatibleChatClient:
 
     def _safe_metadata(self, raw: dict[str, Any]) -> dict[str, Any]:
         return raw
+
+    def _verify_request_model(self, request: AIRequest) -> None:
+        """Admit the effective model with the complete request's policy context."""
+        if self.config.require_free_model:
+            self._verify_free_model(request.model or self.config.model)
 
     def _verify_free_model(self, model: str) -> None:
         """Fail closed if the exact Requesty model is absent or no longer zero-priced.
