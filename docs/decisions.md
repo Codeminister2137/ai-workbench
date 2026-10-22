@@ -645,3 +645,15 @@ requests. OpenRouter requires the low-risk privacy class and a request-local exa
 boolean attestation; private/default requests retain their guard. Price/quota and
 requested privacy filters remain. See
 [ADR-063](decisions/ADR-063-explicit-public-input-privacy-exception.md).
+
+## ADR-064 — Visible warning for unresolved MCP recovery
+
+**Status:** Accepted and implemented offline (2026-10-22); live behaviour
+unverified.
+
+Owner approved reporting an MCP failure that call identity cannot resolve as a
+visible warning beside a completed result, for both unresolved call identity
+and a same-tool retry under a new call id. A run that independently proves
+completion is no longer reported as failed; fatal, incomplete and unfinished
+runs still fail. The unresolved reasons are retained. See
+[ADR-064](decisions/ADR-064-visible-warning-for-unresolved-mcp-recovery.md).

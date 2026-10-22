@@ -9,6 +9,7 @@ from ai_agent.external_reporting import (
     event_mentions_codex_collab_delegation,
     external_agent_exception_hint,
     format_external_agent_stderr,
+    print_external_agent_event_summary,
     write_external_agent_stderr,
 )
 from ai_provider.external_agents import ExternalAgentEventSummary
@@ -34,6 +35,34 @@ def test_completed_delegation_preserves_prior_status():
     summary = ExternalAgentEventSummary(None, (), (event,), (), (), None, None, ())
     status = delegation_status_after_external_agent_events("accepted: local context", summary)
     assert status == "accepted: local context; completed: external Codex MCP delegate_task"
+
+
+def test_unresolved_mcp_recovery_is_printed_as_a_visible_warning(capsys):
+    # ADR-064: the unresolved failure stays visible beside a completed run.
+    summary = ExternalAgentEventSummary(
+        "Done.",
+        (),
+        (),
+        (),
+        (),
+        None,
+        None,
+        (),
+        ("unresolved failure", "second unresolved failure"),
+    )
+    print_external_agent_event_summary(summary)
+    output = capsys.readouterr().out
+    assert "external_agent_mcp_warning: unresolved failure" in output
+    assert "external_agent_mcp_warning: second unresolved failure" in output
+    assert "external_agent_failure_reason" not in output
+
+
+def test_a_failed_run_still_reports_its_failure_reason(capsys):
+    summary = ExternalAgentEventSummary(None, (), (), (), (), None, "sandbox denied", ())
+    print_external_agent_event_summary(summary)
+    output = capsys.readouterr().out
+    assert "external_agent_failure_reason: sandbox denied" in output
+    assert "external_agent_mcp_warning" not in output
 
 
 @pytest.mark.parametrize("tool", [None, [], {}, 3, False])
