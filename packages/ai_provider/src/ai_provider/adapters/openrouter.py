@@ -17,7 +17,13 @@ from urllib.request import Request
 
 from ai_provider.adapters.openai_compatible import OpenAICompatibleChatClient
 from ai_provider.config import ProviderKind
-from ai_provider.contracts import AIMessage, AIRequest, MessageRole, ProviderContinuation
+from ai_provider.contracts import (
+    AIMessage,
+    AIRequest,
+    MessageRole,
+    PrivacyClass,
+    ProviderContinuation,
+)
 from ai_provider.errors import ProviderError, ProviderErrorCategory
 from ai_provider.http_transport import urlopen
 from ai_provider.turn_usage import observe_usage
@@ -120,7 +126,18 @@ class OpenRouterFreeChatClient(OpenAICompatibleChatClient):
             raise self._refusal("Invalid OpenRouter metadata; inference was not sent.")
         return raw
 
-    def _verify_free_model(self, model: str) -> None:
+    def _verify_request_model(self, request: AIRequest) -> None:
+        # Low-risk may still be private. Only a caller's explicit full-input
+        # attestation permits uncertain training/retention of public material.
+        public_or_synthetic = (
+            request.privacy_class is PrivacyClass.PUBLIC_OR_LOW_RISK
+            and request.metadata.get("public_or_synthetic") is True
+        )
+        self._verify_free_model(
+            request.model or self.config.model, public_or_synthetic=public_or_synthetic
+        )
+
+    def _verify_free_model(self, model: str, *, public_or_synthetic: bool = False) -> None:
         # A named variant fixes model identity; gateway routers/auto aliases do not.
         if not model.endswith(":free") or model.startswith("openrouter/"):
             raise self._refusal("OpenRouter requires an exact named :free model.")
@@ -135,13 +152,15 @@ class OpenRouterFreeChatClient(OpenAICompatibleChatClient):
         parameters = matches[0].get("supported_parameters")
         if not isinstance(parameters, list) or "tools" not in parameters:
             raise self._refusal("OpenRouter tool support is unverified; inference was not sent.")
-        self._verify_free_quota()
+        self._verify_free_quota(public_or_synthetic=public_or_synthetic)
 
-    def _verify_free_quota(self) -> None:
+    def _verify_free_quota(self, *, public_or_synthetic: bool = False) -> None:
         raw = self._metadata("key").get("data")
         # Pricing excludes data-policy routing from Free, while routing docs are
         # unqualified. Never assume the requested privacy filter is enforced there.
-        if not isinstance(raw, dict) or raw.get("is_free_tier") is not False:
+        if not public_or_synthetic and (
+            not isinstance(raw, dict) or raw.get("is_free_tier") is not False
+        ):
             raise self._refusal(
                 "OpenRouter Free-plan privacy-filter entitlement is unverified; "
                 "inference was not sent. Resolve the documentation conflict first."
@@ -168,9 +187,8 @@ class OpenRouterFreeChatClient(OpenAICompatibleChatClient):
             )
 
     def _chat_payload(self, request: AIRequest, *, stream: bool) -> dict[str, Any]:
-        # Mandatory even for direct configs which omit require_free_model.
-        if not self.config.require_free_model:
-            self._verify_free_model(request.model or self.config.model)
+        # The request-aware override enforces admission even for direct configs
+        # which omit require_free_model; base payload construction calls it once.
         payload = super()._chat_payload(request, stream=stream)
         payload["provider"] = {
             "require_parameters": True,

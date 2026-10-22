@@ -635,3 +635,13 @@ final completion, retaining model candidates, history and original limits.
 Repeated missing evidence at the same observed state stops; no permissions,
 generic prose grading, storage or default policy change. See
 [ADR-062](decisions/ADR-062-optional-completion-evidence.md).
+
+## ADR-063 — Explicit public-input privacy exception
+
+**Status:** Accepted and implemented offline (2026-10-21); live access unverified.
+
+Owner permits possible retention/training only for explicitly public/synthetic
+requests. OpenRouter requires the low-risk privacy class and a request-local exact
+boolean attestation; private/default requests retain their guard. Price/quota and
+requested privacy filters remain. See
+[ADR-063](decisions/ADR-063-explicit-public-input-privacy-exception.md).
