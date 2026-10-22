@@ -26,6 +26,10 @@ GROUPS = {
         "tests/test_copilot_usage.py",
         "tests/test_kiro_usage.py",
         "tests/test_turn_usage.py",
+        "tests/test_source_info.py",
+        "tests/test_go_source_info.py",
+        "tests/test_opencode_go_adapter.py",
+        "tests/test_opencode_go_protocol_adapters.py",
     ),
     "orchestrator": (
         "tests/test_orchestrator_*.py",
@@ -41,6 +45,7 @@ GROUPS = {
         "tests/test_foreground*.py",
         "tests/test_python_runtime_tool.py",
         "tests/test_validation_process_ownership.py",
+        "tests/test_shell_process_ownership.py",
         "tests/test_shared*.py",
         "tests/test_semantic_refactor.py",
         "tests/test_coding_sessions.py",

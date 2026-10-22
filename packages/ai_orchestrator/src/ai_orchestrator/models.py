@@ -101,6 +101,7 @@ class BillingSource(StrEnum):
     OPENAI_API_BILLING = "openai_api_billing"
     REQUESTY_BILLING = "requesty_billing"
     OPENROUTER_FREE = "openrouter_free"
+    OPENCODE_GO_SUBSCRIPTION_ALLOWANCE = "opencode_go_subscription_allowance"
     CHATGPT_SUBSCRIPTION_ALLOWANCE = "chatgpt_subscription_allowance"
     CHATGPT_WORKSPACE_CREDITS = "chatgpt_workspace_credits"
     GOOGLE_AI_STUDIO_FREE = "google_ai_studio_free"

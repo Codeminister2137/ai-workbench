@@ -17,6 +17,7 @@ class ProviderKind(StrEnum):
     OPENROUTER = "openrouter"
     OPENAI = "openai"
     GOOGLE = "google"
+    OPENCODE_GO = "opencode_go"
 
 
 @dataclass(frozen=True, slots=True)
@@ -102,5 +103,7 @@ def _provider_api_key(provider: ProviderKind) -> str | None:
             return os.getenv("OPENROUTER_API_KEY")
         case ProviderKind.GOOGLE:
             return os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+        case ProviderKind.OPENCODE_GO:
+            return os.getenv("OPENCODE_API_KEY")
         case ProviderKind.OLLAMA:
             return None

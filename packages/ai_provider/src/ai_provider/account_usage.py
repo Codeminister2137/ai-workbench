@@ -4,7 +4,7 @@ from typing import Any
 
 from ai_orchestrator import AccessMethod, BillingSource, ExecutionTarget
 
-from ai_provider import codex_usage, copilot_usage, kiro_usage
+from ai_provider import codex_usage, copilot_usage, go_source_info, kiro_usage
 
 
 def read_execution_allowance(target: ExecutionTarget) -> dict[str, Any] | None:
@@ -25,4 +25,9 @@ def read_execution_allowance(target: ExecutionTarget) -> dict[str, Any] | None:
         and target.billing_source is BillingSource.KIRO_SUBSCRIPTION_ALLOWANCE
     ):
         return kiro_usage.read_kiro_allowance(timeout_seconds=timeout)
+    if (
+        target.access_method is AccessMethod.PROVIDER_API
+        and target.billing_source is BillingSource.OPENCODE_GO_SUBSCRIPTION_ALLOWANCE
+    ):
+        return go_source_info.read_opencode_go_allowance(timeout_seconds=timeout)
     return None

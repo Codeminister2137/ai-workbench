@@ -3,8 +3,9 @@
 **Checked:** 2026-10-13; Gemini individual-access retirement verified 2026-10-14.
 Published limits and account observations can expire.
 
-**Latest scoped update:** 2026-10-21, OpenRouter limits/privacy and Codex data-policy
-scope. This does not refresh every historical offer in the table below.
+**Latest scoped update:** 2026-10-22, capacity comparison below; OpenRouter
+limits/privacy and Codex data-policy scope were also checked 2026-10-21.
+This does not refresh every historical offer in the table below.
 
 This is the shared reference for provider access findings, integration gaps and
 evaluation limits. It is documentation, not a live quota registry or executable
@@ -38,11 +39,15 @@ and private transcripts do not belong in this public reference.
   FAQ says ZDR routing is available on every plan. Provider-logging guidance also
   describes per-request policy filtering. These statements do not establish which
   exact request filters are enforced for this Free account; do not assume parity.
-- Current implementation: `adapters/openrouter.py` refuses Free-plan accounts
-  with unverified privacy-filter entitlement before admitting model inference.
-  A free daily counter does not override that guard. Any public/synthetic-only
-  exception is a separate owner-controlled privacy-policy decision, not approved
-  merely by an end-of-day allowance grant.
+- Historical blanket guard: Free-plan accounts with unverified privacy-filter
+  entitlement were refused even for public inputs. The earlier end-of-day grant
+  did not override this guard.
+- Owner-approved exception, 2026-10-21 ([ADR-063](../../../docs/decisions/ADR-063-explicit-public-input-privacy-exception.md)):
+  `PUBLIC_OR_LOW_RISK` plus literal `metadata["public_or_synthetic"] = True`
+  attests the complete request is public/synthetic and approved for possible
+  retention/training. Unattested/private inputs retain their gate. Every call
+  still requires zero prices and valid remaining quota, and requests
+  `data_collection=deny`. No automatic CLI classification or privacy guarantee.
 
 ### Codex and cross-provider privacy — checked 2026-10-21
 
@@ -55,6 +60,233 @@ it does not establish public disclosure, training permission or equivalent handl
 by every other processor. Evaluate the task data and each additional recipient.
 
 ## Sources and readiness
+
+### Capacity comparison — checked 2026-10-22
+
+Published offers, not account entitlement or measured coding quality:
+
+- [Codex pricing](https://learn.chatgpt.com/docs/pricing) lists Plus at $20/month
+  and Pro tiers at $100/$200/$500. Plus/Pro can purchase additional credits;
+  the account offer determines purchase price. API-key billing is separate.
+  Current documentation says Pro has no five-hour limit; weekly limits may apply.
+  Do not reuse older 5x/20x marketing or assume an upgrade is currently available
+  from a listed tier. Current account usage/reset and checkout terms must decide.
+- [Copilot plans](https://github.com/features/copilot/plans) list Pro $10/month
+  with $15 included AI-credit value, Pro+ $39 with $70, and Max $100 with $200.
+  Totals include variable flex allotments. CLI consumes these credits;
+  [model pricing](https://docs.github.com/en/copilot/reference/copilot-billing/models-and-pricing)
+  meters input/output/cache tokens, including model-dependent cache writes.
+  Historic premium-request counts do not describe a new monthly subscription.
+  The published [trial pause](https://github.blog/changelog/2026-04-10-pausing-new-github-copilot-pro-trials/)
+  remains accessible; current trial eligibility is not established.
+- [OpenRouter pricing](https://openrouter.ai/pricing) confirms free models at
+  20 requests/minute and 50/day, increasing to 1,000/day after $10 lifetime credits
+  purchased. Standard credit purchases carry a 5.5% platform fee. Standard lists
+  data-policy routing; Free does not. The limits page's extracted table omits
+  numeric substitutions; its account counter and pricing FAQ are clearer here.
+  This buys capacity, not proven strong-agent quality or private-input permission.
+- [Kiro pricing](https://kiro.dev/pricing/) advertises $20 subscription credit
+  on a first eligible paid upgrade using social login/Builder ID. Pro is $20/month
+  with 1,000 credits and premium models; Free has 50. Eligibility and regional model
+  availability need verification. Credits are not equivalent to requests or another
+  service's credits. No subscription or add-on billing was enabled.
+- [Antigravity plans](https://antigravity.google/docs/plans/) retain weekly free
+  capacity and higher paid limits; no numeric usable account allowance was established.
+  Existing unresolved shared-tool permission mapping remains a baseline constraint.
+- [Zed](https://zed.dev/pricing) offers $5/14 days without a card, shared with Delta,
+  GPT-6 Luna only. [Cerebras](https://inference-docs.cerebras.ai/support/rate-limits)
+  offers $5/30 days after card verification, with no recurring free tier.
+  Neither establishes a ready strong route through this CLI.
+- [OpenCode Console](https://opencode.ai/v2/docs/console/models/) currently lists
+  limited-time free models including GLM-5.3-Flash and DeepSeek V4.1 Flash, with
+  model-specific zero-retention/no-training statements. Other free models permit
+  improvement/training. Numeric usable quota, no-deposit entitlement, integration
+  and baseline quality remain unverified; signup is not authorized.
+- [Claude pricing](https://claude.com/pricing) lists Claude Code in $20/month Pro
+  and Max from $100. It is another paid candidate, without a verified general free
+  CLI trial or an accepted integration here. New processing/integration needs approval.
+
+Technical recommendation, not an owner decision: compare a capped top-up on the
+existing Codex route first for immediate baseline continuity. For recurring use,
+compare Copilot's token budget and Kiro's eligible first-upgrade offer with the
+actual Codex checkout. Avoid buying OpenRouter solely to obtain a strong coding
+replacement: free-model quality remains unestablished. Free trials may support
+small future evaluations but do not yet replace this baseline route. Preserve
+required instructions/tests/history rather than shrinking the task to fit an offer.
+Private observations and purchase decisions remain in local artifacts/handoff.
+
+### Follow-up: OpenCode Go, Claude and official agent SDKs — 2026-10-22
+
+This supplements the comparison above; recommendations remain unapproved.
+OpenCode Go was previously omitted from its paid shortlist, while Antigravity
+and Claude received too little assessment. No install/account/inference ran.
+
+- [OpenCode Go](https://opencode.ai/v2/docs/console/go/): $10/month; Plus $40.
+  Model-dependent allowance; five-hour/weekly caps are 20%/50% of monthly limits.
+  Example Go monthly limits: Kimi K2.7 Code $60, Kimi K3 $15. These are priced-use
+  allowances, not cash credits or proven completed tasks. Supports other coding
+  agents, requiring client identification/session headers. No need to replace our
+  whole CLI. Privacy varies by model, including training-permitted Contributor
+  routes; extra usage can spend a separate balance. Keep it disabled unless approved.
+- [Claude Pro](https://claude.com/pricing): $20 monthly includes Claude Code.
+  [Plan access](https://support.claude.com/en/articles/11145838-use-claude-code-with-your-pro-or-max-plan)
+  shares five-hour/weekly limits with Claude; API-key authentication can select
+  separate API billing. [Agent SDK policy](https://support.claude.com/en/articles/15036540-use-the-claude-agent-sdk-with-your-claude-plan)
+  currently permits subscription-limit use of the SDK and headless client.
+  This repository has no accepted Claude executor/permission mapping yet.
+- [Antigravity](https://www.antigravity.google/docs/plans): free weekly quota and
+  paid higher baseline quotas; paid credit overages are separately configurable.
+  The local binary exists, but our shared executor explicitly refuses absent MCP
+  grants. [Permissions](https://www.antigravity.google/docs/permissions/) document
+  narrow MCP rules; this is a concrete integration gap to investigate, not proof
+  the service is unsuitable or out of quota. Windows differs from other platforms.
+- [Codex SDK](https://learn.chatgpt.com/docs/codex-sdk): stable Python package
+  openai-codex controls local app-server through JSON-RPC, with a pinned runtime;
+  supports explicit executable selection. [App Server](https://learn.chatgpt.com/docs/app-server)
+  is the official integration surface for conversations, approvals and streamed
+  events. This is distinct from the general OpenAI model API SDK.
+- [Copilot SDK](https://github.com/github/copilot-sdk) also controls the local
+  runtime through JSON-RPC. [Compatibility](https://docs.github.com/en/copilot/how-tos/copilot-sdk/troubleshooting/compatibility)
+  includes sessions, abort, custom tools, MCP and permission/event hooks.
+  The [Python README](https://github.com/github/copilot-sdk/blob/main/python/README.md)
+  documents runtime downloads and an experimental in-process transport. Prefer
+  an explicitly selected child-process transport for any initial assessment;
+  an in-process runtime changes isolation and cannot honor per-client cwd/env.
+
+Engineering assessment: SDK adapters may reduce hand-maintained event parsing and
+improve session/approval integration. They do not fix model quality or increase
+subscription allowance. Compare retained CLI adapters (no migration, existing
+evidence) with optional SDK-backed executors (richer control, new dependencies,
+version/runtime/lifecycle and permission verification). Recommend a focused offline
+contract assessment against existing neutral execution contracts, before choosing
+adoption. Keep provider details below applications/Orchestrator, retain shared-tool
+guards and owned cleanup, and avoid replacing the existing provider-neutral agent
+loop with one vendor's SDK. No architecture/dependency/default change is approved.
+
+Capacity recommendation is now broader: inspect existing Antigravity capacity and
+narrow mapping first for a zero-purchase option; Go is a serious low-cost paid
+candidate, Claude Pro a separate native-agent candidate. Codex top-up remains the
+least-change immediate continuation when checkout terms are acceptable. Quality,
+privacy, exact model and account admission still require independent verification.
+
+### OpenCode Go model starting points — checked 2026-10-22
+
+Recommendations are provisional engineering choices, not measured model parity.
+For manual IDE-assisted development, start with Kimi K2.7 Code. It can perform
+implementation and separate frozen review without manual model switching; retain
+GLM-5.2 as an alternative and GLM-5.3 as an optional different-model reviewer for
+later automated selection. The [recommendation catalog](model-catalog.md) records
+roles and evidence limits. Their published Go monthly
+priced-use limits are $60/$60/$15 respectively, with five-hour/weekly caps still
+applying. The [Go model/limits/privacy table](https://opencode.ai/v2/docs/console/go/)
+lists no-training/zero-day retention for these routes; this is a published policy,
+not an independent audit. Contributor routes can permit training and are not
+recommended for this repository's private context. Keep optional paid extra usage
+separate from the subscription. Reassess choices from actual task results, not
+marketing estimates of requests or automatic switching to a newer model.
+
+An IDE agent using Go is distinct from ai_provider support. A configured key does
+not add a ProviderKind, executor, quota reader, or approved automatic fallback.
+Manual success does not establish our CLI's acceptance or agent quality parity.
+Future automation should reuse neutral route selection and the existing approval,
+privacy, cost and process-ownership contracts, after explicit integration decisions.
+
+Temporary Go follow-up, checked 2026-10-22: the [official offer](https://opencode.ai/v2/docs/console/go/)
+advertises LongCat 2.5 Preview Free, MiniMax M3.1 Flash Free and Beam Free as
+temporarily free/unlimited. Exact IDs, route-specific retention and evaluation
+status are in [the model catalog](model-catalog.md#opencode-go-temporary-free-candidates).
+This does not change the current Kimi preference or authorize switching/inference.
+
+### OpenCode automatic information discovery — checked 2026-10-22
+
+The [Console API overview](https://opencode.ai/v2/docs/console/api/) documents
+model listing and scoped Usage Read permissions. Its
+[Budgets API](https://opencode.ai/v2/docs/console/api/budgets) lists member monthly
+monetary budgets, spend and resets; it can expose personal identities and requires
+the applicable key permissions. This is not evidence that the owner's Go key can
+read Go subscription-window remaining quota. The Go guide documents model listing;
+verify each endpoint/account scope before claiming automatic allowance support.
+Do not substitute workspace budgets or advertised limits for Go remaining usage.
+
+Implementation status in `ai_provider`:
+
+- ``OpenCodeGoChatClient`` connects to ``https://opencode.ai/inference/go/openai/v1``
+  using OpenAI-compatible Chat Completions, with project User-Agent and optional
+  per-request ``x-opencode-session`` from ``request.metadata["opencode_session"]``.
+- ``OpenCodeGoResponsesClient`` extends the generic ``OpenAIResponsesChatClient``
+  base for Go's Responses endpoint at ``https://opencode.ai/inference/go/v1/responses``.
+- ``OpenCodeGoMessagesClient`` extends the generic ``AnthropicMessagesChatClient``
+  base for Go's Messages endpoint at ``https://opencode.ai/inference/go/v1/messages``.
+- ``create_chat_client`` routes OpenCode Go models by protocol:
+  ``responses`` → ``OpenCodeGoResponsesClient``, ``messages`` →
+  ``OpenCodeGoMessagesClient``, otherwise ``OpenCodeGoChatClient``.
+- ``OpenCodeGoSourceInfo`` lists models from ``GET /inference/go/v1/models`` and
+  normalizes capabilities/prices defensively. Each inventory item now records the
+  model's ``protocol`` (``chat``/``responses``/``messages``),
+  ``trains_on_request_data``, and ``requires_global_regions`` flags.
+- Account allowance is reported as ``unavailable`` because no official Go-key
+  endpoint reads remaining subscription allowance.
+- ``ProviderKind.OPENCODE_GO`` and ``BillingSource.OPENCODE_GO_SUBSCRIPTION_ALLOWANCE``
+  wire Go into config, factory and the existing account-usage dispatcher.
+
+### Live probe observations — 2026-10-22
+
+``GET /inference/go/v1/models`` returned **36** model ids. The endpoint does **not**
+return capabilities, context-window or prices. The live list differs from the
+published docs: `longcat-2.5-preview-free` is absent; `grok-4.6`, `glm-5.1`,
+`kimi-k2.6`, `qwen3.6-plus`, `qwen3.7-max`, `minimax-m2.5`, `minimax-m2.7`,
+`omen-alpha` are present.
+
+A minimal public/synthetic probe (`max_output_tokens=8`) across all 36 models
+produced **23 ok / 13 error**. Raw results are preserved at
+`docs/artifacts/go-all-model-probe-20261022.json`.
+
+**Follow-up probe:** the owner toggled Console Privacy settings for Global
+regions and "paid endpoints that train on request data", and the new
+Responses/Messages adapters were activated. With `max_output_tokens=16` (needed
+because GPT Luna rejects values below 16), the rerun produced **33 ok / 3 error**.
+Raw results are preserved at
+`docs/artifacts/go-all-model-probe-20261022-rerun.json`.
+
+Models unblocked by protocol routing and privacy toggles:
+- **Responses:** `deepseek-v4.1-flash`, `deepseek-v4-pro`, `grok-4.6`, `grok-4.7`,
+  `gpt-5.6-luna`, `gpt-6-luna`, `muse-spark-1.2-contributor`,
+  `muse-spark-1.3-contributor`.
+- **Messages:** `claude-haiku-5-5`, `minimax-m2.7`.
+
+Still failing after toggles:
+- `mimo-v2.5-pro`: upstream/router still reports unsupported model ID.
+- `gemini-4-argon-contributor`: returns "Model does not support this protocol"
+  on Chat, Responses and Messages endpoints.
+- `longcat-2.0`: `402` endpoint unavailable.
+
+### Error classification for failing models
+
+| Model | Error | Meaning | Fix type |
+| --- | --- | --- | --- |
+| `deepseek-v4.1-flash`, `deepseek-v4-pro` | `400` "requires Global regions. Select Global in your workspace's Privacy settings" | Model is routed through Global regions; workspace privacy setting blocks it. | Account setting: Settings → Privacy → Global regions. Public reports: anomalyco/opencode #50155, #49184, #58044. |
+| `grok-4.6`, `grok-4.7`, `gpt-5.6-luna`, `gpt-6-luna` | `400` "Model does not support this protocol" | These models are served from `/zen/go/v1/responses` (OpenAI Responses protocol), not `/v1/chat/completions`. | Code: add Responses-protocol adapter or route these model IDs to the responses endpoint. |
+| `claude-haiku-5-5`, `minimax-m2.7` | `400` "Model does not support this protocol" | These models are served from `/zen/go/v1/messages` (Anthropic Messages protocol), not `/v1/chat/completions`. | Code: add Messages-protocol adapter or route these model IDs to the messages endpoint. |
+| `muse-spark-1.2-contributor`, `muse-spark-1.3-contributor`, `gemini-4-argon-contributor` | `400` "trains on request data. Allow paid endpoints that train on request data in your workspace's Privacy settings" | Contributor models trade discounted pricing for training rights; explicit opt-in required. They also appear to map to `/v1/responses`. | Account setting: Settings → Privacy → "Allow paid endpoints that train on request data". Public reports: anomalyco/opencode #50016, #47562. |
+| `mimo-v2.5-pro` | `400` "Unsupported model mimo-v2.5-pro" | Upstream/router does not recognize this model ID right now. Likely a transient Console Go routing issue; MiMo models have a history of upstream provider changes. | Wait/retry or use `mimo-v2.5` / `mimo-v2.6-pro`. Public reports: anomalyco/opencode #45990, #45291, #43481. |
+| `longcat-2.0` | `402` "Endpoint is unavailable" | Either the model is temporarily down or the subscription cap/balance does not cover it. | Check Console usage/caps; retry later. Public reports: anomalyco/opencode #42750, #42757, #27964. |
+
+- **Models that ignore `max_output_tokens`**: `qwen3.6-plus`, `qwen3.7-max`,
+  `qwen3.7-plus`, and `grok-4.6` returned far more output tokens than requested
+  even at `max_output_tokens=16`. Treat these as non-compliant for cost budgeting
+  until the behavior is confirmed fixed.
+- **GPT Luna requires `max_output_tokens >= 16`**; values below 16 return
+  `invalid_request_error`.
+- Several models inject additional context tokens (`minimax-m3` 182 input tokens,
+  `minimax-m3.1-flash-free` 208, `beam-free` 52, `omen-alpha` 64, `kimi-k3` 94),
+  so per-request token estimates should not assume only the caller's prompt
+  counts toward the cap.
+- **Free models observed today:** `beam-free`, `minimax-m3.1-flash-free`.
+  `longcat-2.5-preview-free` was not returned by the listing endpoint and
+  `longcat-2.0` failed the access probe.
+
+Use the probe only with explicit bounds; the qwen models in particular can
+consume far more tokens than requested.
 
 ### Investigating a route-specific failure
 
@@ -106,10 +338,12 @@ quota or successful inference.
 OpenRouter privacy contract remains unresolved for a Free-plan account: its
 [pricing table](https://openrouter.ai/pricing/) excludes data-policy routing,
 while routing/provider-logging documentation describes filters without that
-qualification. The experimental client refuses Free/unknown-tier key metadata
-before inference. Offline successful mocks represent an already non-free-tier
-account calling only zero-priced models; they do not establish free-account
-entitlement. No deposit or policy weakening follows from this observation.
+qualification. Historically the experimental client refused Free/unknown-tier key
+metadata before inference. ADR-063 now permits the explicit public/synthetic-input
+exception described above; unattested/private inputs retain that refusal. Earlier
+successful mocks represented an already non-free-tier account calling only
+zero-priced models; they did not establish free-account entitlement. No deposit
+or additional policy weakening follows from this observation.
 
 Current official public free-model metadata (2026-10-14) lists alternatives such
 as `google/gemma-4-31b-it:free`, `thinkingmachines/inkling-small:free` and

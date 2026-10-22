@@ -61,6 +61,16 @@ One chat-style completion request:
 - `privacy_class`: prototype privacy label;
 - `metadata`: caller metadata that adapters may preserve but should not require.
 
+OpenRouter's optional public-input exception uses
+`metadata={"public_or_synthetic": True}` together with
+`privacy_class=PrivacyClass.PUBLIC_OR_LOW_RISK`. This attests that the **entire**
+request is public/synthetic and approved for possible retention/training; the
+broader privacy class alone does not qualify. Caller code must reassess history,
+instructions and tool results on every request. No automatic classification or
+saved-session inheritance is provided. The exception permits uncertain Free-plan
+privacy-filter entitlement while preserving zero-price, quota and requested
+`data_collection=deny` guards. See [ADR-063](../../../docs/decisions/ADR-063-explicit-public-input-privacy-exception.md).
+
 ### `AIResponse`
 
 One normalized provider response:
@@ -118,7 +128,7 @@ finish metadata normalizes to `unknown`.
 
 Configured backend selection:
 
-- `provider`: `ollama`, `requesty`, or `openai`;
+- `provider`: `ollama`, `requesty`, `openrouter`, `openai`, `google`, or `opencode_go`;
 - `model`: backend model ID;
 - `base_url`: optional backend URL override;
 - `api_key`: optional hosted-provider credential loaded from environment or
@@ -129,15 +139,17 @@ Configured backend selection:
 
 ## Capability Matrix
 
-| Capability | Ollama | Requesty | OpenAI |
-| --- | --- | --- | --- |
-| Chat completion | Implemented | Implemented | Implemented |
-| Streaming | Implemented | Implemented | Implemented |
-| Provider-reported usage | Partial, when Ollama reports counts | Implemented when reported | Implemented when reported |
-| External execution | No | Implemented | Implemented |
-| Tool calling | Not yet | Future trigger | Future trigger |
-| Structured output | Not yet | Future trigger | Future trigger |
-| Embeddings | Not yet | Future trigger | Future trigger |
+| Capability | Ollama | Requesty | OpenRouter | OpenAI | Google | OpenCode Go |
+| --- | --- | --- | --- | --- | --- | --- |
+| Chat completion | Implemented | Implemented | Implemented | Implemented | Implemented | Implemented |
+| Streaming | Implemented | Implemented | Implemented | Implemented | Implemented | Implemented |
+| Provider-reported usage | Partial, when Ollama reports counts | Implemented when reported | Implemented when reported | Implemented when reported | Implemented when reported | Implemented when reported |
+| Model listing | Local only | Via API | Via API | Via API | Via API | Via API |
+| Account allowance observation | No | No | Via API | No | No | Unavailable: no official endpoint |
+| External execution | No | Implemented | Implemented | Implemented | Implemented | Implemented |
+| Tool calling | Not yet | Future trigger | Implemented | Future trigger | Future trigger | Implemented |
+| Structured output | Not yet | Future trigger | Future trigger | Future trigger | Future trigger | Future trigger |
+| Embeddings | Not yet | Future trigger | Future trigger | Future trigger | Future trigger | Future trigger |
 
 The interface should not pretend every backend supports every feature. New capabilities should be added only when a real consumer needs them.
 
@@ -149,10 +161,42 @@ statement that Chat Completions is always the best protocol. ADR-020 records tha
 each hosted adapter should document whether it uses Chat Completions, Responses,
 Anthropic Messages, or another API shape, and why.
 
+OpenCode Go now supports all three documented endpoints:
+
+- **Chat Completions** at `https://opencode.ai/inference/go/openai/v1` via
+  `OpenCodeGoChatClient`.
+- **Responses** at `https://opencode.ai/inference/go/v1/responses` via
+  `OpenCodeGoResponsesClient`, a subclass of the reusable
+  `OpenAIResponsesChatClient`.
+- **Messages** at `https://opencode.ai/inference/go/v1/messages` via
+  `OpenCodeGoMessagesClient`, a subclass of the reusable
+  `AnthropicMessagesChatClient`.
+
+The Responses and Messages endpoints require the `x-opencode-session` header;
+the adapters read it from `request.metadata["opencode_session"]`. A live
+all-model probe with the correct protocol routing and Console Privacy toggles
+achieved 33 ok / 3 error; remaining failures are `mimo-v2.5-pro` (upstream
+unsupported), `gemini-4-argon-contributor` (no supported protocol) and
+`longcat-2.0` (unavailable).
+
+`create_chat_client` routes OpenCode Go models by the protocol declared in
+source info. Callers should pass a stable conversation session id in
+``request.metadata["opencode_session"]`` so the adapter can send the
+``x-opencode-session`` header Go expects for routing and prompt caching. A
+project-specific User-Agent is sent automatically.
+
+Model inventory is collected from ``GET /inference/go/v1/models`` and now
+includes each model's ``protocol`` (``chat``/``responses``/``messages``),
+``trains_on_request_data``, and ``requires_global_regions`` metadata. Go
+subscription remaining allowance is **not** exposed by an official endpoint for
+the inference key; the collector reports ``unavailable`` rather than inferring
+it from published limits.
+
 Prefer the richer provider API when it does not compromise compatibility,
-privacy, cost, quality, or maintainability. OpenAI's Responses API is a likely
-future OpenAI-specific adapter when built-in tools, computer use, or richer
-agentic streaming become necessary.
+privacy, cost, quality, or maintainability. The generic
+`OpenAIResponsesChatClient` and `AnthropicMessagesChatClient` bases make the
+same protocol available to future non-Go providers without duplicating payload
+and stream parsing logic.
 
 ## Provider Factory
 
