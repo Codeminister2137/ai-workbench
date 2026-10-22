@@ -125,6 +125,17 @@ Free-plan conflict is still open.
     context, 99.79% uptime), `cohere/north-mini-code:free` 1 provider
     (256,000 context, 100% uptime), while `openai/gpt-oss-120b:free` and
     `qwen/qwen3.8-27b:free` advertised **no** endpoint.
+  - **The free catalogue itself turns over, so an empty endpoint list is a
+    reading, not a verdict.** Later the same day, about fifty minutes after
+    the snapshot above, a full sweep found 17 free variants and all 17 had an
+    advertised endpoint — but `openai/gpt-oss-120b:free` and
+    `qwen/qwen3.8-27b:free` were **no longer in the public free catalogue**
+    at all, while unrelated free models had appeared. The count staying at 17
+    hides a change of membership. Checked that this is not a rate-limit
+    artefact: repeated reads of those two ids returned an empty list both with
+    and without delays, and the models were absent from `GET /api/v1/models`.
+    Consequence: route availability must be re-read before it is relied on,
+    and never cached as a property of a route.
   - Availability is a source-reported observation, not a quality judgment, and
     not acceptance evidence for this repository.
 

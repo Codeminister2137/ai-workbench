@@ -92,8 +92,41 @@ Two public sources were checked:
 
 | Source | Shape | Coverage of our routes | Limitation |
 | --- | --- | --- | --- |
-| [SWE-bench Verified](https://www.swebench.com/) | One row per **(model, agent scaffold)** pair; 180 rows, 84 distinct model names, 77 distinct scaffolds | 17 of the 36 Go routes have a *family* match, always across a version gap; the 17 OpenRouter free variants have **none** | Scaffold-confounded: the same model appears under many agents with different scores. Covers mostly frontier models |
-| [Aider polyglot](https://aider.chat/docs/leaderboards/) | One row per model under **a single consistent harness**; 52 distinct model ids | Covers the gateway-served open-weight families we actually have: `gpt-oss-120b`, `kimi-k2`, `qwen3-32b`, `gemma-3-27b-it`, `grok-3/4`, plus `deepseek`, `gemini`, `claude`, `gpt` | Also has version gaps, and is a code-**editing** benchmark rather than repo-level issue resolution |
+| [SWE-bench Verified](https://www.swebench.com/) | One row per **(model, agent scaffold)** pair; 180 rows, 84 distinct model names, 77 distinct scaffolds | 17 of the 36 Go routes have a *family* match, always across a version gap; the 17 OpenRouter free variants have **none** | Scaffold-confounded: the same model appears under many agents with different scores. Runs dated 2023-10-10 to **2026-02-26** |
+| [Aider polyglot](https://aider.chat/docs/leaderboards/) | One row per model under **a single consistent harness**; 69 runs, 53 distinct model ids | Covers the gateway-served open-weight families we actually have: `gpt-oss-120b`, `kimi-k2`, `qwen3-32b`, `gemma-3-27b-it`, `grok-3/4`, plus `deepseek`, `gemini`, `claude`, `gpt` | Comparability and coverage are better, but **currency is worse**: runs dated 2024-12-21 to **2025-10-03** |
+
+Neither source wins outright. Aider is the better prior for ranking models
+against each other, because one harness makes its scores comparable and it
+publishes a **specific model id** rather than a display name. SWE-bench is
+fresher by about four months and closer to our real task shape, but its rows
+cannot be compared with each other. Record both, weigh currency explicitly, and
+do not average across them: `percent_correct` and `percent_resolved` are
+different scales, and the readers keep them distinct rather than pretending
+they are interchangeable.
+
+**Four findings constrain any future scoring decision.** All four were measured
+from the readers on 2026-10-22 and are saved with provenance under
+`artifacts/model-capability-priors-20261022/`:
+
+1. **An unpinned model id is a rolling alias.** `deepseek/deepseek-chat`
+   published 17.8, 48.4, 55.1 and 70.2 under an *identical* configuration
+   between 2024-12-21 and 2025-10-03. A leaderboard score for an unpinned id
+   describes a snapshot, not what that id resolves to today. Prefer pinned ids
+   such as `anthropic/claude-3-7-sonnet-20250219` or
+   `gemini/gemini-2.5-pro-preview-06-05`.
+2. **Configuration materially changes the score.** `openai/gpt-5` scored 88.0
+   at high reasoning effort, 86.7 at medium and 81.3 at low; `o3` scored 81.3
+   as `diff` and 78.2 as `architect`. Every record keeps its configuration, so
+   repeated runs stay distinguishable instead of appearing to contradict.
+3. **Accuracy is not reliability.** `openai/gpt-5` reached 88.0% with only
+   91.6% well-formed answers, while `gemini/gemini-2.5-pro-preview-06-05`
+   reached 83.1% at 99.6% well-formed. A model that is right more often can be
+   the worse choice for an unattended run.
+4. **The OpenRouter free route set turns over.** Between two sweeps about fifty
+   minutes apart, `openai/gpt-oss-120b:free` and `qwen/qwen3.8-27b:free`
+   dropped out of the public free catalogue while the count stayed at 17.
+   Availability is therefore a point-in-time reading that must be re-read
+   before use, never a cached property.
 
 **No public leaderboard covers the newest route ids.** Qwen 3.6+/3.7+/3.8+,
 Kimi K2.7, GLM 5.1-5.3, Grok 4.6/4.7, MiMo 2.5/2.6, LongCat 2.0, Beam,
@@ -102,9 +135,12 @@ all. For those routes the internet prior is **absent**, not merely weaker,
 which is the strongest practical argument for judging them from our own CLI
 transcripts.
 
-Readers: `ai_provider.openrouter_endpoints` (route availability) and
-`ai_provider.swe_bench_scores` (published capability prior). The shared
-records are documented in [the interface contract](interface.md).
+Readers: `ai_provider.openrouter_endpoints` (route availability),
+`ai_provider.swe_bench_scores` and `ai_provider.aider_polyglot_scores`
+(published capability priors). The shared records are documented in
+[the interface contract](interface.md). **Scoring is deliberately undecided**:
+the Orchestrator keeps routing from the declared catalog until these readings
+are normalized into a per-model grade, and no prior changes a route on its own.
 
 ## Adding other providers
 

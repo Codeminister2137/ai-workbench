@@ -193,6 +193,23 @@ SWE-bench leaderboard data for one split. It needs no credential, sends no
 prompt and calls no model. A missing split is reported as unavailable rather
 than guessed.
 
+`ai_provider.aider_polyglot_scores.read_aider_polyglot_scores` reads the public
+Aider polyglot leaderboard page, which is HTML rather than JSON, using only the
+Python standard library. Two properties make it the better prior for comparing
+models against each other:
+
+- **One harness.** Every row was produced by the same tool, so scores are
+  comparable model-to-model. The harness is still recorded on every record, and
+  a score must never be read as a model-only claim.
+- **A specific model id.** Each run publishes the exact `--model` argument it
+  used, such as `openrouter/openai/gpt-oss-120b`, so the record grades one
+  model rather than a family. The published display name is kept separately so
+  the extraction stays auditable.
+
+Each run also publishes the failure modes that decide whether a model is usable
+in practice rather than merely accurate: the share of cases that produced a
+well-formed answer, syntax errors, and exhausted context windows.
+
 ## Capability Matrix
 
 | Capability | Ollama | Requesty | OpenRouter | OpenAI | Google | OpenCode Go |
