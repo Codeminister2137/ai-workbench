@@ -100,6 +100,33 @@ Free-plan conflict is still open.
 - The [pricing page](https://openrouter.ai/pricing) now names
   `GET /api/v1/models?output_modalities=all` as the per-model price source
   ("no API key required") and publishes a per-model `llms.txt` guide.
+- **Route availability, checked 2026-10-22.** The public endpoints API
+  `GET /api/v1/models/{author}/{slug}/endpoints` reports, per provider
+  endpoint, the provider name and tag, reported status, uptime over the last
+  day/5m/30m, latency, throughput, quantization, service tier, context
+  length, prices and supported parameters. It needs no key, so it is a
+  first-party availability source rather than a scraped report. `ai_provider`
+  reads it through `openrouter_endpoints.read_openrouter_endpoint_availability`.
+  Observations so far:
+  - `latency_last_30m` and `throughput_last_30m` were **null** in every
+    response observed; they are not yet a usable latency signal.
+  - `context_length` and `quantization` **differ per endpoint** for the same
+    model (65,536 to 1,000,000 tokens; `bf16`, `fp16`, `fp8`, `fp4`, `nvfp4`,
+    `unknown`). A route's real capability depends on which provider serves it,
+    not on the model id.
+  - `supported_parameters` differs per endpoint, and a provider may not
+    support the tool-choice modes the CLI needs.
+  - A `:free` variant lists the **free** endpoints only, and a free variant
+    with no free provider currently serving it returns an **empty endpoint
+    list**. That absence is actionable: the route cannot be used even though
+    the model is still advertised. Dated free-route snapshot, 2026-10-22:
+    `thinkingmachines/inkling-small:free` 1 provider (`nvfp4`, 1,048,576
+    context, 100% uptime), `google/gemma-4-31b-it:free` 1 provider (262,144
+    context, 99.79% uptime), `cohere/north-mini-code:free` 1 provider
+    (256,000 context, 100% uptime), while `openai/gpt-oss-120b:free` and
+    `qwen/qwen3.8-27b:free` advertised **no** endpoint.
+  - Availability is a source-reported observation, not a quality judgment, and
+    not acceptance evidence for this repository.
 
 ### Codex and cross-provider privacy — checked 2026-10-21
 

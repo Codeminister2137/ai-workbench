@@ -109,6 +109,122 @@ class AccountAllowance:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class EndpointAvailability:
+    """Observed availability and performance of one provider endpoint.
+
+    This is the shared, provider-neutral record shape for route availability.
+    Every source normalizes into it so consumers never branch per source. The
+    values are source-reported observations, not quality judgments: a healthy
+    endpoint says nothing about the quality of the model behind it.
+
+    Unknown values stay ``None`` rather than being inferred. ``uptime_*
+    _percent`` are ratios in the range 0-100 as reported by the source,
+    ``latency_seconds`` and ``throughput_tokens_per_second`` carry their unit
+    in the name.
+    """
+
+    source: str
+    model: str
+    provider: str
+    endpoint: str | None = None
+    status: int | None = None
+    uptime_1d_percent: float | None = None
+    uptime_30m_percent: float | None = None
+    latency_seconds: float | None = None
+    throughput_tokens_per_second: float | None = None
+    quantization: str | None = None
+    service_tier: str | None = None
+    context_length: int | None = None
+    max_completion_tokens: int | None = None
+    prices: dict[str, Any] | None = None
+    supported_parameters: tuple[str, ...] | None = None
+    observed_at_utc: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return a JSON-safe representation without account identity."""
+
+        return {
+            "source": self.source,
+            "model": self.model,
+            "provider": self.provider,
+            "endpoint": self.endpoint,
+            "status": self.status,
+            "uptime_1d_percent": self.uptime_1d_percent,
+            "uptime_30m_percent": self.uptime_30m_percent,
+            "latency_seconds": self.latency_seconds,
+            "throughput_tokens_per_second": self.throughput_tokens_per_second,
+            "quantization": self.quantization,
+            "service_tier": self.service_tier,
+            "context_length": self.context_length,
+            "max_completion_tokens": self.max_completion_tokens,
+            "prices": self.prices,
+            "supported_parameters": (
+                list(self.supported_parameters) if self.supported_parameters is not None else None
+            ),
+            "observed_at_utc": self.observed_at_utc,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class EndpointInventory:
+    """Endpoint availability observed for one model at one source.
+
+    ``status`` is one of ``observed``, ``unavailable``, ``unknown``. An
+    observation with no advertised endpoints is still ``observed``; the empty
+    endpoint list is the finding, and ``reason`` says so.
+    """
+
+    status: str
+    source: str
+    model: str
+    endpoints: tuple[EndpointAvailability, ...] = ()
+    observed_at_utc: str | None = None
+    reason: str | None = None
+
+    def summary(self) -> dict[str, Any]:
+        """Return a small availability summary over the observed endpoints."""
+
+        uptimes = [
+            endpoint.uptime_1d_percent
+            for endpoint in self.endpoints
+            if endpoint.uptime_1d_percent is not None
+        ]
+        contexts = [
+            endpoint.context_length
+            for endpoint in self.endpoints
+            if endpoint.context_length is not None
+        ]
+        quantizations = sorted(
+            {
+                endpoint.quantization
+                for endpoint in self.endpoints
+                if endpoint.quantization is not None
+            }
+        )
+        return {
+            "provider_count": len({endpoint.provider for endpoint in self.endpoints}),
+            "endpoint_count": len(self.endpoints),
+            "best_uptime_1d_percent": max(uptimes) if uptimes else None,
+            "worst_uptime_1d_percent": min(uptimes) if uptimes else None,
+            "max_context_length": max(contexts) if contexts else None,
+            "quantizations": quantizations,
+        }
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return a JSON-safe representation without account identity."""
+
+        return {
+            "status": self.status,
+            "source": self.source,
+            "model": self.model,
+            "observed_at_utc": self.observed_at_utc,
+            "reason": self.reason,
+            "summary": self.summary(),
+            "endpoints": [endpoint.to_dict() for endpoint in self.endpoints],
+        }
+
+
 class SourceInfo(Protocol):
     """On-demand collector for a single source's metadata."""
 
