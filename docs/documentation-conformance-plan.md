@@ -1,11 +1,14 @@
 # Official-documentation conformance review
 
-**Priority: High. Scope: whole repository. Status: planned; first Ollama fix implemented.**
+**Priority: High. Scope: whole repository. Status: in progress; first Ollama fix
+implemented and further bounded findings recorded below.**
 
 The owner prioritized this on 2026-10-11: differences between official documentation
 and implementation confuse humans and AI and create later problems. Dropped Ollama
 thinking state between tool calls is the first confirmed discrepancy; its repair
 does not establish repo-wide conformance or successful coding-quality acceptance.
+Group 1 (provider adapters/shared contracts) has several recorded findings below;
+the rest of group 1 and the remaining groups are not yet covered.
 
 ## Bounded review order
 
@@ -96,3 +99,24 @@ enforcement. It now enables the existing constraint on every store connection.
 Offline checks reject new orphan messages, preserve normal/resumed history, and
 retain historical orphan rows without migration or deletion. This changes no
 schema or application workflow; [SQLite requires per-connection enablement](https://www.sqlite.org/foreignkeys.html#fk_enable).
+
+The OpenRouter free adapter's request contract was checked against the official
+[provider routing reference](https://openrouter.ai/docs/guides/routing/provider-selection)
+on 2026-10-22. The `provider` object it sends — `require_parameters: true`,
+`data_collection: "deny"` and a zero `max_price` for `prompt`, `completion`,
+`request` and `image` — uses the documented field names, types and price
+attributes, and the `GET /api/v1/key` fields it reads (`is_free_tier`,
+`free_model_daily_requests`) match the documented response shape. The request
+guards were already locked by offline regressions, so no code changed.
+
+One deliberate departure is now recorded rather than silently treated as
+conformance. OpenRouter documents a separate `provider.zdr` boolean that
+restricts routing to Zero-Data-Retention endpoints. It is a stronger claim than
+`data_collection: "deny"`, and upstream states that a request-level `zdr` only
+ever adds enforcement. The adapter does not request it, because the Free-plan
+data-policy entitlement remains unresolved and requiring ZDR could leave the
+free route with no eligible endpoint. This is an intentional, documented
+departure, not a defect; changing it is a material privacy/routing decision for
+the owner. Dated official findings are recorded in
+[the provider source state](../packages/ai_provider/docs/source-state.md).
+Whole-repository conformance remains incomplete.
