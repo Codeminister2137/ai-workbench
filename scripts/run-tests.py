@@ -20,6 +20,7 @@ GROUPS = {
         "tests/test_requesty_free_models.py",
         "tests/test_openrouter_free_models.py",
         "tests/test_openrouter_usage.py",
+        "tests/test_openrouter_endpoints.py",
         "tests/test_local_capabilities.py",
         "tests/test_local_ollama_latency_example.py",
         "tests/test_codex_usage.py",

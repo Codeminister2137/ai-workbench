@@ -137,6 +137,36 @@ Configured backend selection:
 
 `BackendConfig.from_env()` reads `AI_PROVIDER_*` variables.
 
+### `EndpointAvailability` and `EndpointInventory`
+
+Source-neutral route-availability records. Every source normalizes into this
+shape so consumers never branch per source, and a value the source did not
+report stays `None` rather than being inferred.
+
+`EndpointAvailability` describes one provider endpoint for one model:
+`source`, `model`, `provider`, `endpoint` (the provider's endpoint tag),
+`status`, `uptime_1d_percent`, `uptime_30m_percent`, `latency_seconds`,
+`throughput_tokens_per_second`, `quantization`, `service_tier`,
+`context_length`, `max_completion_tokens`, `prices`, `supported_parameters`
+and `observed_at_utc`. The unit is carried in the name: uptime is a ratio in
+the range 0-100 as reported by the source.
+
+`EndpointInventory` is the per-model envelope: `status` (`observed`,
+`unavailable` or `unknown`), `source`, `model`, `endpoints`,
+`observed_at_utc` and `reason`. An observation with no advertised endpoint is
+still `observed` — the empty list is the finding, and `reason` says so. Its
+`summary()` reports `provider_count`, `endpoint_count`, the best and worst
+1-day uptime, the largest context length and the quantizations present.
+
+These are source-reported availability observations, not quality judgments: a
+healthy endpoint says nothing about the model behind it, and a quantized
+endpoint is not the same capability as a full-precision one. They are not
+acceptance evidence for this repository.
+
+`ai_provider.openrouter_endpoints.read_openrouter_endpoint_availability` reads
+the public OpenRouter endpoints API for one model id. It sends no prompt, calls
+no model, needs no credential, and never discovers credential files.
+
 ## Capability Matrix
 
 | Capability | Ollama | Requesty | OpenRouter | OpenAI | Google | OpenCode Go |
@@ -146,6 +176,7 @@ Configured backend selection:
 | Provider-reported usage | Partial, when Ollama reports counts | Implemented when reported | Implemented when reported | Implemented when reported | Implemented when reported | Implemented when reported |
 | Model listing | Local only | Via API | Via API | Via API | Via API | Via API |
 | Account allowance observation | No | No | Via API | No | No | Unavailable: no official endpoint |
+| Route availability observation | No | No | Via API | No | No | No |
 | External execution | No | Implemented | Implemented | Implemented | Implemented | Implemented |
 | Tool calling | Not yet | Future trigger | Implemented | Future trigger | Future trigger | Implemented |
 | Structured output | Not yet | Future trigger | Future trigger | Future trigger | Future trigger | Future trigger |
