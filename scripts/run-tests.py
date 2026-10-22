@@ -22,6 +22,7 @@ GROUPS = {
         "tests/test_openrouter_usage.py",
         "tests/test_openrouter_endpoints.py",
         "tests/test_swe_bench_scores.py",
+        "tests/test_aider_polyglot_scores.py",
         "tests/test_local_capabilities.py",
         "tests/test_local_ollama_latency_example.py",
         "tests/test_codex_usage.py",

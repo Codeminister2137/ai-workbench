@@ -234,9 +234,26 @@ class CapabilityScore:
     scores. The scaffold is therefore part of the record, and a score must
     never be read as a model-only claim.
 
-    ``model`` is a comparable key derived from the published display name;
-    ``model_display`` keeps the source's own spelling. Both are recorded so
-    the normalization stays auditable. ``scale`` names the unit of ``score``.
+    ``model`` is the specific model identity the source publishes: a resolved
+    model id where the source gives one, otherwise a comparable key derived
+    from the published display name. ``model_display`` always keeps the
+    source's own spelling. Both are recorded so the normalization stays
+    auditable, and ``scale`` names the unit of ``score``.
+
+    ``configuration`` holds the source's run configuration when it materially
+    changes the result, such as a reasoning-effort level or an edit format:
+    the same model scored under two configurations is two different
+    observations. Aider records it as ``edit=<format>`` plus
+    ``; reasoning=<level>`` when published, so repeated runs of one model stay
+    distinguishable instead of appearing to contradict each other.
+
+    The diagnostic fields record *how reliably* the run behaved, not just how
+    often it was right: ``test_cases`` is the size of the published run,
+    ``well_formed_percent`` the share of cases that produced a usable answer,
+    ``syntax_errors`` and ``context_exhausted`` the counts a source reports for
+    the two failure modes our own acceptance criteria care about, and the two
+    token counters the run's consumption. A source that does not publish a
+    field leaves it ``None`` rather than deriving it.
 
     These are published, dated, third-party observations. They are a selection
     prior, not acceptance evidence for this repository.
@@ -251,12 +268,19 @@ class CapabilityScore:
     agent_org: str | None = None
     score: float | None = None
     scale: str | None = None
+    configuration: str | None = None
     measured_at: str | None = None
     verified: bool | None = None
     cost_usd: float | None = None
     warning: str | None = None
     source_url: str | None = None
     observed_at_utc: str | None = None
+    test_cases: int | None = None
+    well_formed_percent: float | None = None
+    syntax_errors: int | None = None
+    context_exhausted: int | None = None
+    prompt_tokens: int | None = None
+    completion_tokens: int | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Return a JSON-safe representation of one published result."""
@@ -271,12 +295,19 @@ class CapabilityScore:
             "agent_org": self.agent_org,
             "score": self.score,
             "scale": self.scale,
+            "configuration": self.configuration,
             "measured_at": self.measured_at,
             "verified": self.verified,
             "cost_usd": self.cost_usd,
             "warning": self.warning,
             "source_url": self.source_url,
             "observed_at_utc": self.observed_at_utc,
+            "test_cases": self.test_cases,
+            "well_formed_percent": self.well_formed_percent,
+            "syntax_errors": self.syntax_errors,
+            "context_exhausted": self.context_exhausted,
+            "prompt_tokens": self.prompt_tokens,
+            "completion_tokens": self.completion_tokens,
         }
 
 
