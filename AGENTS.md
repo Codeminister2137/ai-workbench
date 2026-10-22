@@ -8,6 +8,27 @@ They should remain modular, understandable, maintainable, and portfolio-quality 
 
 The human owner controls product direction and architecture. Codex is an implementation and engineering partner and technical advisor, not the final authority on product or architectural decisions.
 
+## Shared behavioral baseline for CLI agents
+
+Owner clarification (2026-10-19): this file and the repository's other applicable
+instruction files are the behavioral baseline for our CLI agents as well as Codex.
+Apply the same project rules and owner-approved task authority to ordinary
+inspection, coding, testing, investigation and correction within the task's bounds.
+Do not add restrictions merely because a different model or CLI agent performs
+the work. Report missing capabilities explicitly and preserve the project's
+provider-neutral architecture and approval policy.
+
+Pilot tasks may simplify or restrict behavior to answer a specific test question
+or contain effects. Declare each meaningful deviation before the run, explain
+its purpose, and distinguish it from general CLI behavior. Prefer ordinary Python
+and representative coding workflows; a convenient handwritten fixture rule is
+not by itself a product requirement. Test the declared exceptions and protections
+together. Do not silently change consumed trials or regrade them under new rules.
+
+This baseline does not transfer platform-specific tools, credentials or grants
+between agents. Paid/privacy boundaries, actual tool permissions, resource limits
+and physical human approvals retain their explicit scope.
+
 ## Most important rule: ask before assuming
 
 **When an important requirement is ambiguous, incomplete, contradictory, or open to multiple materially different implementations, do not silently choose an implementation. Investigate first, identify the decision, and ask the user when their input is required.**
@@ -498,6 +519,17 @@ from host recovery. Preserve readable evidence, reported usage and cleanup; miss
 observations remain unknown. Do not enable private reasoning/raw-prompt logging
 by default. A small success supports the next stage, not general quality parity.
 
+Owner clarification (2026-10-19): assess the complete intended workflow as well
+as the primary model. A mistake caught and corrected by the main model, scrutiny
+or another declared component within the original bounds is acceptable when the
+final effects and report are sound. Harmless fully recovered friction need not
+be listed in the completion report. Material false claims must be corrected or
+clearly blocked before delivery; a safely stopped task is not a completed task.
+Use `docs/repo-assistant/acceptance-criteria.md` for materiality, evidence and
+recovery criteria. Preserve original trial results; apply changed criteria only
+to fresh preparation. A recoverable candidate error is not itself a terminal
+phase failure, and this clarification does not relax hard safety/approval limits.
+
 Avoid duplicating tasks across paid models or direct-chat/CLI arms by default.
 Use a paired comparison only when its additional relative-quality evidence is
 necessary and the owner explicitly authorizes that usage. A one-time exception
@@ -518,6 +550,14 @@ Always start with cheap state:
 * local `CURRENT_CONTEXT.md`, when present.
 
 Then read targeted authoritative docs for the task:
+
+For provider access, pricing, allowances, model capabilities or data handling,
+first consult `packages/ai_provider/docs/source-state.md` and its linked sources.
+Assess each finding's checked date, account/route scope and unresolved conflicts;
+refresh volatile or consequential facts from official sources when needed. Append
+verified dated findings there rather than leaving reusable knowledge only in chat
+or run artifacts. Live account observations remain private runtime evidence, not
+durable public pricing facts. This reference never replaces live admission guards.
 
 * relevant sections of `AGENTS.md` and nested `AGENTS.md` files, if any;
 * relevant sections of `docs/architecture.md`, `docs/decisions.md`,
@@ -891,6 +931,19 @@ timestamps in the handoff/receipt before requesting sleep.
 
 ### Unattended work windows
 
+Owner update (2026-10-20): before implementation in a NEW unattended window,
+launch and verify the deadline sleep fallback using `-SleepAtUtc`. Follow
+`docs/unattended-sleep.md` for startup, owner-visible cancellation, safe timer
+replacement at closeout and interruption handling. This adds startup scheduling
+to the closeout rules below; do not leave duplicate active timers. An explicit
+no-sleep override still applies. Owner approved rolling renewal: use `-Rolling`,
+renew about every ten minutes and before long work, protect remaining hard task
+bounds plus cleanup/headroom without extending the deadline, and verify the
+updated receipt before admission. Show the fixed owner cancellation command
+`.\cancel-sleep.cmd` at startup and closeout. It cancels all repository helper
+timers; do not rearm after owner cancellation without direction. Never schedule
+an expired window retrospectively.
+
 An unattended duration authorizes a continuous work window across useful,
 already-authorized tasks. Completing or blocking the current slice triggers
 selection of the next task; it does not end the run. Continue until the deadline,
@@ -905,10 +958,16 @@ Use this loop:
    implementation. Interpret "around two hours" as two hours from execution
    start, unless the owner specifies otherwise. Never reuse an expired deadline
    for a new run or silently reset it after compaction.
-2. Maintain a compact candidate ledger in local `CURRENT_CONTEXT.md`. For each
-   candidate record its authoritative plan/accepted requirement, authorization
-   boundary, current code/test evidence, concrete next action and status:
-   `READY`, `NEEDS_INVESTIGATION`, `IN_PROGRESS`, `COMPLETE` or `BLOCKED`.
+2. Before implementation, write the active session plan to local
+   `docs/plans/unattended-work-plan.md`, using
+   `docs/unattended-work-plan-template.md`. Link it from `CURRENT_CONTEXT.md`.
+   Read the immediate task and wider approved goals/plans before choosing the
+   ordered steps. Record their source files, concrete actions, authorization
+   boundaries, rough time estimates, validation and completion conditions, and
+   fallback work that can proceed independently. Maintain the candidate ledger
+   in that plan, with `READY`, `NEEDS_INVESTIGATION`, `IN_PROGRESS`, `COMPLETE`
+   or `BLOCKED` status; keep the current action and plan link in the handoff.
+   A list of broad milestone gaps is not an executable plan.
 3. Prioritize the current objective and prerequisites, then remaining approved
    roadmap work, then other approved repository goals, following the current
    owner priorities in docs/workflow.md. Inspect applicable private
@@ -936,11 +995,59 @@ Use this loop:
 6. Preserve the original deadline, candidate ledger, active reasoning and next
    action across context changes. Apply the session-boundary workflow when
    needed; a checkpoint or compaction does not cancel the active work window.
+   Reassess actual time and update the plan after each completed/blocked step,
+   before a long-running operation, and at least every thirty minutes while
+   work is progressing. Record the checkpoint time, time remaining, closeout
+   reserve, observed progress and next action. An operation's full execution,
+   verification and cleanup envelope must fit before the work cutoff. Replan
+   the remaining steps when estimates or evidence change; do not reset time.
 7. Reserve approximately five minutes before the deadline for safe closeout:
    bounded cleanup, validation status, diff/status review, handoff and final
    report. Do not start operations likely to exceed the remaining time. If all
    useful authorized work is genuinely exhausted earlier, record the candidate
    evidence, blockers and remaining time and explain the early stop.
+
+If the entire current plan finishes or stalls while useful work time remains,
+reopen the recorded wider-goal source files and replenish the plan with concrete
+authorized next actions. Then execute the next step. Completing the written plan
+does not complete the unattended window. A restriction on additional model pilots
+does not prohibit independent inspection, implementation, deterministic testing
+or preparation. Do not turn "no demonstrated defect" into proof that all planned
+requirements or investigations are complete.
+
+Before an early-stop decision, every `READY` action must have been executed or
+given a specific evidenced blocker, and every `NEEDS_INVESTIGATION` action must
+have been investigated. For each alleged blocker, actively check whether a smaller
+independent action can still advance the same approved goal. Record the actual
+attempt/result or the concrete restriction that prevents it. If this evidence
+is missing, continue investigation and plan selection. Do not write a retrospective
+ledger merely to justify a decision to stop already made.
+
+Every plan must contain the same mandatory final step for deadline and early
+closeout: stop admitting work in time, clean up owned processes, independently
+verify the final state, save the handoff, schedule default PC sleep for ten minutes
+after finishing, verify the scheduling receipt, and issue the existing final
+report. Reserve enough time for all of these operations; increase the normal
+five-minute reserve when cleanup or verification needs longer. Success, failure,
+blocked work and incomplete baseline acceptance do not remove this final step.
+
+Owner clarification (2026-10-19): individual plan durations are estimates, not
+automatic task timeouts. Allow reasonable headroom for useful coding, correction,
+testing and review instead of giving each step only its minimum expected time.
+Reallocate the remaining planned time at checkpoints when useful progress warrants
+it. The session deadline, cleanup reserve and explicitly declared inference,
+call/tool/resource limits remain hard boundaries. Prepare any new pilot's finite
+allowance with its headroom before launch; never extend or repurpose a consumed
+or active acceptance allowance to compensate for an optimistic estimate.
+
+Here a step is a meaningful work unit, not every tool operation or model call.
+Keep reassessment brief within the existing turn: reuse current evidence and
+combine clock checks with normal progress monitoring. A checkpoint does not
+require another model/reviewer invocation, a full plan/documentation reread, or
+repeated passing checks. Do not interrupt healthy work merely because its estimate
+elapsed; retain the required time checkpoints and actual hard limits. Track
+avoidable reassessment, context-read and tool-call overhead as a separate backlog
+investigation rather than adding costly evaluation calls during each session.
 
 Apply completion and blockers to concrete slices, not whole project names. A
 passing suite establishes its covered contracts; it does not establish that all
@@ -983,29 +1090,39 @@ label the estimate and cite the last reliable timestamp; do not invent precision
 Include completed work, checks, remaining limitations and pending decision briefs
 with each viable option's pros and cons and the technical recommendation.
 
-Sleep remains separately authorized. Finishing one slice does not justify an
-early stop or sleep. Once the window legitimately ends early, however, an owner
-instruction to sleep on early termination must be scheduled for ten minutes
-after safe closeout, unless the owner specifies a different delay. Save the
-handoff and safely close owned operations first. This includes an evidenced stop
-because all remaining authorized work is blocked: an incomplete baseline or a
-blocked goal does not cancel that sleep instruction or become COMPLETE.
-For sleep authorized only at the deadline, pass the original UTC deadline to
-`scripts/workstation-sleep.ps1` using `-NotBeforeUtc`. For explicitly authorized
-early sleep, record the original deadline and early-stop evidence, then use the
-helper with `-Sleep -DelaySeconds 600`, a fresh `-ReceiptPath` and a fresh
-`-CancelPath`, without that deadline argument. Start the helper using
+Owner clarification (2026-10-19): unattended work includes standing authorization
+to put the PC to sleep ten minutes after finishing, whether finishing at the
+deadline or ending early. This is the default unless the owner explicitly
+overrides it. Missing sleep wording in a launch prompt or saved handoff is not
+a cancellation or a reason to seek repeated authorization; a workflow recording
+no default sleep is incorrect. Finishing one slice still does not justify ending
+the window. The sleep obligation also applies after a mistaken early stop; do
+not compound a continuation failure by omitting the required closeout action.
+
+Save the handoff and safely close owned operations first. For either deadline
+or early closeout, use `scripts/workstation-sleep.ps1` with
+`-Sleep -DelaySeconds 600`, a fresh `-ReceiptPath` and a fresh `-CancelPath`.
+Record the original deadline and any early-stop evidence; default early sleep
+does not require `-NotBeforeUtc`. If the owner explicitly restricts sleep to
+the deadline or later, retain that restriction using `-NotBeforeUtc` with the
+original UTC deadline. Start the helper using
 `Start-Process -WindowStyle Hidden`; do not block the conversation for ten minutes.
-Report the scheduled local time and exact cancellation marker path/command in
-the visible closeout and handoff, so the owner can intervene while still nearby.
+Read the fresh receipt and verify `sleep_scheduled` with the intended time and
+cancellation path before treating scheduling as complete. If launching fails,
+investigate immediately and correct it within the closeout reserve; do not
+silently omit sleep. Actual platform approval requirements still apply.
+Report the scheduled local time and fixed `.\cancel-sleep.cmd` command in the
+visible startup/closeout and handoff, so the owner can intervene. Retain individual
+marker paths in the handoff for internal timer replacement, not as the owner's
+required cancellation command.
 Never remove a time guard without the corresponding owner authorization.
 Report whether sleep was scheduled, requested, rejected or subsequently verified;
 a failed request
 must be reported, not silently treated as success.
 
 New owner instructions or an explicit switch back to an attended session cancel
-pending unattended sleep that has not been requested: create the recorded
-cancellation marker and verify the helper's `sleep_cancelled` receipt before
+pending unattended sleep that has not been requested: run `.\cancel-sleep.cmd`
+and verify the helpers' `sleep_cancelled` receipts before
 resuming work. Merely stating cancellation does not stop a scheduled helper.
 Do not issue a delayed sleep action to compensate for an earlier omission while
 the owner is using the computer.
@@ -1086,7 +1203,7 @@ verified final summary rather than requiring the user to restate these rules in
 each task prompt.
 
 Completion reports at the end of a task should be visually obvious at a glance.
-Start them with a loud Markdown marker, preferably:
+Start every task completion or stopped-work summary with this Markdown marker:
 
 ```text
 ## **SUMMARY**
@@ -1095,10 +1212,12 @@ Start them with a loud Markdown marker, preferably:
 - Notes: ...
 ```
 
-Use `## **SUMMARY**` for normal task completion reports unless a simpler
-one-line answer is clearly better. The marker should catch the eye; the rest of
-the report can stay flexible. Do not force the body into a rigid template when
-a simpler sentence is clearer. The format is a readability aid, not ceremony.
+Use `## **SUMMARY**` even for a concise task closeout or a summary that requests
+a decision before work can continue. Ordinary answers that are not task closeouts
+do not need the marker. Before sending a closeout, verify that its first visible
+line is exactly `## **SUMMARY**`. Keep the body flexible and concise. When the
+CLI supplies this heading in its own envelope, the enclosed agent report must
+continue to avoid a duplicate heading.
 
 Optional supporting-artifact links belong beside the information they support,
 not automatically at the start of a summary. Use descriptive Markdown links and
@@ -1114,6 +1233,13 @@ agent-reported outcome preview and explicitly does not attribute workspace
 edits the CLI cannot independently identify. Agent prompt instructions say the
 CLI owns the closeout and to avoid a duplicate; the CLI envelope, not model
 compliance, is the consistency guarantee.
+
+Owner-approved scrutiny qualification (2026-10-19): when requested scrutiny has
+unresolved findings or cannot complete, the final closeout preserves the original
+response as a draft, shows concrete findings or the review limitation beside it,
+and withholds an accepted outcome preview. Reviewer-proposed revisions are labelled
+as not applied or independently verified. Passing deterministic checks establish
+only those checks. This adds no automatic rewrite, review default or truth guarantee.
 
 For subsection labels inside a summary, avoid run-in bold labels that are
 followed immediately by a sentence on the same rendered line. Prefer a short

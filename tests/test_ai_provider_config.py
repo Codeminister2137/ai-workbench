@@ -60,6 +60,7 @@ def test_backend_config_loads_provider_specific_api_key(
 ) -> None:
     monkeypatch.setenv("AI_PROVIDER_KIND", "requesty")
     monkeypatch.setenv("AI_PROVIDER_MODEL", "openai/gpt-5.1")
+    monkeypatch.delenv("AI_PROVIDER_API_KEY", raising=False)
     monkeypatch.setenv("REQUESTY_API_KEY", "requesty-key")
 
     config = BackendConfig.from_env()
@@ -73,6 +74,7 @@ def test_backend_config_loads_gemini_api_key_for_google(
 ) -> None:
     monkeypatch.setenv("AI_PROVIDER_KIND", "google")
     monkeypatch.setenv("AI_PROVIDER_MODEL", "gemini-3.1-pro")
+    monkeypatch.delenv("AI_PROVIDER_API_KEY", raising=False)
     monkeypatch.setenv("GEMINI_API_KEY", "gemini-test-key")
 
     config = BackendConfig.from_env()
@@ -94,3 +96,25 @@ def test_factory_creates_openai_compatible_client() -> None:
     )
 
     assert isinstance(client, OpenAICompatibleChatClient)
+
+
+def test_backend_config_loads_opencode_go_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AI_PROVIDER_KIND", "opencode_go")
+    monkeypatch.setenv("AI_PROVIDER_MODEL", "kimi-k2.7-code")
+    monkeypatch.delenv("AI_PROVIDER_API_KEY", raising=False)
+    monkeypatch.setenv("OPENCODE_API_KEY", "opencode-test-key")
+
+    config = BackendConfig.from_env()
+
+    assert config.provider is ProviderKind.OPENCODE_GO
+    assert config.api_key == "opencode-test-key"
+
+
+def test_factory_creates_opencode_go_client() -> None:
+    from ai_provider.adapters.opencode_go import OpenCodeGoChatClient
+
+    client = create_chat_client(
+        BackendConfig(provider=ProviderKind.OPENCODE_GO, model="kimi-k2.7-code", api_key="test")
+    )
+
+    assert isinstance(client, OpenCodeGoChatClient)

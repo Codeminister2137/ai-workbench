@@ -5,7 +5,9 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shutil
 import sqlite3
+import subprocess
 import sys
 import time
 from dataclasses import asdict, replace
@@ -589,9 +591,30 @@ def test_owned_job_cleans_descendant_after_root_exits(tmp_path: Path) -> None:
 def test_worker_environment_excludes_provider_credentials(monkeypatch) -> None:
     monkeypatch.setenv("OPENAI_API_KEY", "do-not-forward")
     monkeypatch.setenv("OLLAMA_HOST", "http://remote.invalid")
+    monkeypatch.setenv("PATHEXT", ".EXE;.CMD")
     env = runtime.worker_environment()
     assert "OPENAI_API_KEY" not in env and "OLLAMA_HOST" not in env
     assert "PYTHONPATH" in env
+    assert env["PATHEXT"] == ".EXE;.CMD"
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows executable extension discovery")
+def test_worker_environment_keeps_powershell_python_execution(tmp_path: Path, monkeypatch) -> None:
+    powershell = shutil.which("powershell.exe")
+    assert powershell is not None
+    monkeypatch.setenv("PATH", str(Path(sys.executable).parent))
+    monkeypatch.setenv("PATHEXT", ".COM;.EXE;.BAT;.CMD")
+    result = subprocess.run(
+        [powershell, "-NoProfile", "-Command", "python -c \"print('worker-python-ok')\""],
+        cwd=tmp_path,
+        env=runtime.worker_environment(),
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "worker-python-ok"
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows supervisor startup contract")

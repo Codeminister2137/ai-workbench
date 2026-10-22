@@ -46,6 +46,7 @@ def worker_environment() -> dict[str, str]:
         if key.upper()
         in {
             "PATH",
+            "PATHEXT",
             "SYSTEMROOT",
             "WINDIR",
             "USERPROFILE",

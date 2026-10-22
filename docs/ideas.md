@@ -4,6 +4,26 @@ This file parks useful future ideas that should not be loaded into the active
 implementation path until they become scheduled work. Items here are not accepted
 architecture decisions or current requirements.
 
+## Reduce redundant agent calls and context work
+
+Owner-requested backlog (2026-10-19): investigate avoidable model/allowance cost
+from repeated reassessment, redundant actions, context rereads and tool calls.
+This is a future investigation, not authorization for new inference or telemetry.
+
+- Use existing safe receipts to distinguish productive work from checkpoint,
+  repeated-read, duplicate-command and unnecessary evaluation overhead.
+- Compare calls, input/output tokens, elapsed time and observed spend or allowance
+  where available; distinguish cached/billed usage and keep unknown values unknown.
+- Prefer lightweight checkpoints inside existing turns and reuse current evidence;
+  investigate batching and removal of redundant work before adding automation.
+- Verify that any reduction preserves quality, complete required instructions,
+  meaningful validation, effect reconciliation, approval boundaries, time
+  reassessment, cleanup and default sleep. Do not save calls by dropping safeguards.
+
+Schedule a bounded review when this work is selected. Do not introduce a new
+logging service, persistent metrics format, paid comparison or raw-prompt/private-
+reasoning capture merely to measure the issue.
+
 ## Personal AI Assistant / Local Context
 
 Potential future app or module:

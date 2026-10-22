@@ -36,7 +36,47 @@ def test_scrutiny_rejects_invalid_score_scales(score):
         parse_response_scrutiny_report(text)
 
 
-def test_cli_can_scrutinize_completed_response(capsys, monkeypatch, tmp_path: Path) -> None:
+@pytest.mark.parametrize("prefix", ["", "### "])
+def test_scrutiny_accepts_standalone_bold_sections_preserving_raw_text(prefix):
+    text = (
+        "**VERDICT:** needs_revision\n**SCORE:** 4/10\n"
+        f"{prefix}**STRENGTHS**  \nVisible tests pass.\n"
+        f"{prefix}**ISSUES**\nNo model test execution was observed.\n"
+        "**RECOMMENDED_NEXT_ACTION:** Run the required command.\n"
+        f"{prefix}**REVISED_RESPONSE**\nNone"
+    )
+    result = parse_response_scrutiny_report(text)
+    assert result.verdict == "needs_revision" and result.score == 4
+    assert result.strengths == "Visible tests pass."
+    assert result.issues == "No model test execution was observed."
+    assert result.revised_response == "None"
+    assert result.raw_text == text
+
+
+@pytest.mark.parametrize("heading", ["STRENGTHS", "Review **STRENGTHS**", "**STRENGTHS** inline"])
+def test_colonless_prose_is_not_a_scrutiny_section(heading):
+    text = (
+        f"VERDICT: pass\nSCORE: 8\n{heading}\nVisible tests pass.\n"
+        "ISSUES: None\nRECOMMENDED_NEXT_ACTION: None\nREVISED_RESPONSE: None"
+    )
+    with pytest.raises(ValueError, match="missing scrutiny heading.*STRENGTHS"):
+        parse_response_scrutiny_report(text)
+
+
+def test_mixed_bold_and_canonical_duplicate_sections_remain_invalid():
+    text = (
+        "VERDICT: pass\nSCORE: 8\nSTRENGTHS: Tests pass.\n"
+        "**STRENGTHS**\nDuplicate.\nISSUES: None\n"
+        "RECOMMENDED_NEXT_ACTION: None\nREVISED_RESPONSE: None"
+    )
+    with pytest.raises(ValueError, match="duplicate scrutiny heading: STRENGTHS"):
+        parse_response_scrutiny_report(text)
+
+
+@pytest.mark.parametrize("orchestrated", [False, True])
+def test_cli_can_scrutinize_completed_response(
+    capsys, monkeypatch, tmp_path: Path, orchestrated: bool
+) -> None:
     from dataclasses import replace
 
     from ai_provider import (
@@ -126,10 +166,10 @@ def test_cli_can_scrutinize_completed_response(capsys, monkeypatch, tmp_path: Pa
                 "--scrutinize-response",
                 "--away-minutes",
                 "30",
-                "--orchestrated",
                 "--away-run-db",
                 str(run_db),
             ]
+            + (["--orchestrated"] if orchestrated else [])
         )
         == 0
     )
@@ -143,10 +183,18 @@ def test_cli_can_scrutinize_completed_response(capsys, monkeypatch, tmp_path: Pa
     assert "scrutiny_score: 4" in output
     assert "scrutiny_status: completed" in output
     assert "execution_status: completed_with_scrutiny_findings" in output
+    closeout = output.rsplit("## **SUMMARY**", 1)[1]
+    assert "### Agent report — draft with unresolved scrutiny\nprimary answer" in closeout
+    assert "#### Reviewer issues\ngeneric answer" in closeout
+    assert "#### Reviewer next action\nrevise the answer" in closeout
+    assert "Reviewer-proposed revision (not applied or independently verified)" in closeout
+    assert "Agent-reported outcome: primary answer" not in closeout
     assert len(calls) == 2
     assert calls[1][1] is True
     assert "Candidate assistant response:\nprimary answer" in calls[1][0]
     assert calls[1][2] == _EXAMPLE._RESPONSE_SCRUTINY_SYSTEM_PROMPT
+    if not orchestrated:
+        return
     run_id = next(
         line.removeprefix("away_run_id: ")
         for line in output.splitlines()
@@ -165,6 +213,9 @@ def test_cli_can_scrutinize_completed_response(capsys, monkeypatch, tmp_path: Pa
         "route_policy": "derived_local_cheap",
         "score": 4,
         "verdict": "needs_revision",
+        "issues": "generic answer",
+        "next_action": "revise the answer",
+        "revised_response": "Use the canonical command and inspect its logs.",
     }
 
 
@@ -327,6 +378,10 @@ def test_cli_marks_malformed_scrutiny_as_scrutiny_error(capsys, monkeypatch) -> 
     assert "scrutiny_status: invalid" in output
     assert "scrutiny_failure_reason: missing scrutiny heading" in output
     assert "execution_status: completed_with_scrutiny_errors" in output
+    closeout = output.rsplit("## **SUMMARY**", 1)[1]
+    assert "completion=not_established" in closeout
+    assert "#### Review failure\nmissing scrutiny heading" in closeout
+    assert "### Agent report — draft with unresolved scrutiny\nprimary answer" in closeout
     assert profiles[1].privacy_class is _EXAMPLE.OrchestratorPrivacyClass.LOCAL_ONLY
     assert profiles[1].cost_policy_tier is _EXAMPLE.CostPolicyTier.LOCAL_ONLY
     assert profiles[1].user_backend_override is None

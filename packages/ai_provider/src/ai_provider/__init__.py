@@ -30,7 +30,7 @@ from ai_provider.contracts import (
     UsageMetadata,
     UsageSource,
 )
-from ai_provider.errors import ProviderError, ProviderErrorCategory
+from ai_provider.errors import ProviderError, ProviderErrorCategory, ToolCallFormatError
 from ai_provider.factory import create_chat_client
 from ai_provider.local_capabilities import (
     LocalDiskInfo,
@@ -100,6 +100,7 @@ __all__ = [
     "PrivacyClass",
     "ProviderError",
     "ProviderErrorCategory",
+    "ToolCallFormatError",
     "ProviderKind",
     "RunningOllamaModel",
     "SQLiteChatTranscriptStore",

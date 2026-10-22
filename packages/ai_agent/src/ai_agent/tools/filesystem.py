@@ -238,6 +238,9 @@ class EditFileTool(BaseTool):
                 "Edit an existing file by replacing 'old_text' with 'new_text'. "
                 "Both strings are literal file text: preserve indentation and do not add "
                 "patch markers, read-output line numbers, or Markdown fences. "
+                "To insert text without deleting the anchor, include old_text unchanged "
+                "in new_text along with the added text. Retain existing content that "
+                "the task requires unchanged. "
                 "If old_text is omitted or empty, replaces full file content."
             ),
             category=ToolCategory.WRITE,

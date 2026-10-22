@@ -88,7 +88,11 @@ These files reinforce the required behavior; they cannot technically disable a
 runtime-provided tool. A guaranteed prohibition would require a chat/runtime
 setting that removes or blocks that tool, which this repository cannot provide.
 
-The repo-assistant CLI also prints one fixed `## **SUMMARY**` closeout for
+Every user-visible task completion or stopped-work summary starts with
+`## **SUMMARY**`, including concise reports and summaries that need an owner
+decision. Check the first visible line before sending the report. Ordinary
+non-closeout answers need no marker. The repo-assistant CLI also prints one
+fixed `## **SUMMARY**` closeout for
 provider, native, chat, external-agent, and fallback runs. The selected agent's
 response is retained under `Agent report`; validation and execution fields use
 CLI-recorded evidence. `Changed` previews the first agent-reported outcome line
@@ -210,7 +214,59 @@ Use `Codex: Unattended Work Window` from the canonical prompt library for a
 reusable launch prompt. An unattended duration covers successive useful,
 authorized slices, rather than only the first named task.
 
-Keep the start/deadline and compact candidate ledger in local `CURRENT_CONTEXT.md`.
+Before implementation, create the local session plan at
+`docs/plans/unattended-work-plan.md` from the
+[saved template](unattended-work-plan-template.md). Link it from `CURRENT_CONTEXT.md`;
+keep the start/deadline and current action in that handoff. The plan must name
+the immediate slice and the source files for wider approved goals, then order
+concrete actions with rough durations, validation, completion conditions and
+independent fallback work. Keep its candidate ledger current. No active unattended
+session means the saved plan is inactive; do not reuse an old time allowance.
+
+Before starting a new unattended window's implementation, also launch and verify
+the absolute deadline sleep fallback, unless explicitly overridden. Follow the
+[sleep timer procedure](unattended-sleep.md), including the startup receipt and
+owner-visible exact cancellation command. At normal closeout replace this timer
+with the ten-minute completion timer and verify cancellation of the old one;
+never leave duplicate active timers. Rolling renewal is owner-approved: use
+`-Rolling`, refresh about every ten minutes and before long work, verify the due
+time and preserve the hard deadline. Show `.\cancel-sleep.cmd` as the fixed owner
+command cancelling all repository sleep timers. Follow the procedure's bounded
+work/headroom and cancellation rules; never rearm after cancellation silently.
+
+Time checkpoints are required after every completed or blocked step, before a
+long operation, and at least every thirty minutes during ongoing work. Read the
+clock, record remaining time and closeout reserve, assess actual progress, and
+update the next steps. Admit work only when its full execution/verification/
+cleanup envelope fits. A checkpoint changes the plan, never the original deadline.
+
+Step durations are estimates with reasonable headroom, not mandatory per-step
+timeouts. A healthy task may use more than its estimate by reallocating remaining
+plan time, while preserving the hard session cutoff, closeout reserve and explicit
+pilot/resource allowances. Declare headroom in any fresh pilot's bounds before
+launch; never extend an active or consumed allowance.
+
+Checkpoints concern meaningful work units rather than individual tool calls.
+Reassess briefly using current evidence within the existing turn; batch clock
+reads with normal monitoring. Do not invoke another model/reviewer solely for a
+checkpoint, reread all plans each time, or repeat successful checks without cause.
+The [call and context overhead backlog](ideas.md#reduce-redundant-agent-calls-and-context-work)
+records the separate cost investigation; this does not weaken required checks.
+
+If the whole plan completes or stalls with useful time left, reopen its wider-goal
+source files, investigate concrete independent next actions, replenish the plan
+and execute it. A completed plan, lack of an obvious defect, or a restriction on
+more live pilots is not evidence that offline work is exhausted. Before early
+closeout, execute or establish a specific blocker for every READY action and
+investigate every NEEDS_INVESTIGATION action. Test whether each blocker permits
+a smaller independent action; record what was actually tried or what prevents it.
+Do not construct a retrospective exhaustion ledger to justify stopping.
+
+The plan's final step is mandatory for both deadline and early endings: reserve
+enough time to stop work, clean up owned processes, independently verify state,
+save the handoff, schedule PC sleep ten minutes after finishing, verify its receipt
+and deliver the existing report. Increase the normal closeout reserve when needed.
+Incomplete or failed work never exempts a session from this final step.
 
 An abrupt owner return, including after a usage-limit interruption, switches
 communication to attended mode. Inspect actual scheduled tasks and processes;
@@ -247,16 +303,16 @@ Europe/Warsaw, the original deadline, elapsed work versus known waiting or
 interruption time, and the reason for stopping early. Label uncertain timestamps.
 Summarize material decisions with viable options, each option's pros and cons,
 recommendation and any owner question. Save this evidence before a power action.
-If the owner authorized sleep on early termination, a legitimate early stop with
-all remaining work blocked still requires scheduling sleep ten minutes after safe
-closeout, unless the owner specifies otherwise; an incomplete product is not an
-exemption. Use the sleep helper's -DelaySeconds 600 with fresh receipt/cancellation
-paths, launched hidden without blocking the conversation, for explicit early
-authorization, or its original-deadline guard when sleep is authorized only at
-that deadline. Report the actual power-action outcome.
-Report the scheduled local time and exact cancellation command. New owner
-instructions or an explicit switch to attended mode require creating the recorded
-cancellation marker and verifying sleep_cancelled before resuming work.
+PC sleep ten minutes after finishing an unattended session is the owner-authorized
+default for deadline and early endings, unless explicitly overridden. An omitted
+sleep clause does not revoke that default. Even an unjustified early stop must
+not also omit sleep. Use the sleep helper's -Sleep -DelaySeconds 600 with fresh
+receipt/cancellation paths, launched hidden without blocking the conversation.
+Verify its sleep_scheduled receipt. Use the original-deadline guard only when
+the owner explicitly restricts sleep to that deadline or later. Report the actual power-action outcome.
+Report the scheduled local time and fixed `.\cancel-sleep.cmd` command at startup
+and closeout. New owner instructions or an explicit switch to attended mode
+require running that command and verifying sleep_cancelled before resuming work.
 
 ### Persistent improvement goal: reliable unattended execution
 
@@ -271,6 +327,14 @@ instruction text as success. The concrete-slice completion and blocker checks in
 [AGENTS.md](../AGENTS.md#unattended-work-windows) are the initial correction.
 Keep this goal and its current evidence in `CURRENT_CONTEXT.md` across handoffs.
 
+Owner correction (2026-10-19): another window ended after22m52s with almost two
+hours remaining. A retrospective milestone ledger did not establish exhaustion;
+the owner rejected that conclusion. The run also incorrectly treated sleep as
+unauthorized. The required saved step-by-step plan, timed reassessment checkpoints,
+plan replenishment from wider goals and unconditional default sleep closeout now
+address those failures. Reporting instructions are unchanged. This correction
+is not evidence that subsequent unattended execution will obey the workflow.
+
 Completion requires a subsequent owner-authorized unattended run that follows
 successive useful slices until its fixed deadline or an explicit owner stop;
 an earlier exhaustion claim must satisfy the concrete-action evidence rules.
@@ -279,6 +343,11 @@ authorization boundaries and honest time/validation reporting. Static document
 checks and passing software tests alone do not validate the agent's behavior.
 No new runtime service, autonomous schedule or additional inference allowance is
 authorized by this goal.
+
+The next behavioral validation must also demonstrate the saved ordered plan,
+recorded time checkpoints, actual plan replenishment when needed, and the default
+ten-minute sleep scheduling receipt for whichever ending occurs. Static checks
+of these instructions establish consistency only; the persistent goal stays OPEN.
 
 Recorded failure cases used for the initial instruction review:
 
@@ -327,6 +396,14 @@ git status
 Check for unrelated edits, secrets, generated files, accidental config changes, and incomplete migrations. Never reset/delete user work without approval.
 
 ## 9. Session boundaries
+For late-day continuation with expiring approved allowances, use **"End of day"**
+([Codex: End of Day](prompt-library.md#codex-end-of-day)). It defines a fresh
+finite batch, verifies current allowance/price/privacy readiness and prioritizes
+useful baseline work. It preserves attended mode unless an unattended deadline
+is explicitly supplied; it schedules no wake or sleep action by itself. Ordinary
+DoD Closeout remains the stopping workflow. The repository prompt is canonical;
+using its short name here does not require changing PyCharm's separate library.
+
 Use `Codex: Session Boundary Check` between work sessions, after a commit, before
 switching to a distinct task, or after compaction/context errors.
 

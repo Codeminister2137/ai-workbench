@@ -41,3 +41,18 @@ class ProviderError(RuntimeError):
         self.provider = provider
         self.raw_error = raw_error
         self.partial_messages: tuple[AIMessage, ...] = ()
+
+
+class ToolCallFormatError(ProviderError):
+    """Known malformed generated arguments, before any call in that response runs.
+
+    This permits model feedback, not transport retry or replay of earlier tools.
+    Adapters must not use this signal for unknown failures or uncertain effects.
+    """
+
+    def __init__(self, *, provider: str) -> None:
+        super().__init__(
+            "Model returned malformed tool arguments; no executable call was delivered.",
+            category=ProviderErrorCategory.NON_RETRYABLE,
+            provider=provider,
+        )

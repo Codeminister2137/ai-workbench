@@ -1,6 +1,189 @@
 # CLI Development Foundation Roadmap
 
+## Planned: reliable model availability across sources
+
+Owner direction, 2026-10-21: plan a reliable way to check model availability for
+every configured source. Defer implementation while completing the paid-native
+CLI baseline. The stale `gpt-5.5` ChatGPT route demonstrates why executable/auth
+readiness and a static catalog entry are insufficient. Use source-appropriate
+metadata where available, preserve capability/entitlement distinctions and
+freshness, and report unknowns explicitly. Do not use model generation as an
+availability probe or silently switch models, providers or billing tiers.
+This planned work adds no service, recurring monitor, dependency or paid usage.
+
+## Current paid-native checkpoint: 2026-10-21
+
+Prioritize ordinary development through established paid clients with fallback.
+Current-route work delivered reviewed diagnostic process ownership, conservative
+MCP failure tracking and test integration in `c3b4ba9`; independent registered
+validation passed 2,604 tests with 3 skips, lint/types passed and final frozen
+review found no concrete defect. Coding CLI failures and a model test timeout
+remain preserved; they are not retroactively promoted by host validation.
+The [current baseline assessment](baseline-gap.md) records the remaining command
+timeout/ownership gap, pending MCP error-semantics decision and unverified selected
+fallback. Broader local-model parity and availability automation remain separate.
+
+## Historical checkpoint: 2026-10-20
+
+The latest integrated orchestrated local trial stopped on a private budget-notice
+false positive before tests or either final report. An auxiliary pass also
+displayed unsupported edit/test claims. Presentation now explicitly qualifies
+tool-free advice; focused offline controls cover that delivery and prospective
+notice/receipt corrections. The consumed trial remains failed and unchanged.
+No milestone is promoted. See [current acceptance gaps](baseline-gap.md) and
+[trial evidence and limits](agent-methodology-findings.md#orchestrated-local-trial--2026-10-20).
+
+Current direction: [reassess acceptance around the full workflow](acceptance-criteria.md).
+Owner accepts mistakes caught by scrutiny, the main model or another declared
+component before trustworthy final delivery. Separate primary accuracy, successful
+bounded recovery, safe incomplete outcomes and material false claims escaping to
+the user. Do not reject harmless recovered friction or require flawless drafts.
+Preserve meaningful validation, provenance and hard safety/resource boundaries.
+Existing historical trial verdicts remain unchanged. Seven-case offline calibration
+now demonstrates that validation-driven repair can correct a scripted defect, but
+a scrutiny warning/proposed revision does not replace or explicitly qualify the
+original claim in final delivery. Owner selected explicit final qualification;
+the implementation now preserves a labelled draft beside concrete findings or
+review limitations and withholds an accepted outcome preview. Automatic correction
+was not added. Focused offline regressions cover final delivery and real validation.
+See [the measured limits](agent-methodology-findings.md#offline-workflow-calibration--2026-10-19).
+Structured-report API changes remain deferred. General baseline readiness remains
+unestablished.
+
+Latest attended evidence: isolated report diagnostic `cc` and fresh integrated
+fallback `ce` are consumed and failed report fidelity. `ce` used a coherent final
+task and full committed instructions; model-only source/two meaningful companions,
+three preserved originals, five passing model/independent tests and 3,616 oracle
+cases were verified. Its coding report again omitted its recovered command refusal.
+An independent report gate stopped before frozen review; no second report exists.
+Eight calls/seven accurate tool notices, 139 dependencies, five original index
+entries, protected inputs and eleven owned-child cleanup receipts pass. This is
+failed disclosure, not an inferred algorithmic or transport failure. `cc` likewise
+omitted an actual refusal despite describing the synthetic one. Baseline remains
+**INCOMPLETE**; preserve both reports and all acceptance requirements. Further
+report-contract changes need owner selection, not speculative prose grading or
+another blind prompt-only retry. See `artifacts/cli-report-fidelity-integrated-20261019ce/live-review.md`.
+
+Fresh `by` completed both structural phases in thirteen local model calls:
+model-authored source and four companion tests, three preserved originals,
+seven passing tests per phase, independent tests and 3,616 oracle cases, both
+returned reports and eleven accurate tool notices. All 135 sealed dependencies,
+protected inputs, original index and owned cleanup pass. Strict integrated
+acceptance remains **INCOMPLETE**: the coding report omits a required recovered
+command refusal, and postflight found stale blanket import clauses beside the
+approved typing scope. Full root instructions were correct; composed task
+coherence was insufficiently checked. No imports were used, so typing was not
+exercised live. Source-only review diff and ambiguous test-preservation wording
+are explicit scope notes, not grounds to invent an algorithmic failure.
+The consumed run remains unchanged; a separate offline clarification and seventeen
+regressions address the task contradiction without new inference or production
+changes. Evidence: `artifacts/cli-typing-integrated-acceptance-20261019by/live-review.md`
+and `artifacts/cli-instruction-coherence-20261019bz/README.md`.
+
+The owner approved reviewed standard-library imports such as `typing` in future
+pilots and clarified that repository agent instructions are the CLI behavioral
+baseline. The blanket source-import ban was too narrow for representative Python
+usability. A prepared private profile permits fourteen reviewed typing names,
+aliases and type expressions while retaining existing effect/protected-test
+guards. Required instruction loading and actual guarded test execution are checked
+offline; consumed outcomes are unchanged and strict fresh acceptance remains pending.
+See [the behavioral baseline and declared test deviations](agent-methodology-findings.md#owner-directed-behavioral-baseline--2026-10-19).
+
+The preceding `bu` integrated slice stopped at the fixture's source-import rule before
+tests: model-authored code imported `typing` despite the explicit no-import scope.
+The model preserved three originals, added two companion tests, and recovered one
+failed text edit. Nine requests returned HTTP200; no test execution, coding report
+or frozen review completed. Independent source attribution, protected inputs,
+original indexed content, 131 sealed dependencies and owned cleanup pass. Live
+correctness is unvalidated and baseline acceptance remains INCOMPLETE. That failure
+led to the approved future-profile correction above; it supplies no algorithmic
+failure or new execution authority. No blind replay or historical regrade.
+Local evidence: `artifacts/cli-integrated-completion-acceptance-20261019bu/live-review.md`.
+
+A preceding fresh bounded frozen review passed on existing model-authored input:
+both reads, Git status/diff, six passing tests, accurate notices and an accepted
+substantive final report. Independent 3,616-case oracle and cleanup pass; source-only
+diff and paraphrased output are recorded scope notes. This supplies no fresh coding
+authorship. `artifacts/cli-budget-notice-acceptance-20261019bt/live-review.md`.
+
+Earlier diagnostic evidence follows; its consumed allowance remains closed.
+
+The fresh native review diagnostic exercised ADR-062 live: missing Git diff
+triggered shared feedback; the model then corrected an invalid empty-path call
+and successfully inspected the diff. The original eight-call ceiling stopped
+before a corrected final report, so acceptance still failed. All independent
+tests/oracle, frozen inputs and owned cleanup passed. A retained private wrapper
+also displayed obsolete24/32ceilings despite correct8/8enforcement. Its effect
+on model choice is unknown; the correction subsequently passed offline composition
+and the bounded live review above. All displayed counters must match active limits.
+The retained candidate is not an accepted report. Local evidence:
+`artifacts/cli-completion-acceptance-20261019br/live-review.md`.
+
+Offline continuation reproduced premature completion in the unchanged shared
+loop, with original history preserved and spare request budget. Fourteen new
+diagnostic regressions pass; prepared fixed origin/rule/missing-check projection
+retains the cause safely. The owner selected shared optional completion feedback
+in ADR-062. Implementation passes88focused tests and the full offline gate of
+2,474passed/3skipped, with full Pyright and Ruff passing. Default completion is
+unchanged without caller-declared requirements; live acceptance remains incomplete.
+See [daily readiness](daily-cli-readiness.md#current-assessment--2026-10-19)
+for implemented capabilities and the separate remaining workflow/migration gates.
+
+The approved isolated frozen-review diagnostic reached review and failed for a
+specific omission: no Git diff before the final report, despite unused call/tool
+capacity. Its report also misattributed copied input as current implementation
+and described an unobserved diff. The stronger gate caught this; independent
+tests/oracle, frozen inputs and owned cleanup passed. Baseline remains INCOMPLETE.
+Next: deterministic completion/report-accuracy regressions and inspection of
+existing bounded feedback points before another fresh live question. Preserve
+model authorship and original limits; do not increase caps or repeat integrated
+coding merely to reach review. See [methodology findings](agent-methodology-findings.md).
+
+The owner requested a pilot-methodology audit. Recent runs have provided useful
+stage evidence but no complete acceptance; several proposed changes were never
+exercised before an earlier phase failed. The revised sequence uses deterministic
+reproductions and targeted stage diagnostics before another integrated trial.
+Stronger successful-observation gates and usage/execution distinctions are
+implemented and checked offline. See
+[the methodology findings](agent-methodology-findings.md#pilot-methodology-audit-and-next-sequence--2026-10-19).
+No historical outcome is regraded and baseline acceptance remains INCOMPLETE.
+
+A bounded local slice produced model-authored changes that passed six tests and
+3,616 independent oracle cases, with an accurate coding report. Frozen review
+exhausted its allowance after an invalid empty-path Git diff and separate file
+diffs; its test run and report remain missing. Cleanup was verified. Baseline
+acceptance remains INCOMPLETE. The Git diff tool now explains that callers should
+omit `path` for all changes and supply a nonempty path when narrowing the diff;
+execution semantics and workspace protections are unchanged.
+
 ## Current checkpoint: 2026-10-18
+
+A subsequent local slice made source/test edits but removed an original test;
+preservation checks stopped execution before tests or either report. Owned
+cleanup was independently verified. Offline private-launcher fixes now preserve
+safe error locations, native output/exit codes and populated stop reasons, with
+116 guards and an independently checked scripted workflow. The edit tool's
+description now explains insertion by retaining the original anchor in the
+replacement. This general interface clarification leaves edit semantics and
+strict acceptance unchanged; its effect on model adherence is unverified.
+
+A fresh local acceptance slice stopped on its ninth request when the owned
+Ollama runtime rejected generated tool-call JSON. Eight responses and one source
+edit were observed; no tests, final coding report or frozen review completed.
+Protected inputs and originals stayed unchanged, and owned cleanup was verified.
+The exact malformed bytes and generation-versus-parser cause remain unknown.
+Immediate offline work separates parser error suffixes from echoed arguments and
+restores known provider attribution in a fresh private shim. The owner approved
+the narrow read-only `type(value).__name__` fixture exception and reaffirmed
+ordinary correction within existing resource/approval boundaries. A universal
+one-correction-per-turn cap is not an accepted decision. Shared selective recovery
+is now implemented offline under ADR-061; baseline live acceptance is INCOMPLETE.
+
+The owner approved shared-agent selective recovery and asked that a larger change
+be planned rather than implemented as a small retry patch. The subsequent bounded
+implementation below passes software checks; approval and software checks do not
+complete live acceptance. The documented OpenAI approach and its limits remain in
+[methodology findings](agent-methodology-findings.md#findings-to-retain).
 
 Owner approved structured CLI error attribution with a bounded safe fallback
 control receipt ([ADR-060](../decisions/ADR-060-structured-cli-error-attribution.md)).
@@ -84,6 +267,93 @@ now occurs before descent. Six new regressions and extended boundary checks are
 included; the full root suite passed 2,297 tests with nine skipped. This is a
 verified software fix with mixed model/host authorship, not full coding parity
 or proof of Codex savings. Large shallow listings can still exceed context.
+
+## Approved next baseline slice: shared model-output recovery
+
+**Status: implemented offline; live acceptance INCOMPLETE (2026-10-18).** The owner
+prefers recovery in the actual shared agent over a private-pilot-only experiment
+and requested alignment with established expert methodology. Investigation found
+a coordinated change, so it was planned first under the owner's small-change/large-change
+instruction, then implemented after the owner requested continuation. The shared path now uses
+the actionable-stop option specified below; it adds no live approval prompt and
+no global one-correction-per-turn cap. Detailed local context remains in the
+private CLI parity plan. See [ADR-061](../decisions/ADR-061-shared-model-output-recovery.md).
+
+Offline verification: full gate 2,450 passed / 3 skipped (workspace 2,328, Council 38,
+job-search 84), full Pyright and Ruff lint/format pass. The production adapter,
+shared loop and native CLI activity paths are exercised; failed request usage
+stays partial/unknown. First validation failures exposed a Windows oversized test
+ID, older result stubs missing the additive count and an unregistered test module;
+all were investigated, fixed and verified. No new inference or quality promotion.
+
+OpenAI's [recovery guidance](https://developers.openai.com/api/docs/guides/agents-api/errors)
+checks completed effects and bounds attempts/deadlines. Its
+[tool-runner example](https://developers.openai.com/api/docs/guides/tools-computer-use-sdk-drivers)
+provides safe feedback for recoverable failures while stopping on invalid state.
+Apply those principles to our observed failure modes; neither source specifies a
+universal correction count or proves equivalence to internal Codex behavior.
+
+At approval, ordinary tool/schema errors already returned actionable feedback, but
+`AgentLoop` propagates every `ProviderError`. Ollama's generated-tool JSON parser
+can fail before a usable call reaches the host. The private pilot has repeated-
+blocker observations and a scoped callback; production lacked that composed path.
+Merely marking all HTTP500 errors retryable or catching them in an unobserved
+transport retry would conceal failures and risk wasted work.
+
+Implemented in bounded steps on existing boundaries:
+
+1. **Classify known pre-tool output failures.** Inspect existing provider errors,
+   Ollama parsing/HTTP handling and admission/accounting. Define the smallest
+   neutral signal proving that no executable call was delivered; adapters own
+   provider-specific recognition. ADR-061 selects the additive `ToolCallFormatError`
+   subtype. Unknown, truncated or spoofed error details must
+   not enable correction. Keep raw payloads/reasoning out of messages and logs.
+2. **Compose correction and stall handling.** Feed safe host feedback through the
+   existing shared loop, preserving full history, instructions, settings, tools
+   and privacy. Every failed or corrective request consumes the original turn,
+   phase, time and review reserve. Reuse the pilot's useful progress/checkpoint
+   principles in production-owned code; do not import private artifact modules.
+   Repeated equivalent failures without new evidence trigger a bounded checkpoint
+   or actionable stop. Do not create a separate retry allowance or new supervisor.
+3. **Preserve approval and evidence boundaries.** Never replay completed tools or
+   invent assistant/tool output for a call that could not be decoded. Preserve
+   earlier effects and first-error attribution. Production approvals remain human
+   or existing authorized policy decisions; automated synthetic callbacks remain
+   confined to their named pilot. Unknown effects require reconciliation. During
+   an authorized unattended window, stalled-slice evidence/cleanup and wider-plan
+   continuation follow existing policy; no unattended window is granted here.
+4. **Report and verify the composed behavior.** Distinguish failed requests,
+   corrected output, substantive model work and host recovery. Reuse usage/error
+   receipts; failed-call usage and cost stay partial/unknown when unobserved.
+   Test actual provider/loop/CLI boundaries before preparing any fresh inference.
+
+Required deterministic acceptance:
+
+- Known malformed arguments produce safe feedback, then a corrected call can run
+  exactly once and return a substantive report with full earlier context intact.
+- Several ordinary corrections can occur within one turn; no global one-correction
+  cap is silently introduced. Repeated unchanged failures/no-op or cycling states
+  reach a checkpoint/stop instead of an invisible retry loop.
+- Unknown errors, denied approval, privacy/safety violations, expired bounds and
+  frozen/protected-input violations cannot be converted into automatic recovery.
+- Failed or interrupted operations preserve known effects and error attribution;
+  no replay occurs when execution is uncertain. Generic HTTP500 is insufficient.
+- Original request/tool/time limits and review reserve remain enforced, including
+  at checkpoints; truthful numeric usage and unknown coverage survive closeout.
+- Parser payload spoofing cannot supply cause labels or leak arbitrary text into
+  host feedback, terminal reports, transcripts or safe diagnostic fields.
+
+Only after these checks pass, prepare one fresh bounded local coding/test/report/
+frozen-review slice with new inputs, seals, independent oracle and cleanup checks.
+Preserve all consumed failures. Baseline completion still requires model-authored
+correct effects and both substantive reports, not merely a successful retry.
+New dependencies/services, provider/model/runtime changes, privacy/logging changes
+or materially different public-contract choices retain the normal decision gate.
+
+Next: align a fresh private pilot's transport shim with the neutral signal, retain
+its durable diagnostics, refresh all guards/workflow/oracle/cleanup evidence and
+seal against a clean reviewed source checkpoint. Existing consumed ba and prior
+seals remain evidence. Do not claim live acceptance from this software change.
 
 ## Historical 2026-10-15 live follow-up and interrupted-usage repair
 
@@ -592,6 +862,28 @@ unwrapped without losing backslashes. The default remains pytest only;
 Ruff/Pyright are available through explicit commands or pre-commit, without
 expanding default validation policy.
 
+Standalone validation also retains command-tree ownership through completion,
+timeout and interruption. A finite local reproduction showed a 0.5-second timeout
+waiting 4.13 seconds for a descendant's inherited output pipes. The runner now
+uses the existing Windows job support or a POSIX process group, closes owned
+descendants even after successful parent exit, and stops further validation when
+cleanup is unverified. Interpreter choice and validation receipt fields remain
+unchanged. This advances the C3/C6 offline contract; it does not establish full
+M5 or real-model report fidelity.
+The credential-filtered worker environment also retains Windows `PATHEXT`, which
+PowerShell needs to classify and resolve native executables. A real Python
+invocation verifies this without forwarding provider credentials or changing
+the caller's interpreter choice.
+
+A narrow standalone offline acceptance now combines `python_runtime`, real pytest
+and default/explicit interpreter selection in a workspace with spaces, a
+conflicting PATH and a misleading `.venv` hint. Separate subprocesses run without
+loading the IDE bridge or MCP server; actual interpreter markers and owned cleanup
+are checked. Explicit Ruff/Pyright commands accept valid code and reject seeded
+lint/type errors. Both interpreter selections use the same installed executable;
+this does not establish a second interpreter's compatibility or complete M5.
+Evidence: `artifacts/cli-python-vertical-20261020do/`.
+
 ## Approved capability set
 
 | ID | Capability | Required outcome |
@@ -1017,6 +1309,14 @@ when available; this public roadmap is sufficient to resume the approved work.
 
 ## Next priority after baseline CLI: independent unattended supervision
 
+Reuse the Prompt Library's [workflow and automation assessment](../prompt-library.md#reusable-workflows-and-automation-candidates):
+closeout/context capture, cheap session-boundary checks, scope/stall review and
+pending-decision tracking are inputs to this work, not separate prompt-engine
+projects. Most routine checks already belong in authorized implementation;
+independent execution after interruption remains future supervisor work. Weekly
+prioritization is optional. [End of Day](../prompt-library.md#codex-end-of-day)
+adds bounded useful allowance work and preserves existing Git/power authority.
+
 Owner direction (2026-10-14): finish the established baseline CLI goals first;
 independent unattended supervision is the next priority immediately afterward.
 This does not change existing baseline acceptance conditions or authorize a new
@@ -1037,6 +1337,67 @@ approval boundaries. Do not put arbitrary coding commands into existing queue ro
 Test chat interruption, first failure, uncertain cleanup and deadline closeout with
 local deterministic fixtures before an explicitly granted live window. Planning is
 approved; broader rollout and material implementation choices remain to be reviewed.
+
+### Owner-requested direction: allowance-aware sleep, wake and continuation
+
+Owner clarification (2026-10-21, attended): the eventual goal is a local work
+supervisor that schedules useful authorized work across suitable paid-agent
+allowances, can sleep between work windows, and wakes to continue when resources
+are available again. Record this direction now; prioritize the established CLI
+baseline and reuse its conversation/fallback infrastructure rather than building
+a separate PyCharm-chat recovery system. This is a planning requirement, not
+approval to register wake tasks, start a daemon, change power settings, select a
+local supervisor model, or spend newly refreshed allowances automatically.
+
+The smallest useful progression is:
+
+1. Finish the baseline's demonstrated command/prompt blockers and verify ordinary
+   conversation, saved continuation and selected fallback. Preserve meaningful
+   validation/review; do not expand baseline acceptance into a general scheduler.
+2. Reuse the existing provider-neutral transcript store (ADR-030), conditional
+   observable fallback history (ADR-059), ownership receipts and bounded runners.
+   Establish what each external client actually retains before promising complete
+   history. Saved conversation still needs current repository state, approvals,
+   partial effects and test evidence; never invent missing context or persist
+   provider-private reasoning. Summarization must disclose omitted context.
+3. Add the smallest independently running, finite closeout coordinator after
+   baseline: deterministic owned cleanup and evidence capture, readable handoff,
+   explicit incomplete/unknown outcomes. An optional model may summarize or
+   propose next work; process ownership, spending and power decisions retain
+   deterministic enforcement. A local generative model is not a prerequisite.
+4. Extend coordination to explicitly authorized future work windows. Distinguish
+   using expiring allowance BEFORE reset from resuming on replenished allowance
+   AFTER reset. A provider reset is neither proof of restored model capacity nor
+   authority to start work. Refresh provider-owned observations, check freshness,
+   entitlement, quality, privacy and budget, then admit only useful planned tasks
+   whose complete bounds plus cleanup fit the approved window. Defer unknowns;
+   no generation-only availability polling or unbounded retry loops.
+5. Add an opt-in Windows wake/sleep adapter around that policy. Windows Task
+   Scheduler supports `WakeToRun` from sleep/hibernation; verify this machine's
+   sleep state, wake-timer/power policy and task execution identity before claiming
+   support. Do not assume shutdown wake, unlocked desktop, network readiness or
+   native-client authentication. Waking Windows does not resume a cut-off PyCharm
+   agent; a separate authorized CLI worker must load the saved task/context.
+
+Keep neutral admission/resource policy in `ai_orchestrator`, source-specific
+authentication/quota access in `ai_provider`, and Windows power/process execution
+in the application/OS adapter. Reuse ADR-039's supported scheduling contracts and
+existing application-owned persistence where applicable; its current foreground,
+research-first scope does not authorize arbitrary background coding jobs. New
+task types, recovery behavior, persisted contracts and autonomous power/spending
+authority require explicit design and owner approval before implementation.
+
+Acceptance should cover chat/controller interruption, retained running tasks,
+stale/reused process identities, concurrent writers, missed wakes, stale or wrong
+reset metadata, capacity still unavailable after reset, expired grants, owner
+return/cancellation and bounded cleanup failure. Never resume a consumed trial
+or convert missing tests/reports into success. Before rollout, decide one simple
+owner command that cancels both pending work and power actions; today's
+`cancel-sleep.cmd` cancels repository sleep timers only.
+
+Windows references: [WakeToRun](https://learn.microsoft.com/en-us/windows/win32/taskschd/tasksettings-waketorun)
+and [system wake-up events](https://learn.microsoft.com/en-us/windows/win32/power/system-wake-up-events).
+These establish OS mechanisms, not verified workstation readiness.
 
 ## Resource and scheduling constraints
 
@@ -1061,6 +1422,15 @@ using the time-zone database; OpenRouter's current UTC-day allowance resets at
 00:00 UTC (02:00 Warsaw on October 15, 2026), so its one-hour-before slot is
 23:00 UTC (01:00 Warsaw on that date). Other providers' resets must be verified
 separately; do not assume a shared reset or independent per-model allowances.
+
+Owner clarification (2026-10-20): automatic awareness of available allowances and
+approaching resets belongs in `ai_orchestrator`, after the CLI baseline. Reuse
+provider-owned quota observations; keep provider authentication and HTTP access
+in `ai_provider`. Future orchestration should surface useful authorized work
+before an allowance expires, preserve planned reserves, and distinguish metadata
+checks from requests that generate model output. This is a backlog priority, not
+authorization to implement a scheduler, recurring checks or automatic spending
+during the baseline work. Existing source, privacy and billing gates still apply.
 
 Before admission, refresh remaining quota, preserve a reserve for planned
 acceptance, and check price, entitlement, capability and data-policy readiness.

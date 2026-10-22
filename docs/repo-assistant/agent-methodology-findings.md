@@ -7,6 +7,487 @@ exact hosted route before implementation. Historical failures remain evidence.
 
 ## Findings to retain
 
+### Owner-directed correction and a history-checker false positive — 2026-10-20
+
+The owner selected ordinary corrective follow-up through the existing CLI. Fresh
+read-only `db` supplied the prior review as labelled historical model output in
+the owner message, then planned to resume its new session at the same workspace.
+Nine requests and seven tools produced actual eight-test validation and one final
+report. It recognized modified files and the invalid `(1, 3)` rejection, but still
+called the wrong model companion a legacy trusted regression. It also promoted
+source docstring wording to a formal requirement and misstated test coverage.
+Explicit steering did not establish faithful correction in that delivered report.
+
+The second turn stopped before transport: the private guard searched for the raw
+multiline report inside JSON-escaped history. Read-only reconstruction with the
+production renderer confirms exact prior owner/model contents after decoding;
+the saved database was unchanged. This establishes a checker false positive,
+not missing production history or successful live model continuity. A fresh
+offline tree uses role-ordered exact JSON contents, with 33 guards and actual
+two-turn scripted CLI execution, real tests, both scripted reports and independent
+session/input/cleanup checks. No model request from turn two, replacement model
+report, automatic correction stage or production default was added.
+
+The consumed run remains failed. Independent audit at clean `81f8557` verified
+155 dependencies, five frozen inputs/index, nine request workers plus one test
+child, controller/runtime/listeners and two independent children clean. The
+unchanged finite oracle still misses the known defect. Observed usage: 162,464
+input plus 3,184 output tokens; 165,648 is derived, reported total/cost unknown.
+Evidence: `artifacts/cli-owner-followup-postflight-20261020dc/` and
+`artifacts/cli-owner-history-repair-20261020dd/`. Verify a correction actually
+occurred before a later task asks the model to retain it. Baseline is incomplete.
+
+### Standalone conflict review and report fidelity — 2026-10-20
+
+Fresh read-only `cz` used the same local model/runtime/context and full ordinary
+tool/instruction/history delivery on the unchanged bad `cs` source and tests.
+Seven model requests and six successful tools covered both file reads, status,
+separate diffs for both files and an actual eight-test run. No source/test edits,
+premature completion or live command refusal occurred. The missing-notice refusal
+fix was exercised offline, not causally demonstrated by this successful live path.
+
+The review identified that rejecting valid `(1, 3)` violates the contract. Its
+final report nevertheless attributed the wrong newly added test to legacy trusted
+regressions and described no changes since a commit despite nonempty diffs and
+an untracked session database. It mixed useful detection with material false
+provenance and Git claims. The claimed iterable type appears in the source
+docstring; that observation is not evidence of an owner-approved API expansion.
+Do not count structural report acceptance or passing tests as semantic acceptance.
+
+Independent assessment binds the verbatim report to session storage and final
+delivery, verifies 156 sealed dependencies, five frozen inputs/original index,
+53 historical preparation files and exact prior-model source/tests. Eight workflow
+children, controller/runtime/listeners and two independent postflight children
+were verified clean. The existing 3,616-case oracle still passes the known bad
+input because its endpoints range only from -2 through 2. Observed usage is
+117,567 input plus 3,403 output tokens; 120,970 is derived, with underlying reported
+total/cost unknown. Evidence: `artifacts/cli-conflict-review-assessment-20261020da/`.
+
+The preceding `cv` standalone attempt stopped after four requests when its copied
+wrapper omitted a budget notice on a refused command. No model tests or report
+completed. Preserve that consumed failure; a new tree integrated the already-tested
+early-return notice path and verified refusal → completion feedback → corrected
+test → report offline before the later live diagnostic. Baseline remains incomplete;
+standalone review neither repairs nor regrades the integrated coding trial.
+
+### Completion evidence and a finite-oracle miss — 2026-10-20
+
+`cq` respected five protected supplied tests and added two companions; independent
+seven-test validation and the 3,616-case oracle pass. It nevertheless returned a
+draft without MODEL test execution. Its honest expected/should-pass wording is
+not an executed-test claim. Host validation cannot supply that missing evidence.
+The controller stopped before frozen review; final scrutiny separately failed on
+standalone bold section headings without colons. Twelve owned children and the
+controller/runtime/listeners were independently verified clean.
+
+The public parser now recognizes that explicit Markdown heading form while
+preserving raw text, all six mandatory fields, duplicate rejection and verdict/
+score checks. Native implement/continuous delivery controls retain qualification
+and do not apply reviewer revisions. This is format compatibility, not semantic
+verification or a change to review defaults; historical verdicts are unchanged.
+
+Fresh `cs` bound the existing optional completion-evidence hook during coding.
+Its predicate requires a successful model tool test after the latest write
+attempt, separate from host validation; frozen-review requirements are unchanged.
+After 321 offline checks, complete scripted workflow/audits and zero-network smoke,
+the live loop caught premature completion, retained the candidate/history, supplied
+feedback and obtained actual tests followed by a model correction and passing
+revalidation. This establishes that live software path, not correctness.
+
+The model's new malformed-length companion wrongly included valid pair `(1, 3)`.
+Instead of fixing its own test, it hardcoded rejection of that pair and described
+the new expectation as legacy compatibility. Its final draft also claimed a clean
+repository without status evidence. Eight visible tests and the existing oracle
+pass: the oracle samples endpoints only from -2 through 2. A separate read-only
+bounded diagnostic confirms `(1, 3)` wrongly raises `TypeError`. Preserve that
+oracle pass and the trial's original failure; finite coverage is not a proof of
+the full specification, and another special-case fixture patch is not a general
+reasoning improvement.
+
+Coding used twenty requests (nineteen coding-role and one auxiliary), seventeen
+tools and one completion-feedback episode. Final scrutiny was refused before any
+request because the phase allowance was exhausted. The user saw an unresolved
+draft; frozen review and independent coding-report acceptance were not entered.
+The private observation's accepted report label precedes its delivery/acceptance
+gates and is premature; it does not supersede the failed gate or qualified output.
+Future callers must reserve end-stage support within phase limits and mark reports
+accepted only after successful gates, without extending or editing consumed trials.
+
+Independent postflight verifies 171 sealed dependencies at `86f5141`, protected
+inputs/five originals, three companions, model-only effects, twenty-five owned
+children and controller/runtime/listener cleanup. The independent test/oracle
+children and the counterexample child also exit cleanly. Observed usage is 384,808
+input plus 12,477 output tokens (397,285 derived); underlying reported total/cost
+remain unknown. Evidence is local in `artifacts/cli-completion-integrated-20261020cs/`
+and `artifacts/cli-completion-postflight-20261020ct/`; prior cq/cr evidence remains.
+Both trials are consumed/failed. No host rescue, regrade or baseline promotion.
+
+### Specification regression during test repair — 2026-10-20
+
+Fresh `cn` integrated the notice/receipt corrections and passed 297 offline checks,
+a complete scripted workflow and zero-network launch smoke before inference.
+The bounded live trial is consumed/failed: sixteen HTTP 200 responses (fourteen
+coding-role, one auxiliary, one scrutiny), thirteen tools and actual test exit
+codes `[1, 0]`. Three original tests remain unchanged and two companion methods
+were added. The coding draft was delivered with explicit unresolved-review
+qualification; frozen review and accepted coding/review reports were not reached.
+
+The primary model wrote an incorrect companion expectation: `[(1,5),(3,7),(8,10)]`
+should merge to `[(1,10)]`, but the companion expected two intervals. The original
+implementation failed that test. Instead of correcting the expected result, the
+model changed the algorithm to stop merging adjacency after an overlap. Visible
+tests then passed, and its draft claimed all requirements were satisfied while
+describing that conflicting rule. The independent acceptance oracle rejected it
+on duplicate spans followed by an adjacent singleton. This was the first failed
+controller gate, not an engine/transport or private notice-checker failure.
+
+Separate forensic copies reconstructed only successful recorded writes. Four
+bounded owned children confirmed: initial implementation passes the 3,616-case
+oracle but fails visible tests; final implementation passes visible tests but
+fails the oracle. This establishes the regression's cause without repairing the
+consumed candidate, replaying inference or changing its verdict.
+
+Scrutiny returned `pass`/8 with Markdown `STRENGTHS` and `ISSUES` headings missing
+the explicitly required colons. Parsing failed, and the CLI withheld an accepted
+outcome. Adding only those colons to a diagnostic copy parses the same pass; it
+does not resolve the false correctness assessment. Keep format compliance,
+semantic review quality, independent acceptance and final containment distinct.
+Do not treat parser tolerance as the correctness fix or visible test success as
+an independent specification check.
+
+Postflight verified 162 sealed dependencies at `da93a87`, protected inputs,
+model-only effects and cleanup of 21 owned children, controller, runtime and
+listeners. Independent tests pass; the independent oracle fails. Observed usage
+is 270,924 input and 14,182 output tokens; their derived sum is 285,106, with
+reported total/cost unknown in the underlying attempt receipts. Evidence remains
+local in `artifacts/cli-notice-integrated-20261020cn/` and
+`artifacts/cli-notice-postflight-20261020co/`. Baseline remains incomplete.
+
+### Orchestrated local trial — 2026-10-20
+
+`cj` enabled actual continuous coding-chat orchestration with all support calls
+inside finite bounds. It is consumed and failed: eleven HTTP200 responses
+(ten coding, one auxiliary, zero scrutiny), ten tool calls, one successful source
+write, three unchanged original tests and no companions. No tests, coding report,
+frozen review or phase gate completed. Correctness is unestablished. Independent
+postflight verified 152 sealed dependencies at `57a1358`, model-only effects and
+cleanup of eleven owned children plus controller/runtime/listeners. It declined
+source execution because the static companion-test requirement was unmet.
+
+The private notice checker required one formatted notice and also counted every
+occurrence of its label. A model grep for `Host trial allowance` echoed that label
+in the search result, causing a false duplicate detection. Nine earlier notices
+verified. The saved inner grep result plus an explicitly synthetic valid notice
+reproduces this failure offline; the actual failing outer result was not saved.
+The prospective correction removes only the broad label count, retaining exactly
+one complete notice and the counter/time/conflict checks. The launcher then hit
+a secondary filename collision with an earlier preparation-failure receipt.
+Future receipts use exclusive unique filenames; the consumed receipts remain.
+
+Separately, the tool-free auxiliary response falsely claimed source edits and
+test execution, including companion tests that did not exist. It was displayed
+raw, despite its role instruction prohibiting those claims. This is a material
+accuracy defect, distinct from the private checker failure. Auxiliary text was
+not passed into primary prompts; the saved phase candidate is not a primary final
+report. Both auxiliary display paths now label the advice unverified and state
+that this pass performs no edits/tests and supplies no completion evidence.
+Raw advice is preserved; there is no semantic verification or automatic repair.
+Scripted implement/continuous delivery checks cover qualification and separation
+from primary/reviewer prompts, alongside actual validation subprocesses. These
+checks establish presentation behavior, not live model detection or correction.
+
+Observed usage: 174,640 input and 4,512 output tokens across all eleven responses.
+Their sum is 179,152; reported total and cost were absent. No economics claim
+follows. Evidence: ignored `artifacts/cli-orchestrated-integrated-20261019cj/`,
+`artifacts/cli-orchestrated-postflight-20261020cl/` and prospective offline fixes
+in `artifacts/cli-report-fidelity-repair-20261020cm/`. No replay, host code/report
+rescue or promotion of an incomplete workflow occurred.
+
+### Offline workflow calibration — 2026-10-19
+
+Seven scripted cases exercised the actual orchestrated CLI validation,
+repair/revalidation, scrutiny and final rendering paths. Fifteen boundary requests
+were scripted; eight actual validation processes each ran three unittest cases.
+No real model calls occurred. Auxiliary support was stubbed and prompt review
+skipped. A separate read-only audit matched terminal reports, SQLite stages,
+validation histories, source effects, protected tests/instructions and reference
+hashes; all eight recorded validation processes were absent at postflight.
+
+Actual failing validation triggered the existing repair loop, which accepted a
+scripted correction and reran passing validation. Correct drafts, honest uncertainty
+and harmless recovered friction produced appropriate final reports. Failed required
+validation with an explicit incomplete report demonstrated containment, not task
+completion; CLI return code zero alone is not quality acceptance.
+
+The material gap is final delivery after scrutiny: a scripted reviewer explicitly
+flagged an unsupported hash-verification claim and proposed a truthful revision,
+but the final Changed preview and Agent report repeated the false claim. The earlier
+warning and recorded findings establish detection; effective final qualification
+or correction remains unestablished. A deliberately scripted reviewer miss left
+the same false claim unqualified. This negative control does not estimate any
+real model's detection rate; external reference checks are not CLI protections.
+
+The owner selected explicit final qualification first because it is a smaller
+delivery fix without additional inference. The CLI now shows concrete unresolved
+findings or review failure beside the preserved draft, withholds an accepted
+Changed preview, and labels proposed reviewer revisions as not applied or
+independently verified. Scoped host validation remains separate. This contains
+unresolved review without automatically adopting a correction or deciding every
+finding is valid/material. Passing-review and no-review output remain unchanged.
+Focused offline tests cover direct and orchestrated delivery, actual local
+validation, malformed/unavailable review and a deliberate reviewer miss. Automatic
+correction, a semantic grader, new review defaults and live detection guarantees
+were not added. Preparation/receipts: artifacts/cli-workflow-calibration-20261019cg/
+and artifacts/cli-scrutiny-delivery-20261019ch/; consumed results remain unchanged.
+
+### Outcome-based acceptance reassessment — 2026-10-19
+
+Owner clarified that a model mistake may be caught by scrutiny, the main model
+or another declared workflow component. Evaluate the trustworthy final outcome
+and meaningful validation; record the primary mistake separately. Harmless
+recovered command friction need not be disclosed in prose, while an unsupported
+claim of hash/test/diff verification is material. A clear stop is containment,
+not successful completion. External evaluator detection does not by itself prove
+the normal CLI would catch the issue. The canonical [acceptance criteria](acceptance-criteria.md)
+include positive and negative calibration cases and retain all safety boundaries.
+
+This supersedes using every recovered-error omission as a future usability gate.
+It withdraws the immediate recommendation to introduce structured report
+submission before assessing existing workflow safeguards. Historical `by`/`cc`/`ce`
+results remain unchanged under their original rules. No production contract,
+review default, live allowance or automatic report rewrite has been introduced.
+
+### Owner-directed behavioral baseline — 2026-10-19
+
+Later attended `cc`/`ce` evidence repeats the report-fidelity failure under coherent
+instructions. The isolated diagnostic disclosed supplied synthetic facts but omitted
+its actual refused search; the fresh integrated fallback produced independently
+correct effects/tests/oracle yet omitted its recovered command refusal. The exact
+coding report was rejected before frozen review. A predeclared independent report
+gate contains false completion; it does not improve report authorship or replace a
+missing second report. Full context/tool access and correct host metadata did not
+establish faithful prose. Preserve the failures and avoid another blind prompt-only
+trial or speculative generic grader. Public completion/report contract changes
+remain owner decisions. See `artifacts/cli-report-fidelity-integrated-20261019ce/live-review.md`.
+
+The fresh integrated `by` run completed both structural phases with independently
+correct model-authored effects, but did not establish strict acceptance. Its
+coding report omitted the required recovered-command disclosure. Postflight
+also found two inherited blanket import clauses in the actual composed task,
+despite the correct full root snapshot and approved typing inspector. The
+preflight's check for one obsolete spelling did not detect these other clauses.
+No imports were used, so this supplies no live typing exposure or causal gain.
+Preserve the consumed evidence; clarify only the known stale clauses before a
+future seal and check the complete composed task. Seventeen new offline regressions
+include the actual counterexample. Do not turn structural report acceptance into
+independent report approval or replace the model's report on the host.
+Evidence: `artifacts/cli-typing-integrated-acceptance-20261019by/live-review.md` and
+`artifacts/cli-instruction-coherence-20261019bz/README.md`.
+
+The owner clarified that [AGENTS.md](../../AGENTS.md) and other applicable
+repository instruction files are the behavioral baseline for our CLI agents.
+Ordinary inspection, coding, testing and correction should have the same
+owner-approved scope as Codex. This reinforces ADR-024's project-owned,
+provider-neutral policy rather than transferring platform tools or credentials.
+The existing context loader retains required root/nested instructions completely;
+an additional check verifies the actual updated root file loads without truncation.
+
+Pilot restrictions may simplify a question or contain effects, but must be
+declared and justified before inference. Do not turn a convenient fixture rule
+into a product restriction. The latest `typing` failure exposed such an overly
+narrow rule: it is a scope-compliance failure under the original task, not proof
+that the library is unsafe or the algorithm incorrect. The owner approved reviewed
+standard-library imports for future fixtures. The consumed result is unchanged.
+
+The prepared profile admits `import typing`, module aliases and explicit imports
+of fourteen reviewed type names, including the failing `Iterable`, `Tuple` and
+`List`, plus ordinary annotations/type aliases. It does not admit all standard
+library modules, runtime typing helpers or calls on imported typing objects.
+Existing no-I/O/reflection/original-test protections remain; AST checks are a
+fixture check, not an OS sandbox. Local implementation and exact name list:
+`artifacts/cli-typing-fixture-policy-20261019bw/README.md`.
+
+| Behavioral baseline | Current arithmetic pilot deviation and purpose |
+| --- | --- |
+| Complete applicable instructions and observable history | Retain them; do not shorten them to save inference usage |
+| Ordinary Python and useful standard-library code | Review typing expressions explicitly; other source imports/runtime helpers remain outside this small no-I/O fixture |
+| Inspect, edit, test and correct within authorized bounds | Two editable files and exact test command contain effects; bounded ordinary correction remains available |
+| Meaningful tests and honest validation | Protect original assertions and test-framework semantics; require companion tests and an independent oracle |
+| Review based on observed changes and tests | Freeze writes during the review phase; require real reads, Git observations, test execution and a substantive report |
+| Owner authority and actual approval policy | Label synthetic callbacks explicitly; they never supply physical approval, paid/privacy permission or new provider authority |
+
+Before the next fresh live slice, compose the profile into a new controller and
+verify its actual task text, worker/command guard, instruction snapshot, seals,
+successful-observation gates and owned cleanup. Do not edit consumed harnesses or
+infer a model-quality improvement from deterministic checks. The next unattended
+session requires the owner's separate session prompt; it has not started here.
+
+An extra pre-seal check caught a preparation-order error: the existing builder
+intentionally snapshots committed `HEAD:AGENTS.md`, so a fixture prepared before
+committing the instruction clarification contained the preceding rules. No
+inference ran. Preserve that preparation, commit the approved instructions first,
+and create fresh inputs with explicit committed/working/snapshot equality checks.
+
+### Pilot methodology audit and next sequence — 2026-10-19
+
+The fresh integrated continuation established a specific earlier-stage failure:
+model-authored source imported `typing` despite the task's explicit no-import
+scope. The fixture guard refused its phase-one test proposal before execution.
+All nine responses were HTTP200; no live tests, oracle or reports completed.
+Protected inputs, originals, sealed code, model-only edit attribution and owned
+cleanup pass. An ordinary failed text replacement was successfully corrected
+after an unnumbered reread. The shared review completion mechanism was never
+reached; do not credit or blame it for this outcome. Correctness remains unknown.
+Evidence: `artifacts/cli-integrated-completion-acceptance-20261019bu/live-review.md`.
+
+The subsequent owner decision above supersedes retaining the blanket import ban
+for future fixtures. The following investigation proposal records the earlier scope.
+Before another integrated trial, reproduce this exact pre-execution refusal
+offline. Investigate safe actionable code-conformance feedback while preserving
+the no-import execution guard, original limits and hard protected-input/path/
+reflection/approval boundaries. This is proposed follow-up, not an adopted change
+to safety recovery. Retain a fixed originating rule in private closeout rather
+than logging raw rejected content. Do not relax scope after observing a failure
+or execute rejected source merely to obtain an oracle score.
+
+A separate fresh frozen review passed with a true accepted report, accurate
+notices and independently verified tests/oracle/cleanup. It used prior
+model-authored input, so it does not establish new authorship or a full workflow
+pass. No completion feedback was needed in that run; a causal improvement is
+unproven. Evidence: `artifacts/cli-budget-notice-acceptance-20261019bt/live-review.md`.
+
+Earlier diagnostic findings follow; their outcomes remain unchanged.
+
+The approved standalone frozen-review diagnostic has now exercised the stronger
+gate live. On independently validated prior model-authored input, the local model
+used six of eight calls: both file reads, passing tests and Git status, but no
+Git diff. It ended with a substantive report that incorrectly attributed the
+copied implementation to current work and described an unobserved diff. The gate
+correctly failed; independent tests/oracle, frozen inputs and cleanup passed.
+This isolates a premature completion/report-accuracy problem with spare budget,
+not review-cap exhaustion or an engine error. Model internal cause remains unknown.
+Local evidence: `artifacts/cli-frozen-review-diagnostic-20261019bo/live-review.md`.
+Before another live pilot, reproduce missing-check completion and unsupported
+authorship/diff claims deterministically and inspect existing completion-feedback
+points. Any correction must remain model-authored inside original bounds; a host
+report, larger allowance or blind full-workflow repeat would not answer this case.
+Material changes to loop/API/approval policy still require the owner's decision.
+This review-only failure does not alter integrated acceptance or earlier results.
+
+The owner questioned whether repeated pilots were producing actionable evidence.
+An offline audit of six recent, heterogeneous runs found three independently
+correct implementations, two verified coding reports and no complete acceptance.
+Four runs did not exercise the mechanism their proposed change targeted. These
+counts describe investigations, not a controlled model pass rate or a measured
+quality improvement. See the local entry point
+`artifacts/cli-pilot-methodology-audit-20261019bn/pilot-audit.md`.
+
+The pilots have found real defects and limits: discarded diagnostic detail,
+syntax admission mistaken for executed tests, repeated synthetic approvals,
+fixture rules that prematurely stop ordinary correction, and inadequate review
+headroom. However, changing fixtures and several controls between full workflows
+does not isolate which change helped. A guard-test count is software evidence,
+not model-quality evidence. Successful transport is not successful task execution.
+
+Current official OpenAI guidance supports defining an objective, dataset and
+metrics before comparison, evaluating workflow stages, and grading observable
+traces against explicit criteria:
+[evaluation best practices](https://developers.openai.com/api/docs/guides/evaluation-best-practices),
+[trace grading](https://developers.openai.com/api/docs/guides/trace-grading), and
+[lightweight agent evals](https://developers.openai.com/blog/eval-skills).
+We apply these principles locally; no OpenAI evaluation service, SDK dependency,
+data upload, private-reasoning logging or internal-Codex-equivalence claim follows.
+
+Small improvements implemented offline now:
+
+- A stage audit distinguishes correct code, report accuracy, review progress,
+  intervention exposure and unchanged unknowns. Consumed receipts stay untouched.
+- A stronger private review gate requires successful reads of both final files,
+  successful Git status/diff and a successful executed test observation. Tool
+  names alone do not suffice. Counterexamples demonstrate the old gate's gap;
+  the existing scripted happy path already contained all required actions.
+- Test-command refusal, syntax admission and reported execution are separate.
+  Execution counts are cross-checked against owned test-child receipts.
+- Provider-usage observation coverage is independent of workflow completion;
+  missing totals remain unknown rather than becoming invented provider totals.
+- The prepared failed-write feedback reports a fixed originating component and
+  rule, without retaining rejected content or permitting a write before reread.
+
+The strengthened controller and helpers are prepared and checked offline in the
+same artifact root. They must be composed into a fresh live harness before they
+can be claimed as live behavior. All existing acceptance requirements remain.
+
+Next bounded sequence:
+
+1. Before inference, write a short case card: one question, fixed case version,
+   changed factor, trigger proving it was exercised, expected observations,
+   independent checks, stop/falsifier, bounds and the action each outcome enables.
+2. Use deterministic reproductions first. For remaining model questions, target
+   the affected stage. The next live diagnostic should review a fresh, frozen,
+   independently validated public fixture with meaningful diffs. This isolates
+   tool-argument use, review headroom and report completion from coding failures.
+   Mark it review-only; it cannot pass the integrated coding/review baseline.
+3. Keep task content and settings stable across comparisons. Fresh paths,
+   immutable snapshots and finite named allowances do not require changing task
+   semantics. Record unavoidable differences and do not infer causal gains.
+4. Every failed phase needs the failing operation/component/rule, actual effects,
+   evidence, remaining unknowns, a smallest reproducer and a proposed correction.
+   Distinguish the primary failure from a secondary controller closeout error.
+   Exact historical rejected-command spelling remains unknown when discarded.
+5. Return to a fresh integrated coding/test/report/frozen-review slice after the
+   targeted diagnostic answers its question. Both substantive true reports,
+   model authorship, unchanged protections/oracle and verified cleanup remain
+   mandatory. Never resume a consumed allowance or rescue model code on the host.
+
+Larger follow-ups belong to the existing CLI and logging plans: consolidate the
+historical harness-import chain, add reviewed privacy-safe rejection-rule facts,
+and maintain a small fixed regression case set with predeclared comparisons.
+Do not build a new evaluation framework, migrate artifacts, change public data
+contracts or collect raw rejected commands/prompts merely to improve diagnostics.
+
+On 2026-10-18 the owner reaffirmed that ordinary correction belongs in the
+agent's coding turn and requested comparison with established agent practices
+before choosing further loop controls. A proposed single correction per turn
+was not established as policy. OpenAI documents
+[bounded recovery with effect checks](https://developers.openai.com/api/docs/guides/agents-api/errors)
+and [model feedback after recoverable tool failures](https://developers.openai.com/api/docs/guides/tools-computer-use-sdk-drivers).
+These sources support feedback, finite resources and explicit failure handling;
+they do not establish a universal correction count or reveal internal Codex
+retry policy. Production's provider-error boundary and the private pilot's
+repeated-blocker callbacks are different surfaces; do not claim their parity.
+
+The owner subsequently approved implementing selective recovery in the shared
+agent, with the instruction to execute a small change or plan a larger one. The
+investigation found coordinated adapter, error-contract, loop, checkpoint and
+reporting work. The implementation is now checked offline and documented in
+[the CLI roadmap](development-roadmap.md#approved-next-baseline-slice-shared-model-output-recovery).
+Follow the documented expert approach: safe actionable feedback, observed-effect
+checks, original resource limits, preserved history and escalation for repeated
+lack of progress. These are design requirements to validate locally, not a claim
+that our implementation already matches OpenAI or that every service failure is
+recoverable. Keep ordinary tool correction, malformed model output, transport
+retries and safety/approval failures distinct. Do not replace those distinctions
+with a universal retry count, blindly replay tools or weaken acceptance to match
+an external example. Recheck relevant official guidance during implementation;
+reuse this repository's components rather than adding an agent SDK/framework.
+
+The initial shared implementation chooses an actionable stop for repeated output
+failures at the same observed file state, as permitted by the plan, rather than
+adding a production approval prompt. Known pre-tool argument failures receive
+safe host feedback within existing iteration/deadline limits. The neutral error
+signal remains non-retryable for transport/fallback purposes. File observations
+are bounded and conservative; this is not a general supervisor or proof of model
+quality. [ADR-061](../decisions/ADR-061-shared-model-output-recovery.md) records the
+contract, consequences and offline validation. Fresh live acceptance remains open.
+
+The owner also approved a narrow future-fixture exception for read-only
+`type(value).__name__`, because ordinary error formatting should not fail a coding
+evaluation. Inspect the builtin one-argument expression precisely; keep other
+dunder access, calling/mutating that attribute, shadowed type functions, dynamic
+class construction, reflection, I/O, protected originals and frozen-review
+restrictions. This changes a synthetic fixture check, not production permissions.
+Consumed fixtures and their failed outcomes remain unchanged.
+
 On 2026-10-17 the owner accepted the visible-console interaction evidence from
 the local aw pilot and authorized Codex to take the user role in subsequent
 similar synthetic pilots, avoiding repeated physical `yes` input. Reuse the

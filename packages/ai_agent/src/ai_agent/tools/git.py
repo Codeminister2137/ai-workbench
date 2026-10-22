@@ -144,7 +144,11 @@ class GitDiffTool(BaseTool):
             description="Show staged or unstaged Git diff, optionally narrowed to a path.",
             parameters=(
                 ToolParameter(
-                    "path", "string", "Optional workspace path to inspect.", required=False
+                    "path",
+                    "string",
+                    "Omit to inspect all changes; otherwise provide a nonempty workspace path. "
+                    "Do not pass an empty string.",
+                    required=False,
                 ),
                 ToolParameter(
                     "staged",

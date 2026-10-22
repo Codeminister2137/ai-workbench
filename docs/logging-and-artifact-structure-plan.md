@@ -1,3 +1,43 @@
+> 2026-10-19 bu integrated trial: exact root cause established from safe source
+> locations plus independent static inspection: fixture_validator rejects a typing
+> import before run_command execution. Wrapper retains generic acceptance_exception
+> while fixed source_import_forbidden is absent from original closeout; preserve
+> that known origin/rule in future private diagnostics, not raw exception/model text.
+> Exact rejected command spelling is unknown. Keep execution/admission distinct.
+> bt proved actual budget notices and accepted-versus-candidate report separation
+> in a bounded frozen review; bu verified all eight observed notices independently.
+> No new logging service, artifact-layout migration or production contract needed.
+>
+> 2026-10-19 br: shared completion feedback was observed live; the model performed
+> missing Gitdiff but exhausted the original bound before final report. Existing
+> private reports[2] retains the rejected candidate; readers must distinguish it
+> from an accepted phase report. A historical notice also advertised24/32caps
+> while8/8were enforced. bs prepares an eight-test counterexample/fix; future
+> preflight must check actual emitted notices against active total/phase limits.
+> Preserve consumed evidence; no raw model reasoning or artifact-layout migration.
+>
+> 2026-10-19 bp offline follow-up: a private known exception now preserves fixed
+> fixture origin/rule/missing-check labels through the existing safe failure
+> projection. Fourteen regressions include failed/unknown observations and raw
+> sentinel exclusion. This prepared helper does not change consumed bo evidence,
+> production contracts or loop policy; broader propagation remains planned.
+>
+> 2026-10-19 bo review diagnostic: the successful-observation gate correctly
+> rejected missing git_diff. Its outer ValueError preserves locations but loses
+> the fixed missing-check label. Plan a narrow private fixture-origin/rule/missing
+> check projection before generic closeout; reuse known labels, no raw exception
+> text/prompt capture. Independent trace review established this cause immediately.
+> Do not change consumed harnesses or broaden public contracts for this finding.
+>
+> 2026-10-19 pilot audit: existing receipts preserve useful stage evidence, but
+> exact rejected-command spelling and older discarded engine bodies cannot be
+> recovered. Do not describe generic wrappers as root causes. Future private
+> pilot diagnostics should carry fixed originating component/rule labels before
+> discarding rejected content, distinguish execution from admission/refusal and
+> separate usage coverage from workflow completion. Current bm/bn prototypes
+> implement narrow safe labels/readers offline; broader command classification,
+> incremental live observations and harness consolidation remain this plan's
+> work, without raw logging or selecting a new persistence/layout contract.
 # Logging and artifact structure review
 
 **Priority: High. Scope: whole repository. Status: planned; layout not yet selected.**

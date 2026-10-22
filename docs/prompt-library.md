@@ -33,6 +33,31 @@ an update after each sub-step. Keep investigation and implementation internal
 unless the user asks for an interim report; communicate only at material phase
 changes, long-running waits, blockers, or the final verified closeout.
 
+## Reusable workflows and automation candidates
+
+Reviewed 2026-10-21: retain the useful checks rather than requiring the owner to
+manually chain prompts. Under ordinary authorized implementation, investigation,
+relevant validation, diff review, documentation and context updates already apply.
+The package-specific task templates are optional reminders, not additional gates.
+
+- **Closeout + context capture:** reuse as one evidence-based stopping workflow;
+  save completed/failed checks, partial effects, decisions and next action. A future
+  supervisor can reuse this contract after baseline; a prompt alone cannot survive
+  interruption or prove process cleanup.
+- **Session Boundary Check:** use the existing cheap script and current task state;
+  recommend a new chat at a useful checkpoint, without guessing IDE context usage.
+- **MVP/Stop Review:** trigger when scope grows or repeated attempts stop producing
+  new evidence; defer extra infrastructure and return to the smallest useful task.
+- **Decision Brief / ADR Gap Check:** preserve pending material choices and approved
+  rationale. Raise only relevant boundaries; do not create ADRs for routine details.
+- **Weekly Review:** optional periodic prioritization across projects, using actual
+  outcomes. This is a planning aid, not an automatically scheduled job.
+
+For provider research, consult `packages/ai_provider/docs/source-state.md` first,
+assess per-finding freshness and refresh official sources where necessary. Record
+reusable findings there; current account/runtime observations remain separate.
+No recurring automation, new persistence or IDE settings are introduced here.
+
 ## PyCharm Sync
 
 The PyCharm Prompt Library is separate IDE state. To use the same prompts there:
@@ -72,6 +97,8 @@ For an unattended work window:
 1. `Codex: Unattended Work Window`
 2. Supply the duration and current objective; preserve existing approval and
    live-usage boundaries.
+   Save the timed plan at `docs/plans/unattended-work-plan.md` using the repository
+   template; include wider approved goals and time-reassessment checkpoints.
 3. Continue the selection/investigation/implementation/validation loop across
    completed and blocked slices until the recorded deadline or an evidenced
    exhaustion of useful authorized work.
@@ -98,6 +125,11 @@ The goal is that the user can say "DoD closeout" instead of separately asking
 for commits, context handoff, prompt-library review, ADR review, and final
 validation every time.
 
+For useful work with allowances approaching reset, say **"End of day"** or
+`Use Codex: End of Day`. This runs the prompt below; it does not mean stopping,
+switching to unattended mode, or scheduling sleep. Add an explicit unattended
+deadline separately when wanted.
+
 For architecture-heavy work:
 
 - `Codex: ADR Gap Check` checks for missing or stale ADR coverage.
@@ -115,6 +147,7 @@ For scope control:
 - `Codex: Closeout Helper Set`
 - `Codex: Session Boundary Check`
 - `Codex: Unattended Work Window`
+- `Codex: End of Day`
 - `Codex: MVP/Stop Review`
 - `Codex: Job Search Task`
 - `Codex: AI Council Task`
@@ -256,9 +289,24 @@ Instructions:
 - Record execution start, duration and deadline in UTC and Europe/Warsaw before
   implementation. "Around two hours" means two hours from execution start.
   Never reuse an expired window or reset its deadline after compaction.
-- Maintain a compact candidate ledger in CURRENT_CONTEXT.md: authoritative plan/
-  accepted requirement, authorization boundary, current evidence, next action,
-  and READY/NEEDS_INVESTIGATION/IN_PROGRESS/COMPLETE/BLOCKED status.
+- At startup, before implementation, launch and verify the deadline sleep
+  fallback using -SleepAtUtc as specified in docs/unattended-sleep.md, unless
+  explicitly overridden. Save timer ownership and show the owner the exact
+  cancellation command immediately. At closeout safely replace it with the
+  completion timer and verify cancellation of the startup timer; never leave
+  duplicate active timers. Do not schedule retrospectively. Use owner-approved
+  -Rolling renewal about every ten minutes and before long work. Cover remaining
+  hard task bounds, cleanup and working headroom without extending the deadline;
+  verify receipt acknowledgement before admission. Show .\cancel-sleep.cmd as
+  the fixed command cancelling all repository timers. Do not rearm after owner
+  cancellation without direction.
+- Before implementation, create docs/plans/unattended-work-plan.md from
+  docs/unattended-work-plan-template.md and link it in CURRENT_CONTEXT.md.
+  Read the immediate slice and wider approved goal/plan files. Order concrete
+  steps with rough durations, authorization boundaries, validation/completion
+  conditions, independent fallback work and the candidate ledger using
+  READY/NEEDS_INVESTIGATION/IN_PROGRESS/COMPLETE/BLOCKED statuses.
+  Keep the original start/deadline and current action in CURRENT_CONTEXT.md.
 - Prioritize current work and prerequisites, then approved roadmap work and other
   approved repository goals. Inspect relevant private plans, including extracting
   relevant .docx text; verify plan statements against current code and tests.
@@ -287,6 +335,31 @@ Instructions:
   missing exhaustion evidence means NEEDS_INVESTIGATION, not BLOCKED.
 - Preserve deadline, reasoning and ledger across context changes. Reserve about
   five minutes for safe closeout; do not start operations likely to overrun.
+- Reassess the clock and plan after every completed/blocked step, before a long
+  operation, and at least every thirty minutes during ongoing work. Record time
+  remaining, closeout reserve, actual progress and the next action. Adjust the
+  remaining steps without resetting the deadline; require each operation's full
+  execution/verification/cleanup envelope to fit.
+- Treat step durations as estimates with reasonable headroom, not minimum-time
+  hard stops. Reallocate remaining plan time for useful progress at checkpoints.
+  Keep the session cutoff, closeout reserve and explicit resource/pilot limits
+  hard; declare headroom for fresh allowances before launch, never extend active
+  or consumed trials. A step is a meaningful work unit, not each tool/model call.
+  Reassess briefly in the existing turn using current evidence and normal clock
+  monitoring; no extra model/reviewer call or full-document reread is required
+  solely for a checkpoint. Avoid redundant checks and context/tool overhead.
+- If the whole plan finishes or stalls with useful time left, reopen the wider
+  goal/plan files, investigate independent next actions, replenish the plan and
+  execute it. Restrictions on more pilots do not prohibit offline work. Before
+  early closeout, execute or specifically block each READY action and investigate
+  every NEEDS_INVESTIGATION action, including smaller work allowed by a blocker.
+  Record actual attempts/results or the concrete restriction; do not construct a
+  retrospective ledger to justify a stopping decision already made.
+- Include the mandatory final plan step for every ending: owned-process cleanup,
+  independent verification, saved handoff, sleep scheduled ten minutes after
+  finishing, verified scheduling receipt and the existing final report. Increase
+  the normal closeout reserve when those operations need longer. Failed, blocked
+  or incomplete work does not remove this step.
 - Treat slice results and queued decisions as intermediate commentary. A final
   closeout ends the work window and needs one of the permitted stop conditions;
   "requested work verified" does not mean only the initial named slice passed.
@@ -303,19 +376,19 @@ Instructions:
   copy-ready new-session prompt. Record actual start/stop date/time in UTC and
   Europe/Warsaw, original deadline, elapsed work versus known waiting/interruption
   time, and any early-stop reason. Label estimates when exact evidence is absent.
-- Sleep is separately authorized. If the owner authorized sleep on early
-  termination, schedule it ten minutes after a legitimate early closeout, saved
-  handoff and safe closure of owned operations, including when remaining work
-  is blocked.
-  An incomplete baseline does not cancel that instruction. Use the sleep helper's
-  -Sleep -DelaySeconds 600 with fresh receipt/cancellation paths for this explicit
-  early authorization, launched hidden without blocking the conversation;
-  retain -NotBeforeUtc with the original deadline when sleep is authorized only
-  at that deadline. Report scheduled/requested/rejected/verified accurately.
+- PC sleep ten minutes after finishing unattended work is the standing default
+  for deadline and early endings, unless the owner explicitly overrides it.
+  Missing sleep wording is not cancellation. Even a mistaken early stop must
+  not also omit sleep. After saving the handoff and closing owned operations,
+  use the sleep helper's -Sleep -DelaySeconds 600 with fresh receipt/cancellation
+  paths, launched hidden without blocking the conversation; verify sleep_scheduled
+  in its fresh receipt. Retain -NotBeforeUtc with the original deadline only when
+  the owner explicitly restricts sleep to that deadline or later.
+  Report scheduled/requested/rejected/verified accurately.
   An explicit switch to attended
   mode or new owner instructions cancel unattended sleep not yet requested:
-  create its cancellation marker and verify sleep_cancelled before resuming.
-  Report the scheduled local time and exact cancellation command in the final
+  run .\cancel-sleep.cmd and verify sleep_cancelled before resuming.
+  Report the scheduled local time and fixed .\cancel-sleep.cmd command in the final
   response and handoff. Do not sleep retrospectively.
 
 Output:
@@ -327,6 +400,73 @@ candidates and concrete blockers. Include concise material decision briefs:
 viable options, each option's pros and cons, recommendation and owner question;
 distinguish accepted decisions from pending proposals. Do not claim the whole
 roadmap complete after one slice or leave the summary only in a handoff file.
+```
+
+## `Codex: End of Day`
+
+Short invocation: **End of day**.
+
+```text
+Task:
+Continue useful approved work and use eligible expiring allowances where that
+helps, then leave an accurate checkpoint. Preserve the current session mode.
+
+Context:
+$SELECTION
+
+Instructions:
+- Read CURRENT_CONTEXT.md, Git status and current applicable instructions. Use
+  Codex: Session Boundary Check cheaply; preserve active debugging context when
+  continuing is better. Baseline CLI remains first until complete.
+- Invoking this prompt authorizes a fresh bounded batch on already-approved
+  allowance/free routes within existing privacy, quality and billing limits.
+  It never authorizes buying credits, metered/prepaid fallback, new providers,
+  model/runtime changes, installations, or wider external data transmission.
+- Use ai_provider's existing credential-loading and safe account observations;
+  do not inspect .env. Verify quota, freshness, reset UTC/local time, current
+  zero-price/allowance admission and suitable capabilities. Unknown means defer.
+  Do not confuse an account reset with restored model capacity or access.
+- Default batch bound: at most 30 minutes and 10 execution attempts in total,
+  including correction/review calls, with a fresh name and saved bounds. Declare
+  the measurable unit: provider completion requests or native CLI launches.
+  Native internal model calls remain separate and unknown unless observed;
+  never describe a launch cap as a verified internal request cap.
+  Stop sooner at the verified reset, an existing work cutoff, or exhausted quota;
+  preserve a reserve for planned higher-priority work. Smaller task-specific
+  bounds govern. Allocate cleanup headroom and admit only tasks that fit.
+  Do not renew this batch or spend post-reset allowance under this invocation.
+- Prefer useful implementation, focused advisory review or already-needed
+  research suited to the route. Do not generate busywork to empty a counter.
+  Advisory output is unverified advice until checked; it is not edit/test/review
+  acceptance evidence. Do not lower the baseline's quality floor to use quota.
+- Prepare and test deterministic guards before generation. Keep each task's
+  original tests, genuine execution, report/review requirements, frozen inputs
+  and independent validation. Never replay or regrade a consumed trial.
+- On unexpected failure, preserve actual effects and investigate before any
+  further affected call. Do not silently retry, broaden permissions, switch
+  billing sources or bypass privacy/price/clean-checkout/snapshot guards.
+- No recurring scheduler, wake task, automatic sleep or unattended switch is
+  implied. If an unattended deadline is explicitly supplied, compose with Codex:
+  Unattended Work Window and its timer/closeout requirements; otherwise remain
+  attended. Previously cancelled timers stay cancelled.
+- Save safe usage/cost coverage, outcome, evidence paths and owned cleanup.
+  Update CURRENT_CONTEXT.md with unfinished work and an imperative next action.
+  Use relevant DoD Closeout helpers when actually stopping; do not claim a
+  completed baseline merely because this batch ended.
+- Assess logical commit grouping and create focused local commits only when
+  the changes are coherent, validated and already authorized. Preserve unrelated
+  or incomplete saved work; never stage it merely to make the checkout clean.
+  Assess merge/push readiness, but perform integration or publication only under
+  explicit applicable owner authorization and the normal branch/review/check
+  rules. "End of day" alone grants neither merge nor push permission and never
+  overrides an existing prohibition. Record the next integration action when
+  authorization or validation is missing.
+
+Output:
+Start with ## **SUMMARY**. State useful work completed, validation, actual
+attempts and observed allowance/usage (unknown where missing), remaining work,
+session mode and any material decision. Link concrete evidence. If no eligible
+useful task fits, explain why and continue independent authorized baseline work.
 ```
 
 ## `Codex: Session Boundary Check`

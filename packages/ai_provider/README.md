@@ -13,11 +13,13 @@ answers, or implement job-search logic.
 - Neutral chat-first request/response contract.
 - Provider identity, usage metadata, and prototype privacy classes.
 - Ollama chat and streaming adapter.
-- OpenAI-compatible Chat Completions adapter for OpenAI, Requesty, and Google
-  Gemini-compatible routes.
+- OpenAI-compatible Chat Completions adapter for OpenAI, Requesty, Google
+  Gemini-compatible routes, and OpenCode Go.
 - Provider factory for configured chat clients.
 - Experimental, opt-in OpenRouter free-only API client with per-call exact-price,
   tool-support and daily-quota checks; no deposit or paid fallback.
+- OpenCode Go adapter with model discovery, per-request session headers and
+  explicit unavailable allowance state; no paid overage or automatic switching.
 - Local Ollama inventory, pull, runtime, and capability helpers.
 - Compatibility imports for the agent-owned CLI and shared execution/storage helpers.
 - Native Codex, Copilot, Antigravity and Kiro executors for approved routes.
@@ -42,6 +44,15 @@ integration readiness and evaluation gaps, including Groq's token quotas. These
 findings are shared with orchestration by reference; they are not live quota or
 executable routing policy. [Installation guidance](../../docs/installation.md)
 separates the Python workspace from optional external runtimes and clients.
+
+For subscription/gateway choices and official agent SDK alternatives, start with
+[access and agent integration options](docs/access-options.md). It links the dated
+comparisons, model recommendations and remaining decision boundaries; external
+IDE configuration or a stored key does not establish a working package adapter.
+
+The [provider model recommendation catalog](docs/model-catalog.md) records suggested
+models by access source, intended roles and evidence limits. It is a reference for
+manual use and future automation, separate from the Orchestrator's runtime catalog.
 
 ## Minimal Usage
 

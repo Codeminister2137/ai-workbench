@@ -15,6 +15,7 @@ from ai_agent.codex_authorization import (
     codex_authorization_from_status,
     codex_authorization_registry,
 )
+from ai_agent.completion import CompletionRequirement
 from ai_agent.contracts import (
     PermissionAction,
     ToolCall,
@@ -53,6 +54,7 @@ __all__ = [
     "BaseTool",
     "CODEX_SERVICE_ID",
     "CapabilityGrant",
+    "CompletionRequirement",
     "CreateFileTool",
     "DelegateTaskTool",
     "CredentialLocation",

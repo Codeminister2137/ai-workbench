@@ -9,6 +9,21 @@ Comparable model quality and delegation savings have not yet been established.
 
 ## Start and continue
 
+For the current Codex catalog route, with an installed signed-in client and
+available subscription allowance:
+
+```powershell
+.\scripts\repo-assistant.ps1 --mode coding-chat --execute `
+  --route-id openai-codex-gpt-6-1-sol --shared-tools coding `
+  --privacy public_or_low_risk --cost-policy allowances_allowed `
+  --approval-policy interactive --skip-prompt-review
+```
+
+This explicitly permits the selected low-risk repository context and subscription
+allowance. Confirm the effective route and scope; client availability, allowance
+and fallback readiness are separate from catalog eligibility. Tools still require
+the selected approvals. See the [current readiness limits](baseline-gap.md).
+
 For an already available, compatible local model:
 
 ```powershell
@@ -191,6 +206,14 @@ the remaining execution time. To migrate an old per-turn away budget, select
 five minutes per turn and sixty seconds per request. Regular turns
 can invoke permitted validation tools, but the CLI does not claim host validation
 ran unless its deterministic stage recorded results.
+
+When requested scrutiny reports unresolved findings or cannot complete, the final
+CLI closeout labels the original answer as a draft and shows the concrete findings
+or review limitation beside it. The Changed preview withholds an accepted outcome;
+passing validation applies only to its recorded checks. Proposed reviewer revisions
+are labelled as not applied or independently verified. Review findings are advisory:
+this does not automatically rewrite the answer or prove every concern is valid.
+Passing-review and no-review output retain the ordinary Agent report presentation.
 
 Conversation history retains user requests, final agent reports and the
 host-observed execution outcome, including failed validation or tool errors.

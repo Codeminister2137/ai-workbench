@@ -86,6 +86,18 @@ omitted these 21 Council cases; that command's discovery remains unchanged.
 The Council private-config assertion was stale and now matches the documented
 ignored `council.json` / committed `council.example.json` policy.
 
+With installed pytest 9.1.1, mixed explicit selections can lose package autouse
+fixtures when a root-level file is selected between files from that package.
+Collection diagnostics reproduced two `tests/repo_assistant` package collectors:
+the fixtures belonged to the earlier object, outside the later test's ancestry.
+This caused synthetic native-model admission failures, rather than an admission
+regression. Put root-level modules before nested package selections, keep package
+selections together, or use separate scoped invocations. The root-first control
+retained the fixtures and passed 23 core/native completion tests. Do not weaken
+runtime admission or duplicate its mocks to work around collection order.
+No dependency or package-layout change was needed. Evidence and the installed
+collector/fixture source trace: `artifacts/cli-pytest-fixture-investigation-20261020cw/`.
+
 Choose groups by the affected contract. Provider changes often warrant provider
 plus agent/CLI composition checks; routing changes warrant orchestrator plus the
 affected consumers. Shared approval/session changes warrant agent and CLI.

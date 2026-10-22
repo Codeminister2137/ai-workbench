@@ -12,6 +12,7 @@ from ai_agent.shared_approvals import TerminalApproval
 from ai_orchestrator import AccessMethod
 from ai_provider.agent_readiness import AgentReadiness
 from ai_provider.external_agents import ExternalAgentConfig, run_external_agent
+from ai_provider.repo_context import NATIVE_TOOL_SYSTEM_PROMPT
 
 
 @pytest.fixture(autouse=True)
@@ -169,6 +170,7 @@ tools = true
                 assert "shared:" in payload and runs[0] in payload
                 assert "Explicit decisions" in payload and "Preserve protected.txt" in payload
         assert instructions in payload
+        assert payload.startswith("# Repo assistant system prompt\n" + NATIVE_TOOL_SYSTEM_PROMPT)
         assert "Set value to 2" in payload
         assert "shared_tool_profile: coding" in payload
         assert f"shared_tool_approval_policy: {preset}" in payload

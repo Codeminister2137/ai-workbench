@@ -11,7 +11,7 @@ import shutil
 import subprocess
 import sys
 import time
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import replace
 from io import TextIOWrapper
 from pathlib import Path
@@ -56,6 +56,7 @@ from ai_provider.chat_transcripts import (
     SQLiteChatTranscriptStore,
 )
 from ai_provider.closeout import (
+    AUXILIARY_RESPONSE_NOTICE,
     FINAL_RESPONSE_INSTRUCTION,
     format_cli_closeout,
     safe_fallback_handoff,
@@ -125,6 +126,15 @@ from ai_provider.repo_actions import (
     format_action_results as _format_action_results,
 )
 from ai_provider.repo_context import (
+    ANSWER_ONLY_SYSTEM_PROMPT,
+    TOOL_SYSTEM_PROMPT,
+    build_default_system_prompt,
+    build_native_tool_system_prompt,
+    build_repo_prompt,
+    find_repo_root,
+    load_prompt_context,
+)
+from ai_provider.repo_context import (
     DEFAULT_CONTEXT_BUDGET_CHARS as DEFAULT_CONTEXT_BUDGET_CHARS,
 )
 from ai_provider.repo_context import (
@@ -132,13 +142,6 @@ from ai_provider.repo_context import (
 )
 from ai_provider.repo_context import (
     RepoContextFile as RepoContextFile,  # noqa: F401 - compatibility export
-)
-from ai_provider.repo_context import (
-    build_default_system_prompt,
-    build_native_tool_system_prompt,
-    build_repo_prompt,
-    find_repo_root,
-    load_prompt_context,
 )
 from ai_provider.scrutiny import (
     RESPONSE_SCRUTINY_SYSTEM_PROMPT as _RESPONSE_SCRUTINY_SYSTEM_PROMPT,
@@ -182,6 +185,7 @@ from ai_provider.turn_usage import usage_scope
 from ai_agent import (
     AgentLoop,
     ApprovalPolicyPreset,
+    CompletionRequirement,
     PermissionManager,
     PermissionPolicy,
     ToolCategory,
@@ -515,6 +519,7 @@ def _print_cli_closeout(
     status: str,
     execution_status: str,
     validation_stage: OrchestratedStageRecord | None = None,
+    scrutiny_details: Mapping[str, object] | None = None,
     failure_reason: str | None = None,
     provider: str | None = None,
     category: str | None = None,
@@ -560,6 +565,7 @@ def _print_cli_closeout(
             status=status,
             execution_status=execution_status,
             validation_details=validation_stage.details if validation_stage is not None else None,
+            scrutiny_details=scrutiny_details,
             fallback_attempts=fallback_attempts,
             failure_reason=failure_reason,
             provider=provider,
@@ -1740,6 +1746,7 @@ def _execute_request(
                 details={"route_policy": "derived_local_cheap"},
             )
             print("\n=== Auxiliary panel ===")
+            print(AUXILIARY_RESPONSE_NOTICE)
             auxiliary_result = run_auxiliary_panel(
                 prompt
                 + (
@@ -1862,6 +1869,9 @@ def _execute_request(
                 status=final_status,
                 execution_status=execution_status,
                 validation_stage=validation_stage,
+                scrutiny_details=orchestrated_tracker.scrutiny_details
+                if orchestrated_tracker is not None
+                else None,
                 failure_reason=str(exc),
                 provider=exc.provider,
                 category=exc.category.value if exc.category else None,
@@ -1896,6 +1906,7 @@ def _execute_request(
                 details={
                     "tool_results": len(native_result.tool_results),
                     "tool_errors": sum(1 for item in native_result.tool_results if item.is_error),
+                    "model_output_errors": getattr(native_result, "model_output_errors", None),
                     **_fallback_details(args),
                 },
             )
@@ -1938,6 +1949,7 @@ def _execute_request(
         execution_status = "failed"
     scrutiny_result = None
     scrutiny_elapsed_seconds = None
+    scrutiny_stage_details: dict[str, object] | None = None
     if (
         args.scrutinize_response
         and assistant_response_text is not None
@@ -1946,7 +1958,7 @@ def _execute_request(
         print("\n=== Response scrutiny ===")
         scrutiny_failed = False
         scrutiny_stage_status = "completed"
-        scrutiny_stage_details: dict[str, object] = {"route_policy": "derived_local_cheap"}
+        scrutiny_stage_details = {"route_policy": "derived_local_cheap"}
         if orchestrated_tracker is not None:
             if orchestrated_tracker.run_record.status == "planned":
                 orchestrated_tracker.begin_run()
@@ -2006,6 +2018,9 @@ def _execute_request(
                     print("scrutiny_status: completed")
                     scrutiny_stage_details["verdict"] = scrutiny_report.verdict
                     scrutiny_stage_details["score"] = scrutiny_report.score
+                    scrutiny_stage_details["issues"] = scrutiny_report.issues
+                    scrutiny_stage_details["next_action"] = scrutiny_report.recommended_next_action
+                    scrutiny_stage_details["revised_response"] = scrutiny_report.revised_response
                     if scrutiny_report.verdict != "pass" and execution_status == "completed":
                         execution_status = "completed_with_scrutiny_findings"
             else:
@@ -2172,6 +2187,9 @@ def _execute_request(
         status=final_status,
         execution_status=execution_status,
         validation_stage=validation_stage if orchestrated_tracker is not None else None,
+        scrutiny_details=orchestrated_tracker.scrutiny_details
+        if orchestrated_tracker is not None
+        else scrutiny_stage_details,
         failure_reason=result.orchestration.failure_reason,
     )
     if close_transcript_func is not None:
@@ -3087,6 +3105,7 @@ def _run_external_agent_cli_mode(
                     details={"route_policy": "derived_local_cheap"},
                 )
                 print("\n=== Auxiliary panel ===")
+                print(AUXILIARY_RESPONSE_NOTICE)
                 auxiliary_result = run_auxiliary_panel(
                     prompt,
                     profile,
@@ -3362,6 +3381,9 @@ def _run_external_agent_cli_mode(
         status="failed" if exit_code else "ready",
         execution_status=execution_status,
         validation_stage=validation_stage,
+        scrutiny_details=orchestrated_tracker.scrutiny_details
+        if orchestrated_tracker is not None
+        else None,
         failure_reason=failure_reason,
     )
     if close_transcript is not None:
@@ -3380,6 +3402,16 @@ def _external_agent_prompt_with_execution_metadata(
     shared_approval_policy: str | None = None,
 ) -> str:
     """Describe native and shared enforcement without granting tool authority."""
+
+    if shared_tool_profile in {"coding", "inspection"}:
+        # Replace only our system prefix; caller additions, budgets, history and
+        # quoted repository text must remain verbatim.
+        for legacy_prompt in (ANSWER_ONLY_SYSTEM_PROMPT, TOOL_SYSTEM_PROMPT):
+            if system_prompt.startswith(legacy_prompt):
+                system_prompt = (
+                    build_native_tool_system_prompt() + system_prompt[len(legacy_prompt) :]
+                )
+                break
 
     shared_note = ""
     if shared_tool_profile is not None:
@@ -3448,6 +3480,7 @@ def _run_native_agent(
     repo_root: Path,
     *,
     progress_callback: Callable[[str], None] | None = None,
+    completion_requirements: tuple[CompletionRequirement, ...] = (),
 ) -> Any:
     """Run the provider-native agent loop inside the repository boundary."""
     for instructions in (
@@ -3695,6 +3728,8 @@ def _run_native_agent(
         ),
         max_iterations=args.max_action_rounds,
         deadline=getattr(getattr(args, "fallback_session", None), "deadline", None),
+        diagnostic=progress_callback,
+        completion_requirements=completion_requirements,
         **sampling_kwargs(args),
     )
     try:
@@ -3733,6 +3768,10 @@ def _run_native_agent(
             f"- iterations={result.iterations} "
             f"tool_results={len(result.tool_results)}"
         )
+        if result.model_output_errors:
+            progress_callback(f"model_output_errors: {result.model_output_errors}")
+        if result.completion_failures:
+            progress_callback(f"completion_failures: {result.completion_failures}")
         for tool_result in result.tool_results:
             status = "error" if tool_result.is_error else "ok"
             progress_callback(

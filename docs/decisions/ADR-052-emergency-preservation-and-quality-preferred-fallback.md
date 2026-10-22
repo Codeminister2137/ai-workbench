@@ -46,6 +46,26 @@ work and avoiding unnecessary fallback blockage without silently weakening quali
 
 ## Alternatives and consequences
 
+### Owner's daily-use selection — 2026-10-21
+
+The owner approved using the existing `task_minimum` policy with a `standard`
+task floor in the private daily-use configuration. The rationale is accepting
+modest reductions such as Codex to Kiro/Copilot for development while excluding
+substantially weaker candidates. This uses existing behavior rather than adding
+a relative-downgrade policy: stronger eligible routes rank first, standard routes
+may continue coding, and low routes fail the standard floor. Catalog grades are
+coarse declarations, not measured capability distances. Explicit task overrides
+still apply; same-tier fallback also excludes local routes from allowance-tier
+continuation. The shipped `emergency_preserve` default is unchanged.
+
+The owner also approved retaining shared approval enforcement while adding useful
+native capabilities where equivalent permissions and observable effects can be
+verified. This is a direction for individual mappings, not permission to bypass
+shared denials or enable unrestricted native mutation. No additional native tool
+is enabled by the fallback configuration selection.
+
+### Policy trade-offs
+
 Strict stopping provides a clear implementation quality boundary but cannot
 produce model-assisted preservation when only weaker routes remain. Emergency
 preservation retains that boundary with restricted reporting, at additional

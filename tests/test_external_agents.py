@@ -98,7 +98,7 @@ def test_antigravity_zero_exit_permission_refusal_is_a_failure(tmp_path: Path) -
         timeout_seconds=60.0,
     )
     diagnostic = (
-        'jetski: no output produced — a tool required the "mcp" permission that '
+        'jetski: no output produced \u2014 a tool required the "mcp" permission that '
         "headless mode cannot prompt for, so it was auto-denied."
     )
     result = _external_agent_result_from_completed_process(
@@ -507,6 +507,177 @@ def test_parse_external_agent_jsonl_reports_explicit_failed_status() -> None:
     assert events.failure_reason == "pytest failed"
 
 
+def _mcp_event(status: str, *, tool: str = "edit_file", call_id: str = "call") -> dict:
+    """Build representative offline events, not a reconstructed live stream."""
+    return {
+        "type": "item.started" if status == "in_progress" else "item.completed",
+        "item": {
+            "id": call_id,
+            "type": "mcp_tool_call",
+            "server": "repo_shared",
+            "tool": tool,
+            "status": status,
+        },
+    }
+
+
+@pytest.mark.parametrize("returncode", [0, 7])
+def test_mcp_recovery_preserves_receipts_and_native_exit(tmp_path, returncode):
+    from ai_provider.external_agents import run_external_agent
+
+    stream = [
+        _mcp_event("failed"),
+        _mcp_event("completed", call_id="call"),
+        {"type": "item.completed", "item": {"type": "agent_message", "text": "Done."}},
+        {"type": "turn.completed"},
+    ]
+    raw = "\n".join(map(json.dumps, stream))
+    result = run_external_agent(
+        "fixture",
+        ExternalAgentConfig(AccessMethod.CODEX_CLI, "codex", "fixture", tmp_path, 5),
+        runner=lambda command, **kwargs: subprocess.CompletedProcess(command, returncode, raw, ""),
+    )
+    assert result.returncode == returncode
+    assert result.stdout == raw
+    assert result.events is not None
+    assert result.events.failure_reason is None
+    assert result.events.final_answer == "Done."
+    assert result.events.tool_events == tuple(stream[:2])
+
+
+@pytest.mark.parametrize(
+    "tail",
+    [
+        [],
+        [_mcp_event("completed", tool="read_file")],
+        [_mcp_event("in_progress", call_id="call")],
+        [_mcp_event("completed", call_id="call")],
+        [_mcp_event("completed", call_id="call"), {"type": "turn.completed"}],
+        [
+            _mcp_event("completed", call_id="call"),
+            {"type": "final_answer", "content": "Done."},
+        ],
+        [
+            _mcp_event("completed", call_id="call"),
+            _mcp_event("in_progress", call_id="unfinished"),
+            {"type": "final_answer", "content": "Done."},
+            {"type": "turn.completed"},
+        ],
+    ],
+)
+def test_mcp_recovery_requires_supported_completion(tail):
+    events = parse_external_agent_jsonl("\n".join(map(json.dumps, [_mcp_event("failed"), *tail])))
+    assert events.failure_reason is not None
+
+
+@pytest.mark.parametrize(
+    "fatal",
+    [
+        {"type": "error", "message": "fatal"},
+        {"type": "turn.failed", "error": {"message": "fatal"}},
+        {"type": "item.completed", "item": {"type": "error", "message": "fatal"}},
+        {"type": "item.failed", "item": {"type": "mcp_tool_call", "error": "fatal"}},
+    ],
+)
+@pytest.mark.parametrize("fatal_first", [True, False])
+def test_mcp_recovery_never_clears_fatal_errors(fatal, fatal_first):
+    recovery = [_mcp_event("failed"), _mcp_event("completed", call_id="call")]
+    stream = [fatal, *recovery] if fatal_first else [*recovery, fatal]
+    stream += [{"type": "final_answer", "content": "Done."}, {"type": "turn.completed"}]
+    events = parse_external_agent_jsonl("\n".join(map(json.dumps, stream)))
+    assert events.failure_reason == parse_external_agent_jsonl(json.dumps(fatal)).failure_reason
+
+
+@pytest.mark.parametrize("missing", [None, "id", "server", "tool"])
+def test_mcp_unrelated_success_retains_distinct_failures(missing):
+    first = _mcp_event("failed", call_id="first")
+    second = _mcp_event("failed", call_id="second")
+    first["item"]["arguments"] = {"path": "first.py"}
+    second["item"]["arguments"] = {"path": "second.py"}
+    first["item"]["error"] = {"message": "first failure"}
+    second["item"]["error"] = {"message": "second failure"}
+    unrelated = _mcp_event("completed", call_id="unrelated")
+    unrelated["item"]["arguments"] = {"path": "third.py"}
+    if missing:
+        first["item"].pop(missing)
+    finish = [{"type": "final_answer", "content": "Done."}, {"type": "turn.completed"}]
+    stream = [first, second, unrelated, *finish]
+    events = parse_external_agent_jsonl("\n".join(map(json.dumps, stream)))
+    assert events.failure_reason == "first failure"
+    assert events.tool_events == tuple(stream[:3])
+    # Resolving the second call cannot erase the independently unresolved first.
+    stream = [first, second, _mcp_event("completed", call_id="second"), *finish]
+    assert (
+        parse_external_agent_jsonl("\n".join(map(json.dumps, stream))).failure_reason
+        == "first failure"
+    )
+
+
+def test_mcp_same_tool_and_arguments_without_call_identity_are_not_recovery():
+    failure = _mcp_event("failed", call_id="first")
+    success = _mcp_event("completed", call_id="different")
+    for event in (failure, success):
+        event["item"]["arguments"] = {"path": "same.py", "old_text": "a", "new_text": "b"}
+    stream = [
+        failure,
+        success,
+        {"type": "final_answer", "content": "Done."},
+        {"type": "turn.completed"},
+    ]
+    assert parse_external_agent_jsonl("\n".join(map(json.dumps, stream))).failure_reason is not None
+
+
+@pytest.mark.parametrize("answer_position", ["before_failure", "before_recovery", "after_recovery"])
+def test_mcp_recovery_requires_fresh_answer(answer_position):
+    answer = {"type": "final_answer", "content": "Done."}
+    failure = _mcp_event("failed")
+    success = _mcp_event("completed")
+    streams = {
+        "before_failure": [answer, failure, success],
+        "before_recovery": [failure, answer, success],
+        "after_recovery": [failure, success, answer],
+    }
+    stream = [*streams[answer_position], {"type": "turn.completed"}]
+    events = parse_external_agent_jsonl("\n".join(map(json.dumps, stream)))
+    assert events.final_answer == "Done."
+    assert (events.failure_reason is None) == (answer_position == "after_recovery")
+    assert events.tool_events == (failure, success)
+
+
+@pytest.mark.parametrize("call_id", [None, "", 7])
+@pytest.mark.parametrize("event_type", ["item.started", "item.updated"])
+@pytest.mark.parametrize("later_success", [False, True])
+def test_unidentified_unfinished_mcp_call_remains_unverified(call_id, event_type, later_success):
+    unfinished = _mcp_event("in_progress")
+    unfinished["type"] = event_type
+    if call_id is None:
+        unfinished["item"].pop("id")
+    else:
+        unfinished["item"]["id"] = call_id
+    stream = [unfinished]
+    if later_success:
+        stream.append(_mcp_event("completed"))
+    stream += [{"type": "final_answer", "content": "Done."}, {"type": "turn.completed"}]
+    events = parse_external_agent_jsonl("\n".join(map(json.dumps, stream)))
+    assert events.failure_reason == "incomplete MCP tool call"
+    assert events.final_answer == "Done."
+    assert events.tool_events == tuple(stream[:-2])
+
+
+def test_mcp_each_identified_failure_requires_its_own_recovery():
+    failures = [_mcp_event("failed", call_id=name) for name in ("first", "second")]
+    successes = [_mcp_event("completed", call_id=name) for name in ("first", "second")]
+    stream = [
+        *failures,
+        *successes,
+        {"type": "final_answer", "content": "Done."},
+        {"type": "turn.completed"},
+    ]
+    events = parse_external_agent_jsonl("\n".join(map(json.dumps, stream)))
+    assert events.failure_reason is None
+    assert events.tool_events == tuple(stream[:4])
+
+
 def test_external_agent_progress_line_summarizes_json_events() -> None:
     assert _external_agent_progress_line('{"type":"response.reasoning_summary.delta"}\n') is None
     assert (
@@ -641,7 +812,7 @@ def test_run_diagnostic_command_timeout(monkeypatch, tmp_path):
             stderr=b"private_stderr",
         )
 
-    monkeypatch.setattr(subprocess, "run", mock_run)
+    monkeypatch.setattr("ai_provider.external_agents.run_owned_diagnostic", mock_run)
     result = run_diagnostic_command(PRIVATE_COMMAND, PRIVATE_ARGUMENT, timeout_seconds=1)
     assert not result["ok"]
     assert result["returncode"] is None
@@ -666,7 +837,7 @@ def test_run_diagnostic_command_not_found(monkeypatch, tmp_path):
     def mock_run(*_, **__):
         raise OSError(1, "private_error", "private_file")
 
-    monkeypatch.setattr(subprocess, "run", mock_run)
+    monkeypatch.setattr("ai_provider.external_agents.run_owned_diagnostic", mock_run)
     result = run_diagnostic_command(PRIVATE_COMMAND, PRIVATE_ARGUMENT, timeout_seconds=1)
     assert not result["ok"]
     assert result["returncode"] is None
@@ -704,7 +875,9 @@ def test_run_diagnostic_command_completed_process(returncode: int, monkeypatch):
         stdout=fake_output,
         stderr=fake_error,
     )
-    monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: completed)
+    monkeypatch.setattr(
+        "ai_provider.external_agents.run_owned_diagnostic", lambda *args, **kwargs: completed
+    )
     result = run_diagnostic_command(PRIVATE_COMMAND, PRIVATE_ARGUMENT)
     assert result["ok"] == (returncode == 0)
     assert result["returncode"] == returncode

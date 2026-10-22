@@ -56,6 +56,10 @@ Location: `packages/ai_provider/`
 
 Owns common AI contracts, provider adapters, local/cloud switching, provider API handling, and usage metadata. It does not own application-specific routing strategy.
 
+Provider knowledge entry point: [source state](../packages/ai_provider/docs/source-state.md),
+with dated findings, official references and unresolved access/privacy questions.
+Consult it before repeating provider research; refresh facts according to their scope.
+
 ### AI Orchestrator
 Location: `packages/ai_orchestrator/`
 

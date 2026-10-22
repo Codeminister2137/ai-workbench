@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import math
 import time
+from collections import Counter
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -14,13 +16,18 @@ from ai_provider import (
     AIToolDefinition,
     AIToolParameter,
     ChatClient,
+    FinishReason,
     MessageRole,
     PrivacyClass,
     ProviderError,
     ProviderErrorCategory,
+    ToolCallFormatError,
 )
+from ai_provider.closeout import safe_diagnostic_label
 
+from ai_agent.completion import CompletionRequirement, missing_requirements
 from ai_agent.contracts import ToolCall, ToolResult
+from ai_agent.model_output_recovery import ModelOutputRecovery
 from ai_agent.permissions import PermissionManager
 from ai_agent.tools.base import ToolContext, ToolRegistry
 
@@ -34,10 +41,12 @@ class AgentResult:
     iterations: int = 1
     # Transient only, like ProviderError.partial_messages; never log/persist raw continuation.
     messages: tuple[AIMessage, ...] = field(default=(), repr=False, compare=False)
+    model_output_errors: int = 0
+    completion_failures: int = 0
 
 
 class AgentLoop:
-    """Run model responses and authorized tool calls until the model finishes."""
+    """Run authorized tools, optionally requiring declared evidence before completion."""
 
     def __init__(
         self,
@@ -50,6 +59,8 @@ class AgentLoop:
         deadline: float | None = None,
         temperature: float | None = None,
         top_p: float | None = None,
+        diagnostic: Callable[[str], None] | None = None,
+        completion_requirements: tuple[CompletionRequirement, ...] = (),
     ) -> None:
         if max_iterations < 1:
             raise ValueError("max_iterations must be at least 1")
@@ -63,6 +74,17 @@ class AgentLoop:
         self.deadline = deadline
         self.temperature = temperature
         self.top_p = top_p
+        self.diagnostic = diagnostic
+        if (
+            not isinstance(completion_requirements, tuple)
+            or len(completion_requirements) > 16
+            or any(not isinstance(item, CompletionRequirement) for item in completion_requirements)
+        ):
+            raise ValueError("Expected at most16 declared completion requirements")
+        identifiers = [item.requirement_id for item in completion_requirements]
+        if len(set(identifiers)) != len(identifiers):
+            raise ValueError("Completion requirement identifiers must be unique")
+        self.completion_requirements = completion_requirements
 
     def _check_deadline(self, messages: list[AIMessage]) -> None:
         if self.deadline is not None and time.perf_counter() >= self.deadline:
@@ -88,6 +110,10 @@ class AgentLoop:
             messages.append(AIMessage(MessageRole.SYSTEM, system_prompt))
         messages.append(AIMessage(MessageRole.USER, prompt))
         tool_results: list[ToolResult] = []
+        recovery = ModelOutputRecovery(self.context.workspace_root)
+        model_output_errors = 0
+        completion_failures = 0
+        incomplete_states: Counter[tuple[tuple[str, ...], tuple[tuple[str, str], ...]]] = Counter()
 
         for iteration in range(1, self.max_iterations + 1):
             self._check_deadline(messages)
@@ -104,6 +130,44 @@ class AgentLoop:
                         ),
                     )
                 )
+            except ToolCallFormatError as exc:
+                model_output_errors += 1
+                self._check_deadline(messages)
+                allowed = iteration < self.max_iterations and recovery.allow_feedback()
+                if self.diagnostic:
+                    cause = exc.__cause__ or exc.raw_error
+                    cause_kind = safe_diagnostic_label(type(cause).__name__) if cause else "unknown"
+                    self.diagnostic(
+                        "model_output_error: "
+                        f"provider={safe_diagnostic_label(exc.provider) or 'unknown'} "
+                        f"category={exc.category.value} "
+                        f"cause_kind={cause_kind}"
+                    )
+                    self.diagnostic(
+                        f"model_output_recovery: errors={model_output_errors} "
+                        f"action={'feedback' if allowed else 'stop'}"
+                    )
+                if not allowed:
+                    error = ProviderError(
+                        "Malformed tool arguments repeated without observed file progress, "
+                        "or the turn allowance ended. Earlier effects remain; inspect them "
+                        "and continue only unfinished work in an explicitly resumed turn.",
+                        category=ProviderErrorCategory.NON_RETRYABLE,
+                        provider=exc.provider,
+                    )
+                    error.partial_messages = tuple(messages)
+                    raise error from exc
+                messages.append(
+                    AIMessage(
+                        MessageRole.USER,
+                        "Host execution feedback: the last response's tool arguments could not "
+                        "be decoded. No tool from that response executed. Earlier tool effects "
+                        "remain recorded above; do not replay them. Correct the arguments using "
+                        "the declared schemas and inspect existing effects when needed. "
+                        "The original permissions, task and remaining allowance still apply.",
+                    )
+                )
+                continue
             except ProviderError as exc:
                 exc.partial_messages = tuple(messages)
                 raise
@@ -111,11 +175,71 @@ class AgentLoop:
             self._check_deadline(messages)
             tool_calls = response.tool_calls or response.message.tool_calls
             if not tool_calls:
+                if (
+                    self.completion_requirements
+                    and response.finish_reason not in {FinishReason.LENGTH, FinishReason.ERROR}
+                    and response.message.content.strip()
+                ):
+                    try:
+                        missing = missing_requirements(
+                            self.completion_requirements, tuple(tool_results)
+                        )
+                    except Exception:
+                        error = ProviderError(
+                            "Completion evidence checker failed; inspect earlier effects "
+                            "and the declared requirements before continuing.",
+                            category=ProviderErrorCategory.NON_RETRYABLE,
+                            provider=self.client.backend.provider,
+                        )
+                        error.partial_messages = tuple(messages)
+                        raise error from None
+                    self._check_deadline(messages)
+                    if missing:
+                        completion_failures += 1
+                        key = (missing, recovery.observed_state())
+                        self._check_deadline(messages)
+                        incomplete_states[key] += 1
+                        allowed = iteration < self.max_iterations and incomplete_states[key] < 2
+                        if self.diagnostic:
+                            self.diagnostic("completion_check: missing=" + ",".join(missing))
+                            self.diagnostic(
+                                f"completion_recovery: errors={completion_failures} "
+                                f"action={'feedback' if allowed else 'stop'}"
+                            )
+                        if not allowed:
+                            error = ProviderError(
+                                "Required completion evidence is still missing: "
+                                + ",".join(missing)
+                                + ". The same blocker recurred without observed progress, "
+                                "or the original turn allowance ended. Inspect earlier "
+                                "effects and continue only unfinished work in a new turn.",
+                                category=ProviderErrorCategory.NON_RETRYABLE,
+                                provider=self.client.backend.provider,
+                            )
+                            error.partial_messages = tuple(messages)
+                            raise error
+                        messages.append(
+                            AIMessage(
+                                MessageRole.USER,
+                                "Host completion feedback: the preceding model report is "
+                                "a candidate, not accepted task completion. Missing required "
+                                "successful observations: "
+                                + ",".join(missing)
+                                + ". Perform only the unfinished authorized work and then "
+                                "author a corrected factual final report. Earlier tool "
+                                "effects and observations remain above; do not replay them. "
+                                "The original task, permissions and remaining allowance "
+                                "still apply; this feedback grants no new actions or time.",
+                            )
+                        )
+                        continue
                 return AgentResult(
                     response=response,
                     tool_results=tuple(tool_results),
                     iterations=iteration,
                     messages=tuple(messages),
+                    model_output_errors=model_output_errors,
+                    completion_failures=completion_failures,
                 )
 
             for call in tool_calls:
@@ -169,6 +293,7 @@ class AgentLoop:
                     self._check_deadline(messages)
                     result = tool.run(agent_call, self.context)
                 tool_results.append(result)
+                recovery.observe(result)
                 messages.append(
                     AIMessage(
                         role=MessageRole.TOOL,

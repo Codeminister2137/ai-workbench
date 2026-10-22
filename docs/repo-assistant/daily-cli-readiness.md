@@ -1,4 +1,171 @@
-# Daily CLI readiness — 2026-10-10
+# Daily CLI readiness
+
+2026-10-21 owner clarification: prioritize ordinary paid native agents through
+the CLI with fallback. The [current paid-agent assessment](baseline-gap.md#immediate-paid-agent-baseline--2026-10-21)
+separates its concrete configuration and acceptance gaps from the broader
+local/free-model and IDE-independence work below. The owner selected private
+`task_minimum` fallback with a `standard` floor. Kiro is now eligible for coding
+continuation offline; authentication, allowance and tool connectivity remain
+unprobed. Additional native tools require equivalent permission enforcement and
+observable effects; none are enabled by this configuration change. Historical
+trial verdicts and approval/quality requirements are unchanged.
+
+Later October 21: project-local Copilot/Antigravity executables were found and
+authenticated; ordinary command discovery had missed them. Copilot chat capacity
+is exhausted, Kiro has no verified spare plan credits, and Antigravity's shared
+permission mapping remains unresolved. The attempted Codex coding task stopped
+because its configured `gpt-5.5` model is unsupported for the ChatGPT account.
+Native metadata advertises `gpt-6.1-sol` as default. No coding/test/report phase
+completed. This is a route-configuration failure, not a model-quality result.
+
+## Current paid-native checkpoint — 2026-10-21
+
+The approved `gpt-6.1-sol` route now produced useful diagnostic ownership and
+test-integration fixes, committed as `c3b4ba9`. Independent full registered checks
+passed **2,604 tests with 3 skips**, Ruff/format/Pyright passed, and final frozen
+review found no concrete change-induced defect. This is reviewed source evidence,
+not successful completion of every CLI invocation: both coding calls retained
+MCP failure status, and the corrective model's full test command timed out before
+the independent passing run. Conservative cross-call recovery remains unchanged.
+Command timeout/ownership is the next demonstrated execution gap; selected-route
+fallback and actual POSIX runtime acceptance remain unestablished.
+
+## Historical assessment — 2026-10-20
+
+For the remaining distance and ordered acceptance gates, see
+[distance to baseline usability](baseline-gap.md). The foundation is substantially
+implemented; complete small-workflow, representative continuity, selected-route
+capability/approval and IDE-host-independence acceptance remain distinct gaps.
+
+2026-10-20 update: the fresh orchestrated local `cj` trial is consumed and failed.
+Its private notice checker counted a quoted search label as a duplicate notice.
+It completed no tests or coding/frozen reports. Independent postflight verified
+model-only effects, three unchanged originals, no companion tests and cleanup of
+all eleven owned children plus runtime/listeners. Separately, the tool-free
+auxiliary pass displayed unsupported completion/test claims. Both auxiliary
+presentation paths now explicitly identify the advice as unverified and lacking
+edit/test execution evidence; its text is preserved. Prospective private fixes
+accept quoted labels while retaining complete-notice/counter checks and prevent
+failure-receipt collisions. Offline evidence is not live acceptance. See
+[the methodology record](agent-methodology-findings.md#orchestrated-local-trial--2026-10-20).
+
+Owner-directed reassessment now evaluates the whole intended workflow using
+[materiality and recovery criteria](acceptance-criteria.md). Harmless corrected
+command refusals need not appear in the final report; their omission alone is
+not evidence of dangerous reporting. A false claim of verification is material.
+An authorized component may catch and correct a draft before final delivery;
+a clearly contained stop is useful safety evidence, but the task remains incomplete.
+
+The historical results below retain their original criteria. In particular,
+`ce` cannot be promoted to a completed workflow: its frozen review never ran.
+`cc`'s unsupported hash-verification claim remains a substantive concern.
+
+Offline calibration `cg` exercised seven scripted cases through actual validation,
+repair, scrutiny and final rendering, with eight real three-test executions and
+zero model calls. Validation-driven correction worked under scripted replies;
+harmless recovered friction did not corrupt the report. When scrutiny flagged a
+false hash claim and proposed a correction, the final preview and Agent report
+still repeated the original claim. A deliberately missed review also retained it.
+This demonstrated a delivery gap, not real-model detection rates. The owner chose
+explicit final qualification first. The CLI now preserves the original response
+as a draft when scrutiny is unresolved/unavailable, shows concrete findings and
+labelled reviewer proposals beside it, and withholds an accepted outcome preview.
+Passing host checks remain scoped to those commands. Automatic correction and
+live-model detection remain unestablished; no extra inference or review default
+was added. See [the methodology findings](agent-methodology-findings.md#offline-workflow-calibration--2026-10-19).
+Final focused validation: 105 passed, including five scripted native delivery
+controls with actual subprocess validation. Ruff/format/Pyright pass; no inference.
+
+Latest attended follow-up: the isolated `cc` report diagnostic and the owner-authorized
+fresh integrated `ce` fallback both failed required error disclosure. `ce` produced
+correct model-only effects, preserved three originals, added two meaningful companions,
+and passed five model tests plus independent tests and the 3,616-case oracle. Its
+coding report omitted the recovered command refusal despite coherent task instructions
+and an explicit report reminder. Independent review rejected that exact report before
+frozen review; no second report or integrated acceptance followed. All eight calls,
+seven tool notices, sealed inputs/dependencies and owned cleanup were verified.
+
+`cc` separately disclosed its labelled synthetic refusal but omitted its actual
+refused search and claimed an unobserved hash verification. Neither result justifies
+another blind prompt-only trial, a host-written replacement or waived reporting rules.
+Baseline remains **INCOMPLETE**. Evidence: `artifacts/cli-report-fidelity-acceptance-20261019cc/live-review.md`
+and `artifacts/cli-report-fidelity-integrated-20261019ce/live-review.md`.
+
+The fresh `by` integrated slice completed coding and frozen review in thirteen
+local model calls. Model-only edits preserve all three original tests and add four
+meaningful companions; seven tests pass in each phase, and independent tests and
+the 3,616-case oracle pass. Both reports returned through the structural gate;
+eleven actual budget notices, protected inputs, the original index, 135 sealed
+dependencies and owned cleanup are verified.
+
+Strict integrated acceptance remains **INCOMPLETE**. The coding report omits its
+required recovered-command disclosure. Postflight also found two stale blanket
+import restrictions alongside the approved typing permission in the composed
+task. Preflight verified the complete root instructions but missed that task
+contradiction. The model used no imports, so live typing support was not exercised.
+The review's source-only diff and ambiguous "tests remain unchanged" statement
+limit its coverage; they do not invalidate the independently correct effects.
+Structural report acceptance is distinct from independent substantive acceptance.
+Evidence: `artifacts/cli-typing-integrated-acceptance-20261019by/live-review.md`.
+
+A separate offline clarification changes only the two stale task clauses.
+Seventeen regressions cover the actual composition and preserve the consumed run.
+No new inference, report replacement, guard relaxation or production change follows.
+Repository instructions remain the common CLI behavioral baseline; fixture
+deviations must be explicit and justified.
+
+The preceding `bu` integrated result: the model authored source and two companion tests,
+preserved all three originals, and recovered a failed text edit. It also added a
+forbidden source import; the fixture guard blocked its test command before
+execution. No tests or either final report completed. The cause is established,
+all nine requests returned HTTP200, and independent integrity/cleanup checks pass.
+Correctness remains unvalidated. Evidence:
+`artifacts/cli-integrated-completion-acceptance-20261019bu/live-review.md`.
+
+Separately, a fresh bounded frozen review passed with accurate budget notices and
+an accepted substantive report on existing model-authored input. Its six tests,
+3,616-case oracle, frozen inputs and cleanup pass; source-only Git diff and
+paraphrased test output are recorded scope notes. It supplies no new coding
+authorship or full integrated acceptance. Evidence:
+`artifacts/cli-budget-notice-acceptance-20261019bt/live-review.md`.
+
+The CLI foundation is substantially implemented. Reliable completion and factual
+reporting remain the immediate blockers to baseline acceptance. This is not a
+percentage-complete estimate or a migration approval: basic capabilities working
+individually do not prove a dependable primary development assistant.
+
+| Area | Evidence available | What still blocks acceptance |
+| --- | --- | --- |
+| CLI, coding tools, instructions and history | Interactive sessions and common tools implemented; fresh actual entry-point help passes; previous bounded turn/restart checks | Representative daily-work continuity and required installed-client coverage |
+| Model-authored code and tests | Recent local fixtures passed independent tests and 3,616-case oracle; some coding reports were accurate | Consistent correctness across a complete workflow; prior successes do not rescue failed runs |
+| Final completion and review | Latest integrated run completed both structural phases; actual notices and accepted/candidate reports are checked separately | Strict acceptance still needs coherent task instructions and both reports meeting the reporting requirements |
+| Errors, usage and containment | Structured attribution, per-attempt usage and guarded owned cleanup; latest live cleanup verified | Preserve fixed missing-check labels through private closeout; broader error-propagation review remains planned |
+| Fallback, skills and semantic tools | Implemented with bounded offline and selected installed-client evidence | Current eligible-route availability, broader installed-client/approval coverage and IDE-independent C1-C6 acceptance remain separate |
+
+The next step is fresh coherent preparation under the revised criteria, checking
+the fully composed task and actual scrutiny wiring as well as root instructions.
+The recovered-error investigation and offline final-qualification fix are complete;
+do not repeat them or treat harmless omission alone as a new failure gate.
+Preserve execution, protected-input and approval boundaries. Both substantive
+reports, independently correct model effects and verified cleanup remain required.
+One such success would establish a bounded workflow result, not representative
+quality parity, measured savings or complete daily migration under ADR-049/050.
+
+The latest investigation reproduces the omission deterministically in the actual
+shared loop: it returns the candidate before the task-specific acceptance gate
+runs. The owner selected optional shared completion feedback, now implemented
+under ADR-062 with original bounds and permissions retained. The full offline
+gate passes2,474tests/3skipped; full Pyright and Ruff pass. Task controllers opt in
+through the Python API; no default CLI policy, flag or external-client mapping
+changed. Fresh live acceptance is still required. Local implementation evidence:
+`artifacts/cli-completion-implementation-20261019bq/README.md`.
+
+The broader roadmap still records M1 complete offline, M2/M3 partially accepted,
+M4 in progress and M5 pending. Full IDE replacement and independent unattended
+supervision must not be presented as one successful toy review away. See the
+[current roadmap](development-roadmap.md#milestones).
+
+## Historical assessment — 2026-10-10
 
 **Attended pilot: recommended. Full daily replacement and unattended migration:
 INCOMPLETE.** This is an engineering recommendation, not an owner waiver of
