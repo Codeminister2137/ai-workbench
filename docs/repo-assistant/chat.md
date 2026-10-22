@@ -56,7 +56,10 @@ an inactivity timeout. Model output resets the timer. During execution, the CLI
 prints bounded `external_agent_activity` and `external_agent_status` lines so a
 foreground run shows that work is still happening without dumping raw JSONL.
 The diagnostics block then prints parsed event counts, usage, delegation
-status, failure reasons, and concise stderr summaries. Hidden reasoning-summary
+status, failure reasons, and concise stderr summaries. A completed run whose
+MCP tool-call failure could not be matched to a successful retry additionally
+prints `external_agent_mcp_warning` lines, so an unverified tool failure stays
+visible beside the completed result. Hidden reasoning-summary
 events remain type-only and raw JSONL stays in the transcript-only section. The
 CLI prints the exact
 `external_agent_command_line_json` before execution and adds the effective

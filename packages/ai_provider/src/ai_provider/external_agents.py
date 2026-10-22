@@ -65,6 +65,13 @@ class ExternalAgentEventSummary:
     usage: dict[str, Any] | None
     failure_reason: str | None
     parse_errors: tuple[str, ...]
+    mcp_warnings: tuple[str, ...] = ()
+    """Unresolved MCP failures for a run that independently proved completion.
+
+    ADR-064: recovery that call identity cannot prove is reported as a visible
+    warning rather than a failed run, provided the run independently completed
+    and nothing fatal or unfinished remains. The reasons are retained verbatim.
+    """
 
 
 @dataclass(frozen=True)
@@ -617,6 +624,7 @@ def parse_external_agent_jsonl(text: str) -> ExternalAgentEventSummary:
     failure_reason = None
     answer_chunks: list[str] = []
     mcp_failures: list[tuple[tuple[str, str, str] | None, str]] = []
+    mcp_warnings: list[str] = []
     pending_mcp: set[str] = set()
     recovered_turn_completed = False
     recovered_answer = False
@@ -732,7 +740,19 @@ def parse_external_agent_jsonl(text: str) -> ExternalAgentEventSummary:
             recovered_answer = True
     if failure_reason is None:
         if mcp_failures:
-            failure_reason = mcp_failures[0][1]
+            # ADR-064: an MCP failure that call identity cannot resolve is not a
+            # failed run when the run independently proves completion. The
+            # unresolved reasons stay visible as warnings; a fatal, unfinished
+            # or unanswered run remains a failure.
+            if (
+                recovered_turn_completed
+                and recovered_answer
+                and not pending_mcp
+                and not unidentified_pending_mcp
+            ):
+                mcp_warnings = [reason for _identity, reason in mcp_failures]
+            else:
+                failure_reason = mcp_failures[0][1]
         elif pending_mcp or unidentified_pending_mcp:
             failure_reason = "incomplete MCP tool call"
         elif had_mcp_failure and not (recovered_turn_completed and recovered_answer):
@@ -746,6 +766,7 @@ def parse_external_agent_jsonl(text: str) -> ExternalAgentEventSummary:
         usage=usage,
         failure_reason=failure_reason,
         parse_errors=tuple(parse_errors),
+        mcp_warnings=tuple(mcp_warnings),
     )
 
 

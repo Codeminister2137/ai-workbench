@@ -589,7 +589,9 @@ def test_mcp_recovery_never_clears_fatal_errors(fatal, fatal_first):
 
 
 @pytest.mark.parametrize("missing", [None, "id", "server", "tool"])
-def test_mcp_unrelated_success_retains_distinct_failures(missing):
+def test_mcp_unresolved_failures_are_retained_as_separate_warnings(missing):
+    # ADR-064: each unresolved MCP failure stays visible. Resolving a different
+    # call cannot erase an independently unresolved one.
     first = _mcp_event("failed", call_id="first")
     second = _mcp_event("failed", call_id="second")
     first["item"]["arguments"] = {"path": "first.py"}
@@ -603,17 +605,20 @@ def test_mcp_unrelated_success_retains_distinct_failures(missing):
     finish = [{"type": "final_answer", "content": "Done."}, {"type": "turn.completed"}]
     stream = [first, second, unrelated, *finish]
     events = parse_external_agent_jsonl("\n".join(map(json.dumps, stream)))
-    assert events.failure_reason == "first failure"
+    assert events.failure_reason is None
+    assert events.mcp_warnings == ("first failure", "second failure")
     assert events.tool_events == tuple(stream[:3])
     # Resolving the second call cannot erase the independently unresolved first.
     stream = [first, second, _mcp_event("completed", call_id="second"), *finish]
-    assert (
-        parse_external_agent_jsonl("\n".join(map(json.dumps, stream))).failure_reason
-        == "first failure"
-    )
+    events = parse_external_agent_jsonl("\n".join(map(json.dumps, stream)))
+    assert events.failure_reason is None
+    assert events.mcp_warnings == ("first failure",)
 
 
-def test_mcp_same_tool_and_arguments_without_call_identity_are_not_recovery():
+def test_mcp_same_tool_retry_with_new_call_id_is_reported_as_warning():
+    # ADR-064: a same-tool retry under a new call id cannot be proven by call
+    # identity. When the run independently completed, that is a visible
+    # warning, not a failed run.
     failure = _mcp_event("failed", call_id="first")
     success = _mcp_event("completed", call_id="different")
     for event in (failure, success):
@@ -624,7 +629,10 @@ def test_mcp_same_tool_and_arguments_without_call_identity_are_not_recovery():
         {"type": "final_answer", "content": "Done."},
         {"type": "turn.completed"},
     ]
-    assert parse_external_agent_jsonl("\n".join(map(json.dumps, stream))).failure_reason is not None
+    events = parse_external_agent_jsonl("\n".join(map(json.dumps, stream)))
+    assert events.failure_reason is None
+    assert events.mcp_warnings == ("mcp_tool_call",)
+    assert events.final_answer == "Done."
 
 
 @pytest.mark.parametrize("answer_position", ["before_failure", "before_recovery", "after_recovery"])
@@ -676,6 +684,75 @@ def test_mcp_each_identified_failure_requires_its_own_recovery():
     events = parse_external_agent_jsonl("\n".join(map(json.dumps, stream)))
     assert events.failure_reason is None
     assert events.tool_events == tuple(stream[:4])
+
+
+def _unresolved_failure() -> dict:
+    """An MCP failure whose call identity the stream never establishes."""
+    failure = _mcp_event("failed")
+    failure["item"].pop("id")
+    failure["item"]["error"] = {"message": "unresolved failure"}
+    return failure
+
+
+def test_mcp_unresolved_identity_failure_in_a_completed_run_is_a_warning():
+    stream = [
+        _unresolved_failure(),
+        {"type": "final_answer", "content": "Done."},
+        {"type": "turn.completed"},
+    ]
+    events = parse_external_agent_jsonl("\n".join(map(json.dumps, stream)))
+    assert events.failure_reason is None
+    assert events.mcp_warnings == ("unresolved failure",)
+    assert events.final_answer == "Done."
+
+
+def test_mcp_identified_failure_without_retry_in_a_completed_run_is_a_warning():
+    # ADR-064 covers every MCP failure that call identity cannot resolve,
+    # including one the agent never retried.
+    stream = [
+        _mcp_event("failed", call_id="only"),
+        {"type": "final_answer", "content": "Done."},
+        {"type": "turn.completed"},
+    ]
+    events = parse_external_agent_jsonl("\n".join(map(json.dumps, stream)))
+    assert events.failure_reason is None
+    assert events.mcp_warnings == ("mcp_tool_call",)
+
+
+@pytest.mark.parametrize(
+    "tail,expected",
+    [
+        ([{"type": "final_answer", "content": "Done."}], "unresolved failure"),
+        ([{"type": "turn.completed"}], "unresolved failure"),
+        (
+            [
+                {"type": "final_answer", "content": "Done."},
+                {"type": "turn.completed"},
+                {"type": "error", "message": "fatal"},
+            ],
+            "fatal",
+        ),
+    ],
+)
+def test_mcp_unresolved_failure_still_fails_without_independent_completion(tail, expected):
+    events = parse_external_agent_jsonl("\n".join(map(json.dumps, [_unresolved_failure(), *tail])))
+    assert events.failure_reason == expected
+    assert events.mcp_warnings == ()
+
+
+def test_mcp_unresolved_failure_with_an_unfinished_call_stays_incomplete():
+    unfinished = _mcp_event("in_progress")
+    unfinished["type"] = "item.started"
+    unfinished["item"].pop("id")
+    stream = [
+        _unresolved_failure(),
+        unfinished,
+        {"type": "final_answer", "content": "Done."},
+        {"type": "turn.completed"},
+    ]
+    events = parse_external_agent_jsonl("\n".join(map(json.dumps, stream)))
+    assert events.failure_reason == "unresolved failure"
+    assert events.mcp_warnings == ()
 
 
 def test_external_agent_progress_line_summarizes_json_events() -> None:

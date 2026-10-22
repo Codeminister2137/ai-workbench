@@ -414,6 +414,12 @@ the external agent writes stderr, the console shows a concise stderr summary and
 an `external_agent_stderr_file` path for the full filtered stderr. Non-zero
 external-agent exits also print an explicit `external_agent_failure_reason`, so
 stderr is supporting diagnostic detail rather than the only failure explanation.
+When an external run completes but an MCP tool-call failure could not be
+matched to a successful retry, the run is reported as completed and the
+unresolved failure is printed as `external_agent_mcp_warning`, so an unverified
+tool failure stays visible next to the result instead of being hidden or
+reported as a failed run. See
+[ADR-064](../decisions/ADR-064-visible-warning-for-unresolved-mcp-recovery.md).
 
 ```powershell
 .\scripts\repo-assistant.ps1 `

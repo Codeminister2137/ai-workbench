@@ -61,6 +61,10 @@ def print_external_agent_event_summary(events: ExternalAgentEventSummary) -> Non
         hint = external_agent_failure_hint(events.failure_reason)
         if hint is not None:
             print(f"external_agent_failure_hint: {hint}")
+    for warning in events.mcp_warnings:
+        # ADR-064: an unresolved MCP recovery stays visible even when the run
+        # completed, so the report never hides an unverified tool failure.
+        print(f"external_agent_mcp_warning: {warning}")
     if events.parse_errors:
         print("external_agent_jsonl_parse_errors_json: " + json.dumps(list(events.parse_errors)))
 
