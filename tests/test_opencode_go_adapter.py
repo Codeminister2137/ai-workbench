@@ -1,12 +1,14 @@
 """OpenCode Go adapter tests; no network or real credentials."""
 
 import json
+from email.message import Message
 from io import BytesIO
 
 import pytest
 from ai_provider import (
     AIMessage,
     AIRequest,
+    AIStreamDelta,
     AIStreamFinal,
     BackendConfig,
     MessageRole,
@@ -135,6 +137,7 @@ def test_stream_sends_session_header(monkeypatch):
             )
         )
     )
+    assert isinstance(events[0], AIStreamDelta)
     assert events[0].content == "hi"
     assert isinstance(events[-1], AIStreamFinal)
 
@@ -160,7 +163,7 @@ def test_http_errors_are_normalized(monkeypatch, code, category):
     from urllib.error import HTTPError
 
     def send(request, *, timeout):
-        raise HTTPError(request.full_url, code, "secret", {}, None)
+        raise HTTPError(request.full_url, code, "secret", Message(), None)
 
     monkeypatch.setattr("ai_provider.adapters.openai_compatible.urlopen", send)
 
