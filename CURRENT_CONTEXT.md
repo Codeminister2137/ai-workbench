@@ -1,66 +1,58 @@
-﻿# Current task — ATTENDED, COMPLETE offline
+﻿# Current task — ATTENDED, baseline INCOMPLETE
 
-Owner-authorized logical commits, integration to develop and offline successor
-implementation are complete. Broader CLI live-quality acceptance remains INCOMPLETE.
-No unattended window, power action, paid inference or live model call is active.
+Branch: fix/go-coding-chat-acceptance-turns. Implementation checkpoint: 4a7aca0.
+The previous integration is pushed to develop at d277293. This continuation fixes
+paid-route acceptance preparation; no live model request or power action occurred.
 
-## Integration and validation
+## Last completed slice
 
-Thirteen logical feature commits were merged and pushed to develop at 17d788d.
-The mapping table was included unchanged after explicit owner confirmation; its
-SHA-256 stayed 3c6a4488987491e112f02415535101b6e495230ddd18321438b9993d28c09cd9.
-All five matcher proposals remain unapplied and require a separate owner decision.
-No .env, sleep receipts or temp OpenCode harness files were committed.
+Go coding-chat harness now submits exactly two requests through the same saved
+session. It stops before follow-up if the first CLI turn fails, does not produce
+a session id, or changes source/tests before confirmation. Final host validation
+refuses altered protected tests, ignores stale fixture bytecode, and has finite
+positive timeouts. Partial CLI output survives exceptions and automated replies
+are labelled as automated continuations, never physical owner approval.
 
-Full suite: 2756 passed, 9 skipped in 232.53 seconds. Two matcher-test optional
-field assertions were added afterward; 19 matcher tests and repository Pyright
-passed. The actual pre-push Pyright and full test-runner hooks also passed.
+New offline regressions use scripted CLI replies and actual pytest children,
+including a deliberately stale same-size/same-timestamp .pyc. Registered the module
+in scripts/run-tests.py. Updated baseline docs to distinguish current implemented
+MCP/shell/scrutiny behavior from preserved October 21 historical gaps.
 
-## Offline successor evidence
+Validation: 122 focused tests pass; full root suite 2767 passed, 9 skipped in
+239.25 seconds. Changed script/tests pass Ruff, formatting and Pyright; commit
+hooks pass. Full log: artifacts/go-continuity-harness-full-20261023.log.
+Code committed in 4a7aca0; this continuation has not merged or pushed its branch.
 
-artifacts/cli-baseline-successor-20261023a/ contains the first complete successor
-and evidence at checkpoint 17d788d. It retains coding-chat --orchestrated, pinned
-local route/runtime/context, all 18 ordinary tools, complete instruction/history
-guards, five protected originals, meaningful companions, frozen read-only review,
-independent oracle, admission, process ownership and cleanup.
+## Decision pending / next action
 
-All primary, auxiliary and scrutiny calls share phase/total counters and time
-bounds. Limits: 32 calls/40 tools/7200 seconds including 300 cleanup; coding
-20 calls/28 tools/4500 seconds, review 12 calls/12 tools/2400 seconds. Pending
-support roles reserve one call and 600 seconds each inside those bounds.
+Owner was asked which NEXT acceptance preparation to pursue:
+- Go review/continuation (recommended, matches immediate paid-route baseline;
+  eventual launch consumes subscription allowance and sends the approved fixture).
+- Local report-fidelity pilot (local data/no hosted cost; separate route evidence).
+- Continue offline guards only (no inference; cannot establish live quality).
 
-322 guard tests pass. The real scripted CLI workflow uses 17 calls (13 primary,
-2 auxiliary, 2 scrutiny), 13 tools and one ordinary repair. Actual test exits are
-[1,0,0]. Independent audit verifies 7 tests, 3616 oracle cases, both reports in
-session and delivered output, protected inputs/index, frozen review and cleanup
-of 21 workflow plus 2 independent children. Windows parent/birth/seal smoke passes
-with zero provider requests. Lint/format/Pyright pass on helper definitions;
-the deliberately defective protected fixture is excluded from helper lint/tests.
+Wait for that material route/scope decision before preparing its disputed part.
+Choosing Go preparation is not itself a paid launch grant. Prepare exact tasks,
+finite request/tool/time bounds, root instruction delivery, account/privacy/overage
+admission, frozen evidence and owned cleanup before requesting a named hosted
+inference allowance. Do not launch the existing unguarded harness blindly.
+The current harness directory is not an OS sandbox and its small passing fixture
+cannot establish general baseline usability.
 
-ci/prepare.py and audit_preparation.py passed at 17d788d; original preparation
-and audit remain byte-preserved in ci/preparation-before-20261023a/.
-Final checkpoint refreshes use a fresh sibling successor directory (20261023b)
-and a second ci archive, preserving a's sealed evidence. Read the latest sibling's
-results/preparation/audit receipts for its exact checkpoint. No seal is an inference
-grant. Both acceptance.py --live and unprepared/changed-input launches refuse.
-
-## Next baseline action
-
-The requested offline implementation is complete. Before any real-model acceptance,
-inspect current manifests/seals and settings, define a fresh named finite allowance
-for the intended acceptance question, and refresh any stale snapshots. Preserve
-historical trials; never replay or regrade them. No matcher decision was made.
-Relevant local plans remain repo-assistant-cli-parity-plan, deferred-baseline-work,
-and the closed unattended-work-plan. Broader application DOCX plans are unrelated.
-Persistent unattended-execution reliability goal remains OPEN; this attended work
-does not validate a full unattended window.
+Relevant plans: repo-assistant-cli-parity-plan, deferred-baseline-work,
+opencode-go-integration-first, and closed unattended-work-plan. The paid-route
+baseline takes priority; local-model parity is separate. Broader application DOCX
+plans are unrelated to this bounded CLI work. All matcher disagreements remain
+unapplied and require owner decision. Preserve historical trials and their results.
+The ci/successor snapshots at d277293 remain historical, and must be freshly prepared
+for a later checkout; old seals never authorize replay. No .env or temp harness
+files were committed. Unattended-execution reliability goal remains OPEN.
 
 ## Resume prompt
 
-Repository C:\Users\Jakub\PycharmProjects\AI-projects. Read CURRENT_CONTEXT.md
-and docs/plans/unattended-work-plan.md; verify branch, HEAD, status and the latest
-cli-baseline-successor-20261023* results. Offline runner work is complete; broader
-live CLI quality is incomplete. Prepare the next bounded acceptance question under
-existing local authorization; preserve pinned settings, phase/total support bounds,
-all original-test/frozen-review/oracle/cleanup guards and historical results.
-Pause for owner decision before applying any matcher disagreement.
+Continue in C:\Users\Jakub\PycharmProjects\AI-projects. Read CURRENT_CONTEXT.md
+and relevant baseline-gap.md/development-roadmap.md sections. Verify branch/HEAD/
+status and owner's pending route/scope answer. The harness fix is committed and
+validated; implement the selected next acceptance preparation with fresh named
+bounds and all original instruction/test/review/cleanup guards. Hosted generation
+requires the separately prepared named allowance. Do not change matcher mappings.
