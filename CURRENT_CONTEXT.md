@@ -1,8 +1,9 @@
 # Current task - ATTENDED; Go live continuation INCOMPLETE
 
-Branch: fix/go-coding-chat-acceptance-turns. Current code checkpoint 48d31f2.
-Original logical integration is merged/pushed to develop at d277293. This follow-up
-has not yet merged/pushed. No timers, sleep action or unattended window.
+Branch: develop. Validated code checkpoint 48d31f2; follow-up merge 95f85c0.
+Original logical integration was pushed at d277293; follow-up is now merged.
+Push to origin/develop is authorized; verify actual local/remote heads on resume.
+No timers, sleep action or unattended window.
 
 ## Owner authority and pending decision
 
