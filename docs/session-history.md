@@ -1653,3 +1653,29 @@ Only matcher module/tests, one registration line, appended mapping documentation
 and this handoff were edited by this delegation. Other active work stays owned
 by its original worker. Next action: review the five proposals against the
 manual mapping; completion condition for this delegated implementation is met.
+
+
+## 2026-10-23 attended Go review diagnostics
+
+Prepared and offline-verified read-only Go continuation trial a at f728fce;
+owner then confirmed Extra Usage disabled and standing approval for comparable
+bounded Go runs. Trials a/b stopped on second-completion 60-second HTTP response
+waits; c returned at 72 seconds but exhausted 4096 tokens; d returned at 124 seconds
+and exhausted 8192 tokens with zero visible report text. Each performed five valid
+inspections, stopped before turn two and verified owned cleanup. Original failed
+receipts remain under artifacts/go-review-continuation-prep-20261023[a-d]/.
+Eight total provider attempts, six returned responses; usage on timeouts is unknown.
+No raw reasoning logging, model/billing fallback or account setting change.
+
+The private worker now retains actual tool receipts on model failure and safe
+transport-stage diagnostics; 34 offline controls and independent scripted audits
+pass. Production fixes retain visible incomplete native reports (f4ef561) and
+Go Kimi origin-bound continuation state (518b8e1). Official Kimi guidance requires
+preserved reasoning and recommends >=16000 output tokens. Changing admission's
+8192 default versus exposing an explicit neutral CLI option remains an owner
+choice. Do not silently raise output after admission. e remains an unlaunched
+draft. Initial post-adapter full run failed an external-agent fixture that watched
+the real repository and captured concurrent artifact writes; 48d31f2 isolates it,
+28 module tests pass, full root rerun 2778 pass / 9 skip in 237.67 seconds.
+The earlier pre-push flake's missing
+original traceback still prevents asserting it had this same cause.

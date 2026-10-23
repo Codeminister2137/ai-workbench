@@ -30,9 +30,12 @@ Research and pending matcher choices are preserved in the dated artifact briefs.
 
 The shell/PID ownership repairs, MCP warning policy and advisory scrutiny repair
 are integrated. Offline acceptance-controller and Go two-turn harness checks do
-not establish live paid-route completion. Prepare a fresh guarded Go continuation
-acceptance next; retain admission, root instructions, original tests, frozen review,
-finite total bounds and owned cleanup. Hosted inference requires a named allowance.
+not establish live paid-route completion. October 23 Go review trials stopped on
+timeout/output exhaustion; continuation replay is now repaired under ADR-055.
+Production output-budget configuration needs an owner decision before fresh
+continuation acceptance. Set the selected budget before native admission; retain
+root instructions, original tests, frozen review, finite bounds and owned cleanup.
+Comparable bounded Go runs have standing owner approval; keep each scope named.
 See [the current baseline assessment](baseline-gap.md) for evidence and remaining
 limits. Local synthetic parity remains separate from the paid-route baseline.
 

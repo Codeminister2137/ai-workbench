@@ -24,12 +24,28 @@ stale fixture bytecode, has finite timeouts, and preserves partial CLI logs.
 Offline controls use scripted CLI replies and real test processes; they do not
 establish paid-route report quality or authorize another provider request.
 
-Next: prepare a fresh guarded Go continuation acceptance, retaining full root
-instructions, exact input provenance, process ownership, explicit total request/
-time bounds and frozen review. Check account/privacy/overage admission and obtain
-the named hosted-inference allowance before launch. Do not replay the October 22
-approval-stopped trial or treat a passing arithmetic fixture as general baseline
-completion. The harness's fixture directory is not an OS sandbox.
+Fresh bounded Go read-only review attempts on October 23 remain failed: two
+60-second response waits timed out, then longer requests returned output-limited
+responses at 4096 and 8192 tokens. The latter had no visible report text. Inspections
+and owned cleanup succeeded, but neither saved-session continuation nor report
+quality was established. Preserve those trials; do not regrade them after fixes.
+
+Investigation found two preparation/protocol gaps: the official Kimi guide
+recommends at least 16000 output tokens, and the Go adapter dropped required
+`reasoning_content`. ADR-055 now covers transient origin-bound replay for exactly
+Go Kimi K2.7 Code, including streaming; private state remains out of storage and
+reports. Failed native closeouts now retain any visible terminal partial report,
+labelled incomplete/not accepted. Neither fix proves the cause of earlier failures.
+
+Next: resolve production output-budget configuration before another fresh trial.
+Native admission defaults to 8192 and this coding path has no CLI output-budget
+option. A host override after admission would understate the reserved output;
+do not use it as faithful CLI acceptance. Owner standing authorization covers
+comparable bounded Go runs within existing limits; fresh named preparation and
+billing/privacy admission still apply. Retain full root instructions, exact input
+provenance/history, original tests, frozen review and owned cleanup. No general
+baseline completion is implied by the eventual read-only review. The original
+arithmetic harness's fixture directory is not an OS sandbox.
 
 ### Historical paid-native checkpoint — 2026-10-21
 

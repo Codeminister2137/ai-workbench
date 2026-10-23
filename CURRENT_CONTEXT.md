@@ -1,75 +1,81 @@
-﻿# Current task — ATTENDED, Go preparation COMPLETE offline; baseline INCOMPLETE
+# Current task - ATTENDED; Go live continuation INCOMPLETE
 
-Branch: fix/go-coding-chat-acceptance-turns. Go preparation selected explicitly
-by the owner after 78d8cc0. Hosted generation has NOT been authorized for a named
-run or started. No power action, paid request, account change or model switch.
+Branch: fix/go-coding-chat-acceptance-turns. Current code checkpoint 48d31f2.
+Original logical integration is merged/pushed to develop at d277293. This follow-up
+has not yet merged/pushed. No timers, sleep action or unattended window.
 
-## Current concrete proposal
+## Owner authority and pending decision
 
-artifacts/go-review-continuation-prep-20261023a/ contains launch-brief.md, exact
-first/second tasks, an exclusive input builder, counted worker, owned controller,
-independent audit and offline guard controls. It reviews the actual corrected Go
-continuity harness and its new regression tests, then resumes the same saved
-session. The fixture carries complete committed root AGENTS.md and supplied host
-validation provenance; private plans and .env are excluded from model inputs.
+Owner confirmed 2026-10-23 that Go Extra Usage is disabled and that all comparable
+bounded Go acceptance runs are approved for now. Do not ask again for each such
+run. Prepare fresh named input/path/time/call/token bounds; retain existing model,
+privacy, account/billing boundaries and first-failure stops. No fallback, paid
+overage, account setting change, model switch or replay of consumed trials.
+Remaining account quota stays unknown. Existing safe bootstrap supplies the key;
+never print/commit .env or private continuation state.
 
-Named proposal: go-kimi-readonly-continuation-20261023a-8calls-300seconds.
-Kimi K2.7 Code / existing Go Chat endpoint only. Two owner prompts/invocations,
-eight provider attempts total/four per turn, 24 proposed tools total/12 per turn,
-4096 output tokens per attempt, 300 seconds including startup and cleanup with
-20 seconds reserved for cleanup. Requests max60 seconds, turns max120, clipped
-to original remaining allowance. No fallback, auxiliary, scrutiny or delegation.
+Owner also reported broken summaries. Repository closeouts must start with exact
+`## **SUMMARY**`; keep the body concise. A clarification about which summary was
+meant is pending, but restore that documented marker now.
 
-The production coding-chat profile exposes all18 tools; read_only permissions
-and the explicit guard permit only the six ordinary inspection tools. This
-read-only/static-review slice does not claim full coding/orchestrated acceptance.
-No shell or tests run by the model; host results remain supplied host evidence.
-Inputs/index/tasks/settings/dependencies, exact JSON history and actual per-turn
-read/status/diff coverage are guarded. Report prose cannot replace tool effects.
-The supervisor owns the child OS job and verifies exit/cleanup. Reports still
-need substantive independent review; structural success is not semantic truth.
+Production decision asked asynchronously: explicit provider-neutral
+--max-output-tokens option (recommended; retain defaults; caller selects Kimi's
+budget) versus automatic Kimi-specific 16000 default (easier use, higher per-call
+allowance). Do not implement disputed defaults before the owner chooses.
+This is a production behavior decision, not another run authorization request.
 
-## Validation
+## Verified changes
 
-32 offline controls pass, including actual two-invocation CLI execution with four
-SCRIPTED provider-boundary replies, eight real inspection tool results, saved
-multiline/quoted history, frozen inputs and owned cleanup. Independent audit
-compares actual output hashes, SQLite tool receipts, session and delivered reports.
-Six private Python helpers pass lint/format/Pyright. No real provider traffic.
-Initial preparation/control failures are preserved as separate receipts; causes
-were local argparse/profile wiring and corrected within this offline preparation.
+4a7aca0 fixes duplicated Go acceptance follow-up, protects first-turn source/tests,
+refuses modified tests before executing them, preserves exception logs and avoids
+stale bytecode during finite host validation. Earlier root 2767 pass / 9 skip.
+f4ef561 preserves terminal visible partial native reports in failed closeouts and
+saved chat, labelled incomplete/not accepted; excludes tool requests and private
+continuation state. 58 focused checks and root 2770 pass / 9 skip.
+518b8e1 extends ADR-055 to exactly Go kimi-k2.7-code: transient reasoning_content
+capture/replay, including streaming, only to same provider/model/endpoint; metadata
+scrubbed, no persistence. 90 focused adapter/loop/admission/transcript checks pass.
+Official Kimi guide recommends >=16000 output tokens, includes reasoning in this
+budget and requires preserved thinking. Facts recorded in source-state and ADR.
+48d31f2 isolates external-agent review fixture from the real workspace. Root run
+at 518b8e1 failed 1 test because it observed concurrent artifact writes in real repo;
+preserved log: artifacts/go-kimi-continuation-full-suite-20261023.log. All 28 tests
+in that module pass after isolation. Full root rerun: 2778 passed / 9 skipped in 237.67 seconds.
+Receipt: artifacts/go-kimi-continuation-full-suite-fixed-20261023.log.
 
-Prior public harness fix: 4a7aca0, 122 focused tests, full root2767PASS/9SKIP,
-lint/format/Pyright and commit hooks passed. No production source changed during
-this Go preparation; source-state adds dated official findings. Existing branch
-has not merged/pushed this continuation; develop remains d277293.
+## Preserved live evidence / next boundary
 
-## Required next action / launch boundary
+artifacts/go-review-continuation-prep-20261023a through d are CONSUMED failures.
+Each made two provider attempts and executed five valid inspections; no second
+saved-session turn started. All four verified owned child exit/cleanup. a/b timed
+out waiting for second response at 60 seconds; b safe stack locates HTTP response
+status wait, not a proven remote cause. c returned at 71.77 seconds and exhausted
+4096 output tokens. d returned at 124.44 seconds and exhausted 8192 tokens with
+zero visible report characters. No report-quality or baseline pass. Read their
+failure-analysis.json, worker-result.json and live-controller.json. No raw
+reasoning text was printed/persisted. Original failures are not regraded.
 
-After this handoff checkpoint, build final clean inputs and keep a separate
-exclusive offline proof directory, leaving the canonical live directory unconsumed.
-Read launch-brief.md and the final proof receipts to verify preparation. Then ask
-for the exact named hosted allowance AND confirmation that Go Extra Usage is off.
-Official Go docs permit credit overflow when it is on; client request caps do not
-prove an account-side lock. Account remaining is explicitly unknown/not observed.
-No authenticated metadata request was made. No key is loaded during preparation;
-controller live mode requires the host key and passes only it to the owned child.
-Do not change account settings, expose credentials, bypass a refusal, replay
-consumed state or use another billing source. Any first failed live phase must be
-preserved/investigated rather than replayed. A normal bounded launch needs no
-physical terminal input; automated /exit continuations are not human approvals.
+Fresh private worker b+ captures tools at actual BaseTool.run completion, retaining
+receipts even when later generation fails; safe transport frame/type diagnostics.
+34 offline controls, owned scripted CLI composition and independent audits pass.
+Original a's omitted worker tools were independently recovered/verified against
+all five saved SQLite hashes; original receipt remains unchanged.
 
-All five matcher proposals remain unapplied. Older ci/successor snapshots are
-historical and do not authorize replay. Relevant plans remain CLI parity and
-opencode-go-integration-first; broader application DOCX plans are unrelated.
-Unattended-execution reliability goal stays OPEN; session is attended.
+e is DRAFT ONLY / NOT LAUNCHED (artifacts/go-review-continuation-prep-20261023e).
+It tentatively selects 16000 tokens, 8 attempts, 660 total seconds, but the current
+worker overrides output AFTER native admission, whose default remains 8192.
+Do not launch or call it ready until output is set before real admission. No
+canonical fixture was prepared and no live allowance consumed. Offline controls
+do not cover that admission discrepancy. Keep input provenance/root instructions,
+exact history, actual tool coverage, frozen source/tests/index and ownership guards.
+After the production budget decision, expose the existing neutral request field
+through the chosen path, test it, prepare clean fresh inputs and run once under the
+standing authorization. Independently inspect reports; structural audit alone
+cannot establish truthful/substantive review. Full coding/orchestrated/fallback
+acceptance remains open beyond this read-only component slice.
 
-## Resume prompt
-
-Repository C:\Users\Jakub\PycharmProjects\AI-projects. Read CURRENT_CONTEXT.md
-and artifacts/go-review-continuation-prep-20261023a/launch-brief.md. Verify branch,
-HEAD, clean status, current preparation/audit and whether the owner has approved
-the exact named run plus confirmed Extra Usage disabled. If pending, request only
-that concrete launch scope. If granted, launch once under original bounds through
-the owned controller, inspect both reports independently and preserve all evidence.
-Do not launch solely on the earlier approval of Go preparation.
+Five matcher disagreements remain unapplied; do not change the mapping table
+without owner decision. Shell/PID, MCP warning policy and advisory scrutiny repairs
+are already integrated; ci/successor snapshots remain historical, never replay.
+Relevant private plans: repo-assistant-cli-parity-plan.md and
+opencode-go-integration-first-20261022.md; older unattended plan is CLOSED.
