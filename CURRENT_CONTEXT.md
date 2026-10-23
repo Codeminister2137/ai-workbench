@@ -11,8 +11,21 @@ closeout and scrutiny repair; unreadable re-review stop; research artifacts;
 shell interruption fixture; provider source-state; adapters; route/capability
 proposals; acceptance controllers; accepted workflow documentation.
 Focused checks: 189 passed; repository source/test/script lint and formatting pass.
-Commit hooks passed. Full `.venv/Scripts/python.exe -m pytest -q` is running;
-its result is not yet known. No merge or push yet.
+Commit hooks passed. Full `.venv/Scripts/python.exe -m pytest -q` passed:
+2756 passed, 9 skipped in 232.53 seconds. Pyright initially found two optional
+field checks missing in matcher tests; fixed in 2f74b8b, then 19 matcher tests
+passed and repository Pyright reported zero errors. No merge or push yet.
+
+Fresh private runner definitions are at artifacts/cli-baseline-successor-20261023a/.
+They retain df's call/time reserves, coding-chat --orchestrated, five protected
+originals, frozen review, independent oracle and owned cleanup. The new input
+builder requires freshly audited ci inputs at current HEAD, rather than using
+old cp prepared output. Ten preparation/call-reserve controls pass; lint,
+formatting and Pyright pass on 66 helpers. Full controller checks are pending
+fresh inputs. One attempted integration test stopped on missing inputs because
+the test-selection expression was wrong; no model/runtime/workflow launched.
+Source/helper definitions were copied; no historical receipts, trial state,
+fixtures, seals or launch grants were copied. Historical hash inventory is retained.
 
 ## Pending decision
 
@@ -25,7 +38,7 @@ must wait for this resolution; do not conceal the untracked file.
 
 ## Next action and completion condition
 
-Finish full-suite validation and fix touched-area regressions. Resolve inclusion
+Resolve inclusion
 of the existing table, review status/diff, merge/push validated work to develop.
 Preserve the old ci prepared directory by archiving it under a fresh name;
 regenerate with ci/prepare.py only on a clean tree and pass audit_preparation.py.
