@@ -1,4 +1,4 @@
-﻿# Unattended session plan — 2026-10-23, until 21:00 Warsaw / 19:00 UTC
+# Unattended session plan — 2026-10-23, until 21:00 Warsaw / 19:00 UTC
 
 Owner-authorized unattended window on branch `feature/cli-readiness-and-tool-parity`
 (uncommitted work present; **no push, no merge to `master`**). Follow `AGENTS.md`
@@ -57,4 +57,4 @@ attended-session state.
 
 - 5 matcher disagreements: BLOCKED on owner review.
 - Shell-process-ownership interruption flake: fixed during the attended follow-up;
-  eight targeted tests passed. Full-suite revalidation is in progress in Codex.
+  eight targeted tests passed. Codex full suite: 2756 passed, 9 skipped; integration pushed.
