@@ -120,7 +120,7 @@ class OpenAIResponsesChatClient:
             message=AIMessage(role=MessageRole.ASSISTANT, content="".join(content_parts)),
             backend=self._backend_for_model(model),
             usage=self._usage_from_response(usage_chunk or final_raw),
-            finish_reason=FinishReason.STOP,
+            finish_reason=self._finish_reason(final_raw or {}),
             latency_ms=(time.perf_counter() - started) * 1000,
             raw_metadata=self._safe_metadata(final_raw),
         )
@@ -173,7 +173,7 @@ class OpenAIResponsesChatClient:
             message=AIMessage(role=MessageRole.ASSISTANT, content="".join(content_parts)),
             backend=self._backend_for_model(model),
             usage=self._usage_from_response(raw_response),
-            finish_reason=FinishReason.STOP,
+            finish_reason=self._finish_reason(raw_response),
             latency_ms=latency_ms,
             raw_metadata=self._safe_metadata(raw_response),
         )
@@ -336,3 +336,24 @@ class OpenAIResponsesChatClient:
             else None,
             total_tokens=total_tokens if type(total_tokens) is int and total_tokens >= 0 else None,
         )
+
+    @staticmethod
+    def _finish_reason(raw_response: dict[str, Any]) -> FinishReason:
+        """Map the Responses API ``status``/``incomplete_details`` to a finish reason.
+
+        A truncated (``max_output_tokens``) or content-filtered response reports
+        ``incomplete`` rather than ``completed``; hardcoding ``STOP`` would hide
+        truncation from callers. Providers that omit ``status`` keep the historical
+        ``STOP`` default.
+        """
+
+        status = raw_response.get("status")
+        if status in (None, "completed"):
+            return FinishReason.STOP
+        if status == "incomplete":
+            details = raw_response.get("incomplete_details")
+            reason = details.get("reason") if isinstance(details, dict) else None
+            if reason == "max_output_tokens":
+                return FinishReason.LENGTH
+            return FinishReason.UNKNOWN
+        return FinishReason.UNKNOWN

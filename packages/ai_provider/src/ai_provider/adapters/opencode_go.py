@@ -7,13 +7,15 @@ protocol implementation.
 Session continuity: callers may pass a stable conversation session id in
 ``request.metadata["opencode_session"]``. The adapter sends it as
 ``x-opencode-session`` and a project-specific User-Agent, as required by Go's
-coding-agent identification guidance.
+coding-agent identification guidance. If the caller does not supply a session
+id, the adapter generates a fresh one so the request is always valid.
 """
 
 from __future__ import annotations
 
 from collections.abc import Iterator
 from dataclasses import dataclass, field
+from uuid import uuid4
 
 from ai_provider.adapters.openai_compatible import OpenAICompatibleChatClient
 from ai_provider.config import BackendConfig, ProviderKind
@@ -60,15 +62,22 @@ class OpenCodeGoChatClient(OpenAICompatibleChatClient):
             capabilities=ModelCapabilities(chat=True, streaming=True, tools=True),
         )
 
+    def _session_id_for(self, request: AIRequest) -> str:
+        """Return the caller-supplied session id or a fresh UUID."""
+        session_id = request.metadata.get("opencode_session")
+        if isinstance(session_id, str) and session_id:
+            return session_id
+        return uuid4().hex
+
     def complete(self, request: AIRequest) -> AIResponse:
-        self._session_id = request.metadata.get("opencode_session")
+        self._session_id = self._session_id_for(request)
         try:
             return super().complete(request)
         finally:
             self._session_id = None
 
     def stream(self, request: AIRequest) -> Iterator[AIStreamEvent]:
-        self._session_id = request.metadata.get("opencode_session")
+        self._session_id = self._session_id_for(request)
         try:
             yield from super().stream(request)
         finally:

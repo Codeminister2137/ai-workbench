@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any
+from uuid import uuid4
 
 from ai_provider.adapters.openai_responses import OpenAIResponsesChatClient
 from ai_provider.config import BackendConfig, ProviderKind
@@ -37,15 +38,22 @@ class OpenCodeGoResponsesClient(OpenAIResponsesChatClient):
     def base_url(self) -> str:
         return (self.config.base_url or GO_RESPONSES_BASE_URL).rstrip("/")
 
+    def _session_id_for(self, request: AIRequest) -> str:
+        """Return the caller-supplied session id or a fresh UUID."""
+        session_id = request.metadata.get("opencode_session")
+        if isinstance(session_id, str) and session_id:
+            return session_id
+        return uuid4().hex
+
     def complete(self, request: AIRequest) -> Any:
-        self._session_id = request.metadata.get("opencode_session")
+        self._session_id = self._session_id_for(request)
         try:
             return super().complete(request)
         finally:
             self._session_id = None
 
     def stream(self, request: AIRequest) -> Any:
-        self._session_id = request.metadata.get("opencode_session")
+        self._session_id = self._session_id_for(request)
         try:
             yield from super().stream(request)
         finally:
