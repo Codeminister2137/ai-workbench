@@ -21,6 +21,7 @@ from ai_orchestrator import (
     AccessMethod,
     CostPolicyTier,
     LatencyTarget,
+    ModelCatalogEntry,
     OrchestrationResult,
     QualityThreshold,
     TaskCapability,
@@ -270,6 +271,9 @@ from ai_agent.repair_workflow import (
 )
 from ai_agent.repair_workflow import (
     run_orchestrated_repair_loop as _run_orchestrated_repair_loop,  # noqa: F401 - compatibility export
+)
+from ai_agent.repair_workflow import (
+    run_scrutiny_repair_loop as _run_scrutiny_repair_loop,
 )
 from ai_agent.repair_workflow import (
     validation_failure_fingerprint as _validation_failure_fingerprint,  # noqa: F401 - compatibility export
@@ -566,6 +570,7 @@ def _print_cli_closeout(
             execution_status=execution_status,
             validation_details=validation_stage.details if validation_stage is not None else None,
             scrutiny_details=scrutiny_details,
+            scrutiny_policy=getattr(args, "scrutiny_policy", "advisory"),
             fallback_attempts=fallback_attempts,
             failure_reason=failure_reason,
             provider=provider,
@@ -907,6 +912,31 @@ def _run_chat_mode(
     if close_transcript is not None:
         close_transcript()
     return 0
+
+
+def _ensure_provider_in_catalog(
+    catalog: Sequence[ModelCatalogEntry],
+    provider: str | None,
+    catalog_path: Path,
+) -> None:
+    """Reject a ``--provider`` override that the loaded catalog does not declare.
+
+    ``--provider`` choices come from the catalog rather than a hardcoded list,
+    so every provider a catalog declares is accepted, and a typo fails with the
+    available providers instead of silently matching no route.
+    """
+    if provider is None:
+        return
+    available = sorted({entry.backend.route.provider for entry in catalog})
+    if provider not in available:
+        # Written to stderr explicitly so the message survives whatever catches
+        # the SystemExit; the CLI entry point then exits non-zero.
+        print(
+            f"Unknown provider {provider!r} for catalog {catalog_path}. "
+            f"Available providers: {', '.join(available)}.",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -1345,6 +1375,7 @@ def _execute_request(
             "# User request\n" + args.prompt.strip()
         )
     catalog = load_model_catalog(args.catalog)
+    _ensure_provider_in_catalog(catalog, args.provider, args.catalog)
     profile = coding_task_profile(
         privacy_class=OrchestratorPrivacyClass(args.privacy),
         quality_threshold=QualityThreshold(args.quality),
@@ -1611,6 +1642,28 @@ def _execute_request(
         primary_system_prompt = _system_prompt_with_final_response_contract(primary_system_prompt)
     if args.log_full_prompt:
         _print_model_input("Primary", system_prompt=primary_system_prompt, prompt=prompt)
+    orchestrated_tracker = None
+    orchestrated_deadline = None
+    auxiliary_status = None
+    validation_stage = None
+    if args.orchestrated:
+        assert args.away_minutes is not None
+        orchestrated_deadline = execution_deadline
+        orchestrated_tracker, stage_records = OrchestratedRunTracker.create(
+            args=args,
+            repo_root=repo_root,
+            orchestration=external_orchestration,
+            prompt=args.prompt,
+        )
+        _print_orchestrated_stage_plan(
+            args=args,
+            orchestration=external_orchestration,
+            run_record=orchestrated_tracker.run_record,
+            stage_records=stage_records,
+        )
+        if args.mode == "implement" and args.execute:
+            orchestrated_tracker.begin_run()
+            orchestrated_tracker.start_stage("prompt_review")
     primary_elapsed_seconds = None
     try:
         primary_started = time.perf_counter()
@@ -1711,27 +1764,14 @@ def _execute_request(
             args.approval_policy,
             delegation_enabled=_native_delegation_available(args),
         )
-    orchestrated_tracker = None
-    orchestrated_deadline = None
-    auxiliary_status = None
-    validation_stage = None
     if args.orchestrated:
-        assert args.away_minutes is not None
-        orchestrated_deadline = execution_deadline
-        orchestrated_tracker, stage_records = OrchestratedRunTracker.create(
-            args=args,
-            repo_root=repo_root,
-            orchestration=result.orchestration,
-            prompt=args.prompt,
-        )
-        _print_orchestrated_stage_plan(
-            args=args,
-            orchestration=result.orchestration,
-            run_record=orchestrated_tracker.run_record,
-            stage_records=stage_records,
-        )
+        assert orchestrated_tracker is not None
         if args.mode == "implement" and args.execute:
-            orchestrated_tracker.begin_run()
+            _complete_primary_stages(
+                orchestrated_tracker,
+                orchestration=result.orchestration,
+                review_enabled=not args.skip_prompt_review,
+            )
             if args.tool_profile == "research":
                 from ai_provider.research_execution import prepare_research_run
 
@@ -2155,16 +2195,20 @@ def _execute_request(
                     )
                 )
             else:
-                execution_status = _run_orchestrated_scrutiny(
-                    args=args,
-                    tracker=orchestrated_tracker,
-                    repo_root=repo_root,
-                    profile=profile,
-                    catalog=catalog,
-                    validation_stage=validation_stage,
-                    assistant_response_text=assistant_response_text,
-                    execution_status=execution_status,
-                    deadline=orchestrated_deadline,
+                execution_status, validation_stage, assistant_response_text = (
+                    _run_scrutiny_repair_loop(
+                        args=args,
+                        tracker=orchestrated_tracker,
+                        repo_root=repo_root,
+                        profile=profile,
+                        catalog=catalog,
+                        execution_status=execution_status,
+                        validation_stage=validation_stage,
+                        assistant_response_text=assistant_response_text,
+                        deadline=orchestrated_deadline,
+                        repair_attempt=repair_attempt,
+                        review=_run_orchestrated_scrutiny,
+                    )
                 )
         print(f"final_execution_status: {execution_status}")
         orchestrated_tracker.record_final_handoff_stage(
@@ -2172,6 +2216,7 @@ def _execute_request(
             validation_stage=validation_stage,
             repo_root=repo_root,
             assistant_response_text=assistant_response_text,
+            scrutiny_policy=getattr(args, "scrutiny_policy", "advisory"),
         )
         orchestrated_tracker.finish_run(execution_status=execution_status)
     _print_run_metrics(
@@ -2347,6 +2392,52 @@ def _run_codex_login(
     execution_status = "completed" if result.returncode == 0 and status["ok"] else "failed"
     print(f"execution_status: {execution_status}")
     return 0 if execution_status == "completed" else result.returncode or 1
+
+
+def _complete_primary_stages(
+    tracker: OrchestratedRunTracker,
+    *,
+    orchestration: Any,
+    review_enabled: bool,
+) -> None:
+    """Persist the prompt-review and planning work the primary call already did.
+
+    Both stages run inside ``prepare_execution`` (called by ``run_coding_prompt``)
+    before this helper is reached, so they are recorded here from the returned
+    orchestration rather than being left at ``planned``. ``prompt_review`` is
+    ``skipped`` when ``--skip-prompt-review`` bypassed it; ``planning`` is
+    ``failed`` when orchestration produced no execution plan.
+    """
+
+    prompt_judge = orchestration.prompt_judge
+    tracker.complete_stage(
+        "prompt_review",
+        status="completed" if review_enabled else "skipped",
+        details={
+            "review_enabled": review_enabled,
+            "should_refine": bool(prompt_judge is not None and prompt_judge.should_refine),
+            "issue_count": len(prompt_judge.issues) if prompt_judge is not None else 0,
+        },
+    )
+    plan = orchestration.execution_plan
+    tracker.start_stage(
+        "planning",
+        details={
+            "route_id": plan.target.route_id if plan is not None else "",
+            "provider": plan.target.provider if plan is not None else "",
+            "model": plan.target.model if plan is not None else "",
+        },
+    )
+    tracker.complete_stage(
+        "planning",
+        status="completed" if plan is not None else "failed",
+        details={
+            "route_id": plan.target.route_id if plan is not None else "",
+            "provider": plan.target.provider if plan is not None else "",
+            "model": plan.target.model if plan is not None else "",
+            "failure_reason": orchestration.failure_reason or "",
+        },
+    )
 
 
 def _run_coding_prompt_with_fallback(
@@ -2669,6 +2760,7 @@ def _print_fallback_readiness(args: argparse.Namespace, repo_root: Path) -> int:
     from ai_provider.fallback_diagnostics import fallback_readiness_report
 
     catalog = load_model_catalog(args.catalog)
+    _ensure_provider_in_catalog(catalog, args.provider, args.catalog)
     profile = coding_task_profile(
         privacy_class=OrchestratorPrivacyClass(args.privacy),
         quality_threshold=QualityThreshold(args.quality),
@@ -3100,6 +3192,11 @@ def _run_external_agent_cli_mode(
             )
             if args.execute and args.mode == "implement":
                 orchestrated_tracker.begin_run()
+                _complete_primary_stages(
+                    orchestrated_tracker,
+                    orchestration=orchestration,
+                    review_enabled=not args.skip_prompt_review,
+                )
                 orchestrated_tracker.start_stage(
                     "auxiliary_panel",
                     details={"route_policy": "derived_local_cheap"},
@@ -3348,16 +3445,18 @@ def _run_external_agent_cli_mode(
                 deadline=orchestrated_deadline,
                 repair_attempt=repair_attempt,
             )
-            execution_status = _run_orchestrated_scrutiny(
+            execution_status, validation_stage, final_answer_text = _run_scrutiny_repair_loop(
                 args=args,
                 tracker=orchestrated_tracker,
                 repo_root=repo_root,
                 profile=profile,
                 catalog=catalog,
+                execution_status=execution_status,
                 validation_stage=validation_stage,
                 assistant_response_text=final_answer_text,
-                execution_status=execution_status,
                 deadline=orchestrated_deadline,
+                repair_attempt=repair_attempt,
+                review=_run_orchestrated_scrutiny,
             )
         print(f"final_execution_status: {execution_status}")
         orchestrated_tracker.record_final_handoff_stage(
@@ -3366,6 +3465,7 @@ def _run_external_agent_cli_mode(
             repo_root=repo_root,
             assistant_response_text=None,
             final_answer_text=final_answer_text,
+            scrutiny_policy=getattr(args, "scrutiny_policy", "advisory"),
         )
         orchestrated_tracker.finish_run(execution_status=execution_status)
     _print_run_metrics(

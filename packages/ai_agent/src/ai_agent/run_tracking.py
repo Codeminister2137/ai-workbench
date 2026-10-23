@@ -19,7 +19,7 @@ from ai_provider.orchestrated_runs import (
     OrchestratedStageRecord,
     SQLiteOrchestratedRunStore,
 )
-from ai_provider.repair_state import workspace_fingerprints
+from ai_provider.repair_state import changed_paths, workspace_fingerprints
 
 from ai_agent.validation import (
     ValidationCommandResult,
@@ -227,7 +227,9 @@ class OrchestratedRunTracker:
         self._store = store
         self.run_record = run_record
         self._progress_callback = progress_callback
-        self.initial_workspace: dict[str, str] = {}
+        # ``None`` means "no baseline captured yet" and is distinct from a
+        # captured baseline of an empty workspace (``{}``).
+        self.initial_workspace: dict[str, str] | None = None
         self.scrutiny_status = "not_run"
         self.scrutiny_details: dict[str, object] | None = None
         self.deadline = time.perf_counter() + run_record.budget_seconds
@@ -250,13 +252,24 @@ class OrchestratedRunTracker:
         )
         store = SQLiteOrchestratedRunStore(resolve_orchestrated_run_db_path(args, repo_root))
         tracker = cls(store=store, run_record=run_record, progress_callback=progress_callback)
+        # Establish the workspace baseline here, before any stage runs, so the
+        # handoff can report what this run changed even when ``begin_run`` is
+        # skipped (non-implement modes never start the run).
+        tracker.initial_workspace = workspace_fingerprints(repo_root)
         deadline = getattr(args, "_execution_deadline", None)
         if deadline is not None:
             tracker.deadline = min(tracker.deadline, deadline)
         return tracker, stage_records
 
     def begin_run(self) -> None:
-        self.initial_workspace = workspace_fingerprints(Path(self.run_record.repo_root))
+        """Mark the run as executing, capturing a baseline if none exists yet.
+
+        ``create`` already records the pre-work baseline; this is a fallback for
+        trackers built directly, and the earlier snapshot is preferred because it
+        attributes every later change to the run.
+        """
+        if self.initial_workspace is None:
+            self.initial_workspace = workspace_fingerprints(Path(self.run_record.repo_root))
         self.run_record = self._store.update_run_status(
             self.run_record.run_id,
             status="running",
@@ -409,10 +422,26 @@ class OrchestratedRunTracker:
         repo_root: Path,
         assistant_response_text: str | None,
         final_answer_text: str | None = None,
+        scrutiny_policy: str = "advisory",
     ) -> OrchestratedStageRecord:
-        """Persist final handoff fields for the returning user."""
+        """Persist final handoff fields for the returning user.
 
-        changed_files = git_status_short(repo_root)
+        ``scrutiny_policy`` is recorded so a later reader can tell whether a
+        non-pass verdict was merely advisory (ADR-066 default) or configured as
+        a blocking requirement, rather than having to infer it from the outcome.
+
+        ``changed_files`` is derived from the workspace fingerprint baseline
+        captured by :meth:`create`, so it describes what *this run* changed
+        rather than the whole working tree. Without that baseline the change set
+        is not known, and an explicit note is recorded instead of a guessed list.
+        """
+
+        final_workspace = workspace_fingerprints(repo_root)
+        changed_files = (
+            tuple(changed_paths(self.initial_workspace, final_workspace))
+            if self.initial_workspace is not None
+            else ("workspace baseline not recorded; changed files unknown",)
+        )
         validation_status = (
             str((validation_stage.details or {}).get("validation_status", validation_stage.status))
             if validation_stage is not None
@@ -446,7 +475,10 @@ class OrchestratedRunTracker:
             blockers = "research refinement failed"
             next_action = "inspect research refinement failure details in the repair stage"
         if self.run_record.mode == "implement" and self.scrutiny_status != "pass":
-            risks = (risks + "; " if risks else "") + f"scrutiny {self.scrutiny_status}"
+            # A non-pass verdict is a risk, never a blocker, unless the owner
+            # configured scrutiny as a requirement (ADR-066 keeps that option).
+            label = "scrutiny" if scrutiny_policy == "required" else "advisory scrutiny"
+            risks = (risks + "; " if risks else "") + f"{label} {self.scrutiny_status}"
             if not blockers:
                 next_action = (
                     "inspect scrutiny details and review remaining claims before completion"
@@ -458,6 +490,7 @@ class OrchestratedRunTracker:
                 "execution_status": execution_status,
                 "validation_status": validation_status,
                 "scrutiny_status": self.scrutiny_status,
+                "scrutiny_policy": scrutiny_policy,
                 "changed_files": changed_files,
                 "assistant_response_available": assistant_response_text is not None,
                 "final_answer_available": final_answer_text is not None,

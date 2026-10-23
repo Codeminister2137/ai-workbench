@@ -141,6 +141,9 @@ def test_skipped_validation_never_launches_checks(
 
 
 def test_actual_failure_overrides_assistant_claims_in_handoff(tmp_path: Path, monkeypatch):
+    # Pre-existing dirty-tree file: it belongs to the baseline, so it must not
+    # be reported as changed by this run (F3: changed_files had no baseline).
+    (tmp_path / "preexisting.py").write_text("not ours\n", encoding="utf-8")
     args, tracker = _tracker(tmp_path)
     monkeypatch.setattr(
         run_tracking,
@@ -156,7 +159,7 @@ def test_actual_failure_overrides_assistant_claims_in_handoff(tmp_path: Path, mo
             ),
         ),
     )
-    monkeypatch.setattr(run_tracking, "git_status_short", lambda _: (" M app.py",))
+    (tmp_path / "app.py").write_text("changed by this run\n", encoding="utf-8")
     stage = tracker.record_validation_stage(
         args=args, repo_root=tmp_path, execution_status="completed"
     )
@@ -169,7 +172,7 @@ def test_actual_failure_overrides_assistant_claims_in_handoff(tmp_path: Path, mo
     )
     assert handoff.details is not None
     assert handoff.details["blockers"] == "validation failed"
-    assert handoff.details["changed_files"] == [" M app.py"]
+    assert handoff.details["changed_files"] == ["app.py"]
     persisted = SQLiteOrchestratedRunStore(Path(args.away_run_db)).list_stages(
         tracker.run_record.run_id
     )
@@ -210,10 +213,9 @@ def test_validation_timeout_uses_remaining_run_budget(tmp_path: Path, monkeypatc
     assert 0 < captured["timeout_seconds"] < 95
 
 
-def test_missing_validation_receipt_is_explicit_in_handoff(tmp_path: Path, monkeypatch):
+def test_missing_validation_receipt_is_explicit_in_handoff(tmp_path: Path):
     _, tracker = _tracker(tmp_path)
     tracker.scrutiny_status = "pass"
-    monkeypatch.setattr(run_tracking, "git_status_short", lambda _: ())
     handoff = tracker.record_final_handoff_stage(
         execution_status="completed",
         validation_stage=None,
@@ -222,6 +224,9 @@ def test_missing_validation_receipt_is_explicit_in_handoff(tmp_path: Path, monke
     )
     assert handoff.details is not None
     assert handoff.details["validation_status"] == "not_recorded"
+    # A baseline exists but nothing changed: report an empty change set, not
+    # the whole working tree and not an "unknown" placeholder.
+    assert handoff.details["changed_files"] == []
     risks, next_action = handoff.details["risks"], handoff.details["next_action"]
     assert isinstance(risks, str) and isinstance(next_action, str)
     assert "validation not recorded" in risks

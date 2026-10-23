@@ -73,7 +73,7 @@ def test_cli_away_minutes_sets_visible_foreground_budget(capsys, monkeypatch) ->
                 "--privacy",
                 "external_allowed",
                 "--route-id",
-                "openai-codex-gpt-5-5",
+                "openai/codex-gpt-5.5",
                 "--provider",
                 "openai",
                 "--model",
@@ -364,6 +364,15 @@ def test_cli_orchestrated_implement_updates_stage_statuses(
     assert run_record.status == "completed"
     assert run_record.execution_status == "completed"
     stage_by_name = {record.name: record for record in store.list_stages(run_id)}
+    assert stage_by_name["prompt_review"].status == "completed"
+    assert stage_by_name["prompt_review"].started_at_utc is not None
+    assert stage_by_name["prompt_review"].completed_at_utc is not None
+    assert stage_by_name["planning"].status == "completed"
+    assert stage_by_name["planning"].started_at_utc is not None
+    assert stage_by_name["planning"].completed_at_utc is not None
+    planning_details = stage_by_name["planning"].details
+    assert planning_details is not None
+    assert planning_details["route_id"] == "ollama/qwen2.5-coder:14b"
     assert stage_by_name["auxiliary_panel"].status == "completed"
     assert stage_by_name["auxiliary_panel"].started_at_utc is not None
     assert stage_by_name["auxiliary_panel"].completed_at_utc is not None
@@ -614,7 +623,7 @@ def test_cli_away_minutes_preserves_explicit_timeout(capsys, monkeypatch) -> Non
                 "--privacy",
                 "external_allowed",
                 "--route-id",
-                "openai-codex-gpt-5-5",
+                "openai/codex-gpt-5.5",
                 "--provider",
                 "openai",
                 "--model",

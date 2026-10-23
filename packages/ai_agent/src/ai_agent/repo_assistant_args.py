@@ -305,8 +305,10 @@ def build_argument_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--provider",
-        choices=["ollama", "openai", "requesty", "google"],
-        help="Hard provider override.",
+        help=(
+            "Hard provider override. Valid values are the providers declared by "
+            "the loaded --catalog, so every catalog provider is accepted."
+        ),
     )
     parser.add_argument("--route-id", help="Hard access-route override.")
     parser.add_argument(
@@ -484,6 +486,19 @@ def build_argument_parser() -> argparse.ArgumentParser:
             "Maximum orchestrated repair cycles after failed validation. Use 0 to "
             "disable repairs and -1 to disable the cycle cap while preserving the "
             "--away-minutes wall-clock budget."
+        ),
+    )
+    parser.add_argument(
+        "--scrutiny-policy",
+        action=UserDefaultAction,
+        choices=["advisory", "required"],
+        default="advisory",
+        help=(
+            "How a completed scrutiny report affects the outcome. 'advisory' "
+            "(default) records findings, risks and a next action without letting "
+            "them gate the result; 'required' treats a non-pass verdict as a "
+            "blocking condition, which is the pre-ADR-066 behaviour kept "
+            "available on purpose."
         ),
     )
     parser.add_argument(
