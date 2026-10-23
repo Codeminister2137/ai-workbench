@@ -80,3 +80,12 @@ The final repository-wide gate exposed an acceptance-job validator still pinning
 native contract 1. It now validates the active native contract independently of
 payload schema/harness revision 1, preserving stale-job refusal without a storage
 migration. Fixtures follow the active receipt and retain strict version/type checks.
+
+
+2026-10-23 Go extension within the accepted contract: the exact Kimi K2.7 Code
+adapter now captures and replays `reasoning_content` on the same provider/model/
+endpoint only, including streaming. Metadata excludes reasoning fields; visible
+answers and storage remain separate. Other Go models are not assumed compatible.
+Synthetic HTTP/tool-loop and origin/role isolation regressions pass. This repairs
+a protocol gap discovered during failed bounded review trials; it does not prove
+that gap caused their output exhaustion or establish live workflow acceptance.
