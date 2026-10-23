@@ -202,6 +202,10 @@ def test_cli_rejects_codex_commit_request_without_trusted_local(monkeypatch) -> 
 def test_cli_executes_codex_external_agent_route(
     capsys, monkeypatch, tmp_path: Path, fallback_enabled
 ) -> None:
+    # Workspace observation must not capture unrelated writes in the real repo.
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    (workspace / "README.md").write_text("Synthetic repository for external-agent review.\n")
     allowance_reads = []
 
     def read_allowance(**kwargs):
@@ -262,6 +266,8 @@ def test_cli_executes_codex_external_agent_route(
                 "--mode",
                 "ask",
                 "Review this repository.",
+                "--repo-root",
+                str(workspace),
                 "--privacy",
                 "external_allowed",
                 "--route-id",
