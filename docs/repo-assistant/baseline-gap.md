@@ -40,7 +40,7 @@ blocker: the service rejects the catalog's `gpt-5.5` model for ChatGPT accounts.
 No tool calls, source edits, tests or reports completed; cleanup and unchanged
 source/test/index checks passed. A non-inference native `model/list` observation
 advertises `gpt-6.1-sol` as default and does not list `gpt-5.5`. Updating the active
-route was approved by the owner: `openai-codex-gpt-6-1-sol` is now the first current
+route was approved by the owner: `openai/codex-gpt-6.1-sol` is now the first current
 Codex catalog entry; the old route remains for history. Preserve
 the failed trial; do not classify it as a coding-quality failure or replay it.
 

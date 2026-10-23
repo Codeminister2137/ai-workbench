@@ -27,7 +27,7 @@ approval for `trusted_local`. Existing project reliability work remains active.
   owner's allowance preference therefore excludes Requesty until an explicit
   `--cost-policy prepaid_credits_allowed` authorizes that run.
 - The owner subsequently authorized only free Requesty tests, with no credit
-  purchase. Add a separate `requesty-free-gemma-4-31b` route at `FREE_ONLY`.
+  purchase. Add a separate `requesty/free-google/gemma-4-31b-it` route at `FREE_ONLY`.
   Verify the exact model's live input/output, cache, and tier prices before
   every inference request; reject unknown or nonzero prices without inference.
   This preflight is not an atomic server-side price lock. Do not fall back to

@@ -385,7 +385,7 @@ Update docs when public behavior/configuration changes, architecture changes, or
 
 When a decision changes: supersede the old ADR, add the new ADR, then update architecture/project plans as necessary.
 
-Update local `CURRENT_CONTEXT.md` at the end of non-trivial work when present so the next session has the latest completed work, conflicts/risks, validation status, and next plan.
+Update local `CURRENT_CONTEXT.md` at the end of non-trivial work when present so the next session has the latest completed work, conflicts/risks, validation status, and next plan. `CURRENT_CONTEXT.md` carries only the **current** state; move superseded window blocks, old handoffs and completed-work history to `docs/session-history.md` instead of appending them there.
 
 ## 8. Git
 For substantial work use a focused branch/commit series. Before completion inspect:
