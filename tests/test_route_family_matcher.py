@@ -110,7 +110,9 @@ def test_saved_reader_snapshot_reproduction():
     for entry in catalog["models"]:
         route = entry["route_id"]
         line = next(line for line in table.splitlines() if line.startswith(f"| `{route}` |"))
-        expected = re.search(r"`(exact|family|alias|unmatched)`", line)[1]
+        confidence_match = re.search(r"`(exact|family|alias|unmatched)`", line)
+        assert confidence_match is not None, line
+        expected = confidence_match[1]
         result = propose_route_family(route, entry["model"], rows, checked=CHECKED)
         cells = line.split("|")
         # Agreement requires confidence AND a row actually cited in the table.
@@ -160,4 +162,5 @@ def test_unknown_vendor_is_not_assumed():
 def test_effort_suffix_never_claims_exact():
     result = propose("gemini-3-pro-high", [row("gemini-3-pro-high")])
     assert result.confidence == "family"
+    assert result.gap is not None
     assert "high" in result.gap
