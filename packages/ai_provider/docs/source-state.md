@@ -287,6 +287,44 @@ temporarily free/unlimited. Exact IDs, route-specific retention and evaluation
 status are in [the model catalog](model-catalog.md#opencode-go-temporary-free-candidates).
 This does not change the current Kimi preference or authorize switching/inference.
 
+### OpenCode Go quota and free-model limits — refreshed 2026-10-23
+
+Live observation from this account, plus public-source cross-check:
+
+- **Go subscription allowance can be read with the inference key.**
+  `GET https://opencode.ai/zen/go/v1/usage` with `Authorization: Bearer <OPENCODE_API_KEY>`
+  returns rolling (5-hour), weekly and monthly percentages plus reset timestamps.
+  This contradicts the 2026-10-22 note that no Go-key allowance endpoint existed.
+  The endpoint is not documented in the public Console API pages as of 2026-10-23.
+
+- **Zen free models are not covered by the Go subscription.** Models such as
+  `opencode/deepseek-v4.1-flash-free` and `opencode/mimo-v2.6-flash-free` are
+  Console/Zen limited-time free routes with their own daily cap. Public docs used
+  to cite ~200 requests/day, but the number was removed from the Go page around
+  2026-10-22 and is now enforced server-side without exposing remaining quota or
+  reset time via the API. They can therefore return “free usage limit reached”
+  while the Go subscription still has headroom.
+
+- **There is no reliable API for Zen free-model remaining quota or reset time.**
+  OpenCode states the free limit is dynamic and changes with capacity, so they
+  do not publish a fixed number. The console web UI shows current usage/reset,
+  but no authenticated API endpoint returns the daily free allowance. A 429
+  response *sometimes* carries a `Retry-After` header (observed pointing to the
+  next 00:00 UTC), but this is not guaranteed and does not expose remaining quota.
+  Clients cannot reliably predict when a Zen free route will unblock.
+
+- **Go free models are provider-wide-locked when any Go cap is hit.** Public bug
+  reports (#49014, #51682) confirm that exhausting the 5-hour/weekly/monthly cap
+  on one Go model blocks the entire `opencode-go` provider, including the
+  temporary free models, until that window resets. The Go page says "you can
+  continue using the free models," but enforcement appears to treat all Go routes
+  as sharing the same lock.
+
+Practical implication for this repository: reliable unattended/attended CLI work
+should route through Go paid-included models (e.g., `opencode-go/go-kimi-k2.7-code`)
+when Go is the chosen source, not through `opencode/...-free` Zen routes. Zen free
+routes are acceptable only for optional, interruptible trials with a fallback plan.
+
 ### OpenCode automatic information discovery — checked 2026-10-22
 
 The [Console API overview](https://opencode.ai/v2/docs/console/api/) documents
@@ -314,10 +352,27 @@ Implementation status in `ai_provider`:
   normalizes capabilities/prices defensively. Each inventory item now records the
   model's ``protocol`` (``chat``/``responses``/``messages``),
   ``trains_on_request_data``, and ``requires_global_regions`` flags.
-- Account allowance is reported as ``unavailable`` because no official Go-key
-  endpoint reads remaining subscription allowance.
+- Account allowance can be read via the unofficial but currently working
+  `GET /zen/go/v1/usage` endpoint (see the refreshed quota section above). The
+  source info adapter still reports ``unavailable`` until the adapter is updated
+  to call that endpoint; do not rely on hard-coded advertised limits.
 - ``ProviderKind.OPENCODE_GO`` and ``BillingSource.OPENCODE_GO_SUBSCRIPTION_ALLOWANCE``
   wire Go into config, factory and the existing account-usage dispatcher.
+
+Official documented Go endpoints (re-fetched 2026-10-22 from the
+[Go guide](https://opencode.ai/v2/docs/console/go/)): Chat Completions
+`https://opencode.ai/inference/go/openai/v1/chat/completions`, Responses
+`https://opencode.ai/inference/go/openai/v1/responses`, Messages
+`https://opencode.ai/inference/go/anthropic/v1/messages`, and Gemini
+`https://opencode.ai/inference/go/google/v1beta/models/<model>`, with the live model
+list at `GET https://opencode.ai/inference/go/v1/models`. The Chat path matches the
+implementation exactly. The implemented Responses/Messages bases
+(`/inference/go/v1/responses`, `/inference/go/v1/messages`) are shorter than the
+documented `/go/openai/v1/responses` and `/go/anthropic/v1/messages` forms, but both
+were live-confirmed working on 2026-10-22 (see the probe below), so this is a recorded
+working divergence, not a defect. See the
+[conformance plan](../../../docs/documentation-conformance-plan.md) for the full
+finding.
 
 ### Live probe observations — 2026-10-22
 
