@@ -589,6 +589,13 @@ the full files.
 
 `CURRENT_CONTEXT.md` is the local, ignored immediate handoff file. Keep it current with the last completed work, open conflicts, validation status, and next plan of action when it exists. Do not use it as a durable ADR replacement.
 
+`CURRENT_CONTEXT.md` holds **only current context** — it is a live handoff, not an
+append-only log. Historical material (old unattended-window blocks, superseded
+handoffs, completed past work) belongs in `docs/session-history.md`; ADR-worthy
+decisions belong in `docs/decisions/`; plans belong in `docs/plans/`. When
+`CURRENT_CONTEXT.md` grows historical sections, move them to
+`docs/session-history.md` and keep the current-state block at the top.
+
 `docs/prompt-library.md` is the canonical Codex prompt library for this
 repository. When the user asks to use, check, or run a named `Codex: ...`
 prompt, read that file as the actual prompt source. It also contains PyCharm
@@ -696,6 +703,45 @@ Do not:
 If unrelated technical debt is discovered, report or record it rather than silently expanding scope.
 
 If fixing it is necessary to complete the requested task, explain the dependency.
+
+### Defects found during authorized work are fixed by default
+
+Owner policy (2026-10-23): when a task surfaces a concrete, bounded defect in
+the area it already touches or reviews, **fix it during the task rather than
+deferring it.** Deferring is acceptable, but it is no longer the default.
+
+Two refinements:
+
+* If Codex judges that a *different model* is better suited to the defect than
+  the current one, prefer delegating it to that model. When delegation is not
+  yet practical, fixing it in the current session is still preferred over
+  recording it for later.
+* This does **not** relax scope discipline. It applies to defects found in the
+  reviewed or modified area — a broken report field, a mis-ordered stage, a
+  wrong label, a missing guard on the code just inspected. It does not license
+  sweeping the repository for unrelated technical debt, and genuinely
+  unrelated debt is still reported or recorded rather than fixed.
+
+The distinction is locality and concreteness, not size: a small defect inside
+the touched surface is in scope; a large one in an untouched subsystem is not.
+
+### Record more than seems minimally necessary
+
+Owner policy (2026-10-23): **record as much as is reasonable**, so there is
+data to analyse later and cut back once it proves unnecessary. Under-recording
+is the harder failure to repair after the fact; over-recording can be trimmed.
+
+Applied concretely: intermediate orchestrated stages such as `prompt_review`
+and `planning` must be captured in the run record even when no later stage
+consumes them, and a stage whose tracker is created too late to be transitioned
+out of `planned` is a recording defect, not an acceptable gap. Where recording
+a stage would require moving tracker creation earlier in the pipeline, prefer
+moving it over silently losing the record.
+
+This is a recording policy, not a retention or privacy change. It never
+overrides the privacy boundary: sensitive prompts, credentials and private
+transcripts stay out of records by the existing rules, and "record more" never
+means "send more to an external provider".
 
 ### Avoid stacked low-value improvements
 

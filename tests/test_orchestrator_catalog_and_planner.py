@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -76,7 +77,9 @@ source = "local benchmark"
 
     assert len(catalog) == 1
     assert catalog[0].backend.provider == "ollama"
-    assert catalog[0].backend.route_id == "ollama-llama3-2"
+    # Derived route id follows the approved `provider/product-model` form; the
+    # product is omitted because it only repeats the provider.
+    assert catalog[0].backend.route_id == "ollama/llama3.2"
     assert catalog[0].backend.product == "ollama"
     assert catalog[0].backend.model == "llama3.2"
     assert catalog[0].backend.location is BackendLocation.LOCAL
@@ -209,10 +212,10 @@ def test_example_model_catalog_includes_coding_mvp_backends() -> None:
     assert ("requesty", "openai/gpt-5-mini") in identities
     assert ("openai", "gpt-5.1") in identities
     route_ids = {entry.backend.route_id for entry in catalog}
-    assert "openai-codex-gpt-5-5" in route_ids
-    assert "google-antigravity-gemini-3-1-pro" in route_ids
-    assert "github-copilot-cli-default" in route_ids
-    assert "kiro-cli-default" in route_ids
+    assert "openai/codex-gpt-5.5" in route_ids
+    assert "google/antigravity-gemini-3.1-pro-high" in route_ids
+    assert "github/copilot-cli-auto" in route_ids
+    assert "kiro/auto" in route_ids
     assert all(
         entry.backend.estimate.source
         for entry in catalog
@@ -220,11 +223,88 @@ def test_example_model_catalog_includes_coding_mvp_backends() -> None:
     )
 
 
+def test_default_route_id_reproduces_every_declared_route_id() -> None:
+    """The ``provider/product-model`` derivation must match every catalog id.
+
+    Route ids are hand-authored in the catalog, so the derivation is the
+    documented convention rather than the source of truth. This test keeps the
+    two in step: adding a route whose id does not follow the approved form fails
+    here instead of silently introducing a second naming style.
+    """
+
+    from ai_orchestrator.catalog import _default_route_id
+
+    catalog_path = (
+        Path(__file__).resolve().parents[1]
+        / "packages"
+        / "ai_orchestrator"
+        / "examples"
+        / "model_catalog.toml"
+    )
+    catalog = load_model_catalog(catalog_path)
+
+    mismatches = {
+        entry.backend.route_id: _default_route_id(
+            entry.backend.provider, entry.backend.product, entry.backend.model
+        )
+        for entry in catalog
+        if _default_route_id(entry.backend.provider, entry.backend.product, entry.backend.model)
+        != entry.backend.route_id
+    }
+
+    assert mismatches == {}
+
+
+def test_provider_override_accepts_every_catalog_provider(monkeypatch, tmp_path, capsys) -> None:
+    """``--provider`` is catalog-derived, not a hardcoded list.
+
+    Providers the old hardcoded choices wrongly rejected (github, kiro,
+    opencode_go) must now be accepted, and an unknown provider must fail with
+    the available catalog providers instead of silently matching no route.
+    """
+
+    from ai_agent import repo_coding_assistant as cli
+
+    catalog_path = (
+        Path(__file__).resolve().parents[1]
+        / "packages"
+        / "ai_orchestrator"
+        / "examples"
+        / "model_catalog.toml"
+    )
+    providers = sorted({entry.backend.provider for entry in load_model_catalog(catalog_path)})
+    monkeypatch.setattr(cli, "get_local_provider_capability_snapshot", lambda *a, **k: None)
+
+    base = [
+        "--fallback-readiness",
+        "--repo-root",
+        str(tmp_path),
+        "--privacy",
+        "public_or_low_risk",
+        "--cost-policy",
+        "allowances_allowed",
+    ]
+
+    for provider in providers:
+        assert cli.main([*base, "--provider", provider]) == 0
+        report = json.loads(capsys.readouterr().out)
+        assert report["status"] == "offline"
+
+    # main() aborts via SystemExit, which the CLI entry point turns into a
+    # non-zero exit with the message on stderr.
+    with pytest.raises(SystemExit):
+        cli.main([*base, "--provider", "definitely-not-a-provider"])
+    error = capsys.readouterr().err
+    assert "Unknown provider 'definitely-not-a-provider'" in error
+    for provider in providers:
+        assert provider in error
+
+
 def test_plan_execution_converts_recommendation_to_neutral_target() -> None:
     candidate = ModelCatalogEntry(
         backend=ModelBackend(
             route=AccessRoute(
-                route_id="ollama-llama3-2",
+                route_id="ollama/llama3.2",
                 provider="ollama",
                 product="ollama",
                 model="llama3.2",
@@ -244,7 +324,7 @@ def test_plan_execution_converts_recommendation_to_neutral_target() -> None:
 
     plan = plan_execution(TaskProfile(), recommendation, timeout_seconds=10)
 
-    assert plan.target.route_id == "ollama-llama3-2"
+    assert plan.target.route_id == "ollama/llama3.2"
     assert plan.target.provider == "ollama"
     assert plan.target.product == "ollama"
     assert plan.target.model == "llama3.2"

@@ -255,7 +255,7 @@ Use a small catalog containing the intended Codex CLI target, for example:
 
 ```toml
 [[models]]
-route_id = "openai-codex-gpt-5-5"
+route_id = "openai/codex-gpt-5.5"
 provider = "openai"
 product = "codex"
 model = "gpt-5.5"

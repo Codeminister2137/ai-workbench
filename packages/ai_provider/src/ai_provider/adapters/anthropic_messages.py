@@ -126,7 +126,18 @@ class AnthropicMessagesChatClient:
         yield AIStreamFinal(response=final_response)
 
     def _messages_payload(self, request: AIRequest, *, stream: bool) -> dict[str, Any]:
-        messages = [self._message_payload(message) for message in request.messages]
+        # The Messages API accepts only user/assistant roles inside ``messages``;
+        # the system prompt must be carried by the top-level ``system`` parameter.
+        system_parts = [
+            message.content
+            for message in request.messages
+            if message.role is MessageRole.SYSTEM and message.content
+        ]
+        messages = [
+            self._message_payload(message)
+            for message in request.messages
+            if message.role is not MessageRole.SYSTEM
+        ]
         payload: dict[str, Any] = {
             "model": request.model or self.config.model,
             "messages": messages,
@@ -135,6 +146,8 @@ class AnthropicMessagesChatClient:
             ),
             "stream": stream,
         }
+        if system_parts:
+            payload["system"] = "\n\n".join(system_parts)
         if request.temperature is not None:
             payload["temperature"] = request.temperature
         if request.top_p is not None:

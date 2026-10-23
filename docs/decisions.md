@@ -657,3 +657,63 @@ and a same-tool retry under a new call id. A run that independently proves
 completion is no longer reported as failed; fatal, incomplete and unfinished
 runs still fail. The unresolved reasons are retained. See
 [ADR-064](decisions/ADR-064-visible-warning-for-unresolved-mcp-recovery.md).
+
+## ADR-065 - Route-id naming convention: `provider/product-model`
+
+**Status:** Accepted
+
+**Date:** 2026-10-22
+
+All access-route ids use `provider/product-model`, with the product omitted
+when it only repeats the provider and model ids keeping their native punctuation
+(`:`, `.`, `/`). `product` stays in the label so ADR-021 billing boundaries stay
+visible at a glance; route ids remain opaque keys and are never parsed. The
+convention amends ADR-021's display/selection form, not its identity semantics.
+Separately, `--provider` no longer hardcodes its choices and is validated against
+the loaded catalog, so every declared provider (including `github`, `kiro`,
+`opencode_go`) is accepted. See
+[ADR-065](decisions/ADR-065-route-id-naming-convention.md).
+
+## ADR-066 — Scrutiny is advisory; its findings must reach the model
+
+**Status:** Accepted (advisory policy); revision-loop extension design confirmed
+by owner 2026-10-23 (Option B minimal loop; Option B `format_issues` rendering)
+
+**Date:** 2026-10-23
+
+Owner made orchestrated scrutiny advisory by default: a non-`pass` verdict
+records findings, risks and a next action, but does not by itself decide that
+the work is unaccepted, because it falsely blocks too much in practice. A hard
+requirement stays available as an explicit future option rather than being
+deleted. A malformed review report is recorded as a *review failure* and must
+never stand in for a quality verdict — the current hard gate on an exact
+6-heading format lets a local model's formatting decide the outcome.
+
+Investigation established that scrutiny is **terminal, not a feedback loop**:
+it runs after the last repair, `repair_workflow.py` never references it, and
+its `revised_response` is rendered as "not applied or independently verified".
+The intended corrective design already exists for the research profile
+(`ai_provider.research_refinement`) and is the reference implementation to
+extend to coding. Owner chose the **minimal loop** (Option B): one extra
+scrutiny-fed repair pass gated on the existing `--max-repair-cycles`, deferring
+the full guard set (review-time reserve, no-progress fingerprint) until live
+signal justifies it. `format_issues` renders in the closeout only when
+non-empty on a `pass` verdict (Option B). See
+[ADR-066](decisions/ADR-066-scrutiny-is-advisory-and-its-findings-must-reach-the-model.md).
+
+
+## ADR-067 - Temporary: Codex write delegation runs with the sandbox bypass
+
+**Status:** Accepted as a temporary workaround, flagged for replacement
+
+**Date:** 2026-10-23
+
+Codex write delegation is blocked on this machine: the PyCharm-bundled binaries
+(0.137.0 rejects all model ids; 0.160.1 works but its sandbox backend is
+disabled, so workspace-write still cannot write). The owner chose to run write
+delegations with `--dangerously-bypass-approvals-and-sandbox` as an explicitly
+**temporary** solution. Compensating controls: git diff review of every Codex
+write against a pre-run snapshot, prompts restricted to named files, no secrets
+in prompts, read-only analysis keeps its normal sandbox. Exit when a working
+sandbox backend, a fixed bundled binary, or a proper CLI install exists. See
+[ADR-067](decisions/ADR-067-temporary-codex-sandbox-bypass-for-delegated-write-work.md).

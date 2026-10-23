@@ -138,9 +138,120 @@ transcripts.
 Readers: `ai_provider.openrouter_endpoints` (route availability),
 `ai_provider.swe_bench_scores` and `ai_provider.aider_polyglot_scores`
 (published capability priors). The shared records are documented in
-[the interface contract](interface.md). **Scoring is deliberately undecided**:
-the Orchestrator keeps routing from the declared catalog until these readings
-are normalized into a per-model grade, and no prior changes a route on its own.
+[the interface contract](interface.md). The per-route mapping from each
+declared route id to its inferred upstream family, with an explicit
+confidence level and gap description, is in
+[route-upstream-family-mapping.md](route-upstream-family-mapping.md).
+**Scoring rule — recommendation-only bands, decided 2026-10-23.** Each source
+gets its own categorical band, deliberately more granular than a
+high/medium/low split, and the band is a *recommendation*: the Orchestrator
+keeps routing from the declared catalog, no prior changes a route on its own,
+and a local L3 CLI measurement overrides a band for a specific task.
+
+### Band scale
+
+Six bands per source. Each source's cutoffs were calibrated on that source's
+own published-row distribution in the dated 2026-10-22 snapshot
+(p10 / p25 / median / p75 / p90, rounded to readable anchors) and then fixed,
+so a later refresh moves a row between bands only when its published score
+changes rather than because the edges moved with the field. They are
+population bands, not equal-width bands: SWE-bench clusters near the top, so
+its upper edges sit closer together than Aider's.
+
+| Band | Aider polyglot `percent_correct` | SWE-bench Verified `percent_resolved` |
+| --- | --- | --- |
+| Frontier | ≥ 80 | ≥ 75 |
+| Very strong | 70 – 80 | 70 – 75 |
+| Strong | 50 – 70 | 55 – 70 |
+| Mediocre | 25 – 50 | 40 – 55 |
+| Weak | 12 – 25 | 24 – 40 |
+| Very weak | < 12 | < 24 |
+
+**The labels are a vocabulary, not a calibration.** Owner decision
+(2026-10-23) renamed the middle three bands from `Strong` / `Solid` /
+`Competent` — which read as synonyms — to `Very strong` / `Strong` /
+`Mediocre`. Only the labels changed; every cutoff above stayed exactly where
+it was, because the calibration is the data and the labels are how we read it.
+A five-tier `Very high` / `High` / `Medium` / `Low` / `Very low` alternative
+was rejected for two reasons: it would discard the `Frontier` distinction the
+data supports and that is decision-relevant, and it would collide with
+`ModelCatalogEntry.quality`'s `low` / `standard` / `high`. That field is the
+*minimum requirement a task declares*; a band is *published evidence about an
+upstream family*. Two different layers, so two vocabularies that must never
+overlap — otherwise a band can be misread as a requirement, and a future change
+feeding bands into selection could appear to satisfy one.
+
+Share of each source's published rows — 69 Aider rows, 180 SWE-bench rows.
+Reproduce with `python -m ai_provider.capability_bands --prior <snapshot>`:
+
+| Band | Aider | SWE-bench |
+| --- | --- | --- |
+| Frontier | 6 (9%) | 13 (7%) |
+| Very strong | 12 (17%) | 33 (18%) |
+| Strong | 18 (26%) | 47 (26%) |
+| Mediocre | 16 (23%) | 45 (25%) |
+| Weak | 11 (16%) | 24 (13%) |
+| Very weak | 6 (9%) | 18 (10%) |
+
+Scale definitions, validation and the recompute command live in
+`ai_provider.capability_bands`, tested in
+[tests/test_capability_bands.py](../../../tests/test_capability_bands.py).
+
+### Per-route bands
+
+The 18 routes declared in `model_catalog.toml`, graded from the primary matched
+row in [route-upstream-family-mapping.md](route-upstream-family-mapping.md) —
+the row with the closest identity; alternate rows recorded there are not used.
+`—` means that source published no row for this route's family, so the route
+stays ungraded in that column.
+
+| Route | Aider band | SWE-bench band | Confidence |
+| --- | --- | --- | --- |
+| `ollama/deepseek-coder-v2:16b` | — | — | `unmatched` |
+| `ollama/gpt-oss:20b` | Mediocre (41.8) | — | `family` |
+| `ollama/qwen2.5-coder:14b` | Very weak (8) | Very weak (9) | `family` |
+| `ollama/qwen3:14b` | Mediocre (40) | — | `family` |
+| `openai/codex-gpt-6.1-sol` | — | — | `unmatched` |
+| `openai/codex-gpt-5.5` | Frontier (88) | — | `family` |
+| `google/ai-studio-gemini-3.1-pro` | — | Strong (69.6) | `family` |
+| `google/ai-studio-gemini-3.8-flash` | — | Frontier (75.8) | `family` |
+| `google/antigravity-gemini-3.1-pro-high` | — | Strong (69.6) | `family` |
+| `google/antigravity-gemini-3.8-flash-high` | — | Frontier (75.8) | `family` |
+| `github/copilot-cli-auto` | — | — | `unmatched` |
+| `kiro/auto` | — | — | `unmatched` |
+| `openai/api-gpt-5.1` | Frontier (88) | — | `family` |
+| `openai/api-gpt-5-mini` | Frontier (88) | — | `family` |
+| `requesty/free-google/gemma-4-31b-it` | Very weak (4.9) | — | `family` |
+| `requesty/openai/gpt-5.1` | Frontier (88) | — | `family` |
+| `requesty/openai/gpt-5-mini` | Frontier (88) | — | `family` |
+| `opencode-go/go-kimi-k2.7-code` | Strong (59.1) | Very strong (70.8) | `family` |
+
+14 routes are graded at `family` confidence and 4 stay ungraded; 10 carry an
+Aider band, 6 a SWE-bench band, and only `opencode-go/go-kimi-k2.7-code` and
+`ollama/qwen2.5-coder:14b` carry both.
+
+**How to read this table.**
+
+- **Two columns, never one number.** `percent_correct` and `percent_resolved`
+  are different scales under different harnesses, so the two bands stand side
+  by side and are never averaged, merged or ranked against each other.
+- **`—` is absence, not weakness.** No score is imputed for an ungraded route,
+  and a missing row never becomes a low band.
+- **Every graded row is `family`, never `exact`.** No route matched a published
+  id verbatim, so a band describes an upstream family across a version, size or
+  effort gap — read the gap column before acting on it. `Frontier` on
+  `openai/api-gpt-5-mini` is the *flagship* gpt-5 row: the mini tier itself is
+  unmeasured, and `requesty/free-google/gemma-4-31b-it` is graded from an
+  `edit=whole` run, the weakest edit format.
+- **SWE-bench rows are scaffold-specific.** Every number there carries one agent
+  scaffold, so the band describes a (model, scaffold) pair, not the model alone.
+- **The bands are stale by construction.** Aider runs are dated to 2025-10-03
+  and SWE-bench to 2026-02-26; re-read both before relying on a band.
+- **A band is not a declared requirement.** `ModelCatalogEntry.quality`
+  (`low` / `standard` / `high`) stays the task's declared minimum tier for a
+  catalog entry, while a band is published evidence about an upstream family.
+  The vocabularies are kept distinct on purpose, and no band ever writes to a
+  catalog entry or an admission decision.
 
 ## Adding other providers
 

@@ -11,6 +11,21 @@ freshness, and report unknowns explicitly. Do not use model generation as an
 availability probe or silently switch models, providers or billing tiers.
 This planned work adds no service, recurring monitor, dependency or paid usage.
 
+## Implemented: advisory scrutiny and bounded repair
+
+ADR-066 now uses tolerant report parsing with labelled format limitations,
+records unreadable reviews as review failures, defaults to advisory scrutiny,
+and retains `--scrutiny-policy required` for a blocking non-pass verdict.
+Coding and external-agent paths feed findings back as untrusted advice, rerun
+validation and review, and share the existing repair-cycle cap. Unreadable
+re-review stops repair rather than reusing stale findings. A pass with non-empty
+`format_issues` shows the review limitation in closeout.
+
+Focused offline regressions cover these behaviors. Live model-quality and
+integrated report-fidelity acceptance remain incomplete. The minimal loop is
+the owner-approved design; the full research refinement guard set is deferred.
+Research and pending matcher choices are preserved in the dated artifact briefs.
+
 ## Current paid-native checkpoint: 2026-10-21
 
 Prioritize ordinary development through established paid clients with fallback.
@@ -1065,7 +1080,7 @@ sent to the clients. No web/search calls or natural account exhaustion were used
 | Google Antigravity CLI 1.2.16 | Harmless native `run_command` (`Write-Output sandbox_probe_only`) with `--sandbox` and no bypass flag | Denied in headless mode because `command` had no allow rule; no marker was produced. This verifies that the tested sandbox invocation did not authorize shell execution. Fixture: `artifacts/antigravity-sandbox-command-probe-20261006-130539`. |
 | GitHub Copilot CLI 1.0.90 | Shared coding profile under `read_only`; attempted one `edit_file` call | Denied by the MCP permission manager with “no scoped approval”; the sentinel stayed unchanged and the session recorded the failed edit receipt. Fixture/receipt: `artifacts/permission-live-20261006-124835`. |
 | GitHub Copilot CLI 1.0.90 | Shared coding profile under `read_only`; attempted harmless `run_command` output | Denied before command execution with “no scoped approval”; no command output was produced. Fixture/log: `artifacts/shell-permission-live-20261006-124910` and `artifacts/shell-permission-live-copilot-20261006-124919.log`. |
-| PyCharm-bundled Codex CLI, route `openai-codex-gpt-5-5` / model `gpt-5.5` | Explicit skill/read-only inspection on the same synthetic review fixture | Deferred until the provider-reported reset on 2026-10-10 at 08:35 (timezone unspecified). The earlier attempt was blocked before any tool call by a usage-limit response; zero tool and file-change events. It was not retried. |
+| PyCharm-bundled Codex CLI, route `openai/codex-gpt-5.5` / model `gpt-5.5` | Explicit skill/read-only inspection on the same synthetic review fixture | Deferred until the provider-reported reset on 2026-10-10 at 08:35 (timezone unspecified). The earlier attempt was blocked before any tool call by a usage-limit response; zero tool and file-change events. It was not retried. |
 
 Each completed Copilot invocation reported one premium request. Kiro emitted
 per-run credit metering, but no account balance or allowance was queried. The

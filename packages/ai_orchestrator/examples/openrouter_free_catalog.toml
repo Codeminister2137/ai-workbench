@@ -26,7 +26,7 @@ context_window_tokens = 262144
 
 # Existing Requesty free route supplies a same-tier fallback when configured.
 [[models]]
-route_id = "requesty-free-gemma-4-31b"
+route_id = "requesty/free-google/gemma-4-31b-it"
 provider = "requesty"
 product = "requesty_free"
 model = "google/gemma-4-31b-it"

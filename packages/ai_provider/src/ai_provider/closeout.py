@@ -95,6 +95,50 @@ def _agent_outcome(response: str | None) -> str:
     return "No concise outcome was captured; see the agent report below."
 
 
+def _scrutiny_finding_lines(scrutiny_details: Mapping[str, object]) -> list[str]:
+    """Render the readable parts of a scrutiny report as labelled sections."""
+
+    lines: list[str] = []
+    for key, label in (
+        ("verdict", "Reviewer verdict"),
+        ("issues", "Reviewer issues"),
+        ("next_action", "Reviewer next action"),
+        ("failure_reason", "Review failure"),
+        ("skip_reason", "Review not completed"),
+    ):
+        value = scrutiny_details.get(key)
+        if isinstance(value, str) and value.strip():
+            lines.extend([f"#### {label}", value.strip()])
+    revision = scrutiny_details.get("revised_response")
+    if isinstance(revision, str) and revision.strip().lower() not in {
+        "",
+        "none",
+        "none.",
+        "null",
+    }:
+        lines.extend(
+            [
+                "#### Reviewer-proposed revision (not applied or independently verified)",
+                revision,
+            ]
+        )
+    return lines
+
+
+def _format_issue_bullets(format_issues: object) -> list[str]:
+    """Render parser workarounds as bullets, or nothing when there are none."""
+
+    if not isinstance(format_issues, list) or not format_issues:
+        return []
+    return [
+        "#### Reviewer output was partially unreadable",
+        "The reviewer did not produce the exact report shape it was "
+        "asked for. What follows is what could be recovered; this is "
+        "a limitation of the review, not a finding about the work.",
+        *(f"- {issue}" if isinstance(issue, str) else f"- {issue!r}" for issue in format_issues),
+    ]
+
+
 def format_cli_closeout(
     *,
     response_text: str | None,
@@ -102,6 +146,7 @@ def format_cli_closeout(
     execution_status: str,
     validation_details: Mapping[str, object] | None = None,
     scrutiny_details: Mapping[str, object] | None = None,
+    scrutiny_policy: str = "advisory",
     fallback_attempts: Sequence[Mapping[str, str]] = (),
     failure_reason: str | None = None,
     provider: str | None = None,
@@ -136,41 +181,61 @@ def format_cli_closeout(
             "fallback_handoff=" + ", ".join(f"{key}:{value}" for key, value in handoff.items())
         )
 
-    unresolved_review = scrutiny_details is not None and scrutiny_details.get("verdict") != "pass"
+    # ADR-066 separates two very different states that used to be conflated:
+    #
+    # - The reviewer *reached* a non-pass verdict. Under the advisory policy
+    #   (the default) that is recorded and shown but does not gate the outcome,
+    #   because advisory was adopted precisely because the gate falsely blocked.
+    # - The review never produced a verdict at all — it failed, was skipped, or
+    #   the reviewer returned output that could not be read. That is *missing*
+    #   review evidence rather than a judgement, so it still prevents an
+    #   accepted completion under either policy.
+    scrutiny_verdict = scrutiny_details.get("verdict") if scrutiny_details is not None else None
+    review_never_ran = scrutiny_details is not None and scrutiny_verdict is None
+    non_pass_verdict = scrutiny_details is not None and scrutiny_verdict not in (None, "pass")
+    unresolved_review = review_never_ran or (non_pass_verdict and scrutiny_policy == "required")
+    scrutiny_did_not_pass = scrutiny_verdict != "pass" if scrutiny_details is not None else False
+    notes.append(f"scrutiny_policy={scrutiny_policy}")
     review_lines: list[str] = []
-    if unresolved_review:
+    if scrutiny_did_not_pass:
         assert scrutiny_details is not None
-        notes.append("completion=not_established; scrutiny=unresolved")
-        review_lines = [
-            "### Unresolved scrutiny",
-            "The draft below is not an accepted completion report. "
-            "Resolve the review findings or missing review before treating the task as complete.",
-            "Review findings are advisory; they are not independent verification.",
-        ]
-        for key, label in (
-            ("verdict", "Reviewer verdict"),
-            ("issues", "Reviewer issues"),
-            ("next_action", "Reviewer next action"),
-            ("failure_reason", "Review failure"),
-            ("skip_reason", "Review not completed"),
-        ):
-            value = scrutiny_details.get(key)
-            if isinstance(value, str) and value.strip():
-                review_lines.extend([f"#### {label}", value.strip()])
-        revision = scrutiny_details.get("revised_response")
-        if isinstance(revision, str) and revision.strip().lower() not in {
-            "",
-            "none",
-            "none.",
-            "null",
-        }:
-            review_lines.extend(
-                [
-                    "#### Reviewer-proposed revision (not applied or independently verified)",
-                    revision,
-                ]
-            )
+        if unresolved_review:
+            notes.append("completion=not_established; scrutiny=unresolved")
+            heading = "### Unresolved scrutiny"
+            preamble = [
+                "The draft below is not an accepted completion report. "
+                "Resolve the review findings or missing review before treating "
+                "the task as complete.",
+                "Review findings are advisory; they are not independent verification.",
+            ]
+        else:
+            heading = "### Scrutiny findings (advisory)"
+            preamble = [
+                "Scrutiny did not reach a pass verdict. Under the advisory "
+                "scrutiny policy these findings are recorded but do not gate the "
+                "outcome; read them before treating the work as complete.",
+                "Review findings are advisory; they are not independent verification.",
+            ]
+        review_lines = [heading, *preamble]
+        review_lines.extend(_scrutiny_finding_lines(scrutiny_details))
+        review_lines.extend(_format_issue_bullets(scrutiny_details.get("format_issues")))
         review_lines.append("")
+    elif scrutiny_details is not None:
+        # ADR-066: a pass verdict is a pass even when the reviewer's report had
+        # recoverable shape problems. The recovered verdict is what counts, but
+        # the unreadable remainder is still shown so a missing finding is not
+        # silently treated as a finding-free review.
+        format_issue_lines = _format_issue_bullets(scrutiny_details.get("format_issues"))
+        if format_issue_lines:
+            notes.append("scrutiny=pass_with_format_issues")
+            review_lines = [
+                "### Scrutiny format issues (advisory)",
+                "The reviewer reached a pass verdict, but part of its report could "
+                "not be read. The recovered verdict is retained; findings that were "
+                "lost with the unreadable text cannot be ruled out.",
+                *format_issue_lines,
+                "",
+            ]
 
     response = response_text.strip() if response_text and response_text.strip() else None
     report = response if response is not None else "No final response was captured."

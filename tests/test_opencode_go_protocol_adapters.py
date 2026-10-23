@@ -10,6 +10,7 @@ from ai_provider import (
     AIMessage,
     AIRequest,
     BackendConfig,
+    FinishReason,
     MessageRole,
     PrivacyClass,
     ProviderKind,
@@ -156,6 +157,102 @@ def test_messages_client_sends_session_header(monkeypatch):
     assert response.usage.input_tokens == 5
 
 
+def test_messages_client_hoists_system_prompt_to_top_level(monkeypatch):
+    captured = {}
+
+    def send(request, *, timeout):
+        captured["payload"] = json.loads(request.data.decode())
+        return Response(
+            {
+                "content": [{"type": "text", "text": "hello"}],
+                "usage": {"input_tokens": 5, "output_tokens": 2},
+                "stop_reason": "end_turn",
+            }
+        )
+
+    monkeypatch.setattr("ai_provider.adapters.anthropic_messages.urlopen", send)
+
+    client = OpenCodeGoMessagesClient(
+        BackendConfig(
+            provider=ProviderKind.OPENCODE_GO, model="claude-haiku-5-5", api_key="test-key"
+        )
+    )
+    client.complete(
+        AIRequest(
+            messages=(
+                AIMessage(MessageRole.SYSTEM, "Be terse."),
+                AIMessage(MessageRole.USER, "Hi"),
+            ),
+            privacy_class=PrivacyClass.EXTERNAL_ALLOWED,
+        )
+    )
+    payload = captured["payload"]
+    # The Messages API rejects role="system" inside messages; system must be top-level.
+    assert payload["system"] == "Be terse."
+    roles = [message["role"] for message in payload["messages"]]
+    assert "system" not in roles
+    assert roles == ["user"]
+
+
+def test_responses_client_generates_session_header_when_missing(monkeypatch):
+    def send(request, *, timeout):
+        headers = {key.lower(): value for key, value in request.headers.items()}
+        assert "x-opencode-session" in headers
+        assert len(headers["x-opencode-session"]) == 32
+        return Response(
+            {
+                "output": [
+                    {
+                        "type": "message",
+                        "role": "assistant",
+                        "content": [{"type": "output_text", "text": "hello"}],
+                    }
+                ],
+                "usage": {"input_tokens": 5, "output_tokens": 2},
+            }
+        )
+
+    monkeypatch.setattr("ai_provider.adapters.openai_responses.urlopen", send)
+
+    client = OpenCodeGoResponsesClient(
+        BackendConfig(provider=ProviderKind.OPENCODE_GO, model="grok-4.6", api_key="test-key")
+    )
+    client.complete(
+        AIRequest(
+            messages=(AIMessage(MessageRole.USER, "Hi"),),
+            privacy_class=PrivacyClass.EXTERNAL_ALLOWED,
+        )
+    )
+
+
+def test_messages_client_generates_session_header_when_missing(monkeypatch):
+    def send(request, *, timeout):
+        headers = {key.lower(): value for key, value in request.headers.items()}
+        assert "x-opencode-session" in headers
+        assert len(headers["x-opencode-session"]) == 32
+        return Response(
+            {
+                "content": [{"type": "text", "text": "hello"}],
+                "usage": {"input_tokens": 5, "output_tokens": 2},
+                "stop_reason": "end_turn",
+            }
+        )
+
+    monkeypatch.setattr("ai_provider.adapters.anthropic_messages.urlopen", send)
+
+    client = OpenCodeGoMessagesClient(
+        BackendConfig(
+            provider=ProviderKind.OPENCODE_GO, model="claude-haiku-5-5", api_key="test-key"
+        )
+    )
+    client.complete(
+        AIRequest(
+            messages=(AIMessage(MessageRole.USER, "Hi"),),
+            privacy_class=PrivacyClass.EXTERNAL_ALLOWED,
+        )
+    )
+
+
 def test_responses_stream_yields_text_and_final(monkeypatch):
     from ai_provider.contracts import AIStreamFinal
 
@@ -254,3 +351,50 @@ def test_generic_anthropic_messages_base_has_anthropic_base_url(monkeypatch):
             privacy_class=PrivacyClass.EXTERNAL_ALLOWED,
         )
     )
+
+
+def test_responses_finish_reason_maps_status_and_incomplete_details(monkeypatch):
+    cases = [
+        ({"status": "completed"}, FinishReason.STOP),
+        ({}, FinishReason.STOP),  # absent status keeps the historical default
+        (
+            {"status": "incomplete", "incomplete_details": {"reason": "max_output_tokens"}},
+            FinishReason.LENGTH,
+        ),
+        (
+            {"status": "incomplete", "incomplete_details": {"reason": "content_filter"}},
+            FinishReason.UNKNOWN,
+        ),
+        ({"status": "failed"}, FinishReason.UNKNOWN),
+    ]
+    pending = [extra for extra, _ in cases]
+
+    def send(request, *, timeout):
+        extra = pending.pop(0)
+        return Response(
+            {
+                "output": [
+                    {
+                        "type": "message",
+                        "role": "assistant",
+                        "content": [{"type": "output_text", "text": "hi"}],
+                    }
+                ],
+                "usage": {"input_tokens": 1, "output_tokens": 1},
+                **extra,
+            }
+        )
+
+    monkeypatch.setattr("ai_provider.adapters.openai_responses.urlopen", send)
+
+    client = OpenAIResponsesChatClient(
+        BackendConfig(provider=ProviderKind.OPENAI, model="gpt-5", api_key="test-key")
+    )
+    for extra, expected in cases:
+        response = client.complete(
+            AIRequest(
+                messages=(AIMessage(MessageRole.USER, "Hi"),),
+                privacy_class=PrivacyClass.EXTERNAL_ALLOWED,
+            )
+        )
+        assert response.finish_reason is expected, extra

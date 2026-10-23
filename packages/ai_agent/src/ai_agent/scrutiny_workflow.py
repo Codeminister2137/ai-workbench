@@ -33,9 +33,10 @@ from ai_provider.repair_state import changed_paths, workspace_fingerprints
 from ai_provider.scrutiny import (
     RESEARCH_SCRUTINY_SYSTEM_PROMPT,
     RESPONSE_SCRUTINY_SYSTEM_PROMPT,
+    UNPARSEABLE_VERDICT,
     build_research_scrutiny_prompt,
     build_response_scrutiny_prompt,
-    parse_response_scrutiny_report,
+    parse_response_scrutiny_report_lenient,
 )
 
 from ai_agent.repair_workflow import format_validation_failures_for_prompt
@@ -106,7 +107,7 @@ def run_orchestrated_scrutiny(
     else:
         paths = (
             []
-            if research is not None
+            if research is not None or tracker.initial_workspace is None
             else changed_paths(tracker.initial_workspace, workspace_fingerprints(repo_root))
         )
         # Keep the review bounded; fingerprints establish observed changes, not correctness.
@@ -263,21 +264,39 @@ def run_orchestrated_scrutiny(
             )
             if scrutiny.response is None:
                 raise ProviderError(scrutiny.orchestration.failure_reason or "No scrutiny response")
-            report = parse_response_scrutiny_report(scrutiny.response.message.content)
+            report = parse_response_scrutiny_report_lenient(scrutiny.response.message.content)
         except (ProviderError, ValueError) as exc:
             details["failure_reason"] = str(exc)
             print(f"scrutiny_failure_reason: {exc}")
             _print_research_admission_diagnostics(details)
         else:
-            stage_status = "completed"
-            tracker.scrutiny_status = report.verdict
-            details.update(
-                verdict=report.verdict,
-                score=report.score,
-                issues=report.issues,
-                next_action=report.recommended_next_action,
-                revised_response=report.revised_response,
-            )
+            if report.format_issues:
+                # Anything the parser had to work around is evidence about the
+                # reviewer, not a judgement about the candidate. Record it
+                # rather than letting it silently colour the verdict.
+                details["format_issues"] = list(report.format_issues)
+            if report.verdict == UNPARSEABLE_VERDICT:
+                # No readable verdict means the review did not happen. That is a
+                # review failure, deliberately distinct from a review that
+                # reached a needs_revision or fail verdict.
+                stage_status = "failed"
+                reason = "reviewer output was not a readable scrutiny report: " + "; ".join(
+                    report.format_issues
+                )
+                details["failure_reason"] = reason
+                details["issues"] = report.issues
+                details["next_action"] = report.recommended_next_action
+                print(f"scrutiny_failure_reason: {reason}")
+            else:
+                stage_status = "completed"
+                tracker.scrutiny_status = report.verdict
+                details.update(
+                    verdict=report.verdict,
+                    score=report.score,
+                    issues=report.issues,
+                    next_action=report.recommended_next_action,
+                    revised_response=report.revised_response,
+                )
             print(report.raw_text)
     details["scrutiny_status"] = tracker.scrutiny_status
     tracker.complete_stage("scrutiny", status=stage_status, details=details)

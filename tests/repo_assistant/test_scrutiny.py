@@ -6,6 +6,10 @@ from pathlib import Path
 
 import pytest
 from ai_provider.orchestrated_runs import SQLiteOrchestratedRunStore
+from ai_provider.scrutiny import (
+    UNPARSEABLE_VERDICT,
+    parse_response_scrutiny_report_lenient,
+)
 
 from .support import (
     _EXAMPLE,
@@ -74,8 +78,9 @@ def test_mixed_bold_and_canonical_duplicate_sections_remain_invalid():
 
 
 @pytest.mark.parametrize("orchestrated", [False, True])
+@pytest.mark.parametrize("scrutiny_policy", ["advisory", "required"])
 def test_cli_can_scrutinize_completed_response(
-    capsys, monkeypatch, tmp_path: Path, orchestrated: bool
+    capsys, monkeypatch, tmp_path: Path, orchestrated: bool, scrutiny_policy: str
 ) -> None:
     from dataclasses import replace
 
@@ -164,6 +169,8 @@ def test_cli_can_scrutinize_completed_response(
                 "qwen2.5-coder:14b",
                 "--execute",
                 "--scrutinize-response",
+                "--scrutiny-policy",
+                scrutiny_policy,
                 "--away-minutes",
                 "30",
                 "--away-run-db",
@@ -184,11 +191,20 @@ def test_cli_can_scrutinize_completed_response(
     assert "scrutiny_status: completed" in output
     assert "execution_status: completed_with_scrutiny_findings" in output
     closeout = output.rsplit("## **SUMMARY**", 1)[1]
-    assert "### Agent report — draft with unresolved scrutiny\nprimary answer" in closeout
     assert "#### Reviewer issues\ngeneric answer" in closeout
     assert "#### Reviewer next action\nrevise the answer" in closeout
     assert "Reviewer-proposed revision (not applied or independently verified)" in closeout
-    assert "Agent-reported outcome: primary answer" not in closeout
+    if scrutiny_policy == "required":
+        # ADR-066 keeps the blocking behaviour available on request.
+        assert "completion=not_established" in closeout
+        assert "### Agent report — draft with unresolved scrutiny\nprimary answer" in closeout
+        assert "Agent-reported outcome: primary answer" not in closeout
+    else:
+        # ADR-066 default: a non-pass verdict advises, it does not gate.
+        assert "completion=not_established" not in closeout
+        assert "### Scrutiny findings (advisory)" in closeout
+        assert "### Agent report\nprimary answer" in closeout
+        assert "Agent-reported outcome: primary answer" in closeout
     assert len(calls) == 2
     assert calls[1][1] is True
     assert "Candidate assistant response:\nprimary answer" in calls[1][0]
@@ -394,3 +410,74 @@ def test_scrutiny_requires_executing_ask_or_review() -> None:
 
     with pytest.raises(SystemExit):
         main(["--mode", "plan", "Review code.", "--execute", "--scrutinize-response"])
+
+
+def test_lenient_parse_is_silent_on_a_well_formed_report() -> None:
+    text = (
+        "VERDICT: pass\nSCORE: 8\nSTRENGTHS: grounded\nISSUES: none\n"
+        "RECOMMENDED_NEXT_ACTION: None\nREVISED_RESPONSE: None"
+    )
+    report = parse_response_scrutiny_report_lenient(text)
+
+    assert report.verdict == "pass"
+    assert report.score == 8
+    assert report.format_issues == ()
+
+
+def test_lenient_parse_keeps_the_findings_of_a_partly_malformed_report() -> None:
+    """A missing heading must not throw away a review that did reach a verdict."""
+
+    text = "VERDICT: needs_revision\nSCORE: 4\nISSUES: generic answer"
+    report = parse_response_scrutiny_report_lenient(text)
+
+    assert report.verdict == "needs_revision"
+    assert report.issues == "generic answer"
+    assert any("missing heading" in issue for issue in report.format_issues)
+    assert any("REVISED_RESPONSE" in issue for issue in report.format_issues)
+
+
+def test_lenient_parse_never_turns_a_format_problem_into_a_quality_verdict() -> None:
+    """Unreadable output reports UNPARSEABLE_VERDICT, never pass/fail or a score."""
+
+    report = parse_response_scrutiny_report_lenient("Looks fine to me, no notes.")
+
+    assert report.verdict == UNPARSEABLE_VERDICT
+    assert report.verdict not in {"pass", "needs_revision", "fail"}
+    assert report.score is None
+    assert report.format_issues
+
+
+def test_lenient_parse_reports_no_score_rather_than_inventing_a_zero() -> None:
+    text = (
+        "VERDICT: pass\nSTRENGTHS: grounded\nISSUES: none\n"
+        "RECOMMENDED_NEXT_ACTION: None\nREVISED_RESPONSE: None"
+    )
+    report = parse_response_scrutiny_report_lenient(text)
+
+    assert report.verdict == "pass"
+    assert report.score is None
+    assert any("SCORE" in issue for issue in report.format_issues)
+
+
+def test_lenient_parse_keeps_an_out_of_range_score_out_of_the_report() -> None:
+    text = (
+        "VERDICT: pass\nSCORE: 42\nSTRENGTHS: grounded\nISSUES: none\n"
+        "RECOMMENDED_NEXT_ACTION: None\nREVISED_RESPONSE: None"
+    )
+    report = parse_response_scrutiny_report_lenient(text)
+
+    assert report.verdict == "pass"
+    assert report.score is None
+    assert any("out of range" in issue for issue in report.format_issues)
+
+
+def test_lenient_parse_survives_a_duplicated_heading() -> None:
+    text = (
+        "VERDICT: fail\nSCORE: 2\nSTRENGTHS: a\nSTRENGTHS: b\nISSUES: c\n"
+        "RECOMMENDED_NEXT_ACTION: d\nREVISED_RESPONSE: None"
+    )
+    report = parse_response_scrutiny_report_lenient(text)
+
+    assert report.verdict == "fail"
+    assert report.score == 2
+    assert report.format_issues

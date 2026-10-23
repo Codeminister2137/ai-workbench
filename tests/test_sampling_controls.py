@@ -85,7 +85,7 @@ def test_external_primary_refuses_before_client_or_fallback_start(tmp_path, monk
                 "--repo-root",
                 str(tmp_path),
                 "--route-id",
-                "openai-codex-gpt-5-5",
+                "openai/codex-gpt-5.5",
                 "--privacy",
                 "public_or_low_risk",
                 "--cost-policy",

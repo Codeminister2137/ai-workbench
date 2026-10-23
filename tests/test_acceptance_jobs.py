@@ -68,7 +68,7 @@ def job(tmp_path: Path) -> AcceptanceJob:
         "native_coding_tools_v1",
         1,
         str(tmp_path),
-        "ollama-gpt-oss-20b",
+        "ollama/gpt-oss:20b",
         evidence.model,
         evidence.runtime_version,
         evidence.model_digest,

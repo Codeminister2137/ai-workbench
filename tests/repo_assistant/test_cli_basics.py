@@ -40,7 +40,9 @@ def test_tee_output_flushes_progress_to_disk(tmp_path):
         assert path.read_text() == "started research\n"
 
 
-def test_cli_help_lists_google_provider() -> None:
+def test_cli_help_provider_is_catalog_derived() -> None:
+    """``--provider`` advertises no fixed choice list; it comes from the catalog."""
+
     result = __import__("subprocess").run(
         [
             sys.executable,
@@ -53,7 +55,9 @@ def test_cli_help_lists_google_provider() -> None:
     )
 
     assert result.returncode == 0
-    assert "--provider {ollama,openai,requesty,google}" in result.stdout
+    assert "--provider" in result.stdout
+    # The old hardcoded choice list must be gone.
+    assert "{ollama,openai,requesty,google}" not in result.stdout
     assert "--mode {ask,review,implement,plan,diagnose,chat,coding-chat}" in result.stdout
     assert "--coding-chat-history-budget-chars" in result.stdout
     assert "--scrutinize-response" in result.stdout

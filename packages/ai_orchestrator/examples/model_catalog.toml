@@ -1,5 +1,5 @@
 [[models]]
-route_id = "ollama-deepseek-coder-v2-16b"
+route_id = "ollama/deepseek-coder-v2:16b"
 provider = "ollama"
 product = "ollama"
 model = "deepseek-coder-v2:16b"
@@ -31,7 +31,7 @@ output_cost_per_million_tokens = 0
 source = "local benchmark: 3 runs, 1 warmup, median latency for deepseek-coder-v2:16b"
 
 [[models]]
-route_id = "ollama-gpt-oss-20b"
+route_id = "ollama/gpt-oss:20b"
 provider = "ollama"
 product = "ollama"
 model = "gpt-oss:20b"
@@ -66,7 +66,7 @@ source = "local benchmark: 3 runs, 1 warmup, median latency for gpt-oss:20b"
 review_deliberative = true
 
 [[models]]
-route_id = "ollama-qwen2-5-coder-14b"
+route_id = "ollama/qwen2.5-coder:14b"
 provider = "ollama"
 product = "ollama"
 model = "qwen2.5-coder:14b"
@@ -98,7 +98,7 @@ output_cost_per_million_tokens = 0
 source = "local benchmark: 3 runs, 1 warmup, median latency for qwen2.5-coder:14b"
 
 [[models]]
-route_id = "ollama-qwen3-14b"
+route_id = "ollama/qwen3:14b"
 provider = "ollama"
 product = "ollama"
 model = "qwen3:14b"
@@ -134,7 +134,7 @@ review_deliberative = true
 review_direct = true
 
 [[models]]
-route_id = "openai-codex-gpt-6-1-sol"
+route_id = "openai/codex-gpt-6.1-sol"
 provider = "openai"
 product = "codex"
 model = "gpt-6.1-sol"
@@ -159,7 +159,7 @@ embeddings = false
 source = "Codex CLI subscription allowance; live usage telemetry is captured from CLI JSONL events when available."
 
 [[models]]
-route_id = "openai-codex-gpt-5-5"
+route_id = "openai/codex-gpt-5.5"
 provider = "openai"
 product = "codex"
 model = "gpt-5.5"
@@ -184,7 +184,7 @@ embeddings = false
 source = "Codex CLI subscription allowance; live usage telemetry is captured from CLI JSONL events when available."
 
 [[models]]
-route_id = "google-ai-studio-gemini-3-1-pro"
+route_id = "google/ai-studio-gemini-3.1-pro"
 provider = "google"
 product = "google_ai_studio"
 model = "gemini-3.1-pro"
@@ -213,7 +213,7 @@ source = "Google AI Studio free allowance docs"
 source_url = "https://ai.google.dev/pricing"
 
 [[models]]
-route_id = "google-ai-studio-gemini-3-8-flash"
+route_id = "google/ai-studio-gemini-3.8-flash"
 provider = "google"
 product = "google_ai_studio"
 model = "gemini-3.8-flash"
@@ -242,7 +242,7 @@ source = "Google AI Studio free allowance docs"
 source_url = "https://ai.google.dev/pricing"
 
 [[models]]
-route_id = "google-antigravity-gemini-3-1-pro"
+route_id = "google/antigravity-gemini-3.1-pro-high"
 provider = "google"
 product = "antigravity"
 model = "gemini-3.1-pro-high"
@@ -264,7 +264,7 @@ multimodal_input = false
 embeddings = false
 
 [[models]]
-route_id = "google-antigravity-gemini-3-8-flash"
+route_id = "google/antigravity-gemini-3.8-flash-high"
 provider = "google"
 product = "antigravity"
 model = "gemini-3.8-flash-high"
@@ -286,7 +286,7 @@ multimodal_input = false
 embeddings = false
 
 [[models]]
-route_id = "github-copilot-cli-default"
+route_id = "github/copilot-cli-auto"
 provider = "github"
 product = "github_copilot"
 model = "auto"
@@ -308,7 +308,7 @@ multimodal_input = false
 embeddings = false
 
 [[models]]
-route_id = "kiro-cli-default"
+route_id = "kiro/auto"
 provider = "kiro"
 product = "kiro"
 model = "auto"
@@ -330,7 +330,7 @@ multimodal_input = false
 embeddings = false
 
 [[models]]
-route_id = "openai-api-gpt-5-1"
+route_id = "openai/api-gpt-5.1"
 provider = "openai"
 product = "openai_api"
 model = "gpt-5.1"
@@ -358,7 +358,7 @@ source = "OpenAI model docs, checked 2026-09-20"
 source_url = "https://developers.openai.com/api/docs/models/gpt-5.1"
 
 [[models]]
-route_id = "openai-api-gpt-5-mini"
+route_id = "openai/api-gpt-5-mini"
 provider = "openai"
 product = "openai_api"
 model = "gpt-5-mini"
@@ -386,7 +386,7 @@ source = "OpenAI model docs, checked 2026-09-20"
 source_url = "https://developers.openai.com/api/docs/models/gpt-5-mini"
 
 [[models]]
-route_id = "requesty-free-gemma-4-31b"
+route_id = "requesty/free-google/gemma-4-31b-it"
 provider = "requesty"
 product = "requesty_free"
 model = "google/gemma-4-31b-it"
@@ -417,7 +417,7 @@ source = "Requesty live models API checked 2026-10-01; runtime prices rechecked 
 source_url = "https://router.requesty.ai/v1/models"
 
 [[models]]
-route_id = "requesty-openai-gpt-5-1"
+route_id = "requesty/openai/gpt-5.1"
 provider = "requesty"
 product = "requesty"
 model = "openai/gpt-5.1"
@@ -445,7 +445,7 @@ source = "OpenAI pricing with Requesty OpenAI-compatible routing docs, checked 2
 source_url = "https://docs.requesty.ai/quickstart"
 
 [[models]]
-route_id = "requesty-openai-gpt-5-mini"
+route_id = "requesty/openai/gpt-5-mini"
 provider = "requesty"
 product = "requesty"
 model = "openai/gpt-5-mini"
@@ -471,3 +471,32 @@ input_cost_per_million_tokens = 0.25
 output_cost_per_million_tokens = 2.0
 source = "OpenAI pricing with Requesty OpenAI-compatible routing docs, checked 2026-09-20"
 source_url = "https://docs.requesty.ai/quickstart"
+
+[[models]]
+route_id = "opencode-go/go-kimi-k2.7-code"
+provider = "opencode_go"
+product = "go"
+model = "kimi-k2.7-code"
+location = "external"
+access_method = "provider_api"
+auth_method = "api_key"
+billing_source = "opencode_go_subscription_allowance"
+cost_policy_tier = "allowances_allowed"
+quality = "high"
+latency = "interactive"
+base_url = "https://opencode.ai/inference/go/openai/v1"
+notes = "OpenCode Go Kimi K2.7 Code route. Requires OPENCODE_API_KEY. Provisional catalog entry; route-id naming may be normalized later."
+
+[models.capabilities]
+chat = true
+streaming = true
+tools = true
+structured_output = false
+multimodal_input = false
+embeddings = false
+
+[models.context_limits]
+context_window_tokens = 256000
+
+[models.metadata]
+provisional = true

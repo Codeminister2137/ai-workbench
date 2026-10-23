@@ -18,7 +18,7 @@ def offline_args(tmp_path, *flags):
         "--cost-policy",
         "allowances_allowed",
         "--route-id",
-        "openai-codex-gpt-5-5",
+        "openai/codex-gpt-5.5",
         *flags,
     ]
 
@@ -48,9 +48,17 @@ def test_offline_report_preserves_approval_exclusions_without_side_effects(
     assert report["allowance"] == "unknown"
     candidates = report["fallback_candidates"]
     assert candidates
-    assert all(not row["executor_compatible"] for row in candidates)
-    assert all("trusted_local" in row["reason"] for row in candidates)
+    # External-agent CLI routes are statically incompatible without trusted_local
+    # approval; provider-api routes may be statically compatible offline but still
+    # have unknown authentication, allowance and execution readiness.
     assert all(not row["execution_ready"] for row in candidates)
+    assert all(
+        row["authentication"] == "not_checked" and row["allowance"] == "unknown"
+        for row in candidates
+    )
+    for row in candidates:
+        if row["reason"] is not None:
+            assert "trusted_local" in row["reason"]
     assert list(tmp_path.iterdir()) == []
 
 
@@ -212,7 +220,7 @@ def test_selected_skill_readiness_includes_implicit_read_only_tool_requirements(
         "selected_skills": ["review-repo-change"],
     }
     candidates = {row["route_id"]: row for row in report["fallback_candidates"]}
-    antigravity = candidates.get("google-antigravity-gemini-3-1-pro")
+    antigravity = candidates.get("google/antigravity-gemini-3.1-pro-high")
     if antigravity is not None:
         assert not antigravity["executor_compatible"]
         assert "headless mode denies MCP tools" in antigravity["reason"]
@@ -271,9 +279,7 @@ def test_readiness_explains_unsupported_codex_feature_on_alternate_shared_routes
     )
     report = json.loads(capsys.readouterr().out)
     copilot = next(
-        row
-        for row in report["fallback_candidates"]
-        if row["route_id"] == "github-copilot-cli-default"
+        row for row in report["fallback_candidates"] if row["route_id"] == "github/copilot-cli-auto"
     )
     assert not copilot["executor_compatible"]
     assert copilot["reason"] == ("Codex-specific options are not mapped for common inspection")
@@ -295,8 +301,8 @@ def test_readiness_explains_unsupported_codex_feature_on_alternate_shared_routes
 @pytest.mark.parametrize(
     "method,route_id",
     [
-        ("copilot_cli", "github-copilot-cli-default"),
-        ("kiro_cli", "kiro-cli-default"),
+        ("copilot_cli", "github/copilot-cli-auto"),
+        ("kiro_cli", "kiro/auto"),
     ],
 )
 def test_readiness_reports_unsupported_codex_options_on_alternate_routes(
@@ -366,7 +372,7 @@ def test_readiness_preserves_codex_options_on_codex_routes(option, shared_profil
     from ai_orchestrator import load_model_catalog, prepare_execution
 
     catalog = load_model_catalog("packages/ai_orchestrator/examples/model_catalog.toml")
-    entry = next(item for item in catalog if item.backend.route_id == "openai-codex-gpt-5-5")
+    entry = next(item for item in catalog if item.backend.route_id == "openai/codex-gpt-5.5")
     profile = cli.coding_task_profile(
         privacy_class=cli.OrchestratorPrivacyClass.EXTERNAL_ALLOWED,
         route_id_override=entry.backend.route_id,
@@ -417,7 +423,7 @@ def test_readiness_reports_unsupported_unshared_alternate_approval(
         lambda _method: "mock-client",
     )
     catalog = load_model_catalog("packages/ai_orchestrator/examples/model_catalog.toml")
-    entry = next(item for item in catalog if item.backend.route_id == "github-copilot-cli-default")
+    entry = next(item for item in catalog if item.backend.route_id == "github/copilot-cli-auto")
     profile = cli.coding_task_profile(
         privacy_class=cli.OrchestratorPrivacyClass.EXTERNAL_ALLOWED,
         route_id_override=entry.backend.route_id,
@@ -485,10 +491,10 @@ def test_provider_option_exclusion_is_precise_and_does_not_probe(tmp_path):
 @pytest.mark.parametrize(
     "method,route_id",
     [
-        ("codex_cli", "openai-codex-gpt-5-5"),
-        ("copilot_cli", "github-copilot-cli-default"),
-        ("kiro_cli", "kiro-cli-default"),
-        ("antigravity_cli", "google-antigravity-gemini-3-1-pro"),
+        ("codex_cli", "openai/codex-gpt-5.5"),
+        ("copilot_cli", "github/copilot-cli-auto"),
+        ("kiro_cli", "kiro/auto"),
+        ("antigravity_cli", "google/antigravity-gemini-3.1-pro-high"),
     ],
 )
 @pytest.mark.parametrize(

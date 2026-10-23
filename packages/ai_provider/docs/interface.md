@@ -210,6 +210,19 @@ Each run also publishes the failure modes that decide whether a model is usable
 in practice rather than merely accurate: the share of cases that produced a
 well-formed answer, syntax errors, and exhausted context windows.
 
+`ai_provider.capability_bands` turns those two priors into the recommendation
+grade published in the [model catalog](model-catalog.md). Each source keeps its
+own fixed band cutoffs, calibrated on a dated snapshot and then frozen, because
+`percent_correct` and `percent_resolved` are different scales under different
+harnesses; the two bands are reported side by side and never averaged.
+`band_for()` returns `None` when a source published no score, so an absent prior
+is never reported as a low band, and an uncalibrated source raises rather than
+inheriting another source's cutoffs. A band is published evidence about an
+upstream family — deliberately a different vocabulary from the Orchestrator's
+`QualityThreshold` (`low`/`standard`/`high`), which is the minimum tier a task
+declares for a catalog entry. This module never writes to a catalog entry, and a
+local L3 CLI measurement overrides a band for a specific task.
+
 ## Capability Matrix
 
 | Capability | Ollama | Requesty | OpenRouter | OpenAI | Google | OpenCode Go |

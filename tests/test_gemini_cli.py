@@ -280,7 +280,7 @@ def test_gemini_free_fallback_preserves_quality_privacy_and_billing_tier():
     gemini = next(item for item in opt_in if item.backend.access_method is AccessMethod.GEMINI_CLI)
     default = load_model_catalog(root / "packages/ai_orchestrator/examples/model_catalog.toml")
     requesty = next(
-        item for item in default if item.backend.route_id == "requesty-free-gemma-4-31b"
+        item for item in default if item.backend.route_id == "requesty/free-google/gemma-4-31b-it"
     )
     backend = requesty.backend
     target = ExecutionTarget(

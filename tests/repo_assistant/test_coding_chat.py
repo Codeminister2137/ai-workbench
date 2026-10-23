@@ -662,7 +662,7 @@ def test_coding_chat_external_sign_in_and_retry_without_competing_terminal_input
             "--repo-root",
             str(tmp_path),
             "--route-id",
-            "openai-codex-gpt-5-5",
+            "openai/codex-gpt-5.5",
             "--privacy",
             "external_allowed",
             "--cost-policy",
@@ -1225,7 +1225,7 @@ def test_official_client_receives_conversation_and_new_run_scope_each_turn(tmp_p
                 "--privacy",
                 "external_allowed",
                 "--route-id",
-                "openai-codex-gpt-5-5",
+                "openai/codex-gpt-5.5",
                 "--skip-prompt-review",
                 "Keep the provider boundary intact",
             ]

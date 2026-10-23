@@ -13,6 +13,8 @@ import threading
 import time
 from pathlib import Path
 
+import pytest
+
 
 def _publish_pid(path: Path, pid: int) -> None:
     """Atomically publish ``pid`` at ``path``.
@@ -102,6 +104,15 @@ def test_reader_waits_for_content_not_just_existence(tmp_path: Path) -> None:
     reader_thread.join()
 
 
+def test_publish_pid_overwrites_whitespace_stale_file(tmp_path: Path) -> None:
+    """Publishing a PID atomically replaces a stale file containing only whitespace."""
+
+    pid_file = tmp_path / "child.pid"
+    pid_file.write_text("   \n")
+    _publish_pid(pid_file, 123)
+    assert _read_pid(pid_file) == 123
+
+
 def test_publish_pid_overwrites_stale_file(tmp_path: Path) -> None:
     """Publishing a new PID replaces any existing stale publication atomically."""
 
@@ -109,3 +120,40 @@ def test_publish_pid_overwrites_stale_file(tmp_path: Path) -> None:
     pid_file.write_text("stale")
     _publish_pid(pid_file, 42)
     assert _read_pid(pid_file) == 42
+
+
+def test_reader_times_out_cleanly_when_pid_never_appears(tmp_path: Path) -> None:
+    """A publication that never happens fails with a clear error, not a hang.
+
+    Cleanup code waits for the descendant's PID before terminating it; when the
+    child dies before publishing, the wait must give up after its deadline
+    instead of blocking forever or returning a bogus PID.
+    """
+
+    pid_file = tmp_path / "child.pid"
+    started = time.monotonic()
+    with pytest.raises(FileNotFoundError, match="PID was not published in time"):
+        _read_pid(pid_file, timeout=0.2)
+    elapsed = time.monotonic() - started
+
+    assert 0.2 <= elapsed < 5.0
+    assert not pid_file.exists()
+
+
+def test_publishing_same_pid_twice_is_idempotent(tmp_path: Path) -> None:
+    """Republishing an identical PID leaves the same readable state behind.
+
+    A retried publication must not corrupt the value, leave the temporary file
+    behind, or make the reader observe a partial write.
+    """
+
+    pid_file = tmp_path / "child.pid"
+    _publish_pid(pid_file, 4242)
+    first = pid_file.read_text()
+
+    _publish_pid(pid_file, 4242)
+    second = pid_file.read_text()
+
+    assert first == second == "4242"
+    assert _read_pid(pid_file) == 4242
+    assert sorted(entry.name for entry in tmp_path.iterdir()) == ["child.pid"]

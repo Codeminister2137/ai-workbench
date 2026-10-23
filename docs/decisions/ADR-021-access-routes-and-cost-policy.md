@@ -8,6 +8,10 @@
 `PREPAID_CREDITS_ALLOWED` and separates private user preferences. All other
 route, authentication, and financial boundary decisions remain accepted.
 
+**Amendment (2026-10-22):** ADR-065 fixes the display/selection form of the
+route id as `provider/product-model`. It amends only how a route is labelled and
+chosen; the `provider + product + model` identity defined here is unchanged.
+
 ## Context
 
 The repository originally described execution mostly as provider/model selection.

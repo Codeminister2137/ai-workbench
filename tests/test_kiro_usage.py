@@ -252,7 +252,7 @@ def test_dispatch_only_admits_kiro_subscription_billing(monkeypatch):
 
     catalog = load_model_catalog("packages/ai_orchestrator/examples/model_catalog.toml")
     profile = coding_task_profile(
-        route_id_override="github-copilot-cli-default",
+        route_id_override="github/copilot-cli-auto",
         privacy_class=PrivacyClass.EXTERNAL_ALLOWED,
         cost_policy_tier=CostPolicyTier.ALLOWANCES_ALLOWED,
     )

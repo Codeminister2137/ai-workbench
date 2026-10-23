@@ -69,7 +69,10 @@ def test_final_response_instruction_requires_the_same_schema() -> None:
 
 
 @pytest.mark.parametrize("verdict", ["needs_revision", "fail"])
-def test_unresolved_scrutiny_qualifies_claims_without_replacing_the_draft(verdict: str) -> None:
+@pytest.mark.parametrize("scrutiny_policy", ["advisory", "required"])
+def test_scrutiny_findings_qualify_claims_without_replacing_the_draft(
+    verdict: str, scrutiny_policy: str
+) -> None:
     draft = "I independently verified the supplied hash."
     output = format_cli_closeout(
         response_text=draft,
@@ -82,18 +85,46 @@ def test_unresolved_scrutiny_qualifies_claims_without_replacing_the_draft(verdic
             "next_action": "Verify it or retract that claim.",
             "revised_response": "The supplied hash remains unverified.",
         },
+        scrutiny_policy=scrutiny_policy,
     )
 
-    assert output.count(draft) == 1
-    assert output.endswith(f"### Agent report — draft with unresolved scrutiny\n{draft}\n")
     assert "#### Reviewer issues\nNo hash verification was observed." in output
     assert "#### Reviewer next action\nVerify it or retract that claim." in output
     assert "Reviewer-proposed revision (not applied or independently verified)" in output
-    assert "completion=not_established" in output
+    assert f"scrutiny_policy={scrutiny_policy}" in output
     assert "execution_status=completed_with_tool_errors" in output
-    changed = next(line for line in output.splitlines() if line.startswith("- Changed:"))
-    assert draft not in changed and "unresolved scrutiny" in changed
-    assert "- Validated: passed (Recorded checks only;" in output
+
+    if scrutiny_policy == "required":
+        assert output.count(draft) == 1
+        assert output.endswith(f"### Agent report — draft with unresolved scrutiny\n{draft}\n")
+        assert "completion=not_established" in output
+        changed = next(line for line in output.splitlines() if line.startswith("- Changed:"))
+        assert draft not in changed and "unresolved scrutiny" in changed
+        assert "- Validated: passed (Recorded checks only;" in output
+    else:
+        # ADR-066 default: findings are shown and do not gate the outcome, so the
+        # draft is reported as the outcome rather than withheld as an unaccepted draft.
+        assert "completion=not_established" not in output
+        assert "### Scrutiny findings (advisory)" in output
+        assert output.endswith(f"### Agent report\n{draft}\n")
+        assert "Agent-reported outcome: I independently verified the supplied hash." in output
+
+
+def test_advisory_policy_still_withholds_a_completion_when_the_review_never_ran() -> None:
+    """A missing review is missing evidence, not an advisory judgement.
+
+    ADR-066 made non-pass verdicts advisory; it did not make a promised-but-absent
+    review look like a completed one.
+    """
+
+    output = format_cli_closeout(
+        response_text="Draft answer.",
+        status="ready",
+        execution_status="completed_with_scrutiny_errors",
+        scrutiny_details={"failure_reason": "Reviewer timed out."},
+    )
+    assert "completion=not_established" in output
+    assert "The draft below is not an accepted completion report." in output
 
 
 @pytest.mark.parametrize(
@@ -125,4 +156,43 @@ def test_passing_review_does_not_silently_adopt_a_proposed_rewrite() -> None:
         scrutiny_details={"verdict": "pass", "revised_response": "Reviewer rewrite."},
     ) == format_cli_closeout(
         response_text="Original answer.", status="ready", execution_status="completed"
+    )
+
+
+def test_passing_review_surfaces_residual_format_issues() -> None:
+    """A pass with an unreadable remainder is still shown, but does not gate."""
+
+    output = format_cli_closeout(
+        response_text="Draft answer.",
+        status="ready",
+        execution_status="completed",
+        scrutiny_details={
+            "verdict": "pass",
+            "format_issues": ["missing heading(s): SCORE", "unreadable score: 'high'"],
+        },
+    )
+
+    assert "### Scrutiny format issues (advisory)" in output
+    assert "#### Reviewer output was partially unreadable" in output
+    assert "- missing heading(s): SCORE" in output
+    assert "- unreadable score: 'high'" in output
+    assert "scrutiny=pass_with_format_issues" in output
+    assert "completion=not_established" not in output
+    assert output.endswith("### Agent report\nDraft answer.\n")
+    assert "Agent-reported outcome: Draft answer." in output
+
+
+def test_passing_review_without_format_issues_renders_no_review_section() -> None:
+    output = format_cli_closeout(
+        response_text="Draft answer.",
+        status="ready",
+        execution_status="completed",
+        scrutiny_details={"verdict": "pass", "format_issues": []},
+    )
+
+    assert "Scrutiny" not in output
+    assert "partially unreadable" not in output
+    assert "scrutiny=pass_with_format_issues" not in output
+    assert output == format_cli_closeout(
+        response_text="Draft answer.", status="ready", execution_status="completed"
     )

@@ -105,17 +105,35 @@ _RESPONSE_SCRUTINY_BOLD_HEADING_PATTERN = (
 _FENCED_JSON_PATTERN = re.compile(r"```(?:json)?\s*(\{.*?\})\s*```", re.DOTALL)
 
 
+#: Verdict reported when the reviewer's output could not be read as a report at
+#: all. Deliberately outside :data:`_RESPONSE_SCRUTINY_VERDICTS` so it can never
+#: be mistaken for the reviewer having judged the candidate.
+UNPARSEABLE_VERDICT = "unparseable"
+
+
 @dataclass(frozen=True)
 class ResponseScrutinyReport:
-    """Parsed second-pass response-quality report."""
+    """Parsed second-pass response-quality report.
+
+    ``score`` is ``None`` when the report carried no readable score. It is
+    deliberately not defaulted to ``0``: "no score could be read" and "the
+    reviewer scored this zero" are different claims, and collapsing them would
+    turn a formatting problem into an apparent quality judgement.
+
+    ``format_issues`` records anything the parser had to work around — missing
+    headings, an unreadable verdict, a malformed score. An empty tuple means
+    the reviewer produced exactly the requested shape. Callers that treat a
+    verdict as evidence must check this is empty first.
+    """
 
     verdict: str
-    score: int
+    score: int | None
     strengths: str
     issues: str
     recommended_next_action: str
     revised_response: str
     raw_text: str
+    format_issues: tuple[str, ...] = ()
 
 
 def build_response_scrutiny_prompt(original_prompt: str, response: str) -> str:
@@ -155,7 +173,14 @@ def build_research_scrutiny_prompt(
 
 
 def parse_response_scrutiny_report(text: str) -> ResponseScrutinyReport:
-    """Parse and validate the structured response-scrutiny report."""
+    """Parse and validate the structured response-scrutiny report, strictly.
+
+    Raises ``ValueError`` on any deviation from the required shape. Callers in
+    the orchestrated path should prefer
+    :func:`parse_response_scrutiny_report_lenient`, which keeps whatever the
+    reviewer produced and records the deviation instead — a strict raise here
+    makes a local model's formatting decide the outcome.
+    """
 
     sections = _parse_response_scrutiny_heading_sections(text)
     if sections is None:
@@ -190,8 +215,85 @@ def parse_response_scrutiny_report(text: str) -> ResponseScrutinyReport:
     )
 
 
-def _parse_response_scrutiny_heading_sections(text: str) -> dict[str, str] | None:
-    """Parse canonical or standalone bold headings without changing the raw report."""
+def parse_response_scrutiny_report_lenient(text: str) -> ResponseScrutinyReport:
+    """Parse a scrutiny report, keeping whatever the reviewer's formatting allowed.
+
+    A local review model asked for an exact six-heading shape will sometimes
+    produce a sound review that omits a heading, mislabels one, or writes a
+    score as prose. The strict parser raises on all of those, and when it did,
+    the *formatting* decided the run's outcome rather than the review.
+
+    This parser never raises for a format problem. It recovers every heading it
+    can find, records what it could not use in ``format_issues``, and reports an
+    unreadable verdict as :data:`UNPARSEABLE_VERDICT` rather than inventing one.
+    A caller must therefore treat a report with ``format_issues`` as
+    *unreliable review output* — evidence about the reviewer — and never as a
+    judgement about the candidate.
+
+    Only format problems are tolerated. A report whose verdict and score are
+    both readable but whose ``ISSUES`` section is empty is still a valid,
+    complete verdict; absence of findings is not a format defect.
+    """
+
+    duplicates: list[str] = []
+    sections = _parse_response_scrutiny_heading_sections(text, duplicates=duplicates) or {}
+    if not sections:
+        sections = _parse_response_scrutiny_json_sections(text)
+
+    format_issues: list[str] = [f"duplicate heading: {heading}" for heading in duplicates]
+
+    missing = [heading for heading in _RESPONSE_SCRUTINY_HEADINGS if heading not in sections]
+    if missing:
+        format_issues.append("missing heading(s): " + ", ".join(missing))
+
+    raw_verdict = sections.get("VERDICT", "")
+    verdict = raw_verdict.strip().strip("*`").strip().lower()
+    if verdict not in _RESPONSE_SCRUTINY_VERDICTS:
+        if raw_verdict.strip():
+            format_issues.append(f"unreadable verdict: {raw_verdict!r}")
+        verdict = UNPARSEABLE_VERDICT
+
+    score = _lenient_scrutiny_score(sections.get("SCORE", ""), format_issues)
+
+    return ResponseScrutinyReport(
+        verdict=verdict,
+        score=score,
+        strengths=sections.get("STRENGTHS", "").strip(),
+        issues=sections.get("ISSUES", "").strip(),
+        recommended_next_action=sections.get("RECOMMENDED_NEXT_ACTION", "").strip(),
+        revised_response=sections.get("REVISED_RESPONSE", "").strip(),
+        raw_text=text,
+        format_issues=tuple(format_issues),
+    )
+
+
+def _lenient_scrutiny_score(raw: str, format_issues: list[str]) -> int | None:
+    """Return a readable 0-10 score, or ``None`` when none could be read."""
+
+    cleaned = raw.strip().strip("*`").strip()
+    if not cleaned:
+        format_issues.append("missing SCORE")
+        return None
+    if not re.fullmatch(r"[+-]?\d+(?:[ \t]*/[ \t]*10)?", cleaned):
+        format_issues.append(f"unreadable score: {raw!r}")
+        return None
+    score = int(cleaned.split("/")[0].strip())
+    if not 0 <= score <= 10:
+        format_issues.append(f"score out of range: {score}")
+        return None
+    return score
+
+
+def _parse_response_scrutiny_heading_sections(
+    text: str, *, duplicates: list[str] | None = None
+) -> dict[str, str] | None:
+    """Parse canonical or standalone bold headings without changing the raw report.
+
+    A duplicated heading raises, because the strict parser must reject a report
+    it cannot read unambiguously. Passing ``duplicates`` switches to tolerant
+    mode: the first occurrence is kept, each repeat is appended to the list, and
+    the caller decides how to report it.
+    """
 
     text = re.sub(_RESPONSE_SCRUTINY_BOLD_HEADING_PATTERN, r"\1**\2:**", text)
 
@@ -208,7 +310,10 @@ def _parse_response_scrutiny_heading_sections(text: str) -> dict[str, str] | Non
     for index, match in enumerate(matches):
         heading = match.group(1).upper().replace(" ", "_")
         if heading in sections:
-            raise ValueError(f"duplicate scrutiny heading: {heading}")
+            if duplicates is None:
+                raise ValueError(f"duplicate scrutiny heading: {heading}")
+            duplicates.append(heading)
+            continue
         section_end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
         first_line = match.group(2).strip()
         continuation = text[match.end() : section_end].strip()

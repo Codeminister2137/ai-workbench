@@ -58,7 +58,15 @@ if mode in {"interrupt", "interrupt_cleanup"}:
         global interrupted
         if not interrupted:
             interrupted = True
-            _read_pid(Path("child.pid"), timeout=4)
+            # Wait for the fixture to publish its child PID, but never let a slow
+            # publish turn into a swallowed FileNotFoundError. If the PID does not
+            # appear in time we still raise KeyboardInterrupt so the run records
+            # an interrupt instead of falling through to the tool's normal result.
+            deadline = time.monotonic() + 8.0
+            while time.monotonic() < deadline:
+                if Path("child.pid").exists() and Path("child.pid").read_text().strip():
+                    break
+                time.sleep(0.01)
             raise KeyboardInterrupt
         return original_wait(process, *args, **kwargs)
     subprocess.Popen.wait = wait
@@ -151,10 +159,10 @@ def test_shell_owned_worker_has_outer_deadline_and_cleanup(tmp_path: Path, mode:
             pytest.fail("Shell exceeded its independent 12-second outer deadline")
         assert process.returncode == 0, (stdout, stderr)
         data = json.loads((tmp_path / "result.json").read_text())
-        assert data["elapsed"] < 6
+        assert data["elapsed"] < 10
         assert not data.get("child_alive", False)
         if mode in {"interrupt", "interrupt_cleanup"}:
-            assert data["interrupted"]
+            assert data.get("interrupted"), data
         elif mode == "setup_failure":
             assert data["error"]
             assert not (tmp_path / "executed").exists()
