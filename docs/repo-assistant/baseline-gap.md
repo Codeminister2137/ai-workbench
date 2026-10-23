@@ -37,10 +37,11 @@ Go Kimi K2.7 Code, including streaming; private state remains out of storage and
 reports. Failed native closeouts now retain any visible terminal partial report,
 labelled incomplete/not accepted. Neither fix proves the cause of earlier failures.
 
-Next: resolve production output-budget configuration before another fresh trial.
-Native admission defaults to 8192 and this coding path has no CLI output-budget
-option. A host override after admission would understate the reserved output;
-do not use it as faithful CLI acceptance. Owner standing authorization covers
+Owner selected the automatic 16000-token default for native coding on exactly
+Go Kimi K2.7 Code. It applies before admission when the request has no explicit
+limit; other models retain their defaults. A host override after admission would
+understate reserved output, so the next fresh trial must verify the actual admitted
+budget reaches transport unchanged. Owner standing authorization covers
 comparable bounded Go runs within existing limits; fresh named preparation and
 billing/privacy admission still apply. Retain full root instructions, exact input
 provenance/history, original tests, frozen review and owned cleanup. No general

@@ -1,9 +1,9 @@
 # Current task - ATTENDED; Go live continuation INCOMPLETE
 
-Branch: develop. Validated code checkpoint 48d31f2; follow-up merge 95f85c0.
-Original logical integration was pushed at d277293; follow-up is now merged.
-Push to origin/develop is authorized; verify actual local/remote heads on resume.
-No timers, sleep action or unattended window.
+Branch: fix/go-kimi-default-output-budget. Previous develop integration d45f791
+is pushed. Owner selected the automatic Go/Kimi 16000 default; implementation and
+98 focused checks pass, full root suite and fresh acceptance are next. No timers,
+sleep action or unattended window. Merge/push to develop remains authorized.
 
 ## Owner authority and pending decision
 
@@ -19,11 +19,11 @@ Owner also reported broken summaries. Repository closeouts must start with exact
 `## **SUMMARY**`; keep the body concise. A clarification about which summary was
 meant is pending, but restore that documented marker now.
 
-Production decision asked asynchronously: explicit provider-neutral
---max-output-tokens option (recommended; retain defaults; caller selects Kimi's
-budget) versus automatic Kimi-specific 16000 default (easier use, higher per-call
-allowance). Do not implement disputed defaults before the owner chooses.
-This is a production behavior decision, not another run authorization request.
+Production decision resolved: after confirming the proposed 16000 output-token
+cap per call, owner said "Then use the default." Implement automatic 16000 for
+exactly opencode_go / kimi-k2.7-code before native context admission. Explicit
+request limits and other models' defaults stay unchanged; no new CLI flag.
+Recorded in docs/decisions.md and source-state. 98 focused checks pass.
 
 ## Verified changes
 
@@ -62,18 +62,18 @@ receipts even when later generation fails; safe transport frame/type diagnostics
 Original a's omitted worker tools were independently recovered/verified against
 all five saved SQLite hashes; original receipt remains unchanged.
 
-e is DRAFT ONLY / NOT LAUNCHED (artifacts/go-review-continuation-prep-20261023e).
-It tentatively selects 16000 tokens, 8 attempts, 660 total seconds, but the current
-worker overrides output AFTER native admission, whose default remains 8192.
-Do not launch or call it ready until output is set before real admission. No
-canonical fixture was prepared and no live allowance consumed. Offline controls
-do not cover that admission discrepancy. Keep input provenance/root instructions,
-exact history, actual tool coverage, frozen source/tests/index and ownership guards.
-After the production budget decision, expose the existing neutral request field
-through the chosen path, test it, prepare clean fresh inputs and run once under the
-standing authorization. Independently inspect reports; structural audit alone
-cannot establish truthful/substantive review. Full coding/orchestrated/fallback
-acceptance remains open beyond this read-only component slice.
+e is still UNLAUNCHED (artifacts/go-review-continuation-prep-20261023e).
+Fresh bounds: 16000 tokens/call, 8 attempts total/4 per turn, 660 total seconds,
+300 per turn/290 per request, 20 cleanup reserve, 24 tools/12 per turn.
+The old draft imposed output AFTER admission. Remove that override and require
+actual production admission to supply 16000 before each guarded provider call;
+audit admission/transport agreement. Preserve earlier draft control receipts.
+Then run offline controls and independent proof; prepare clean exclusive canonical
+inputs only after the new code's full root suite passes. Launch once under standing
+authorization. Independently inspect reports; structural success does not certify
+report quality. Full coding/orchestrated/fallback acceptance stays open beyond this
+read-only review slice. Preserve root instructions, exact history, original tests,
+frozen source/index and owned cleanup. No private reasoning logging/persistence.
 
 Five matcher disagreements remain unapplied; do not change the mapping table
 without owner decision. Shell/PID, MCP warning policy and advisory scrutiny repairs

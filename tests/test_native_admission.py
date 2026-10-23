@@ -146,6 +146,55 @@ def test_complete_instructions_and_metadata_survive_estimated_admission(admitted
     assert "estimated_utf8" in diagnostics[0] and "verified_token_count=false" in diagnostics[0]
 
 
+@pytest.mark.parametrize("stream", [False, True])
+@pytest.mark.parametrize("explicit", [None, 1024])
+def test_go_kimi_default_is_reserved_before_transport(stream, explicit):
+    client, diagnostics = RecordingClient(), []
+    wrapper = NativeCodingClient(
+        client,
+        BackendConfig(ProviderKind.OPENCODE_GO, "kimi-k2.7-code"),
+        256000,
+        diagnostics.append,
+    )
+    request = AIRequest((AIMessage(MessageRole.USER, "Review"),), max_output_tokens=explicit)
+    if stream:
+        list(wrapper.stream(request))
+    else:
+        wrapper.complete(request)
+    expected = 16000 if explicit is None else explicit
+    assert client.requests[0].max_output_tokens == expected
+    assert f"output_tokens={expected} " in diagnostics[0]
+    assert request.max_output_tokens == explicit
+
+
+def test_go_kimi_default_refuses_insufficient_context_without_lowering_budget():
+    client = RecordingClient()
+    wrapper = NativeCodingClient(
+        client, BackendConfig(ProviderKind.OPENCODE_GO, "kimi-k2.7-code"), 12000
+    )
+    with pytest.raises(ProviderError, match="does not fit"):
+        wrapper.complete(AIRequest((AIMessage(MessageRole.USER, "Review"),)))
+    assert not client.requests
+
+
+@pytest.mark.parametrize(
+    "provider,model,expected",
+    [
+        (ProviderKind.OPENCODE_GO, "glm-5.3", 8192),
+        (ProviderKind.OPENAI, "kimi-k2.7-code", 8192),
+        (ProviderKind.OPENCODE_GO, "kimi-k2.7-code", 16000),
+    ],
+)
+def test_output_default_is_scoped_even_with_unknown_capacity(provider, model, expected):
+    for context in (256000, None):
+        client = RecordingClient()
+        wrapper = NativeCodingClient(client, BackendConfig(provider, model), context)
+        wrapper.complete(AIRequest((AIMessage(MessageRole.USER, "Review"),)))
+        assert client.requests[0].max_output_tokens == (
+            None if context is None and expected == 8192 else expected
+        )
+
+
 @pytest.mark.parametrize("component", ["instructions", "tool_schema", "history", "output"])
 def test_overflow_refuses_without_truncation_or_inference(admitted, component):
     wrapper, client, _ = admitted

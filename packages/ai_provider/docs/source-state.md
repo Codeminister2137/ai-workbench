@@ -619,8 +619,17 @@ OpenAI-compatible endpoint. Gateway-specific enforcement remains unverified.
 
 The Go adapter now carries this field through ADR-055's transient origin-bound
 continuation contract for exactly `kimi-k2.7-code`, including streamed fragments.
-Raw metadata excludes reasoning fields. No reasoning persistence, model switch,
-automatic budget increase or inference authorization is implied. Saved-session
+Raw metadata excludes reasoning fields. That protocol repair implied no reasoning persistence, model switch, budget
+increase or inference authorization. Saved-session
 restart still restores visible conversation, not private continuation state.
 Do not classify an output-limited empty answer as model-quality acceptance or
 silently reinterpret reasoning as delivered answer text.
+
+
+Owner follow-up (2026-10-23): selected the automatic 16000-token default for
+native coding on exactly opencode_go / kimi-k2.7-code. It is set before context
+admission; explicit request budgets still win and other models retain their
+existing defaults. Context insufficiency refuses without silently reducing this
+model's default. Deterministic transport/admission tests cover normal/streaming,
+explicit overrides, scope isolation and unknown/small capacities. This does not
+change account settings or establish live acceptance.

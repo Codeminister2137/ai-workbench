@@ -32,8 +32,9 @@ The shell/PID ownership repairs, MCP warning policy and advisory scrutiny repair
 are integrated. Offline acceptance-controller and Go two-turn harness checks do
 not establish live paid-route completion. October 23 Go review trials stopped on
 timeout/output exhaustion; continuation replay is now repaired under ADR-055.
-Production output-budget configuration needs an owner decision before fresh
-continuation acceptance. Set the selected budget before native admission; retain
+Owner selected an automatic 16000-token native coding default for exactly Go
+Kimi K2.7 Code. Verify admission/transport agree in fresh continuation acceptance;
+retain
 root instructions, original tests, frozen review, finite bounds and owned cleanup.
 Comparable bounded Go runs have standing owner approval; keep each scope named.
 See [the current baseline assessment](baseline-gap.md) for evidence and remaining

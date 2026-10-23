@@ -210,6 +210,14 @@ class NativeCodingClient:
             )
             if reason:
                 raise ProviderError(reason, category=ProviderErrorCategory.CONFIGURATION)
+        # Kimi's reasoning and visible answer share its output allowance. Apply
+        # the owner-approved default before sizing, never after admission.
+        if (
+            request.max_output_tokens is None
+            and self.config.provider is ProviderKind.OPENCODE_GO
+            and model == "kimi-k2.7-code"
+        ):
+            request = replace(request, max_output_tokens=16000)
         context = self.context_tokens
         if context is None:
             self._report(
