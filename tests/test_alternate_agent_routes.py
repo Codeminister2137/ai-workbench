@@ -204,14 +204,14 @@ def test_cli_cost_policy_precedence(tmp_path: Path, capsys) -> None:
         "--privacy",
         "external_allowed",
         "--route-id",
-        "requesty-openai-gpt-5-mini",
+        "requesty/openai/gpt-5-mini",
         "--skip-prompt-review",
     ]
     assert main(args + ["--user-config", str(config)]) == 0
-    assert "route_id: requesty-openai-gpt-5-mini" not in capsys.readouterr().out
+    assert "route_id: requesty/openai/gpt-5-mini" not in capsys.readouterr().out
     assert (
         main(args + ["--user-config", str(config), "--cost-policy", "prepaid_credits_allowed"]) == 0
     )
-    assert "route_id: requesty-openai-gpt-5-mini" in capsys.readouterr().out
+    assert "route_id: requesty/openai/gpt-5-mini" in capsys.readouterr().out
     assert main(args) == 0
-    assert "route_id: requesty-openai-gpt-5-mini" in capsys.readouterr().out
+    assert "route_id: requesty/openai/gpt-5-mini" in capsys.readouterr().out

@@ -52,7 +52,7 @@ Use the Codex route when you want the native Codex execution workflow:
 .\scripts\repo-assistant.ps1 `
   "Review this repository and identify the smallest safe next change." `
   --privacy external_allowed `
-  --route-id openai-codex-gpt-5-5 `
+  --route-id openai/codex-gpt-5.5 `
   --provider openai --model gpt-5.5 `
   --execute --skip-prompt-review
 ```

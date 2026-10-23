@@ -50,22 +50,22 @@ def _parse_entry(item: object) -> ModelCatalogEntry:
     access_method = AccessMethod(
         _optional_string(item, "access_method", default=_default_access_method(location))
     )
-    route_id = _optional_string(
-        item,
-        "route_id",
-        default=_default_route_id(provider, model),
-    )
-    product = _optional_string(
-        item,
-        "product",
-        default=_default_product(provider, access_method),
-    )
     auth_method = AuthMethod(
         _optional_string(
             item,
             "auth_method",
             default=_default_auth_method(provider, access_method),
         )
+    )
+    product = _optional_string(
+        item,
+        "product",
+        default=_default_product(provider, access_method),
+    )
+    route_id = _optional_string(
+        item,
+        "route_id",
+        default=_default_route_id(provider, product, model),
     )
     billing_source = BillingSource(
         _optional_string(
@@ -129,11 +129,45 @@ def _optional_string(item: dict[str, Any], key: str, *, default: str) -> str:
     return value.strip()
 
 
-def _default_route_id(provider: str, model: str) -> str:
-    normalized_model = (
-        model.lower().replace(":", "-").replace("/", "-").replace(".", "-").replace("_", "-")
-    )
-    return f"{provider.lower()}-{normalized_model}"
+# Human-readable slugs for provider and product values that would otherwise be
+# awkward inside a route id. These mirror the labels the catalog already used
+# before route ids were normalized, so the convention stays stable.
+_PROVIDER_SLUGS = {"opencode_go": "opencode-go"}
+_PRODUCT_SLUGS = {
+    "google_ai_studio": "ai-studio",
+    "openai_api": "api",
+    "requesty_free": "free",
+    "github_copilot": "copilot-cli",
+    "gemini_cli": "gemini-cli",
+}
+
+
+def _slug(value: str, overrides: dict[str, str]) -> str:
+    lowered = value.strip().lower()
+    if lowered in overrides:
+        return overrides[lowered]
+    return lowered.replace("_", "-")
+
+
+def _default_route_id(provider: str, product: str, model: str) -> str:
+    """Derive a route id in the approved ``provider/product-model`` form.
+
+    The provider is always the leading segment. Product and model are joined
+    with ``-``; the product is omitted when it only repeats the provider, so
+    single-product routes read as ``ollama/qwen3:14b`` rather than
+    ``ollama/ollama-qwen3:14b``. Model ids keep their native punctuation
+    (``:``, ``.``, ``/``), so the label shows the real model string instead of
+    a lossy hyphen-mangled form.
+
+    Route ids are opaque keys used for exact-match lookup and display only;
+    they are never parsed back into their components.
+    """
+    provider_slug = _slug(provider, _PROVIDER_SLUGS)
+    product_slug = _slug(product, _PRODUCT_SLUGS)
+    normalized_model = model.strip().lower()
+    if product_slug == provider_slug:
+        return f"{provider_slug}/{normalized_model}"
+    return f"{provider_slug}/{product_slug}-{normalized_model}"
 
 
 def _default_access_method(location: BackendLocation) -> str:

@@ -81,7 +81,7 @@ quality = "standard"
 chat = true
 tools = true
 [[models]]
-route_id = "github-copilot-cli-default"
+route_id = "github/copilot-cli-auto"
 provider = "github"
 product = "github_copilot"
 model = "auto"
@@ -100,7 +100,7 @@ tools = true
     if args.fallback_client == "kiro":
         catalog.write_text(
             catalog.read_text(encoding="utf-8")
-            .replace('route_id = "github-copilot-cli-default"', 'route_id = "kiro-cli-default"')
+            .replace('route_id = "github/copilot-cli-auto"', 'route_id = "kiro/auto"')
             .replace('provider = "github"', 'provider = "kiro"')
             .replace('product = "github_copilot"', 'product = "kiro"')
             .replace('access_method = "copilot_cli"', 'access_method = "kiro_cli"')

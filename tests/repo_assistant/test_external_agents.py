@@ -84,7 +84,7 @@ def test_cli_plans_codex_external_agent_route(capsys, monkeypatch) -> None:
                 "--privacy",
                 "external_allowed",
                 "--route-id",
-                "openai-codex-gpt-5-5",
+                "openai/codex-gpt-5.5",
                 "--provider",
                 "openai",
                 "--model",
@@ -96,7 +96,7 @@ def test_cli_plans_codex_external_agent_route(capsys, monkeypatch) -> None:
         == 0
     )
     output = capsys.readouterr().out
-    assert "route_id: openai-codex-gpt-5-5" in output
+    assert "route_id: openai/codex-gpt-5.5" in output
     assert "access_method: codex_cli" in output
     assert "external_agent_command: codex-test" in output
     assert "external_agent_command_line_json:" in output
@@ -119,7 +119,7 @@ def test_cli_approval_policy_read_only_maps_to_codex_sandbox(capsys, monkeypatch
                 "--privacy",
                 "external_allowed",
                 "--route-id",
-                "openai-codex-gpt-5-5",
+                "openai/codex-gpt-5.5",
                 "--provider",
                 "openai",
                 "--model",
@@ -153,7 +153,7 @@ def test_cli_approval_policy_trusted_local_maps_to_commit_capable_codex_sandbox(
                 "--privacy",
                 "external_allowed",
                 "--route-id",
-                "openai-codex-gpt-5-5",
+                "openai/codex-gpt-5.5",
                 "--provider",
                 "openai",
                 "--model",
@@ -184,7 +184,7 @@ def test_cli_rejects_codex_commit_request_without_trusted_local(monkeypatch) -> 
                 "--privacy",
                 "external_allowed",
                 "--route-id",
-                "openai-codex-gpt-5-5",
+                "openai/codex-gpt-5.5",
                 "--provider",
                 "openai",
                 "--model",
@@ -265,7 +265,7 @@ def test_cli_executes_codex_external_agent_route(
                 "--privacy",
                 "external_allowed",
                 "--route-id",
-                "openai-codex-gpt-5-5",
+                "openai/codex-gpt-5.5",
                 "--provider",
                 "openai",
                 "--model",
@@ -352,7 +352,9 @@ def test_cli_executes_codex_external_agent_route(
     assert final_handoff_details is not None
     assert final_handoff_details["final_answer_available"] is True
     assert final_handoff_details["assistant_response_available"] is False
-    assert final_handoff_details["changed_files"] == [" M example.py"]
+    # The fake agent reports a file_change event, but no file actually changed
+    # on disk: changed_files reflects observed workspace changes, not agent claims.
+    assert final_handoff_details["changed_files"] == []
 
 
 def test_external_agent_jsonl_parser_extracts_failure_and_final_answer() -> None:
@@ -392,7 +394,7 @@ def test_cli_does_not_print_raw_jsonl_when_codex_fails(capsys, monkeypatch) -> N
                 "--privacy",
                 "external_allowed",
                 "--route-id",
-                "openai-codex-gpt-5-5",
+                "openai/codex-gpt-5.5",
                 "--provider",
                 "openai",
                 "--model",
@@ -436,7 +438,7 @@ def test_cli_reports_nonzero_external_agent_exit_without_jsonl_failure(
                 "--privacy",
                 "external_allowed",
                 "--route-id",
-                "openai-codex-gpt-5-5",
+                "openai/codex-gpt-5.5",
                 "--provider",
                 "openai",
                 "--model",
@@ -490,7 +492,7 @@ def test_cli_reports_antigravity_headless_refusal_despite_zero_exit(
                 "--privacy",
                 "external_allowed",
                 "--route-id",
-                "google-antigravity-gemini-3-1-pro",
+                "google/antigravity-gemini-3.1-pro-high",
                 "--approval-policy",
                 "trusted_local",
                 "--execute",
@@ -529,7 +531,7 @@ def test_cli_explains_codex_timeout_without_duplicate_response_header(
                 "--privacy",
                 "external_allowed",
                 "--route-id",
-                "openai-codex-gpt-5-5",
+                "openai/codex-gpt-5.5",
                 "--provider",
                 "openai",
                 "--model",
@@ -665,7 +667,7 @@ def test_cli_preserves_raw_codex_jsonl_in_transcript_only(
                 "--privacy",
                 "external_allowed",
                 "--route-id",
-                "openai-codex-gpt-5-5",
+                "openai/codex-gpt-5.5",
                 "--provider",
                 "openai",
                 "--model",
@@ -715,7 +717,7 @@ def test_cli_can_use_codex_output_last_message_file(
                 "--privacy",
                 "external_allowed",
                 "--route-id",
-                "openai-codex-gpt-5-5",
+                "openai/codex-gpt-5.5",
                 "--provider",
                 "openai",
                 "--model",

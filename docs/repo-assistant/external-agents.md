@@ -30,7 +30,7 @@ retain their existing behavior.
 
 Requesty remains a provider API route using `REQUESTY_API_KEY`. Paid catalog
 routes require `prepaid_credits_allowed`. The separate
-`requesty-free-gemma-4-31b` route uses `free_only` and verifies live zero pricing
+`requesty/free-google/gemma-4-31b-it` route uses `free_only` and verifies live zero pricing
 before every inference request, including tool-loop turns and model overrides.
 Missing or changed prices block inference; there is no paid fallback. Requesty
 currently advertises 200 free requests per day for free models. This pricing
@@ -38,7 +38,7 @@ preflight is not an atomic service-side billing guarantee.
 
 Run opt-in synthetic coding acceptance with
 `uv run python scripts/alternate-agent-acceptance.py`. Select only the free
-Requesty route with `--routes requesty-free-gemma-4-31b`. Live completion/tool
+Requesty route with `--routes requesty/free-google/gemma-4-31b-it`. Live completion/tool
 tests require `AI_PROVIDER_RUN_REQUESTY_FREE_INTEGRATION=1`; they assert reported
 zero cost. Ordinary tests mock the API and do not spend requests. The tested
 Gemma route reports no training but 30-day retention; acceptance sends only
@@ -65,12 +65,12 @@ controls are not mapped yet.
 
 ```powershell
 .\scripts\repo-assistant.ps1 --mode ask "Reply CONNECTED; do not call tools." `
-  --execute --privacy external_allowed --route-id kiro-cli-default `
+  --execute --privacy external_allowed --route-id kiro/auto `
   --approval-policy trusted_local --skip-prompt-review
 ```
 
-Other route IDs: `github-copilot-cli-default`,
-`google-antigravity-gemini-3-1-pro`, and `requesty-openai-gpt-5-mini`.
+Other route IDs: `github/copilot-cli-auto`,
+`google/antigravity-gemini-3.1-pro-high`, and `requesty/openai/gpt-5-mini`.
 Model slugs/entitlement may change: inspect the client's model list or use
 `--model`. Kiro and Copilot default routes use native automatic selection.
 Antigravity uses stream JSON input/output; Kiro uses ACP JSONL. Copilot supplies
@@ -168,12 +168,12 @@ offline MCP success do not establish live quality or general chat parity.
 The catalog includes subscription/client-backed coding-agent routes alongside
 provider API routes:
 
-- Codex CLI: `openai-codex-gpt-5-5`, access method `codex_cli`;
-- Google Antigravity: `google-antigravity-gemini-3-1-pro` and
-  `google-antigravity-gemini-3-8-flash`, access method `antigravity_cli`;
-- GitHub Copilot placeholder: `github-copilot-cli-default`, access method
+- Codex CLI: `openai/codex-gpt-5.5`, access method `codex_cli`;
+- Google Antigravity: `google/antigravity-gemini-3.1-pro-high` and
+  `google/antigravity-gemini-3.8-flash-high`, access method `antigravity_cli`;
+- GitHub Copilot placeholder: `github/copilot-cli-auto`, access method
   `copilot_cli`;
-- Kiro placeholder: `kiro-cli-default`, access method `kiro_cli`.
+- Kiro placeholder: `kiro/auto`, access method `kiro_cli`.
 
 Codex execution is wired first. The CLI discovers the Codex command from
 `CODEX_COMMAND`, then PATH, then the PyCharm bundled Codex binary. Example:
@@ -182,7 +182,7 @@ Codex execution is wired first. The CLI discovers the Codex command from
 .\scripts\repo-assistant.ps1 `
   "Review this repository and identify the smallest safe next change." `
   --privacy external_allowed `
-  --route-id openai-codex-gpt-5-5 `
+  --route-id openai/codex-gpt-5.5 `
   --provider openai --model gpt-5.5 `
   --execute --skip-prompt-review
 ```
@@ -416,7 +416,7 @@ authentication checks, tool connections or provider probes:
 
 ```powershell
 uv run --no-sync ai-assistant --fallback-readiness `
-  --route-id openai-codex-gpt-5-5 --privacy public_or_low_risk `
+  --route-id openai/codex-gpt-5.5 --privacy public_or_low_risk `
   --cost-policy allowances_allowed
 ```
 

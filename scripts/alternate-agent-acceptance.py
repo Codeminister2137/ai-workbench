@@ -15,10 +15,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 ROUTES = (
-    "requesty-free-gemma-4-31b",
-    "google-antigravity-gemini-3-1-pro",
-    "github-copilot-cli-default",
-    "kiro-cli-default",
+    "requesty/free-google/gemma-4-31b-it",
+    "google/antigravity-gemini-3.1-pro-high",
+    "github/copilot-cli-auto",
+    "kiro/auto",
 )
 SOURCE = "def add(a, b):\n    return a - b\n"
 TESTS = """import unittest

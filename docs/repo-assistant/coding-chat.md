@@ -14,7 +14,7 @@ available subscription allowance:
 
 ```powershell
 .\scripts\repo-assistant.ps1 --mode coding-chat --execute `
-  --route-id openai-codex-gpt-6-1-sol --shared-tools coding `
+  --route-id openai/codex-gpt-6.1-sol --shared-tools coding `
   --privacy public_or_low_risk --cost-policy allowances_allowed `
   --approval-policy interactive --skip-prompt-review
 ```

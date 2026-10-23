@@ -119,7 +119,7 @@ def test_automatic_catalog_prefers_tested_local_tools_preserving_explicit_choice
     assert recommend_model(profile, eligible).selected.backend.model == "gpt-oss:20b"
     for profile in (
         coding_task_profile(model_override="qwen2.5-coder:14b"),
-        coding_task_profile(route_id_override="ollama-qwen2-5-coder-14b"),
+        coding_task_profile(route_id_override="ollama/qwen2.5-coder:14b"),
     ):
         assert native_coding_catalog(catalog, profile) is catalog
         assert recommend_model(profile, catalog).selected.backend.model == "qwen2.5-coder:14b"

@@ -89,13 +89,14 @@ def test_complete_sends_session_header_and_user_agent(monkeypatch):
     assert response.usage.total_tokens == 12
 
 
-def test_complete_without_session_does_not_send_header(monkeypatch):
+def test_complete_without_session_sends_generated_header(monkeypatch):
     calls = []
 
     def send(request, *, timeout):
         calls.append(request)
         headers = {key.lower(): value for key, value in request.headers.items()}
-        assert "x-opencode-session" not in headers
+        assert "x-opencode-session" in headers
+        assert len(headers["x-opencode-session"]) == 32  # uuid4 hex
         return Response({"choices": [{"message": {"content": "ok"}, "finish_reason": "stop"}]})
 
     monkeypatch.setattr("ai_provider.adapters.openai_compatible.urlopen", send)
