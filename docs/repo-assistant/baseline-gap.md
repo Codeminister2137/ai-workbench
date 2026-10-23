@@ -1,12 +1,37 @@
 # Distance to established baseline CLI usability
 
-## Immediate paid-agent baseline — 2026-10-21
+## Immediate paid-agent baseline — updated 2026-10-23
 
 Owner clarification: the immediate baseline is ordinary development with paid
 agents through this CLI, with fallback. Local/free-model quality experiments,
 allowance-reset automation and eventual IDE-host independence are separate work;
 their unfinished results must not become prerequisites for this narrower goal.
 Historical trials retain their original verdicts and broader milestones remain open.
+
+Current offline checkpoint: the shell/PID ownership repairs are integrated and
+the full root suite passed 2,756 tests with nine skips. ADR-064 supplies visible
+warnings for unresolved MCP recovery; ADR-066 makes readable scrutiny advisory
+by default and supplies bounded scrutiny-fed repair. The pending-policy and
+command-gap descriptions in the historical October 21 evidence below are not
+current implementation blockers.
+
+The Go coding-chat acceptance harness had two concrete fidelity defects: it
+queued the follow-up twice and allowed first-turn edits to be hidden by the
+final-only checks. The corrected harness submits exactly two requests to one
+saved session, stops before follow-up on first-turn failure or premature edits,
+and checks protected tests before final host execution. Host validation ignores
+stale fixture bytecode, has finite timeouts, and preserves partial CLI logs.
+Offline controls use scripted CLI replies and real test processes; they do not
+establish paid-route report quality or authorize another provider request.
+
+Next: prepare a fresh guarded Go continuation acceptance, retaining full root
+instructions, exact input provenance, process ownership, explicit total request/
+time bounds and frozen review. Check account/privacy/overage admission and obtain
+the named hosted-inference allowance before launch. Do not replay the October 22
+approval-stopped trial or treat a passing arithmetic fixture as general baseline
+completion. The harness's fixture directory is not an OS sandbox.
+
+### Historical paid-native checkpoint — 2026-10-21
 
 The native-client path already has useful live evidence: the October 13 Codex
 task produced a correct change, meaningful companion tests and real execution;
