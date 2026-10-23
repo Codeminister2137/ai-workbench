@@ -26,7 +26,20 @@ integrated report-fidelity acceptance remain incomplete. The minimal loop is
 the owner-approved design; the full research refinement guard set is deferred.
 Research and pending matcher choices are preserved in the dated artifact briefs.
 
-## Current paid-native checkpoint: 2026-10-21
+## Current paid-route baseline: 2026-10-23
+
+The shell/PID ownership repairs, MCP warning policy and advisory scrutiny repair
+are integrated. Offline acceptance-controller and Go two-turn harness checks do
+not establish live paid-route completion. October 23 Go review trials stopped on
+timeout/output exhaustion; continuation replay is now repaired under ADR-055.
+Production output-budget configuration needs an owner decision before fresh
+continuation acceptance. Set the selected budget before native admission; retain
+root instructions, original tests, frozen review, finite bounds and owned cleanup.
+Comparable bounded Go runs have standing owner approval; keep each scope named.
+See [the current baseline assessment](baseline-gap.md) for evidence and remaining
+limits. Local synthetic parity remains separate from the paid-route baseline.
+
+## Historical paid-native checkpoint: 2026-10-21
 
 Prioritize ordinary development through established paid clients with fallback.
 Current-route work delivered reviewed diagnostic process ownership, conservative

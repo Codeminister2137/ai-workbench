@@ -1,66 +1,81 @@
-﻿# Current task — ATTENDED, COMPLETE offline
+# Current task - ATTENDED; Go live continuation INCOMPLETE
 
-Owner-authorized logical commits, integration to develop and offline successor
-implementation are complete. Broader CLI live-quality acceptance remains INCOMPLETE.
-No unattended window, power action, paid inference or live model call is active.
+Branch: fix/go-coding-chat-acceptance-turns. Current code checkpoint 48d31f2.
+Original logical integration is merged/pushed to develop at d277293. This follow-up
+has not yet merged/pushed. No timers, sleep action or unattended window.
 
-## Integration and validation
+## Owner authority and pending decision
 
-Thirteen logical feature commits were merged and pushed to develop at 17d788d.
-The mapping table was included unchanged after explicit owner confirmation; its
-SHA-256 stayed 3c6a4488987491e112f02415535101b6e495230ddd18321438b9993d28c09cd9.
-All five matcher proposals remain unapplied and require a separate owner decision.
-No .env, sleep receipts or temp OpenCode harness files were committed.
+Owner confirmed 2026-10-23 that Go Extra Usage is disabled and that all comparable
+bounded Go acceptance runs are approved for now. Do not ask again for each such
+run. Prepare fresh named input/path/time/call/token bounds; retain existing model,
+privacy, account/billing boundaries and first-failure stops. No fallback, paid
+overage, account setting change, model switch or replay of consumed trials.
+Remaining account quota stays unknown. Existing safe bootstrap supplies the key;
+never print/commit .env or private continuation state.
 
-Full suite: 2756 passed, 9 skipped in 232.53 seconds. Two matcher-test optional
-field assertions were added afterward; 19 matcher tests and repository Pyright
-passed. The actual pre-push Pyright and full test-runner hooks also passed.
+Owner also reported broken summaries. Repository closeouts must start with exact
+`## **SUMMARY**`; keep the body concise. A clarification about which summary was
+meant is pending, but restore that documented marker now.
 
-## Offline successor evidence
+Production decision asked asynchronously: explicit provider-neutral
+--max-output-tokens option (recommended; retain defaults; caller selects Kimi's
+budget) versus automatic Kimi-specific 16000 default (easier use, higher per-call
+allowance). Do not implement disputed defaults before the owner chooses.
+This is a production behavior decision, not another run authorization request.
 
-artifacts/cli-baseline-successor-20261023a/ contains the first complete successor
-and evidence at checkpoint 17d788d. It retains coding-chat --orchestrated, pinned
-local route/runtime/context, all 18 ordinary tools, complete instruction/history
-guards, five protected originals, meaningful companions, frozen read-only review,
-independent oracle, admission, process ownership and cleanup.
+## Verified changes
 
-All primary, auxiliary and scrutiny calls share phase/total counters and time
-bounds. Limits: 32 calls/40 tools/7200 seconds including 300 cleanup; coding
-20 calls/28 tools/4500 seconds, review 12 calls/12 tools/2400 seconds. Pending
-support roles reserve one call and 600 seconds each inside those bounds.
+4a7aca0 fixes duplicated Go acceptance follow-up, protects first-turn source/tests,
+refuses modified tests before executing them, preserves exception logs and avoids
+stale bytecode during finite host validation. Earlier root 2767 pass / 9 skip.
+f4ef561 preserves terminal visible partial native reports in failed closeouts and
+saved chat, labelled incomplete/not accepted; excludes tool requests and private
+continuation state. 58 focused checks and root 2770 pass / 9 skip.
+518b8e1 extends ADR-055 to exactly Go kimi-k2.7-code: transient reasoning_content
+capture/replay, including streaming, only to same provider/model/endpoint; metadata
+scrubbed, no persistence. 90 focused adapter/loop/admission/transcript checks pass.
+Official Kimi guide recommends >=16000 output tokens, includes reasoning in this
+budget and requires preserved thinking. Facts recorded in source-state and ADR.
+48d31f2 isolates external-agent review fixture from the real workspace. Root run
+at 518b8e1 failed 1 test because it observed concurrent artifact writes in real repo;
+preserved log: artifacts/go-kimi-continuation-full-suite-20261023.log. All 28 tests
+in that module pass after isolation. Full root rerun: 2778 passed / 9 skipped in 237.67 seconds.
+Receipt: artifacts/go-kimi-continuation-full-suite-fixed-20261023.log.
 
-322 guard tests pass. The real scripted CLI workflow uses 17 calls (13 primary,
-2 auxiliary, 2 scrutiny), 13 tools and one ordinary repair. Actual test exits are
-[1,0,0]. Independent audit verifies 7 tests, 3616 oracle cases, both reports in
-session and delivered output, protected inputs/index, frozen review and cleanup
-of 21 workflow plus 2 independent children. Windows parent/birth/seal smoke passes
-with zero provider requests. Lint/format/Pyright pass on helper definitions;
-the deliberately defective protected fixture is excluded from helper lint/tests.
+## Preserved live evidence / next boundary
 
-ci/prepare.py and audit_preparation.py passed at 17d788d; original preparation
-and audit remain byte-preserved in ci/preparation-before-20261023a/.
-Final checkpoint refreshes use a fresh sibling successor directory (20261023b)
-and a second ci archive, preserving a's sealed evidence. Read the latest sibling's
-results/preparation/audit receipts for its exact checkpoint. No seal is an inference
-grant. Both acceptance.py --live and unprepared/changed-input launches refuse.
+artifacts/go-review-continuation-prep-20261023a through d are CONSUMED failures.
+Each made two provider attempts and executed five valid inspections; no second
+saved-session turn started. All four verified owned child exit/cleanup. a/b timed
+out waiting for second response at 60 seconds; b safe stack locates HTTP response
+status wait, not a proven remote cause. c returned at 71.77 seconds and exhausted
+4096 output tokens. d returned at 124.44 seconds and exhausted 8192 tokens with
+zero visible report characters. No report-quality or baseline pass. Read their
+failure-analysis.json, worker-result.json and live-controller.json. No raw
+reasoning text was printed/persisted. Original failures are not regraded.
 
-## Next baseline action
+Fresh private worker b+ captures tools at actual BaseTool.run completion, retaining
+receipts even when later generation fails; safe transport frame/type diagnostics.
+34 offline controls, owned scripted CLI composition and independent audits pass.
+Original a's omitted worker tools were independently recovered/verified against
+all five saved SQLite hashes; original receipt remains unchanged.
 
-The requested offline implementation is complete. Before any real-model acceptance,
-inspect current manifests/seals and settings, define a fresh named finite allowance
-for the intended acceptance question, and refresh any stale snapshots. Preserve
-historical trials; never replay or regrade them. No matcher decision was made.
-Relevant local plans remain repo-assistant-cli-parity-plan, deferred-baseline-work,
-and the closed unattended-work-plan. Broader application DOCX plans are unrelated.
-Persistent unattended-execution reliability goal remains OPEN; this attended work
-does not validate a full unattended window.
+e is DRAFT ONLY / NOT LAUNCHED (artifacts/go-review-continuation-prep-20261023e).
+It tentatively selects 16000 tokens, 8 attempts, 660 total seconds, but the current
+worker overrides output AFTER native admission, whose default remains 8192.
+Do not launch or call it ready until output is set before real admission. No
+canonical fixture was prepared and no live allowance consumed. Offline controls
+do not cover that admission discrepancy. Keep input provenance/root instructions,
+exact history, actual tool coverage, frozen source/tests/index and ownership guards.
+After the production budget decision, expose the existing neutral request field
+through the chosen path, test it, prepare clean fresh inputs and run once under the
+standing authorization. Independently inspect reports; structural audit alone
+cannot establish truthful/substantive review. Full coding/orchestrated/fallback
+acceptance remains open beyond this read-only component slice.
 
-## Resume prompt
-
-Repository C:\Users\Jakub\PycharmProjects\AI-projects. Read CURRENT_CONTEXT.md
-and docs/plans/unattended-work-plan.md; verify branch, HEAD, status and the latest
-cli-baseline-successor-20261023* results. Offline runner work is complete; broader
-live CLI quality is incomplete. Prepare the next bounded acceptance question under
-existing local authorization; preserve pinned settings, phase/total support bounds,
-all original-test/frozen-review/oracle/cleanup guards and historical results.
-Pause for owner decision before applying any matcher disagreement.
+Five matcher disagreements remain unapplied; do not change the mapping table
+without owner decision. Shell/PID, MCP warning policy and advisory scrutiny repairs
+are already integrated; ci/successor snapshots remain historical, never replay.
+Relevant private plans: repo-assistant-cli-parity-plan.md and
+opencode-go-integration-first-20261022.md; older unattended plan is CLOSED.

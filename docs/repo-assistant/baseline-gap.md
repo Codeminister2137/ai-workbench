@@ -1,12 +1,53 @@
 # Distance to established baseline CLI usability
 
-## Immediate paid-agent baseline — 2026-10-21
+## Immediate paid-agent baseline — updated 2026-10-23
 
 Owner clarification: the immediate baseline is ordinary development with paid
 agents through this CLI, with fallback. Local/free-model quality experiments,
 allowance-reset automation and eventual IDE-host independence are separate work;
 their unfinished results must not become prerequisites for this narrower goal.
 Historical trials retain their original verdicts and broader milestones remain open.
+
+Current offline checkpoint: the shell/PID ownership repairs are integrated and
+the full root suite passed 2,756 tests with nine skips. ADR-064 supplies visible
+warnings for unresolved MCP recovery; ADR-066 makes readable scrutiny advisory
+by default and supplies bounded scrutiny-fed repair. The pending-policy and
+command-gap descriptions in the historical October 21 evidence below are not
+current implementation blockers.
+
+The Go coding-chat acceptance harness had two concrete fidelity defects: it
+queued the follow-up twice and allowed first-turn edits to be hidden by the
+final-only checks. The corrected harness submits exactly two requests to one
+saved session, stops before follow-up on first-turn failure or premature edits,
+and checks protected tests before final host execution. Host validation ignores
+stale fixture bytecode, has finite timeouts, and preserves partial CLI logs.
+Offline controls use scripted CLI replies and real test processes; they do not
+establish paid-route report quality or authorize another provider request.
+
+Fresh bounded Go read-only review attempts on October 23 remain failed: two
+60-second response waits timed out, then longer requests returned output-limited
+responses at 4096 and 8192 tokens. The latter had no visible report text. Inspections
+and owned cleanup succeeded, but neither saved-session continuation nor report
+quality was established. Preserve those trials; do not regrade them after fixes.
+
+Investigation found two preparation/protocol gaps: the official Kimi guide
+recommends at least 16000 output tokens, and the Go adapter dropped required
+`reasoning_content`. ADR-055 now covers transient origin-bound replay for exactly
+Go Kimi K2.7 Code, including streaming; private state remains out of storage and
+reports. Failed native closeouts now retain any visible terminal partial report,
+labelled incomplete/not accepted. Neither fix proves the cause of earlier failures.
+
+Next: resolve production output-budget configuration before another fresh trial.
+Native admission defaults to 8192 and this coding path has no CLI output-budget
+option. A host override after admission would understate the reserved output;
+do not use it as faithful CLI acceptance. Owner standing authorization covers
+comparable bounded Go runs within existing limits; fresh named preparation and
+billing/privacy admission still apply. Retain full root instructions, exact input
+provenance/history, original tests, frozen review and owned cleanup. No general
+baseline completion is implied by the eventual read-only review. The original
+arithmetic harness's fixture directory is not an OS sandbox.
+
+### Historical paid-native checkpoint — 2026-10-21
 
 The native-client path already has useful live evidence: the October 13 Codex
 task produced a correct change, meaningful companion tests and real execution;

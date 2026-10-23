@@ -19,6 +19,104 @@ from ai_provider.chat_transcripts import SQLiteChatTranscriptStore
 from ai_provider.closeout import format_cli_closeout, safe_fallback_handoff
 
 
+@pytest.mark.parametrize("scenario", ["limited", "empty", "transport_after_tool"])
+def test_failed_native_report_survives_cli_and_chat_restart(
+    tmp_path, monkeypatch, capsys, scenario
+):
+    from ai_provider import AIToolCall
+    from ai_provider.contracts import FinishReason
+
+    catalog = tmp_path / "catalog.toml"
+    catalog.write_text(
+        """[[models]]
+route_id = "primary"
+provider = "ollama"
+product = "ollama"
+model = "primary"
+location = "local"
+access_method = "local_runtime"
+auth_method = "none"
+billing_source = "local_free"
+cost_policy_tier = "local_only"
+quality = "high"
+[models.capabilities]
+chat = true
+tools = true
+""",
+        encoding="utf-8",
+    )
+    (tmp_path / "user-config.toml").write_text("[fallback]\nenabled = false\n")
+    (tmp_path / "review.txt").write_text("Read-only input")
+    calls = []
+
+    class Client:
+        def complete(self, request):
+            calls.append(request)
+            if scenario == "transport_after_tool":
+                if len(calls) > 1:
+                    raise ProviderError("Synthetic transport failure")
+                tools = (AIToolCall("read", "read_file", {"path": "review.txt"}),)
+                return AIResponse(
+                    AIMessage(MessageRole.ASSISTANT, "Intermediate tool request", tool_calls=tools),
+                    BackendInfo("ollama", "primary", BackendLocation.LOCAL),
+                    tool_calls=tools,
+                )
+            return AIResponse(
+                AIMessage(
+                    MessageRole.ASSISTANT,
+                    "Partial review ends here" if scenario == "limited" else "",
+                ),
+                BackendInfo("ollama", "primary", BackendLocation.LOCAL),
+                finish_reason=FinishReason.LENGTH,
+            )
+
+    monkeypatch.setattr(cli, "create_chat_client", lambda config: Client())
+    monkeypatch.setattr(cli, "_fallback_target_compatible", lambda *args: True)
+    monkeypatch.setattr("builtins.input", lambda prompt: "/exit")
+    assert (
+        cli.main(
+            [
+                "--mode",
+                "coding-chat",
+                "--execute",
+                "--shared-tools",
+                "coding",
+                "--approval-policy",
+                "read_only",
+                "--repo-root",
+                str(tmp_path),
+                "--catalog",
+                str(catalog),
+                "--provider",
+                "ollama",
+                "--model",
+                "primary",
+                "--skip-prompt-review",
+                "Review the supplied input.",
+            ]
+        )
+        == 1
+    )
+    output = capsys.readouterr().out
+    store = SQLiteChatTranscriptStore(tmp_path / "data/repo-assistant-chats.sqlite3")
+    session = store.latest_session(repo_root=tmp_path)
+    assert session is not None
+    saved = store.list_messages(session.session_id)[-1]
+    assert saved.metadata is not None
+    assert saved.metadata["returncode"] == 1
+    assert saved.metadata["execution_status"] == "failed"
+    assert output.count("## **SUMMARY**") == 1
+    if scenario == "limited":
+        label = "Incomplete agent report (execution failed; not accepted):"
+        assert label in output and label in saved.content
+        assert "Partial review ends here" in output and "Partial review ends here" in saved.content
+        assert "No final response was captured" not in output
+    else:
+        assert "No final response was captured" in output
+        assert "Incomplete agent report" not in saved.content
+        assert "Intermediate tool request" not in saved.content
+
+
 @pytest.mark.parametrize("scenario", ["direct", "switch", "exhausted", "unknown", "recovered"])
 def test_native_cli_error_context_survives_chat_restart(tmp_path, monkeypatch, capsys, scenario):
     catalog = tmp_path / "catalog.toml"

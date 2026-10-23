@@ -1,8 +1,8 @@
 """OpenCode Go coding-chat continuity acceptance.
 
 Runs a two-turn coding-chat conversation against the OpenCode Go
-``opencode-go/go-kimi-k2.7-code`` route and validates that the assistant remembers context
-across turns and completes the task. This is a continuity check, not a
+``opencode-go/go-kimi-k2.7-code`` route and checks continuation through the same
+saved session and completion of the task. This is a continuity check, not a
 comparative model-quality evaluation.
 
 Run with OPENCODE_API_KEY exported and Ollama running for the derived local
@@ -11,16 +11,18 @@ auxiliary route, e.g.:
     ollama serve
     python -m uv run --env-file .env python scripts/opencode-go-coding-chat-acceptance.py
 
-The harness uses an isolated fixture directory so the live run cannot affect
-repository files outside ``artifacts/``.
+The harness creates its fixture under ``artifacts/``. The fixture instructions
+restrict edits; the directory itself is not an operating-system sandbox.
 """
 
 from __future__ import annotations
 
+import argparse
 import builtins
 import contextlib
 import io
 import json
+import math
 import subprocess
 import sys
 import time
@@ -70,6 +72,8 @@ def main() -> int:
         help="Total wall-clock timeout for each CLI invocation.",
     )
     args = parser.parse_args()
+    if not math.isfinite(args.timeout_seconds) or args.timeout_seconds <= 0:
+        parser.error("--timeout-seconds must be finite and greater than zero")
 
     repo = Path(__file__).resolve().parents[1]
     root = (
@@ -91,8 +95,23 @@ def main() -> int:
         encoding="utf-8",
     )
 
-    validation = [sys.executable, "-m", "pytest", "-q"]
-    baseline = subprocess.run(validation, cwd=fixture, capture_output=True, text=True)
+    # Ignore fixture bytecode from earlier/model-side validation. A same-size
+    # edit within one timestamp tick must still execute the current source.
+    validation = [
+        sys.executable,
+        "-B",
+        "-X",
+        f"pycache_prefix={root / 'host-validation-cache'}",
+        "-m",
+        "pytest",
+        "-q",
+    ]
+    baseline = subprocess.run(
+        validation, cwd=fixture, capture_output=True, text=True, timeout=args.timeout_seconds
+    )
+    (root / "baseline-validation.log").write_text(
+        baseline.stdout + baseline.stderr, encoding="utf-8"
+    )
     if baseline.returncode == 0:
         print("acceptance_fixture_error: fixture must fail before the agent edit", flush=True)
         return 1
@@ -143,7 +162,9 @@ def main() -> int:
         "--max-action-rounds",
         "6",
         "--timeout-seconds",
-        str(int(args.timeout_seconds)),
+        str(args.timeout_seconds),
+        "--turn-timeout-seconds",
+        str(args.timeout_seconds),
         TURN_ONE,
     ]
 
@@ -156,44 +177,79 @@ def main() -> int:
     statuses = []
     started = time.monotonic()
     session_id: str | None = None
+    first_turn_source_unchanged = False
+    first_turn_tests_unchanged = False
+    failure_reason = None
     print(f"acceptance_started: {ROUTE}", flush=True)
     try:
         with contextlib.redirect_stdout(log):
             statuses.append(cli.main(invocation))
+            first_turn_source_unchanged = source_file.read_text(encoding="utf-8") == SOURCE
+            first_turn_tests_unchanged = test_file.read_text(encoding="utf-8") == TESTS
             # Capture the created session id from the first run's output.
             for line in log.getvalue().splitlines():
                 if line.startswith("coding_session_id:"):
                     session_id = line.split(":", 1)[1].strip()
                     break
-            if session_id is None:
-                raise RuntimeError("First turn did not emit a coding_session_id")
-            # Second turn uses the same session to verify continuity.
-            owner_inputs.clear()
-            owner_inputs.extend([TURN_TWO, "/exit"])
-            _replace_arg(invocation, "--coding-session", session_id)
-            invocation[-1] = TURN_TWO
-            statuses.append(cli.main(invocation))
+            if statuses[0] != 0:
+                failure_reason = "First CLI turn failed; follow-up was not submitted"
+            elif not first_turn_source_unchanged or not first_turn_tests_unchanged:
+                failure_reason = "First turn changed protected source or tests before confirmation"
+            elif not session_id:
+                failure_reason = "First turn did not emit a coding_session_id"
+            else:
+                # The initial prompt already submits TURN_TWO. Queue only exit;
+                # queuing TURN_TWO as well would execute the follow-up twice.
+                owner_inputs.clear()
+                owner_inputs.append("/exit")
+                _replace_arg(invocation, "--coding-session", session_id)
+                invocation[-1] = TURN_TWO
+                statuses.append(cli.main(invocation))
     finally:
         builtins.input = original_input
         sys.stdin = original_stdin
-
-    (root / "assistant.log").write_text(log.getvalue(), encoding="utf-8")
-
-    checked = subprocess.run(validation, cwd=fixture, capture_output=True, text=True)
-    (root / "validation.log").write_text(checked.stdout + checked.stderr, encoding="utf-8")
+        (root / "assistant.log").write_text(log.getvalue(), encoding="utf-8")
 
     changed = source_file.read_text(encoding="utf-8") != SOURCE
     tests_unchanged = test_file.read_text(encoding="utf-8") == TESTS
+    checked = None
+    if len(statuses) == 2 and all(status == 0 for status in statuses) and tests_unchanged:
+        checked = subprocess.run(
+            validation, cwd=fixture, capture_output=True, text=True, timeout=args.timeout_seconds
+        )
+        (root / "validation.log").write_text(checked.stdout + checked.stderr, encoding="utf-8")
+
     passed = (
-        all(s == 0 for s in statuses) and changed and tests_unchanged and checked.returncode == 0
+        len(statuses) == 2
+        and all(s == 0 for s in statuses)
+        and first_turn_source_unchanged
+        and first_turn_tests_unchanged
+        and changed
+        and tests_unchanged
+        and checked is not None
+        and checked.returncode == 0
     )
+    if not passed and failure_reason is None:
+        if statuses[-1] != 0:
+            failure_reason = "Follow-up CLI turn failed"
+        elif not tests_unchanged:
+            failure_reason = "Follow-up changed protected tests; validation was not executed"
+        elif not changed:
+            failure_reason = "Follow-up did not change the defective source"
+        else:
+            failure_reason = "Final host validation failed"
     result = {
         "route": ROUTE,
         "passed": passed,
         "statuses": statuses,
+        "session_id": session_id,
+        "first_turn_source_unchanged": first_turn_source_unchanged,
+        "first_turn_tests_unchanged": first_turn_tests_unchanged,
+        "failure_reason": failure_reason,
+        "continuations": "automated acceptance continuations, not physical owner approval",
         "source_changed": changed,
         "tests_unchanged": tests_unchanged,
-        "validation_exit_code": checked.returncode,
+        "validation_exit_code": checked.returncode if checked is not None else None,
         "elapsed_seconds": time.monotonic() - started,
     }
     (root / "results.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
@@ -215,6 +271,4 @@ def _ollama_reachable() -> bool:
 
 
 if __name__ == "__main__":
-    import argparse
-
     raise SystemExit(main())

@@ -1859,6 +1859,19 @@ def _execute_request(
             )
         except ProviderError as exc:
             primary_elapsed_seconds = time.perf_counter() - primary_started
+            # Only a terminal authored response is report text. Earlier tool
+            # requests, tool output and private continuation state are not.
+            partial = exc.partial_messages[-1] if exc.partial_messages else None
+            if (
+                partial is not None
+                and partial.role is MessageRole.ASSISTANT
+                and not partial.tool_calls
+                and partial.content.strip()
+            ):
+                assistant_response_text = (
+                    "Incomplete agent report (execution failed; not accepted):\n\n"
+                    + partial.content
+                )
             print(f"failure_reason: {exc}")
             final_status = "failed"
             execution_status = "failed"
@@ -1905,7 +1918,7 @@ def _execute_request(
             print(f"execution_status: {execution_status}")
             _print_cli_closeout(
                 args=args,
-                response_text=None,
+                response_text=assistant_response_text,
                 status=final_status,
                 execution_status=execution_status,
                 validation_stage=validation_stage,

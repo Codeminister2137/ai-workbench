@@ -71,6 +71,7 @@ GROUPS = {
         "tests/test_alternate_agent_routes.py",
         "tests/test_fallback*.py",
         "tests/test_bounded_acceptance_controller.py",
+        "tests/test_opencode_go_coding_chat_acceptance.py",
         "tests/test_chat_transcripts.py",
         "tests/test_user_config.py",
         "tests/test_coding_assist_example.py",

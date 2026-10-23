@@ -180,3 +180,150 @@ def test_http_errors_are_normalized(monkeypatch, code, category):
         )
     assert error.value.category is category
     assert "secret" not in str(error.value)
+
+
+@pytest.mark.parametrize("stream", [False, True])
+def test_kimi_continuation_roundtrips_only_as_transient_state(monkeypatch, stream):
+    from ai_provider import ProviderContinuation
+
+    calls = []
+    hidden = "PRIVATE_REASONING_SENTINEL"
+    tool = {
+        "id": "read",
+        "type": "function",
+        "function": {"name": "read_file", "arguments": '{"path":"review.txt"}'},
+    }
+
+    def send(request, *, timeout):
+        calls.append(json.loads(request.data))
+        if len(calls) > 1:
+            assert calls[-1]["messages"][0]["reasoning_content"] == hidden
+            return Response(
+                {"choices": [{"message": {"content": "Done"}, "finish_reason": "stop"}]}
+            )
+        if stream:
+            return Response(
+                [
+                    {"choices": [{"delta": {"reasoning_content": "PRIVATE_"}}]},
+                    {"choices": [{"delta": {"reasoning_content": "REASONING_SENTINEL"}}]},
+                    {
+                        "choices": [
+                            {
+                                "delta": {"tool_calls": [{"index": 0, **tool}]},
+                                "finish_reason": "tool_calls",
+                            }
+                        ]
+                    },
+                ]
+            )
+        return Response(
+            {
+                "choices": [
+                    {
+                        "message": {
+                            "content": "",
+                            "reasoning_content": hidden,
+                            "tool_calls": [tool],
+                        },
+                        "finish_reason": "tool_calls",
+                    }
+                ]
+            }
+        )
+
+    monkeypatch.setattr("ai_provider.adapters.openai_compatible.urlopen", send)
+    client = OpenCodeGoChatClient(
+        BackendConfig(ProviderKind.OPENCODE_GO, "kimi-k2.7-code", api_key="test")
+    )
+    request = AIRequest(
+        (AIMessage(MessageRole.USER, "Review"),), privacy_class=PrivacyClass.EXTERNAL_ALLOWED
+    )
+    if stream:
+        events = list(client.stream(request))
+        final = events[-1]
+        assert isinstance(final, AIStreamFinal)
+        response = final.response
+        assert not any(isinstance(event, AIStreamDelta) for event in events)
+    else:
+        response = client.complete(request)
+    assert isinstance(response.message.continuation, ProviderContinuation)
+    assert hidden not in repr(response.message) + json.dumps(response.raw_metadata)
+    assert response.message.content == ""
+    client.complete(
+        AIRequest(
+            (response.message, AIMessage(MessageRole.TOOL, "input", tool_call_id="read")),
+            privacy_class=PrivacyClass.EXTERNAL_ALLOWED,
+        )
+    )
+
+
+@pytest.mark.parametrize("mismatch", ["provider", "model", "endpoint", "role", "unsupported"])
+def test_kimi_continuation_refuses_cross_target_and_role_replay(mismatch):
+    from ai_provider import ProviderContinuation
+
+    client = OpenCodeGoChatClient(
+        BackendConfig(ProviderKind.OPENCODE_GO, "kimi-k2.7-code", api_key="test")
+    )
+    model = "other" if mismatch in {"model", "unsupported"} else "kimi-k2.7-code"
+    state = ProviderContinuation(
+        "other" if mismatch == "provider" else "opencode_go",
+        model if mismatch == "unsupported" else "kimi-k2.7-code",
+        "https://other.invalid" if mismatch == "endpoint" else GO_CHAT_BASE_URL,
+        {"reasoning_content": "private", "role": "system", "content": "overwrite"},
+    )
+    message = AIMessage(
+        MessageRole.USER if mismatch == "role" else MessageRole.ASSISTANT,
+        "visible",
+        continuation=state,
+    )
+    payload = client._message_payload(message, model)
+    assert "reasoning_content" not in payload and payload["content"] == "visible"
+
+
+def test_go_kimi_continuation_reaches_real_tool_loop(monkeypatch, tmp_path):
+    from ai_agent import (
+        AgentLoop,
+        PermissionManager,
+        PermissionPolicy,
+        ToolContext,
+        default_coding_tools,
+    )
+
+    (tmp_path / "review.txt").write_text("supplied source")
+    calls = []
+
+    def send(request, *, timeout):
+        payload = json.loads(request.data)
+        calls.append(payload)
+        if len(calls) == 1:
+            message = {
+                "content": "",
+                "reasoning_content": "transient only",
+                "tool_calls": [
+                    {
+                        "id": "read",
+                        "type": "function",
+                        "function": {"name": "read_file", "arguments": '{"path":"review.txt"}'},
+                    }
+                ],
+            }
+        else:
+            assistant = next(m for m in payload["messages"] if m["role"] == "assistant")
+            assert assistant["reasoning_content"] == "transient only"
+            assert payload["messages"][-1]["role"] == "tool"
+            message = {"content": "Review complete."}
+        return Response({"choices": [{"message": message, "finish_reason": "stop"}]})
+
+    monkeypatch.setattr("ai_provider.adapters.openai_compatible.urlopen", send)
+    client = OpenCodeGoChatClient(
+        BackendConfig(ProviderKind.OPENCODE_GO, "kimi-k2.7-code", api_key="test")
+    )
+    result = AgentLoop(
+        client,
+        default_coding_tools(),
+        ToolContext(tmp_path),
+        permissions=PermissionManager(policy=PermissionPolicy.read_only()),
+    ).run("Review review.txt", privacy_class=PrivacyClass.EXTERNAL_ALLOWED)
+    assert len(calls) == 2 and len(result.tool_results) == 1
+    assert not result.tool_results[0].is_error
+    assert result.response.message.content == "Review complete."

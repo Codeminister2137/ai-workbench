@@ -15,17 +15,21 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from dataclasses import dataclass, field
+from typing import Any
 from uuid import uuid4
 
 from ai_provider.adapters.openai_compatible import OpenAICompatibleChatClient
 from ai_provider.config import BackendConfig, ProviderKind
 from ai_provider.contracts import (
+    AIMessage,
     AIRequest,
     AIResponse,
     AIStreamEvent,
     BackendInfo,
     BackendLocation,
+    MessageRole,
     ModelCapabilities,
+    ProviderContinuation,
 )
 from ai_provider.errors import ProviderError, ProviderErrorCategory
 
@@ -90,3 +94,44 @@ class OpenCodeGoChatClient(OpenAICompatibleChatClient):
         if isinstance(session_id, str) and session_id:
             headers["x-opencode-session"] = session_id
         return headers
+
+    def _continuation(self, message: dict[str, Any], model: str) -> ProviderContinuation | None:
+        reasoning = message.get("reasoning_content")
+        if model == "kimi-k2.7-code" and isinstance(reasoning, str) and reasoning:
+            return ProviderContinuation(
+                self.backend.provider, model, self.base_url, {"reasoning_content": reasoning}
+            )
+        return None
+
+    def _message_payload(self, message: AIMessage, model: str) -> dict[str, Any]:
+        payload = super()._message_payload(message, model)
+        state = message.continuation
+        if (
+            model == "kimi-k2.7-code"
+            and message.role is MessageRole.ASSISTANT
+            and state is not None
+            and (state.provider, state.model, state.base_url)
+            == (self.backend.provider, model, self.base_url)
+            and isinstance(state.payload.get("reasoning_content"), str)
+        ):
+            payload["reasoning_content"] = state.payload["reasoning_content"]
+        return payload
+
+    def _collect_continuation(self, state: dict[str, Any], delta: dict[str, Any]) -> None:
+        reasoning = delta.get("reasoning_content")
+        if isinstance(reasoning, str):
+            state["reasoning_content"] = state.get("reasoning_content", "") + reasoning
+
+    def _safe_metadata(self, raw: dict[str, Any]) -> dict[str, Any]:
+        def clean(value: Any) -> Any:
+            if isinstance(value, dict):
+                return {
+                    key: clean(item)
+                    for key, item in value.items()
+                    if key not in {"reasoning_content", "reasoning", "reasoning_details"}
+                }
+            if isinstance(value, list):
+                return [clean(item) for item in value]
+            return value
+
+        return clean(raw)

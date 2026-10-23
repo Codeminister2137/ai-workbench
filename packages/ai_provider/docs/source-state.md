@@ -289,6 +289,17 @@ This does not change the current Kimi preference or authorize switching/inferenc
 
 ### OpenCode Go quota and free-model limits — refreshed 2026-10-23
 
+Official-guide recheck for the next bounded CLI review (2026-10-23):
+[Go](https://opencode.ai/v2/docs/console/go/) still lists `kimi-k2.7-code` at
+`https://opencode.ai/inference/go/openai/v1/chat/completions`, with no training
+and zero-day retention. It requires a stable conversation/session header and a
+client-specific User-Agent. Its **Usage beyond limits** section says enabling
+Extra Usage permits subscription-limit overflow to Console pay-as-you-go credits.
+An allowance-only acceptance must therefore confirm Extra Usage is disabled;
+route identity or client-side call limits alone cannot establish that account
+setting. This was a public-document recheck, not an account observation or
+inference grant. The usage-endpoint findings below retain their original scope.
+
 Live observation from this account, plus public-source cross-check:
 
 - **Go subscription allowance can be read with the inference key.**
@@ -596,3 +607,20 @@ Checked 2026-10-13; verify again before choosing or activating a source.
 - [Zed trial](https://zed.dev/pricing)
 
 Retirement source: [official Gemini CLI announcement](https://github.com/google-gemini/gemini-cli/discussions/28017). The previous 1,000-request individual offer is historical and must not be used for current routing.
+
+### Kimi tool continuation and output allowance - verified 2026-10-23
+
+The [official Kimi thinking-model guide](https://platform.kimi.ai/docs/guide/use-thinking-models)
+specifies preserved `reasoning_content` for K2.7 Code tool loops, recommends
+`max_tokens >= 16000`, and says reasoning and visible answer share that budget.
+Thinking cannot be disabled for this model; omit `temperature`. The
+[Go guide](https://opencode.ai/v2/docs/console/go/) lists the same model on its
+OpenAI-compatible endpoint. Gateway-specific enforcement remains unverified.
+
+The Go adapter now carries this field through ADR-055's transient origin-bound
+continuation contract for exactly `kimi-k2.7-code`, including streamed fragments.
+Raw metadata excludes reasoning fields. No reasoning persistence, model switch,
+automatic budget increase or inference authorization is implied. Saved-session
+restart still restores visible conversation, not private continuation state.
+Do not classify an output-limited empty answer as model-quality acceptance or
+silently reinterpret reasoning as delivered answer text.
