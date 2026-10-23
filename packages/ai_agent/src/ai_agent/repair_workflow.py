@@ -273,8 +273,15 @@ def run_scrutiny_repair_loop(
             review_status = execution_status_with_validation_stage(review_status, validation_stage)
         execution_status = run_review(review_status)
         reviewed = _stage_details(tracker, "scrutiny")
-        if reviewed is not None:
-            details = reviewed[1]
+        # Stage details merge across attempts, so a failed re-review still carries
+        # the previous verdict. Treat only a completed review as a readable one.
+        if reviewed is not None and reviewed[0] == "completed":
+            details: dict[str, object] = reviewed[1]
+            reviewed_completed = True
+        else:
+            details = {}
+            reviewed_completed = False
+        attempt["review_status"] = reviewed[0] if reviewed is not None else "missing"
         attempt["review_verdict"] = details.get("verdict")
         attempts.append(attempt)
         print(
@@ -284,6 +291,12 @@ def run_scrutiny_repair_loop(
         if details.get("verdict") == "pass":
             execution_status = execution_status_without_validation_error(execution_status)
             stop_reason = "scrutiny_passed"
+            break
+        if not reviewed_completed:
+            # No readable verdict is a review failure, not a quality judgement.
+            # Repairing again would target advice nobody produced, so stop and
+            # let the run record the review failure instead of guessing.
+            stop_reason = "review_failed"
             break
         if no_progress >= 2:
             stop_reason = "repeated_no_progress"
