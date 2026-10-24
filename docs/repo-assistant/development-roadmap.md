@@ -926,6 +926,25 @@ lint/type errors. Both interpreter selections use the same installed executable;
 this does not establish a second interpreter's compatibility or complete M5.
 Evidence: `artifacts/cli-python-vertical-20261020do/`.
 
+### Consolidated C1-C6 IDE-independence contract (M5 offline)
+
+`tests/test_ide_independent_capabilities.py` exercises the approved capability
+set through the shared coding registry in a workspace with no
+`data/pycharm-mcp.json`. It covers C1 repository/Git and file mutation, C2 the
+portable review skill plus working instructions, C3 `python_runtime` and a real
+unittest run, C4 `fetch_url` provenance plus the private-network refusal, C5
+Jedi navigation and preview-then-apply rename, and C6 handle-based process
+continuity including refusal after host close. A fresh process also proves the
+common surface never imports the `mcp` SDK, and a valid IDE configuration only
+adds the three read-only IDE tools; removing it restores the identical common
+surface.
+
+This is deterministic offline composition evidence, not installed-client or
+live-model acceptance. The C4 success path uses an injected test fetcher rather
+than a real public request; the C5 checks require the optional Jedi extra; C6
+covers host-owned child continuity, not a cross-provider route switch. M5 still
+needs installed-client/live evidence and any capability work those checks expose.
+
 ## Approved capability set
 
 | ID | Capability | Required outcome |
@@ -945,7 +964,7 @@ Evidence: `artifacts/cli-python-vertical-20261020do/`.
 | M2 | Common tools and portable skills | Offline discovery/prerequisite reporting is implemented; Copilot and Kiro passed live selected-skill inspection; Antigravity's default headless MCP permission was verified denied; Codex check is deferred until its reported reset | C1-C4 work through common contracts on selected routes; explicit skills resolve dependencies; required instructions are available or omissions cause a clear refusal |
 | M3 | Semantic tooling with temporary IDE host | Read-only IDE bridge, optional Jedi preview/apply, and read-only Python definitions/references implemented; bounded native/shared MCP rename acceptance passed with a synthetic client | Selected C5 operations pass native/shared live acceptance with defined semantics and permissions; installed-client coverage is still required where applicable |
 | M4 | Coding and process continuity | In progress; live Copilot and Kiro fallback each continued shared edits and polled the same in-flight process handle | Agreed session/process model preserves objective, decisions, scoped approvals, receipts and handles across turns and fallback; uncertain effects are reconciled |
-| M5 | Independence from the IDE tool host | Pending | Approved C1-C6 workflows remain usable with PyCharm tool hosting unavailable; PyCharm can serve only as editor/viewer |
+| M5 | Independence from the IDE tool host | Offline C1-C6 common-surface contract implemented and passing; installed-client/live parity pending | Approved C1-C6 workflows remain usable with PyCharm tool hosting unavailable; PyCharm can serve only as editor/viewer |
 
 Each milestone has deterministic correctness checks and separately recorded live
 acceptance where necessary. A milestone cannot be reported fully accepted on

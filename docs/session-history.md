@@ -1838,3 +1838,31 @@ bounded question, auxiliary alignment and bookkeeping attribution. Scrutiny
 passed with one harmless wording note about grouping the five originals. This
 does not establish general report fidelity, live fallback, scrutiny-fed repair or
 a clean paid-agent baseline. Evidence: artifacts/cli-bookkeeping-attribution-20261024g/.
+
+## 2026-10-24 - Consolidated C1-C6 IDE-independence offline contract
+
+The M5 gap was the absence of a single deterministic contract showing the
+approved capability set works with PyCharm unavailable. The new
+`tests/test_ide_independent_capabilities.py` exercises each capability through
+the shared coding registry in a workspace with no `data/pycharm-mcp.json`:
+
+- C1 real Git status/diff plus read/list/find/grep and create/edit, with the
+  index tree unchanged by reads.
+- C2 the canonical portable review skill and working repository instructions.
+- C3 `python_runtime` plus a real unittest run using the current interpreter.
+- C4 `fetch_url` provenance through an injected test fetcher and the real
+  private-network refusal.
+- C5 Jedi definitions and preview-then-apply rename, with no mutation before
+  apply.
+- C6 host-owned child process continuity and refusal after supervisor close.
+
+Two further checks prove the common surface is complete and never imports the
+MCP SDK in a fresh process, and that a valid IDE configuration only adds the
+three read-only IDE tools while removal restores the identical surface.
+
+Eight tests pass; Ruff, formatting and Pyright are clean. This is deterministic
+offline composition evidence, not installed-client or live-model acceptance.
+The C4 success path uses an injected test fetcher; C5 requires the optional Jedi
+extra; C6 covers host-owned child continuity rather than a cross-provider route
+switch. M5 still needs installed-client/live evidence. Slice B (live fallback)
+remains blocked pending the owner's route/billing/trigger decision.

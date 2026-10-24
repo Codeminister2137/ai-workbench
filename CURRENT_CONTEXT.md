@@ -1,4 +1,4 @@
-# Current task - ATTENDED; trial g recorded, auxiliary contract and attribution verified
+# Current task - ATTENDED; trial g recorded, C1-C6 offline IDE independence implemented
 
 Branch: develop. Latest production code: fa403ba; handoff commit follows.
 No active inference job, local server, timer, sleep or unattended window.
@@ -99,19 +99,24 @@ baseline. c2a82d7 and 7478fc8 now have live integrated exercise in g. Five
 matcher disagreements remain unapplied: ask before changing mapping. Post-trial
 current-render files are labelled host re-renderings, not original model delivery.
 
+Slice C offline consolidation is implemented in
+`tests/test_ide_independent_capabilities.py`: C1-C6 each have a deterministic
+contract through the shared coding registry with no IDE configuration, the
+common surface never imports the MCP SDK in a fresh process, and a valid IDE
+configuration is purely additive. Remaining M5 work is installed-client/live
+parity, not missing offline capability. The C4 success path uses an injected test
+fetcher; C5 requires the optional Jedi extra; C6 covers host-owned child
+continuity, not a cross-provider route switch.
+
 Next actions, in order:
 
-1. Slice B - fresh bounded live fallback trial. Verify the automatic
-   comparable-quality fallback path with a named fresh grant, comparable bounds,
-   production-shaped auxiliary contract and owned cleanup. Completion condition:
-   fallback is actually attempted and recorded, the primary report is supported
-   by its receipts, and no original trial is replayed or regraded.
-2. Slice C - offline consolidation of C1-C6 IDE independence. Re-open
-   `docs/repo-assistant/development-roadmap.md` and the M5 row, confirm which of
-   C1-C6 still lack deterministic offline coverage, and implement the missing
-   contracts without introducing a new IDE dependency. Completion condition:
-   each remaining C-item has either a passing offline contract test or a named
-   blocker with the decision that unlocks it.
+1. Slice B - fresh bounded live fallback trial. Blocked pending an owner decision
+   on the fallback route/provider, billing source, credentials and whether a
+   synthetic usage-limit trigger counts as live fallback evidence. Do not start a
+   paid or client-based fallback run before that choice.
+2. M5 installed-client/live parity. Reuse the consolidated offline contract and
+   add only the missing installed-client evidence; do not redo the deterministic
+   surface checks.
 
 Do not replay f or g, and do not regrade them.
 

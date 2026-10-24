@@ -213,6 +213,15 @@ or fixed number of remaining runs: the next checks can reveal implementation wor
   shared Git/read/search tools, and verifies unchanged files/index without an IDE
   endpoint. This is deterministic C1/C2 composition evidence; selected-route
   model review quality remains a separate acceptance question.
+- A consolidated offline C1-C6 contract now exercises each capability through the
+  shared coding registry with no IDE configuration: repository/Git and file
+  mutation, the portable review skill plus working instructions, `python_runtime`
+  and a real unittest run, fetch provenance plus the private-network refusal,
+  Jedi navigation and preview-then-apply rename, and host-owned process
+  continuity including refusal after close. A fresh process also proves the
+  common surface never imports the MCP SDK, and a valid IDE configuration only
+  adds the three read-only IDE tools. This is deterministic composition evidence,
+  not installed-client or live-model acceptance.
 
 ## Remaining acceptance work
 
@@ -306,7 +315,7 @@ did not resolve this model's report-fidelity gap; the allowance is consumed.
 | Complete trustworthy small workflow | Immediate gap: fresh coherent task, model-authored coding/tests, actual execution, substantive frozen review, both faithful reports, independent checks and cleanup together. The revised criteria allow harmless recovered friction and supported corrections. A contained stop remains incomplete. |
 | Representative daily conversation (M4) | Existing continuity and selected live fallback/process evidence is partial. Establish objective/decision/history/approval preservation over useful turns, correction, interruption/restart and required route switches. One arithmetic fixture cannot establish this. |
 | Required capabilities on selected routes (M2/M3) | Common tools/skills and semantic contracts are implemented with selected live/synthetic evidence. Complete the required C1-C5 cases and actual permission/client checks on the routes used; unsupported combinations must refuse clearly. This does not require every possible provider or optional integration. |
-| Independence from PyCharm tool hosting (M5) | Still pending acceptance: demonstrate the approved C1-C6 workflows with the IDE tool host unavailable. Python environment/validation diagnostics and semantic primitives are steps toward it, not the complete result. Missing capability may require implementation. |
+| Independence from PyCharm tool hosting (M5) | Offline C1-C6 common-surface contract implemented and passing without IDE configuration; installed-client/live parity remains pending. Missing capability may still require implementation. |
 
 The [roadmap capability and milestone tables](development-roadmap.md#approved-capability-set)
 remain authoritative. C1-C6 cover repository/Git, instructions/skills, Python
@@ -333,8 +342,9 @@ continuity. Preserve the accepted privacy/approval/security bar in every gate.
    with the new trusted originals; this does not complete live acceptance.
 2. Resolve the first evidenced gap, then complete a small realistic multi-turn
    development case against the existing required continuity/tool outcomes.
-3. Finish selected-route approval/tool checks and IDE-host-independent C1-C6
-   acceptance. Reuse valid existing evidence and combine compatible checks rather
+3. Finish selected-route approval/tool checks and the installed-client side of
+   IDE-host-independent C1-C6 acceptance; the consolidated offline contract now
+   passes. Reuse valid existing evidence and combine compatible checks rather
    than restarting the entire matrix or adding speculative infrastructure.
 
 Each success supports the next stage. Representative quality parity, measured
