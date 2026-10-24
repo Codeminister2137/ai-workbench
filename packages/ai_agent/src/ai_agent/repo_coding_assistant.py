@@ -1486,9 +1486,15 @@ def _execute_request(
                 profile,
                 catalog,
                 external_orchestration.execution_plan.target,
-                compatible=lambda target: _fallback_target_compatible(target, args, repo_root),
+                # Admission is configuration-only here. A network probe at
+                # construction time would let one transient provider error shrink
+                # the candidate set before the walk starts, which defeats the
+                # whole-set requirement; each route is verified when it executes.
+                compatible=lambda target: _fallback_target_compatible(
+                    target, args, repo_root, probe_provider=False
+                ),
                 preservation_compatible=lambda target: _preservation_target_compatible(
-                    target, args, repo_root
+                    target, args, repo_root, probe_provider=False
                 ),
                 incompatibility_reason=lambda target: _fallback_target_incompatibility(
                     target, args, repo_root, probe_provider=False
@@ -2564,9 +2570,14 @@ def _preservation_args(args: argparse.Namespace) -> argparse.Namespace:
     )
 
 
-def _preservation_target_compatible(target: Any, args: argparse.Namespace, repo_root: Path) -> bool:
+def _preservation_target_compatible(
+    target: Any, args: argparse.Namespace, repo_root: Path, *, probe_provider: bool = True
+) -> bool:
     """Check the restricted executor's configuration without performing inference."""
-    return _preservation_target_incompatibility(target, args, repo_root) is None
+    return (
+        _preservation_target_incompatibility(target, args, repo_root, probe_provider=probe_provider)
+        is None
+    )
 
 
 def _preservation_target_incompatibility(
@@ -2671,9 +2682,14 @@ def _preserve_fallback_work(
     return response.message.content
 
 
-def _fallback_target_compatible(target: Any, args: argparse.Namespace, repo_root: Path) -> bool:
+def _fallback_target_compatible(
+    target: Any, args: argparse.Namespace, repo_root: Path, *, probe_provider: bool = True
+) -> bool:
     """Preserve tool/approval constraints and verify provider credentials without inference."""
-    return _fallback_target_incompatibility(target, args, repo_root) is None
+    return (
+        _fallback_target_incompatibility(target, args, repo_root, probe_provider=probe_provider)
+        is None
+    )
 
 
 def _fallback_executable_status(target: Any, repo_root: Path) -> str:
@@ -2763,9 +2779,23 @@ def _fallback_target_incompatibility(
         from urllib.request import Request, urlopen
 
         from ai_provider.adapters.openai_compatible import OpenAICompatibleChatClient
+        from ai_provider.go_source_info import OpenCodeGoSourceInfo
 
-        client = OpenAICompatibleChatClient(config)
-        request = Request(f"{client.base_url}/models", headers=client._headers())
+        client = create_chat_client(config)
+        if not isinstance(client, OpenAICompatibleChatClient):
+            # Responses/Messages clients expose no model-list probe. Construction
+            # already validated the configuration, and the route's credentials and
+            # model are checked again when it actually executes.
+            return None
+        # OpenCode Go serves chat under ``/go/openai/v1`` but its model inventory
+        # under ``/go/v1``; using the chat base URL here would probe a 404 and
+        # wrongly mark a usable route incompatible.
+        models_url = (
+            OpenCodeGoSourceInfo().models_url
+            if config.provider is ProviderKind.OPENCODE_GO
+            else f"{client.base_url}/models"
+        )
+        request = Request(models_url, headers=client._headers())
         with urlopen(request, timeout=10) as response:
             models = json.loads(response.read().decode("utf-8"))
         if any(
