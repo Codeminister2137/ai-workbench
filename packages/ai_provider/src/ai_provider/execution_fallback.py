@@ -338,6 +338,16 @@ class FallbackSession:
                     ProviderErrorCategory.RATE_LIMIT,
                     ProviderErrorCategory.USAGE_LIMIT,
                 }:
+                    # The walk stops here, so record the route that stopped it.
+                    # Without this entry the run record cannot distinguish a
+                    # refused route from one that was never attempted.
+                    self.attempts.append(
+                        {
+                            "route_id": self.current.route_id,
+                            "status": "failed",
+                            "category": exc.category.value,
+                        }
+                    )
                     raise
                 error = exc
                 limited = not overload

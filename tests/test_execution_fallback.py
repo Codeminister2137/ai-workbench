@@ -926,6 +926,9 @@ def test_other_errors_do_not_switch(monkeypatch, routes, category):
     with pytest.raises(ProviderError):
         run.run("task", execute, lambda result: False, observe=str)
     assert calls == ["codex"]
+    # The walk stopped at this route, so the record must name it and its category
+    # instead of leaving the aborted attempt invisible.
+    assert run.attempts == [{"route_id": "codex", "status": "failed", "category": category.value}]
 
 
 def test_noninteractive_missing_auth_is_reported_before_execution(monkeypatch, routes):
