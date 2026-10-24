@@ -113,7 +113,14 @@ Next actions, in order:
 1. Slice B - fresh bounded live fallback trial. Blocked pending an owner decision
    on the fallback route/provider, billing source, credentials and whether a
    synthetic usage-limit trigger counts as live fallback evidence. Do not start a
-   paid or client-based fallback run before that choice.
+   paid or client-based fallback run before that choice. Current executable
+   options: GitHub Copilot CLI (standard tier, allowance, different bucket) is
+   the only eligible route available without new setup; Codex CLI (high) needs
+   `CODEX_COMMAND` configured; Antigravity (high) is executable but its headless
+   shared-tool/MCP path is explicitly ineligible. Completion condition: fallback
+   is actually attempted and recorded on a different billing source, the
+   completing route's report is supported by its receipts, and no original trial
+   is replayed or regraded.
 2. M5 installed-client/live parity. Reuse the consolidated offline contract and
    add only the missing installed-client evidence; do not redo the deterministic
    surface checks.
