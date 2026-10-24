@@ -4,12 +4,24 @@ Officially supported metadata:
 
 - ``GET https://opencode.ai/inference/go/v1/models`` lists available models.
 - Chat usage is returned in Chat Completions responses.
-- Go subscription remaining allowance is **not** exposed by an official
-  endpoint scoped to the Go inference key. The Console Budgets API covers
-  workspace member monetary budgets and requires separate permissions/scope.
+- ``GET https://opencode.ai/zen/go/v1/usage`` accepts the Go inference key and
+  returns account-wide rolling (5-hour), weekly and monthly usage percentages
+  with reset timestamps. It is reachable from this account but is not listed on
+  the public Console API pages, so it is treated as an observed endpoint rather
+  than a documented contract.
 
-This collector therefore reports account allowance as ``unavailable`` rather
-than scraping or inferring it from published limits.
+Two different limit facts exist for Go and they must not be merged:
+
+- The usage endpoint reports **account-wide percentages only**. It does not
+  attribute usage to a model, so no per-model remaining balance can be derived
+  from it.
+- Go also publishes **per-model monthly priced-use caps** (for example Kimi K2.7
+  Code at $60). Those are documented sub-limits, not observations.
+
+Exhausting any Go cap blocks the whole ``opencode-go`` provider, including its
+temporary free models, until the relevant window resets. This collector reports
+the observed percentages, the published caps and the binding window separately
+instead of inventing a combined dollar balance.
 """
 
 from __future__ import annotations
@@ -35,6 +47,17 @@ from ai_provider.source_info import (
 
 GO_INFERENCE_BASE_URL = "https://opencode.ai/inference/go"
 GO_CHAT_BASE_URL = "https://opencode.ai/inference/go/openai/v1"
+GO_USAGE_URL = "https://opencode.ai/zen/go/v1/usage"
+
+# Published Go monthly priced-use caps in USD, checked 2026-10-24 against
+# packages/ai_provider/docs/source-state.md. These are documented limits, not
+# account observations; the usage endpoint reports percentages, not dollars.
+_PUBLISHED_MONTHLY_USD: dict[str, float] = {
+    "kimi-k2.7-code": 60.0,
+    "kimi-k3": 15.0,
+    "glm-5.2": 60.0,
+    "glm-5.3": 15.0,
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -123,37 +146,135 @@ class OpenCodeGoSourceInfo(SourceInfo):
         *,
         timeout_seconds: float = 15,
     ) -> AccountAllowance:
-        """Return unavailable because Go does not expose a quota endpoint for the inference key.
+        """Read account-wide Go usage percentages from the documented usage endpoint.
 
-        Published monthly/5-hour/weekly dollar limits are not account observations.
+        The endpoint reports rolling (5-hour), weekly and monthly percentages plus
+        reset timestamps for the whole Go account. It does not decompose usage by
+        model, so the percentages are a shared constraint rather than a per-model
+        balance. Published per-model dollar caps are reported separately by
+        ``read_opencode_go_allowance`` and must not be confused with these
+        observations.
         """
 
-        del timeout_seconds  # No network call; parameter kept for interface parity.
-        return AccountAllowance(
-            status="unavailable",
-            source=self.source,
-            observed_at_utc=_utc_now(),
-            reason="no_official_account_allowance_endpoint_for_go_key",
+        if (
+            isinstance(timeout_seconds, bool)
+            or not isinstance(timeout_seconds, (int, float))
+            or not math.isfinite(timeout_seconds)
+            or timeout_seconds <= 0
+        ):
+            raise ValueError("Metadata timeout must be finite and positive")
+        observed_at = _utc_now()
+        if not self.api_key:
+            return AccountAllowance(
+                status="unavailable",
+                source=self.source,
+                observed_at_utc=observed_at,
+                reason="credential_not_configured",
+            )
+        request = Request(
+            GO_USAGE_URL,
+            headers={
+                "Authorization": f"Bearer {self.api_key}",
+                "User-Agent": self.user_agent,
+                "Accept": "application/json",
+            },
+            method="GET",
         )
+        try:
+            with urlopen(request, timeout=timeout_seconds) as response:
+                body = response.read(65_536 + 1)
+            if len(body) > 65_536:
+                raise ValueError("Usage response exceeded byte bound")
+            windows = _parse_usage_windows(json.loads(body.decode("utf-8")))
+        except (OSError, ValueError, TypeError) as error:
+            reason = "metadata_request_failed"
+            if isinstance(error, HTTPError):
+                if error.code == 401:
+                    reason = "authentication_failed"
+                elif error.code == 403:
+                    reason = "permission_denied"
+                elif error.code == 429:
+                    reason = "usage_endpoint_rate_limited"
+            return AccountAllowance(
+                status="unavailable",
+                source=self.source,
+                observed_at_utc=observed_at,
+                reason=reason,
+            )
+        return AccountAllowance(
+            status="observed",
+            source=self.source,
+            windows=windows,
+            observed_at_utc=observed_at,
+        )
+
+
+def _parse_usage_windows(raw: object) -> tuple[dict[str, Any], ...]:
+    """Normalize the documented Go usage payload; reject unexpected shapes."""
+    if not isinstance(raw, dict):
+        raise ValueError("Invalid usage envelope")
+    usage = raw.get("usage")
+    if not isinstance(usage, dict):
+        raise ValueError("Invalid usage body")
+    windows: list[dict[str, Any]] = []
+    for window in ("rolling", "weekly", "monthly"):
+        row = usage.get(window)
+        if not isinstance(row, dict):
+            raise ValueError("Invalid usage window")
+        percent = row.get("percent")
+        if type(percent) is not int or not 0 <= percent <= 100:
+            raise ValueError("Invalid usage percent")
+        resets = row.get("resetsAt")
+        if not isinstance(resets, str) or not resets:
+            raise ValueError("Invalid usage reset")
+        windows.append(
+            {
+                "bucket_id": f"go_{window}",
+                "window": window,
+                "used_percent": percent,
+                "remaining_percent": 100 - percent,
+                "resets_at": resets,
+                "status": row.get("status") if isinstance(row.get("status"), str) else None,
+            }
+        )
+    return tuple(windows)
 
 
 def read_opencode_go_allowance(
     *, api_key: str | None = None, timeout_seconds: float = 15
 ) -> dict[str, Any]:
-    """Return an explicit unavailable report for Go subscription allowance.
+    """Report Go account usage together with published per-model dollar caps.
 
-    Go publishes model-specific monthly/5-hour/weekly dollar limits, but it does
-    not expose a supported endpoint for the inference key to read remaining
-    allowance. This function records that gap rather than inferring a value.
+    The account percentages come from the live usage endpoint and apply to the
+    whole Go subscription. ``model_limits_usd`` carries the published monthly
+    priced-use cap for each model and is a separate, documented limit rather than
+    an observation. Hitting any account window blocks the entire ``opencode-go``
+    provider until that window resets, so ``binding_window`` names the window
+    closest to its limit.
     """
 
     if api_key is None:
         api_key = os.getenv("OPENCODE_API_KEY")
-    return (
+    report = (
         OpenCodeGoSourceInfo(api_key=api_key)
         .account_allowance(timeout_seconds=timeout_seconds)
         .to_dict()
     )
+    report["model_limits_usd"] = dict(_PUBLISHED_MONTHLY_USD)
+    windows = report.get("windows") or ()
+    binding = max(windows, key=lambda row: row["used_percent"], default=None)
+    report["binding_window"] = (
+        {
+            "window": binding["window"],
+            "used_percent": binding["used_percent"],
+            "remaining_percent": binding["remaining_percent"],
+            "resets_at": binding["resets_at"],
+        }
+        if binding is not None
+        else None
+    )
+    report["usage_scope"] = "account_wide_percentages; per-model caps are published, not observed"
+    return report
 
 
 _RESPONSES_MODELS = frozenset(

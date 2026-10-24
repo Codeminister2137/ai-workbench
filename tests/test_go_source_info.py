@@ -105,13 +105,112 @@ def test_list_models_failures_are_sanitized(monkeypatch, failure):
     assert "secret" not in json.dumps(inventory.to_dict())
 
 
-def test_account_allowance_is_explicitly_unavailable():
-    collector = go.OpenCodeGoSourceInfo(api_key="synthetic")
-    allowance = collector.account_allowance(timeout_seconds=4)
-    assert allowance.status == "unavailable"
+def usage_payload():
+    return {
+        "usage": {
+            "rolling": {"status": "ok", "percent": 0, "resetsAt": "2026-10-24T19:44:54.756Z"},
+            "weekly": {"status": "ok", "percent": 90, "resetsAt": "2026-10-26T00:00:00.000Z"},
+            "monthly": {"status": "ok", "percent": 45, "resetsAt": "2026-11-22T09:49:38.000Z"},
+        }
+    }
+
+
+def test_account_allowance_reads_the_documented_usage_endpoint(monkeypatch):
+    calls = []
+
+    def open_request(request, *, timeout):
+        calls.append(request)
+        assert request.get_method() == "GET"
+        assert request.full_url == "https://opencode.ai/zen/go/v1/usage"
+        headers = {key.lower(): value for key, value in request.headers.items()}
+        assert headers.get("authorization") == "Bearer synthetic-go-key"
+        assert "ai_projects" in headers.get("user-agent", "")
+        assert request.data is None
+        assert timeout == 4
+        return Response(usage_payload())
+
+    monkeypatch.setattr(go, "urlopen", open_request)
+    allowance = go.OpenCodeGoSourceInfo(api_key="synthetic-go-key").account_allowance(
+        timeout_seconds=4
+    )
+
+    assert len(calls) == 1
+    assert allowance.status == "observed"
     assert allowance.source == "opencode_go"
-    assert allowance.reason is not None
-    assert "no_official_account_allowance_endpoint" in allowance.reason
+    assert allowance.reason is None
+    assert [window["window"] for window in allowance.windows] == ["rolling", "weekly", "monthly"]
+    assert [window["used_percent"] for window in allowance.windows] == [0, 90, 45]
+    assert [window["remaining_percent"] for window in allowance.windows] == [100, 10, 55]
+    assert allowance.windows[1]["resets_at"] == "2026-10-26T00:00:00.000Z"
+    assert "synthetic-go-key" not in json.dumps(allowance.to_dict())
+
+
+def test_account_allowance_without_key_is_unavailable(monkeypatch):
+    monkeypatch.setattr(go, "urlopen", lambda *a, **k: pytest.fail("Network attempted"))
+    allowance = go.OpenCodeGoSourceInfo(api_key=None).account_allowance(timeout_seconds=4)
+    assert allowance.status == "unavailable"
+    assert allowance.reason == "credential_not_configured"
+
+
+@pytest.mark.parametrize(
+    "failure",
+    ["http_401", "http_403", "http_429", "oversize", "bad_json", "bad_shape", "bad_percent"],
+)
+def test_account_allowance_failures_are_sanitized(monkeypatch, failure):
+    def open_request(request, *, timeout):
+        if failure.startswith("http_"):
+            raise HTTPError(request.full_url, int(failure.split("_")[1]), "secret", Message(), None)
+        if failure == "oversize":
+            return Response(b"x" * (65_536 + 1))
+        if failure == "bad_json":
+            return Response(b"synthetic-secret-not-json")
+        if failure == "bad_shape":
+            return Response({"usage": {"rolling": {}}})
+        payload = usage_payload()
+        payload["usage"]["weekly"]["percent"] = 101
+        return Response(payload)
+
+    monkeypatch.setattr(go, "urlopen", open_request)
+    allowance = go.OpenCodeGoSourceInfo(api_key="synthetic-go-key").account_allowance(
+        timeout_seconds=4
+    )
+
+    assert allowance.status == "unavailable"
+    assert allowance.windows == ()
+    assert "secret" not in json.dumps(allowance.to_dict())
+    expected = {
+        "http_401": "authentication_failed",
+        "http_403": "permission_denied",
+        "http_429": "usage_endpoint_rate_limited",
+    }.get(failure, "metadata_request_failed")
+    assert allowance.reason == expected
+
+
+def test_allowance_report_keeps_account_percentages_and_published_caps_separate(monkeypatch):
+    monkeypatch.setattr(go, "urlopen", lambda request, *, timeout: Response(usage_payload()))
+    report = go.read_opencode_go_allowance(api_key="synthetic-go-key", timeout_seconds=4)
+
+    assert report["status"] == "observed"
+    assert report["model_limits_usd"]["kimi-k2.7-code"] == 60.0
+    assert report["model_limits_usd"]["kimi-k3"] == 15.0
+    # The binding window is the account-wide one closest to its limit.
+    assert report["binding_window"] == {
+        "window": "weekly",
+        "used_percent": 90,
+        "remaining_percent": 10,
+        "resets_at": "2026-10-26T00:00:00.000Z",
+    }
+    assert "account_wide" in report["usage_scope"]
+    assert "not observed" in report["usage_scope"]
+    assert "synthetic-go-key" not in json.dumps(report)
+
+
+def test_allowance_report_without_observation_has_no_binding_window(monkeypatch):
+    monkeypatch.setattr(go, "urlopen", lambda *a, **k: pytest.fail("Network attempted"))
+    report = go.read_opencode_go_allowance(api_key=None, timeout_seconds=4)
+    assert report["status"] == "unavailable"
+    assert report["binding_window"] is None
+    assert report["model_limits_usd"]["kimi-k2.7-code"] == 60.0
 
 
 @pytest.mark.parametrize("timeout", [True, 0, -1, float("inf"), float("nan")])
@@ -156,6 +255,8 @@ def test_account_usage_dispatcher_routes_go_to_source_info(monkeypatch):
     )
     from ai_provider import account_usage
 
+    monkeypatch.setenv("OPENCODE_API_KEY", "synthetic-go-key")
+    monkeypatch.setattr(go, "urlopen", lambda request, *, timeout: Response(usage_payload()))
     target = ExecutionTarget(
         route_id="opencode-go-kimi",
         provider="opencode_go",
@@ -169,9 +270,10 @@ def test_account_usage_dispatcher_routes_go_to_source_info(monkeypatch):
     )
     result = account_usage.read_execution_allowance(target)
     assert result is not None
-    assert result["status"] == "unavailable"
+    assert result["status"] == "observed"
     assert result["source"] == "opencode_go"
-    assert "no_official_account_allowance_endpoint" in result["reason"]
+    assert [window["used_percent"] for window in result["windows"]] == [0, 90, 45]
+    assert result["binding_window"]["window"] == "weekly"
 
 
 def test_account_usage_dispatcher_returns_none_for_non_go_sources():
