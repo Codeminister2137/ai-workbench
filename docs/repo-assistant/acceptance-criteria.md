@@ -145,3 +145,9 @@ host checks certify only their recorded scope. This small delivery change adds n
 inference. It contains unresolved review but does not complete a correction or
 establish that every finding is valid/material. Passing-review and no-review output
 remain unchanged; a reviewer miss still cannot be inferred into automatic detection.
+
+Current CLI scrutiny also receives bounded native read/diff/test receipts, including
+for read-only work with no changed-file excerpts. Omitted or truncated receipt
+content remains unverified; this is evidence delivery, not a truth guarantee.
+The closeout owns its summary heading and adjusts a leading duplicate heading
+for display while retaining the original agent response in saved conversation.

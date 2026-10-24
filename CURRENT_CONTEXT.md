@@ -18,27 +18,37 @@ This does not authorize different private data, model/billing switches or paid
 overage. No .env/private plans/credential values in model inputs or logs.
 Closeouts start with exact `## **SUMMARY**` and stay concise.
 
-## Active continuation - Go primary with local support approved
+## Active continuation - local support retained; evidence gap repaired
 
-Fresh preparation: artifacts/cli-baseline-go-successor-20261024a/README.md.
-ci inputs regenerated and independently audited at clean HEAD 09188b1; old
-preparation preserved under ci/preparation-before-20261024-go. 303 inherited
-controls passed before Go composition; 25 focused Go transport/budget/effect
-controls passed after it. No live inference, no new source commit or push.
+Owner selected local auxiliary/scrutiny for now. Paid-tier whole-workflow
+escalation is permitted only if observed evidence establishes local inadequacy.
+Local token economy is secondary to adequate context/output/time; retain finite
+bounds and account separately for hosted calls. ADR-025 defaults are unchanged.
 
-First scripted Go composition STOPPED: existing auxiliary/scrutiny profiles derive
-LOCAL_ONLY cost/privacy (ADR-025), so Go-only catalog cannot serve them. Seven
-synthetic coding requests are not live calls or workflow completion. Failure
-logs/receipts preserved. Copied delivery helper also failed temporary cleanup
-because SQLite transaction context did not close connection; fresh copy now
-uses closing(), still needs composition verification. Predecessor unchanged.
+Consumed artifacts/cli-baseline-hybrid-successor-20261024c/ remains FAILED:
+16 calls (12 Go, 4 local), 22 proposed tools, 272.46 seconds. Coding and frozen
+review both ran seven passing tests; independent 3616-case oracle passed.
+Frozen-review scrutiny requested revision; private acceptance stopped. Worker,
+local runtime and descendant cleanup verified. Original reports remain intact.
 
-Owner selected LOCAL support for now (2026-10-24). A wholly paid-tier workflow
-is permissible if evidence establishes local-model inadequacy. Local budgets
-matter less: prioritize adequate context/output/time, still finite bounds and
-complete accounting; report Go allowance separately. ADR-025 defaults stay.
-Finish hybrid composition, offline controls/audit/seal and owned launch before
-inference. Existing draft --live remains disabled.
+Root cause traced: scrutiny receives changed-file excerpts, so an unchanged
+frozen review had no source excerpts and no native read/diff/test receipts.
+Production now supplies bounded receipts (107c17d). Closeout renders a leading
+model SUMMARY as Agent summary while preserving raw saved content (c96cc92).
+Store connection leak fixed at e2936f6, already pushed. Current code validation:
+85 focused passed; full suite 2797 passed / 9 skipped in 219.88 seconds.
+
+Fresh local-only evidence diagnostic artifacts/local-scrutiny-evidence-20261024d/
+used two actual GPT-OSS calls, 65536 context / 16384 output, no paid calls. With
+new production evidence, supported prior candidate passed (9/10); a synthetic
+99-tests/hash-verification claim required revision. Cleanup and original fixture
+preservation verified. These do not regrade c or establish universal review quality.
+No evidence-based reason to escalate to paid support now.
+
+Next: prepare one fresh named full hybrid workflow after the evidence/display
+repairs, validate offline and seal before live inference. Keep all original tests,
+frozen review, shared phase/total allowances and owned cleanup. Previous c cannot
+be replayed or upgraded to completed. Matcher disagreements remain unapplied.
 
 ## Latest completed bounded run
 
