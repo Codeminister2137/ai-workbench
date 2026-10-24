@@ -7,7 +7,15 @@ import pytest
 from ai_agent import support_passes
 from ai_agent.external_reporting import activity_preview
 from ai_orchestrator import CostPolicyTier, PrivacyClass, TaskType, load_model_catalog
-from ai_provider import AIMessage, AIResponse, BackendInfo, BackendLocation, MessageRole
+from ai_provider import (
+    AIMessage,
+    AIResponse,
+    AIToolCall,
+    BackendInfo,
+    BackendLocation,
+    FinishReason,
+    MessageRole,
+)
 from ai_provider.coding_assist import CodingAssistResult, coding_task_profile
 from ai_provider.repo_context import RepoContextFile
 
@@ -73,6 +81,38 @@ def test_auxiliary_without_local_route_never_uses_cloud_parent():
     )
     assert result.status == "failed"
     assert result.response_text is None
+
+
+@pytest.mark.parametrize("kind", ["tools", "empty", "truncated", "valid"])
+def test_auxiliary_accepts_only_complete_text_advice(kind):
+    catalog = load_model_catalog(Path("packages/ai_orchestrator/examples/model_catalog.toml"))
+    requests = []
+
+    class Client:
+        backend = BackendInfo("ollama", "fixture", BackendLocation.LOCAL)
+
+        def complete(self, request):
+            requests.append(request)
+            return AIResponse(
+                AIMessage(
+                    MessageRole.ASSISTANT,
+                    "" if kind == "empty" else "Inspect test coverage before review.",
+                    tool_calls=(AIToolCall("unexpected", "read_file", {"path": "source.py"}),)
+                    if kind == "tools"
+                    else (),
+                ),
+                self.backend,
+                finish_reason=FinishReason.LENGTH if kind == "truncated" else FinishReason.STOP,
+            )
+
+    result = support_passes.run_auxiliary_panel(
+        "Review the task.", coding_task_profile(), catalog, client_factory=lambda _: Client()
+    )
+    assert len(requests) == 1 and not requests[0].tools
+    assert result.status == ("completed" if kind == "valid" else "failed")
+    assert (result.response_text is not None) == (kind == "valid")
+    if kind != "valid":
+        assert result.failure_reason
 
 
 def test_context_execution_uses_planned_target_configuration(monkeypatch):

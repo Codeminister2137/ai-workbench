@@ -216,6 +216,7 @@ def test_auxiliary_panel_uses_local_cheap_route_with_fake_client(monkeypatch) ->
             return AIResponse(
                 message=AIMessage(MessageRole.ASSISTANT, "check tests and decision boundaries"),
                 backend=self.backend,
+                finish_reason=_EXAMPLE.FinishReason.STOP,
             )
 
         def stream(self, request):

@@ -30,6 +30,7 @@ from ai_provider import (
     BackendConfig,
     BackendInfo,
     ChatClient,
+    FinishReason,
     MessageRole,
     OllamaResourceProfile,
     ProviderError,
@@ -262,7 +263,11 @@ def run_auxiliary_panel(
             review_prompt=False,
             timeout_seconds=timeout_seconds,
             execute=True,
-            system_prompt="Provide bounded auxiliary coding review only.",
+            system_prompt=(
+                "Provide bounded auxiliary coding review only. Return plain text advice. "
+                "No tools are available: do not emit tool calls or attempt the enclosed "
+                "task. State missing evidence and checks for the primary agent to obtain."
+            ),
             start_ollama=start_ollama,
             ollama_command=ollama_command,
             ollama_startup_timeout_seconds=ollama_startup_timeout_seconds,
@@ -291,6 +296,25 @@ def run_auxiliary_panel(
             failure_reason=reason,
         )
     text = result.response.message.content.strip()
+    reason = (
+        "Auxiliary advice proposed tools in a tool-free pass"
+        if result.response.tool_calls or result.response.message.tool_calls
+        else (
+            "Auxiliary advice did not finish normally"
+            if result.response.finish_reason is not FinishReason.STOP
+            else ("Auxiliary advice was empty" if not text else None)
+        )
+    )
+    if reason is not None:
+        if progress_callback is not None:
+            progress_callback(f"auxiliary_panel_activity: failed - {reason}")
+        return AuxiliaryPanelResult(
+            status="failed",
+            route_id=route.route_id if route is not None else None,
+            provider=result.response.backend.provider,
+            model=result.response.backend.model,
+            failure_reason=reason,
+        )
     if progress_callback is not None:
         progress_callback(f"auxiliary_panel_activity: completed - {activity_preview(text)}")
     return AuxiliaryPanelResult(
