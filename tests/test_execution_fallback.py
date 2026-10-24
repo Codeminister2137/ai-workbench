@@ -25,6 +25,7 @@ from ai_orchestrator import (
     QualityThreshold,
     TaskCapability,
     TaskProfile,
+    cost_policy_allows,
     prepare_execution,
 )
 from ai_orchestrator.fallback import fallback_candidates
@@ -1056,7 +1057,7 @@ def test_incompatibility_explanation_never_authorizes_or_authenticates_route(mon
 
 
 @pytest.mark.parametrize("tier", tuple(CostPolicyTier))
-def test_fallback_policy_enforces_same_tier_for_every_cost_ceiling(tier):
+def test_fallback_policy_admits_lower_tiers_and_refuses_higher_ones(tier):
     # Synthetic route metadata isolates the tier/bucket policy from client entitlement.
     primary_entry = entry(
         "first", AccessMethod.PROVIDER_API, BillingSource.OPENAI_API_BILLING, tier=tier
@@ -1083,6 +1084,7 @@ def test_fallback_policy_enforces_same_tier_for_every_cost_ceiling(tier):
     assert plan is not None
     assert fallback_candidates(task, (primary_entry, alternative), plan.target) == (alternative,)
     assert fallback_candidates(task, (primary_entry, same_bucket), plan.target) == ()
+    # A cheaper source is always admissible; a costlier one needs explicit escalation.
     for other_tier in CostPolicyTier:
         if other_tier is tier:
             continue
@@ -1093,7 +1095,8 @@ def test_fallback_policy_enforces_same_tier_for_every_cost_ceiling(tier):
                 route=replace(alternative.backend.route, cost_policy_tier=other_tier),
             ),
         )
-        assert fallback_candidates(task, (primary_entry, other), plan.target) == ()
+        expected = (other,) if cost_policy_allows(other_tier, tier) else ()
+        assert fallback_candidates(task, (primary_entry, other), plan.target) == expected
 
 
 def test_quota_words_in_success_or_tool_output_do_not_trigger_switch():
@@ -1472,3 +1475,57 @@ def test_session_preflight_honours_priority_and_exclusions(monkeypatch, routes):
     excluded = session(monkeypatch, routes, excluded_route_ids=frozenset({"kiro"}))
     assert list(excluded.ready) == ["copilot"]
     assert "kiro" not in excluded.ready
+
+
+def test_session_walks_the_whole_ordered_set_until_a_route_completes(monkeypatch):
+    # "Whole set" means iterate the ordered candidates, not give up after one failure.
+    catalog = (
+        entry(
+            "codex",
+            AccessMethod.CODEX_CLI,
+            BillingSource.CHATGPT_SUBSCRIPTION_ALLOWANCE,
+            QualityThreshold.HIGH,
+        ),
+        entry(
+            "copilot",
+            AccessMethod.COPILOT_CLI,
+            BillingSource.GITHUB_COPILOT_SUBSCRIPTION_ALLOWANCE,
+            QualityThreshold.HIGH,
+        ),
+        entry(
+            "kiro",
+            AccessMethod.KIRO_CLI,
+            BillingSource.KIRO_SUBSCRIPTION_ALLOWANCE,
+            QualityThreshold.HIGH,
+        ),
+        entry(
+            "antigravity",
+            AccessMethod.ANTIGRAVITY_CLI,
+            BillingSource.ANTIGRAVITY_SUBSCRIPTION_ALLOWANCE,
+            QualityThreshold.HIGH,
+        ),
+    )
+    run = session(monkeypatch, catalog, priority=("kiro", "copilot", "antigravity"))
+    calls = []
+
+    def execute(target, prompt):
+        calls.append(target.route_id)
+        if target.route_id == "antigravity":
+            return ExternalAgentResult((), 0, "done", "")
+        event = json.dumps({"type": "error", "message": "You've hit your usage limit"})
+        return ExternalAgentResult(
+            (), 1, event + "\n", "", events=parse_external_agent_jsonl(event)
+        )
+
+    run.run("Fix source", execute, external_usage_limit, observe=lambda result: "limit")
+
+    assert list(run.ready) == ["kiro", "copilot", "antigravity"]
+    assert calls == ["codex", "kiro", "copilot", "antigravity"]
+    assert [attempt["route_id"] for attempt in run.attempts] == calls
+    assert [attempt["status"] for attempt in run.attempts] == [
+        "usage_limit",
+        "usage_limit",
+        "usage_limit",
+        "finished",
+    ]
+    assert run.current.route_id == "antigravity"

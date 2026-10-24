@@ -71,7 +71,7 @@ tools = true
             )
 
     monkeypatch.setattr(cli, "create_chat_client", lambda config: Client())
-    monkeypatch.setattr(cli, "_fallback_target_compatible", lambda *args: True)
+    monkeypatch.setattr(cli, "_fallback_target_compatible", lambda *args, **kwargs: True)
     monkeypatch.setattr("builtins.input", lambda prompt: "/exit")
     assert (
         cli.main(
@@ -186,7 +186,7 @@ tools = true
     # Only transport/client admission and readiness are synthetic. Do not replace
     # native wrappers, AgentLoop, FallbackSession, CLI catch/observer or chat executor.
     monkeypatch.setattr(cli, "create_chat_client", lambda config: Client(config.model))
-    monkeypatch.setattr(cli, "_fallback_target_compatible", lambda *args: True)
+    monkeypatch.setattr(cli, "_fallback_target_compatible", lambda *args, **kwargs: True)
     monkeypatch.setattr("builtins.input", lambda prompt: "/exit")
     code = cli.main(
         [

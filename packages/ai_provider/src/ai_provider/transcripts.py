@@ -50,7 +50,10 @@ class TeeOutput(TextIOBase):
         return self._transcript.write(text)
 
     def flush(self) -> None:
-        self._terminal.flush()
+        # Either stream can already be closed when the interpreter finalizes this
+        # tee, so a closed stream must not turn shutdown into a traceback.
+        if not self._terminal.closed:
+            self._terminal.flush()
         if not self._transcript.closed:
             self._transcript.flush()
 
