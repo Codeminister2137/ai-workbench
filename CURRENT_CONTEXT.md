@@ -77,9 +77,18 @@ OpenRouter free route (commits 40848ee, a635bd0, 607ca72):
   derivation still reproduces every declared route id (19 routes).
 - `scripts/fallback-acceptance.py` gained `--fallback-route openrouter-free`; a
   new test renders every harness route into a loadable catalog.
-- `FallbackSession.run` now records `{"route_id", "status": "failed",
-  "category"}` for a route whose non-continuable provider error stops the walk,
-  so the run record names the aborted route instead of hiding it.
+- A short-lived change that recorded a route whose non-continuable error stopped
+  the walk was **reverted** (607ca72, 45380c2): it broke the deliberate
+  `fallback_attempts` contract asserted by
+  `tests/repo_assistant/test_error_propagation.py`, where only switch-causing
+  attempts are listed and the terminal failure is reported through
+  `effective_route_id` plus its category. Changing that contract needs the owner.
+  Known limitation: `session_attempts` therefore does not name a route that
+  refuses before switching; the CLI envelope still reports
+  `effective_route_id` and `failure_reason`. The artifact
+  `artifacts/fallback-acceptance-20261024-174436/` was produced while that change
+  was briefly active, so its `session_attempts` contains an extra
+  `failed`/`configuration` entry; treat that entry as non-current behaviour.
 - Dated findings in `packages/ai_provider/docs/source-state.md`: 469 public
   models, 17 `:free`, 16 tool-capable at zero price; the chosen route has exactly
   one free endpoint (Google AI Studio, 262,144 context, zero price).
@@ -90,8 +99,9 @@ Live evidence (fresh, not a replay):
 - `artifacts/fallback-acceptance-20261024-173049/` and
   `artifacts/fallback-acceptance-20261024-174436/`: preserved failures. The walk
   reached `openrouter/free-google/gemma-4-31b-it:free` and stopped on the
-  entitlement refusal. The second run records the attempted route with
-  `category: configuration` (the first could not, before the recording fix).
+  entitlement refusal. The second run's extra `failed`/`configuration` entry came
+  from the reverted change and is not current behaviour; both runs agree that the
+  route was reached and refused before inference.
 - `artifacts/unattended-20261024-1720/openrouter_attested_probe.py`: an attested
   synthetic call passed every adapter guard; account quota was 0/50 used, 50
   remaining; the single upstream endpoint answered **429**

@@ -39,8 +39,8 @@ expanded scope authority.
 | 3 | Record free-by-default as an ADR and index entry | COMPLETE | ADR-068, `docs/decisions.md` |
 | 4 | Bounded live trial proving the route participates | COMPLETE with a preserved failure and a cause | `fallback-acceptance-20261024-173049/`, `-174436/`; attested probe: guards passed, upstream 429 from the single free endpoint; ordinary CLI refused by the entitlement guard |
 | 5 | M5 installed-client/live parity | BLOCKED (evidenced) | Offline C1-C6 contract passes; Copilot 0% remaining and unconfigured, Kiro monthly limit reached. Unlock: client allowance reset or a newly installed client. No code change pending |
-| 6 | Record the fallback route that stops the walk | COMPLETE | 607ca72; live re-run shows `category: configuration` on the attempted route |
-| 7 | Docs, handoff, commits, push to develop | IN_PROGRESS | 607ca72 push pending; `CURRENT_CONTEXT.md` rewritten with the owner decision brief |
+| 6 | Record the fallback route that stops the walk | REVERTED | 607ca72 attempted it; 45380c2 reverted because it changed the documented `fallback_attempts` contract. Known limitation recorded in the handoff |
+| 7 | Docs, handoff, commits, push to develop | IN_PROGRESS | 45380c2; push pending; `CURRENT_CONTEXT.md` carries the owner decision brief |
 | 8 | Owner decision: OpenRouter entitlement (A spend / B attestation flag / C continue on CONFIGURATION / D leave unused) | BLOCKED on owner | Recommendation B. Queued in `CURRENT_CONTEXT.md`; do not implement any option unattended |
 | Final | Stop admissions; clean up; verify state; save handoff; replace the rolling timer with `-Sleep -DelaySeconds 600`; verify receipt; deliver report | Required | Reserve 15 minutes |
 
