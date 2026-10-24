@@ -56,6 +56,17 @@ FALLBACK_ROUTES = {
         "cost_policy_tier": "free_only",
         "quality": "standard",
     },
+    "openrouter-free": {
+        "route_id": "openrouter/free-google/gemma-4-31b-it:free",
+        "provider": "openrouter",
+        "product": "openrouter_free",
+        "model": "google/gemma-4-31b-it:free",
+        "access_method": "provider_api",
+        "auth_method": "api_key",
+        "billing_source": "openrouter_free",
+        "cost_policy_tier": "free_only",
+        "quality": "standard",
+    },
     "opencode-go": {
         "route_id": "opencode-go/go-kimi-k2.7-code",
         "provider": "opencode_go",

@@ -82,3 +82,31 @@ def test_shared_live_harness_with_synthetic_client(tmp_path, monkeypatch, client
 
     monkeypatch.setattr(harness.cli, "_run_external_agent", execute)
     assert harness.main() == 0
+
+
+def test_every_fallback_route_renders_a_loadable_catalog_entry(tmp_path):
+    """A route typo must fail offline rather than during a live acceptance run."""
+    from ai_orchestrator import CostPolicyTier, load_model_catalog
+
+    catalog_path = tmp_path / "catalog.toml"
+    catalog_path.write_text(
+        "".join(harness.route_block(spec) for spec in harness.FALLBACK_ROUTES.values()),
+        encoding="utf-8",
+    )
+    loaded = {entry.backend.route_id: entry.backend for entry in load_model_catalog(catalog_path)}
+
+    for spec in harness.FALLBACK_ROUTES.values():
+        backend = loaded[spec["route_id"]]
+        assert backend.provider == spec["provider"]
+        assert backend.product == spec["product"]
+        assert backend.model == spec["model"]
+        assert backend.billing_source.value == spec["billing_source"]
+        assert backend.cost_policy_tier is CostPolicyTier(spec["cost_policy_tier"])
+
+    free = {
+        name
+        for name, spec in harness.FALLBACK_ROUTES.items()
+        if spec["cost_policy_tier"] == "free_only"
+    }
+    assert free == {"requesty-free", "openrouter-free"}
+    assert harness.FALLBACK_ROUTES["openrouter-free"]["model"].endswith(":free")
