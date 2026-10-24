@@ -7,7 +7,14 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
-from ai_orchestrator import AccessMethod, BillingSource, CostPolicyTier, load_model_catalog
+from ai_orchestrator import (
+    AccessMethod,
+    BackendLocation,
+    BillingSource,
+    CostPolicyTier,
+    cost_policy_allows,
+    load_model_catalog,
+)
 from ai_provider import gemini_cli
 from ai_provider.agent_readiness import check_agent_readiness
 from ai_provider.execution_fallback import external_usage_limit
@@ -270,7 +277,7 @@ def test_opt_in_catalog_is_distinct_from_default_and_other_google_products():
     )
 
 
-def test_gemini_free_fallback_preserves_quality_privacy_and_billing_tier():
+def test_free_fallback_preserves_quality_privacy_and_cost_ceiling():
     from ai_orchestrator import PrivacyClass, QualityThreshold, TaskCapability, TaskProfile
     from ai_orchestrator.fallback import fallback_candidates
     from ai_orchestrator.planner import ExecutionTarget
@@ -300,15 +307,34 @@ def test_gemini_free_fallback_preserves_quality_privacy_and_billing_tier():
         required_capabilities=frozenset({TaskCapability.CHAT, TaskCapability.TOOLS}),
         quality_threshold=QualityThreshold.STANDARD,
     )
-    assert [item.backend.route_id for item in fallback_candidates(profile, catalog, target)] == [
-        "gemini-cli-free-flash"
-    ]
+    candidates = fallback_candidates(profile, catalog, target)
+    # A cost policy is a ceiling: cheaper tiers are admissible, dearer ones are not.
+    assert "gemini-cli-free-flash" in [item.backend.route_id for item in candidates]
+    assert all(
+        cost_policy_allows(item.backend.cost_policy_tier, CostPolicyTier.FREE_ONLY)
+        for item in candidates
+    )
+    assert not any(
+        item.backend.cost_policy_tier
+        in {
+            CostPolicyTier.ALLOWANCES_ALLOWED,
+            CostPolicyTier.PREPAID_CREDITS_ALLOWED,
+            CostPolicyTier.BILLING_ALLOWED,
+        }
+        for item in candidates
+    )
     assert not fallback_candidates(
         replace(profile, quality_threshold=QualityThreshold.HIGH), catalog, target
     )
-    assert not fallback_candidates(
-        replace(profile, privacy_class=PrivacyClass.LOCAL_ONLY), catalog, target
+    assert not any(
+        item.backend.location is not BackendLocation.LOCAL
+        for item in fallback_candidates(
+            replace(profile, privacy_class=PrivacyClass.LOCAL_ONLY), catalog, target
+        )
     )
-    assert not fallback_candidates(
-        profile, catalog, target, exhausted_billing_sources=frozenset({"gemini_cli_free"})
-    )
+    assert "gemini-cli-free-flash" not in [
+        item.backend.route_id
+        for item in fallback_candidates(
+            profile, catalog, target, exhausted_billing_sources=frozenset({"gemini_cli_free"})
+        )
+    ]

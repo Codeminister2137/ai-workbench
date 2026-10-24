@@ -4,7 +4,13 @@ from collections.abc import Callable
 from dataclasses import replace
 from typing import Any
 
-from ai_orchestrator import ExecutionTarget, ModelCatalogEntry, TaskProfile, prepare_execution
+from ai_orchestrator import (
+    ExecutionTarget,
+    ModelCatalogEntry,
+    TaskProfile,
+    cost_policy_allows,
+    prepare_execution,
+)
 from ai_orchestrator.fallback import FallbackQualityPolicy, fallback_candidates, fallback_profile
 
 
@@ -105,10 +111,10 @@ def fallback_readiness_report(
             continue
         if backend.route_id in excluded_route_ids:
             reason = "excluded by fallback.exclude"
-        elif backend.cost_policy_tier is not primary.cost_policy_tier and not (
+        elif not cost_policy_allows(backend.cost_policy_tier, primary.cost_policy_tier) and not (
             allow_cost_escalation and backend.route_id in priority
         ):
-            reason = "different cost tier"
+            reason = "higher cost tier"
         elif backend.billing_source is primary.billing_source:
             reason = "shared billing source"
         else:

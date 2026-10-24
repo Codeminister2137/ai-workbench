@@ -399,3 +399,19 @@ def test_task_cost_policy_still_rejects_escalation_it_does_not_allow(task_and_ro
         allow_cost_escalation=True,
     )
     assert "billed" not in [entry.backend.route_id for entry in ordered]
+
+
+def test_free_tier_route_is_admitted_and_prioritised_from_allowance_initial(task_and_routes):
+    task, catalog, initial = task_and_routes
+    standard_task = replace(task, quality_threshold=QualityThreshold.STANDARD)
+    free = _tiered(
+        "free", QualityThreshold.STANDARD, BillingSource.REQUESTY_BILLING, CostPolicyTier.FREE_ONLY
+    )
+    ordered = fallback_candidates(
+        standard_task,
+        catalog + (free,),
+        initial,
+        quality_policy=FallbackQualityPolicy.TASK_MINIMUM,
+        priority=("free",),
+    )
+    assert ordered[0].backend.route_id == "free"

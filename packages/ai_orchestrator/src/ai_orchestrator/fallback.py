@@ -9,6 +9,7 @@ from ai_orchestrator.models import (
     TaskCapability,
     TaskProfile,
     TaskType,
+    cost_policy_allows,
 )
 from ai_orchestrator.planner import ExecutionTarget
 from ai_orchestrator.recommender import recommend_model
@@ -115,7 +116,9 @@ def fallback_candidates(
     ``allow_cost_escalation`` permits a listed priority route to sit in a higher
     cost tier than the initial route. It is off by default so that a local-only
     or free-only run cannot silently continue on billed inference; the caller
-    must opt in explicitly.
+    must opt in explicitly. Lower tiers than the initial route are always
+    admissible: continuing on a cheaper source is a downgrade in spend, and the
+    task cost policy still has to allow that tier.
     """
 
     quality_policy = FallbackQualityPolicy(quality_policy)
@@ -145,7 +148,7 @@ def fallback_candidates(
             or entry.backend.billing_source is not initial.billing_source
         )
         and (
-            entry.backend.cost_policy_tier is initial.cost_policy_tier
+            cost_policy_allows(entry.backend.cost_policy_tier, initial.cost_policy_tier)
             or (allow_cost_escalation and entry.backend.route_id in priority)
         )
         and entry.backend.route_id not in excluded_route_ids

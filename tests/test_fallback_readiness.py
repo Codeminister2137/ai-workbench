@@ -142,7 +142,7 @@ def test_compatible_offline_routes_do_not_claim_authenticated_or_connected(
     assert copilot["authentication"] == "not_checked"
     assert copilot["tool_connection"] == "not_checked"
     assert not copilot["execution_ready"]
-    assert any(row["reason"] == "different cost tier" for row in report["policy_exclusions"])
+    assert any(row["reason"] == "higher cost tier" for row in report["policy_exclusions"])
 
 
 def test_readiness_distinguishes_available_executable_from_adapter_support(
