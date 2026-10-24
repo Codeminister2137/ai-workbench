@@ -67,8 +67,18 @@ supported by its tool receipts with no material false claim, but the local
 auxiliary pass proposed an unavailable tool and left the workflow
 `completed_with_auxiliary_errors`. Both trials keep their original verdicts.
 Repairs `c2a82d7` (reject non-text auxiliary advice) and `7478fc8` (bold closeout
-label) are offline-validated; their live integrated effect and explicit
-host-bookkeeping attribution remain unestablished.
+label) were then exercised by fresh bounded trial `g`, which aligned the harness
+with production's auxiliary contract and asked for explicit bookkeeping
+attribution. `g` used 6 calls, 8 executed tools and 85.43 seconds with verified
+cleanup. The auxiliary proposal is now recorded without execution or budget use,
+so `stop_reason` is `None`; production itself classified the pass as "Auxiliary
+advice proposed tools in a tool-free pass". The primary report named
+`orchestration.sqlite3` and `session.sqlite3` as untracked host bookkeeping,
+distinguished them from the candidate changes, and made no
+predate/unchanged/unrelated claim. Both 10-test runs and the 3616-case oracle
+passed, and the independent live audit accepts auxiliary alignment and
+attribution for this bounded question. Clean paid-agent workflow acceptance,
+live fallback and scrutiny-fed repair remain unestablished.
 
 Owner standing authorization covers comparable bounded Go runs within existing
 limits; fresh named preparation and billing/privacy admission still apply.

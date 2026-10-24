@@ -1,6 +1,6 @@
-# Current task - ATTENDED; trial f recorded, auxiliary repair committed
+# Current task - ATTENDED; trial g recorded, auxiliary contract and attribution verified
 
-Branch: develop. Latest production code: 7478fc8; handoff commit follows.
+Branch: develop. Latest production code: fa403ba; handoff commit follows.
 No active inference job, local server, timer, sleep or unattended window.
 Owner-authorized logical commits and push to develop remain in scope.
 
@@ -73,24 +73,47 @@ The first independent audit attempt failed on a harness predicate expecting one
 timing observation per admitted call (6) while the failed auxiliary call has none
 (5); the audit script was corrected and the re-run passed. Original verdict kept.
 
+artifacts/cli-bookkeeping-attribution-20261024g/: completed_with_auxiliary_errors,
+auxiliary contract aligned, attribution exercised. Fresh read-only review of the
+unchanged e candidate. 6 calls (1 local auxiliary, 4 Go coding, 1 local scrutiny),
+8 executed tools, 85.43 seconds, verified worker/runtime cleanup. The auxiliary
+pass again proposed `repo_browser.git_status`; it is now recorded in
+`advisory_tool_proposals`, executed and counted nowhere, so `stop_reason` is
+`None`. Production's own `auxiliary_panel` stage classifies it as "Auxiliary
+advice proposed tools in a tool-free pass". The primary report names both
+untracked host entries (`orchestration.sqlite3`, `session.sqlite3`) as host
+bookkeeping, distinguishes them from the `AM` candidate files, and makes no
+predate/unchanged/unrelated claim. Both 10-test runs and the 3616-case oracle
+passed; frozen inputs/index and no-edit review verified. Usage: 86094 input /
+3893 output tokens; dollar cost and account quota unavailable. Scrutiny passed
+with one harmless wording note about grouping the five originals. First
+whole-directory guard run exposed 28 failures in stale two-phase copies; those
+are preserved, and the declared 9-file suite passes 107/107.
+
 ## Remaining limits / next independent acceptance scope
 
-f's report is supported for its read-only question, but clean workflow acceptance
-is not established because the auxiliary pass failed. c2a82d7/7478fc8 have no
-live integrated re-exercise. Bookkeeping attribution adherence remains
-unexercised. Live fallback and scrutiny-fed repair were not exercised by e or f
-(offline checks cover repair composition). Five matcher disagreements remain
-unapplied: ask before changing mapping. Post-trial current-render files are
-labelled host re-renderings, not original model delivery.
+g establishes the auxiliary-contract alignment and explicit bookkeeping
+attribution for this bounded read-only question. It does not establish general
+report fidelity, live fallback, scrutiny-fed repair or a clean paid-agent
+baseline. c2a82d7 and 7478fc8 now have live integrated exercise in g. Five
+matcher disagreements remain unapplied: ask before changing mapping. Post-trial
+current-render files are labelled host re-renderings, not original model delivery.
 
-Next action (imperative, pending owner go-ahead on paid usage): prepare a fresh
-bounded g trial that (1) mirrors production's auxiliary contract in the harness
-so an auxiliary-only tool proposal is a recorded auxiliary failure rather than a
-run-level safety stop, and (2) uses a task whose inspection includes the host
-session/orchestration databases so bookkeeping attribution is actually exercised.
-Completion condition: the primary report is supported by its receipts, host
-bookkeeping is attributed correctly, the auxiliary outcome is recorded, and
-inputs/cleanup are verified. Do not replay f or regrade it.
+Next actions, in order:
+
+1. Slice B - fresh bounded live fallback trial. Verify the automatic
+   comparable-quality fallback path with a named fresh grant, comparable bounds,
+   production-shaped auxiliary contract and owned cleanup. Completion condition:
+   fallback is actually attempted and recorded, the primary report is supported
+   by its receipts, and no original trial is replayed or regraded.
+2. Slice C - offline consolidation of C1-C6 IDE independence. Re-open
+   `docs/repo-assistant/development-roadmap.md` and the M5 row, confirm which of
+   C1-C6 still lack deterministic offline coverage, and implement the missing
+   contracts without introducing a new IDE dependency. Completion condition:
+   each remaining C-item has either a passing offline contract test or a named
+   blocker with the decision that unlocks it.
+
+Do not replay f or g, and do not regrade them.
 
 Relevant private plans remain repo-assistant-cli-parity-plan.md and
 opencode-go-integration-first-20261022.md; old unattended plan is CLOSED.

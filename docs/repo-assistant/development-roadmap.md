@@ -45,8 +45,11 @@ On the same date, one bounded coding/review question completed under local
 auxiliary and scrutiny support, and a separate read-only report-fidelity trial
 was mechanically accepted but tainted by a local auxiliary tool proposal. Repairs
 for that auxiliary contract and for a bold closeout label are offline-validated.
-Clean workflow acceptance, explicit host-bookkeeping attribution, live fallback
-and scrutiny-fed repair remain open. See
+A third bounded trial then aligned the harness with production's auxiliary
+contract and exercised explicit bookkeeping attribution: the auxiliary proposal
+is recorded without stopping the run, and the primary report named both host
+databases as host bookkeeping. Clean paid-agent workflow acceptance, live
+fallback and scrutiny-fed repair remain open. See
 [the current baseline assessment](baseline-gap.md) for evidence and remaining
 limits. Local synthetic parity remains separate from the paid-route baseline.
 

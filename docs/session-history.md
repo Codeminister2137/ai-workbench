@@ -1801,3 +1801,40 @@ is empty/truncated, with a clear failure reason, instead of displaying it; 7478f
 recognises `**Changed:**` in the closeout preview. Focused checks and the full
 suite (2809 passed, 9 skipped) pass. The consumed trial keeps its original
 verdict; the integrated live effect of the repairs is not established.
+
+## 2026-10-24 - Trial g: auxiliary contract alignment and bookkeeping attribution
+
+Fresh read-only frozen-review trial `g` tested two questions left open by `f`:
+does a tool-free auxiliary proposal become a recorded auxiliary failure instead
+of a run-level safety stop, and does the primary report attribute host
+session/orchestration bookkeeping correctly? The candidate stayed the unchanged
+Go-authored `e` implementation and five companions; five originals remained
+protected. No trial was replayed or regraded.
+
+Preparation aligned the harness with production's `run_auxiliary_panel`: an
+advisory proposal is recorded in `advisory_tool_proposals`, never executed and
+never counted, while primary unknown tools still stop and primary known tools
+still count. `test_auxiliary_contract.py` proves this deterministically. The
+declared 9-file guard suite passed 107/107; a first whole-directory run exposed
+28 failures in stale two-phase copies, which are preserved rather than rewritten
+or deleted. One scripted production workflow (8 calls, 5 tools, network
+disabled), an independent offline audit, the seal and an owned smoke all passed.
+
+Live `g` used 6 calls (1 local auxiliary, 4 Go coding, 1 local scrutiny), 8
+executed tools and 85.43 seconds, with verified worker/runtime cleanup. The
+auxiliary pass again proposed `repo_browser.git_status`; the harness recorded it
+and did not stop, so `stop_reason` is `None`. Production's own stage classified
+the pass as "Auxiliary advice proposed tools in a tool-free pass" and the run
+reports `completed_with_auxiliary_errors`. The Go report named both untracked
+host entries (`orchestration.sqlite3`, `session.sqlite3`) as host bookkeeping,
+distinguished them from the `AM` candidate files, and made no
+predate/unchanged/unrelated claim. Both 10-test runs and the 3616-case oracle
+passed; frozen inputs/index and the no-edit review were verified.
+
+Usage was 86094 input and 3893 output provider-reported tokens across 6 calls
+with complete coverage; dollar cost and account quota were unavailable. The
+independent live audit records mechanical and clean workflow acceptance for this
+bounded question, auxiliary alignment and bookkeeping attribution. Scrutiny
+passed with one harmless wording note about grouping the five originals. This
+does not establish general report fidelity, live fallback, scrutiny-fed repair or
+a clean paid-agent baseline. Evidence: artifacts/cli-bookkeeping-attribution-20261024g/.
