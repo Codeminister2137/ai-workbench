@@ -69,6 +69,7 @@ def run_owned_diagnostic(
             active_error = sys.exception()
             deadline = time.monotonic() + 2
             verified = True
+            cleanup_interrupt: KeyboardInterrupt | SystemExit | None = None
             try:
                 if job is not None:
                     verified = job.stop(max(0, deadline - time.monotonic()))
@@ -80,6 +81,11 @@ def run_owned_diagnostic(
                 elif process.poll() is None:
                     # Ownership failed while the root was still suspended.
                     process.kill()
+            except (KeyboardInterrupt, SystemExit) as exc:
+                # Still attempt the bounded root cleanup below before delivering
+                # cancellation, and never claim the interrupted tree stop passed.
+                cleanup_interrupt = exc
+                verified = False
             except Exception:
                 verified = False
             try:
@@ -93,12 +99,18 @@ def run_owned_diagnostic(
                         time.sleep(0.02)
                     else:
                         verified = False
+            except (KeyboardInterrupt, SystemExit) as exc:
+                cleanup_interrupt = exc
+                verified = False
             except (OSError, subprocess.TimeoutExpired):
                 verified = False
             if not verified:
                 message = "Diagnostic process-tree cleanup could not be verified"
                 if isinstance(active_error, (KeyboardInterrupt, SystemExit)):
                     active_error.add_note(message)
+                elif cleanup_interrupt is not None:
+                    cleanup_interrupt.add_note(message)
+                    raise cleanup_interrupt
                 else:
                     raise OSError(message)
         stdout.seek(0)

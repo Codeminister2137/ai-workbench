@@ -1679,3 +1679,27 @@ the real repository and captured concurrent artifact writes; 48d31f2 isolates it
 28 module tests pass, full root rerun 2778 pass / 9 skip in 237.67 seconds.
 The earlier pre-push flake's missing
 original traceback still prevents asserting it had this same cause.
+
+
+## 2026-10-24 Go default and diagnostic cleanup follow-up
+
+Owner selected automatic 16000-token native admission for exactly Go Kimi K2.7
+Code, committed 720378d. 98 focused checks passed. Initial full suite: 2785 pass,
+1 failure, 9 skip; diagnostic exit_cleanup_error lacked the expected warning note.
+Original receipt preserved in go-kimi-default-output-full-suite-20261023.log.
+A traced module run passed all 23 original cases; original trigger stays unknown.
+Four deterministic controls reproduced cancellation during cleanup losing the
+warning and sometimes skipping remaining root cleanup. 75ebd83 repairs those
+paths without extending the cleanup deadline; 91 focused checks and full root
+2790 pass / 9 skip (224.90 seconds). Before/after evidence stays in artifacts.
+
+Fresh read-only Go trial 20261024a was sealed at 75ebd83: 37 offline controls,
+real scripted CLI composition, admission/transport budget agreement and independent
+owned audit passed. Automatic approval review rejected live launch twice before
+execution, requiring user authorization naming the exact repository payload and
+OpenCode destination beyond standing bounded-Go approval. Files were independently
+compared to already-pushed origin/develop, with no private plans or .env in fixture;
+the reviewer still rejected. No hosted calls or live launch marker were created.
+An explicit payload/destination approval request is pending. Preserve unconsumed
+trial state; after HEAD changes prepare a fresh exclusive seal instead of editing
+its old manifest. This is a platform approval block, not provider/model failure.

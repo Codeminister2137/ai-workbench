@@ -12,6 +12,54 @@ from ai_provider.external_agents import run_diagnostic_command
 from ai_provider.process_ownership import WindowsJob
 
 
+@pytest.mark.skipif(os.name != "nt", reason="Windows diagnostic cleanup stages")
+@pytest.mark.parametrize("stage", ["job", "wait"])
+@pytest.mark.parametrize("error_type", [KeyboardInterrupt, SystemExit])
+def test_cleanup_cancellation_retains_warning_and_attempts_root_cleanup(
+    monkeypatch, stage, error_type
+):
+    from types import SimpleNamespace
+
+    error = error_type(23)
+
+    class Process:
+        _handle = 1
+        waits = 0
+        killed = False
+
+        def poll(self):
+            return 0 if self.killed else None
+
+        def kill(self):
+            self.killed = True
+
+        def wait(self, timeout):
+            self.waits += 1
+            if self.waits == 2 and stage == "wait":
+                raise error
+            return 0
+
+    class Job:
+        def stop(self, timeout):
+            if stage == "job":
+                raise error
+            return True
+
+    process = Process()
+    monkeypatch.setattr(subprocess, "Popen", lambda *args, **kwargs: process)
+    monkeypatch.setattr(diagnostic_process, "WindowsJob", lambda process: Job())
+    monkeypatch.setattr(
+        diagnostic_process.ctypes,
+        "WinDLL",
+        lambda *args: SimpleNamespace(NtResumeProcess=lambda handle: 0),
+    )
+    with pytest.raises(error_type) as caught:
+        diagnostic_process.run_owned_diagnostic(("synthetic",), timeout=1)
+    assert caught.value is error
+    assert process.killed and process.waits == 2
+    assert error.__notes__ == ["Diagnostic process-tree cleanup could not be verified"]
+
+
 @pytest.mark.parametrize(
     "states, expected",
     [

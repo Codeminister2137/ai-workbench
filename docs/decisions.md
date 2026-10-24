@@ -717,3 +717,16 @@ write against a pre-run snapshot, prompts restricted to named files, no secrets
 in prompts, read-only analysis keeps its normal sandbox. Exit when a working
 sandbox backend, a fixed bundled binary, or a proper CLI install exists. See
 [ADR-067](decisions/ADR-067-temporary-codex-sandbox-bypass-for-delegated-write-work.md).
+
+
+## Go Kimi native coding output default - 2026-10-23
+
+Owner selected the automatic default after confirming the proposed cap was
+16000 output tokens per call. Native coding admission now reserves 16000 for
+exactly opencode_go / kimi-k2.7-code when no request limit was supplied. Explicit
+limits and other models' defaults are unchanged. This uses the existing neutral
+request field before sizing; insufficient context refuses rather than reducing
+the selected default. No new CLI option, billing source or reasoning persistence.
+The owner selected this over an explicit CLI budget option; no additional rationale
+is inferred. See source-state for the official Kimi recommendation and ADR-055
+for transient continuation handling. This default is not live quality acceptance.

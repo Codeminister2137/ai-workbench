@@ -1,11 +1,11 @@
 # Current task - ATTENDED; Go live continuation INCOMPLETE
 
-Branch: develop. Validated code checkpoint 48d31f2; follow-up merge 95f85c0.
-Original logical integration was pushed at d277293; follow-up is now merged.
-Push to origin/develop is authorized; verify actual local/remote heads on resume.
-No timers, sleep action or unattended window.
+Branch: fix/go-kimi-default-output-budget. Previous develop integration d45f791
+is pushed. Owner selected the automatic Go/Kimi 16000 default; implementation and
+98 focused admission checks pass. Current full suite: 2790 passed / 9 skipped. No timers,
+sleep action or unattended window. Merge/push to develop remains authorized.
 
-## Owner authority and pending decision
+## Owner authority and accepted default
 
 Owner confirmed 2026-10-23 that Go Extra Usage is disabled and that all comparable
 bounded Go acceptance runs are approved for now. Do not ask again for each such
@@ -15,15 +15,13 @@ overage, account setting change, model switch or replay of consumed trials.
 Remaining account quota stays unknown. Existing safe bootstrap supplies the key;
 never print/commit .env or private continuation state.
 
-Owner also reported broken summaries. Repository closeouts must start with exact
-`## **SUMMARY**`; keep the body concise. A clarification about which summary was
-meant is pending, but restore that documented marker now.
+Closeouts must start with exact `## **SUMMARY**` and stay concise.
 
-Production decision asked asynchronously: explicit provider-neutral
---max-output-tokens option (recommended; retain defaults; caller selects Kimi's
-budget) versus automatic Kimi-specific 16000 default (easier use, higher per-call
-allowance). Do not implement disputed defaults before the owner chooses.
-This is a production behavior decision, not another run authorization request.
+Production decision resolved: after confirming the proposed 16000 output-token
+cap per call, owner said "Then use the default." Implement automatic 16000 for
+exactly opencode_go / kimi-k2.7-code before native context admission. Explicit
+request limits and other models' defaults stay unchanged; no new CLI flag.
+Recorded in docs/decisions.md and source-state. 98 focused checks pass.
 
 ## Verified changes
 
@@ -62,18 +60,45 @@ receipts even when later generation fails; safe transport frame/type diagnostics
 Original a's omitted worker tools were independently recovered/verified against
 all five saved SQLite hashes; original receipt remains unchanged.
 
-e is DRAFT ONLY / NOT LAUNCHED (artifacts/go-review-continuation-prep-20261023e).
-It tentatively selects 16000 tokens, 8 attempts, 660 total seconds, but the current
-worker overrides output AFTER native admission, whose default remains 8192.
-Do not launch or call it ready until output is set before real admission. No
-canonical fixture was prepared and no live allowance consumed. Offline controls
-do not cover that admission discrepancy. Keep input provenance/root instructions,
-exact history, actual tool coverage, frozen source/tests/index and ownership guards.
-After the production budget decision, expose the existing neutral request field
-through the chosen path, test it, prepare clean fresh inputs and run once under the
-standing authorization. Independently inspect reports; structural audit alone
-cannot establish truthful/substantive review. Full coding/orchestrated/fallback
-acceptance remains open beyond this read-only component slice.
+2026-10-24 follow-up: 75ebd83 fixes cancellation during diagnostic cleanup.
+Four deterministic controls failed before the fix; now cancellation retains its
+warning and remaining bounded root cleanup is attempted. Original full-suite
+exit_cleanup_error case's exact trigger remains unknown; it passed the trace
+probe. Preserved original: artifacts/go-kimi-default-output-full-suite-20261023.log.
+After fix: 91 focused checks and root 2790 pass / 9 skip in 224.90 seconds.
+Root receipt: artifacts/go-kimi-default-output-full-suite-fixed-20261024.log.
+
+Fresh prepared trial a: artifacts/go-review-continuation-prep-20261024a/,
+name go-kimi-readonly-continuation-20261024a-8calls-660seconds, sealed at 75ebd83.
+37 offline controls and independent owned scripted proof/audit pass. The worker
+now REQUIRES actual admission to select 16000 and never overrides output after
+admission; independent audit matches admission diagnostics and transport budgets.
+Old e remains an unlaunched draft. Earlier a-d stay consumed failures.
+
+LIVE HAS NOT STARTED: automatic approval review rejected launch twice BEFORE
+CreateProcess. No marker, provider request or quota consumption on this fresh
+trial. Re-verification showed all three fixture files exactly match the already
+pushed origin/develop versions; other fixture content is only host-validation.json.
+No .env/private plans/credentials in model payload. Automatic reviewer still
+requires a trusted user message explicitly authorizing these files and destination.
+A request is pending for AGENTS.md, scripts/opencode-go-coding-chat-acceptance.py,
+tests/test_opencode_go_coding_chat_acceptance.py plus host receipt/tasks/conversation
+to https://opencode.ai/inference/go/openai/v1/chat/completions, kimi-k2.7-code.
+Standing Go approval persists but does not bypass this platform rejection.
+Do not retry live until that exact user authorization arrives.
+
+After integration changes HEAD, retire the unused a seal and prepare a fresh
+exclusive directory/name at the final clean checkpoint, preserving all original
+files/receipts. Same bounds: 16000 output tokens per call, 8 attempts total/4 per
+turn, 660 seconds total, 300 per turn/290 per request, 20 cleanup reserve,
+24 tools/12 per turn. Exactly two invocations with complete root instructions,
+exact saved visible history, real successful reads/status/diff coverage, frozen
+source/tests/index and owned process cleanup. No auxiliary/scrutiny/delegation
+in this declared read-only slice; all 18 ordinary tools exposed with six allowed
+inspection operations. Host tests are supplied, not model execution. Once user
+payload approval arrives, launch once, then independently audit effects and
+substantively review both reports. Full coding/orchestrated/fallback acceptance
+remains open beyond this component slice. No raw reasoning persistence/logging.
 
 Five matcher disagreements remain unapplied; do not change the mapping table
 without owner decision. Shell/PID, MCP warning policy and advisory scrutiny repairs
