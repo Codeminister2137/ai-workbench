@@ -741,3 +741,19 @@ output and execution time; preserve finite run/cleanup bounds and count all
 roles, while reporting hosted allowance consumption separately. This is task
 authority, not an automatic routing-policy change or permission for overage,
 new private payloads, or unbounded retries. Preserve each consumed result.
+
+## ADR-068 - Free routes are the default preference
+
+**Status:** Accepted
+
+**Date:** 2026-10-24
+
+Owner decision: free routes are preferred by default and more free sources are
+welcome. Free-first ordering applies whenever a free route can actually serve
+the task's quality, privacy, capability and provider requirements; it never
+waives those requirements, never authorizes paid overage, and never turns a free
+route's provisional quality into a measured claim. The default catalog now
+declares an OpenRouter free route; that route is declared but not yet ordered
+because the no-credits account is refused by the entitlement guard for ordinary
+CLI requests. See
+[ADR-068](decisions/ADR-068-free-routes-are-the-default-preference.md).

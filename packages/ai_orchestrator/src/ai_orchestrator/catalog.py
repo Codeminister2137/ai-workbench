@@ -137,6 +137,7 @@ _PRODUCT_SLUGS = {
     "google_ai_studio": "ai-studio",
     "openai_api": "api",
     "requesty_free": "free",
+    "openrouter_free": "free",
     "github_copilot": "copilot-cli",
     "gemini_cli": "gemini-cli",
 }

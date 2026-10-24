@@ -524,6 +524,39 @@ def test_opt_in_catalog_provenance_and_existing_fallback():
     )
 
 
+def test_default_catalog_free_route_builds_the_guarded_client():
+    """The default catalog's OpenRouter route must be a real, guarded free route."""
+    root = Path(__file__).resolve().parents[1]
+    catalog = load_model_catalog(root / "packages/ai_orchestrator/examples/model_catalog.toml")
+    entry = next(
+        item
+        for item in catalog
+        if item.backend.route_id == "openrouter/free-google/gemma-4-31b-it:free"
+    )
+    backend = entry.backend
+    assert backend.provider == "openrouter"
+    assert backend.billing_source is BillingSource.OPENROUTER_FREE
+    assert backend.cost_policy_tier is CostPolicyTier.FREE_ONLY
+    assert backend.model.endswith(":free")
+
+    from ai_orchestrator.planner import ExecutionTarget
+
+    config = backend_config_from_execution_target(
+        ExecutionTarget(
+            backend.route_id,
+            backend.provider,
+            backend.product,
+            backend.model,
+            backend.access_method,
+            backend.auth_method,
+            backend.billing_source,
+            backend.cost_policy_tier,
+        )
+    )
+    assert config.provider is ProviderKind.OPENROUTER and config.require_free_model
+    assert isinstance(create_chat_client(config), OpenRouterFreeChatClient)
+
+
 def test_conventional_environment_key(monkeypatch):
     monkeypatch.setenv("AI_PROVIDER_KIND", "openrouter")
     monkeypatch.setenv("AI_PROVIDER_MODEL", MODEL)

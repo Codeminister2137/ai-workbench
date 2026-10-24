@@ -199,7 +199,7 @@ Scale definitions, validation and the recompute command live in
 
 ### Per-route bands
 
-The 18 routes declared in `model_catalog.toml`, graded from the primary matched
+The 19 routes declared in `model_catalog.toml`, graded from the primary matched
 row in [route-upstream-family-mapping.md](route-upstream-family-mapping.md) —
 the row with the closest identity; alternate rows recorded there are not used.
 `—` means that source published no row for this route's family, so the route
@@ -225,8 +225,9 @@ stays ungraded in that column.
 | `requesty/openai/gpt-5.1` | Frontier (88) | — | `family` |
 | `requesty/openai/gpt-5-mini` | Frontier (88) | — | `family` |
 | `opencode-go/go-kimi-k2.7-code` | Strong (59.1) | Very strong (70.8) | `family` |
+| `openrouter/free-google/gemma-4-31b-it:free` | — | — | `unmatched` |
 
-14 routes are graded at `family` confidence and 4 stay ungraded; 10 carry an
+14 routes are graded at `family` confidence and 5 stay ungraded; 10 carry an
 Aider band, 6 a SWE-bench band, and only `opencode-go/go-kimi-k2.7-code` and
 `ollama/qwen2.5-coder:14b` carry both.
 

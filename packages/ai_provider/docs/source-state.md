@@ -3,9 +3,10 @@
 **Checked:** 2026-10-13; Gemini individual-access retirement verified 2026-10-14.
 Published limits and account observations can expire.
 
-**Latest scoped update:** 2026-10-22, capacity comparison below; OpenRouter
-limits/privacy, Codex data-policy scope and the OpenRouter request-contract
-refresh were also checked 2026-10-21 and 2026-10-22.
+**Latest scoped update:** 2026-10-24, OpenRouter free inventory and the declared
+free route; capacity comparison below; OpenRouter limits/privacy, Codex
+data-policy scope and the OpenRouter request-contract refresh were also checked
+2026-10-21 and 2026-10-22.
 This does not refresh every historical offer in the table below.
 
 This is the shared reference for provider access findings, integration gaps and
@@ -138,6 +139,61 @@ Free-plan conflict is still open.
     and never cached as a property of a route.
   - Availability is a source-reported observation, not a quality judgment, and
     not acceptance evidence for this repository.
+
+### OpenRouter — refreshed 2026-10-24
+
+The 2026-10-21 and 2026-10-22 findings above stand, including the unresolved
+Free-plan privacy-filter conflict. This entry records the free inventory and the
+one route this repository now declares; it does not resolve that conflict.
+
+- **Public free inventory, read 2026-10-24.** `GET /api/v1/models` returned 469
+  models, of which 17 are `:free` variants. Sixteen advertise `tools` **and**
+  report zero `prompt`/`completion` price. The one exclusion,
+  `nvidia/nemotron-3.5-content-safety:free`, lists no `tools` and is therefore
+  not a candidate for a tool-using CLI route.
+- **Turnover continues.** `openai/gpt-oss-120b:free` and `qwen/qwen3.8-27b:free`
+  are still absent from the public catalogue, while `google/gemma-4-31b-it:free`
+  and `cohere/north-mini-code:free` remain. The count coinciding with the
+  2026-10-22 total again hides a different membership, which confirms the earlier
+  rule: re-read availability, never cache it as a route property.
+- **Chosen route: `google/gemma-4-31b-it:free`.** It reports 262,144 context and
+  `tools` support. Its `:free` endpoint list contained exactly one provider on
+  2026-10-24 — Google AI Studio, `google-ai-studio`, status 0, 262,144 context,
+  `unknown` quantization, zero prompt/completion price, `tools` supported. A
+  single free endpoint is a concentration risk, not a quality claim: the route
+  cannot be served if that provider stops serving the free variant.
+- The paid slug `google/gemma-4-31b-it` listed 15 endpoints at non-zero prices
+  (about $0.10–$1.09 per million tokens). The adapter reads the `:free` entry in
+  the full model list and refuses on any non-zero price, so the paid endpoints
+  cannot be reached through this route; `data_collection=deny`, zero `max_price`
+  and `require_parameters` stay in the request.
+- **Live admission probe, 2026-10-24.** A synthetic request with the explicit
+  `public_or_synthetic` attestation (ADR-063) passed every adapter guard: the
+  model list entry was exactly one match at zero price with `tools`, and
+  `GET /key` reported `is_free_tier: true` with
+  `free_model_daily_requests = {used: 0, limit: 50, remaining: 50}`. The
+  `:free` endpoint list still showed one provider (Google AI Studio, status 0,
+  100% 30-minute uptime, zero price). The POST then returned **HTTP 429** with
+  upstream metadata: `"google/gemma-4-31b-it:free is temporarily rate-limited
+  upstream"`, `provider_error_code: 429`,
+  `limit_source: upstream_provider_shared_pool`, with remedy hints to retry,
+  add a BYOK provider key, or route to another provider. Account quota was
+  untouched, so this is an upstream shared-pool limit, not exhausted allowance.
+  The adapter maps 429 to `RATE_LIMIT`, which a fallback walk already treats as
+  a continuation signal.
+- **Unattested CLI use is refused on this account.** `is_free_tier: true` means
+  no credits have ever been purchased, so an ordinary CLI request without an
+  attestation is rejected by the entitlement guard before inference. The CLI has
+  no public/synthetic attestation flag, so this route cannot serve ordinary CLI
+  work until the entitlement question is decided; it is declared and testable
+  but not ordered in the local fallback priority.
+- No leaderboard row measures the `:free` serving variant, so the route stays
+  `unmatched` in
+  [route-upstream-family-mapping.md](route-upstream-family-mapping.md) and
+  carries no inherited Gemma prior. Quality is provisional and unmeasured.
+- Free-plan quota, per-minute limits and the privacy-filter conflict are
+  unchanged; the adapter still re-reads `/key` before every call and refuses
+  without an attested public/synthetic payload when entitlement is unverified.
 
 ### Codex and cross-provider privacy — checked 2026-10-21
 
@@ -483,7 +539,7 @@ or successful connection does not prove better quality or fix a stalled task.
 | --- | --- | --- |
 | Antigravity | Official Google agent client; Free allowance refreshes weekly, with capacity/work-based limits | Model discovery connected successfully. Remaining quota and selected-model entitlement unknown. Shared MCP permission mapping unresolved. Automatic quota-reader startup isolation is unproved; this does not invalidate the separate connection check. |
 | Requesty | Existing API adapter; advertised 200 free-model requests/day without a card | Exact approved Gemma route passed live zero input/output/cache/tier-price validation. Free daily remaining unknown. Prepaid balance does not measure free allowance. Route quality remains provisional standard. Paid routes remain supported under explicit cost policy. |
-| OpenRouter | API gateway; advertised 50 free requests/day, rising to 1,000 after adding $10 credits; 20 requests/minute | Owner selected next-source priority on 2026-10-14. Experimental opt-in free-only adapter implemented offline: distinct key/provenance, exact zero prices/tool support/daily remaining checks each call, zero price caps and data_collection=deny. Key/account readiness and live quality unverified; example Qwen free endpoint listing was empty. Credit purchase deferred; no paid fallback. |
+| OpenRouter | API gateway; advertised 50 free requests/day, rising to 1,000 after adding $10 credits; 20 requests/minute | Owner selected next-source priority on 2026-10-14. Experimental opt-in free-only adapter implemented offline: distinct key/provenance, exact zero prices/tool support/daily remaining checks each call, zero price caps and data_collection=deny. Key/account readiness and live quality unverified; example Qwen free endpoint listing was empty. Credit purchase deferred; no paid fallback. Updated 2026-10-24: `google/gemma-4-31b-it:free` (262,144 context, tools, one free endpoint) is now a declared default-catalog route; the adapter guards are unchanged and live quality is still unmeasured. |
 | Gemini CLI | Individual free/Pro/Ultra access retired on 2026-06-18 | Owner sign-in failed with the matching retirement error; official announcement verified 2026-10-14. Offline adapter/MCP evidence is preserved, but the individual free route refuses even with cached auth. Approved pilot never started. Enterprise/API access remains a separate, unapproved route; no Antigravity substitution. |
 | Groq | Free API with per-model request and token limits | Full coding-session use recommended for deferral; smaller tasks remain candidates. No adapter or account acceptance established. See quantitative comparison below. |
 | Cerebras | $5 trial after verified payment method, expires after 30 days; no recurring free tier | Deferred as an emergency/promotion candidate. Revisit for distinctive capability or cost; no account/integration activation. |

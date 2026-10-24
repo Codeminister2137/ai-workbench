@@ -386,6 +386,37 @@ source = "OpenAI model docs, checked 2026-09-20"
 source_url = "https://developers.openai.com/api/docs/models/gpt-5-mini"
 
 [[models]]
+route_id = "openrouter/free-google/gemma-4-31b-it:free"
+provider = "openrouter"
+product = "openrouter_free"
+model = "google/gemma-4-31b-it:free"
+location = "external"
+access_method = "provider_api"
+auth_method = "api_key"
+billing_source = "openrouter_free"
+cost_policy_tier = "free_only"
+quality = "standard"
+latency = "interactive"
+notes = "OpenRouter free variant of the same Gemma model as the Requesty free route. The guarded OpenRouter client verifies the exact :free price, tool support and daily free quota before every call, requests data_collection=deny with zero max_price, and refuses rather than falling back to a paid model. Free model inventory rechecked 2026-10-24: 16 tool-capable zero-priced variants. A 2026-10-24 account probe reported is_free_tier=true, so ordinary unattested CLI requests are refused by the entitlement guard; an attested synthetic call passed every guard and the single free endpoint answered 429 from its upstream shared pool. Quality is provisional and carries no leaderboard prior because the :free variant has no measured row."
+
+[models.capabilities]
+chat = true
+streaming = true
+tools = true
+structured_output = false
+multimodal_input = false
+embeddings = false
+
+[models.context_limits]
+context_window_tokens = 262144
+
+[models.estimate]
+input_cost_per_million_tokens = 0
+output_cost_per_million_tokens = 0
+source = "OpenRouter public models API checked 2026-10-24; runtime prices and quota rechecked before inference"
+source_url = "https://openrouter.ai/api/v1/models"
+
+[[models]]
 route_id = "requesty/free-google/gemma-4-31b-it"
 provider = "requesty"
 product = "requesty_free"

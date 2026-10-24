@@ -140,8 +140,8 @@ def test_saved_reader_snapshot_reproduction():
             indent=2,
         )
     )
-    assert len(catalog["models"]) == 18
-    assert agreements == 13
+    assert len(catalog["models"]) == 19
+    assert agreements == 14
     assert {item["route"] for item in disagreements} == {
         "openai/codex-gpt-5.5",
         "openai/api-gpt-5.1",
