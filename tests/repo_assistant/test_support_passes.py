@@ -105,6 +105,9 @@ def test_auxiliary_accepts_only_complete_text_advice(kind):
                 finish_reason=FinishReason.LENGTH if kind == "truncated" else FinishReason.STOP,
             )
 
+        def stream(self, request):
+            return iter(())
+
     result = support_passes.run_auxiliary_panel(
         "Review the task.", coding_task_profile(), catalog, client_factory=lambda _: Client()
     )
