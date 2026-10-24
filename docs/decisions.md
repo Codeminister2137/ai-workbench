@@ -730,3 +730,14 @@ the selected default. No new CLI option, billing source or reasoning persistence
 The owner selected this over an explicit CLI budget option; no additional rationale
 is inferred. See source-state for the official Kimi recommendation and ADR-055
 for transient continuation handling. This default is not live quality acceptance.
+
+## CLI baseline support routing - owner clarification 2026-10-24
+
+Keep auxiliary review and scrutiny on local models for the next Go-primary CLI
+baseline, consistent with ADR-025. Escalation to a wholly paid-tier workflow is
+permitted if observed evidence establishes that local models do not handle the
+required support well. Local token economy is secondary to adequate context,
+output and execution time; preserve finite run/cleanup bounds and count all
+roles, while reporting hosted allowance consumption separately. This is task
+authority, not an automatic routing-policy change or permission for overage,
+new private payloads, or unbounded retries. Preserve each consumed result.

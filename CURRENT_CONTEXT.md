@@ -18,6 +18,28 @@ This does not authorize different private data, model/billing switches or paid
 overage. No .env/private plans/credential values in model inputs or logs.
 Closeouts start with exact `## **SUMMARY**` and stay concise.
 
+## Active continuation - Go primary with local support approved
+
+Fresh preparation: artifacts/cli-baseline-go-successor-20261024a/README.md.
+ci inputs regenerated and independently audited at clean HEAD 09188b1; old
+preparation preserved under ci/preparation-before-20261024-go. 303 inherited
+controls passed before Go composition; 25 focused Go transport/budget/effect
+controls passed after it. No live inference, no new source commit or push.
+
+First scripted Go composition STOPPED: existing auxiliary/scrutiny profiles derive
+LOCAL_ONLY cost/privacy (ADR-025), so Go-only catalog cannot serve them. Seven
+synthetic coding requests are not live calls or workflow completion. Failure
+logs/receipts preserved. Copied delivery helper also failed temporary cleanup
+because SQLite transaction context did not close connection; fresh copy now
+uses closing(), still needs composition verification. Predecessor unchanged.
+
+Owner selected LOCAL support for now (2026-10-24). A wholly paid-tier workflow
+is permissible if evidence establishes local-model inadequacy. Local budgets
+matter less: prioritize adequate context/output/time, still finite bounds and
+complete accounting; report Go allowance separately. ADR-025 defaults stay.
+Finish hybrid composition, offline controls/audit/seal and owned launch before
+inference. Existing draft --live remains disabled.
+
 ## Latest completed bounded run
 
 artifacts/go-review-continuation-prep-20261024b/ is CONSUMED. Name:
