@@ -43,7 +43,8 @@ limit; other models retain their defaults. A host override after admission would
 understate reserved output. The fresh worker refuses mismatched admitted budgets;
 37 offline controls and an independent scripted audit compare admission diagnostics
 with transport receipts. Current full root suite: 2790 passed, nine skipped.
-Live review/continuation remains incomplete; no post-default hosted trial has run. Owner standing authorization covers
+Live review/continuation remains incomplete; no post-default hosted trial has run.
+Owner standing authorization covers
 comparable bounded Go runs within existing limits; fresh named preparation and
 billing/privacy admission still apply. Retain full root instructions, exact input
 provenance/history, original tests, frozen review and owned cleanup. No general

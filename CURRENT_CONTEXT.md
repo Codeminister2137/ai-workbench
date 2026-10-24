@@ -1,9 +1,9 @@
 # Current task - ATTENDED; Go live continuation INCOMPLETE
 
-Branch: fix/go-kimi-default-output-budget. Previous develop integration d45f791
-is pushed. Owner selected the automatic Go/Kimi 16000 default; implementation and
-98 focused admission checks pass. Current full suite: 2790 passed / 9 skipped. No timers,
-sleep action or unattended window. Merge/push to develop remains authorized.
+Branch: develop. Go/Kimi default and cleanup correction integrated at ab15658.
+Validated code checkpoint: 75ebd83. Full root suite: 2790 passed / 9 skipped.
+Push to origin/develop remains authorized; verify local/remote heads on resume.
+No timers, sleep action or unattended window. Live payload approval is pending.
 
 ## Owner authority and accepted default
 
