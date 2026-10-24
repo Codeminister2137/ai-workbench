@@ -3,7 +3,8 @@ from __future__ import annotations
 import json
 import sqlite3
 import uuid
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
+from contextlib import closing, contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -451,10 +452,11 @@ class SQLiteOrchestratedRunStore:
             raise KeyError(f"orchestrated stage does not exist: {run_id} {stage_name}")
         return records[0]
 
-    def _connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(self.path)
-        connection.execute("PRAGMA foreign_keys = ON")
-        return connection
+    @contextmanager
+    def _connect(self) -> Iterator[sqlite3.Connection]:
+        with closing(sqlite3.connect(self.path)) as connection, connection:
+            connection.execute("PRAGMA foreign_keys = ON")
+            yield connection
 
 
 def _utc_now() -> str:

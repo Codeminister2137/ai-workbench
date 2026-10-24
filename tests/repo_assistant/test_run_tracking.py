@@ -1,5 +1,6 @@
 """Durable stage receipts and bounded foreground execution contracts."""
 
+import sqlite3
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -11,6 +12,40 @@ from ai_agent.validation import ValidationCommandResult
 from ai_orchestrator.models import TaskProfile
 from ai_orchestrator.orchestrator import OrchestrationResult, OrchestrationStatus
 from ai_provider.orchestrated_runs import SQLiteOrchestratedRunStore
+
+
+@pytest.mark.parametrize("rollback", [False, True])
+def test_run_store_closes_connections_and_preserves_transactions(tmp_path, monkeypatch, rollback):
+    original_connect = sqlite3.connect
+    connections = []
+
+    def connect(*args, **kwargs):
+        connection = original_connect(*args, **kwargs)
+        connections.append(connection)
+        return connection
+
+    monkeypatch.setattr("ai_provider.orchestrated_runs.sqlite3.connect", connect)
+    store = SQLiteOrchestratedRunStore(tmp_path / "runs.sqlite3")
+    store.initialize()
+    with store._connect() as connection:
+        connection.execute("CREATE TABLE connection_lifecycle (value INTEGER)")
+    try:
+        with store._connect() as connection:
+            connection.execute("INSERT INTO connection_lifecycle VALUES (1)")
+            if rollback:
+                raise ValueError("transaction rejected")
+    except ValueError:
+        assert rollback
+    for connection in connections:
+        with pytest.raises(sqlite3.ProgrammingError, match="closed"):
+            connection.execute("SELECT 1")
+    verification = original_connect(store.path)
+    try:
+        assert verification.execute("SELECT value FROM connection_lifecycle").fetchall() == (
+            [] if rollback else [(1,)]
+        )
+    finally:
+        verification.close()
 
 
 def test_tracker_and_record_cannot_extend_outer_execution_deadline(tmp_path, monkeypatch):
