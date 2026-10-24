@@ -67,6 +67,12 @@ def test_native_caller_declares_completion_evidence_and_reports_correction(tmp_p
         ),
     )
     assert result.completion_failures == 1 and len(client.requests) == 3
+    from ai_provider.closeout import FINAL_RESPONSE_INSTRUCTION
+
+    for request in client.requests:
+        system = next(m.content for m in request.messages if m.role is MessageRole.SYSTEM)
+        assert FINAL_RESPONSE_INSTRUCTION in system
+        assert system.count(FINAL_RESPONSE_INSTRUCTION) == 1
     assert len(result.tool_results) == 1
     assert (tmp_path / "native.txt").read_text() == "native"
     assert client.requests[1].messages[-2].content == "Premature report"
@@ -288,9 +294,12 @@ def test_native_agent_mode_executes_provider_tool_calls(
     )
 
     assert result.response.message.content == "native complete"
+    from ai_provider.closeout import FINAL_RESPONSE_INSTRUCTION
     from ai_provider.repo_context import NATIVE_TOOL_SYSTEM_PROMPT
 
-    assert requests[0].messages[0].content == NATIVE_TOOL_SYSTEM_PROMPT
+    assert requests[0].messages[0].content == (
+        NATIVE_TOOL_SYSTEM_PROMPT + "\n\n" + FINAL_RESPONSE_INSTRUCTION
+    )
     assert requests[0].tools
     assert all(request.temperature == sampling.get("temperature") for request in requests)
     assert all(request.top_p == sampling.get("top_p") for request in requests)

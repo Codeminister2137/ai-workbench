@@ -3792,7 +3792,9 @@ def _run_native_agent(
         )
         system_prompt = RESEARCH_SYSTEM_PROMPT + ("\n" + args.system if args.system else "")
     else:
-        system_prompt = build_native_tool_system_prompt(args.system)
+        system_prompt = _system_prompt_with_final_response_contract(
+            build_native_tool_system_prompt(args.system)
+        )
         native_client = prepare_native_coding_client(
             client,
             config,
