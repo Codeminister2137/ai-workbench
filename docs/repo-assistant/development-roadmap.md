@@ -33,9 +33,9 @@ are integrated. Offline acceptance-controller and Go two-turn harness checks do
 not establish live paid-route completion. October 23 Go review trials stopped on
 timeout/output exhaustion; continuation replay is now repaired under ADR-055.
 Owner selected an automatic 16000-token native coding default for exactly Go
-Kimi K2.7 Code. Verify admission/transport agree in fresh continuation acceptance;
-retain
-root instructions, original tests, frozen review, finite bounds and owned cleanup.
+Kimi K2.7 Code. Offline controls now verify admission/transport agree; live
+continuation acceptance remains pending. Retain root instructions, original tests,
+frozen review, finite bounds and owned cleanup.
 Comparable bounded Go runs have standing owner approval; keep each scope named.
 See [the current baseline assessment](baseline-gap.md) for evidence and remaining
 limits. Local synthetic parity remains separate from the paid-route baseline.

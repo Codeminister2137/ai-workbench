@@ -619,8 +619,8 @@ OpenAI-compatible endpoint. Gateway-specific enforcement remains unverified.
 
 The Go adapter now carries this field through ADR-055's transient origin-bound
 continuation contract for exactly `kimi-k2.7-code`, including streamed fragments.
-Raw metadata excludes reasoning fields. That protocol repair implied no reasoning persistence, model switch, budget
-increase or inference authorization. Saved-session
+Raw metadata excludes reasoning fields. That protocol repair implied no reasoning
+persistence, model switch, budget increase or inference authorization. Saved-session
 restart still restores visible conversation, not private continuation state.
 Do not classify an output-limited empty answer as model-quality acceptance or
 silently reinterpret reasoning as delivered answer text.
