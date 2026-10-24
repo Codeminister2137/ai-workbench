@@ -1727,3 +1727,44 @@ extended allowance or retrospective promotion of earlier failures. Structural Go
 continuity is demonstrated; clean report fidelity and full coding/orchestrated/
 fallback baseline remain incomplete. See local 20261024b/results.md and separate
 independent-report-assessment.json for exact evidence and limitations.
+
+## 2026-10-24 - Go primary with local support and scrutiny evidence repair
+
+Owner retained local auxiliary/scrutiny, permitted wholly paid-tier escalation
+only after evidence of local inadequacy, and prioritized adequate local context,
+output and time over token economy. The durable clarification is indexed in
+docs/decisions.md; production ADR-025 defaults stay unchanged.
+
+The first fresh hybrid c trial stopped at frozen-review scrutiny after 16 calls
+(12 Go, 4 local), 22 tools and 272.46 seconds. Both model test runs and the
+independent oracle passed; worker/runtime cleanup passed. Investigation found
+that unchanged review phases supplied neither changed-file excerpts nor native
+inspection/test receipts to scrutiny. Original trial remains failed.
+
+Repairs: e2936f6 closes run-store connections after commit/rollback; 107c17d
+supplies bounded native read/diff/test receipts; c96cc92 gives the CLI sole
+rendered summary heading while preserving raw responses; c6c2f34 handles empty
+bold Changed labels and clarifies host bookkeeping in response instructions.
+Latest full suite: 2801 passed, 9 skipped in 238.94 seconds.
+
+Two fresh local-only diagnostic calls with 65536 context and 16384 output tokens
+passed the supported review and requested revision for synthetic 99-tests/hash
+claims. No paid requests, original fixture changes or cleanup uncertainty.
+These controls supported retaining local review instead of escalating.
+
+Fresh hybrid e at 6885708 completed coding and frozen review with 11 Go and four
+local calls, 19 tools and 328.19 seconds. Each phase executed ten passing tests,
+five originals and five model-authored companions. The independent 3616-case
+oracle, model-only source reconstruction, frozen review, saved-report continuity
+and cleanup passed. Go reported 215382 input / 5447 output tokens; local reported
+40492 / 5771. Actual dollar cost and account remaining allowance were unobserved.
+
+Reporting remains qualified: both model reports called CLI bookkeeping DBs
+unrelated and unchanged, although the host created/updated them. Local scrutiny
+did not correct this. Subsequent prompt clarification is implemented and tested,
+not a new live adherence pass or a retrospective rewrite. This bounded coding
+result establishes neither universal report fidelity nor broader quality parity;
+live fallback and scrutiny-fed repair were not exercised. Evidence is preserved
+in artifacts/cli-baseline-hybrid-successor-20261024{c,e}/,
+artifacts/local-scrutiny-evidence-20261024d/ and
+artifacts/hybrid-live-assessment-20261024/. Five matcher proposals remain unapplied.
