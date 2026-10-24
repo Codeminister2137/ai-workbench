@@ -88,7 +88,7 @@ def _agent_outcome(response: str | None) -> str:
         if not candidate or candidate.startswith("#") or candidate.startswith("```"):
             continue
         candidate = re.sub(
-            r"^(-\s+)?\*\*(Changed|Validated|Notes|Preserved)\*\*\s*:",
+            r"^(-\s+)?\*\*(Changed|Validated|Notes|Preserved)(?:\*\*\s*:|:\*\*)",
             r"\1\2:",
             candidate,
         )

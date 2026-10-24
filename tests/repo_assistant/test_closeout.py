@@ -4,7 +4,7 @@ import pytest
 from ai_provider.closeout import FINAL_RESPONSE_INSTRUCTION, format_cli_closeout
 
 
-@pytest.mark.parametrize("label", ["- Changed:", "Changed:", "- **Changed**:"])
+@pytest.mark.parametrize("label", ["- Changed:", "Changed:", "- **Changed**:", "- **Changed:**"])
 def test_closeout_preview_uses_content_after_a_standalone_changed_label(label):
     response = f"## **SUMMARY**\n{label}\n  - Implemented inclusive span union.\n- Notes: retained"
     output = format_cli_closeout(
