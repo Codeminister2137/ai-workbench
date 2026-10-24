@@ -363,10 +363,17 @@ Implementation status in `ai_provider`:
   normalizes capabilities/prices defensively. Each inventory item now records the
   model's ``protocol`` (``chat``/``responses``/``messages``),
   ``trains_on_request_data``, and ``requires_global_regions`` flags.
-- Account allowance can be read via the unofficial but currently working
-  `GET /zen/go/v1/usage` endpoint (see the refreshed quota section above). The
-  source info adapter still reports ``unavailable`` until the adapter is updated
-  to call that endpoint; do not rely on hard-coded advertised limits.
+- Account allowance is read from ``GET /zen/go/v1/usage`` (see the refreshed quota
+  section above). ``OpenCodeGoSourceInfo.account_allowance`` calls that endpoint with
+  the Go inference key and normalizes the rolling/weekly/monthly percentages plus
+  their reset timestamps; ``read_opencode_go_allowance`` additionally reports the
+  binding window and the published per-model monthly caps under ``model_limits_usd``.
+  The endpoint is reachable but is not listed on the public Console API pages, so it
+  is treated as an observed endpoint rather than a documented contract. Two facts
+  must stay separate: the endpoint reports **account-wide percentages only** (it does
+  not decompose usage by model), while the per-model dollar caps are documented
+  sub-limits, not observations. Hitting any account window blocks the entire
+  ``opencode-go`` provider, including its free models, until that window resets.
 - ``ProviderKind.OPENCODE_GO`` and ``BillingSource.OPENCODE_GO_SUBSCRIPTION_ALLOWANCE``
   wire Go into config, factory and the existing account-usage dispatcher.
 

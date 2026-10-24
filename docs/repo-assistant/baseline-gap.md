@@ -377,11 +377,11 @@ Read-only allowance inventory (no inference) at
 | --- | --- | --- | --- |
 | openai/codex-* | allowances | 5h window 100% used, weekly 31% used | authenticated |
 | kiro/auto | allowances | plan coverage only; service reports monthly limit reached | authenticated |
-| opencode-go/go-kimi-k2.7-code | allowances | no official endpoint (unknown) | executor-compatible |
+| opencode-go/go-kimi-k2.7-code | allowances | no official endpoint at the time (superseded 2026-10-24, see below) | executor-compatible |
 | github/copilot-cli-auto | allowances | chat 200/200 used (0%), completions 2000/2000 | client not configured |
 | google/antigravity-* | allowances | not observable | not installed; headless MCP ineligible |
 | OpenRouter free | not in catalog | 50/50 free daily requests, 16 tool-capable free models | no route |
-| requesty free / AI Studio / Ollama | other tiers | - | excluded by same-tier rule |
+| requesty free / AI Studio / Ollama | other tiers | - | admitted as cheaper fallback tiers from 2026-10-24 |
 
 Two ordering hazards are recorded rather than inferred away. `kiro_usage`
 deliberately reports plan coverage, never a remaining balance, so its 100%
@@ -392,5 +392,59 @@ Live fallback trial `artifacts/fallback-acceptance-20261024-123206/`: the switch
 was recorded (`simulated-codex -> kiro/auto (usage_limit)`, attempts
 `codex_cli, kiro_cli`, different billing source, allowance observation stored),
 but the target refused with Kiro's own `runError`: "The monthly usage limit has
-been reached". `passed` stayed false and is not regraded. Fallback is therefore
-attempted and recorded but **not completed**, so Slice B remains open.
+been reached". `passed` stayed false and is not regraded. Fallback was therefore
+attempted and recorded but **not completed** at that point. The completion is
+recorded in the next section.
+
+## 2026-10-24 Slice B completed: the fallback walks the whole ordered set
+
+Owner direction: fallback "only makes sense if it tries whole set", and a cheaper
+tier must be admissible from an allowance initial so a free route with a capable
+model and enough allowance is used and prioritised. Three changes follow from that.
+
+- **Downward tier inclusion.** `fallback_candidates` now admits any tier the task
+  cost policy allows (`cost_policy_allows(entry.tier, initial.tier)`) instead of
+  requiring the exact initial tier. A cost policy is a ceiling, so continuing on
+  `free_only` from `allowances_allowed` is a downgrade in spend, not an escalation.
+  `fallback_diagnostics` reports the exclusion reason as "higher cost tier". The
+  old same-tier invariant test was replaced by
+  `test_free_tier_route_is_admitted_and_prioritised_from_allowance_initial` plus a
+  ceiling assertion in `tests/test_gemini_cli.py`.
+- **Whole-set walk.** `tests/test_execution_fallback.py::test_session_walks_the_whole_ordered_set_until_a_route_completes`
+  drives three failing fallbacks (`kiro -> copilot -> antigravity`) and asserts the
+  attempt sequence ends only when a route finishes.
+- **OpenCode Go usage is now readable.** `go_source_info` reads
+  `GET https://opencode.ai/zen/go/v1/usage` with the inference key and reports the
+  account-wide rolling/weekly/monthly percentages, their reset times, the binding
+  window and the published per-model monthly caps separately. It no longer claims
+  that no endpoint exists.
+
+Harness: `scripts/fallback-acceptance.py` now takes repeatable `--fallback-route`
+(`requesty-free`, `opencode-go`, `kiro`, `copilot`), builds the catalog from that
+order, records the session's ready set and attempt sequence, and can force a
+declared synthetic usage limit on one external route (`--simulate-limit-on`) so the
+walk must continue to the next candidate. A run passes only when every configured
+route is accounted for as either ready or explicitly unavailable, the attempts
+follow the configured order, and the last attempt finished.
+
+Live evidence, no original trial replayed or regraded:
+
+| artifact | result |
+| --- | --- |
+| `artifacts/fallback-acceptance-20261024-151618/` | passed. Whole set held (4/4 ready, 0 unaccounted). `simulated-codex:usage_limit -> requesty free:finished`. 6 real free calls, 18529 tokens, reported cost $0.00. |
+| `artifacts/fallback-acceptance-20261024-151909/` | passed. 2 hops: `simulated-codex:usage_limit -> kiro:usage_limit (declared synthetic) -> requesty free:finished`. 5 real free calls, 15523 tokens, $0.00. |
+
+`artifacts/fallback-acceptance-20261024-151449/` is preserved as a failed
+pre-completion attempt: the free route did real tool work but exhausted the default
+`--max-action-rounds 3` before running the test. That was a fixture bound, not a
+fallback defect; the harness now uses a still-finite 6 rounds and the failure is
+kept rather than regraded.
+
+Remaining limits. Only one route in a live walk was genuinely exhausted and
+continued past; the second hop's failure was declared synthetic because Kiro
+reports its exhausted plan as a generic process error, not as a usage limit. The
+completing route was the free Requesty route in both runs, so a live walk that
+continues *into* `opencode-go` or a CLI client is still unexercised. Fallback
+still switches only on usage-limit/overload signals, so a route that fails for any
+other reason ends the run instead of continuing.
+

@@ -1890,3 +1890,58 @@ The C4 success path uses an injected test fetcher; C5 requires the optional Jedi
 extra; C6 covers host-owned child continuity rather than a cross-provider route
 switch. M5 still needs installed-client/live evidence. Slice B (live fallback)
 remains blocked pending the owner's route/billing/trigger decision.
+
+## 2026-10-24 - Slice B completed: whole-set fallback walks to a real completion
+
+Owner direction was that fallback "only makes sense if it tries whole set", and
+that a cheaper tier must stay admissible from an allowance initial so a free
+route with a capable model and enough allowance is used and prioritised.
+
+Implemented:
+
+- `fallback_candidates` admits any tier the task cost policy allows
+  (`cost_policy_allows(entry.tier, initial.tier)`) instead of demanding the exact
+  initial tier. `fallback_diagnostics` now reports "higher cost tier" rather than
+  "different cost tier". The old same-tier invariant test was replaced by
+  `test_free_tier_route_is_admitted_and_prioritised_from_allowance_initial` and a
+  ceiling assertion in `tests/test_gemini_cli.py`.
+- `tests/test_execution_fallback.py::test_session_walks_the_whole_ordered_set_until_a_route_completes`
+  proves the loop continues across three failing fallbacks and stops only when a
+  route finishes.
+- `OpenCodeGoSourceInfo.account_allowance` reads
+  `GET https://opencode.ai/zen/go/v1/usage` with the Go inference key and
+  normalizes rolling/weekly/monthly percentages plus reset times;
+  `read_opencode_go_allowance` adds `binding_window`, `model_limits_usd` and
+  `usage_scope`. Account-wide percentages and published per-model dollar caps stay
+  separate facts.
+- `scripts/fallback-acceptance.py` takes repeatable `--fallback-route`, builds the
+  catalog from that order, records the session's ready set and attempt sequence,
+  and can force a declared synthetic limit on one external route with
+  `--simulate-limit-on` so the walk must continue.
+
+Two bounded live runs passed and one earlier attempt is preserved as a failure:
+
+- `artifacts/fallback-acceptance-20261024-151618/`: whole set held 4/4, 0
+  unaccounted; `simulated-codex:usage_limit -> requesty free:finished`; 6 real free
+  calls, 18529 tokens, reported cost $0.00.
+- `artifacts/fallback-acceptance-20261024-151909/`: two hops,
+  `simulated-codex:usage_limit -> kiro:usage_limit (declared synthetic) ->
+  requesty free:finished`; 5 real free calls, 15523 tokens, $0.00.
+- `artifacts/fallback-acceptance-20261024-151449/`: failed attempt. The free route
+  did real tool work but exhausted the default `--max-action-rounds 3`. The harness
+  now uses a still-finite 6 rounds; the failure is kept and not regraded.
+
+Defect found and fixed on the way: the preflight provider probe constructed
+`OpenAICompatibleChatClient` directly, which raised `KeyError` for
+`opencode-go` because that client has no default base URL, and it probed
+`{chat_base}/models`, a 404 for Go. The probe now uses `create_chat_client` and
+Go's real model-inventory URL, and session admission stays configuration-only so a
+transient provider error cannot shrink the candidate set. `TeeOutput.flush` no
+longer raises during interpreter shutdown when the terminal stream is already
+closed.
+
+Remaining limits: the completing route was the free Requesty route in both runs, so
+a live walk that continues into `opencode-go` or a CLI client is still unexercised.
+Kiro reports its exhausted plan as a generic process error, not a usage limit, which
+is why the second hop's failure had to be declared synthetic. Fallback still switches
+only on usage-limit/overload signals.

@@ -48,8 +48,8 @@ for that auxiliary contract and for a bold closeout label are offline-validated.
 A third bounded trial then aligned the harness with production's auxiliary
 contract and exercised explicit bookkeeping attribution: the auxiliary proposal
 is recorded without stopping the run, and the primary report named both host
-databases as host bookkeeping. Clean paid-agent workflow acceptance, live
-fallback and scrutiny-fed repair remain open. See
+databases as host bookkeeping. Clean paid-agent workflow acceptance and
+scrutiny-fed repair remain open; live fallback is now complete. See
 [the current baseline assessment](baseline-gap.md) for evidence and remaining
 limits. Local synthetic parity remains separate from the paid-route baseline.
 
@@ -267,6 +267,18 @@ but no candidate had usable capacity at the time, so fallback is attempted and
 recorded rather than completed. See
 `docs/repo-assistant/baseline-gap.md` and
 `artifacts/fallback-acceptance-20261024-123206/`.
+
+Slice B (live fallback) is **COMPLETE**. The fallback now walks the whole ordered
+candidate set and admits cheaper tiers than the initial route, and the acceptance
+harness runs every configured route in order until one completes. Two bounded live
+runs passed: `artifacts/fallback-acceptance-20261024-151618/` (whole set held 4/4,
+real free route completed) and `artifacts/fallback-acceptance-20261024-151909/`
+(two hops, one declared synthetic limit, real free route completed). OpenCode Go
+account usage is now readable from `GET https://opencode.ai/zen/go/v1/usage`, which
+closes the "allowance unobservable" blocker recorded above. Remaining limits: the
+completing route was free Requesty in both runs, so a live walk continuing *into*
+`opencode-go` or a CLI client is still unexercised, and fallback still switches only
+on usage-limit/overload signals. See `docs/repo-assistant/baseline-gap.md`.
 
 An observed provider `error` finish was normalized as a blank response. The owner
 approved recognizing OpenRouter choice-level errors with the existing root-error

@@ -1,10 +1,11 @@
-# Current task - ATTENDED; trial g recorded, C1-C6 offline IDE independence implemented
+# Current task - ATTENDED; Slice B (live whole-set fallback) complete, M5 next
 
-Branch: develop. Latest production code: fa403ba; handoff commit follows.
+Branch: develop. Latest production code: ca03d1b; handoff commit follows.
 No active inference job, local server, timer, sleep or unattended window.
 Owner-authorized logical commits and push to develop remain in scope.
 
-**Status: INCOMPLETE.** The immediate paid-agent CLI baseline is not established.
+**Status: INCOMPLETE.** Slice B is COMPLETE; the wider paid-agent CLI baseline is
+not established. Next imperative action: M5 installed-client/live parity (below).
 
 ## Owner authority and current policy
 
@@ -12,7 +13,6 @@ Keep auxiliary review and scrutiny local for now (ADR-025). A wholly paid-tier
 workflow is permissible only after evidence establishes local-model inadequacy.
 Local token economy is secondary to sufficient context, output and time; retain
 finite run/cleanup bounds, count every role and report hosted usage separately.
-The two local controls below support retaining local models, not escalation.
 
 Standing comparable bounded Go acceptance authorization remains; owner confirmed
 Extra Usage disabled. No paid overage, unbounded retries, model/billing switches,
@@ -21,18 +21,37 @@ Native Go Kimi default is 16000 output tokens before admission; explicit caps wi
 Existing endpoint: https://opencode.ai/inference/go/openai/v1/chat/completions.
 Fresh synthetic fixture tasks/source/tests, committed AGENTS and their execution
 history were used; no private plans or .env values were transmitted/logged.
-Actual account remaining quota/dollar cost were not observed. Closeouts begin
-with exact ## **SUMMARY** and Changed/Validated/Notes bullets.
+Closeouts begin with exact ## **SUMMARY** and Changed/Validated/Notes bullets.
 
 ## Completed implementation and validation
 
-d7c102c delivers the final-response contract to native agents; d7423ca and
-4a6e6d9 stop read-only handoff status/diff inspection from refreshing the Git
-index. c2a82d7 rejects auxiliary advice that proposes tools or is empty/truncated
-instead of displaying it, with a clear failure reason; 7478fc8 recognises
-`**Changed:**` in the closeout preview. Each repair had a failing regression
-assertion first. Focused checks and the full suite pass: 2809 passed / 9 skipped
-in 243.35 seconds; receipts under artifacts/auxiliary-repair-20261024/.
+Slice B: the fallback now walks the whole ordered candidate set and admits cheaper
+tiers than the initial route, so the free Requesty route can complete after a
+usage-limited primary. `fallback_candidates` uses
+`cost_policy_allows(entry.tier, initial.tier)`; `fallback_diagnostics` reports
+"higher cost tier". OpenCode Go account usage is readable from
+`GET https://opencode.ai/zen/go/v1/usage` (account-wide percentages) with the
+published per-model dollar caps reported separately. `scripts/fallback-acceptance.py`
+takes repeatable `--fallback-route`, records the ready set and attempt sequence, and
+supports a declared `--simulate-limit-on` for one external route.
+
+Live evidence (no trial replayed or regraded):
+
+- artifacts/fallback-acceptance-20261024-151618/ passed. Whole set held 4/4, 0
+  unaccounted. `simulated-codex:usage_limit -> requesty free:finished`, 6 real free
+  calls, 18529 tokens, $0.00.
+- artifacts/fallback-acceptance-20261024-151909/ passed. Two hops,
+  `simulated-codex:usage_limit -> kiro:usage_limit (declared synthetic) ->
+  requesty free:finished`, 5 real free calls, 15523 tokens, $0.00.
+- artifacts/fallback-acceptance-20261024-151449/ preserved failure: the free route
+  did real tool work but exhausted the default `--max-action-rounds 3`. Fixture
+  bound, not a fallback defect; the harness now uses a still-finite 6 rounds.
+
+Earlier completed work: d7c102c delivers the final-response contract to native
+agents; d7423ca and 4a6e6d9 stop read-only handoff status/diff inspection from
+refreshing the Git index; c2a82d7 rejects auxiliary advice that proposes tools or is
+empty/truncated; 7478fc8 recognises `**Changed:**` in the closeout preview. Slice C
+offline C1-C6 lives in `tests/test_ide_independent_capabilities.py` (8 tests).
 
 ## Consumed live evidence - do not replay or rewrite verdicts
 
@@ -92,10 +111,16 @@ are preserved, and the declared 9-file suite passes 107/107.
 
 ## Remaining limits / next independent acceptance scope
 
+Slice B establishes a live whole-set fallback that reaches a real completion on a
+different billing source. It does not establish a live walk that continues *into*
+`opencode-go` or a CLI client, because the completing route was the free Requesty
+route in both runs. Kiro reports its exhausted plan as a generic process error
+rather than a usage limit, so the second hop's failure was declared synthetic.
+Fallback still switches only on usage-limit/overload signals.
+
 g establishes the auxiliary-contract alignment and explicit bookkeeping
 attribution for this bounded read-only question. It does not establish general
-report fidelity, live fallback, scrutiny-fed repair or a clean paid-agent
-baseline. c2a82d7 and 7478fc8 now have live integrated exercise in g. Five
+report fidelity, scrutiny-fed repair or a clean paid-agent baseline. Five
 matcher disagreements remain unapplied: ask before changing mapping. Post-trial
 current-render files are labelled host re-renderings, not original model delivery.
 
@@ -110,33 +135,23 @@ continuity, not a cross-provider route switch.
 
 Next actions, in order:
 
-1. Slice B - live fallback is **attempted and recorded but not completed**.
-   `artifacts/fallback-acceptance-20261024-123206/` shows a genuine cross-source
-   switch (`simulated-codex -> kiro/auto`, attempts `codex_cli, kiro_cli`,
-   different billing source, allowance observation stored), but Kiro refused with
-   its own `runError`: "The monthly usage limit has been reached". `passed` is
-   false and must not be regraded. Every other candidate is also unavailable:
-   Copilot chat 200/200 used and client unconfigured; Antigravity not installed;
-   OpenCode Go executor-compatible but allowance unobservable; Codex 5h window
-   exhausted until 2026-10-24T12:36:33Z. The completing run needs a route with
-   real capacity. Recommended next step: make `scripts/fallback-acceptance.py`
-   support a provider-API fallback target (`opencode-go`) so the fallback can
-   complete without a CLI client, then run one bounded attempt.
-   Completion condition unchanged: fallback attempted and recorded on a
-   different billing source, the completing route's report supported by its
-   receipts, and no original trial replayed or regraded.
-2. M5 installed-client/live parity. Reuse the consolidated offline contract and
+1. M5 installed-client/live parity. Reuse the consolidated offline contract and
    add only the missing installed-client evidence; do not redo the deterministic
-   surface checks.
+   surface checks. Completion condition: at least one capability set exercised
+   through an installed client against a real repository, with receipts.
+2. Optional follow-up, owner decision needed: add an OpenRouter free catalog route
+   so its real account allowance can participate in fallback. It is not a catalog
+   route today, so it cannot be selected.
 
-Fallback ordering is now configurable and evidence-derived: `[fallback]`
+Fallback ordering is configurable and evidence-derived: `[fallback]`
 `priority`/`exclude`/`allow_cost_escalation`, plus `--fallback-priority` and
-`--fallback-exclude` per invocation. The local default order was derived from
+`--fallback-exclude` per invocation. The local default order is Requesty free,
+opencode-go, kiro, copilot, antigravity-pro, antigravity-flash, derived from
 `artifacts/allowance-inventory-20261024/`. Two recorded hazards: `kiro_usage`
-reports plan coverage, never remaining balance, and OpenRouter free has account
-allowance but no catalog route.
+reports plan coverage, never remaining balance, and hitting any Go account window
+blocks the whole `opencode-go` provider including its free models.
 
-Do not replay f or g, and do not regrade them.
+Do not replay c, d, e, f or g, and do not regrade them.
 
 Relevant private plans remain repo-assistant-cli-parity-plan.md and
 opencode-go-integration-first-20261022.md; old unattended plan is CLOSED.
