@@ -260,6 +260,14 @@ Recent iterative trials produced correct effects in some runs but did not finish
 both the substantive edit report and frozen review. Passing code checks alone
 does not complete those acceptance phases or establish parity.
 
+Fallback ordering is now an explicit, allowance-derived chain (`[fallback]`
+`priority`/`exclude`/`allow_cost_escalation`, `--fallback-priority`,
+`--fallback-exclude`). A live switch was recorded on a different billing source,
+but no candidate had usable capacity at the time, so fallback is attempted and
+recorded rather than completed. See
+`docs/repo-assistant/baseline-gap.md` and
+`artifacts/fallback-acceptance-20261024-123206/`.
+
 An observed provider `error` finish was normalized as a blank response. The owner
 approved recognizing OpenRouter choice-level errors with the existing root-error
 categories; an error finish without usable details is non-retryable. Existing

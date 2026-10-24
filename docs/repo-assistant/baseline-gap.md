@@ -359,3 +359,38 @@ independent postflight and bounded counterexample:
 artifacts/cli-completion-postflight-20261020ct/. Prior cq/cr/cn/co/cj/cl/cm evidence is preserved.
 Owner-approved trusted-regression offline calibration:
 artifacts/cli-trusted-regression-calibration-20261020cp/.
+
+## 2026-10-24 allowance-derived fallback ordering
+
+Fallback ordering is now expressible as an explicit chain rather than only
+same-tier recommender scoring. `fallback_candidates` accepts `priority`,
+`excluded_route_ids` and `allow_cost_escalation`; `[fallback]` exposes
+`priority`, `exclude` and `allow_cost_escalation`; `--fallback-priority` and
+`--fallback-exclude` override per invocation. Priority orders candidates but
+never relaxes privacy, capability or quality filters, and the task cost policy
+still rejects any tier it does not allow.
+
+Read-only allowance inventory (no inference) at
+`artifacts/allowance-inventory-20261024/`:
+
+| route | tier | observed allowance | ready |
+| --- | --- | --- | --- |
+| openai/codex-* | allowances | 5h window 100% used, weekly 31% used | authenticated |
+| kiro/auto | allowances | plan coverage only; service reports monthly limit reached | authenticated |
+| opencode-go/go-kimi-k2.7-code | allowances | no official endpoint (unknown) | executor-compatible |
+| github/copilot-cli-auto | allowances | chat 200/200 used (0%), completions 2000/2000 | client not configured |
+| google/antigravity-* | allowances | not observable | not installed; headless MCP ineligible |
+| OpenRouter free | not in catalog | 50/50 free daily requests, 16 tool-capable free models | no route |
+| requesty free / AI Studio / Ollama | other tiers | - | excluded by same-tier rule |
+
+Two ordering hazards are recorded rather than inferred away. `kiro_usage`
+deliberately reports plan coverage, never a remaining balance, so its 100%
+value must not be read as capacity. OpenRouter free has real account allowance
+but no catalog route, so it cannot participate until one is added.
+
+Live fallback trial `artifacts/fallback-acceptance-20261024-123206/`: the switch
+was recorded (`simulated-codex -> kiro/auto (usage_limit)`, attempts
+`codex_cli, kiro_cli`, different billing source, allowance observation stored),
+but the target refused with Kiro's own `runError`: "The monthly usage limit has
+been reached". `passed` stayed false and is not regraded. Fallback is therefore
+attempted and recorded but **not completed**, so Slice B remains open.

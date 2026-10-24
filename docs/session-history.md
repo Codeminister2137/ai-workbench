@@ -1,5 +1,29 @@
 # Session History
 
+## 2026-10-24 allowance-derived fallback ordering; Kiro fallback target exhausted
+
+Fallback ordering became an explicit, configurable chain. `fallback_candidates`
+gained `priority`, `excluded_route_ids` and `allow_cost_escalation`; the user
+config gained `fallback.priority`, `fallback.exclude` and
+`fallback.allow_cost_escalation`; the CLI gained `--fallback-priority` and
+`--fallback-exclude`. Priority reorders candidates only: privacy, capability and
+quality filters still apply, and the task cost policy still rejects any tier it
+does not permit. Fifteen tests were added; the full suite passes 2832/9 skipped.
+
+The default order was derived from a read-only allowance inventory
+(`artifacts/allowance-inventory-20261024/`) rather than from quality alone:
+Codex (authenticated, weekly 31% used), Kiro (authenticated, coverage-only
+allowance), OpenCode Go (unknown, executor-compatible), Copilot (client not
+configured, chat bucket exhausted), Antigravity (not installed). Two hazards were
+recorded instead of inferred away: Kiro reports plan coverage, not remaining
+balance, and OpenRouter free has account allowance but no catalog route.
+
+The live fallback trial `artifacts/fallback-acceptance-20261024-123206/` recorded
+a genuine cross-source switch (`simulated-codex -> kiro/auto`, attempts
+`codex_cli, kiro_cli`) but the Kiro target refused in its own protocol stream:
+"The monthly usage limit has been reached". `passed` remained false and was not
+regraded. Slice B is therefore attempted and recorded but not completed.
+
 ## 2026-10-14 free-source integration and methodology closeout
 
 Guarded, opt-in OpenRouter integration and Gemini historical transport contracts

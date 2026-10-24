@@ -110,20 +110,31 @@ continuity, not a cross-provider route switch.
 
 Next actions, in order:
 
-1. Slice B - fresh bounded live fallback trial. Blocked pending an owner decision
-   on the fallback route/provider, billing source, credentials and whether a
-   synthetic usage-limit trigger counts as live fallback evidence. Do not start a
-   paid or client-based fallback run before that choice. Current executable
-   options: GitHub Copilot CLI (standard tier, allowance, different bucket) is
-   the only eligible route available without new setup; Codex CLI (high) needs
-   `CODEX_COMMAND` configured; Antigravity (high) is executable but its headless
-   shared-tool/MCP path is explicitly ineligible. Completion condition: fallback
-   is actually attempted and recorded on a different billing source, the
-   completing route's report is supported by its receipts, and no original trial
-   is replayed or regraded.
+1. Slice B - live fallback is **attempted and recorded but not completed**.
+   `artifacts/fallback-acceptance-20261024-123206/` shows a genuine cross-source
+   switch (`simulated-codex -> kiro/auto`, attempts `codex_cli, kiro_cli`,
+   different billing source, allowance observation stored), but Kiro refused with
+   its own `runError`: "The monthly usage limit has been reached". `passed` is
+   false and must not be regraded. Every other candidate is also unavailable:
+   Copilot chat 200/200 used and client unconfigured; Antigravity not installed;
+   OpenCode Go executor-compatible but allowance unobservable; Codex 5h window
+   exhausted until 2026-10-24T12:36:33Z. The completing run needs a route with
+   real capacity. Recommended next step: make `scripts/fallback-acceptance.py`
+   support a provider-API fallback target (`opencode-go`) so the fallback can
+   complete without a CLI client, then run one bounded attempt.
+   Completion condition unchanged: fallback attempted and recorded on a
+   different billing source, the completing route's report supported by its
+   receipts, and no original trial replayed or regraded.
 2. M5 installed-client/live parity. Reuse the consolidated offline contract and
    add only the missing installed-client evidence; do not redo the deterministic
    surface checks.
+
+Fallback ordering is now configurable and evidence-derived: `[fallback]`
+`priority`/`exclude`/`allow_cost_escalation`, plus `--fallback-priority` and
+`--fallback-exclude` per invocation. The local default order was derived from
+`artifacts/allowance-inventory-20261024/`. Two recorded hazards: `kiro_usage`
+reports plan coverage, never remaining balance, and OpenRouter free has account
+allowance but no catalog route.
 
 Do not replay f or g, and do not regrade them.
 
