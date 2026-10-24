@@ -1703,3 +1703,27 @@ the reviewer still rejected. No hosted calls or live launch marker were created.
 An explicit payload/destination approval request is pending. Preserve unconsumed
 trial state; after HEAD changes prepare a fresh exclusive seal instead of editing
 its old manifest. This is a platform approval block, not provider/model failure.
+
+
+## 2026-10-24 explicit payload approval and Go continuation result
+
+Owner explicitly approved the declared repository payload and OpenCode destination
+after the platform review block. Fresh 20261024b, sealed at a1ce8d0, then completed:
+two actual coding-chat invocations in one saved session, four provider responses,
+nine successful inspections, 171.46 seconds, frozen source/tests/index/dependencies
+and verified owned cleanup. Production admission and transport both used 16000.
+Transient continuation was observed and forwarded within each tool loop; only
+visible conversation was restored across invocations, under ADR-055's existing
+persistence boundary. 96082 provider-reported input plus 12719 output tokens;
+reported dollar cost unavailable. No model edits/shell/tests or route/billing switch.
+
+Independent structural audit passed. Scoped static code observations/no-findings
+assessment are supported, but report quality is not accepted unqualified. First
+report says no provider calls were performed; four host completion calls actually
+returned. External Codex corrects that unqualified claim and attributes detection
+externally, not to automatic CLI protection. Second report duplicates the reserved
+SUMMARY heading. Original reports/receipts remain unchanged; no silent rewrite,
+extended allowance or retrospective promotion of earlier failures. Structural Go
+continuity is demonstrated; clean report fidelity and full coding/orchestrated/
+fallback baseline remain incomplete. See local 20261024b/results.md and separate
+independent-report-assessment.json for exact evidence and limitations.

@@ -1,6 +1,6 @@
 # Distance to established baseline CLI usability
 
-## Immediate paid-agent baseline — updated 2026-10-23
+## Immediate paid-agent baseline — updated 2026-10-24
 
 Owner clarification: the immediate baseline is ordinary development with paid
 agents through this CLI, with fallback. Local/free-model quality experiments,
@@ -8,8 +8,8 @@ allowance-reset automation and eventual IDE-host independence are separate work;
 their unfinished results must not become prerequisites for this narrower goal.
 Historical trials retain their original verdicts and broader milestones remain open.
 
-Current offline checkpoint: the shell/PID ownership repairs are integrated and
-the full root suite passed 2,756 tests with nine skips. ADR-064 supplies visible
+At the initial integrated offline checkpoint, shell/PID ownership repairs were
+integrated and the full root suite passed 2,756 tests with nine skips. ADR-064 supplies visible
 warnings for unresolved MCP recovery; ADR-066 makes readable scrutiny advisory
 by default and supplies bounded scrutiny-fed repair. The pending-policy and
 command-gap descriptions in the historical October 21 evidence below are not
@@ -43,12 +43,24 @@ limit; other models retain their defaults. A host override after admission would
 understate reserved output. The fresh worker refuses mismatched admitted budgets;
 37 offline controls and an independent scripted audit compare admission diagnostics
 with transport receipts. Current full root suite: 2790 passed, nine skipped.
-Live review/continuation remains incomplete; no post-default hosted trial has run.
-Owner standing authorization covers
-comparable bounded Go runs within existing limits; fresh named preparation and
-billing/privacy admission still apply. Retain full root instructions, exact input
+A fresh post-default read-only review/continuation completed two invocations in
+one saved session: four returned provider requests, nine actual inspections,
+171.46 seconds, frozen inputs and verified owned cleanup. Admission/transport
+both selected 16000; private continuation was forwarded within both tool loops.
+Independent audit confirms exact visible history and saved/delivered reports.
+
+Independent source review supports the scoped code observations. Reporting is
+qualified: the first model report says no provider calls were performed, although
+host evidence records four. The second adds a duplicate SUMMARY heading. External
+assessment catches these; they do not establish automatic CLI report protection
+or a clean report-fidelity pass. Original reports remain unchanged. Full coding,
+orchestrated scrutiny/repair and fallback acceptance remain open.
+
+Owner standing authorization covers comparable bounded Go runs within existing
+limits; fresh named preparation and billing/privacy admission still apply.
+Retain full root instructions, exact input
 provenance/history, original tests, frozen review and owned cleanup. No general
-baseline completion is implied by the eventual read-only review. The original
+baseline completion is implied by this read-only review. The original
 arithmetic harness's fixture directory is not an OS sandbox.
 
 ### Historical paid-native checkpoint — 2026-10-21

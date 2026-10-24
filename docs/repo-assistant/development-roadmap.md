@@ -26,16 +26,20 @@ integrated report-fidelity acceptance remain incomplete. The minimal loop is
 the owner-approved design; the full research refinement guard set is deferred.
 Research and pending matcher choices are preserved in the dated artifact briefs.
 
-## Current paid-route baseline: 2026-10-23
+## Current paid-route baseline: 2026-10-24
 
 The shell/PID ownership repairs, MCP warning policy and advisory scrutiny repair
 are integrated. Offline acceptance-controller and Go two-turn harness checks do
 not establish live paid-route completion. October 23 Go review trials stopped on
 timeout/output exhaustion; continuation replay is now repaired under ADR-055.
 Owner selected an automatic 16000-token native coding default for exactly Go
-Kimi K2.7 Code. Offline controls now verify admission/transport agree; live
-continuation acceptance remains pending. Retain root instructions, original tests,
-frozen review, finite bounds and owned cleanup.
+Kimi K2.7 Code. Fresh read-only Go continuation now demonstrates two invocations,
+exact saved visible history, actual inspection tools, matched admission/transport
+budgets and verified owned cleanup. Its reporting remains qualified: an unqualified
+no-provider-calls claim contradicts host counts, and a nested summary duplicates
+the CLI heading. External detection is not automatic CLI correction. Full coding,
+orchestrated review/repair and fallback acceptance remain open. Retain original
+tests, full instructions/history, frozen review, finite bounds and owned cleanup.
 Comparable bounded Go runs have standing owner approval; keep each scope named.
 See [the current baseline assessment](baseline-gap.md) for evidence and remaining
 limits. Local synthetic parity remains separate from the paid-route baseline.
