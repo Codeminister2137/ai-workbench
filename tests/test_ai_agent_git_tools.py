@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import subprocess
 from pathlib import Path
 
@@ -34,6 +35,18 @@ def test_status_preserves_index_and_reports_changes(working_tree: Path) -> None:
     assert "source.txt" in result.output and "untracked.txt" in result.output
     assert index.read_bytes() == before
     assert GitStatusTool().definition.category is ToolCategory.READ
+
+
+@pytest.mark.parametrize("tool", [GitStatusTool(), GitDiffTool()])
+def test_inspection_preserves_index_when_only_worktree_timestamp_changed(working_tree, tool):
+    source = working_tree / "source.txt"
+    timestamp = source.stat().st_mtime_ns + 2_000_000_000
+    os.utime(source, ns=(timestamp, timestamp))
+    index = working_tree / ".git/index"
+    before = index.read_bytes()
+
+    assert not tool.execute({}, ToolContext(working_tree)).is_error
+    assert index.read_bytes() == before
 
 
 def test_diff_separates_staged_and_unstaged_without_external_helpers(working_tree: Path) -> None:

@@ -28,6 +28,8 @@ def _git_inspect(name: str, arguments: tuple[str, ...], context: ToolContext) ->
         "status.submoduleSummary=false",
         "-c",
         "diff.submodule=short",
+        "-c",
+        "diff.autoRefreshIndex=false",
         "-C",
         str(context.workspace_root.resolve()),
     )
