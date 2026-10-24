@@ -6,6 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from ai_agent.contracts import ToolResult
 from ai_provider import (
     AIMessage,
     AIResponse,
@@ -57,7 +58,11 @@ def test_native_final_delivery_preserves_draft_and_actual_validation(
             AIMessage(MessageRole.ASSISTANT, draft),
             BackendInfo("scripted", "offline-control", BackendLocation.LOCAL),
         ),
-        tool_results=(),
+        tool_results=(
+            ToolResult(
+                "read_file", "CURRENT_NATIVE_INSPECTION_RECEIPT", metadata={"path": "existing.py"}
+            ),
+        ),
     )
     calls = []
 
@@ -67,6 +72,7 @@ def test_native_final_delivery_preserves_draft_and_actual_validation(
             return prepared
         calls.append(prompt)
         assert draft in prompt and "actual validation passed" in prompt
+        assert "CURRENT_NATIVE_INSPECTION_RECEIPT" in prompt
         if review == "unavailable":
             raise ProviderError("Scripted reviewer unavailable")
         text = (

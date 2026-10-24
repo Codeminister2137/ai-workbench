@@ -1834,6 +1834,7 @@ def _execute_request(
                 },
             )
     assistant_response_text = None
+    args._scrutiny_tool_results = ()
     primary_response = result.response
     if args.native_tools and args.execute and result.config is not None:
         if orchestrated_tracker is not None and args.mode == "implement":
@@ -1943,6 +1944,7 @@ def _execute_request(
         primary_elapsed_seconds = time.perf_counter() - primary_started
         primary_response = native_result.response
         assistant_response_text = native_result.response.message.content
+        args._scrutiny_tool_results = native_result.tool_results
         delegation_status = _delegation_status_after_native_tools(
             delegation_status,
             native_result.tool_results,
@@ -2132,6 +2134,7 @@ def _execute_request(
                         repo_root,
                         progress_callback=print,
                     )
+                    args._scrutiny_tool_results = native_repair.tool_results
                     status = (
                         "completed_with_tool_errors"
                         if any(item.is_error for item in native_repair.tool_results)

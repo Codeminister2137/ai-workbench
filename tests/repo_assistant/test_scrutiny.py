@@ -481,3 +481,50 @@ def test_lenient_parse_survives_a_duplicated_heading() -> None:
     assert report.verdict == "fail"
     assert report.score == 2
     assert report.format_issues
+
+
+def test_read_only_scrutiny_retains_bounded_observations_and_execution_status():
+    from argparse import Namespace
+
+    from ai_agent.contracts import ToolResult
+    from ai_agent.scrutiny_workflow import _observed_tool_evidence
+
+    evidence = _observed_tool_evidence(
+        Namespace(
+            _scrutiny_tool_results=(
+                ToolResult(
+                    "run_command", "refused command", is_error=True, metadata={"executed": False}
+                ),
+                ToolResult(
+                    "read_file", "def merge_spans(spans): ...", metadata={"path": "span_union.py"}
+                ),
+                ToolResult("git_diff", "observed diff"),
+                ToolResult(
+                    "run_command", "Ran 7 tests\nOK", metadata={"executed": True, "exit_code": 0}
+                ),
+            )
+        )
+    )
+    assert "def merge_spans" in evidence and "observed diff" in evidence
+    assert '"executed": false' in evidence and "is_error=True" in evidence
+    assert '"exit_code": 0' in evidence and "Ran 7 tests\nOK" in evidence
+
+
+def test_scrutiny_tool_receipts_are_bounded_and_not_claimed_when_missing():
+    from argparse import Namespace
+
+    from ai_agent.contracts import ToolResult
+    from ai_agent.scrutiny_workflow import _observed_tool_evidence
+
+    assert "No native" in _observed_tool_evidence(Namespace())
+    evidence = _observed_tool_evidence(
+        Namespace(
+            _scrutiny_tool_results=tuple(
+                ToolResult("read_file", f"receipt-{index}\n" + "x" * 4000) for index in range(20)
+            )
+        )
+    )
+    assert len(evidence) <= 12_000
+    assert "receipt-0\n" not in evidence
+    assert "receipt-8\n" in evidence
+    assert "truncated" in evidence and "omitted" in evidence
