@@ -4,6 +4,30 @@ import pytest
 from ai_provider.closeout import FINAL_RESPONSE_INSTRUCTION, format_cli_closeout
 
 
+@pytest.mark.parametrize("verdict", ["pass", "needs_revision"])
+def test_closeout_owns_summary_heading_even_when_agent_duplicates_it(verdict):
+    response = "## **SUMMARY**\n- Changed: candidate outcome\n- Validated: agent claim"
+    output = format_cli_closeout(
+        response_text=response,
+        status="ready",
+        execution_status="completed",
+        scrutiny_details={"verdict": verdict, "issues": "Review limitation"},
+        scrutiny_policy="required",
+    )
+    assert output.count("## **SUMMARY**") == 1
+    assert "#### Agent summary\n- Changed: candidate outcome" in output
+    assert "- Validated: agent claim" in output
+    assert response.startswith("## **SUMMARY**")
+
+
+def test_closeout_does_not_rewrite_summary_heading_in_a_code_example():
+    response = "Example:\n```markdown\n## **SUMMARY**\n```"
+    output = format_cli_closeout(
+        response_text=response, status="ready", execution_status="completed"
+    )
+    assert response in output
+
+
 def test_closeout_uses_fixed_schema_and_reports_absent_validation_stage() -> None:
     output = format_cli_closeout(
         response_text="A model-specific final answer.",

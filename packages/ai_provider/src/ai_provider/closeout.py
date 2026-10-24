@@ -239,6 +239,14 @@ def format_cli_closeout(
 
     response = response_text.strip() if response_text and response_text.strip() else None
     report = response if response is not None else "No final response was captured."
+    # The outer envelope owns this heading. Adjust only a leading duplicate in
+    # the display; callers retain the original agent response in session storage.
+    report = re.sub(
+        r"\A##[ \t]+\*\*SUMMARY\*\*[ \t]*(?:\r?\n|$)",
+        "#### Agent summary\n",
+        report,
+        count=1,
+    )
     outcome = (
         "Agent draft retained below; unresolved scrutiny prevents an accepted outcome summary."
         if unresolved_review
