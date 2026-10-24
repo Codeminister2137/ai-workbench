@@ -41,7 +41,13 @@ the CLI heading. External detection is not automatic CLI correction. Full coding
 orchestrated review/repair and fallback acceptance remain open. Retain original
 tests, full instructions/history, frozen review, finite bounds and owned cleanup.
 Comparable bounded Go runs have standing owner approval; keep each scope named.
-See [the current baseline assessment](baseline-gap.md) for evidence and remaining
+On the same date, one bounded coding/review question completed under local
+auxiliary and scrutiny support, and a separate read-only report-fidelity trial
+was mechanically accepted but tainted by a local auxiliary tool proposal. Repairs
+for that auxiliary contract and for a bold closeout label are offline-validated.
+Clean workflow acceptance, explicit host-bookkeeping attribution, live fallback
+and scrutiny-fed repair remain open. See
+[the current baseline assessment](baseline-gap.md) for evidence and remaining
 limits. Local synthetic parity remains separate from the paid-route baseline.
 
 ## Historical paid-native checkpoint: 2026-10-21

@@ -1768,3 +1768,36 @@ live fallback and scrutiny-fed repair were not exercised. Evidence is preserved
 in artifacts/cli-baseline-hybrid-successor-20261024{c,e}/,
 artifacts/local-scrutiny-evidence-20261024d/ and
 artifacts/hybrid-live-assessment-20261024/. Five matcher proposals remain unapplied.
+
+## 2026-10-24 - Bookkeeping review trial f and auxiliary-pass repair
+
+Fresh read-only frozen-review trial `f` asked whether the native production
+review produces a faithful report after the final-response contract is actually
+delivered. Preparation found and committed three production defects with failing
+regressions first: d7c102c delivered the contract to native agents, d7423ca kept
+handoff status inspection from refreshing the index, and 4a6e6d9 stopped
+read-only diff from refreshing index metadata.
+
+Live `f` used 6 calls (1 local auxiliary, 4 Go coding, 1 local scrutiny),
+11 proposed tools and 199.70 seconds, with verified owned cleanup. The Go primary
+and local scrutiny completed. The local auxiliary pass failed at its first call
+because gpt-oss:20b proposed an unavailable tool in a tool-free pass; the harness
+refused it before execution. The workflow is `completed_with_auxiliary_errors`
+with `stop_reason=Unknown proposed tool`; this is a production auxiliary-pass
+defect, not a Go/provider failure.
+
+Both 10-test runs and the independent 3616-case oracle passed. Frozen inputs and
+index, original tests, inherited companions, raw saved-report continuity and the
+single SUMMARY heading were independently verified. Usage was 85847 input and
+4099 output provider-reported tokens; dollar cost was unavailable. The audit
+records mechanical acceptance but not clean workflow acceptance. Independent
+agent inspection found the report supported by its 10 tool receipts with no
+material false claim; a minor scope imprecision describes whole-worktree Git
+status as the two reviewed files, and bookkeeping attribution was not exercised
+because the report never mentioned the host databases it saw.
+
+Repairs after the trial: c2a82d7 rejects auxiliary advice that proposes tools or
+is empty/truncated, with a clear failure reason, instead of displaying it; 7478fc8
+recognises `**Changed:**` in the closeout preview. Focused checks and the full
+suite (2809 passed, 9 skipped) pass. The consumed trial keeps its original
+verdict; the integrated live effect of the repairs is not established.

@@ -56,6 +56,20 @@ assessment catches these; they do not establish automatic CLI report protection
 or a clean report-fidelity pass. Original reports remain unchanged. Full coding,
 orchestrated scrutiny/repair and fallback acceptance remain open.
 
+On 2026-10-24 the existing `coding-chat --orchestrated` workflow completed a
+bounded coding and frozen-review question under local auxiliary/scrutiny support
+(11 Go + 4 local calls, 19 tools, 328.19 seconds; five originals and five model
+companions, ten passing tests per phase, independent 3616-case oracle, frozen
+review and owned cleanup). A separate read-only bookkeeping-review trial then
+tested report fidelity after the final-response contract was delivered to native
+agents (6 calls, 11 proposed tools, 199.70 seconds). Its primary report was
+supported by its tool receipts with no material false claim, but the local
+auxiliary pass proposed an unavailable tool and left the workflow
+`completed_with_auxiliary_errors`. Both trials keep their original verdicts.
+Repairs `c2a82d7` (reject non-text auxiliary advice) and `7478fc8` (bold closeout
+label) are offline-validated; their live integrated effect and explicit
+host-bookkeeping attribution remain unestablished.
+
 Owner standing authorization covers comparable bounded Go runs within existing
 limits; fresh named preparation and billing/privacy admission still apply.
 Retain full root instructions, exact input

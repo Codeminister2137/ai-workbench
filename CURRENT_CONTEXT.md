@@ -1,8 +1,10 @@
-# Current task - ATTENDED; hybrid runner implemented, live result qualified
+# Current task - ATTENDED; trial f recorded, auxiliary repair committed
 
-Branch: develop. Latest production code: c6c2f34; handoff commit follows.
+Branch: develop. Latest production code: 7478fc8; handoff commit follows.
 No active inference job, local server, timer, sleep or unattended window.
 Owner-authorized logical commits and push to develop remain in scope.
+
+**Status: INCOMPLETE.** The immediate paid-agent CLI baseline is not established.
 
 ## Owner authority and current policy
 
@@ -24,18 +26,13 @@ with exact ## **SUMMARY** and Changed/Validated/Notes bullets.
 
 ## Completed implementation and validation
 
-7ba21ef records owner local-first and conditional escalation policy.
-e2936f6 closes run-store SQLite connections after commit/rollback; two regression
-cases failed before repair. 89 focused checks passed.
-107c17d supplies bounded native read/diff/test receipts to scrutiny, including
-read-only phases with no changed-file excerpts. 85 focused checks passed.
-c96cc92 renders a leading duplicate model SUMMARY as Agent summary, retaining
-raw saved response. c6c2f34 fixes bold/empty Changed-label preview and clarifies
-host database/log bookkeeping in existing final-response instructions.
-Latest 56 focused checks passed. Full suite after final code commit:
-2801 passed / 9 skipped in 238.94 seconds; receipt
-artifacts/hybrid-preview-bookkeeping-full-suite-20261024.log.
-Earlier code/handoff push gates passed through 6885708; final push follows.
+d7c102c delivers the final-response contract to native agents; d7423ca and
+4a6e6d9 stop read-only handoff status/diff inspection from refreshing the Git
+index. c2a82d7 rejects auxiliary advice that proposes tools or is empty/truncated
+instead of displaying it, with a clear failure reason; 7478fc8 recognises
+`**Changed:**` in the closeout preview. Each repair had a failing regression
+assertion first. Focused checks and the full suite pass: 2809 passed / 9 skipped
+in 243.35 seconds; receipts under artifacts/auxiliary-repair-20261024/.
 
 ## Consumed live evidence - do not replay or rewrite verdicts
 
@@ -62,23 +59,39 @@ Usage: Go 215382 input + 5447 output; local 40492 input + 5771 output tokens.
 Independent mechanical/substantive evidence:
 artifacts/hybrid-live-assessment-20261024/assessment-e.json and substantive-e.json.
 
+artifacts/cli-bookkeeping-review-20261024f/: completed_with_auxiliary_errors.
+Fresh read-only frozen review after d7c102c delivered the final-response contract.
+6 calls (1 local auxiliary, 4 Go coding, 1 local scrutiny), 11 proposed tools
+(10 executed + 1 refused auxiliary proposal), 199.70 seconds. Go primary and
+scrutiny completed; the local auxiliary pass proposed an unavailable tool in a
+tool-free pass and was refused before execution. Both 10-test runs and the
+3616-case oracle passed; frozen inputs/index, report continuity and cleanup were
+verified. Usage: 85847 input / 4099 output tokens; dollar cost unavailable.
+Independent agent inspection supports the report with no material false claim;
+one minor Git-scope imprecision; bookkeeping attribution was not exercised.
+The first independent audit attempt failed on a harness predicate expecting one
+timing observation per admitted call (6) while the failed auxiliary call has none
+(5); the audit script was corrected and the re-run passed. Original verdict kept.
+
 ## Remaining limits / next independent acceptance scope
 
-Runner implementation and this bounded coding/review question are handled.
-Clean report fidelity remains qualified: model reports call run/session DBs
-unrelated and unchanged, although the host created/updated them. Do not interpret
-local pass verdicts as automatic semantic correction. New c6c2f34 instructions
-clarify this, but their model adherence has not had another paid acceptance run.
-Post-trial current-render files are labelled host re-renderings, not original
-model delivery. Original e completion and c failure remain unchanged.
+f's report is supported for its read-only question, but clean workflow acceptance
+is not established because the auxiliary pass failed. c2a82d7/7478fc8 have no
+live integrated re-exercise. Bookkeeping attribution adherence remains
+unexercised. Live fallback and scrutiny-fed repair were not exercised by e or f
+(offline checks cover repair composition). Five matcher disagreements remain
+unapplied: ask before changing mapping. Post-trial current-render files are
+labelled host re-renderings, not original model delivery.
 
-Broader baseline/general quality parity is not established. For a future fresh
-baseline slice, verify bookkeeping attribution and/or fallback under a concrete
-new bounded question; do not repeat paid coding merely to reproduce this result.
-Live fallback and scrutiny-fed repair were not exercised by e (offline checks
-cover repair composition). Keep all original-test/frozen-review/history/cleanup
-protections and local support. No current owner decision blocks the implemented
-runner. Five matcher disagreements remain unapplied: ask before changing mapping.
+Next action (imperative, pending owner go-ahead on paid usage): prepare a fresh
+bounded g trial that (1) mirrors production's auxiliary contract in the harness
+so an auxiliary-only tool proposal is a recorded auxiliary failure rather than a
+run-level safety stop, and (2) uses a task whose inspection includes the host
+session/orchestration databases so bookkeeping attribution is actually exercised.
+Completion condition: the primary report is supported by its receipts, host
+bookkeeping is attributed correctly, the auxiliary outcome is recorded, and
+inputs/cleanup are verified. Do not replay f or regrade it.
+
 Relevant private plans remain repo-assistant-cli-parity-plan.md and
 opencode-go-integration-first-20261022.md; old unattended plan is CLOSED.
 Historical continuity trials and earlier failures remain in docs/session-history.md.
