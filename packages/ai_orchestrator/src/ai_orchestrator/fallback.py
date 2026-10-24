@@ -69,6 +69,15 @@ def fallback_profile(
     )
 
 
+def _accepts(profile: TaskProfile, entry: ModelCatalogEntry) -> bool:
+    """Reuse the recommender's acceptance rules so ordering cannot relax them."""
+    try:
+        recommend_model(profile, (entry,))
+    except ValueError:
+        return False
+    return True
+
+
 def fallback_candidates(
     profile: TaskProfile,
     catalog: tuple[ModelCatalogEntry, ...],
@@ -79,6 +88,9 @@ def fallback_candidates(
     allow_initial_billing_source: bool = False,
     quality_policy: FallbackQualityPolicy = FallbackQualityPolicy.PRESERVE_QUALITY,
     preservation_only: bool = False,
+    priority: tuple[str, ...] = (),
+    excluded_route_ids: frozenset[str] = frozenset(),
+    allow_cost_escalation: bool = False,
 ) -> tuple[ModelCatalogEntry, ...]:
     """Rank same-tier alternatives meeting the original task constraints.
 
@@ -90,6 +102,20 @@ def fallback_candidates(
     continuation admits weaker models after higher-quality candidates. Unknown
     original quality refuses either new policy. Availability failures can exclude
     a route without excluding its entire billing bucket.
+
+    ``priority`` is a caller-supplied ordered route list, typically derived from
+    observed account allowance, reliability and task quality. Listed routes are
+    returned first in that order; unlisted eligible routes keep the existing
+    recommender ranking behind them. Priority never relaxes privacy, capability
+    or quality filters, so it orders candidates rather than admitting new ones.
+
+    ``excluded_route_ids`` drops routes unconditionally, for example a source
+    already serving a concurrent session.
+
+    ``allow_cost_escalation`` permits a listed priority route to sit in a higher
+    cost tier than the initial route. It is off by default so that a local-only
+    or free-only run cannot silently continue on billed inference; the caller
+    must opt in explicitly.
     """
 
     quality_policy = FallbackQualityPolicy(quality_policy)
@@ -118,7 +144,11 @@ def fallback_candidates(
             allow_initial_billing_source
             or entry.backend.billing_source is not initial.billing_source
         )
-        and entry.backend.cost_policy_tier is initial.cost_policy_tier
+        and (
+            entry.backend.cost_policy_tier is initial.cost_policy_tier
+            or (allow_cost_escalation and entry.backend.route_id in priority)
+        )
+        and entry.backend.route_id not in excluded_route_ids
         and entry.backend.billing_source.value not in exhausted_billing_sources
         and entry.backend.route_id not in unavailable_route_ids
         and (
@@ -126,12 +156,23 @@ def fallback_candidates(
             or quality_rank[entry.quality] < quality_rank[normal_profile.quality_threshold]
         )
     )
-    ranked = []
-    while eligible:
+    if priority:
+        listed = frozenset(priority)
+        by_route = {entry.backend.route_id: entry for entry in eligible}
+        ranked = [
+            entry
+            for route_id in priority
+            if (entry := by_route.get(route_id)) is not None and _accepts(candidate_profile, entry)
+        ]
+        remaining = tuple(entry for entry in eligible if entry.backend.route_id not in listed)
+    else:
+        ranked = []
+        remaining = eligible
+    while remaining:
         try:
-            chosen = recommend_model(candidate_profile, eligible).selected
+            chosen = recommend_model(candidate_profile, remaining).selected
         except ValueError:
             break
         ranked.append(chosen)
-        eligible = tuple(entry for entry in eligible if entry is not chosen)
+        remaining = tuple(entry for entry in remaining if entry is not chosen)
     return tuple(ranked)

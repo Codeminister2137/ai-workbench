@@ -88,6 +88,9 @@ class FallbackSession:
         preservation_compatible: Callable[[ExecutionTarget], bool] | None = None,
         save_handoff: Callable[[dict[str, Any]], None] | None = None,
         observe_allowance: Callable[[ExecutionTarget], dict[str, Any] | None] | None = None,
+        priority: tuple[str, ...] = (),
+        excluded_route_ids: frozenset[str] = frozenset(),
+        allow_cost_escalation: bool = False,
     ) -> None:
         self.profile = profile
         self.catalog = catalog
@@ -100,6 +103,9 @@ class FallbackSession:
         self.quality_policy = FallbackQualityPolicy(quality_policy)
         self.save_handoff = save_handoff
         self.observe_allowance = observe_allowance
+        self.priority = priority
+        self.excluded_route_ids = excluded_route_ids
+        self.allow_cost_escalation = allow_cost_escalation
         self.allowance_observations: dict[str, dict[str, Any]] = {}
         self.exhausted: set[str] = set()
         self.overloaded: set[str] = set()
@@ -127,6 +133,9 @@ class FallbackSession:
             initial,
             allow_initial_billing_source=True,
             quality_policy=self.quality_policy,
+            priority=self.priority,
+            excluded_route_ids=self.excluded_route_ids,
+            allow_cost_escalation=self.allow_cost_escalation,
         )
         preservation = (
             fallback_candidates(
@@ -136,6 +145,9 @@ class FallbackSession:
                 allow_initial_billing_source=True,
                 quality_policy=self.quality_policy,
                 preservation_only=True,
+                priority=self.priority,
+                excluded_route_ids=self.excluded_route_ids,
+                allow_cost_escalation=self.allow_cost_escalation,
             )
             if preservation_compatible is not None
             else ()
@@ -369,6 +381,9 @@ class FallbackSession:
                 unavailable_route_ids=frozenset(self.overloaded),
                 allow_initial_billing_source=bool(self.overloaded),
                 quality_policy=self.quality_policy,
+                priority=self.priority,
+                excluded_route_ids=self.excluded_route_ids,
+                allow_cost_escalation=self.allow_cost_escalation,
             )
             next_target = next(
                 (
@@ -470,6 +485,9 @@ class FallbackSession:
             allow_initial_billing_source=bool(self.overloaded),
             quality_policy=self.quality_policy,
             preservation_only=True,
+            priority=self.priority,
+            excluded_route_ids=self.excluded_route_ids,
+            allow_cost_escalation=self.allow_cost_escalation,
         )
         for entry in candidates:
             target = self.preservation_ready.get(entry.backend.route_id)

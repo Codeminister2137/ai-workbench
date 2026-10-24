@@ -575,3 +575,31 @@ def test_shared_fallback_compatibility_preserves_profile_and_approval(
         assert "--dangerously-skip-permissions is not supported" in reason
     else:
         assert reason is None
+
+
+def test_offline_report_honours_priority_and_exclusions(monkeypatch, tmp_path, capsys):
+    monkeypatch.setenv("GITHUB_COPILOT_COMMAND", "copilot-test")
+    assert (
+        cli.main(
+            offline_args(
+                tmp_path,
+                "--fallback-quality-policy",
+                "task_minimum",
+                "--fallback-priority",
+                "github/copilot-cli-auto",
+                "--fallback-exclude",
+                "google/antigravity-gemini-3.1-pro-high",
+            )
+        )
+        == 0
+    )
+    report = json.loads(capsys.readouterr().out)
+    assert report["fallback_ordering"] == {
+        "priority": ["github/copilot-cli-auto"],
+        "excluded_route_ids": ["google/antigravity-gemini-3.1-pro-high"],
+        "allow_cost_escalation": False,
+    }
+    candidates = [row["route_id"] for row in report["fallback_candidates"]]
+    assert candidates[0] == "github/copilot-cli-auto"
+    reasons = {row["route_id"]: row["reason"] for row in report["policy_exclusions"]}
+    assert reasons["google/antigravity-gemini-3.1-pro-high"] == "excluded by fallback.exclude"

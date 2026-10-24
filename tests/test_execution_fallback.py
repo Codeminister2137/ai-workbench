@@ -1464,3 +1464,11 @@ def test_provider_coding_wrappers_continue_on_normalized_limit(monkeypatch, rout
         assert result.orchestration.recommendation.selected.backend.provider == "google"
     assert result.response.message.content == "Done"
     assert calls == ["openai", "google"]
+
+
+def test_session_preflight_honours_priority_and_exclusions(monkeypatch, routes):
+    ordered = session(monkeypatch, routes, priority=("kiro", "copilot"))
+    assert list(ordered.ready) == ["kiro", "copilot"]
+    excluded = session(monkeypatch, routes, excluded_route_ids=frozenset({"kiro"}))
+    assert list(excluded.ready) == ["copilot"]
+    assert "kiro" not in excluded.ready

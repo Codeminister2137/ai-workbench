@@ -41,6 +41,9 @@ class UserConfig:
     cost_policy: CostPolicyTier = CostPolicyTier.PREPAID_CREDITS_ALLOWED
     fallback_enabled: bool = True
     fallback_quality_policy: FallbackQualityPolicy = FallbackQualityPolicy.EMERGENCY_PRESERVE
+    fallback_priority: tuple[str, ...] = ()
+    fallback_exclude: tuple[str, ...] = ()
+    fallback_allow_cost_escalation: bool = False
     quality: QualityThreshold = QualityThreshold.STANDARD
     privacy: PrivacyClass = PrivacyClass.LOCAL_ONLY
     approval_policy: ApprovalPolicyPreset = ApprovalPolicyPreset.INTERACTIVE
@@ -60,6 +63,18 @@ def apply_user_defaults(args: argparse.Namespace, config: UserConfig) -> None:
         value = getattr(config, key)
         setattr(args, key, value.value if isinstance(value, StrEnum) else value)
     args._configured_user_defaults = config.configured_defaults
+
+
+def _route_id_list(fallback: dict[str, object], key: str) -> tuple[str, ...]:
+    """Validate one ordered route-id list without accepting duplicates."""
+    value = fallback.get(key, ())
+    if not isinstance(value, (list, tuple)) or not all(
+        isinstance(item, str) and item.strip() for item in value
+    ):
+        raise ValueError(f"fallback.{key} must be a list of non-empty route id strings")
+    if len(set(value)) != len(value):
+        raise ValueError(f"fallback.{key} must not repeat a route id")
+    return tuple(value)
 
 
 def load_user_config(path: Path, *, required: bool = False) -> UserConfig:
@@ -94,11 +109,25 @@ def load_user_config(path: Path, *, required: bool = False) -> UserConfig:
         ):
             raise ValueError(f"defaults.{key} must be a finite positive number")
     fallback = data.get("fallback", {})
-    if not isinstance(fallback, dict) or set(fallback) - {"enabled", "quality_policy"}:
-        raise ValueError("User config fallback supports only enabled and quality_policy")
+    if not isinstance(fallback, dict) or set(fallback) - {
+        "enabled",
+        "quality_policy",
+        "priority",
+        "exclude",
+        "allow_cost_escalation",
+    }:
+        raise ValueError(
+            "User config fallback supports only enabled, quality_policy, "
+            "priority, exclude and allow_cost_escalation"
+        )
     enabled = fallback.get("enabled", True)
     if not isinstance(enabled, bool):
         raise ValueError("fallback.enabled must be a boolean")
+    allow_cost_escalation = fallback.get("allow_cost_escalation", False)
+    if not isinstance(allow_cost_escalation, bool):
+        raise ValueError("fallback.allow_cost_escalation must be a boolean")
+    priority = _route_id_list(fallback, "priority")
+    exclude = _route_id_list(fallback, "exclude")
     return UserConfig(
         quality=QualityThreshold(defaults.get("quality", base.quality.value)),
         privacy=PrivacyClass(defaults.get("privacy", base.privacy.value)),
@@ -125,4 +154,7 @@ def load_user_config(path: Path, *, required: bool = False) -> UserConfig:
         fallback_quality_policy=FallbackQualityPolicy(
             fallback.get("quality_policy", base.fallback_quality_policy.value)
         ),
+        fallback_priority=priority,
+        fallback_exclude=exclude,
+        fallback_allow_cost_escalation=allow_cost_escalation,
     )

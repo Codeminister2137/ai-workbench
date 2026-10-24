@@ -18,13 +18,29 @@ def fallback_readiness_report(
     enabled: bool = True,
     quality_policy: FallbackQualityPolicy = FallbackQualityPolicy.EMERGENCY_PRESERVE,
     preservation_incompatibility: Callable[[ExecutionTarget], str | None] | None = None,
+    priority: tuple[str, ...] = (),
+    excluded_route_ids: frozenset[str] = frozenset(),
+    allow_cost_escalation: bool = False,
 ) -> dict[str, Any]:
     """Explain policy/adapter exclusions without performing runtime or account probes.
 
     The caller supplies a static inspector. An eligible route may still lack
     authentication, connected tools or allowance; none is asserted by this report.
     """
-    eligible = fallback_candidates(profile, catalog, primary, quality_policy=quality_policy)
+    ordering = {
+        "priority": list(priority),
+        "excluded_route_ids": sorted(excluded_route_ids),
+        "allow_cost_escalation": allow_cost_escalation,
+    }
+    eligible = fallback_candidates(
+        profile,
+        catalog,
+        primary,
+        quality_policy=quality_policy,
+        priority=priority,
+        excluded_route_ids=excluded_route_ids,
+        allow_cost_escalation=allow_cost_escalation,
+    )
     candidates = []
     preservation_candidates = []
     preservation = fallback_candidates(
@@ -33,6 +49,9 @@ def fallback_readiness_report(
         primary,
         quality_policy=quality_policy,
         preservation_only=True,
+        priority=priority,
+        excluded_route_ids=excluded_route_ids,
+        allow_cost_escalation=allow_cost_escalation,
     )
     for entry in eligible + preservation:
         preserving = entry in preservation
@@ -84,7 +103,11 @@ def fallback_readiness_report(
         backend = entry.backend
         if backend.route_id == primary.route_id or backend.route_id in eligible_ids:
             continue
-        if backend.cost_policy_tier is not primary.cost_policy_tier:
+        if backend.route_id in excluded_route_ids:
+            reason = "excluded by fallback.exclude"
+        elif backend.cost_policy_tier is not primary.cost_policy_tier and not (
+            allow_cost_escalation and backend.route_id in priority
+        ):
             reason = "different cost tier"
         elif backend.billing_source is primary.billing_source:
             reason = "shared billing source"
@@ -95,6 +118,7 @@ def fallback_readiness_report(
         "status": "offline",
         "fallback_enabled": enabled,
         "fallback_quality_policy": quality_policy.value,
+        "fallback_ordering": ordering,
         "primary_route": primary.route_id,
         "cost_policy_tier": primary.cost_policy_tier.value,
         "authentication": "not_checked",

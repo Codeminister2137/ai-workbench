@@ -112,6 +112,21 @@ def build_argument_parser() -> argparse.ArgumentParser:
         help="Override user fallback quality policy for this invocation.",
     )
     parser.add_argument(
+        "--fallback-priority",
+        action="append",
+        metavar="ROUTE_ID",
+        help=(
+            "Override the user fallback route order for this invocation; repeat the "
+            "flag to set the full ordered chain. Unlisted eligible routes follow it."
+        ),
+    )
+    parser.add_argument(
+        "--fallback-exclude",
+        action="append",
+        metavar="ROUTE_ID",
+        help="Exclude a route from fallback for this invocation; repeatable.",
+    )
+    parser.add_argument(
         "--fallback-readiness",
         action="store_true",
         help=(

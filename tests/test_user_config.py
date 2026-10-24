@@ -267,3 +267,44 @@ def test_shared_inspection_retains_read_only_despite_configured_authority(
         == 0
     )
     assert "provider_native_approval_policy: read_only" in capsys.readouterr().out
+
+
+def fallback_config(tmp_path: Path, settings: str) -> Path:
+    path = tmp_path / "user-config.toml"
+    path.write_text("[fallback]\n" + settings, encoding="utf-8")
+    return path
+
+
+def test_fallback_ordering_preferences_load(tmp_path):
+    config = load_user_config(
+        fallback_config(
+            tmp_path,
+            'priority = ["a", "b"]\nexclude = ["c"]\nallow_cost_escalation = true\n',
+        )
+    )
+    assert config.fallback_priority == ("a", "b")
+    assert config.fallback_exclude == ("c",)
+    assert config.fallback_allow_cost_escalation is True
+
+
+def test_fallback_ordering_defaults_stay_closed(tmp_path):
+    config = load_user_config(fallback_config(tmp_path, 'quality_policy = "task_minimum"\n'))
+    assert config.fallback_priority == ()
+    assert config.fallback_exclude == ()
+    assert config.fallback_allow_cost_escalation is False
+
+
+@pytest.mark.parametrize(
+    "settings",
+    [
+        'priority = "a"',
+        'priority = ["a", "a"]',
+        'priority = [""]',
+        "exclude = [1]",
+        'allow_cost_escalation = "yes"',
+        "unknown_key = 1",
+    ],
+)
+def test_fallback_ordering_rejects_invalid_settings(tmp_path, settings):
+    with pytest.raises(ValueError):
+        load_user_config(fallback_config(tmp_path, settings))

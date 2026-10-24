@@ -1110,6 +1110,9 @@ def _execute_request(
     args.fallback_quality_policy = FallbackQualityPolicy(
         args.fallback_quality_policy or user_config.fallback_quality_policy
     )
+    args.fallback_priority = tuple(args.fallback_priority or user_config.fallback_priority)
+    args.fallback_exclude = tuple(args.fallback_exclude or user_config.fallback_exclude)
+    args.fallback_allow_cost_escalation = user_config.fallback_allow_cost_escalation
     if args.list_skills:
         if any(
             (
@@ -1494,6 +1497,9 @@ def _execute_request(
                 interactive_login=not hasattr(args, "_coding_chat_history"),
                 observe_allowance=read_execution_allowance,
                 quality_policy=args.fallback_quality_policy,
+                priority=args.fallback_priority,
+                excluded_route_ids=frozenset(args.fallback_exclude),
+                allow_cost_escalation=args.fallback_allow_cost_escalation,
                 save_handoff=lambda summary: _save_fallback_handoff(
                     repo_root, {"objective": args.prompt or "", **summary}
                 ),
@@ -2839,6 +2845,9 @@ def _print_fallback_readiness(args: argparse.Namespace, repo_root: Path) -> int:
         executable_status=lambda target: _fallback_executable_status(target, repo_root),
         enabled=args.fallback_enabled,
         quality_policy=args.fallback_quality_policy,
+        priority=args.fallback_priority,
+        excluded_route_ids=frozenset(args.fallback_exclude),
+        allow_cost_escalation=args.fallback_allow_cost_escalation,
     )
     report["requirements"] = {
         "shared_tool_profile": args.shared_tools,

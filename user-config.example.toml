@@ -22,3 +22,15 @@ enabled = true
 # "prefer_quality" explicitly allows weaker implementation after stronger routes fail.
 # Legacy "preserve_quality" stops; "task_minimum" retains the task's quality floor.
 quality_policy = "emergency_preserve"
+# Optional ordered fallback chain. Listed routes are tried first, in this order;
+# other eligible routes keep the normal recommender ranking behind them. Order by
+# observed allowance, reliability and then quality: a route with exhausted or
+# unknown allowance belongs below one with verified remaining capacity. Ordering
+# never relaxes privacy, capability or quality filters. Override per invocation
+# with --fallback-priority / --fallback-exclude.
+# priority = ["route/one", "route/two"]
+# Routes never used for fallback, for example a source already serving a session.
+# exclude = ["route/three"]
+# Off by default. When true, a listed priority route may sit in a higher cost tier
+# than the initial route; the task cost policy still has to allow that tier.
+# allow_cost_escalation = false

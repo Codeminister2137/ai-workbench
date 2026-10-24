@@ -290,3 +290,112 @@ def test_preservation_query_cannot_enable_downgrade_for_other_policies(task_and_
         fallback_candidates(task, catalog, initial, quality_policy=policy, preservation_only=True)
         == ()
     )
+
+
+def _tiered(route: str, quality: QualityThreshold, billing: BillingSource, tier: CostPolicyTier):
+    """Build an entry in an explicit cost tier for escalation-boundary tests."""
+    entry = _entry(route, quality, billing)
+    return replace(
+        entry,
+        backend=replace(
+            entry.backend,
+            route=replace(entry.backend.route, cost_policy_tier=tier),
+        ),
+    )
+
+
+def test_priority_orders_listed_routes_ahead_of_recommender_ranking(task_and_routes):
+    task, catalog, initial = task_and_routes
+    standard_task = replace(task, quality_threshold=QualityThreshold.STANDARD)
+    ordered = fallback_candidates(
+        standard_task,
+        catalog,
+        initial,
+        quality_policy=FallbackQualityPolicy.TASK_MINIMUM,
+        priority=("standard", "strong"),
+    )
+    assert [entry.backend.route_id for entry in ordered[:2]] == ["standard", "strong"]
+
+
+def test_priority_cannot_admit_a_route_below_the_quality_floor(task_and_routes):
+    task, catalog, initial = task_and_routes
+    ordered = fallback_candidates(
+        task,
+        catalog,
+        initial,
+        quality_policy=FallbackQualityPolicy.EMERGENCY_PRESERVE,
+        priority=("weak", "strong"),
+    )
+    assert [entry.backend.route_id for entry in ordered] == ["strong"]
+
+
+def test_excluded_route_ids_are_never_candidates(task_and_routes):
+    task, catalog, initial = task_and_routes
+    standard_task = replace(task, quality_threshold=QualityThreshold.STANDARD)
+    ordered = fallback_candidates(
+        standard_task,
+        catalog,
+        initial,
+        quality_policy=FallbackQualityPolicy.TASK_MINIMUM,
+        priority=("strong", "standard"),
+        excluded_route_ids=frozenset({"strong"}),
+    )
+    assert "strong" not in [entry.backend.route_id for entry in ordered]
+    assert ordered[0].backend.route_id == "standard"
+
+
+def test_cost_escalation_requires_opt_in_and_a_listed_route(task_and_routes):
+    task, catalog, initial = task_and_routes
+    billed_task = replace(task, cost_policy_tier=CostPolicyTier.BILLING_ALLOWED)
+    billed = _tiered(
+        "billed",
+        QualityThreshold.HIGH,
+        BillingSource.OPENAI_API_BILLING,
+        CostPolicyTier.BILLING_ALLOWED,
+    )
+    wider = catalog + (billed,)
+    without_opt_in = fallback_candidates(
+        billed_task,
+        wider,
+        initial,
+        quality_policy=FallbackQualityPolicy.TASK_MINIMUM,
+        priority=("billed",),
+    )
+    assert "billed" not in [entry.backend.route_id for entry in without_opt_in]
+    with_opt_in = fallback_candidates(
+        billed_task,
+        wider,
+        initial,
+        quality_policy=FallbackQualityPolicy.TASK_MINIMUM,
+        priority=("billed",),
+        allow_cost_escalation=True,
+    )
+    assert with_opt_in[0].backend.route_id == "billed"
+    unlisted = fallback_candidates(
+        billed_task,
+        wider,
+        initial,
+        quality_policy=FallbackQualityPolicy.TASK_MINIMUM,
+        priority=("strong",),
+        allow_cost_escalation=True,
+    )
+    assert "billed" not in [entry.backend.route_id for entry in unlisted]
+
+
+def test_task_cost_policy_still_rejects_escalation_it_does_not_allow(task_and_routes):
+    task, catalog, initial = task_and_routes
+    billed = _tiered(
+        "billed",
+        QualityThreshold.HIGH,
+        BillingSource.OPENAI_API_BILLING,
+        CostPolicyTier.BILLING_ALLOWED,
+    )
+    ordered = fallback_candidates(
+        task,
+        catalog + (billed,),
+        initial,
+        quality_policy=FallbackQualityPolicy.TASK_MINIMUM,
+        priority=("billed",),
+        allow_cost_escalation=True,
+    )
+    assert "billed" not in [entry.backend.route_id for entry in ordered]
