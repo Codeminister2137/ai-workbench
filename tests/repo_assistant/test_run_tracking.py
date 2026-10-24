@@ -1,6 +1,8 @@
 """Durable stage receipts and bounded foreground execution contracts."""
 
+import os
 import sqlite3
+import subprocess
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -12,6 +14,20 @@ from ai_agent.validation import ValidationCommandResult
 from ai_orchestrator.models import TaskProfile
 from ai_orchestrator.orchestrator import OrchestrationResult, OrchestrationStatus
 from ai_provider.orchestrated_runs import SQLiteOrchestratedRunStore
+
+
+def test_handoff_git_status_preserves_index_bytes(tmp_path):
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    tracked = tmp_path / "tracked.txt"
+    tracked.write_text("unchanged contents\n")
+    subprocess.run(["git", "add", "tracked.txt"], cwd=tmp_path, check=True)
+    index = tmp_path / ".git" / "index"
+    before = index.read_bytes()
+    timestamp = tracked.stat().st_mtime_ns + 2_000_000_000
+    os.utime(tracked, ns=(timestamp, timestamp))
+
+    assert run_tracking.git_status_short(tmp_path) == ("A  tracked.txt",)
+    assert index.read_bytes() == before
 
 
 @pytest.mark.parametrize("rollback", [False, True])

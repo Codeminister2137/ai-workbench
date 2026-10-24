@@ -188,7 +188,7 @@ def git_status_short(repo_root: Path) -> tuple[str, ...]:
 
     try:
         result = subprocess.run(
-            ["git", "status", "--short"],
+            ["git", "--no-optional-locks", "status", "--short"],
             cwd=repo_root,
             capture_output=True,
             text=True,
