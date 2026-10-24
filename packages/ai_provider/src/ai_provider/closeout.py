@@ -19,7 +19,12 @@ The CLI wraps your final response in this fixed user-visible closeout:
 Do not emit a duplicate summary; answer the request normally and clearly
 distinguish proposed or agent-reported changes from independently verified
 results. The CLI's validation and execution fields come from recorded evidence,
-not from claims in your response."""
+not from claims in your response.
+The CLI host may create or update session/orchestration databases and logs during
+the task, independently of your tools. If mentioning those artifacts, distinguish
+host bookkeeping from your own edits. Their presence at your first inspection
+does not establish that they predated the task, stayed unchanged, or are unrelated
+to the workflow."""
 
 
 def safe_diagnostic_label(value: object) -> str | None:
@@ -82,10 +87,18 @@ def _agent_outcome(response: str | None) -> str:
         candidate = line.strip()
         if not candidate or candidate.startswith("#") or candidate.startswith("```"):
             continue
+        candidate = re.sub(
+            r"^(-\s+)?\*\*(Changed|Validated|Notes|Preserved)\*\*\s*:",
+            r"\1\2:",
+            candidate,
+        )
         for prefix in ("- Changed:", "Changed:"):
             if candidate.startswith(prefix):
                 candidate = candidate[len(prefix) :].strip()
                 break
+        if not candidate:
+            continue
+        candidate = candidate.removeprefix("- ")
         if len(candidate) > 200:
             candidate = candidate[:197].rstrip() + "..."
         return (

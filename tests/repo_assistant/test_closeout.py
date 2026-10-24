@@ -4,6 +4,23 @@ import pytest
 from ai_provider.closeout import FINAL_RESPONSE_INSTRUCTION, format_cli_closeout
 
 
+@pytest.mark.parametrize("label", ["- Changed:", "Changed:", "- **Changed**:"])
+def test_closeout_preview_uses_content_after_a_standalone_changed_label(label):
+    response = f"## **SUMMARY**\n{label}\n  - Implemented inclusive span union.\n- Notes: retained"
+    output = format_cli_closeout(
+        response_text=response, status="ready", execution_status="completed"
+    )
+    preview = next(line for line in output.splitlines() if line.startswith("- Changed:"))
+    assert "Agent-reported outcome: Implemented inclusive span union." in preview
+    assert response.replace("## **SUMMARY**", "#### Agent summary", 1) in output
+
+
+def test_closeout_instruction_distinguishes_host_bookkeeping_from_model_edits():
+    assert "session/orchestration databases and logs" in FINAL_RESPONSE_INSTRUCTION
+    assert "distinguish\nhost bookkeeping from your own edits" in FINAL_RESPONSE_INSTRUCTION
+    assert "does not establish that they predated the task" in FINAL_RESPONSE_INSTRUCTION
+
+
 @pytest.mark.parametrize("verdict", ["pass", "needs_revision"])
 def test_closeout_owns_summary_heading_even_when_agent_duplicates_it(verdict):
     response = "## **SUMMARY**\n- Changed: candidate outcome\n- Validated: agent claim"
