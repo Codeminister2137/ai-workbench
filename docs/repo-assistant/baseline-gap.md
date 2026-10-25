@@ -501,4 +501,3 @@ completing route was the free Requesty route in both runs, so a live walk that
 continues *into* `opencode-go` or a CLI client is still unexercised. Fallback
 still switches only on usage-limit/overload signals, so a route that fails for any
 other reason ends the run instead of continuing.
-
