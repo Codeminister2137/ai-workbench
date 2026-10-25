@@ -1,5 +1,12 @@
 # CLI Development Foundation Roadmap
 
+## October 25 reporting contract
+
+ADR-070 implements the owner-approved separation of host adapter/validation facts
+from raw agent narration scoped to repository/tool actions, including prospective
+conversation metadata. Unknown effects remain unknown and required scrutiny remains
+binding. Fresh bounded Go review acceptance is pending; consumed trials are unchanged.
+
 ## Planned: reliable model availability across sources
 
 Owner direction, 2026-10-21: plan a reliable way to check model availability for

@@ -1,6 +1,6 @@
 # Distance to established baseline CLI usability
 
-## October 25 current checkpoint: reporting-contract decision pending
+## October 25 current checkpoint: reporting contract approved, acceptance pending
 
 The host corrections are implemented and validated, but general paid-CLI acceptance
 remains incomplete. Later frozen reviews exercised technical correctness without
@@ -26,12 +26,11 @@ non-pass, corrected report, rerun of nine tests and passing re-review, without s
 changes. Live q did not require that repair, so successful live scrutiny-fed repair
 remains unestablished. All original consumed results remain unchanged.
 
-The unresolved decision is the future reporting contract: retain strict host-wide
-interpretation of unqualified effect claims, or explicitly present host inference/
-validation facts separately from repository-tool narration. The latter is a
-recommendation, not an accepted policy. It must not certify arbitrary technical
-claims or regrade consumed trials. No further paid repetition is active while the
-owner's decision is pending. Local reviewable examples and independent assessments
+The owner approved explicit host inference/validation facts separately from scoped
+repository/tool narration (ADR-070). Fresh delivery and history retain raw reports,
+observed adapter counts and unknowns; scope does not certify arbitrary technical
+claims. Implementation is undergoing validation before a fresh bounded acceptance
+question. Consumed trials retain their original results. Local examples and assessments
 are under `artifacts/cli-public-layout-postflight-20261025q/`; original o/p/q evidence
 remains in their named trial directories.
 

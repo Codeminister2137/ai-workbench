@@ -646,6 +646,9 @@ def test_scrutiny_distinguishes_existing_git_diff_from_current_invocation_change
     assert "current execution attempt" in prompt
     assert "read-only request can inspect earlier uncommitted changes" in system
     assert "No network tools does not mean" in system
+    assert "Delivery contract: Agent narrative describes repository/tool actions" in system
+    assert "None means unknown" in system
+    assert "Scope does not excuse incorrect technical claims" in system
     assert "Flag unsupported broader claims" in " ".join(system.split())
     if baseline == "unchanged":
         assert "No fingerprint differences observed" in prompt

@@ -1,3 +1,14 @@
+## ADR-070 - Host observations and scoped agent reports
+
+**Status:** Accepted
+**Date:** 2026-10-25
+
+The owner approved explicit host adapter/validation observations alongside raw agent
+reports scoped to repository/tool actions, preserved prospectively in conversation
+history. Unknown effects remain unknown; consumed trials are unchanged.
+
+Detailed ADR: `docs/decisions/ADR-070-host-observations-and-scoped-agent-reports.md`
+
 **Date:** 2026-09-19
 
 Use `pdoc` as the initial generated Python API documentation tool and add

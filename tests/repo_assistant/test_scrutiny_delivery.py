@@ -151,6 +151,24 @@ def test_native_final_delivery_preserves_draft_and_actual_validation(
     output = capsys.readouterr().out
     assert output.index(AUXILIARY_RESPONSE_NOTICE) < output.index(auxiliary_claim)
     final = output.rsplit("## **SUMMARY**", 1)[1]
+    assert (
+        "Observed adapter calls in this CLI invocation: 0 attempts, 0 completed responses" in final
+    )
+    assert "not a network audit" in final
+    if mode == "coding-chat":
+        import json
+        import sqlite3
+
+        with sqlite3.connect(tmp_path / "coding.sqlite3") as connection:
+            raw, metadata = connection.execute(
+                "SELECT content, metadata_json FROM chat_messages WHERE role='assistant'"
+            ).fetchone()
+        assert raw == draft
+        assert json.loads(metadata)["report_scope"] == "repository_tool_actions_v1"
+        assert json.loads(metadata)["inference_observation"] == {
+            "adapter_attempts": 0,
+            "completed_responses": 0,
+        }
     assert len(calls) == 1
     assert (tmp_path / "validate.py").read_text(encoding="utf-8") == validator
     assert process_identity(int((tmp_path / "validation.pid").read_text())) is None

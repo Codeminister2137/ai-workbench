@@ -13,7 +13,11 @@ from ai_provider.chat_transcripts import (
     ChatSessionRecord,
     SQLiteChatTranscriptStore,
 )
-from ai_provider.closeout import safe_diagnostic_label, safe_fallback_handoff
+from ai_provider.closeout import (
+    REPORT_SCOPE_NOTICE,
+    safe_diagnostic_label,
+    safe_fallback_handoff,
+)
 
 from ai_agent.coding_chat_input import StagedCodingInput
 
@@ -47,6 +51,8 @@ class CodingTurnResult:
     category: str | None = None
     cause_kind: str | None = None
     fallback_handoff: Mapping[str, object] | None = None
+    report_scope: str | None = None
+    inference_observation: Mapping[str, int] | None = None
 
     def __post_init__(self) -> None:
         """Keep additive diagnostics bounded before observers or stores consume them."""
@@ -132,7 +138,13 @@ class CodingChatController:
                 **{
                     key: value
                     for key, value in (message.metadata or {}).items()
-                    if key in {"effective_route_id", "fallback_attempts"}
+                    if key
+                    in {
+                        "effective_route_id",
+                        "fallback_attempts",
+                        "report_scope",
+                        "inference_observation",
+                    }
                 },
                 **{
                     key: label
@@ -160,6 +172,9 @@ class CodingChatController:
             "claims do not override host-observed failure outcomes.\n"
             "Queued owner input is not permission to replay work. Later owner corrections "
             "take precedence over earlier reports, even if the running turn finished later.\n"
+            "For reports explicitly marked repository_tool_actions_v1: "
+            f"{REPORT_SCOPE_NOTICE} Unmarked earlier reports retain their original scope; "
+            "missing inference observations mean unknown, never zero.\n"
         )
         rendered = header + json.dumps(turns, ensure_ascii=False)
         budget = self.history_budget_chars
@@ -299,6 +314,12 @@ class CodingChatController:
                 "returncode": result.returncode,
                 "failure_reason": result.failure_reason,
                 "reply_to": message_id,
+                **({"report_scope": result.report_scope} if result.report_scope else {}),
+                **(
+                    {"inference_observation": dict(result.inference_observation)}
+                    if result.inference_observation is not None
+                    else {}
+                ),
                 **(
                     {"effective_route_id": result.effective_route_id}
                     if result.effective_route_id is not None

@@ -4,6 +4,29 @@ import pytest
 from ai_provider.closeout import FINAL_RESPONSE_INSTRUCTION, format_cli_closeout
 
 
+@pytest.mark.parametrize("counts", [None, (0, 0), (8, 6)])
+def test_closeout_host_receipts_do_not_certify_absent_network_or_rewrite_report(counts):
+    from ai_provider.turn_usage import ACTIVE_USAGE, TurnUsage
+
+    token = ACTIVE_USAGE.set(TurnUsage(attempts=counts[0], responses=counts[1]) if counts else None)
+    raw = "No network calls were performed. Technical claim still needs review."
+    try:
+        output = format_cli_closeout(
+            response_text=raw, status="ready", execution_status="completed"
+        )
+    finally:
+        ACTIVE_USAGE.reset(token)
+    assert f"### Agent report\n{raw}" in output
+    assert "Agent narrative describes repository/tool actions" in output
+    assert "not a network audit" in output
+    assert "technical claims still require evidence and review" in output
+    if counts is None:
+        assert "inference counts are unknown" in output
+    else:
+        assert f"{counts[0]} attempts, {counts[1]} completed responses" in output
+    assert "all host effects" in FINAL_RESPONSE_INSTRUCTION
+
+
 @pytest.mark.parametrize("label", ["- Changed:", "Changed:", "- **Changed**:", "- **Changed:**"])
 def test_closeout_preview_uses_content_after_a_standalone_changed_label(label):
     response = f"## **SUMMARY**\n{label}\n  - Implemented inclusive span union.\n- Notes: retained"

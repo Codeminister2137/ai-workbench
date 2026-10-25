@@ -28,6 +28,7 @@ from ai_provider import (
     create_chat_client,
     get_ollama_resource_profile,
 )
+from ai_provider.closeout import REPORT_SCOPE_NOTICE, observed_inference
 from ai_provider.coding_assist import CodingAssistResult, run_coding_prompt
 from ai_provider.orchestrated_runs import OrchestratedStageRecord
 from ai_provider.repair_state import changed_paths, workspace_fingerprints
@@ -214,6 +215,11 @@ def run_orchestrated_scrutiny(
         context_length = 32768
         scrutiny_system = (
             RESPONSE_SCRUTINY_SYSTEM_PROMPT
+            + "\nDelivery contract: "
+            + REPORT_SCOPE_NOTICE
+            + f"\nObserved adapter receipts so far (not a network audit): {observed_inference()}. "
+            "None means unknown. Scope does not excuse incorrect technical claims or "
+            "explicit claims about all host/provider effects. "
             + "\nReview the implementation claims against the supplied file excerpts and "
             "deterministic validation. Evidence is bounded: explicitly identify unverified "
             "claims. Never override failed or skipped validation with a pass claim. "

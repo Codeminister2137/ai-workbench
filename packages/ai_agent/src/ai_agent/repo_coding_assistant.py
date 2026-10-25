@@ -59,7 +59,9 @@ from ai_provider.chat_transcripts import (
 from ai_provider.closeout import (
     AUXILIARY_RESPONSE_NOTICE,
     FINAL_RESPONSE_INSTRUCTION,
+    REPORT_SCOPE,
     format_cli_closeout,
+    observed_inference,
     safe_fallback_handoff,
 )
 from ai_provider.codex_mcp import setup_project_codex_mcp
@@ -561,6 +563,8 @@ def _print_cli_closeout(
                 category=category,
                 cause_kind=cause_kind,
                 fallback_handoff=fallback_handoff,
+                report_scope=REPORT_SCOPE,
+                inference_observation=observed_inference(),
             )
         )
     print(
