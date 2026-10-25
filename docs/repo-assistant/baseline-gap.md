@@ -1,5 +1,40 @@
 # Distance to established baseline CLI usability
 
+## October 25 current checkpoint: reporting-contract decision pending
+
+The host corrections are implemented and validated, but general paid-CLI acceptance
+remains incomplete. Later frozen reviews exercised technical correctness without
+establishing an unqualified reporting pass:
+
+| Fresh question | Observed outcome |
+| --- | --- |
+| o: reporting instructions | Required scrutiny and six tests passed; eight frozen inputs unchanged. The report incorrectly attributed the host's source-byte comparison to the tests. Four Go/two local calls, nine primary tool proposals, 276.74 seconds; cleanup verified. |
+| p: visible identity tests | Preparation proved that the added identity tests reject a mismatched copy. Live work stopped before tests/report at a pre-execution `list_dir` guard: three Go/one local call, ten executed tool receipts, 177.33 seconds; inputs unchanged and cleanup verified. The rejected path and full failed-batch proposal count were not retained. The old combined rule cannot distinguish an actual workspace escape from an unlisted path inside the flat fixture. No provider-service error is established. |
+| q: normal public repository layout | Required scrutiny and nine tests passed, with supported technical findings and accurate test/manifest attribution. The final no-network wording remained unqualified. Six Go/two local calls, 16 primary proposals, 272.83 seconds; all 505 inputs and 1,000 historical evidence files unchanged, cleanup verified. |
+
+Question q used a history-free archive of 499 committed public files plus six
+declared route/probe inputs. Ignored handoffs, private plans, credentials and
+original Git/recovery history were excluded. The three identity cases checked both
+the imported-module paths and computed source digests against the supplied manifest;
+the six original cases checked prompt behavior. Its normal nested-directory access
+removed the flat fixture's filename restriction while preserving the workspace
+boundary. Prospective receipts retain complete proposal counts and safe path-relation
+classification before hard rejection, without logging rejected private paths.
+
+Preparation passed 25 guards and a real scripted report-only correction: an initial
+non-pass, corrected report, rerun of nine tests and passing re-review, without source
+changes. Live q did not require that repair, so successful live scrutiny-fed repair
+remains unestablished. All original consumed results remain unchanged.
+
+The unresolved decision is the future reporting contract: retain strict host-wide
+interpretation of unqualified effect claims, or explicitly present host inference/
+validation facts separately from repository-tool narration. The latter is a
+recommendation, not an accepted policy. It must not certify arbitrary technical
+claims or regrade consumed trials. No further paid repetition is active while the
+owner's decision is pending. Local reviewable examples and independent assessments
+are under `artifacts/cli-public-layout-postflight-20261025q/`; original o/p/q evidence
+remains in their named trial directories.
+
 ## October 25 reporting scope: n technical review passed, fidelity qualified
 
 Fresh frozen trial `artifacts/cli-scope-review-20261025n/` reviewed the host's

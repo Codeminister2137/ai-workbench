@@ -284,3 +284,7 @@ requested log path. Interruption closes that file and restores terminal output.
   conversations resume through `--coding-session`, not `--chat-session`.
 - Full C1-C6 installed-client coverage, long-conversation quality comparisons
   and measured delegation economics remain migration acceptance work.
+- Prompt instructions and a passing model scrutiny verdict do not certify absence
+  of host network or runtime-file effects. Explicit separation of host inference
+  facts from agent tool-action narration is a proposed reporting-contract change,
+  pending the owner's decision; the current format and verdict policy remain intact.

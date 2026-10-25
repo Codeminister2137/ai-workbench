@@ -1,5 +1,32 @@
 # Session History
 
+## 2026-10-25 public-layout review and reporting decision boundary
+
+Frozen review o passed mechanical/required-scrutiny gates but incorrectly claimed
+the six tests checked imported-source byte identity; a host guard performed that
+comparison. Fresh p made three identity comparisons visible in the protected tests,
+with a deterministic mismatched-copy rejection, but live p stopped at a pre-execution
+directory guard before tests/report. The exact rejected path was discarded; the
+combined guard cannot establish whether it was an escape or an unlisted in-root path.
+Its failed-batch proposal count was also missing. All inputs and owned cleanup were
+preserved. These consumed outcomes were not replayed or regraded.
+
+Fresh q restored normal directory navigation in a history-free public Git archive:
+499 committed files, six declared probe/config inputs, no ignored private files or
+original Git/recovery history. New receipts preserve proposal counts and safe path
+classification. Its 25 guards and scripted report-only correction/revalidation/
+re-review passed. Live q used six Go/two local calls and 16 primary tool proposals
+in 272.83 seconds. Nine tests passed; 505 inputs and 1,000 historical evidence files
+were unchanged, required scrutiny passed and owned cleanup was independently checked.
+Technical findings and test/manifest attribution were supported. The final report's
+unqualified no-network sentence still lacks an explicit actor boundary.
+
+The owner was presented with two concrete prospective closeout examples: strict
+host-wide effect claims, or explicit host facts with agent-action scope. The latter
+was recommended for clarity without another model/service, but remains a proposal.
+No reporting/acceptance contract was changed, no consumed result promoted, and no
+further paid trial started while that material decision was pending.
+
 ## 2026-10-25 frozen review n and negative reporting scope
 
 Fresh ordinary tool-enabled review n supported the host invocation-scope patch;

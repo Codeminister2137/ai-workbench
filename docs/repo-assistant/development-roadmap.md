@@ -29,6 +29,14 @@ Research and pending matcher choices are preserved in the dated artifact briefs.
 
 ## Current paid-route checkpoint: 2026-10-25
 
+Later o/p/q evidence leaves report-contract interpretation pending with the owner.
+Question q used the normal public repository layout, passed nine tests and required
+scrutiny, preserved 505 inputs and supported its technical/test-identity findings,
+but still used unqualified no-network wording. No source/permission/provider change
+or retrospective grade change resolves that wording automatically. Host-fact and
+actor-scope delivery examples are prepared for a prospective owner decision; further
+paid repetition is paused at this boundary. See the current assessment below.
+
 Frozen host-patch review n passed its mechanical and required-scrutiny gates, with
 supported technical findings, three tests and no model writes. Its unqualified
 no-network-calls claim still prevents an unqualified report-fidelity pass. Primary
