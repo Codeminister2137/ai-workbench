@@ -2,6 +2,17 @@
 
 ## October 25 current checkpoint: reporting contract approved, acceptance pending
 
+Fresh required-review trial r stopped incomplete before tests/final response. Whole
+source/test reads accumulated tool history until native input admission estimated
+254,912 input tokens; reserving 16,000 output plus 256 framing exceeded the declared
+256,000 context. Instructions/history were preserved and no next Go request was
+sent. Five Go/two local calls and 19 tool proposals consumed 147.51 seconds. All
+506 protected inputs and 2,056 historical files remained unchanged; owned cleanup
+was verified. Ten independent host-only tests passed; these do not rescue r.
+Evidence: `artifacts/cli-scoped-report-review-20261025r/` and its stopped postflight.
+Native prompt/tool descriptions now recommend search and focused line ranges;
+whole-file reads remain available and no instruction/history truncation is added.
+
 The host corrections are implemented and validated, but general paid-CLI acceptance
 remains incomplete. Later frozen reviews exercised technical correctness without
 establishing an unqualified reporting pass:
