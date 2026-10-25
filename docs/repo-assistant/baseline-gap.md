@@ -77,8 +77,11 @@ advice proposed tools in a tool-free pass". The primary report named
 distinguished them from the candidate changes, and made no
 predate/unchanged/unrelated claim. Both 10-test runs and the 3616-case oracle
 passed, and the independent live audit accepts auxiliary alignment and
-attribution for this bounded question. Clean paid-agent workflow acceptance,
-live fallback and scrutiny-fed repair remain unestablished.
+attribution for this bounded question. Clean paid-agent workflow acceptance and
+scrutiny-fed repair remain unestablished. Subsequent bounded Slice B trials
+established live fallback into Requesty free, including a declared synthetic
+intermediate Kiro limit; see the Slice B evidence below. Continuation into Go
+or an installed CLI client remains unexercised by those trials.
 
 Owner standing authorization covers comparable bounded Go runs within existing
 limits; fresh named preparation and billing/privacy admission still apply.
@@ -380,13 +383,16 @@ Read-only allowance inventory (no inference) at
 | opencode-go/go-kimi-k2.7-code | allowances | no official endpoint at the time (superseded 2026-10-24, see below) | executor-compatible |
 | github/copilot-cli-auto | allowances | chat 200/200 used (0%), completions 2000/2000 | client not configured |
 | google/antigravity-* | allowances | not observable | not installed; headless MCP ineligible |
-| OpenRouter free | not in catalog | 50/50 free daily requests, 16 tool-capable free models | no route |
+| OpenRouter free | free_only (route added later on 2026-10-24) | 50/50 free daily requests, 16 tool-capable free models at the inventory observation | declared; ordinary CLI use refused by privacy-entitlement guard |
 | requesty free / AI Studio / Ollama | other tiers | - | admitted as cheaper fallback tiers from 2026-10-24 |
 
 Two ordering hazards are recorded rather than inferred away. `kiro_usage`
 deliberately reports plan coverage, never a remaining balance, so its 100%
-value must not be read as capacity. OpenRouter free has real account allowance
-but no catalog route, so it cannot participate until one is added.
+value must not be read as capacity. OpenRouter free subsequently gained a catalog
+route on 2026-10-24, but remains outside the local priority order: ordinary CLI
+requests lack the complete-input public/synthetic attestation required on this
+Free-plan account (ADR-063). The separate attested synthetic probe passed the
+guards and received an upstream shared-pool 429; it did not establish model quality.
 
 Live fallback trial `artifacts/fallback-acceptance-20261024-123206/`: the switch
 was recorded (`simulated-codex -> kiro/auto (usage_limit)`, attempts

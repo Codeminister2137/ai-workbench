@@ -1,57 +1,70 @@
-# Unattended session plan - 2026-10-24, until 22:00 Warsaw / 20:00 UTC
-
-Follow `AGENTS.md` "Unattended work windows", `docs/unattended-sleep.md` and
-`docs/workflow.md`. This plan grants no inference, dependency, infrastructure or
-expanded scope authority.
+# Unattended work plan — 2026-10-25, deadline 14:00 CET / 13:00Z
 
 ## Window and boundaries
 
-- **Status:** ACTIVE.
-- **Actual start:** 2026-10-24 17:20 UTC / 19:20 Europe/Warsaw (CEST).
-- **Owner duration/deadline:** until 22:00 Europe/Warsaw = **2026-10-24T20:00:00Z**.
-  Fixed; not extended or reused.
-- **Immediate objective:** owner-approved Option A - add an OpenRouter free catalog
-  route so a real free source can participate in primary selection and fallback.
-  Owner's standing preference: "Always A, by default. More free stuff is good."
-- **Wider approved goals, in owner priority order** (`docs/workflow.md`
-  "Current product priorities"): CLI -> job search -> business -> Council.
-- **Live/resource/privacy limits:** standing bounded Go acceptance authorization;
-  Extra Usage disabled; no paid overage, no unbounded retries, no model/billing
-  switches, no new private payloads, no raw-prompt/private-reasoning logging, no
-  credential exposure. `.env` keys stay in the process environment only.
-- **Closeout reserve / work-admission cutoff:** 15 minutes, so stop admitting new
-  work at **19:45Z**; anything still running must end by 19:50Z.
-- **Sleep:** DEFAULT, ten minutes after finishing. No owner override.
-- **Startup fallback:** `-Sleep -Rolling -SleepAtUtc 2026-10-24T20:00:00Z`,
-  receipt `artifacts/unattended-20261024-1720/sleep-startup.json`,
-  cancel `artifacts/unattended-20261024-1720/sleep-startup.cancel`, PID 63220.
-  Owner-visible cancellation: `.\cancel-sleep.cmd` (all repository timers).
-- **Rolling renewal:** renewed 17:45:29Z with `-ProtectedUntilUtc
-  2026-10-24T19:50:00Z`; receipt acknowledged `planned_sleep_utc
-  19:50:00Z`. Renew again about every ten minutes.
+- Status: ACTIVE. Actual start 2026-10-25 07:45:35Z / 08:45:35 Europe/Warsaw
+  and Europe/Budapest (CET after today's DST change).
+- Fixed owner deadline: 2026-10-25T13:00:00Z / 14:00 local. No renewal of scope/time.
+- Immediate objective: owner selected A, restricted reviewed non-sensitive input
+  and controlled tools/credentials; include B (general-repository protection) in
+  plans. No credit purchase, account changes, broad privacy bypass or new service.
+- Sources: current conversation; ADR-063; provider source-state October 25;
+  docs/repo-assistant/baseline-gap.md and acceptance-criteria.md;
+  docs/repo-assistant/development-roadmap.md; docs/logging-and-artifact-structure-plan.md;
+  docs/plans/repo-assistant-cli-parity-plan.md;
+  docs/plans/opencode-go-integration-first-20261022.md;
+  docs/plans/deferred-baseline-work-20261022.md; CLI readiness review.
+- Wider goals: CLI -> job search -> business -> Council, per docs/workflow.md.
+  Application .docx plans will be read if CLI candidates exhaust; not immediate
+  implementation sources because the current slice is CLI/provider privacy.
+- Inherited edits: CURRENT_CONTEXT, prior window plan, baseline-gap, session-history,
+  provider source-state are owned recovery/investigation changes; preserve them.
+- No new dependencies, credentials exposure, raw-prompt/private-reasoning logging,
+  paid overage, consumed-trial replay or invented physical approvals. Local
+  auxiliary/scrutiny default remains. Comparable fresh bounded Go acceptance has
+  standing authorization, but each live scope needs fresh offline preparation
+  and actual admission. New restricted route does not grant general private input.
+- Closeout reserve: 15 min; stop new work admissions at 12:45Z, owned workers done
+  by 12:50Z, complete verification/handoff/power scheduling by 13:00Z.
+- Sleep DEFAULT ten minutes after finishing. Startup rolling helper PID 62192;
+  receipt artifacts/unattended-20261025-0745/sleep-startup.json; cancellation
+  artifacts/unattended-20261025-0745/sleep-startup.cancel. Verified sleep_scheduled,
+  initial due 08:16:16Z / 09:16:16 local, fixed deadline 13:00Z.
+- Renew about every ten minutes, next by 07:56Z; protect full operations plus
+  cleanup/headroom and verify acknowledgement. Owner command .\cancel-sleep.cmd.
+  Historical October 23 stale receipt may report missing acknowledgement; its
+  helper is absent, do not forge state or delete evidence.
 
 ## Ordered steps and candidate ledger
 
-| Order | Concrete action | Status | Evidence / next action |
-| --- | --- | --- | --- |
-| 1 | Recheck the OpenRouter free list, zero price and endpoint availability; record dated findings | COMPLETE | `source-state.md` "OpenRouter - refreshed 2026-10-24"; 469 models, 17 free, 16 usable; chosen `google/gemma-4-31b-it:free` |
-| 2 | Add the OpenRouter free catalog route and harness route with tests | COMPLETE | 40848ee, a635bd0; full suite 2846 passed, Ruff and Pyright clean |
-| 3 | Record free-by-default as an ADR and index entry | COMPLETE | ADR-068, `docs/decisions.md` |
-| 4 | Bounded live trial proving the route participates | COMPLETE with a preserved failure and a cause | `fallback-acceptance-20261024-173049/`, `-174436/`; attested probe: guards passed, upstream 429 from the single free endpoint; ordinary CLI refused by the entitlement guard |
-| 5 | M5 installed-client/live parity | BLOCKED (evidenced) | Offline C1-C6 contract passes; Copilot 0% remaining and unconfigured, Kiro monthly limit reached. Unlock: client allowance reset or a newly installed client. No code change pending |
-| 6 | Record the fallback route that stops the walk | REVERTED | 607ca72 attempted it; 45380c2 reverted because it changed the documented `fallback_attempts` contract. Known limitation recorded in the handoff |
-| 7 | Docs, handoff, commits, push to develop | IN_PROGRESS | 45380c2; push pending; `CURRENT_CONTEXT.md` carries the owner decision brief |
-| 8 | Owner decision: OpenRouter entitlement (A spend / B attestation flag / C continue on CONFIGURATION / D leave unused) | BLOCKED on owner | Recommendation B. Queued in `CURRENT_CONTEXT.md`; do not implement any option unattended |
-| Final | Stop admissions; clean up; verify state; save handoff; replace the rolling timer with `-Sleep -DelaySeconds 600`; verify receipt; deliver report | Required | Reserve 15 minutes |
+| Order | Concrete action | Authority / source | Duration incl checks | Completion condition | Status / next action |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Define and implement narrow reviewed-input preparation/execution using existing provider contracts; exclude ambient repo context/history and model tools | Owner A; ADR-063 remains intact unless a new clearly approved narrow contract is necessary | 45-90 min | One bounded input, explicit complete-input review, no tools/ambient context, offline denial/unchanged-guard regressions, docs | COMPLETE: 2532665; one digest-bound USER input, no tools/ambient context; full offline suite passed |
+| 2 | Record A and rationale; plan B without implementing general repository protection | Owner selected A and requested B in plans | 15-25 min | Accurate ADR/plan and no false public classification | COMPLETE: ADR-069 and A/B plan committed in 2532665 |
+| 3 | Verify restricted execution with dummy/mock transport and full relevant checks; consider fresh wholly synthetic one-shot free acceptance only if existing grant covers it | Owner A and standing no-private-payload limits; no paid inference | 20-40 min | Captured complete wire input, authentication separated, zero-price/quota guards intact; no leaked sentinel | COMPLETE offline; LIVE BLOCKED: fresh synthetic a passed exact-wire/admission checks, single upstream shared-pool HTTP 429; preserved, no retry. Unlock: endpoint capacity; independent CLI work continues |
+| 4 | Prepare next clean CLI scrutiny/repair acceptance from current source rather than copying historical stale controls | Baseline plan and acceptance criteria | 45-90 min | Fresh finite allowance/controller, deterministic real effects/oracle/report cases, protected originals and cleanup | IN_PROGRESS: fresh h prep reuses guarded e coding/review and g advisory classification; prospective controls/seals required |
+| 5 | Execute fresh comparable bounded Go workflow if preparation and allowance qualify; investigate first failure before any new trial | Standing comparable Go grant; local auxiliary/scrutiny; no overage | 30-60 min | Actual intended workflow effects and honest report/evidence; consumed result preserved | NEEDS_INVESTIGATION; depends on row 4; Go 10% weekly remaining observed08:08Z, Extra Usage disabled retained |
+| 6 | Investigate/fix concrete recording/error propagation gaps in reviewed CLI paths | Owner defect/recording policy and logging plan | 30-60 min | Demonstrated defect traced and bounded fix validated, or specific evidenced design blocker | COMPLETE for early-primary-failure slice: 6b39bdd, 70 focused and 1152 CLI checks passed; continue investigation if new evidence |
+| 7 | Fresh wider-roadmap selection if above complete/stall; inspect deferred tasks then application plans and actual code | AGENTS/workflow priorities; no speculative features | remaining time | Every remaining candidate has actual outcome or exact restriction; smaller actions considered | NEEDS_INVESTIGATION |
+| Final | Stop admissions; clean owned workers; independently verify final diff/status; save handoff; replace rolling timer with fresh ten-minute sleep; verify scheduling and prior cancellation; final visible report | AGENTS/workflow/unattended-sleep | reserve 15 min | Actual start/stop/waiting evidence, receipt and owner cancel command retained | REQUIRED for deadline or evidenced early closeout |
 
-Candidate statuses: READY, NEEDS_INVESTIGATION, IN_PROGRESS, COMPLETE, BLOCKED.
+## Time/progress checkpoints
 
-## Time and progress checkpoints
-
-| Actual UTC time | Trigger/step result | Time left / reserve | Evidence and changed estimates | Revised next action |
+| UTC | Event | Remaining / reserve | Evidence | Next |
 | --- | --- | --- | --- | --- |
-| 17:20 | Window start; plan written; startup timer verified (`sleep_scheduled`, due 17:50:06Z) | 160 min / 15 | Timer PID 63220 | Steps 1-3 |
-| 17:30 | Catalog route + docs + tests green; harness live run refused by the entitlement guard | 150 min / 15 | `fallback-acceptance-20261024-173049/` | Attested probe to separate account entitlement from route viability |
-| 17:33 | Attested probe passed guards, upstream 429 from the shared free pool; cause established from the response body | 147 min / 15 | `openrouter_attested_probe.py`, `openrouter_429_diagnosis.py` | Record findings, keep the route out of the local priority, queue the owner decision |
-| 17:38 | Full suite 2846 passed; Ruff/Pyright clean; 40848ee + a635bd0 pushed | 142 min / 15 | `HEAD == origin/develop == a635bd0` | Fix the aborted-route recording gap |
-| 17:45 | Rolling lease renewed and acknowledged to 19:50:00Z | 135 min / 15 | receipt `planned_sleep_utc 19:50:00Z` | Handoff, push 607ca72, then independent work |
+| 07:45:35 | Owner switched unattended; deadline converted | 314m / 15m | local CET and UTC clocks agree | Start timer, plan, inspect restricted path |
+| 07:46:16 | Startup sleep_scheduled verified | 313m / 15m | receipt PID 62192 | Implement A; renew by 07:56Z |
+| 07:57 | A implementation and 160 focused checks complete; full suite/types running | 303m / 15m | Exact-input and unchanged-guard controls pass; no model call | Finish gates and source diff review; next timer renewal by 08:02Z |
+| 08:03 | A committed and all gates passed; one synthetic free call reached upstream and returned 429 | 297m / 15m | 2892 workspace + 38 Council + 84 job-search passed, 3 skips; Ruff/types clean; exact 253-byte wire input verified | Preserve consumed failure; continue CLI scrutiny/repair preparation; timer due 08:30:20Z, renew by 08:10Z |
+
+| 08:17 | Early failure run-state defect fixed/committed; next two-phase baseline preparation selected | 283m / 15m | 6b39bdd; 1152 CLI tests passed; rolling timer renewed to08:46:41Z | Prepare h offline and check all protections; next renewal08:26Z |
+
+## Exhaustion gate
+
+Do not stop at one slice or passing tests. At every completion/blocker inspect and
+select the next concrete approved action. Before early closeout investigate every
+NEEDS_INVESTIGATION row and execute every READY row or establish specific evidence
+preventing it; check smaller independent actions and replenish from wider sources.
+A material decision is queued while independent work continues. No padding with
+repeated tests, speculative features or idle waiting. Preserve original deadline,
+active action and timer state across compaction.

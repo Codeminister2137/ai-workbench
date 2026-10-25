@@ -1,6 +1,8 @@
 # ADR-069 — Restricted reviewed non-sensitive input
 
-**Status:** Accepted direction, 2026-10-25; implementation validation in progress.
+**Status:** Accepted, 2026-10-25; implemented and validated offline. First live
+synthetic request passed admission and exact-payload checks but received an
+upstream shared-pool 429. Live model quality remains unestablished.
 
 ## Owner decision and rationale
 

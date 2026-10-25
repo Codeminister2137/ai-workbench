@@ -1945,3 +1945,240 @@ a live walk that continues into `opencode-go` or a CLI client is still unexercis
 Kiro reports its exhausted plan as a generic process error, not a usage limit, which
 is why the second hop's failure had to be declared synthetic. Fallback still switches
 only on usage-limit/overload signals.
+
+
+## 2026-10-24 interrupted-window handoff (archived on attended return 2026-10-25)
+
+This is the preserved previous handoff; its ACTIVE wording and push reminders are historical. On return, HEAD and the local origin/develop reference both resolved to 3d7e020. The original deadline expired; no window was extended.
+
+# Current task - UNATTENDED until 2026-10-24T20:00:00Z; OpenRouter free route declared
+
+Branch: develop. `HEAD == origin/develop == 607ca72` (push of 607ca72 pending at
+handoff time; verify before relying on it).
+Active unattended window until **22:00 Europe/Warsaw / 20:00Z**, plan at
+`docs/plans/unattended-work-plan.md` (Status: ACTIVE).
+
+**Status: INCOMPLETE.** The owner-approved Option A (declare an OpenRouter free
+catalog route) is implemented, validated and pushed. Ordinary CLI use of that
+route is blocked by an account entitlement question that needs the owner, so it
+is declared but deliberately not ordered. Next imperative action: the owner
+decision in "Pending owner decision" below; independent work continues in the
+window.
+
+## Pending owner decision - OpenRouter free-route entitlement
+
+Decision needed: how the declared OpenRouter free route should become usable for
+ordinary CLI work on this account.
+
+Why it matters: the account reports `is_free_tier: true` (no credits ever
+purchased), and ADR-063 requires an explicit public/synthetic attestation for a
+Free-plan account. The CLI has no attestation flag, so every ordinary CLI request
+to this route is refused before inference by the entitlement guard. Because a
+`CONFIGURATION` refusal is not a continuation signal, a fallback walk that reaches
+the route stops there instead of continuing. The route is therefore declared,
+tested and live-probed but not ordered.
+
+Options:
+- **A. Buy $10 of OpenRouter credits (owner spends money).** Flips
+  `is_free_tier` to false, removes the entitlement refusal and raises the free
+  daily ceiling from 50 to 1,000. Pros: the route becomes usable for ordinary CLI
+  work with no code or privacy change; also raises quota. Cons: real spend, and it
+  treats a credits-purchase proxy as evidence of data-policy entitlement, which
+  the source-state notes is not the same claim.
+- **B. Add an explicit CLI public/synthetic attestation flag.** Pros: no spend;
+  keeps the ADR-063 boundary explicit and operator-controlled. Cons: a new
+  user-facing privacy-affecting switch; the operator must assert the whole request
+  is public, and the flag could be misused.
+- **C. Let a fallback walk continue past a route-level `CONFIGURATION` refusal.**
+  Pros: the whole ordered set is honored even when a route cannot serve; no spend
+  or privacy change. Cons: changes shared routing policy and contradicts the
+  existing `test_other_errors_do_not_switch` contract; could mask a genuine
+  misconfiguration by silently switching.
+- **D. Leave the route declared and unused.** Pros: zero risk, no decision needed
+  now. Cons: the free capacity stays unavailable, contrary to the free-by-default
+  preference.
+
+Technical recommendation: **B**, then C if route refusals keep aborting walks.
+B keeps the ADR-063 privacy boundary explicit, costs nothing, and makes the route
+usable for genuinely public/synthetic work; A spends money and relies on a proxy
+claim, while C changes routing semantics for every route.
+
+Owner answer needed: choose A, B, C or D (or another direction) and, if B or C,
+the reason to preserve in the ADR.
+
+## Owner authority and current policy
+
+Free routes are preferred by default whenever they meet the task's quality,
+privacy, capability and provider requirements (ADR-068, owner statement
+2026-10-24: "Always A, by default. More free stuff is good."). Free never waives
+a requirement and never authorizes paid overage.
+
+Keep auxiliary review and scrutiny local for now (ADR-025). A wholly paid-tier
+workflow is permissible only after evidence establishes local-model inadequacy.
+Standing comparable bounded Go acceptance authorization remains; owner confirmed
+Extra Usage disabled. No paid overage, unbounded retries, model/billing switches,
+new private payloads, raw-prompt/private-reasoning logging or credential exposure.
+Closeouts begin with exact `## **SUMMARY**` and Changed/Validated/Notes bullets.
+
+## Completed in this window
+
+OpenRouter free route (commits 40848ee, a635bd0, 607ca72):
+
+- `packages/ai_orchestrator/examples/model_catalog.toml` declares
+  `openrouter/free-google/gemma-4-31b-it:free` (`free_only`, 262,144 context,
+  tools). `_PRODUCT_SLUGS` gained `openrouter_free -> free`, so the ADR-065
+  derivation still reproduces every declared route id (19 routes).
+- `scripts/fallback-acceptance.py` gained `--fallback-route openrouter-free`; a
+  new test renders every harness route into a loadable catalog.
+- A short-lived change that recorded a route whose non-continuable error stopped
+  the walk was **reverted** (607ca72, 45380c2): it broke the deliberate
+  `fallback_attempts` contract asserted by
+  `tests/repo_assistant/test_error_propagation.py`, where only switch-causing
+  attempts are listed and the terminal failure is reported through
+  `effective_route_id` plus its category. Changing that contract needs the owner.
+  Known limitation: `session_attempts` therefore does not name a route that
+  refuses before switching; the CLI envelope still reports
+  `effective_route_id` and `failure_reason`. The artifact
+  `artifacts/fallback-acceptance-20261024-174436/` was produced while that change
+  was briefly active, so its `session_attempts` contains an extra
+  `failed`/`configuration` entry; treat that entry as non-current behaviour.
+- Dated findings in `packages/ai_provider/docs/source-state.md`: 469 public
+  models, 17 `:free`, 16 tool-capable at zero price; the chosen route has exactly
+  one free endpoint (Google AI Studio, 262,144 context, zero price).
+- ADR-068 records free-by-default; `docs/decisions.md` index updated.
+
+Live evidence (fresh, not a replay):
+
+- `artifacts/fallback-acceptance-20261024-173049/` and
+  `artifacts/fallback-acceptance-20261024-174436/`: preserved failures. The walk
+  reached `openrouter/free-google/gemma-4-31b-it:free` and stopped on the
+  entitlement refusal. The second run's extra `failed`/`configuration` entry came
+  from the reverted change and is not current behaviour; both runs agree that the
+  route was reached and refused before inference.
+- `artifacts/unattended-20261024-1720/openrouter_attested_probe.py`: an attested
+  synthetic call passed every adapter guard; account quota was 0/50 used, 50
+  remaining; the single upstream endpoint answered **429**
+  (`limit_source: upstream_provider_shared_pool`, "temporarily rate-limited
+  upstream"). `openrouter_429_diagnosis.py` preserves the body and account data.
+  This is upstream capacity, not exhausted allowance, and the adapter maps 429 to
+  `RATE_LIMIT`, which a walk already continues.
+
+## Validation in this window
+
+- Full suite: 2846 passed, 9 skipped (before the recording fix); targeted
+  fallback suite 192 passed after it.
+- Ruff check and format clean; Pyright 0 errors.
+- Pushed `develop` at a635bd0; 607ca72 committed after that and its push is the
+  remaining step.
+
+## M5 installed-client/live parity - investigated, blocked on allowance
+
+The offline C1-C6 contract in `tests/test_ide_independent_capabilities.py` already
+passes without IDE configuration. What M5 still needs is the same approved
+capability set exercised through an **installed third-party client** against a real
+repository. Both known clients are unavailable for that today:
+`github/copilot-cli-auto` has its chat bucket at 200/200 used (0% remaining) and
+no configured command, and `kiro/auto` reports its monthly limit reached as a
+generic process error. The free and Go routes are provider APIs, not installed
+clients, so they cannot substitute.
+
+Blocker: no installed client with remaining allowance. Unlock condition: Copilot
+quota reset or a configured Copilot command, Kiro monthly reset, or a newly
+installed client. No code change is pending on this; do not re-run the offline
+surface checks.
+
+## Consumed live evidence - do not replay or rewrite verdicts
+
+c: `artifacts/cli-baseline-hybrid-successor-20261024c/` FAILED private acceptance
+(frozen review lacked receipts). d: `artifacts/local-scrutiny-evidence-20261024d/`
+local diagnostic. e: `artifacts/cli-baseline-hybrid-successor-20261024e/`
+completed coding and frozen review. f:
+`artifacts/cli-bookkeeping-review-20261024f/` completed_with_auxiliary_errors.
+g: `artifacts/cli-bookkeeping-attribution-20261024g/`
+completed_with_auxiliary_errors, auxiliary contract aligned. Do not replay or
+regrade c, d, e, f or g. Slice B live runs:
+`artifacts/fallback-acceptance-20261024-151618/` and `-151909/` passed;
+`-151449/` is a preserved round-limit failure.
+
+## Fallback ordering
+
+Configurable via `[fallback] priority`/`exclude`/`allow_cost_escalation`,
+`--fallback-priority` and `--fallback-exclude`. The local order is Requesty free,
+opencode-go, kiro, copilot, antigravity-pro, antigravity-flash, derived from
+`artifacts/allowance-inventory-20261024/`. The OpenRouter free route is
+intentionally absent from `priority` until the decision above is made. Two
+recorded hazards: `kiro_usage` reports plan coverage, never remaining balance, and
+hitting any Go account window blocks the whole `opencode-go` provider including
+its free models.
+
+Relevant private plans remain repo-assistant-cli-parity-plan.md and
+opencode-go-integration-first-20261022.md. Historical trials and earlier failures
+remain in `docs/session-history.md`.
+
+
+## Preserved October 24 window plan — replaced for October 25
+
+# Unattended session plan - 2026-10-24, until 22:00 Warsaw / 20:00 UTC
+
+Follow `AGENTS.md` "Unattended work windows", `docs/unattended-sleep.md` and
+`docs/workflow.md`. This plan grants no inference, dependency, infrastructure or
+expanded scope authority.
+
+## Window and boundaries
+
+- **Status:** INTERRUPTED / EXPIRED; recovered in attended mode on 2026-10-25.
+  Usage-limit interruption reported by owner; exact last execution time is unknown.
+  Original deadline is preserved and cannot authorize a new window.
+- **Actual start:** 2026-10-24 17:20 UTC / 19:20 Europe/Warsaw (CEST).
+- **Owner duration/deadline:** until 22:00 Europe/Warsaw = **2026-10-24T20:00:00Z**.
+  Fixed; not extended or reused.
+- **Immediate objective:** owner-approved Option A - add an OpenRouter free catalog
+  route so a real free source can participate in primary selection and fallback.
+  Owner's standing preference: "Always A, by default. More free stuff is good."
+- **Wider approved goals, in owner priority order** (`docs/workflow.md`
+  "Current product priorities"): CLI -> job search -> business -> Council.
+- **Live/resource/privacy limits:** standing bounded Go acceptance authorization;
+  Extra Usage disabled; no paid overage, no unbounded retries, no model/billing
+  switches, no new private payloads, no raw-prompt/private-reasoning logging, no
+  credential exposure. `.env` keys stay in the process environment only.
+- **Closeout reserve / work-admission cutoff:** 15 minutes, so stop admitting new
+  work at **19:45Z**; anything still running must end by 19:50Z.
+- **Sleep:** DEFAULT, ten minutes after finishing. No owner override.
+- **Startup fallback:** `-Sleep -Rolling -SleepAtUtc 2026-10-24T20:00:00Z`,
+  receipt `artifacts/unattended-20261024-1720/sleep-startup.json`,
+  cancel `artifacts/unattended-20261024-1720/sleep-startup.cancel`, PID 63220.
+  Owner-visible cancellation: `.\cancel-sleep.cmd` (all repository timers).
+- **Rolling renewal:** renewed 17:45:29Z with `-ProtectedUntilUtc
+  2026-10-24T19:50:00Z`; receipt acknowledged `planned_sleep_utc
+  19:50:00Z`. Historical lease, not renewable after this window.
+- **Observed on attended return:** receipt records `sleep_requested` at
+  2026-10-24T19:50:00Z and `sleep_api_returned_success` at 21:53:49Z. No matching
+  timer/acceptance worker remained running. This is an API receipt, not independent
+  verification of a Windows suspend/resume transition. Do not schedule missed
+  closeout sleep while the owner is using the PC.
+
+## Ordered steps and candidate ledger
+
+| Order | Concrete action | Status | Evidence / next action |
+| --- | --- | --- | --- |
+| 1 | Recheck the OpenRouter free list, zero price and endpoint availability; record dated findings | COMPLETE | `source-state.md` "OpenRouter - refreshed 2026-10-24"; 469 models, 17 free, 16 usable; chosen `google/gemma-4-31b-it:free` |
+| 2 | Add the OpenRouter free catalog route and harness route with tests | COMPLETE | 40848ee, a635bd0; full suite 2846 passed, Ruff and Pyright clean |
+| 3 | Record free-by-default as an ADR and index entry | COMPLETE | ADR-068, `docs/decisions.md` |
+| 4 | Bounded live trial proving the route participates | COMPLETE with a preserved failure and a cause | `fallback-acceptance-20261024-173049/`, `-174436/`; attested probe: guards passed, upstream 429 from the single free endpoint; ordinary CLI refused by the entitlement guard |
+| 5 | M5 installed-client/live parity | BLOCKED (evidenced) | Offline C1-C6 contract passes; Copilot 0% remaining and unconfigured, Kiro monthly limit reached. Unlock: client allowance reset or a newly installed client. No code change pending |
+| 6 | Record the fallback route that stops the walk | REVERTED | 607ca72 attempted it; 45380c2 reverted because it changed the documented `fallback_attempts` contract. Known limitation recorded in the handoff |
+| 7 | Docs, handoff, commits, push to develop | COMPLETE for saved changes | Attended return: HEAD and local origin/develop both 3d7e020, initial working tree clean; no fresh remote fetch |
+| 8 | Owner decision: OpenRouter entitlement (A spend / B attestation flag / C continue on CONFIGURATION / D leave unused) | BLOCKED on owner | Recommendation B. Queued in `CURRENT_CONTEXT.md`; do not implement any option unattended |
+| Final | Stop admissions; clean up; verify state; save handoff; replace the rolling timer with `-Sleep -DelaySeconds 600`; verify receipt; deliver report | Required | Reserve 15 minutes |
+
+Candidate statuses: READY, NEEDS_INVESTIGATION, IN_PROGRESS, COMPLETE, BLOCKED.
+
+## Time and progress checkpoints
+
+| Actual UTC time | Trigger/step result | Time left / reserve | Evidence and changed estimates | Revised next action |
+| --- | --- | --- | --- | --- |
+| 17:20 | Window start; plan written; startup timer verified (`sleep_scheduled`, due 17:50:06Z) | 160 min / 15 | Timer PID 63220 | Steps 1-3 |
+| 17:30 | Catalog route + docs + tests green; harness live run refused by the entitlement guard | 150 min / 15 | `fallback-acceptance-20261024-173049/` | Attested probe to separate account entitlement from route viability |
+| 17:33 | Attested probe passed guards, upstream 429 from the shared free pool; cause established from the response body | 147 min / 15 | `openrouter_attested_probe.py`, `openrouter_429_diagnosis.py` | Record findings, keep the route out of the local priority, queue the owner decision |
+| 17:38 | Full suite 2846 passed; Ruff/Pyright clean; 40848ee + a635bd0 pushed | 142 min / 15 | `HEAD == origin/develop == a635bd0` | Fix the aborted-route recording gap |
+| 17:45 | Rolling lease renewed and acknowledged to 19:50:00Z | 135 min / 15 | receipt `planned_sleep_utc 19:50:00Z` | Handoff, push 607ca72, then independent work |
