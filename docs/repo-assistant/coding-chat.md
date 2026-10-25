@@ -231,6 +231,11 @@ requested log path. Interruption closes that file and restores terminal output.
 
 ## Current limits
 
+- Teardown attempts foreground cleanup even if terminal cleanup raises. Incomplete
+  teardown or process observation leaves the saved session `interrupted`, requiring
+  explicit reconciliation before resume. Active caller contexts are restored and
+  cleanup exceptions propagate with Python's normal exception chaining. A failed
+  cleanup attempt does not prove every owned process was stopped.
 - Expiry prevents subsequent requests, tools and approvals and rejects late
   success. Running tools are not forcibly interrupted. Interactive idle input
   expires automatically; blocking noninteractive input is checked when it

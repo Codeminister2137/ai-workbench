@@ -29,6 +29,13 @@ Research and pending matcher choices are preserved in the dated artifact briefs.
 
 ## Current paid-route checkpoint: 2026-10-25
 
+Subsequent saved-session cleanup trials j/k are incomplete: both stopped at
+private fixture guards before final coding reports and frozen review. Retain their
+original results. The concrete production teardown defect was fixed separately
+by the host, with real-session/owned-child regressions; this is implementation
+progress toward M4, not model-authored acceptance or a completed M4 milestone.
+See [the follow-up assessment](baseline-gap.md) for provenance and evidence.
+
 The fresh bounded Go trial i completed production orchestrated coding and frozen
 review with two independently supported reports, five unchanged originals, three
 new companion tests, eight passing tests per phase, 3,616 oracle cases and verified

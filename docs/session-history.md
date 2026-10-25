@@ -1,5 +1,28 @@
 # Session History
 
+## 2026-10-25 saved-session teardown correction
+
+Fresh Go trials j/k diagnosed the cleanup defect but stopped at private fixture
+guards before final coding reports and required frozen reviews. Original results
+remain consumed/incomplete, with owned cleanup verified. Independent postflight
+found lost exception chaining in k's candidate. The subsequent production fix and
+eleven real-session/owned-child regressions are host-authored, separately attributed
+from those trials. Terminal cleanup failure no longer skips foreground teardown;
+uncertain cleanup persists interrupted state and restores active caller contexts.
+
+The fix passed 82 focused tests, targeted Ruff lint/format and Pyright. Fresh full
+registered validation passed 3,037 tests with three skips. A separately bounded
+one-call static Go review found no concrete change-induced defect in six frozen
+public files, which remained unchanged. That review used no tools or auxiliary/
+scrutiny stages and treated supplied test results as host observations. It does
+not replace the missing phases of j/k or establish general workflow parity.
+
+The owner resumed attended work after a usage interruption. The unattended
+window was superseded; its sleep receipt acknowledged cancellation and no helper
+was running. An older stale registration caused a missing-ack warning. The prior
+full test log ended without a result; it was preserved and fresh validation began.
+No test pass or work during the interruption is inferred from that partial log.
+
 ## 2026-10-25 bounded Go coding/review completion
 
 Fresh trial i completed the small orchestrated coding and read-only frozen-review

@@ -209,15 +209,23 @@ def run_coding_chat(
         )
         return status
     finally:
-        terminal.close()
+        cleanup_complete = False
         try:
-            foreground.close()
-            for handle in session.supervisor.processes:
-                session.observe_process(session.supervisor.status(handle))
+            try:
+                terminal.close()
+            finally:
+                foreground.close()
+                for handle in session.supervisor.processes:
+                    session.observe_process(session.supervisor.status(handle))
+            cleanup_complete = True
         finally:
             try:
                 session.status(
-                    "interrupted" if status == 130 else "completed" if status == 0 else "failed"
+                    "interrupted"
+                    if status == 130 or not cleanup_complete
+                    else "completed"
+                    if status == 0
+                    else "failed"
                 )
             finally:
                 ACTIVE_FOREGROUND.reset(foreground_token)

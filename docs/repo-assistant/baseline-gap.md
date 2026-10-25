@@ -1,5 +1,39 @@
 # Distance to established baseline CLI usability
 
+## October 25 follow-up: cleanup correction, continuity acceptance incomplete
+
+Fresh saved-conversation trials j and k remain consumed and incomplete. Their
+read-only diagnoses were accepted, but neither delivered a final coding report or
+the required frozen-review phase. Trial j stopped at the private pinned-command
+guard before edits; the exact rejected command was not retained. Trial k produced
+source and companion-test edits, then stopped at the private pending-write
+inspection guard. Its exact rejected write target was not retained. These are
+fixture-origin failures; no downstream Go service error is established. Owned
+worker/runtime cleanup was verified. Neither trial is replayed or regraded.
+
+Independent postflight also found that k's candidate discarded the first cleanup
+exception when both cleanup actions failed. A separate **host-authored** production
+fix now attempts foreground cleanup even when terminal cleanup raises, records
+incomplete teardown/observation as `interrupted`, restores caller contexts and
+preserves Python exception chaining. Eleven new regressions exercise real saved
+sessions and owned children, reconciliation, normal outcomes and multiple failures.
+This correction does not supply the missing model reports or rescue either trial.
+
+Validation: 82 focused tests passed; the registered full suites passed 3,037 tests
+with three skips. Targeted Ruff lint/format checks and configured Pyright passed.
+A separate fresh one-call Go static review of six frozen public files found no
+concrete change-induced defects; supplied validation was labelled as host evidence,
+not reviewer execution. It used 22,690 input/13,432 output tokens in 143.82 seconds,
+with no tools or edits. This explicitly narrow review omitted auxiliary/scrutiny
+stages and does not establish ordinary tool-enabled workflow acceptance. Evidence:
+`artifacts/cli-cleanup-review-20261025l/` and
+`artifacts/unattended-20261025-2000/full-cleanup-attended.log`.
+
+Original evidence: `artifacts/cli-cleanup-continuity-20261025j/` and
+`artifacts/cli-cleanup-continuity-20261025k/`; independent candidate check:
+`artifacts/cli-cleanup-postflight-20261025k/`. Broader M4 continuity and the
+remaining foundation milestones still require their own acceptance evidence.
+
 ## October 25 current checkpoint: bounded Go coding/review completed
 
 Fresh trial `artifacts/cli-clean-workflow-20261025i/` completed the small
