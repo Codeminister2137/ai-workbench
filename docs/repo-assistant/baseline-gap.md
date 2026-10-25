@@ -1,6 +1,54 @@
 # Distance to established baseline CLI usability
 
-## Immediate paid-agent baseline — updated 2026-10-24
+## October 25 current checkpoint
+
+Owner-selected restricted non-sensitive input (A) is implemented separately from
+general coding; B remains planned. Its first exact-input free request passed
+admission but received an upstream shared-pool 429. This does not block the
+independent Go baseline or establish OpenRouter quality.
+
+Fresh two-phase trial h completed coding but stopped before frozen review. It
+used 18 Go primary and two local support calls within its original phase cap;
+the scrutiny repair changed a companion test, reran nine tests, then exhausted
+its primary-call allowance before a new final report. The original h outcome
+remains failed/incomplete. Independent checks passed nine tests and all 3,616
+oracle cases; those checks do not supply the missing model report or frozen review.
+
+The local scrutiny referred to an already-corrected test expectation. A source-
+level reconstruction of its tool-evidence subsection retained old snapshots but
+omitted the latest passing test output, diff and status when the evidence budget
+filled. The full transmitted prompt was not logged, so this is a demonstrated
+selection defect, not proof of why the model made that finding. Current fixes
+prioritize recent receipts in execution order and retain terminal output summaries.
+
+A second demonstrated defect let earlier validation/reporting appear current
+after an incomplete repair changed files. The prospective correction retains old
+checks as history, marks current validation not run, and labels the old report a
+draft pending current validation/review. Advisory verdict policy is unchanged for
+unchanged input. No historical result is regraded. Evidence and the exact local
+failure origin are under `artifacts/unattended-20261025-0745/`; h remains at
+`artifacts/cli-clean-workflow-20261025h/` with verified owned cleanup.
+
+The early-primary-error recording path was also corrected: failed CLI execution
+now closes persisted run/stage state rather than leaving it running (6b39bdd).
+
+A separate fresh local-only review probe supplied the current synthetic snapshots,
+recent receipts and a host-authored draft. Its one GPT-OSS20b response still
+proposed an eight-test summary despite the supplied current nine-test evidence;
+it also attributed a no-defects assertion absent from the draft. It returned
+`needs_revision`, score3, without format issues or tool proposals. This does not
+establish local review reliability or the cause of the stale finding in h. Input
+hashes and owned cleanup passed; no paid inference or historical regrade occurred.
+Evidence: `artifacts/unattended-20261025-0745/local-review-*`.
+
+Adjacent failure injection demonstrated that a post-repair scrutiny `pass` could
+clear `completed_with_validation_errors` even when real validation had failed or
+timed out. The correction preserves that status; only passed deterministic
+validation may clear it. Advisory review policy and CLI exit-code policy are
+unchanged. Both real-command cases now retain the validation blocker in the run,
+handoff and final execution status.
+
+## Immediate paid-agent baseline — October 24 evidence
 
 Owner clarification: the immediate baseline is ordinary development with paid
 agents through this CLI, with fallback. Local/free-model quality experiments,
@@ -77,8 +125,11 @@ advice proposed tools in a tool-free pass". The primary report named
 distinguished them from the candidate changes, and made no
 predate/unchanged/unrelated claim. Both 10-test runs and the 3616-case oracle
 passed, and the independent live audit accepts auxiliary alignment and
-attribution for this bounded question. Clean paid-agent workflow acceptance,
-live fallback and scrutiny-fed repair remain unestablished.
+attribution for this bounded question. Clean paid-agent workflow acceptance and
+scrutiny-fed repair remain unestablished. Subsequent bounded Slice B trials
+established live fallback into Requesty free, including a declared synthetic
+intermediate Kiro limit; see the Slice B evidence below. Continuation into Go
+or an installed CLI client remains unexercised by those trials.
 
 Owner standing authorization covers comparable bounded Go runs within existing
 limits; fresh named preparation and billing/privacy admission still apply.
@@ -380,13 +431,16 @@ Read-only allowance inventory (no inference) at
 | opencode-go/go-kimi-k2.7-code | allowances | no official endpoint at the time (superseded 2026-10-24, see below) | executor-compatible |
 | github/copilot-cli-auto | allowances | chat 200/200 used (0%), completions 2000/2000 | client not configured |
 | google/antigravity-* | allowances | not observable | not installed; headless MCP ineligible |
-| OpenRouter free | not in catalog | 50/50 free daily requests, 16 tool-capable free models | no route |
+| OpenRouter free | free_only (route added later on 2026-10-24) | 50/50 free daily requests, 16 tool-capable free models at the inventory observation | declared; ordinary CLI use refused by privacy-entitlement guard |
 | requesty free / AI Studio / Ollama | other tiers | - | admitted as cheaper fallback tiers from 2026-10-24 |
 
 Two ordering hazards are recorded rather than inferred away. `kiro_usage`
 deliberately reports plan coverage, never a remaining balance, so its 100%
-value must not be read as capacity. OpenRouter free has real account allowance
-but no catalog route, so it cannot participate until one is added.
+value must not be read as capacity. OpenRouter free subsequently gained a catalog
+route on 2026-10-24, but remains outside the local priority order: ordinary CLI
+requests lack the complete-input public/synthetic attestation required on this
+Free-plan account (ADR-063). The separate attested synthetic probe passed the
+guards and received an upstream shared-pool 429; it did not establish model quality.
 
 Live fallback trial `artifacts/fallback-acceptance-20261024-123206/`: the switch
 was recorded (`simulated-codex -> kiro/auto (usage_limit)`, attempts

@@ -15,6 +15,19 @@ See [workspace setup](../../CONTRIBUTING.md) before running examples. End-to-end
 coding/model-quality acceptance remains incomplete; offline contracts and tests
 are separate from live quality evidence.
 
+## Restricted reviewed tasks
+
+`python -m uv run --no-sync python -m ai_agent.reviewed_task task.txt` prepares a
+bounded UTF-8 task without
+inference. Review the entire file locally, then supply `--execute`,
+`--confirm-non-sensitive` and `--approved-sha256 <digest>` to send exactly that
+input to an explicitly named OpenRouter free model. Review approves possible
+retention/training and excludes keys and genuinely private data. No repository
+context, history, tools, shell or fallback is attached. The command uses the
+existing environment credential path; it does not load `.env`. Model output is
+labelled unverified. See [the input-boundary plan](../../docs/repo-assistant/restricted-input-plan.md)
+for bounds, limitations and planned general-repository protection.
+
 ## Optional completion evidence for task controllers
 
 `AgentLoop(..., completion_requirements=(CompletionRequirement("git_diff", check),))`

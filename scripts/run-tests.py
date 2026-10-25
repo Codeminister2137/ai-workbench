@@ -19,6 +19,7 @@ GROUPS = {
         "tests/test_openai_compatible_adapter.py",
         "tests/test_requesty_free_models.py",
         "tests/test_openrouter_free_models.py",
+        "tests/test_reviewed_input.py",
         "tests/test_openrouter_usage.py",
         "tests/test_openrouter_endpoints.py",
         "tests/test_swe_bench_scores.py",

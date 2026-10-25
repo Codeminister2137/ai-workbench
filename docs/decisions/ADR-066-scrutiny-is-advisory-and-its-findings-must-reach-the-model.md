@@ -118,3 +118,19 @@ residual caveats.
   quality.
 - Nothing here changes what counts as independent verification. Advisory
   means "does not block by itself", not "unreviewed work is accepted".
+
+## Implementation corrections — 2026-10-25
+
+A failed scrutiny repair may already have changed files. Earlier validation and
+review then describe an older state, so the retained report is a draft and has no
+accepted outcome preview until current checks/review exist. Earlier validation
+receipts remain preserved as history; current validation is marked not run. A
+failed attempt with no observed changes retains the existing advisory policy.
+This qualifies missing current evidence, not the reviewer's non-pass judgement.
+
+Recent tool observations now have budget priority while selected receipts remain
+in execution order. Successful edits are visible and long excerpts retain both
+head and terminal summary, explicitly marking omitted middle text. This fixes a
+demonstrated omission of later passing tests/diffs/status without increasing the
+evidence budget or claiming a reviewer will interpret it correctly. No new repair
+allowance, automatic model/billing change or retrospective trial promotion.

@@ -3,7 +3,8 @@
 **Checked:** 2026-10-13; Gemini individual-access retirement verified 2026-10-14.
 Published limits and account observations can expire.
 
-**Latest scoped update:** 2026-10-24, OpenRouter free inventory and the declared
+**Latest scoped update:** 2026-10-25, OpenRouter credits/privacy and local CLI
+payload tracing; 2026-10-24, OpenRouter free inventory and the declared
 free route; capacity comparison below; OpenRouter limits/privacy, Codex
 data-policy scope and the OpenRouter request-contract refresh were also checked
 2026-10-21 and 2026-10-22.
@@ -26,6 +27,87 @@ A date alone does not make a fact currently reliable: prices, model availability
 quota and entitlement need fresh admission evidence before execution. Unknown or
 contradictory evidence remains explicit. Account balances, credentials, prompts
 and private transcripts do not belong in this public reference.
+
+### OpenRouter — refreshed 2026-10-25: credits, privacy and CLI payload
+
+Owner requested investigation and accepts ordinary non-sensitive repository data
+for now, conditional on excluding genuinely private material and API keys. This
+does not authorize a purchase or establish that the current tool boundary meets
+that condition. No authenticated settings change or inference was performed.
+
+- [Pricing](https://openrouter.ai/pricing) still states 50 free requests/day,
+  increasing to 1,000 after at least $10 of purchased credits, with 20/minute.
+  Higher quota does not reserve upstream capacity; the prior shared-pool 429 is
+  not repaired by a quota increase. The Standard credit fee is 5.5%; the official
+  [fee announcement](https://openrouter.ai/blog/simplifying-our-platform-fee/)
+  additionally gives a $0.80 minimum for non-crypto payments. A $10 credit top-up
+  therefore suggests about $10.80 before applicable taxes; verify actual checkout
+  and credited amount rather than treating this estimate as a purchase receipt.
+- [Terms, section 4](https://openrouter.ai/terms) specify a $5 minimum purchase,
+  possible unused-credit expiration after 365 days, unused-credit refunds only
+  within 24 hours, non-refundable platform fees and no crypto refunds. Auto
+  recharge is optional. No subscription or auto recharge is needed for this
+  proposed manual top-up. Keep paid inference and paid fallback disabled.
+- The Free/Standard data-policy-routing table versus all-plan ZDR FAQ conflict
+  remains on the same pricing page. The [key schema](https://openrouter.ai/docs/api_reference/limits)
+  defines `is_free_tier` as whether credits were purchased, not verified privacy
+  entitlement. Buying credits changes that proxy, not downstream model terms.
+- [Data collection](https://openrouter.ai/docs/guides/privacy/data-collection)
+  distinguishes optional private input/output logging from optional product-use
+  permission; both are documented off by default. Request metadata is retained,
+  and sampled prompts undergo anonymous categorization using a ZDR model.
+  Actual account opt-ins were not inspected. [Terms, section 6](https://openrouter.ai/terms)
+  also grant service-operation rights and broader rights when logging is enabled;
+  do not equate the default documentation with an account-setting observation.
+- [Provider logging](https://openrouter.ai/docs/guides/privacy/provider-logging)
+  separates OpenRouter's own handling from downstream provider training and
+  retention. [ZDR guidance](https://openrouter.ai/docs/guides/features/zdr)
+  explicitly says enforcing Google ZDR excludes AI Studio endpoints. Fresh public
+  [route metadata](https://openrouter.ai/api/v1/models/google/gemma-4-31b-it:free/endpoints)
+  still lists one zero-price endpoint, Google AI Studio, with 262,144 context.
+  Inference: requiring ZDR would currently leave this particular route without
+  an eligible endpoint; this is metadata reasoning, not a live inference result.
+- Google's [API terms](https://ai.google.dev/gemini-api/terms) permit product/model
+  improvement and human review for unpaid services, with a separate EEA/UK/Swiss
+  exception applying paid data-use terms. Paid terms still allow limited abuse
+  retention. These general terms alone do not establish which upstream account,
+  region or special OpenRouter agreement covers this endpoint. Do not claim that
+  OpenRouter credit purchase makes Google's upstream service paid, or that the
+  owner's location alone resolves the gateway's data treatment.
+- Local payload tracing found that `repo_context.load_prompt_context` includes
+  root/nested AGENTS instructions, CURRENT_CONTEXT and selected files;
+  coding-chat adds saved visible history/handoff/skills as applicable. Native
+  tools append file reads and command outputs to later requests. Workspace
+  location and action-category authorization do not block in-workspace `.env`
+  reads or sanitize sensitive output. Shell execution inherits environment
+  variables. `FallbackHistoryClient` may add prior visible history but removes
+  provider-private continuation. Provider authentication belongs in the HTTP
+  Authorization header, not model messages; there is no general content-secret
+  filter at these composition boundaries.
+- A dummy-only offline capture at
+  `artifacts/openrouter-privacy-review-20261025/offline-observations.json`
+  confirms synthetic `.env` content and a synthetic environment value printed
+  by an authorized shell tool enter the next composed request. No provider was
+  called, no real secret was read, and the temporary workspace was removed.
+  Current OpenRouter entitlement refusal was neither exercised nor bypassed.
+  This demonstrates a potential path, not evidence of historical exfiltration.
+
+Subsequent owner-approved A implementation (ADR-069): one digest-bound reviewed
+non-sensitive USER input without tools/context/history, separate from ADR-063's
+public attestation. The first bounded synthetic live trial on 2026-10-25 passed
+admission and verified exactly 253 task bytes on the wire, then returned HTTP 429
+with `limit_source=upstream_provider_shared_pool` and the upstream rate-limit
+signature. Its one inference POST and two metadata GETs are preserved under
+`artifacts/unattended-20261025-0745/restricted-live-result.json`; no retry or paid
+fallback occurred. Offline gates passed. Upstream capacity and model quality
+remain separate from input-boundary acceptance.
+
+Recommendation: do not buy credits as a substitute for the data boundary. First
+prepare task-scoped, reviewed, credential-free inputs/environment and control
+subsequent tool output/history. An isolated copy alone is not an OS sandbox when
+arbitrary shell access remains. Broad tool access plus instructions or secret
+pattern matching alone cannot guarantee exclusion. Implementing a changed
+OpenRouter admission contract requires an explicit design under ADR-063.
 
 ### OpenRouter — checked 2026-10-21
 

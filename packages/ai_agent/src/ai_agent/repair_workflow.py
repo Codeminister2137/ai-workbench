@@ -239,6 +239,37 @@ def run_scrutiny_repair_loop(
         if failure_reason:
             attempt["failure_reason"] = failure_reason
         if attempt_status not in {"completed", "completed_with_tool_errors"}:
+            paths = changed_paths(before, workspace_fingerprints(repo_root))
+            attempt["changed_paths"] = paths
+            attempt["progress"] = "evidence_changed" if paths else "no_progress"
+            if paths:
+                # An interrupted repair may already have changed files. Keep
+                # earlier receipts as history, never as validation of that state.
+                previous_validation = (
+                    {
+                        **dict(validation_stage.details or {}),
+                        "stage_status": validation_stage.status,
+                        "started_at_utc": validation_stage.started_at_utc,
+                        "completed_at_utc": validation_stage.completed_at_utc,
+                    }
+                    if validation_stage is not None
+                    else {"validation_status": "not_recorded"}
+                )
+                validation_stage = tracker.complete_stage(
+                    "validation",
+                    status="skipped",
+                    details={
+                        "validation_status": "not_run",
+                        "results": [],
+                        "skip_reason": "Workspace changed during an incomplete scrutiny repair",
+                        "previous_validation": previous_validation,
+                    },
+                )
+                tracker.scrutiny_status = "not_run"
+                tracker.scrutiny_details = {
+                    **(tracker.scrutiny_details or {}),
+                    "input_changed_since_review": True,
+                }
             attempts.append(attempt)
             stop_reason = "repair_execution_failed"
             repair_status = "failed"
@@ -289,7 +320,8 @@ def run_scrutiny_repair_loop(
             f"review={attempt['review_verdict']} progress={attempt['progress']}"
         )
         if details.get("verdict") == "pass":
-            execution_status = execution_status_without_validation_error(execution_status)
+            # A review judgement cannot override failed or timed-out validation.
+            # Only the passed-validation branch below may clear that status.
             stop_reason = "scrutiny_passed"
             break
         if not reviewed_completed:

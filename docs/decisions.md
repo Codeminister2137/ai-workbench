@@ -757,3 +757,17 @@ declares an OpenRouter free route; that route is declared but not yet ordered
 because the no-credits account is refused by the entitlement guard for ordinary
 CLI requests. See
 [ADR-068](decisions/ADR-068-free-routes-are-the-default-preference.md).
+
+## ADR-069 — Restricted reviewed non-sensitive input
+
+**Status:** Accepted direction, 2026-10-25.
+
+Owner selected A: restricted task access with reviewed non-sensitive inputs and
+controlled tools/credentials, while keeping genuinely private data and API keys
+out. The narrow implementation uses one exact digest-bound input without tools,
+ambient repository context, history or continuation. ADR-063 public/synthetic
+attestation is unchanged. B, protection for general repository access, is planned
+rather than enabled. No purchase or broad privacy bypass is authorized.
+
+See [ADR-069](decisions/ADR-069-restricted-reviewed-non-sensitive-input.md) and
+[the A/B plan](repo-assistant/restricted-input-plan.md).

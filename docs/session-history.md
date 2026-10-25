@@ -1945,3 +1945,17 @@ a live walk that continues into `opencode-go` or a CLI client is still unexercis
 Kiro reports its exhausted plan as a generic process error, not a usage limit, which
 is why the second hop's failure had to be declared synthetic. Fallback still switches
 only on usage-limit/overload signals.
+
+## 2026-10-25 — Public source integration and README reconciliation
+
+Release preparation integrates restricted reviewed-input execution and corrections
+to CLI failure records, stale review evidence and validation status after repair.
+The README combines the remote master introduction with implementation-checked
+capabilities and explicit acceptance limits. Offline software validation does not
+establish general model quality or complete coding/research acceptance.
+
+Immediate handoffs and private window plans stay local. Two public reference notes
+now have documentation paths: [reviewer output formatting](research/reviewer-output-format-20261023.md)
+and the [route-family matcher proposal](research/route-family-matcher-proposal-20261023.md).
+Their dated findings and proposal status are preserved. Existing published history
+is retained; removing private paths from the current tip does not erase history.

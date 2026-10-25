@@ -483,6 +483,17 @@ class OrchestratedRunTracker:
                 next_action = (
                     "inspect scrutiny details and review remaining claims before completion"
                 )
+        if (
+            self.scrutiny_details
+            and self.scrutiny_details.get("input_changed_since_review") is True
+        ):
+            blockers = (blockers + "; " if blockers else "") + (
+                "workspace changed during an incomplete repair"
+            )
+            next_action = (
+                "inspect current changes, rerun deterministic validation and scrutiny, "
+                "and obtain a current completion report"
+            )
         return self.complete_stage(
             "final_handoff",
             status=handoff_status,

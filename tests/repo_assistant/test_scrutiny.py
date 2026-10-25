@@ -526,5 +526,75 @@ def test_scrutiny_tool_receipts_are_bounded_and_not_claimed_when_missing():
     )
     assert len(evidence) <= 12_000
     assert "receipt-0\n" not in evidence
-    assert "receipt-8\n" in evidence
+    assert "receipt-19\n" in evidence
     assert "truncated" in evidence and "omitted" in evidence
+
+
+def test_scrutiny_evidence_keeps_latest_validation_and_diffs_when_older_reads_fill_budget():
+    from argparse import Namespace
+
+    from ai_agent.contracts import ToolResult
+    from ai_agent.scrutiny_workflow import _observed_tool_evidence
+
+    evidence = _observed_tool_evidence(
+        Namespace(
+            _scrutiny_tool_results=(
+                *(ToolResult("read_file", f"old-snapshot-{i}\n" + "x" * 4000) for i in range(12)),
+                ToolResult(
+                    "edit_file", "corrected the expectation", metadata={"path": "test_source.py"}
+                ),
+                ToolResult(
+                    "run_command", "LATEST VALIDATION: Ran 8 tests\nOK", metadata={"exit_code": 0}
+                ),
+                ToolResult("git_diff", "LATEST DIFF: corrected expectation"),
+                ToolResult("git_status", "LATEST STATUS"),
+            )
+        )
+    )
+    assert len(evidence) <= 12_000
+    assert (
+        "LATEST VALIDATION" in evidence
+        and "LATEST DIFF" in evidence
+        and "LATEST STATUS" in evidence
+    )
+    assert "corrected the expectation" in evidence
+    assert (
+        evidence.index("LATEST VALIDATION")
+        < evidence.index("LATEST DIFF")
+        < evidence.index("LATEST STATUS")
+    )
+
+
+def test_long_tool_output_retains_terminal_result_with_explicit_middle_omission():
+    from argparse import Namespace
+
+    from ai_agent.contracts import ToolResult
+    from ai_agent.scrutiny_workflow import _observed_tool_evidence
+
+    evidence = _observed_tool_evidence(
+        Namespace(
+            _scrutiny_tool_results=(
+                ToolResult("run_command", "COMMAND START\n" + "x" * 5000 + "\nRan 9 tests\nOK"),
+            )
+        )
+    )
+    assert "COMMAND START" in evidence and "Ran 9 tests\nOK" in evidence
+    assert "middle omitted" in evidence and len(evidence) <= 12_000
+
+
+@pytest.mark.parametrize("verdict", ["pass", "needs_revision"])
+def test_old_review_cannot_certify_changed_input_after_incomplete_repair(verdict):
+    from ai_provider.closeout import format_cli_closeout
+
+    output = format_cli_closeout(
+        response_text="Earlier report claims tests passed.",
+        status="ready",
+        execution_status="completed_with_tool_errors",
+        scrutiny_details={"verdict": verdict, "input_changed_since_review": True},
+        scrutiny_policy="advisory",
+        validation_details={"validation_status": "not_run", "results": []},
+    )
+    assert "completion=not_established" in output
+    assert "workspace changed during an incomplete repair" in output
+    assert "Agent-reported outcome:" not in output
+    assert "### Agent report — draft" in output

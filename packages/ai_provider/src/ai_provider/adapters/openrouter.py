@@ -26,6 +26,7 @@ from ai_provider.contracts import (
 )
 from ai_provider.errors import ProviderError, ProviderErrorCategory
 from ai_provider.http_transport import urlopen
+from ai_provider.reviewed_input import has_reviewed_non_sensitive_input
 from ai_provider.turn_usage import observe_usage
 
 BASE_URL = "https://openrouter.ai/api/v1"
@@ -127,17 +128,20 @@ class OpenRouterFreeChatClient(OpenAICompatibleChatClient):
         return raw
 
     def _verify_request_model(self, request: AIRequest) -> None:
-        # Low-risk may still be private. Only a caller's explicit full-input
-        # attestation permits uncertain training/retention of public material.
+        # Low-risk alone is insufficient. ADR-063's full-public attestation and
+        # ADR-069's exact reviewed tool-free input are separate permissions.
         public_or_synthetic = (
             request.privacy_class is PrivacyClass.PUBLIC_OR_LOW_RISK
             and request.metadata.get("public_or_synthetic") is True
         )
         self._verify_free_model(
-            request.model or self.config.model, public_or_synthetic=public_or_synthetic
+            request.model or self.config.model,
+            reviewed_for_retention=(
+                public_or_synthetic or has_reviewed_non_sensitive_input(request)
+            ),
         )
 
-    def _verify_free_model(self, model: str, *, public_or_synthetic: bool = False) -> None:
+    def _verify_free_model(self, model: str, *, reviewed_for_retention: bool = False) -> None:
         # A named variant fixes model identity; gateway routers/auto aliases do not.
         if not model.endswith(":free") or model.startswith("openrouter/"):
             raise self._refusal("OpenRouter requires an exact named :free model.")
@@ -152,13 +156,13 @@ class OpenRouterFreeChatClient(OpenAICompatibleChatClient):
         parameters = matches[0].get("supported_parameters")
         if not isinstance(parameters, list) or "tools" not in parameters:
             raise self._refusal("OpenRouter tool support is unverified; inference was not sent.")
-        self._verify_free_quota(public_or_synthetic=public_or_synthetic)
+        self._verify_free_quota(reviewed_for_retention=reviewed_for_retention)
 
-    def _verify_free_quota(self, *, public_or_synthetic: bool = False) -> None:
+    def _verify_free_quota(self, *, reviewed_for_retention: bool = False) -> None:
         raw = self._metadata("key").get("data")
         # Pricing excludes data-policy routing from Free, while routing docs are
         # unqualified. Never assume the requested privacy filter is enforced there.
-        if not public_or_synthetic and (
+        if not reviewed_for_retention and (
             not isinstance(raw, dict) or raw.get("is_free_tier") is not False
         ):
             raise self._refusal(

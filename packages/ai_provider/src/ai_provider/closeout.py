@@ -204,11 +204,22 @@ def format_cli_closeout(
     #   review evidence rather than a judgement, so it still prevents an
     #   accepted completion under either policy.
     scrutiny_verdict = scrutiny_details.get("verdict") if scrutiny_details is not None else None
+    review_input_changed = (
+        scrutiny_details is not None and scrutiny_details.get("input_changed_since_review") is True
+    )
     review_never_ran = scrutiny_details is not None and scrutiny_verdict is None
     non_pass_verdict = scrutiny_details is not None and scrutiny_verdict not in (None, "pass")
-    unresolved_review = review_never_ran or (non_pass_verdict and scrutiny_policy == "required")
-    scrutiny_did_not_pass = scrutiny_verdict != "pass" if scrutiny_details is not None else False
+    unresolved_review = (
+        review_input_changed
+        or review_never_ran
+        or (non_pass_verdict and scrutiny_policy == "required")
+    )
+    scrutiny_did_not_pass = review_input_changed or (
+        scrutiny_verdict != "pass" if scrutiny_details is not None else False
+    )
     notes.append(f"scrutiny_policy={scrutiny_policy}")
+    if review_input_changed:
+        notes.append("repair=incomplete_with_workspace_changes")
     review_lines: list[str] = []
     if scrutiny_did_not_pass:
         assert scrutiny_details is not None
@@ -221,6 +232,12 @@ def format_cli_closeout(
                 "the task as complete.",
                 "Review findings are advisory; they are not independent verification.",
             ]
+            if review_input_changed:
+                preamble.insert(
+                    0,
+                    "The workspace changed during an incomplete repair. Earlier validation "
+                    "and review predate those changes; the retained report may be stale.",
+                )
         else:
             heading = "### Scrutiny findings (advisory)"
             preamble = [

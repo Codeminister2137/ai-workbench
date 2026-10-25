@@ -122,8 +122,9 @@ class ResponseScrutinyReport:
 
     ``format_issues`` records anything the parser had to work around — missing
     headings, an unreadable verdict, a malformed score. An empty tuple means
-    the reviewer produced exactly the requested shape. Callers that treat a
-    verdict as evidence must check this is empty first.
+    the reviewer produced exactly the requested shape. Callers retain readable
+    verdicts according to review policy while displaying any format limitations;
+    correct shape alone does not establish factual review quality.
     """
 
     verdict: str

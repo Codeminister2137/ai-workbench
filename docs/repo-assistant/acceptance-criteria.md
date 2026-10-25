@@ -73,6 +73,18 @@ read-only. If it finds a defect requiring edits, finish that audit and use a
 separately declared repair stage within the original allowance, then validate and
 review the changed state again. Old frozen-review receipts cannot certify edits.
 
+An incomplete scrutiny repair can already have changed workspace files. The CLI
+retains earlier validation as historical evidence, marks current validation not
+run, and qualifies the retained report as a draft until the new state has current
+validation/review. A failed attempt with no observed file changes retains the
+existing advisory-review behavior. Review evidence budgets prioritize recent
+observations and preserve their execution order; long output excerpts retain both
+the beginning and terminal summary with an explicit middle-omission label.
+
+A post-repair scrutiny pass cannot clear a failed or timed-out deterministic
+validation status. Review judgement and executed validation remain distinct;
+only a subsequent passed validation stage clears the validation-error status.
+
 ## Requirements versus fixture conveniences
 
 Use evidence needed for the task, not universal tool sequences, test counts or
