@@ -7,11 +7,34 @@ processes. Live suites retain their existing environment opt-ins.
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+# Git exports these into hooks. Fixture commands must discover their own repos.
+# https://git-scm.com/docs/githooks (foreign-repository environment boundary)
+_GIT_REPOSITORY_ENV = frozenset(
+    {
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+        "GIT_CONFIG",
+        "GIT_CONFIG_PARAMETERS",
+        "GIT_CONFIG_COUNT",
+        "GIT_OBJECT_DIRECTORY",
+        "GIT_DIR",
+        "GIT_WORK_TREE",
+        "GIT_IMPLICIT_WORK_TREE",
+        "GIT_GRAFT_FILE",
+        "GIT_INDEX_FILE",
+        "GIT_NO_REPLACE_OBJECTS",
+        "GIT_REPLACE_REF_BASE",
+        "GIT_PREFIX",
+        "GIT_INTERNAL_SUPER_PREFIX",
+        "GIT_SHALLOW_FILE",
+        "GIT_COMMON_DIR",
+    }
+)
 GROUPS = {
     "provider": (
         "tests/test_ai_provider_*.py",
@@ -163,6 +186,16 @@ def test_commands(names: list[str], extra: list[str], *, root: Path = ROOT) -> l
     return commands
 
 
+def test_environment() -> dict[str, str]:
+    """Isolate fixture repositories while preserving ordinary test/tool settings."""
+    return {
+        name: value
+        for name, value in os.environ.items()
+        if name.upper() not in _GIT_REPOSITORY_ENV
+        and not name.upper().startswith(("GIT_CONFIG_KEY_", "GIT_CONFIG_VALUE_"))
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     arguments = list(sys.argv[1:] if argv is None else argv)
     separator = arguments.index("--") if "--" in arguments else len(arguments)
@@ -179,7 +212,7 @@ def main(argv: list[str] | None = None) -> int:
         status = 0
         for command in test_commands(args.groups or ["full"], extra):
             print(f"Running {len(command) - 3 - len(extra)} test modules", flush=True)
-            result = subprocess.run(command, cwd=ROOT, check=False)
+            result = subprocess.run(command, cwd=ROOT, env=test_environment(), check=False)
             if result.returncode and not status:
                 status = result.returncode
         return status

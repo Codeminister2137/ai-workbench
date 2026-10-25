@@ -83,6 +83,14 @@ The pre-commit stage still runs fast Ruff checks. Pre-push runs Pyright and the
 full offline workspace runner. Council runs in its own pytest process because
 it has a legacy top-level `tests` package. The previous root `pytest` command
 omitted these 21 Council cases; that command's discovery remains unchanged.
+
+The runner removes Git's repository-local hook variables from pytest child
+environments, including repository/index paths and scoped configuration entries.
+Otherwise fixture Git commands can operate on the publishing repository instead
+of their temporary directories. Ordinary tool settings and noninteractive Git
+controls are preserved. A local-only push-hook regression checks that fixture
+commits and bare-repository initialization leave the sender's HEAD, index and
+configuration unchanged. This isolation does not replace tool permissions.
 The Council private-config assertion was stale and now matches the documented
 ignored `council.json` / committed `council.example.json` policy.
 
