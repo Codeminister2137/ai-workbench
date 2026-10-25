@@ -29,6 +29,13 @@ Research and pending matcher choices are preserved in the dated artifact briefs.
 
 ## Current paid-route checkpoint: 2026-10-25
 
+Fresh M4 trial m completed correct coding and a read-only frozen inspection across
+three cold processes, but required final scrutiny misattributed prior coding edits
+to the review phase. Its draft also made an unsupported bookkeeping-state claim.
+It remains incomplete despite passing independent effects/tests/oracle checks.
+Production scrutiny evidence now labels invocation scope and runtime exclusions;
+this prospective framing correction does not establish live reviewer reliability.
+
 Subsequent saved-session cleanup trials j/k are incomplete: both stopped at
 private fixture guards before final coding reports and frozen review. Retain their
 original results. The concrete production teardown defect was fixed separately

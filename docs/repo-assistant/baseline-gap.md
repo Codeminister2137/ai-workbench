@@ -1,5 +1,39 @@
 # Distance to established baseline CLI usability
 
+## October 25 later M4 question: m remains incomplete
+
+Fresh trial `artifacts/cli-continuity-20261025m/` exercised three cold processes
+sharing one saved conversation: read-only diagnosis, clarified coding, then frozen
+tool-enabled review. Its coding effects and report passed independent assessment:
+six protected tests unchanged, five model-authored companions, 11 passing tests
+and 1,593 independent oracle cases. Seven frozen inputs remained unchanged during
+review, which used only read/Git/test tools and ran another 11 passing tests.
+
+Required final local scrutiny nevertheless returned `needs_revision`, attributing
+the earlier coding edits to the frozen review and recommending their removal.
+The fixture stopped at its required-verdict gate. The saved review draft also
+asserted that runtime bookkeeping files were untouched, which its inspection did
+not establish; host conversation/orchestration rows changed. Trial m is consumed
+and **incomplete**, not rescued by the independent checks. It used 14 Go and four
+local support calls, 20 tool proposals and 480.20 seconds including verified owned
+cleanup. The original 32-call/40-tool/7,200-second limits were not extended.
+Independent assessment is under `artifacts/cli-continuity-postflight-20261025m/`.
+
+Investigation found a production evidence-framing gap: an empty changed-path list
+did not explicitly identify the invocation-start baseline, while Git-relative
+differences could include prior edits. The prospective correction labels that
+baseline, distinguishes an unavailable snapshot from no observed fingerprint
+differences, identifies current-attempt receipts and states runtime exclusions.
+Scrutiny instructions distinguish reviewing existing edits from making new ones.
+The transmitted m prompt was not logged, so the model's exact inference cause
+remains unknown. These labels do not establish reviewer reliability or change
+verdict, advisory/required, repair or acceptance policy. No original trial is regraded.
+
+Validation of the framing correction: 63 focused tests passed, including all three
+new baseline cases; the final scrutiny module rerun passed 40 tests. Full registered
+suites passed 3,040 tests with three skips; configured Pyright reported no errors.
+These are deterministic software checks, not a successful live semantic re-review.
+
 ## October 25 follow-up: cleanup correction, continuity acceptance incomplete
 
 Fresh saved-conversation trials j and k remain consumed and incomplete. Their

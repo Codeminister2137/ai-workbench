@@ -582,6 +582,81 @@ def test_long_tool_output_retains_terminal_result_with_explicit_middle_omission(
     assert "middle omitted" in evidence and len(evidence) <= 12_000
 
 
+@pytest.mark.parametrize("baseline", ["unchanged", "changed", "unavailable"])
+def test_scrutiny_distinguishes_existing_git_diff_from_current_invocation_changes(
+    tmp_path, baseline
+):
+    import time
+    from argparse import Namespace
+    from unittest.mock import Mock
+
+    from ai_agent.contracts import ToolResult
+    from ai_agent.scrutiny_workflow import run_orchestrated_scrutiny
+    from ai_provider.repair_state import workspace_fingerprints
+
+    from .support import _implementation_scrutiny_result
+
+    source = tmp_path / "already_edited.py"
+    source.write_text("earlier coding result\n")
+    initial = None if baseline == "unavailable" else workspace_fingerprints(tmp_path)
+    if baseline == "changed":
+        source.write_text("new edit during this invocation\n")
+    args = Namespace(
+        prompt="Review the existing uncommitted change read-only.",
+        timeout_seconds=5,
+        start_ollama=False,
+        ollama_command="ollama",
+        ollama_startup_timeout_seconds=5,
+        ollama_log_file=None,
+        ollama_profile=None,
+        _scrutiny_tool_results=(
+            ToolResult("git_diff", "Existing Git diff: earlier coding result"),
+            ToolResult("run_command", "11 passed", metadata={"exit_code": 0}),
+        ),
+    )
+    tracker = Mock(
+        initial_workspace=initial,
+        deadline=time.perf_counter() + 30,
+        start_stage=lambda *a, **kw: None,
+        complete_stage=lambda *a, **kw: None,
+    )
+    requests = []
+
+    def review(prompt, *a, **kwargs):
+        requests.append((prompt, kwargs["system_prompt"]))
+        return _implementation_scrutiny_result()
+
+    run_orchestrated_scrutiny(
+        args=args,
+        tracker=tracker,
+        repo_root=tmp_path,
+        profile=_EXAMPLE.coding_task_profile(model_override="qwen2.5-coder:14b"),
+        catalog=(),
+        validation_stage=None,
+        assistant_response_text="Inspected the existing change; no write tools used.",
+        execution_status="completed",
+        deadline=None,
+        coding_runner=Mock(side_effect=review),
+    )
+    prompt, system = requests[0]
+    assert "relative to this invocation's start" in prompt
+    assert "Git diff/status do not establish when or by whom a change was made" in prompt
+    assert "do not establish that runtime bookkeeping was untouched" in prompt
+    assert "Existing Git diff: earlier coding result" in prompt and "11 passed" in prompt
+    assert "current execution attempt" in prompt
+    assert "read-only request can inspect earlier uncommitted changes" in system
+    if baseline == "unchanged":
+        assert "No fingerprint differences observed" in prompt
+    elif baseline == "changed":
+        assert "Observed changed/deleted paths:\nalready_edited.py" in prompt
+        assert "No fingerprint differences observed" not in prompt
+    else:
+        assert (
+            "Start snapshot unavailable; current-invocation change attribution is unknown" in prompt
+        )
+        assert "No fingerprint differences observed" not in prompt
+
+
 @pytest.mark.parametrize("verdict", ["pass", "needs_revision"])
 def test_old_review_cannot_certify_changed_input_after_incomplete_repair(verdict):
     from ai_provider.closeout import format_cli_closeout

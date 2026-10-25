@@ -1,5 +1,27 @@
 # Session History
 
+## 2026-10-25 continuity m and scrutiny evidence scope
+
+Fresh three-process trial m preserved the saved conversation through diagnosis,
+clarified coding and frozen inspection. Correct model-authored source and five
+companions passed 11 tests and 1,593 independent oracle cases; protected and frozen
+inputs were preserved. Required local scrutiny falsely attributed coding-phase
+changes to frozen review, and the saved draft overclaimed runtime bookkeeping
+preservation. The workflow stopped incomplete. Its 14 Go/four local calls,
+20 tool proposals and 480.20 seconds stayed within the original bounds; owned
+worker/runtime cleanup was verified. Original evidence remains consumed.
+
+Investigation exposed ambiguous production evidence scope. The prospective fix
+labels invocation-start fingerprints separately from Git state, marks missing
+baselines unknown, identifies current-attempt receipts and states runtime
+bookkeeping exclusions. Three regression cases cover actual supplied review
+prompts for unchanged, changed and unavailable baselines. No raw m prompt was
+logged; the exact inference cause remains unknown. No verdict policy change or
+retroactive acceptance is implied.
+
+The framing correction passed 63 focused tests, a final 40-test scrutiny rerun,
+full registered suites (3,040 passed, three skipped), Ruff and configured Pyright.
+
 ## 2026-10-25 saved-session teardown correction
 
 Fresh Go trials j/k diagnosed the cleanup defect but stopped at private fixture

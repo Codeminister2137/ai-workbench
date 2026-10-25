@@ -215,6 +215,13 @@ are labelled as not applied or independently verified. Review findings are advis
 this does not automatically rewrite the answer or prove every concern is valid.
 Passing-review and no-review output retain the ordinary Agent report presentation.
 
+Orchestrated scrutiny distinguishes workspace fingerprints since this invocation
+started from Git diffs/status, which can include earlier edits. Missing start
+snapshots leave attribution unknown. Fingerprints exclude runtime logs, databases
+and caches; they do not prove those artifacts were untouched. Current-attempt tool
+receipts provide bounded evidence. These labels help reviewers assess temporal
+claims but do not guarantee a correct model verdict.
+
 Conversation history retains user requests, final agent reports and the
 host-observed execution outcome, including failed validation or tool errors.
 It does not persist raw tool arguments/output as additional conversation turns.
