@@ -679,6 +679,55 @@ def test_public_attestation_does_not_persist_to_next_request(monkeypatch):
     assert [call.get_method() for call in calls] == ["GET", "GET", "POST", "GET", "GET"]
 
 
+@pytest.mark.parametrize("stream", [False, True])
+def test_reviewed_non_sensitive_exception_preserves_wire_guards(monkeypatch, stream):
+    from ai_provider.reviewed_input import reviewed_input_request, reviewed_input_sha256
+
+    calls = _public_account_transport(monkeypatch, stream=stream)
+    text = "Explicitly reviewed non-sensitive code example"
+    value = reviewed_input_request(text, approved_sha256=reviewed_input_sha256(text), model=MODEL)
+    chat = client()
+    list(chat.stream(value)) if stream else chat.complete(value)
+    payload = json.loads(calls[-1].data)
+    assert payload["messages"] == [{"role": "user", "content": text}]
+    assert "tools" not in payload and "metadata" not in payload
+    assert payload["provider"] == {
+        "require_parameters": True,
+        "data_collection": "deny",
+        "max_price": {"prompt": 0, "completion": 0, "request": 0, "image": 0},
+    }
+    assert calls[-1].get_header("Authorization") == "Bearer test-only"
+    assert "test-only" not in calls[-1].data.decode()
+    with pytest.raises(ProviderError, match="privacy-filter entitlement"):
+        chat.complete(request())
+
+
+@pytest.mark.parametrize("stream", [False, True])
+@pytest.mark.parametrize("defect", ["input_changed", "history", "quota", "price"])
+def test_reviewed_exception_refuses_changed_input_and_nonfree_or_exhausted_route(
+    monkeypatch, stream, defect
+):
+    from dataclasses import replace
+
+    from ai_provider.reviewed_input import reviewed_input_request, reviewed_input_sha256
+
+    text = "Explicitly reviewed example"
+    value = reviewed_input_request(text, approved_sha256=reviewed_input_sha256(text), model=MODEL)
+    kwargs = {}
+    if defect == "input_changed":
+        value = replace(value, messages=(AIMessage(MessageRole.USER, text + "private context"),))
+    elif defect == "history":
+        value = replace(value, messages=(*value.messages, AIMessage(MessageRole.USER, "history")))
+    elif defect == "quota":
+        kwargs["quota"] = {"used": 50, "limit": 50, "remaining": 0}
+    else:
+        kwargs["rows"] = [row(pricing={"prompt": "0", "completion": "0.1"})]
+    calls = _public_account_transport(monkeypatch, stream=stream, **kwargs)
+    with pytest.raises(ProviderError):
+        list(client().stream(value)) if stream else client().complete(value)
+    assert all(call.get_method() == "GET" for call in calls)
+
+
 def test_generic_transport_cannot_bypass_guards():
     from ai_provider.adapters.openai_compatible import OpenAICompatibleChatClient
 

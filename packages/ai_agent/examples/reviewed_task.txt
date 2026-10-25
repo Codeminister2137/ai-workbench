@@ -1,0 +1,4 @@
+Review only the following non-sensitive synthetic Python code. State whether it implements addition correctly and explain any defect. Do not claim to inspect files, execute commands or run tests. No tools are available.
+
+def add(a, b):
+    return a - b

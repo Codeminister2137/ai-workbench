@@ -71,6 +71,16 @@ saved-session inheritance is provided. The exception permits uncertain Free-plan
 privacy-filter entitlement while preserving zero-price, quota and requested
 `data_collection=deny` guards. See [ADR-063](../../../docs/decisions/ADR-063-explicit-public-input-privacy-exception.md).
 
+The separate `ai_provider.reviewed_input.reviewed_input_request` helper binds
+review of exact non-sensitive UTF-8 text to `reviewed_non_sensitive_sha256` request
+metadata. OpenRouter accepts this narrow entitlement exception only for one
+bounded USER message without tools, history, names, tool-call data or private
+continuation. It does not declare the input public and does not inherit across
+requests; modifying or adding input invalidates review. The caller must exclude
+secrets/genuinely private data and approve possible retention/training. This is
+an explicit declaration, not secret detection. Existing privacy/price/quota/wire
+guards remain. See [ADR-069](../../../docs/decisions/ADR-069-restricted-reviewed-non-sensitive-input.md).
+
 ### `AIResponse`
 
 One normalized provider response:

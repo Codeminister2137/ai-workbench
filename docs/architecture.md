@@ -405,6 +405,12 @@ filter entitlement is relaxed; private/default request gates, zero-price/quota
 checks and requested data-policy filters remain. This is not automatic CLI
 classification, persistent consent or a guarantee of provider retention terms.
 
+ADR-069 adds a separate narrow path for explicitly reviewed non-sensitive input:
+one digest-bound USER message without tools, history or continuation. The owner
+permits non-sensitive repository material even when it is not public. This
+exception does not classify arbitrary agent-loop data or alter ADR-063's public
+attestation. General repository protection remains planned, not enabled.
+
 ## 10. Shared code
 Share code only when multiple projects genuinely need the same stable behavior. Good candidates are common AI contracts, provider adapters, and stable usage/configuration primitives. Avoid shared packages for experimental or application-specific logic.
 
