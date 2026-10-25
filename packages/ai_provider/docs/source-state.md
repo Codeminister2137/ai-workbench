@@ -3,7 +3,8 @@
 **Checked:** 2026-10-13; Gemini individual-access retirement verified 2026-10-14.
 Published limits and account observations can expire.
 
-**Latest scoped update:** 2026-10-25, OpenRouter credits/privacy and local CLI
+**Latest scoped update:** 2026-10-25, Go coding-agent requirements/limits rechecked
+and OpenRouter credits/privacy and local CLI
 payload tracing; 2026-10-24, OpenRouter free inventory and the declared
 free route; capacity comparison below; OpenRouter limits/privacy, Codex
 data-policy scope and the OpenRouter request-contract refresh were also checked
@@ -27,6 +28,23 @@ A date alone does not make a fact currently reliable: prices, model availability
 quota and entitlement need fresh admission evidence before execution. Unknown or
 contradictory evidence remains explicit. Account balances, credentials, prompts
 and private transcripts do not belong in this public reference.
+
+### OpenCode Go — rechecked 2026-10-25: bounded coding admission
+
+The [official Go guide](https://opencode.ai/v2/docs/console/go/) still lists
+Kimi K2.7 Code and requires typical coding-agent traffic, the client's own user
+agent and a stable `x-opencode-session` conversation identifier. It lists a $60
+Go monthly allowance for this model, with $0.95 input/$4 output/$0.19 cached-read
+per million tokens; five-hour and weekly windows are 20% and 50% of the monthly
+allowance. These published amounts are not current account headroom or token
+budgets. Default workspace privacy blocks paid endpoints that train on request
+data; actual route eligibility and saved settings still require scoped checks.
+
+Fresh model-list and account-allowance metadata were checked before the bounded
+October 25 coding/review trial and again afterward. Account observations remain
+private runtime evidence. The completed small task supplies scoped workflow
+evidence, not general model quality, independent quota pools or a spending grant.
+No Extra Usage, purchase or billing-source change was enabled by this work.
 
 ### OpenRouter — refreshed 2026-10-25: credits, privacy and CLI payload
 

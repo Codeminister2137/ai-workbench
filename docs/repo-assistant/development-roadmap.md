@@ -21,12 +21,30 @@ validation and review, and share the existing repair-cycle cap. Unreadable
 re-review stops repair rather than reusing stale findings. A pass with non-empty
 `format_issues` shows the review limitation in closeout.
 
-Focused offline regressions cover these behaviors. Live model-quality and
-integrated report-fidelity acceptance remain incomplete. The minimal loop is
+Focused offline regressions cover these behaviors. The scoped live completion/
+report-fidelity result is recorded below; general model quality and successful
+live scrutiny-fed repair remain unestablished. The minimal loop is
 the owner-approved design; the full research refinement guard set is deferred.
 Research and pending matcher choices are preserved in the dated artifact briefs.
 
-## Current paid-route baseline: 2026-10-24
+## Current paid-route checkpoint: 2026-10-25
+
+The fresh bounded Go trial i completed production orchestrated coding and frozen
+review with two independently supported reports, five unchanged originals, three
+new companion tests, eight passing tests per phase, 3,616 oracle cases and verified
+owned cleanup. It used nine Go and four local support calls, 19 tool proposals and
+630.83 seconds inside its original 32-call/40-tool/7,200-second bounds. The local
+review auxiliary's tool proposal was rejected without execution; the CLI retained
+its auxiliary-error status while required validation and final scrutiny passed.
+
+The small-workflow completion/report-fidelity gate is now complete; existing live
+fallback evidence is separate. The broader foundation roadmap remains incomplete:
+this small task does not establish representative daily conversation, all selected
+route/client capability checks, IDE-host independence, general parity or successful
+live scrutiny-fed repair. Preserve the original h failure and all consumed trials.
+See [the current assessment](baseline-gap.md) for the exact evidence and limits.
+
+## Historical paid-route checkpoint: 2026-10-24
 
 The shell/PID ownership repairs, MCP warning policy and advisory scrutiny repair
 are integrated. Offline acceptance-controller and Go two-turn harness checks do

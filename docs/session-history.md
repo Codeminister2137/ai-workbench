@@ -1,5 +1,23 @@
 # Session History
 
+## 2026-10-25 bounded Go coding/review completion
+
+Fresh trial i completed the small orchestrated coding and read-only frozen-review
+question within its original 32-call/40-tool/7,200-second allowance: nine Go calls,
+four local support calls, 19 tools and 630.83 seconds including owned cleanup.
+Independent assessment accepted both current reports, five unchanged original
+tests, three additive companions, eight passing tests per phase and 3,616 oracle
+cases. The review auxiliary proposed a tool in its tool-free pass; production
+rejected it without execution and preserved the auxiliary-error status. Required
+validation and final scrutiny passed. No live repair was needed or established.
+
+The scoped completion/report-fidelity gate is complete; the broader roadmap is
+incomplete. Existing live fallback evidence remains separate. Original h and i
+receipts were preserved without replay or regrading. Assessment and cleanup
+evidence are under `artifacts/go-completion-postflight-20261025i/` and original
+trial evidence under `artifacts/cli-clean-workflow-20261025i/`. No production code,
+provider selection, service, dependency, approval policy or billing source changed.
+
 ## 2026-10-24 allowance-derived fallback ordering; Kiro fallback target exhausted
 
 Fallback ordering became an explicit, configurable chain. `fallback_candidates`

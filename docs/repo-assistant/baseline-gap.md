@@ -1,6 +1,36 @@
 # Distance to established baseline CLI usability
 
-## October 25 current checkpoint
+## October 25 current checkpoint: bounded Go coding/review completed
+
+Fresh trial `artifacts/cli-clean-workflow-20261025i/` completed the small
+production `coding-chat --orchestrated` coding and frozen-review question. Both
+saved and delivered reports passed independent substantive assessment against
+actual source, test inventory, successful write receipts, diffs and executed tests.
+Five protected original methods remain unchanged; three model-authored companions
+bring the total to eight. Both phases ran eight passing tests; separate host
+validation and all 3,616 bounded oracle cases passed. Frozen review made no edits.
+Owned worker/runtime cleanup and absence of the listener were independently checked.
+
+The original 32-call/40-tool/7,200-second allowance was not extended: nine Go
+primary calls plus four local support calls, 19 tool proposals, 630.83 seconds
+including owned cleanup. Both final scrutiny verdicts passed. The review auxiliary
+proposed a tool in its tool-free pass; production rejected it without execution,
+retained `completed_with_auxiliary_errors`, and completed the required review and
+validation. This is a contained advisory-stage failure with a completed task,
+not a claim that every component succeeded. No repair was needed in this trial.
+
+Independent assessment is recorded separately under
+`artifacts/go-completion-postflight-20261025i/`; original controller receipts keep
+their structural-only outcome and pending-external-review labels. The assessor
+checks existing leading-summary display normalization while comparing the raw
+saved reports; it does not rewrite model output or supply missing model phases.
+This closes the scoped small-workflow completion/report-fidelity gate. Earlier
+live fallback evidence remains separate. General parity, successful live
+scrutiny-fed repair, representative daily conversation and the remaining route/
+IDE-independence milestone checks are not established by this arithmetic fixture.
+No additional inference or infrastructure is implied.
+
+## October 25 earlier checkpoint: consumed h remains incomplete
 
 Owner-selected restricted non-sensitive input (A) is implemented separately from
 general coding; B remains planned. Its first exact-input free request passed
@@ -363,7 +393,7 @@ did not resolve this model's report-fidelity gap; the allowance is consumed.
 
 | Gate | Current evidence and remaining distance |
 | --- | --- |
-| Complete trustworthy small workflow | Immediate gap: fresh coherent task, model-authored coding/tests, actual execution, substantive frozen review, both faithful reports, independent checks and cleanup together. The revised criteria allow harmless recovered friction and supported corrections. A contained stop remains incomplete. |
+| Complete trustworthy small workflow | Completed by fresh Go trial i on October 25: model-authored coding/companions, actual execution, substantive read-only frozen review, both faithful reports, independent checks and cleanup. One advisory auxiliary failure was contained without preventing completion. This scoped result does not establish general parity or successful live scrutiny-fed repair. |
 | Representative daily conversation (M4) | Existing continuity and selected live fallback/process evidence is partial. Establish objective/decision/history/approval preservation over useful turns, correction, interruption/restart and required route switches. One arithmetic fixture cannot establish this. |
 | Required capabilities on selected routes (M2/M3) | Common tools/skills and semantic contracts are implemented with selected live/synthetic evidence. Complete the required C1-C5 cases and actual permission/client checks on the routes used; unsupported combinations must refuse clearly. This does not require every possible provider or optional integration. |
 | Independence from PyCharm tool hosting (M5) | Offline C1-C6 common-surface contract implemented and passing without IDE configuration; installed-client/live parity remains pending. Missing capability may still require implementation. |
