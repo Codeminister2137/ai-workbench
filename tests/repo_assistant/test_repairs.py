@@ -356,6 +356,109 @@ def _native_response(text: str):
     )
 
 
+@pytest.mark.parametrize("changes_workspace", [False, True])
+def test_failed_scrutiny_repair_cannot_reuse_validation_for_changed_workspace(
+    capsys, monkeypatch, tmp_path: Path, changes_workspace
+):
+    from ai_provider import ProviderError
+
+    prepared = _prepared_native_implementation(tmp_path)
+    helper = tmp_path / "helper.py"
+    helper.write_text("def answer(): return 0\n", encoding="utf-8")
+    validator = tmp_path / "validate.py"
+    validator.write_text(
+        "from pathlib import Path\nimport helper\n"
+        "with Path('validation-count.log').open('a') as log: log.write('checked\\n')\n"
+        "assert helper.answer() == 0\nprint('original state validated')\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "config.toml").write_text("", encoding="utf-8")
+    native_calls = []
+
+    def native(*args, **kwargs):
+        native_calls.append(1)
+        if len(native_calls) == 1:
+            return _native_response("Earlier report: the original helper and validation passed.")
+        if changes_workspace:
+            helper.write_text("def answer(): return 1\n", encoding="utf-8")
+        raise ProviderError("Synthetic repair allowance exhausted")
+
+    def coding(*args, **kwargs):
+        if kwargs.get("progress_prefix") == "scrutiny_activity":
+            return _scrutiny_verdict("needs_revision", "Inspect the helper.")
+        return prepared
+
+    monkeypatch.setattr(_EXAMPLE, "run_coding_prompt", coding)
+    monkeypatch.setattr(_EXAMPLE, "_run_native_agent", native)
+    monkeypatch.setattr(
+        _EXAMPLE,
+        "run_auxiliary_panel",
+        lambda *a, **k: _EXAMPLE.AuxiliaryPanelResult(status="completed"),
+    )
+    database = tmp_path / "run.sqlite3"
+    assert (
+        main(
+            [
+                "--mode",
+                "implement",
+                "Inspect the synthetic helper.",
+                "--provider",
+                "ollama",
+                "--model",
+                "qwen2.5-coder:14b",
+                "--execute",
+                "--orchestrated",
+                "--away-minutes",
+                "1",
+                "--skip-prompt-review",
+                "--max-repair-cycles",
+                "1",
+                "--repo-root",
+                str(tmp_path),
+                "--user-config",
+                str(tmp_path / "config.toml"),
+                "--away-run-db",
+                str(database),
+                "--validation-command",
+                f'"{_EXAMPLE.sys.executable}" -B validate.py',
+            ]
+        )
+        == 0
+    )
+    output = capsys.readouterr().out
+    final = output.rsplit("## **SUMMARY**", 1)[-1]
+    assert len(native_calls) == 2
+    assert (tmp_path / "validation-count.log").read_text().splitlines() == ["checked"]
+    run_id = next(
+        line.split(": ", 1)[1] for line in output.splitlines() if line.startswith("away_run_id: ")
+    )
+    stages = {
+        stage.name: stage for stage in SQLiteOrchestratedRunStore(database).list_stages(run_id)
+    }
+    validation = stages["validation"].details
+    repair = stages["repair"].details
+    assert validation is not None and repair is not None
+    assert stages["repair"].status == "failed"
+    if changes_workspace:
+        assert validation["validation_status"] == "not_run"
+        previous_validation = typing.cast("dict[str, Any]", validation["previous_validation"])
+        scrutiny_repair = typing.cast("dict[str, Any]", repair["scrutiny_repair"])
+        assert previous_validation["validation_status"] == "passed"
+        assert scrutiny_repair["attempts"][0]["changed_paths"] == ["helper.py"]
+        assert "completion=not_established" in final
+        assert "workspace changed during an incomplete repair" in final
+        assert "### Agent report — draft" in final
+        assert "Agent-reported outcome:" not in final
+        assert "- Validated: passed" not in final
+        handoff = stages["final_handoff"].details
+        assert handoff is not None and handoff["validation_status"] == "not_run"
+        assert "rerun deterministic validation and scrutiny" in str(handoff["next_action"])
+    else:
+        assert validation["validation_status"] == "passed"
+        assert "completion=not_established" not in final
+        assert "Agent-reported outcome:" in final
+
+
 def test_cli_scrutiny_findings_trigger_bounded_repair_that_can_pass(
     capsys,
     monkeypatch,

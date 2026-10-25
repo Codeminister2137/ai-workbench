@@ -1,6 +1,38 @@
 # Distance to established baseline CLI usability
 
-## Immediate paid-agent baseline — updated 2026-10-24
+## October 25 current checkpoint
+
+Owner-selected restricted non-sensitive input (A) is implemented separately from
+general coding; B remains planned. Its first exact-input free request passed
+admission but received an upstream shared-pool 429. This does not block the
+independent Go baseline or establish OpenRouter quality.
+
+Fresh two-phase trial h completed coding but stopped before frozen review. It
+used 18 Go primary and two local support calls within its original phase cap;
+the scrutiny repair changed a companion test, reran nine tests, then exhausted
+its primary-call allowance before a new final report. The original h outcome
+remains failed/incomplete. Independent checks passed nine tests and all 3,616
+oracle cases; those checks do not supply the missing model report or frozen review.
+
+The local scrutiny referred to an already-corrected test expectation. A source-
+level reconstruction of its tool-evidence subsection retained old snapshots but
+omitted the latest passing test output, diff and status when the evidence budget
+filled. The full transmitted prompt was not logged, so this is a demonstrated
+selection defect, not proof of why the model made that finding. Current fixes
+prioritize recent receipts in execution order and retain terminal output summaries.
+
+A second demonstrated defect let earlier validation/reporting appear current
+after an incomplete repair changed files. The prospective correction retains old
+checks as history, marks current validation not run, and labels the old report a
+draft pending current validation/review. Advisory verdict policy is unchanged for
+unchanged input. No historical result is regraded. Evidence and the exact local
+failure origin are under `artifacts/unattended-20261025-0745/`; h remains at
+`artifacts/cli-clean-workflow-20261025h/` with verified owned cleanup.
+
+The early-primary-error recording path was also corrected: failed CLI execution
+now closes persisted run/stage state rather than leaving it running (6b39bdd).
+
+## Immediate paid-agent baseline — October 24 evidence
 
 Owner clarification: the immediate baseline is ordinary development with paid
 agents through this CLI, with fallback. Local/free-model quality experiments,
