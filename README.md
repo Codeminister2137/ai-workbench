@@ -1,107 +1,185 @@
 # AI Workbench
 
-A Python workspace for local-first AI tooling, provider-agnostic model access,
-transparent orchestration, and small AI-assisted applications.
+**Provider-agnostic AI infrastructure, agent orchestration, and developer automation — built with Python.**
 
-The repository is organized as a modular monorepo. Reusable libraries live under
-`packages/`; applications and prototypes live under `apps/`.
+AI Workbench is a modular platform for integrating multiple AI providers, coordinating intelligent agents, and building reliable AI-powered developer tools.
 
-## Explore the Project
+The project explores a practical question:
 
-- **Review the design:** [architecture](docs/architecture.md),
-  [package ownership](docs/project-map.md), and [recorded decisions](docs/decisions.md).
-- **Try it locally:** the offline quick start below needs no model or credentials.
-- **Develop or use an AI coding assistant:** start with
-  [contributing](CONTRIBUTING.md) and the [repository instructions](AGENTS.md).
+**How can we make AI agents useful, reliable, and cost-effective when models, APIs, execution environments, and usage limits are constantly changing?**
 
-## Current Status
+Rather than depending on a single model or service, AI Workbench separates provider integrations, orchestration decisions, and agent execution into reusable components.
 
-| Area | Location | Status |
-| --- | --- | --- |
-| Provider layer | [ai-provider](packages/ai_provider/README.md) | Provider-neutral contracts, local and hosted adapters, streaming, native-client executors and usage metadata. |
-| Orchestrator | [ai-orchestrator](packages/ai_orchestrator/README.md) | Neutral routing, same-tier fallback, reviewer selection, repair progress and time-admission contracts. |
-| Agent and CLI | [ai-agent](packages/ai_agent/README.md) | Repository assistant CLI, permission-controlled tools, conversational coding, protected public research and report validation. |
-| AI Council | [Local AI Council](apps/ai_council/README.md) | Local prototype using Ollama through the provider layer, with browser and CLI entry points. |
-| Job search automation | [Job-search prototypes](apps/job_search/README.md) | Early email prototype only; broader automation is not production-ready. |
+The long-term vision is a unified environment where developers can coordinate AI agents, delegate coding tasks, manage provider availability, and maintain human oversight over automated operations.
+
+> **Development status:** Active development / portfolio project. Core infrastructure, agent tools, and selected applications are implemented. Broader autonomous workflows and sustained live acceptance remain in progress.
+
+## Key Capabilities
+
+### Multi-Provider AI Integration
+
+A common interface for accessing AI models across different execution environments.
+
+- Local inference through Ollama.
+- Hosted LLMs through OpenAI-compatible APIs.
+- Provider integrations including OpenAI, Requesty, and experimental OpenRouter free-tier routing.
+- Native coding-agent execution paths for tools such as Codex CLI, Copilot, Antigravity, and Kiro.
+- Streaming responses, usage metadata, and normalized provider errors.
+
+Provider access is kept separate from model selection and application logic, making it easier to add or replace backends.
+
+[Explore the provider package](packages/ai_provider/README.md)
+
+### Intelligent Orchestration and Fallback
+
+An independent orchestration layer designed to make model selection and execution decisions transparent and configurable.
+
+Current capabilities include:
+
+- Task profiling and model recommendations.
+- Deterministic prompt evaluation and refinement.
+- Capability-, privacy-, and cost-aware route selection.
+- Same-tier fallback when usage limits are exhausted.
+- Execution planning and subtask delegation contracts.
+- Support for bounded repair and review workflows.
+
+An important design principle is that **fallback should preserve task requirements and user-defined constraints**, rather than blindly switching to any available model.
+
+[Explore the orchestrator](packages/ai_orchestrator/README.md)
+
+### Agentic Coding Tools
+
+A repository-aware AI coding assistant with controlled access to development tools.
+
+Capabilities include:
+
+- Multi-turn agent execution and conversational coding.
+- File operations, code search, local Git inspection, and shell commands.
+- Configurable permission and approval policies.
+- Workspace boundaries for filesystem operations.
+- Execution tracking and validation receipts.
+- Context management and incremental conversation summaries.
+- Repair workflows informed by observed validation results.
+- Optional preview-first Python symbol refactoring.
+
+The system distinguishes between **a model claiming success and an operation being verified through actual execution evidence**.
+
+[Explore the agent package](packages/ai_agent/README.md)
+
+### Local AI Council
+
+An experimental application that sends a prompt to multiple configured local AI models, streams their individual responses, and stores conversation history.
+
+Current implementation uses Ollama and SQLite, with browser and CLI interfaces.
+
+The Council serves as a practical application of the shared provider infrastructure and a foundation for future multi-model collaboration.
+
+[Explore AI Council](apps/ai_council/README.md)
+
+## Architecture
+
+AI Workbench is organized as a modular Python monorepo.
+
+```text
+Applications & Interfaces
+├── Repository-aware Coding Assistant
+├── Local AI Council
+└── Job Search Automation (prototype)
+             │
+             ▼
+      AI Orchestrator
+  ├── Task Profiling
+  ├── Model Selection
+  ├── Execution Planning
+  ├── Provider Fallback
+  └── Review / Repair Policies
+             │
+             ▼
+       AI Provider Layer
+  ├── Local Ollama Models
+  ├── Hosted Model APIs
+  └── Native Coding Agents
+```
+
+The three core packages have distinct responsibilities:
+
+| Package | Responsibility |
+|---|---|
+| `ai_provider` | Provider communication, adapters, execution backends, and usage metadata |
+| `ai_orchestrator` | Task evaluation, routing decisions, fallback, and execution planning |
+| `ai_agent` | Agent loops, coding tools, permissions, workflow composition, and CLI execution |
+
+Orchestration does not directly implement provider APIs. Execution components interact with models through appropriate provider interfaces and executors.
+
+This separation allows individual components to evolve without tightly coupling application logic to a particular AI service.
+
+See [Architecture](docs/architecture.md), [Project Map](docs/project-map.md), and [Architecture Decisions](docs/decisions.md).
 
 ## What Works Today
 
-- Run local model requests through a provider-neutral interface.
-- Route hosted requests through OpenAI-compatible APIs when credentials are
-  explicitly configured.
-- Use a CLI-first repo-aware coding assistant:
+The repository currently supports:
 
-```powershell
-.\scripts\repo-assistant.ps1 "Explain the current architecture."
-```
+- Provider-neutral requests to local and configured hosted models.
+- Local and hosted response streaming.
+- Deterministic model recommendations and execution planning.
+- Policy-constrained provider fallback.
+- Repository-aware coding assistance through the CLI.
+- Permission-controlled tool execution.
+- Research workflows with retrieval records and structural validation.
+- Local multi-model conversations through AI Council.
 
-- Run deterministic orchestration passes without contacting a provider.
-- Produce public-source research reports using local inference, retrieval receipts
-  and bounded advisory review.
-- Plan research jobs offline and explicitly start a foreground sequence only when
-  each task fits its full allocation.
-- Run a local AI Council prototype with Ollama.
+**Important limitations:** End-to-end coding quality and sustained live acceptance are not yet fully validated. Individual components and offline tests should not be interpreted as proof of production readiness. Some provider paths require separately installed clients, credentials, or explicit opt-in.
 
-Most hosted or external-provider paths are opt-in and require explicit privacy,
-cost-policy, and credential configuration.
+## Development Roadmap
 
-Research quality-first review remains opt-in. Deterministic validation establishes
-structure and executed receipts, not factual accuracy. Sustained live acceptance
-is still incomplete; the software tests and model-quality evaluation are separate.
+| Area | Status |
+|---|---|
+| Provider-neutral integration and adapters | Implemented |
+| Core model selection and orchestration contracts | Implemented |
+| Provider fallback and policy constraints | Implemented; broader live validation ongoing |
+| Agentic coding CLI and controlled tools | Implemented; end-to-end acceptance ongoing |
+| Local AI Council | Prototype |
+| Automated research and review workflows | Experimental |
+| Unified agent management dashboard | Planned |
+| Remote task supervision and PC control | Under development |
+| Broader job-search automation | Early prototype |
 
-## Engineering Focus and Limits
+The long-term direction is to extend these foundations into a unified system for coordinating multiple specialized agents across development and automation workflows.
 
-Provider APIs, routing decisions and tool execution have separate contracts.
-The orchestrator can return an execution target without importing a provider
-adapter; applications choose how to execute it. Coding tools enforce permissions
-and workspace boundaries, while foreground processes and fallback preserve
-observable receipts rather than treating a model's success claim as validation.
-
-This is an actively developed portfolio project. The CLI's end-to-end coding
-and frozen-review acceptance remains incomplete; configured native clients are
-not evidence of equal model quality. AI Council and job-search workflows remain
-prototypes. The [CLI roadmap](docs/repo-assistant/development-roadmap.md) records
-completed software slices and outstanding acceptance separately.
+See the [development roadmap](docs/repo-assistant/development-roadmap.md) for detailed implementation and validation progress.
 
 ## Quick Start
 
-Requirements:
-
-See [installation and external runtimes](docs/installation.md) for workspace
-environment ownership and deployment prerequisites. Python dependencies use the
-project's `uv`-managed `.venv`; external runtimes and official agent clients need
-separate provisioning for the selected routes.
+### Requirements
 
 - Python `>=3.13,<3.15`
 - `uv`
-- Optional: Ollama for local model execution
+- Optional: Ollama for local inference
+- Optional: External provider credentials or supported native coding-agent clients
 
-Install and validate:
+### Install
 
 ```powershell
 python -m uv sync --locked
-python -m uv run --no-sync python scripts/run-tests.py full -- -q
-python -m uv run --no-sync ruff check .
-python -m uv run --no-sync pyright
 ```
 
-The full offline runner covers workspace, Council and job-search tests in
-separate processes. Live model tests require explicit opt-in; installation and
-the checks above do not start inference. See [test selection](docs/test-workflow.md).
-
-Run a dry repo-assistant request:
+### Try a Repository Assistant Planning Request
 
 ```powershell
 uv run --no-sync ai-assistant --mode plan "Summarize this repository structure."
 ```
 
-Inspect a research acceptance plan without loading models or creating run state:
+This exercises the planning interface without starting model inference.
+
+### Run the Repository Assistant
 
 ```powershell
-uv run --no-sync python scripts/research-acceptance.py --plan --model gpt-oss:20b
+.\scripts\repo-assistant.ps1 "Explain the current architecture."
 ```
 
-Run the AI Council prototype:
+Actual model execution requires a supported and correctly configured backend.
+
+### Run the Local AI Council
 
 ```powershell
 cd apps\ai_council
@@ -110,63 +188,13 @@ cd apps\ai_council
 .\tasks.ps1 start
 ```
 
-Then open `http://127.0.0.1:8765`.
+Open `http://127.0.0.1:8765`.
 
-## Architecture
+See the [installation guide](docs/installation.md) for full environment setup and provider configuration.
 
-```text
-Applications
-  AI Council
-  Job Search Automation
-  Repository assistant CLI (ai-agent)
-    |
-    v
-AI Orchestrator (optional routing and planning)
-    |
-    v
-Provider-Agnostic AI Infrastructure (ai-provider)
-  Ollama
-  Requesty
-  Direct provider APIs
-  Dedicated executors such as Codex CLI
-```
+## Testing and Code Quality
 
-The default architecture is a modular monorepo, not microservices. Packages are
-designed to compose through explicit contracts while remaining independently
-understandable.
-
-Key docs:
-
-- [Architecture](docs/architecture.md) and package boundaries
-- [Decision index](docs/decisions.md) and ADRs
-- [Environment](docs/environment.md) and secret handling
-- [Repo assistant](docs/repo-coding-assistant.md) workflow guides
-- [Project map](docs/project-map.md) and responsibility ownership
-- [Definition of done](docs/definition-of-done.md)
-- [Publication and privacy review](docs/publication.md)
-
-Private planning notes may exist locally under `docs/plans/`, but that
-directory is ignored in the current source tree. Ignoring a file does not remove
-previously committed copies from Git history; publication requires a history review.
-
-## Repository Layout
-
-```text
-packages/
-  ai_provider/       # provider contracts, adapters, runtime helpers
-  ai_orchestrator/   # prompt review, routing, planning, refinement
-  ai_agent/          # tool contracts, permissions, agent loop
-apps/
-  ai_council/        # local multi-agent council prototype
-  job_search/        # early job-search automation prototypes
-scripts/             # workspace helper scripts
-tests/               # workspace-level tests
-docs/                # architecture, decisions, and runbooks
-```
-
-## Development
-
-Useful commands:
+The workspace uses automated tests, static analysis, and documented engineering conventions.
 
 ```powershell
 python -m uv run --no-sync python scripts/run-tests.py full -- -q
@@ -175,10 +203,39 @@ python -m uv run --no-sync ruff format --check .
 python -m uv run --no-sync pyright
 ```
 
-See [contributing](CONTRIBUTING.md) for setup, checks and branch workflow, and
-[AGENTS.md](AGENTS.md) for the owner's decision and AI-assistant boundaries.
+Testing emphasizes isolated components, explicit boundaries, controlled external execution, and reproducible validation.
+
+Live model tests require separate configuration and opt-in.
+
+## Engineering Principles
+
+AI Workbench is developed around several principles:
+
+**Provider independence.** Applications should not be unnecessarily tied to one model vendor.
+
+**Transparent decisions.** Routing and execution decisions should be understandable and inspectable.
+
+**User control.** Automated tools must respect permissions, workspace boundaries, privacy requirements, and cost constraints.
+
+**Evidence over claims.** Agent output is not sufficient proof of successful execution.
+
+**Pragmatic architecture.** Prefer maintainable, modular solutions over unnecessary complexity.
+
+**Incremental development.** Implement, test, and validate individual capabilities before expanding automation.
+
+## Documentation
+
+- [Architecture](docs/architecture.md)
+- [Project Map](docs/project-map.md)
+- [Architecture Decisions](docs/decisions.md)
+- [Repository Assistant Guide](docs/repo-coding-assistant.md)
+- [Installation](docs/installation.md)
+- [Contributing](CONTRIBUTING.md)
+- [Testing](docs/test-workflow.md)
+- [Privacy and Publication](docs/publication.md)
 
 ## License
 
-This repository is source-available for portfolio and review purposes only. No
-open-source license is granted. See `LICENSE.md`.
+AI Workbench is **source-available for portfolio and review purposes**.
+
+No open-source license is granted. See [LICENSE.md](LICENSE.md).
