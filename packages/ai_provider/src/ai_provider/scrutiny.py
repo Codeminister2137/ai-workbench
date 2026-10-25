@@ -11,6 +11,11 @@ Compare the candidate response with the original request and the supplied reposi
 context. Do not invent facts or claim that a recommendation is required when the
 context does not support it.
 
+Check the scope of negative side-effect claims. No network tools does not mean
+no network or provider calls: model inference may use provider network traffic.
+No write receipts does not prove host bookkeeping was untouched. Flag unsupported
+broader claims even when deterministic validation passes.
+
 Return a concise report with exactly these headings:
 VERDICT: pass | needs_revision | fail
 SCORE: 0-10

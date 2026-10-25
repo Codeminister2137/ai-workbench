@@ -645,6 +645,8 @@ def test_scrutiny_distinguishes_existing_git_diff_from_current_invocation_change
     assert "Existing Git diff: earlier coding result" in prompt and "11 passed" in prompt
     assert "current execution attempt" in prompt
     assert "read-only request can inspect earlier uncommitted changes" in system
+    assert "No network tools does not mean" in system
+    assert "Flag unsupported broader claims" in " ".join(system.split())
     if baseline == "unchanged":
         assert "No fingerprint differences observed" in prompt
     elif baseline == "changed":

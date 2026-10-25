@@ -1,5 +1,32 @@
 # Distance to established baseline CLI usability
 
+## October 25 reporting scope: n technical review passed, fidelity qualified
+
+Fresh frozen trial `artifacts/cli-scope-review-20261025n/` reviewed the host's
+invocation-scope patch through ordinary inspection/test tools and local auxiliary/
+required scrutiny. The controller completed and scrutiny passed. Independent checks
+confirmed six frozen inputs, three passing tests, no model writes and owned cleanup;
+817 historical files were unchanged. It used eight Go and two local calls, ten tool
+proposals and 296.08 seconds within its original 10-call/12-tool/2,700-second bound.
+Technical findings and its stated research-path/source-identity limits are supported.
+
+The delivered report nevertheless said "no network calls" without limiting the
+claim to optional network tools. Inference did use provider traffic. Independent
+assessment therefore withholds an unqualified report-fidelity pass; the original
+controller success remains mechanical evidence, not a retroactive semantic grade.
+Evidence: `artifacts/cli-scope-review-postflight-20261025n/`.
+
+The prospective reporting correction tells primary answer-only, legacy-action and
+native-tool prompts to distinguish tool activity from provider/host effects. Response
+scrutiny now checks unsupported broad negative claims even after passing tests.
+This changes instructions, not transport, privacy, permissions or verdict policy,
+and does not guarantee semantic detection. No consumed trial is retried or regraded.
+
+The reporting correction passed 104 focused tests and the full registered suites
+(3,043 passed, three skipped), with Ruff and configured Pyright passing. These
+checks establish instruction propagation and regression behavior, not live report
+truthfulness after the change.
+
 ## October 25 later M4 question: m remains incomplete
 
 Fresh trial `artifacts/cli-continuity-20261025m/` exercised three cold processes

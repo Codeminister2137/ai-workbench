@@ -1,5 +1,24 @@
 # Session History
 
+## 2026-10-25 frozen review n and negative reporting scope
+
+Fresh ordinary tool-enabled review n supported the host invocation-scope patch;
+required local scrutiny passed, six frozen inputs stayed unchanged, three tests
+passed and owned cleanup was verified. It used eight Go/two local calls, ten tool
+proposals and 296.08 seconds. Its original controller completed mechanically.
+Independent assessment qualified report fidelity because the report claimed no
+network calls although inference used provider traffic. No model-authored edit or
+optional network-tool call was observed; those narrower claims are supported.
+
+The prospective instruction correction scopes negative side-effect claims in all
+primary prompt modes and response scrutiny. It introduces no new privacy, transport,
+approval, persisted-data or verdict policy. Original evidence remains consumed;
+external detection does not prove the ordinary workflow caught the claim.
+
+The reporting correction passed 104 focused tests, full registered suites with
+3,043 passes/three skips, Ruff and configured Pyright. Live semantic acceptance
+remains a separately bounded question.
+
 ## 2026-10-25 continuity m and scrutiny evidence scope
 
 Fresh three-process trial m preserved the saved conversation through diagnosis,

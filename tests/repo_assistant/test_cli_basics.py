@@ -309,6 +309,26 @@ def test_log_full_prompt_requires_log_file() -> None:
         main(["--mode", "plan", "Review logging.", "--log-full-prompt"])
 
 
+@pytest.mark.parametrize("mode", ["answer", "legacy_actions", "native_tools"])
+def test_primary_reporting_scopes_negative_effect_claims_without_changing_owner_text(mode):
+    from ai_provider.repo_context import (
+        build_default_system_prompt,
+        build_native_tool_system_prompt,
+    )
+
+    owner = "Inspect only; preserve the task's privacy and approval boundaries."
+    prompt = (
+        build_native_tool_system_prompt(owner)
+        if mode == "native_tools"
+        else build_default_system_prompt(owner, actions_enabled=mode == "legacy_actions")
+    )
+    assert "Not invoking network tools does not establish" in prompt
+    assert "zero network or provider calls" in prompt
+    assert "Distinguish tool activity from provider inference" in prompt
+    assert "without evidence for that broader scope" in prompt
+    assert owner in prompt
+
+
 def test_stable_ai_assistant_entry_point_loads_cli() -> None:
     from ai_agent.cli import main as stable_main
 

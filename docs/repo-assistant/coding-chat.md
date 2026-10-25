@@ -222,6 +222,11 @@ and caches; they do not prove those artifacts were untouched. Current-attempt to
 receipts provide bounded evidence. These labels help reviewers assess temporal
 claims but do not guarantee a correct model verdict.
 
+Primary and review instructions also distinguish observed tool actions from model
+inference and host bookkeeping. Not using a network tool does not establish zero
+provider traffic; not invoking an edit tool does not establish that all runtime
+files were untouched. Broader negative claims require evidence for that scope.
+
 Conversation history retains user requests, final agent reports and the
 host-observed execution outcome, including failed validation or tool errors.
 It does not persist raw tool arguments/output as additional conversation turns.

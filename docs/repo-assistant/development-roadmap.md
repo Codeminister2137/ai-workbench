@@ -29,6 +29,12 @@ Research and pending matcher choices are preserved in the dated artifact briefs.
 
 ## Current paid-route checkpoint: 2026-10-25
 
+Frozen host-patch review n passed its mechanical and required-scrutiny gates, with
+supported technical findings, three tests and no model writes. Its unqualified
+no-network-calls claim still prevents an unqualified report-fidelity pass. Primary
+and review instructions now distinguish tool actions from inference/host effects;
+this prospective correction does not regrade n or establish general semantic safety.
+
 Fresh M4 trial m completed correct coding and a read-only frozen inspection across
 three cold processes, but required final scrutiny misattributed prior coding edits
 to the review phase. Its draft also made an unsupported bookkeeping-state claim.
