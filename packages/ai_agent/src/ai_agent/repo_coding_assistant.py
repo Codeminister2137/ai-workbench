@@ -1677,8 +1677,8 @@ def _execute_request(
             orchestrated_tracker.begin_run()
             orchestrated_tracker.start_stage("prompt_review")
     primary_elapsed_seconds = None
+    primary_started = time.perf_counter()
     try:
-        primary_started = time.perf_counter()
         result = _run_coding_prompt_with_fallback(
             prompt,
             profile,
@@ -1700,6 +1700,40 @@ def _execute_request(
         )
         primary_elapsed_seconds = time.perf_counter() - primary_started
     except ProviderError as exc:
+        primary_elapsed_seconds = time.perf_counter() - primary_started
+        if orchestrated_tracker is not None:
+            # The initial prepare_execution above already produced this review
+            # and plan. A later provider/preparation error must not leave their
+            # receipt or the entire run looking like work is still in progress.
+            _complete_primary_stages(
+                orchestrated_tracker,
+                orchestration=external_orchestration,
+                review_enabled=not args.skip_prompt_review,
+            )
+            orchestrated_tracker.complete_stage(
+                "implementation",
+                status="failed",
+                details={
+                    "failure_phase": "primary_request_preparation_or_execution",
+                    "failure_category": exc.category.value,
+                    "provider": exc.provider or "",
+                    "cause_kind": _error_cause_kind(exc),
+                },
+            )
+            for skipped in ("auxiliary_panel", "validation", "scrutiny", "repair"):
+                orchestrated_tracker.complete_stage(
+                    skipped,
+                    status="skipped",
+                    details={"skip_reason": "primary request preparation/execution failed"},
+                )
+            orchestrated_tracker.record_final_handoff_stage(
+                execution_status="failed",
+                validation_stage=None,
+                repo_root=repo_root,
+                assistant_response_text=None,
+                scrutiny_policy=args.scrutiny_policy,
+            )
+            orchestrated_tracker.finish_run(execution_status="failed")
         print("=== Repo Coding Assistant ===")
         print(f"mode: {args.mode}")
         print(f"repo_root: {repo_root}")

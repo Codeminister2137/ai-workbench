@@ -295,3 +295,67 @@ def test_stage_failure_cannot_be_hidden_by_missing_optional_details(tmp_path: Pa
     assert run_tracking.execution_status_with_validation_stage("completed", stage) == (
         "completed_with_validation_errors"
     )
+
+
+@pytest.mark.parametrize("review_enabled", [False, True])
+def test_primary_preparation_failure_closes_orchestrated_run_and_remaining_stages(
+    tmp_path, monkeypatch, capsys, review_enabled
+):
+    from ai_provider import ProviderError, ProviderErrorCategory
+
+    from .support import _EXAMPLE, main
+
+    config = tmp_path / "config.toml"
+    config.write_text("", encoding="utf-8")
+    database = tmp_path / "runs.sqlite3"
+
+    def failed_primary(*args, **kwargs):
+        raise ProviderError(
+            "Synthetic request preparation failed",
+            provider="ollama",
+            category=ProviderErrorCategory.CONFIGURATION,
+        )
+
+    monkeypatch.setattr(_EXAMPLE, "_run_coding_prompt_with_fallback", failed_primary)
+    arguments = [
+        "--mode",
+        "implement",
+        "Inspect the synthetic helper.",
+        "--provider",
+        "ollama",
+        "--model",
+        "qwen2.5-coder:14b",
+        "--execute",
+        "--orchestrated",
+        "--away-minutes",
+        "1",
+        "--repo-root",
+        str(tmp_path),
+        "--user-config",
+        str(config),
+        "--away-run-db",
+        str(database),
+    ]
+    if not review_enabled:
+        arguments.append("--skip-prompt-review")
+    assert main(arguments) == 1
+    output = capsys.readouterr().out
+    run_id = next(
+        line.split(": ", 1)[1] for line in output.splitlines() if line.startswith("away_run_id: ")
+    )
+    store = SQLiteOrchestratedRunStore(database)
+    run = store.get_run(run_id)
+    assert run is not None and run.status == "failed" and run.execution_status == "failed"
+    stages = {item.name: item for item in store.list_stages(run_id)}
+    assert stages["prompt_review"].status == ("completed" if review_enabled else "skipped")
+    assert stages["planning"].status == "completed"
+    assert stages["implementation"].status == "failed"
+    assert stages["implementation"].details is not None
+    assert stages["implementation"].details["failure_category"] == "configuration"
+    assert stages["implementation"].details["provider"] == "ollama"
+    for name in ("auxiliary_panel", "validation", "scrutiny", "repair"):
+        assert stages[name].status == "skipped"
+    assert stages["final_handoff"].status == "failed"
+    assert stages["final_handoff"].details is not None
+    assert stages["final_handoff"].details["execution_status"] == "failed"
+    assert not any(item.status in {"planned", "running"} for item in stages.values())
