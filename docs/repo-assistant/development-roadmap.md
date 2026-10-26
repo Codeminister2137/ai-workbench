@@ -5,7 +5,11 @@
 ADR-070 implements the owner-approved separation of host adapter/validation facts
 from raw agent narration scoped to repository/tool actions, including prospective
 conversation metadata. Unknown effects remain unknown and required scrutiny remains
-binding. Fresh bounded Go review acceptance is pending; consumed trials are unchanged.
+binding. October 26 fresh t completed a frozen four-case envelope review with required
+scrutiny, independent effect/report checks and cleanup. Review-format limitations
+were disclosed under ADR-066. This closes that narrow reporting question; broader
+continuity/capability parity and live scrutiny-fed repair remain open. Consumed
+earlier trials are unchanged; see the current baseline assessment for r/s/t evidence.
 
 ## Planned: reliable model availability across sources
 

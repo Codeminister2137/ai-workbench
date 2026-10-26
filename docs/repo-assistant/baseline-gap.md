@@ -1,6 +1,36 @@
 # Distance to established baseline CLI usability
 
-## October 25 current checkpoint: reporting contract approved, acceptance pending
+## October 26 current checkpoint: narrow closeout review completed
+
+ADR-070's host-observation/report-scope implementation is committed as e999366.
+Fresh t completed a deliberately smaller frozen review of the closeout envelope:
+four Go/two local completions, ten primary proposals, 102.33 seconds. The model ran
+four cases (three receipt/scope variants and one actual imported-source path/digest
+comparison against a supplied manifest), delivered a supported scoped review, and
+required final scrutiny passed. Its malformed reviewer headings/score were visibly
+qualified under existing ADR-066; no review policy changed. All 506 protected inputs
+and 4,174 historical files were unchanged; owned cleanup was independently verified.
+
+The host closeout and saved metadata reported six observed adapter attempts and
+responses, explicitly outside a network-audit guarantee. The original report was
+retained exactly in SQLite/journal; display normalized its leading duplicate summary
+heading. An independent checker initially conflated raw retention with byte-identical
+display, failed, then was corrected with its first failure preserved. No model output
+or consumed result was replaced. Four independent host tests passed. Evidence:
+`artifacts/cli-closeout-review-20261026t/` and `cli-closeout-postflight-20261026t/`.
+
+This establishes the declared four-case completion/report-fidelity question, not
+broader history/continuity/capability parity or successful live scrutiny-fed repair.
+General baseline acceptance remains incomplete. Original r/s and earlier results
+retain their declared scope and verdicts.
+
+Fresh s, the broader review following r, stopped at its declared initial tool
+allowance: 19 admitted/executed proposals plus a rejected three-operation batch exceeded
+20. Eight Go/one local calls, 22 proposals total, 88.08 seconds; model tests, final report
+and required final review were not reached. Context estimate 86,829 fit the 256,000
+window. All 506 inputs and 3,115 historical files were unchanged; cleanup verified.
+Unverified auxiliary advice included false function/test claims and is not accepted
+completion evidence. This is a fixture-bound stop, not an established Go service error.
 
 Fresh required-review trial r stopped incomplete before tests/final response. Whole
 source/test reads accumulated tool history until native input admission estimated
@@ -14,7 +44,7 @@ Native prompt/tool descriptions now recommend search and focused line ranges;
 whole-file reads remain available and no instruction/history truncation is added.
 
 The host corrections are implemented and validated, but general paid-CLI acceptance
-remains incomplete. Later frozen reviews exercised technical correctness without
+remains incomplete. Before t, earlier frozen reviews exercised technical correctness without
 establishing an unqualified reporting pass:
 
 | Fresh question | Observed outcome |
@@ -40,8 +70,8 @@ remains unestablished. All original consumed results remain unchanged.
 The owner approved explicit host inference/validation facts separately from scoped
 repository/tool narration (ADR-070). Fresh delivery and history retain raw reports,
 observed adapter counts and unknowns; scope does not certify arbitrary technical
-claims. Implementation is undergoing validation before a fresh bounded acceptance
-question. Consumed trials retain their original results. Local examples and assessments
+claims. The implementation passed the fresh narrow t question described above;
+consumed earlier trials retain their original results. Local examples and assessments
 are under `artifacts/cli-public-layout-postflight-20261025q/`; original o/p/q evidence
 remains in their named trial directories.
 

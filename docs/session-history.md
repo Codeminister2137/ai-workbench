@@ -1,5 +1,33 @@
 # Session History
 
+## 2026-10-26 scoped host observations and fresh closeout acceptance
+
+The owner approved ADR-070's host facts plus repository/tool-action report scope.
+Commit e999366 implements it in closeout delivery, raw conversation metadata/history
+and required-review context. Commit 361e033 clarifies focused native inspection
+without changing reads or trimming required instructions/history.
+
+Broader frozen questions r and s stopped incomplete: r exhausted estimated context
+after whole-file reads; s exceeded its initial tool reserve. Their inputs, original
+results and cleanup evidence remain preserved. Neither was resumed or regraded.
+The current baseline assessment records exact causes, usage and independent checks.
+
+Fresh t reduced the question to the closeout envelope and four protected cases.
+Preparation passed 25 guards, scripted report-only correction/revalidation/re-review,
+a negative digest calibration and smoke checks before current privacy/quota admission.
+Live t used four Go/two local calls and ten proposals in 102.33 seconds. The primary
+report, tests, source identity and effect scope were independently checked. Required
+frozen scrutiny passed with disclosed report-format limitations under ADR-066; all
+506 inputs and 4,174 historical files stayed unchanged and owned cleanup was verified.
+The raw response is retained exactly; display applies existing duplicate-heading
+normalization. A mistaken independent display-identity assertion was corrected with
+its original failure retained, without changing the trial or any model response.
+
+The narrow completion/report-fidelity question is established. General CLI parity,
+broader continuity/capability milestones and live scrutiny-fed repair remain open.
+Final registered validation passed 3,047 tests with three skips; Pyright reported
+zero errors, and source lint/format checks passed. No merge or push was performed.
+
 ## 2026-10-25 public-layout review and reporting decision boundary
 
 Frozen review o passed mechanical/required-scrutiny gates but incorrectly claimed
