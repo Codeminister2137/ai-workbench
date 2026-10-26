@@ -7,8 +7,10 @@ with six host regressions. This is host recovery from consumed incomplete w,
 not an accepted Go coding result or a claim that v reviewed the new behavior.
 w stopped at its declared initial coding cap before revalidation/report/review;
 its fixture configured 17 production rounds despite that ten-reply cap. Align
-future preparation and expose the actual native reply ceiling in the next fresh
-bounded coding question. No w allowance may be extended or resumed.
+future preparation; fresh x did align the caps but exhausted ten inspection rounds
+without implementation/report. Both trials remain incomplete. The host now exposes
+the actual native reply ceiling in the system prompt, preserving enforcement and
+history; fresh frozen review remains required. No consumed allowance may resume.
 
 Host-written a2bb69c prevents truncation from splitting long inline-link/image
 destinations, leaving complete links in the agent report. Fresh v passed its 39-case

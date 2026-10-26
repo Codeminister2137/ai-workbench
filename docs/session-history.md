@@ -1,5 +1,16 @@
 # Session History
 
+## 2026-10-26 — action-budget visibility after consumed x
+
+x used ten Go/two local completions and 15 read/search/Git proposals in 94.62seconds,
+exhausting the correctly aligned ten-round initial limit without edits/tests/report.
+Required scrutiny failed on the absent response; frozen review was not reached.
+All 506 protected inputs and 13,106 prior evidence files and owned cleanup verified.
+The host implements the six-line static native reply-ceiling notice with three
+actual-request cases and an updated exact-system assertion.180 focused cases pass.
+This is host-written code; x remains consumed incomplete. Evidence:
+artifacts/cli-action-budget-postflight-20261026x/. Fresh frozen review is still due.
+
 ## 2026-10-26 — reference recovery after consumed w
 
 w stopped incomplete at its declared host ten-primary-reply initial cap. Ten Go/

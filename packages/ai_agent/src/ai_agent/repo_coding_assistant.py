@@ -3913,6 +3913,12 @@ def _run_native_agent(
             for operation in ("start", "status", "stop"):
                 registry.register(ProcessTool(active_session.supervisor, operation))
         registry = active_session.observe_registry(registry)
+    system_prompt += (
+        f"\n\nHost action budget: at most {args.max_action_rounds} model replies for this "
+        "invocation (including the final report).\n"
+        "Reserve replies for validation, correction and the final report.\n"
+        "Other guards may stop earlier; this ceiling grants no new actions or time."
+    )
     agent = AgentLoop(
         client,
         registry,

@@ -2,6 +2,18 @@
 
 ## October 26 current checkpoint: reference previews fixed; coding acceptance incomplete
 
+Fresh x aligned the initial production/fixture limits but exhausted its ten rounds
+on inspection without editing, running tests or producing a final report. Ten Go/
+two local calls, 15 proposals, 94.62 seconds; required scrutiny failed on the absent
+response. All 506 protected inputs and 13,106 historical files stayed unchanged;
+owned cleanup verified. This is a declared-bound stop, not a Go service error.
+The host then implements the six-line native system notice of the actual configured
+reply ceiling, including the final report and earlier-stop caveat. Three host
+request regressions and the updated exact-system test cover this additive change;
+180 focused tests pass. This is host-written code, not an accepted x solution.
+Fresh frozen review of both current host corrections remains required. Evidence:
+`artifacts/cli-action-budget-postflight-20261026x/`.
+
 Fresh w stopped at its declared initial ten-primary-reply cap after correcting
 three failed tests, before model revalidation, report, required scrutiny or frozen
 review. Ten Go/one local calls, 15 proposals, 203.14 seconds; all 505 protected inputs
