@@ -1,6 +1,23 @@
 # Distance to established baseline CLI usability
 
-## October 26 current checkpoint: reference previews fixed; coding acceptance incomplete
+## October 26 current checkpoint: reference/notice corrections reviewed; coding acceptance incomplete
+
+Fresh y completed frozen review of host checkpoint 405cb52: ten Go/two local calls,
+19 proposals, 234.40 seconds. Required scrutiny passed without format limitations.
+All 182 selected cases passed model execution and an independent host rerun (180
+behavioral cases plus two actual imported-module path/hash comparisons against a
+supplied manifest). All 509 frozen inputs and 15,231 historical files stayed unchanged;
+raw report/metadata, current validation and owned cleanup were verified. Independent
+semantic assessment supports the report's source findings and test/effect scope.
+Two later proposed commands were refused before execution; the one executed test
+run count is accurate. No live repair was used and no original report was replaced.
+Evidence: `artifacts/cli-budget-review-20261026y/` and
+`artifacts/cli-budget-postflight-20261026y/final-assessment.md`.
+
+The reference-preview correction and native reply-ceiling notice are implemented
+and reviewed. Full registered validation passes 3,067 tests/3 skips; Ruff/format/
+Pyright pass. This remains host recovery/implementation plus fresh frozen review,
+not accepted Go coding/cold-restart or general baseline parity. w/x remain incomplete.
 
 Fresh x aligned the initial production/fixture limits but exhausted its ten rounds
 on inspection without editing, running tests or producing a final report. Ten Go/
@@ -11,7 +28,7 @@ The host then implements the six-line native system notice of the actual configu
 reply ceiling, including the final report and earlier-stop caveat. Three host
 request regressions and the updated exact-system test cover this additive change;
 180 focused tests pass. This is host-written code, not an accepted x solution.
-Fresh frozen review of both current host corrections remains required. Evidence:
+That required frozen review is completed by y above. Evidence:
 `artifacts/cli-action-budget-postflight-20261026x/`.
 
 Fresh w stopped at its declared initial ten-primary-reply cap after correcting
@@ -23,8 +40,8 @@ The host fixture applied a ten-reply cap while configuring the production loop f
 phase capacity does not authorize resuming w. Its retained candidate passed 51 cases
 in a later host-only rerun. The root adopts the one-line reference-marker extension
 with six independent host regressions, explicitly as host recovery rather than an
-accepted Go coding result. The new reference behavior still requires fresh frozen
-review. Evidence: `artifacts/cli-reference-postflight-20261026w/`.
+accepted Go coding result. y above reviews the current reference behavior.
+Evidence: `artifacts/cli-reference-postflight-20261026w/`.
 
 ## October 26 earlier checkpoint: artifact-link preview fix reviewed
 

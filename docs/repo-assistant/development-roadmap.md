@@ -10,7 +10,11 @@ its fixture configured 17 production rounds despite that ten-reply cap. Align
 future preparation; fresh x did align the caps but exhausted ten inspection rounds
 without implementation/report. Both trials remain incomplete. The host now exposes
 the actual native reply ceiling in the system prompt, preserving enforcement and
-history; fresh frozen review remains required. No consumed allowance may resume.
+history. Fresh y completes frozen review of both current host corrections: 182 selected
+cases and required scrutiny pass; all 509 frozen inputs/15,231 historical files and
+owned cleanup verified. Full registered validation passes 3,067 tests/3 skips, with
+Ruff/format/Pyright pass. No consumed allowance may resume. This is a completed
+bounded review, not accepted Go coding/cold-restart or general baseline parity.
 
 Host-written a2bb69c prevents truncation from splitting long inline-link/image
 destinations, leaving complete links in the agent report. Fresh v passed its 39-case

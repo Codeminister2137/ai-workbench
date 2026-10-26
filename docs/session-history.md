@@ -1,5 +1,20 @@
 # Session History
 
+## 2026-10-26 — y frozen review of current host corrections completed
+
+Fresh y reviewed the reference-preview correction and native reply-ceiling notice at
+405cb52. Ten Go/two local calls, 19 proposals, 234.40 seconds; required scrutiny passed
+without format limitations. Model execution and independent host rerun passed all
+182 selected cases. All 509 frozen inputs, 15,231 prior evidence files, fixture index,
+raw report/host metadata and owned cleanup verified. Semantic assessment supports
+current source/test/effect claims. Two proposed commands were refused before execution;
+the report's one executed test run is accurate. No live repair was needed or claimed.
+Full registered root checks: 3,067 passed/3 skipped; Ruff/format/Pyright pass.
+Evidence: artifacts/cli-budget-review-20261026y/ and cli-budget-postflight-20261026y/.
+The source fixes remain host recovery/implementation; w/x remain consumed incomplete.
+General paid CLI/M4/capability acceptance and successful live scrutiny-fed repair
+remain incomplete. No push/merge, private payload, billing change or trial extension.
+
 ## 2026-10-26 — action-budget visibility after consumed x
 
 x used ten Go/two local completions and 15 read/search/Git proposals in 94.62seconds,
