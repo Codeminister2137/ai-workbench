@@ -122,7 +122,12 @@ def _agent_outcome(response: str | None) -> str:
             continue
         candidate = candidate.removeprefix("- ")
         if len(candidate) > 200:
-            candidate = candidate[:197].rstrip() + "..."
+            # Keep full links in the report rather than clipping a destination.
+            candidate = (
+                "See the agent report below for the linked outcome."
+                if "](" in candidate
+                else candidate[:197].rstrip() + "..."
+            )
         return (
             f"Agent-reported outcome: {candidate} "
             "(workspace changes are not independently attributed by the CLI)."
