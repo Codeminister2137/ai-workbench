@@ -1,5 +1,21 @@
 # Session History
 
+## 2026-10-26 — stopped ab and host scrutiny-evidence correction
+
+ab observed active CPython3.14.4 versus a fake workspace hint,one real pytest pass,
+expected RuffF821 and Pyrightassignment-type return1. Required scrutiny questioned
+the version missing from its evidence and treated host execution status as candidate
+text. Repair exhausted24-tool cap:10Go/2local,26returned proposals20executed6rejected,
+174.83seconds.516frozen inputs/24,374history/index and cleanup verified. Accepted
+final report/re-review absent;original candidate/reviewer/stages preserved,not resumed.
+Host source correction retains recent runtime/fetch receipts,last successful fetch
+before refusal,and separates host evidence from raw candidate text. Four regressions
+exercise actual tools/budget pressure/real prompt composition. Final full3,071pass/
+3skip,Ruff/format/Pyright pass. This is implementation evidence,not automatic reviewer
+accuracy or live scrutiny-fed repair. C4 model-free officialPython-json fetch succeeds
+with112744retainedbytes/digest and private-network refusal;fresh frozen fix review/
+C4live question is next. Active unattended window/deadline remain in the private plan.
+
 ## 2026-10-26 — unattended start and native-Go portable-skill case aa
 
 Owner authorized a new unattended window14:41:41Z/15:41:41CET until19Z/20local;

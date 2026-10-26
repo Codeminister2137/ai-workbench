@@ -1,5 +1,15 @@
 # CLI Development Foundation Roadmap
 
+## October 26 runtime/fetch scrutiny evidence
+
+Consumed ab correctly executed the C3 diagnostics but did not complete required
+report repair. Its failure exposed missing runtime receipts and host-status/candidate
+mixing in scrutiny input. The host now retains bounded recent runtime/fetch provenance
+(including a successful fetch followed by refusal) and separates host evidence from
+candidate text. Four new regressions and the full3,071passed/3skipped gate pass with
+Ruff/format/Pyright. Frozen review/live acceptance remains prospective; no old trial
+is repaired or regraded. See baseline-gap.md and the ab stopped assessment.
+
 ## October 26 selected native-Go C2 evidence
 
 Fresh aa invokes the canonical portable review skill through the single-shot native

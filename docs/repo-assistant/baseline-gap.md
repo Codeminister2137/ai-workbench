@@ -1,5 +1,27 @@
 # Distance to established baseline CLI usability
 
+## October 26 C3 diagnostics and scrutiny-evidence repair
+
+Fresh ab observed correct active-runtime/one-case pytest/Ruff-F821/Pyright-type-error
+diagnostics, but remains CONSUMED INCOMPLETE. Required scrutiny questioned a version
+present in a runtime receipt omitted by the evidence filter and attributed a host
+status label to the candidate. Report repair exhausted the original tool cap:
+ten Go/two local calls,26returned proposals,20executed/six rejected before execution,
+174.83seconds. All516frozen inputs/24,374historical files/index and cleanup verified.
+No accepted final report/re-review was delivered; ab is not resumed or regraded.
+Evidence: `artifacts/cli-python-postflight-20261026ab/final-assessment.md`.
+
+The host fixes the demonstrated evidence path: latest runtime and fetch observations,
+including the last successful fetch before a later refusal, survive ordinary read
+volume within the existing12-receipt/12,000-character budget and execution order.
+Host execution status/validation/receipts now follow a separate labelled section,
+leaving candidate-authored text unchanged. Four new regressions use actual runtime/
+fetch tool results and the real scrutiny composition path. All44scrutiny cases are
+covered by final registered validation:3,071passed/3skips;Ruff/format/Pyright pass.
+This is host implementation,not live reviewer-quality proof. Fresh frozen review and
+selected C4 provenance acceptance are being prepared; source permissions, validation
+semantics and raw report retention do not change.
+
 ## October 26 selected native-Go C2 skill case
 
 Fresh aa verifies actual canonical review-repo-change selection, Git/tool prerequisite
