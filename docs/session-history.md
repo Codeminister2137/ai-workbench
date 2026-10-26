@@ -1,5 +1,17 @@
 # Session History
 
+## 2026-10-26 — reference recovery after consumed w
+
+w stopped incomplete at its declared host ten-primary-reply initial cap. Ten Go/
+one local calls, 15 proposals, 203.14 seconds; model tests failed three of 51 cases,
+then the model corrected the candidate but did not revalidate/report/reach required
+scrutiny or frozen review. Host audit preserved all 505 protected inputs and 9,937
+historical files and verified owned cleanup. Later host-only 51 tests passed.
+The root adopts the one-line reference-marker fix with six independent host cases,
+explicitly as host recovery. See artifacts/cli-reference-postflight-20261026w/.
+The fixture configured 17 production rounds but capped initial coding at ten replies;
+future fresh coding must align those bounds. No consumed result was resumed/regraded.
+
 ## 2026-10-26 artifact links and real preview defect
 
 Corrected Windows chat-link guidance to slash-prefixed absolute local targets and

@@ -2,6 +2,14 @@
 
 ## October 26 artifact-link preview correction
 
+Reference-style links now receive the same conservative pointer when overlong,
+with six host regressions. This is host recovery from consumed incomplete w,
+not an accepted Go coding result or a claim that v reviewed the new behavior.
+w stopped at its declared initial coding cap before revalidation/report/review;
+its fixture configured 17 production rounds despite that ten-reply cap. Align
+future preparation and expose the actual native reply ceiling in the next fresh
+bounded coding question. No w allowance may be extended or resumed.
+
 Host-written a2bb69c prevents truncation from splitting long inline-link/image
 destinations, leaving complete links in the agent report. Fresh v passed its 39-case
 frozen review with required scrutiny, independent effects/report checks and cleanup;

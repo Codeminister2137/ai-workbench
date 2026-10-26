@@ -1,6 +1,20 @@
 # Distance to established baseline CLI usability
 
-## October 26 current checkpoint: artifact-link preview fix reviewed
+## October 26 current checkpoint: reference previews fixed; coding acceptance incomplete
+
+Fresh w stopped at its declared initial ten-primary-reply cap after correcting
+three failed tests, before model revalidation, report, required scrutiny or frozen
+review. Ten Go/one local calls, 15 proposals, 203.14 seconds; all 505 protected inputs
+and 9,937 historical files stayed unchanged and owned cleanup was verified.
+The host fixture applied a ten-reply cap while configuring the production loop for
+17 rounds. This mismatch must be removed before fresh coding preparation; unused
+phase capacity does not authorize resuming w. Its retained candidate passed 51 cases
+in a later host-only rerun. The root adopts the one-line reference-marker extension
+with six independent host regressions, explicitly as host recovery rather than an
+accepted Go coding result. The new reference behavior still requires fresh frozen
+review. Evidence: `artifacts/cli-reference-postflight-20261026w/`.
+
+## October 26 earlier checkpoint: artifact-link preview fix reviewed
 
 The owner reported missing summary links. Windows chat targets now use slash-prefixed
 local paths, documented in AGENTS/workflow; file existence is verified, but client

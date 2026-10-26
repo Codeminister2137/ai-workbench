@@ -125,7 +125,7 @@ def _agent_outcome(response: str | None) -> str:
             # Keep full links in the report rather than clipping a destination.
             candidate = (
                 "See the agent report below for the linked outcome."
-                if "](" in candidate
+                if "](" in candidate or "][" in candidate
                 else candidate[:197].rstrip() + "..."
             )
         return (
