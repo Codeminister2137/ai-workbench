@@ -1,6 +1,26 @@
 # Distance to established baseline CLI usability
 
-## October 26 current checkpoint: fresh coding and cold-review question completed
+## October 26 selected native-Go C2 skill case
+
+Fresh aa verifies actual canonical review-repo-change selection, Git/tool prerequisite
+checks, full root/nested instruction and skill delivery, and exactly six inspection
+tools under read_only policy. The single-shot native-Go CLI inspects staged and
+unstaged changes, identifies both seeded regressions and accurately reports no model
+test execution. Required scrutiny passes. Six Go/two local calls, eight proposals,
+114.98 seconds;511frozen inputs/22,249historical files/index unchanged; owned cleanup
+and raw/scoped host evidence verified. Three host-only snapshot/prerequisite checks
+pass independently; these do not certify reviewed-function correctness.
+
+Review precision is qualified: its valid100/0.2 discount example accompanies an
+overbroad "any discount>0" trigger. The host corrects the condition to price>0 and
+discount!=0.5; this external qualification is not automatic CLI correction. Canonical
+skill delivery/authority is verified, not flawless reviewer accuracy. No consumed
+trial/report was changed or resumed. Evidence:
+`artifacts/cli-skill-postflight-20261026aa/final-assessment.md`.
+This selected native case advances C2/M2 and common-tool independence; C3-C6, applicable
+installed-client coverage and broader M4/live scrutiny-fed repair remain open.
+
+## October 26 coding and cold-review question completed
 
 Fresh z completes a small synthetic status-counting change using the production
 CLI at a373098, followed by a cold worker reviewing the same saved conversation and

@@ -1,5 +1,23 @@
 # Session History
 
+## 2026-10-26 — unattended start and native-Go portable-skill case aa
+
+Owner authorized a new unattended window14:41:41Z/15:41:41CET until19Z/20local;
+20minutecloseoutreserve and rolling sleep fallback recorded in the private active
+plan. Prior usage-limit interruption is not work. Fresh sealed aa was unconsumed,
+successful smoke confirmed,current entitlement/privacy/quota refreshed before launch.
+Actual native-Go single-shot CLI selected review-repo-change with checked Git/tool
+prerequisites,complete root/nested instructions and six-tool read_only authority.
+Both staged/unstaged seeded regressions were identified with correct concreteexamples;
+no model test execution/writes occurred or were claimed. Required scrutiny passed.
+Six Go/two local calls,eightproposals,114.98seconds;511frozeninputs/22249history/index
+unchanged;rawreport/hostreceipts and ownedcleanup verified. Three passing host checks
+cover identity/prerequisites only. Reviewprecisionqualified: "any discount>0" overlooks
+50%/zeroprice equality; host discloses exact condition,without replacing rawreport or
+claiming automatic CLI correction. Selected C2 delivery/authority is verified,not
+unqualified reviewer accuracy or fullM2/M5. Next independent candidate:C3 runtime and
+real test/lint/type diagnostics. Evidence: artifacts/cli-skill-postflight-20261026aa/.
+
 ## 2026-10-26 — z synthetic coding and cold frozen review completed
 
 Fresh z uses production a373098 and a small status-counting task, distinct from

@@ -1,5 +1,15 @@
 # CLI Development Foundation Roadmap
 
+## October 26 selected native-Go C2 evidence
+
+Fresh aa invokes the canonical portable review skill through the single-shot native
+Go CLI with checked prerequisites, complete root/nested instructions, six inspection
+tools and read_only policy. Both Git snapshots are reviewed, no model tests/writes
+are claimed, required scrutiny and independent effects/host validation/cleanup pass.
+Reviewer precision remains qualified by a disclosed overbroad discount trigger; the
+host's correction is not automatic CLI repair. This covers selected native C2 delivery
+and authority, not all C1-C6/M2/M5 or installed-client parity. See baseline-gap.md.
+
 ## October 26 coding/current-report/cold-review acceptance
 
 Fresh z completes the small synthetic status-counting coding question and a cold
