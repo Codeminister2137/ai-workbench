@@ -1,6 +1,40 @@
 # Distance to established baseline CLI usability
 
-## October 26 current checkpoint: narrow closeout review completed
+## October 26 current checkpoint: artifact-link preview fix reviewed
+
+The owner reported missing summary links. Windows chat targets now use slash-prefixed
+local paths, documented in AGENTS/workflow; file existence is verified, but client
+rendering/opening remains unconfirmed. Investigation also reproduced a production
+defect: the outcome preview clipped long inline-link/image destinations at 200 characters.
+Host-written a2bb69c adds a conservative bounded pointer, retaining complete links
+in the full report. Eleven host regressions cover long/short links, images, escaped
+labels/destinations, angle-wrapped/nested paths, plaintext and Changed-prefix handling.
+
+Fresh v completed frozen review of that current patch: 7 Go/2 local calls, 11 proposals,
+152.99 seconds; required scrutiny passed without format issues. All 39 selected cases
+passed model execution and an independent host rerun. All 507 frozen inputs and 8,364
+historical files stayed unchanged; raw report retention and owned cleanup verified.
+Its two minor prose counts are explicitly corrected in the postflight assessment:
+the pointer is 50 characters, not 55; seven read calls covered six unique public files,
+not three files overall. Neither changes correctness, authorization or the 200-character
+bound. Original reports remain unchanged. Evidence: `artifacts/cli-link-review-20261026v/`
+and `artifacts/cli-link-postflight-20261026v/`. Full validation: 3,058 passed, 3 skipped;
+Ruff/Pyright pass.
+
+The preceding u coding/cold-restart question remains incomplete. Its host AST guard
+rejected private helpers despite the announced task permitting local preview handling;
+this was a too-narrow preparation rule, not an established Go service error. 8 Go/1 local
+calls, 15 proposals, 282.74 seconds; 504 inputs/5,743 historical files and cleanup verified.
+Model tests, final report and frozen review were not reached. Original candidate/five
+tests remain preserved. Later host-only validation passed 38 existing cases but found
+three escaped/angle-path failures; the host selected the smaller pointer implementation
+rather than adopting that parser. No u result was rescued/regraded. Future coding
+preflight guards must match announced scope and allow ordinary local helper functions.
+
+This completes the link fix and its bounded frozen review, not M4/capability parity,
+successful live scrutiny-fed repair or general CLI baseline acceptance.
+
+## October 26 earlier checkpoint: narrow closeout review completed
 
 ADR-070's host-observation/report-scope implementation is committed as e999366.
 Fresh t completed a deliberately smaller frozen review of the closeout envelope:

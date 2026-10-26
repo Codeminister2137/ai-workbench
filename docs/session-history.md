@@ -1,5 +1,30 @@
 # Session History
 
+## 2026-10-26 artifact links and real preview defect
+
+Corrected Windows chat-link guidance to slash-prefixed absolute local targets and
+removed a stale current-roadmap pending-decision statement. Client rendering remains
+unconfirmed. Reproduced a separate real CLI defect: 200-character preview truncation
+split long inline Markdown destinations while the full report retained them.
+
+Fresh u attempted model coding then cold-restart frozen review. A too-narrow host
+AST guard rejected private preview helpers, so u stopped incomplete before tests,
+final report or review. 8 Go/1 local calls, 15 proposals, 282.74 seconds; 504 protected inputs,
+5,743 historical files and owned cleanup verified. The original candidate/five tests
+remain unchanged. Host-only tests found three escaped/angle-path gaps. The final
+root implementation a2bb69c is a smaller host-written seven-line fallback with eleven
+host regressions; it is not a promoted model solution or retrospective u acceptance.
+
+Fresh v reviewed the current host fix under new sealed bounds. 25 guards, scripted
+report correction/revalidation/re-review, 39 selected cases, negative digest calibration,
+smoke and current admission passed before paid inference. Live v: 7 Go/2 local, 11 proposals,
+152.99 seconds; 39 tests and required scrutiny passed. Independent checks confirmed 507
+inputs/8,364 historical files unchanged, raw report retention and owned cleanup. Minor
+prose-count errors are qualified in its postflight assessment; original reports remain.
+Current full validation passed 3,058 tests with three skips; Ruff/format/Pyright passed.
+No push/merge.
+Broader M4, capabilities and successful live scrutiny-fed repair remain incomplete.
+
 ## 2026-10-26 scoped host observations and fresh closeout acceptance
 
 The owner approved ADR-070's host facts plus repository/tool-action report scope.

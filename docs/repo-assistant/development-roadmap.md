@@ -1,5 +1,15 @@
 # CLI Development Foundation Roadmap
 
+## October 26 artifact-link preview correction
+
+Host-written a2bb69c prevents truncation from splitting long inline-link/image
+destinations, leaving complete links in the agent report. Fresh v passed its 39-case
+frozen review with required scrutiny, independent effects/report checks and cleanup;
+full registered validation passed 3,058 tests with three skips. The earlier coding/cold-restart
+trial u remains incomplete after a too-narrow host fixture guard rejected private
+helpers. This does not establish M4 or broader capability parity. See baseline-gap.md
+for exact provenance, evidence, minor report-count qualifications and remaining gates.
+
 ## October 25 reporting contract
 
 ADR-070 implements the owner-approved separation of host adapter/validation facts

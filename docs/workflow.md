@@ -109,6 +109,10 @@ On Windows, use a slash-prefixed Markdown target such as
 A bare `C:/...` target can be parsed as a URI scheme and lose the local-file link.
 Verify that the file exists; rendering/opening in the owner's client still requires
 client observation and must not be claimed solely from a filesystem check.
+The CLI's concise outcome preview uses a pointer to the full agent report when an
+overlong candidate contains an inline-link destination separator. This prevents
+clipping a URL or image destination. Complete links remain in the agent report;
+the preview does not promise to preserve clickable links or parse every Markdown form.
 
 ### Investigating unexplained errors
 
