@@ -1,5 +1,23 @@
 # CLI Development Foundation Roadmap
 
+## October 26 semantic evidence preparation
+
+Scrutiny now receives Python navigation and semantic rename preview/apply receipts,
+including bounded applied path/hash metadata and explicit omissions. Actual Jedi
+preview/apply/reuse-refusal and partial-metadata regressions pass; full3,073passed/
+3skipped,Ruff/format/Pyright pass. Permissions and ephemeral plan semantics are
+unchanged. Selected live C5 evidence remains prospective; see baseline-gap.md.
+
+## October 26 frozen review/provenance stop
+
+Fresh ac observed public fetch provenance and zero-connection private refusal,
+then its declared frozen-review guard rejected a command proposal before execution.
+No accepted report or required scrutiny followed; ac remains consumed incomplete.
+Independent input/history/index/cleanup checks and four host regressions pass.
+Command intent is unknown. Source981072b's live frozen review remains unestablished;
+the next independent capability slice is C5 semantic navigation/rename. See
+baseline-gap.md and `artifacts/cli-public-postflight-20261026ac/final-assessment.md`.
+
 ## October 26 runtime/fetch scrutiny evidence
 
 Consumed ab correctly executed the C3 diagnostics but did not complete required

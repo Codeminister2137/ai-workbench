@@ -1,5 +1,28 @@
 # Distance to established baseline CLI usability
 
+## October 26 semantic scrutiny receipts
+
+Host preparation for C5 reproduced dropped actual Jedi navigation/preview/apply
+receipts. Scrutiny now includes these bounded observations, selected plan metadata
+and up to eight applied path/hash entries, with explicit omissions for larger plans.
+Real-tool regression covers nonmutating preview, two-file apply and one-use refusal;
+another covers bounded partial-apply metadata. Full registered3,073passed/3skipped,
+Ruff/format/Pyright pass. This changes evidence delivery, not permissions, rename
+semantics or live capability acceptance. A fresh C5 coding/cold-review case is next.
+
+## October 26 frozen review ac remains incomplete
+
+Fresh ac stopped before execution of a proposed command outside its declared
+frozen-review scope: six Go/one local responses,19proposals/17executed tools,
+92.40seconds. Command intent is unknown; only its argument digest was retained.
+No final candidate or required scrutiny was reached. All507frozen inputs,
+26,500historical files/index and owned cleanup were independently verified;
+four host regression cases pass. Actual public HTTP200/body digest and retained
+length, plus private-network refusal with zero connections, support transport
+mechanics only. Review/provenance delivery remains incomplete. No consumed result
+was replayed or regraded. Evidence:
+`artifacts/cli-public-postflight-20261026ac/final-assessment.md`.
+
 ## October 26 C3 diagnostics and scrutiny-evidence repair
 
 Fresh ab observed correct active-runtime/one-case pytest/Ruff-F821/Pyright-type-error

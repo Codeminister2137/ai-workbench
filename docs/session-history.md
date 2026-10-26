@@ -1,5 +1,25 @@
 # Session History
 
+## 2026-10-26 — host semantic scrutiny evidence correction
+
+C5 preparation reproduced scrutiny dropping real Jedi navigation, preview and apply
+receipts. Host correction forwards these tools and selected bounded plan/path/hash
+metadata, including partial errors and explicit omitted-file counts. Real Jedi
+nonmutating preview/two-file apply/reused-plan refusal and bounded metadata cases
+pass; full registered3,073passed/3skipped,Ruff/format/Pyright pass. No permission,
+rename lifetime, provider or public API change. Live capability proof remains open.
+
+## 2026-10-26 — ac frozen review stopped within task scope guards
+
+Fresh ac on981072b:6Go/1local,19returned proposals/17executed tools,92.40seconds.
+The fixture rejected run_command outside frozen-review authorization before batch
+execution; exact command intent unknown because only argument digest retained.
+No candidate report/required scrutiny.507inputs/26,500history/index and owned cleanup
+verified;host4regression cases pass. Actual public HTTP200/body112744bytes/SHA256
+and private-network zero-connection refusal verified,without provenance-delivery
+completion. Original consumed result retained. Assessment:
+`artifacts/cli-public-postflight-20261026ac/final-assessment.md`.
+
 ## 2026-10-26 — stopped ab and host scrutiny-evidence correction
 
 ab observed active CPython3.14.4 versus a fake workspace hint,one real pytest pass,

@@ -62,6 +62,9 @@ def _observed_tool_evidence(args: argparse.Namespace) -> str:
             "run_command",
             "python_runtime",
             "fetch_url",
+            "python_navigate",
+            "rename_preview",
+            "rename_apply",
         }
     ]
     observations = {
@@ -114,7 +117,7 @@ def _observed_tool_evidence(args: argparse.Namespace) -> str:
         reverse=True,
     )
     for ordinal, item in priority:
-        metadata = {
+        metadata: dict[str, Any] = {
             key: value[:250] if isinstance(value, str) else value
             for key in (
                 "path",
@@ -129,9 +132,33 @@ def _observed_tool_evidence(args: argparse.Namespace) -> str:
                 "sha256",
                 "bytes_retained",
                 "truncated",
+                "operation",
+                "plan_id",
+                "plan_sha256",
             )
             if isinstance(value := item.metadata.get(key), (str, int, bool))
         }
+        if item.name == "rename_preview":
+            metadata["applied"] = item.metadata.get("applied") is True
+            files = item.metadata.get("files")
+            if isinstance(files, list):
+                metadata["files"] = [name[:250] for name in files[:8] if isinstance(name, str)]
+                if len(files) > 8:
+                    metadata["files_omitted"] = len(files) - 8
+        elif item.name == "rename_apply":
+            applied = item.metadata.get("applied")
+            if isinstance(applied, list):
+                metadata["applied"] = [
+                    {
+                        key: value[:250]
+                        for key in ("path", "sha256")
+                        if isinstance(value := entry.get(key), str)
+                    }
+                    for entry in applied[:8]
+                    if isinstance(entry, dict)
+                ]
+                if len(applied) > 8:
+                    metadata["applied_files_omitted"] = len(applied) - 8
         if item.name == "python_runtime":
             runtime_metadata = item.metadata.get("runtime")
             if isinstance(runtime_metadata, dict):

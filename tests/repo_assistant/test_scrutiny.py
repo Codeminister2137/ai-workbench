@@ -582,6 +582,47 @@ def test_long_tool_output_retains_terminal_result_with_explicit_middle_omission(
     assert "middle omitted" in evidence and len(evidence) <= 12_000
 
 
+def test_semantic_receipt_metadata_is_bounded_and_excludes_unrelated_fields():
+    from argparse import Namespace
+
+    from ai_agent.contracts import ToolResult
+    from ai_agent.scrutiny_workflow import _observed_tool_evidence
+
+    files = [f"changed_{index}.py" for index in range(32)]
+    evidence = _observed_tool_evidence(
+        Namespace(
+            _scrutiny_tool_results=(
+                ToolResult(
+                    "rename_preview",
+                    "Preview only",
+                    metadata={
+                        "files": files,
+                        "applied": False,
+                    },
+                ),
+                ToolResult(
+                    "rename_apply",
+                    "Partially applied; reconcile remaining files",
+                    is_error=True,
+                    metadata={
+                        "applied": [
+                            {"path": name, "sha256": str(index) * 64, "unrelated": "EXCLUDED_VALUE"}
+                            for index, name in enumerate(files)
+                        ]
+                    },
+                ),
+            )
+        )
+    )
+    assert '"applied": false' in evidence
+    assert '"files_omitted": 24' in evidence
+    assert '"applied_files_omitted": 24' in evidence
+    assert "changed_0.py" in evidence and "changed_31.py" not in evidence
+    assert "EXCLUDED_VALUE" not in evidence
+    assert "is_error=True" in evidence and "Partially applied" in evidence
+    assert len(evidence) <= 12_000
+
+
 def test_runtime_receipt_survives_later_large_reads_with_recent_validation(tmp_path):
     import sys
     from argparse import Namespace
