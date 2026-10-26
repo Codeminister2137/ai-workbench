@@ -623,6 +623,66 @@ def test_semantic_receipt_metadata_is_bounded_and_excludes_unrelated_fields():
     assert len(evidence) <= 12_000
 
 
+def test_scrutiny_retains_owned_process_start_status_stop_and_unknown_handle(tmp_path):
+    import sys
+    import time
+    from argparse import Namespace
+
+    from ai_agent.contracts import ToolCall
+    from ai_agent.processes import ProcessSupervisor, ProcessTool
+    from ai_agent.scrutiny_workflow import _observed_tool_evidence
+    from ai_agent.tools.base import ToolContext
+
+    supervisor = ProcessSupervisor(tmp_path)
+    context = ToolContext(tmp_path)
+    try:
+        started = ProcessTool(supervisor, "start").run(
+            ToolCall(
+                "process_start",
+                {
+                    "argv": [
+                        sys.executable,
+                        "-u",
+                        "-c",
+                        "import time; print('OWNED_CHILD_READY', flush=True); time.sleep(30)",
+                    ]
+                },
+            ),
+            context,
+        )
+        assert not started.is_error
+        handle = started.metadata["process_handle"]
+        end = time.monotonic() + 5
+        while True:
+            observed = ProcessTool(supervisor, "status").run(
+                ToolCall("process_status", {"process_handle": handle}), context
+            )
+            if "OWNED_CHILD_READY" in observed.output:
+                break
+            assert time.monotonic() < end
+            time.sleep(0.01)
+        stopped = ProcessTool(supervisor, "stop").run(
+            ToolCall("process_stop", {"process_handle": handle}), context
+        )
+        refused = ProcessTool(supervisor, "status").run(
+            ToolCall("process_status", {"process_handle": "not-owned"}), context
+        )
+        assert not stopped.is_error and stopped.metadata["returncode"] is not None
+        assert refused.is_error
+        evidence = _observed_tool_evidence(
+            Namespace(_scrutiny_tool_results=(started, observed, stopped, refused))
+        )
+        for name in ("process_start", "process_status", "process_stop"):
+            assert f"Tool: {name}" in evidence
+        assert handle in evidence and "OWNED_CHILD_READY" in evidence
+        assert "Unknown process handle" in evidence and "is_error=True" in evidence
+        assert evidence.index("Tool: process_start") < evidence.index("Tool: process_stop")
+        assert len(evidence) <= 12_000
+    finally:
+        supervisor.close()
+    assert all(owned.process.poll() is not None for owned in supervisor.processes.values())
+
+
 def test_runtime_receipt_survives_later_large_reads_with_recent_validation(tmp_path):
     import sys
     from argparse import Namespace
@@ -821,7 +881,7 @@ def test_scrutiny_distinguishes_existing_git_diff_from_current_invocation_change
     assert "Git diff/status do not establish when or by whom a change was made" in prompt
     assert "do not establish that runtime bookkeeping was untouched" in prompt
     assert "Existing Git diff: earlier coding result" in prompt and "11 passed" in prompt
-    assert "current execution attempt" in prompt
+    assert "current invocation, including earlier repair attempts" in prompt
     assert "read-only request can inspect earlier uncommitted changes" in system
     assert "No network tools does not mean" in system
     assert "Delivery contract: Agent narrative describes repository/tool actions" in system

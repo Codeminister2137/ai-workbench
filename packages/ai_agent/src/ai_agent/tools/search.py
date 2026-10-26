@@ -92,7 +92,9 @@ class FindFilesTool(BaseTool):
 
         matches: list[str] = []
         for item in _workspace_entries(target_path, context):
-            if fnmatch.fnmatch(item.name, pattern):
+            if fnmatch.fnmatch(item.name, pattern) or item.relative_to(target_path).full_match(
+                pattern
+            ):
                 try:
                     rel = item.relative_to(context.workspace_root)
                     matches.append(str(rel))
@@ -211,7 +213,11 @@ class GrepSearchTool(BaseTool):
                 resolved = file_path.resolve()
                 if not context.is_within_workspace(resolved):
                     continue
-                content = resolved.read_text(encoding="utf-8", errors="ignore")
+                content = resolved.read_text(encoding="utf-8")
+                # Runtime databases and other binary files are not source text.
+                # Ignoring decode failures can also fabricate a matching token.
+                if "\0" in content:
+                    continue
             except Exception:  # noqa: BLE001
                 continue
 

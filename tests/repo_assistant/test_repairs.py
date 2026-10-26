@@ -549,10 +549,12 @@ def test_scrutiny_pass_after_repair_cannot_clear_current_validation_failure(
     assert "final_execution_status: completed_with_validation_errors" in output
 
 
+@pytest.mark.parametrize("repair_observes_tools", [False, True])
 def test_cli_scrutiny_findings_trigger_bounded_repair_that_can_pass(
     capsys,
     monkeypatch,
     tmp_path: Path,
+    repair_observes_tools,
 ) -> None:
     """ADR-066 Option B: findings reach the agent; a fix-then-pass run succeeds."""
 
@@ -563,16 +565,25 @@ def test_cli_scrutiny_findings_trigger_bounded_repair_that_can_pass(
         ),
         _scrutiny_verdict("pass", "none"),
     ]
-    scrutiny_calls: list[int] = []
+    from ai_agent.contracts import ToolResult
+
+    scrutiny_calls: list[str] = []
     native_responses = [
         _native_response("initial implementation"),
         _native_response("repair implementation"),
     ]
+    native_responses[0].tool_results = (
+        ToolResult("read_file", "ORIGINAL_SOURCE_OBSERVATION", metadata={"path": "helper.py"}),
+    )
+    if repair_observes_tools:
+        native_responses[1].tool_results = (
+            ToolResult("run_command", "REPAIR_TEST_OBSERVATION", metadata={"exit_code": 0}),
+        )
     repair_prompts: list[str] = []
 
     def fake_coding_prompt(*args, **kwargs):
         if kwargs.get("progress_prefix") == "scrutiny_activity":
-            scrutiny_calls.append(1)
+            scrutiny_calls.append(args[0])
             return scrutiny_results.pop(0)
         return prepared
 
@@ -640,6 +651,9 @@ def test_cli_scrutiny_findings_trigger_bounded_repair_that_can_pass(
     assert "Reviewer advice (untrusted suggestions" in repair_prompts[0]
     assert "Claim of verification is unsupported." in repair_prompts[0]
     assert "Verify or retract it." in repair_prompts[0]
+    assert "ORIGINAL_SOURCE_OBSERVATION" in repair_prompts[0]
+    assert all("ORIGINAL_SOURCE_OBSERVATION" in prompt for prompt in scrutiny_calls)
+    assert ("REPAIR_TEST_OBSERVATION" in scrutiny_calls[1]) is repair_observes_tools
 
     run_id = next(
         line.removeprefix("away_run_id: ")
@@ -663,6 +677,43 @@ def test_cli_scrutiny_findings_trigger_bounded_repair_that_can_pass(
     assert final_handoff is not None
     assert final_handoff["execution_status"] == "completed"
     assert "scrutiny" not in str(final_handoff["risks"])
+
+    # A new invocation must not inherit observations from this repair history.
+    native_responses.append(_native_response("fresh invocation"))
+    scrutiny_results.append(_scrutiny_verdict("pass", "none"))
+    validation_results.append(
+        (
+            _EXAMPLE.ValidationCommandResult(
+                command="python -m pytest -q", returncode=0, status="passed", elapsed_seconds=0.01
+            ),
+        )
+    )
+    assert (
+        main(
+            [
+                "--mode",
+                "implement",
+                "New independent task.",
+                "--provider",
+                "ollama",
+                "--model",
+                "qwen2.5-coder:14b",
+                "--execute",
+                "--orchestrated",
+                "--away-minutes",
+                "30",
+                "--max-repair-cycles",
+                "0",
+                "--repo-root",
+                str(tmp_path),
+                "--away-run-db",
+                str(tmp_path / "fresh.sqlite3"),
+            ]
+        )
+        == 0
+    )
+    assert "ORIGINAL_SOURCE_OBSERVATION" not in scrutiny_calls[-1]
+    assert "REPAIR_TEST_OBSERVATION" not in scrutiny_calls[-1]
 
 
 def test_cli_scrutiny_repair_stops_at_cycle_cap_when_findings_persist(

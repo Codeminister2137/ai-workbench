@@ -1,5 +1,32 @@
 # Distance to established baseline CLI usability
 
+## October 26 attended repair/search/process slice
+
+Host corrections now carry bounded earlier native receipts into repair and retain
+initial plus repair observations for re-review. A fresh invocation starts clean;
+earlier observations are explicitly labelled historical rather than current proof.
+Process start/status/stop receipts also reach scrutiny. Search skips NUL-bearing
+or invalid UTF-8 content instead of fabricating text matches, and recursive globs
+match root/nested files relative to their selected base.
+
+Four additional cases cover repair with/without new receipts and invocation reset,
+actual owned-child start/poll/stop/refusal/cleanup, SQLite/invalid UTF-8/Unicode search,
+and recursive glob behavior. Focused84passed; final registered3,077passed/3skipped,
+Ruff/format/Pyright pass. This is host implementation and deterministic evidence,
+not accepted live scrutiny-fed repair, C6 continuity or required real-model frozen
+review. General baseline remains incomplete. Original ab/ac/ad results are retained.
+
+## October 26 C5 correct effects; delivery incomplete
+
+Fresh ad observed actual definitions/references, nonmutating preview, exact two-file
+apply, current diff/status and eight passing model tests. Independent host tests,
+semantic oracle, preserved comments/string/public behavior and applied hashes pass.
+The next proposal exceeded the original20-tool initial allowance before delivery:
+nine Go/one local,21returned/20executed tools,82.14seconds. No final report, required
+scrutiny or frozen review followed; ad remains consumed incomplete.509protected
+inputs/27,560history/index and owned cleanup verified. No extension/replay/regrade.
+Evidence: `artifacts/cli-semantic-postflight-20261026ad/final-assessment.md`.
+
 ## October 26 semantic scrutiny receipts
 
 Host preparation for C5 reproduced dropped actual Jedi navigation/preview/apply

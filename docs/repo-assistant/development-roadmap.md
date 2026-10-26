@@ -1,5 +1,23 @@
 # CLI Development Foundation Roadmap
 
+## October 26 attended evidence/search corrections
+
+Native repair receives bounded prior observations and preserves chronological
+initial/repair receipts for re-review; invocation reset prevents cross-task carryover.
+Process receipts reach scrutiny. Search excludes NUL-bearing/invalid UTF-8 content
+and supports base-relative recursive globs. Final registered3,077passed/3skipped,
+Ruff/format/Pyright pass. These host fixes are not live C6 or scrutiny-fed repair
+acceptance. Required fresh frozen review and broader baseline work remain open.
+Owner ended unattended mode at20:23local; no new paid trial or sleep was started.
+
+## October 26 C5 effects observed; complete delivery remains open
+
+Fresh ad performed correct two-file Jedi navigation/preview/apply and eight model
+tests, independently checked by the host. The original initial tool allowance ended
+before a final report, required scrutiny or frozen review. It remains consumed
+incomplete despite correct effects; protections/history/index/owned cleanup pass.
+See baseline-gap.md and `artifacts/cli-semantic-postflight-20261026ad/final-assessment.md`.
+
 ## October 26 semantic evidence preparation
 
 Scrutiny now receives Python navigation and semantic rename preview/apply receipts,

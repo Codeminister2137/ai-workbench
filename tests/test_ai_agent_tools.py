@@ -24,6 +24,38 @@ def test_tool_context_path_resolution(tmp_path: Path) -> None:
     assert context.is_within_workspace(tmp_path.parent / "outside.txt") is False
 
 
+def test_search_skips_sqlite_bytes_and_invalid_utf8_without_losing_unicode(tmp_path):
+    import sqlite3
+
+    with sqlite3.connect(tmp_path / "runtime.sqlite3") as connection:
+        connection.execute("CREATE TABLE messages(content TEXT)")
+        connection.execute("INSERT INTO messages VALUES (?)", ("TARGET_TOKEN runtime payload",))
+    (tmp_path / "invalid.dat").write_bytes(b"TARGET_\xffTOKEN fabricated\n")
+    (tmp_path / "code.py").write_text("# TARGET_TOKEN caf\u00e9\n", encoding="utf-8")
+    result = GrepSearchTool().run(
+        ToolCall("grep_search", {"query": "TARGET_TOKEN"}), ToolContext(tmp_path)
+    )
+    assert not result.is_error
+    assert "code.py:1: # TARGET_TOKEN caf\u00e9" in result.output
+    assert "runtime.sqlite3" not in result.output and "invalid.dat" not in result.output
+    assert result.metadata["matches"] == 1
+
+
+def test_find_files_recursive_glob_matches_root_and_nested_files_relative_to_base(tmp_path):
+    base = tmp_path / "project"
+    nested = base / "nested"
+    nested.mkdir(parents=True)
+    for path in (base / "test_root.py", nested / "test_child.py", tmp_path / "test_outside.py"):
+        path.write_text("", encoding="utf-8")
+    result = FindFilesTool().run(
+        ToolCall("find_files", {"pattern": "**/test_*.py", "path": "project"}),
+        ToolContext(tmp_path),
+    )
+    assert not result.is_error and result.metadata["count"] == 2
+    assert "test_root.py" in result.output and "test_child.py" in result.output
+    assert "test_outside.py" not in result.output
+
+
 def test_create_and_read_file_tool(tmp_path: Path) -> None:
     context = ToolContext(workspace_root=tmp_path)
     create_tool = CreateFileTool()

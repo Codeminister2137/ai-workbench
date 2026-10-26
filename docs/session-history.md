@@ -1,5 +1,40 @@
 # Session History
 
+## 2026-10-26 — attended closeout after usage-limit interruption
+
+Unattended window started14:41:41Z/15:41:41CET with fixed19Z/20local deadline.
+Last confirmed checkpoint16:34:41Z; interrupted full-test log lastwrite16:36:04Z.
+Automatic approval review then rejected the next command because usage was exhausted;
+the command did not execute. No work is claimed for the gap. Owner resumed attended
+work at20:23local; clock verified19:23:51Z. Immediate slice was validated and closed;
+no additional paid trial was started. Wider C6/M4/frozen-review work remains incomplete.
+
+Host fixes retain bounded prior native receipts for repair and initial/repair history
+for re-review, reset observations between invocations, deliver process receipts, skip
+NUL-bearing/invalid UTF-8 search content and support base-relative recursive globs.
+Four additional cases include real SQLite and owned-child effects. Focused84passed;
+final registered3,077passed/3skipped,Ruff/format/Pyright pass. Original ab/ac/ad results
+and27,560historical files/509protected ad inputs/index remain unchanged. Logs:
+`artifacts/repair-search-process-attended-full-20261026.log` and
+`artifacts/repair-search-process-pyright-20261026.log`.
+
+Current window sleep receipt records cancellation18:30:08Z/19:30:08local, helper94312
+absent. Attended CancelAll signalled all timers; an old October23 receipt lacks its
+acknowledgement, but all eight registered helper PIDs are absent. Original receipts
+are preserved; no new timer or physical sleep transition is claimed. The old stale
+registration remains a documented tooling follow-up, outside this immediate slice.
+
+## 2026-10-26 — ad C5 effects verified; original bound stop before report
+
+Fresh ad on76bbd3c:9Go/1local,21returnedproposals/20executed tools,82.14seconds.
+Actual semantic navigation, nonmutating preview/exact plan apply changed two intended
+sources; eight model cases, host rerun, semantic oracle and applied hashes pass.
+Next proposal crossed original20-tool initial cap; no report/required scrutiny/
+frozen review.509protected inputs/27,560history/index and owned cleanup verified.
+Consumed incomplete,not extended/replayed/regraded. Search returned runtime SQLite
+content and recursive glob missed tests; both separately reproduced for host repair.
+Assessment: `artifacts/cli-semantic-postflight-20261026ad/final-assessment.md`.
+
 ## 2026-10-26 — host semantic scrutiny evidence correction
 
 C5 preparation reproduced scrutiny dropping real Jedi navigation, preview and apply
