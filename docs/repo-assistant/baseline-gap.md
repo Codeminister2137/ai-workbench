@@ -1,6 +1,31 @@
 # Distance to established baseline CLI usability
 
-## October 26 current checkpoint: reference/notice corrections reviewed; coding acceptance incomplete
+## October 26 current checkpoint: fresh coding and cold-review question completed
+
+Fresh z completes a small synthetic status-counting change using the production
+CLI at a373098, followed by a cold worker reviewing the same saved conversation and
+exact independently accepted bytes. The model authors the implementation and three
+meaningful companions; both phases execute 16 selected cases (13 protected + three
+authored), deliver supported current reports and pass required scrutiny without
+format issues. Independent host reruns and a separate black-box oracle pass. No
+live repair, host source recovery, replacement report or trial extension was needed.
+
+Sixteen Go/four local calls, 24 proposals and 520.94 seconds stayed within fresh
+bounds. All 508 protected inputs, 16,811 historical files, frozen candidate and Git
+index were unchanged; original task/report continuity, raw retention, scoped adapter
+metadata and owned cleanup were independently verified. Native/private initial caps
+matched, and the current CLI disclosed the configured reply ceiling. The synthetic
+function remains fixture-only; production source is unchanged. Root's prior full
+validation remains 3,067 passed/3 skipped, Ruff/format/Pyright pass.
+
+This closes the declared narrow model-authored coding/current-report/cold-worker
+review question. General baseline acceptance remains incomplete: broader M4 history,
+interruption/correction/fallback, selected live capability gates and successful live
+scrutiny-fed repair remain unestablished. Earlier consumed results are not regraded.
+Evidence: `artifacts/cli-status-continuity-20261026z/` and
+`artifacts/cli-status-postflight-20261026z/final-assessment.md`.
+
+## October 26 earlier checkpoint: reference/notice corrections reviewed
 
 Fresh y completed frozen review of host checkpoint 405cb52: ten Go/two local calls,
 19 proposals, 234.40 seconds. Required scrutiny passed without format limitations.

@@ -1,5 +1,22 @@
 # Session History
 
+## 2026-10-26 — z synthetic coding and cold frozen review completed
+
+Fresh z uses production a373098 and a small status-counting task, distinct from
+consumed span/link/notice trials. The model implements one-pass normalized counts,
+adds three meaningful companions, executes 16 cases and delivers a supported report.
+A second cold worker retains the original task/report in one saved conversation,
+reviews exact host-accepted frozen bytes read-only, executes the same 16 cases and
+delivers a supported substantive review. Required scrutiny passes both phases with
+no format issues. Independent reruns and separate host oracles pass. No live repair,
+host source recovery, replacement reports, bounds extensions or regrading occurred.
+Sixteen Go/four local calls, 24 proposals, 520.94 seconds; all 508 protected inputs,
+16,811 historical files and scratch index unchanged; raw reports/scoped metadata,
+two exited workers and owned runtime/listener cleanup verified. Source stays fixture-
+only. Narrow coding/current-report/cold-review acceptance is complete; general CLI/
+M4/capability/fallback and successful live scrutiny-fed repair remain incomplete.
+Evidence: artifacts/cli-status-continuity-20261026z/ and cli-status-postflight-20261026z/.
+
 ## 2026-10-26 — y frozen review of current host corrections completed
 
 Fresh y reviewed the reference-preview correction and native reply-ceiling notice at

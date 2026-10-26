@@ -1,5 +1,17 @@
 # CLI Development Foundation Roadmap
 
+## October 26 coding/current-report/cold-review acceptance
+
+Fresh z completes the small synthetic status-counting coding question and a cold
+read-only review in the same saved conversation. Both model-authored reports are
+supported; 16 selected cases and required scrutiny pass in each phase. Independent
+host reruns/oracles, all 508 protected inputs/16,811 historical files, frozen bytes,
+continuity/raw retention and owned cleanup pass. Sixteen Go/four local calls and
+24 proposals consumed 520.94 seconds within original bounds. No live repair or host
+source recovery was needed; source remains in the evidence fixture. This closes
+that narrow completion/report-fidelity question, not general M4/capability/fallback
+parity or successful live scrutiny-fed repair. See baseline-gap.md and the z postflight.
+
 ## October 26 artifact-link preview correction
 
 Reference-style links now receive the same conservative pointer when overlong,
