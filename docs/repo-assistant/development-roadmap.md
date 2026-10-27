@@ -1,5 +1,26 @@
 # CLI Development Foundation Roadmap
 
+## October 27 Meta Model API provider route
+
+The owner chose a dedicated Meta adapter over a generic base-URL override, because
+the route must stay usable after the hackathon on the owner's own Meta account and
+because Meta content-training consent should be an explicit admission rule rather
+than a catalogue note. `ProviderKind.META` resolves `META_API_KEY`; new
+`MetaResponsesChatClient` inherits `OpenAIResponsesChatClient`, defaults to
+`https://api.meta.ai/v1`, forces `store: false`, refuses non-`muse-` ids on both the
+configured and per-request model, and refuses Contributor variants because Meta
+trains on their request content. `BillingSource.META_API_BILLING` plus the
+`meta/muse-spark-1.3` route at `prepaid_credits_allowed` make the cost boundary
+explicit; the route's estimate uses the published Standard prices
+(USD1.25/4.25 per million input/output tokens, checked 2026-10-27). Ten tests
+(nine mocked transport/admission cases plus one environment-key case) cover factory
+routing, wrong-provider and wrong-model refusal, refusal of a per-request
+Contributor override, endpoint override, the `store: false` payload, streaming
+deltas and local-only privacy refusal. Validation: root **2968 passed / 9 skipped**,
+Ruff/format clean (336 files), Pyright 0 errors, and a plan-mode CLI run selects
+`meta/muse-spark-1.3` without inference. No live call, account probe or quality
+acceptance was performed.
+
 ## October 27 in-turn slash-command handling
 
 Idle coding-chat input refuses an unrecognized slash command instead of treating it as

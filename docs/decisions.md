@@ -1,3 +1,17 @@
+## ADR-071 - Dedicated Meta Model API provider route
+
+**Status:** Accepted
+**Date:** 2026-10-27
+
+Add `ProviderKind.META` and a dedicated `MetaResponsesChatClient` that inherits
+the generic Responses adapter, defaults to `https://api.meta.ai/v1`, refuses
+Contributor variants and non-`muse-` models, and forces `store: false`. The
+catalog route `meta/muse-spark-1.3` is `prepaid_credits_allowed` while prepaid
+credit remains; the owner's own Meta account keeps the route available after the
+event.
+
+Detailed ADR: `docs/decisions/ADR-071-meta-model-api-provider-route.md`
+
 ## ADR-070 - Host observations and scoped agent reports
 
 **Status:** Accepted

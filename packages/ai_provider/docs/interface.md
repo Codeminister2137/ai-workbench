@@ -138,7 +138,7 @@ finish metadata normalizes to `unknown`.
 
 Configured backend selection:
 
-- `provider`: `ollama`, `requesty`, `openrouter`, `openai`, `google`, or `opencode_go`;
+- `provider`: `ollama`, `requesty`, `openrouter`, `openai`, `google`, `opencode_go`, or `meta`;
 - `model`: backend model ID;
 - `base_url`: optional backend URL override;
 - `api_key`: optional hosted-provider credential loaded from environment or
