@@ -118,3 +118,15 @@ def test_factory_creates_opencode_go_client() -> None:
     )
 
     assert isinstance(client, OpenCodeGoChatClient)
+
+
+def test_backend_config_loads_meta_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AI_PROVIDER_KIND", "meta")
+    monkeypatch.setenv("AI_PROVIDER_MODEL", "muse-spark-1.3")
+    monkeypatch.delenv("AI_PROVIDER_API_KEY", raising=False)
+    monkeypatch.setenv("META_API_KEY", "meta-test-key")
+
+    config = BackendConfig.from_env()
+
+    assert config.provider is ProviderKind.META
+    assert config.api_key == "meta-test-key"

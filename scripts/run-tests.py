@@ -51,6 +51,7 @@ GROUPS = {
         "tests/test_route_family_matcher.py",
         "tests/test_local_capabilities.py",
         "tests/test_local_ollama_latency_example.py",
+        "tests/test_meta_responses_adapter.py",
         "tests/test_codex_usage.py",
         "tests/test_copilot_usage.py",
         "tests/test_kiro_usage.py",
