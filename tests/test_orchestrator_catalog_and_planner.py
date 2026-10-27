@@ -282,7 +282,7 @@ def test_provider_override_accepts_every_catalog_provider(monkeypatch, tmp_path,
         "--privacy",
         "public_or_low_risk",
         "--cost-policy",
-        "allowances_allowed",
+        "billing_allowed",
     ]
 
     for provider in providers:

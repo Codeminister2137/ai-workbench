@@ -110,6 +110,7 @@ class BillingSource(StrEnum):
     ANTIGRAVITY_SUBSCRIPTION_ALLOWANCE = "antigravity_subscription_allowance"
     GITHUB_COPILOT_SUBSCRIPTION_ALLOWANCE = "github_copilot_subscription_allowance"
     KIRO_SUBSCRIPTION_ALLOWANCE = "kiro_subscription_allowance"
+    META_API_BILLING = "meta_api_billing"
 
 
 class CostPolicyTier(StrEnum):

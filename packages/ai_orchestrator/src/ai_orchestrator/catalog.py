@@ -232,6 +232,8 @@ def _default_billing_source(provider: str, access_method: AccessMethod) -> str:
         return BillingSource.GOOGLE_AI_STUDIO_FREE.value
     if provider == "openai":
         return BillingSource.OPENAI_API_BILLING.value
+    if provider == "meta":
+        return BillingSource.META_API_BILLING.value
     return BillingSource.OPENAI_API_BILLING.value
 
 
