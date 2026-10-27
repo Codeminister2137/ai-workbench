@@ -1,5 +1,16 @@
 # CLI Development Foundation Roadmap
 
+## October 27 in-turn slash-command handling
+
+Idle coding-chat input refuses an unrecognized slash command instead of treating it as
+a request, but the in-flight reader queued it: typing `/model ...` during a running
+turn silently became the next coding request, and the model received a command string
+as owner text. In-flight input now refuses unknown slash commands with the same
+guidance and offers `/steer` for a literal request that begins with `/`. One focused
+regression covers refusal and the `/steer` escape. No approval, queue-ordering or
+steering semantics changed; idle commands, approvals and bare `yes`/`no` handling are
+untouched.
+
 ## October 27 C6 trial fixture prepared offline
 
 The process/session-continuity question now has a fresh sealed fixture at

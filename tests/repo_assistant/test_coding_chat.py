@@ -136,6 +136,23 @@ def test_queued_input_is_scoped_to_its_conversation(tmp_path: Path):
         second.turn(queued, lambda request: pytest.fail("must not execute"))
 
 
+def test_inflight_unknown_slash_command_is_refused_not_queued_as_a_request():
+    from ai_agent.coding_chat_input import CodingChatInput
+
+    written = []
+    terminal = CodingChatInput(written.append)
+
+    terminal.feed("/model gpt-oss:20b")
+    assert not terminal.pending
+    assert any("unknown command during a turn" in text for text in written)
+
+    # A literal request that begins with '/' stays reachable through /steer.
+    terminal.feed("/steer /model gpt-oss:20b")
+    assert list(terminal.pending) == ["/model gpt-oss:20b"]
+    original = next(text for text in written if "unknown command" in text)
+    assert "/steer" in original
+
+
 def test_multiple_inflight_corrections_use_latest_request_with_all_owner_context(tmp_path):
     from ai_agent.coding_chat_input import CodingChatInput
 
