@@ -21,6 +21,18 @@ Ruff/format clean (336 files), Pyright 0 errors, and a plan-mode CLI run selects
 `meta/muse-spark-1.3` without inference. No live call, account probe or quality
 acceptance was performed.
 
+## October 27 Meta live connectivity smoke
+
+Four synthetic probes (no repository content, under USD0.01 total) confirmed
+authentication, `system`-role input, `store: false` and provider-reported usage on
+`muse-spark-1.3`. They also produced one operational fact: at a 64-token output cap
+the answer was empty with `finish_reason: length`, while the same prompt at 512
+tokens returned `link ok` after 467 output tokens, 456 of them reasoning. Muse Spark
+therefore spends roughly 95% of its output budget on reasoning, so tightly capped
+requests silently return nothing and budgets must be sized for reasoning plus answer.
+Recorded in `packages/ai_provider/docs/source-state.md` and `model-catalog.md`. This is
+connectivity and accounting evidence only, not quality acceptance.
+
 ## October 27 in-turn slash-command handling
 
 Idle coding-chat input refuses an unrecognized slash command instead of treating it as

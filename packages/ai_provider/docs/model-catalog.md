@@ -102,11 +102,13 @@ policy.
 
 Standard Muse pricing is USD1.25 per million input tokens and USD4.25 per million
 output tokens, with cached input at USD0.15. Reasoning and visible output share
-`max_output_tokens`, so a small output cap can truncate an answer that spent its
-budget reasoning. Meta's dashboard spend setting only sends an alert; it is not a
-hard cap, so local admission bounds remain the spending guard. The catalog route
-is `meta/muse-spark-1.3` at `prepaid_credits_allowed`; lower it to
-`billing_allowed` only when charging the owner's account is intended.
+`max_output_tokens`. A live probe on 2026-10-27 returned **no visible text** at a
+64-token cap and `link ok` at 512 tokens with 456 of those 467 tokens spent on
+reasoning, so budget output generously rather than tightly. Meta's dashboard spend
+setting only sends an alert; it is not a hard cap, so local admission bounds remain
+the spending guard. The catalog route is `meta/muse-spark-1.3` at
+`prepaid_credits_allowed`; lower it to `billing_allowed` only when charging the
+owner's account is intended.
 
 ## Capability prior coverage — checked 2026-10-22
 

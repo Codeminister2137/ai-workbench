@@ -839,3 +839,14 @@ rejects `truncation: "auto"` and `frequency_penalty`/`presence_penalty`, and
 `reasoning.effort: "none"` is unsupported for Muse Spark. Prompt caching is
 available (`prompt_cache_retention` hint), so repeated long instructions may bill
 at the cached input rate.
+
+Measured live on 2026-10-27 with four synthetic probes that contained no repository
+content (`artifacts/meta-smoke-20261027/`): authentication, `system`-role input,
+`store: false` and provider-reported usage all work against `muse-spark-1.3`. One
+operational fact matters for budgeting: at `max_output_tokens: 64` the response
+carried **no visible text** and reported `finish_reason: length`, because all 64
+output tokens were reasoning; the same prompt at `max_output_tokens: 512` returned
+`link ok` after 467 output tokens, **456 of them reasoning**. Muse Spark therefore
+spent roughly 95% of its output budget on reasoning even for a trivial prompt, so a
+small cap silently produces empty answers. The four probes cost under USD0.01 in
+total. This is a small connectivity/accounting observation, not quality acceptance.
