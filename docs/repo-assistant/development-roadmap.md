@@ -1,5 +1,20 @@
 # CLI Development Foundation Roadmap
 
+## October 27 C6 trial fixture prepared offline
+
+The process/session-continuity question now has a fresh sealed fixture at
+`artifacts/cli-c6-continuity-20261027ae-preparation-v1/` (private). It is built from
+the public archive of commit `10695c2`, adds a synthetic `plan_jobs` task with 15
+protected cases, and adds a protected bounded long job. Verified offline only: the
+seed fails all 15 protected cases (non-vacuity), a host reference implementation plus
+companion passes 16/16, and the long job runs 6.09s producing 11 lines ending in
+`complete`, so a second-turn poll can distinguish partial progress from completion.
+The launch harness, route switch and process-handle continuity are **not** built and
+no paid trial was prepared or launched. Two harness constraints are now recorded:
+the existing z harness runs each phase in a fresh child process, so it cannot carry a
+shared host process handle, and C6 needs one persistent foreground CLI process driving
+two scripted turns plus an offline route switch, verified offline before any paid run.
+
 ## October 27 search evidence fidelity correction
 
 Review of the previous search slice found two host-only defects. `grep_search`

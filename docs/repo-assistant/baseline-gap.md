@@ -1,5 +1,15 @@
 # Distance to established baseline CLI usability
 
+## October 27 C6 fixture prepared, live trial still open
+
+A fresh sealed fixture now exists for the process/session-continuity question
+(15 protected cases, a protected 6-second long job, a host-only rehearsal showing the
+seed fails 15/15 and a reference passes 16/16). This is offline preparation evidence.
+It does not demonstrate that a foreground session keeps a host child handle across
+turns and a route switch, and no model was invoked. The existing z harness cannot
+answer it unchanged because its phases run in separate child processes with separate
+handle registries. General baseline remains incomplete.
+
 ## October 27 search evidence fidelity correction
 
 `grep_search` used `str.splitlines` for numbering, so files containing form feeds,
