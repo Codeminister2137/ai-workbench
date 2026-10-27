@@ -56,6 +56,35 @@ def test_find_files_recursive_glob_matches_root_and_nested_files_relative_to_bas
     assert "test_outside.py" not in result.output
 
 
+def test_grep_reports_editor_line_numbers_with_non_newline_separators(tmp_path: Path) -> None:
+    # Form feed, U+2028 and CRLF must not shift the reported line numbers the way
+    # str.splitlines would; only "\n" ends a line here.
+    (tmp_path / "page.py").write_bytes(
+        "first\n\x0csecond\u2028third\r\nTARGET_TOKEN\nlast".encode()
+    )
+    result = GrepSearchTool().run(
+        ToolCall("grep_search", {"query": "TARGET_TOKEN"}), ToolContext(tmp_path)
+    )
+    assert not result.is_error and result.metadata["matches"] == 1
+    assert result.output == "page.py:3: TARGET_TOKEN"
+
+
+def test_search_tools_return_nothing_for_non_positive_limits(tmp_path: Path) -> None:
+    (tmp_path / "code.py").write_text("TARGET_TOKEN\n", encoding="utf-8")
+    context = ToolContext(tmp_path)
+    for limit in (0, -1):
+        grep = GrepSearchTool().run(
+            ToolCall("grep_search", {"query": "TARGET_TOKEN", "max_matches": limit}), context
+        )
+        assert not grep.is_error
+        assert grep.metadata["matches"] == 0 and "code.py" not in grep.output
+        found = FindFilesTool().run(
+            ToolCall("find_files", {"pattern": "*.py", "max_results": limit}), context
+        )
+        assert not found.is_error
+        assert found.metadata["count"] == 0 and "code.py" not in found.output
+
+
 def test_create_and_read_file_tool(tmp_path: Path) -> None:
     context = ToolContext(workspace_root=tmp_path)
     create_tool = CreateFileTool()

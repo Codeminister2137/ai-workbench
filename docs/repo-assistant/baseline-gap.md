@@ -1,5 +1,15 @@
 # Distance to established baseline CLI usability
 
+## October 27 search evidence fidelity correction
+
+`grep_search` used `str.splitlines` for numbering, so files containing form feeds,
+vertical tabs or Unicode separators reported match lines offset from what an editor
+shows; numbering now breaks only on `\n`. A non-positive `max_results`/`max_matches`
+returned one result because the bound was checked after the first append; zero or less
+now returns none. Two regressions cover both. Root2,957passed/9skipped, Council38,
+job-search84, Ruff/format and Pyright pass. Host-only deterministic evidence; no live
+acceptance is claimed and the general baseline remains incomplete.
+
 ## October 26 attended repair/search/process slice
 
 Host corrections now carry bounded earlier native receipts into repair and retain

@@ -1,5 +1,20 @@
 # CLI Development Foundation Roadmap
 
+## October 27 search evidence fidelity correction
+
+Review of the previous search slice found two host-only defects. `grep_search`
+numbered lines with `str.splitlines`, which also breaks on form feeds, vertical tabs
+and Unicode separators, so a match after a page break was reported on a line an editor
+does not show. Lines now break only on `\n` (a trailing `\r` is removed), so reported
+locations match an editor or `grep`. Both search tools also checked their result bound
+only after appending the first match, so `max_results`/`max_matches` of zero or less
+returned one result; they now return none, consistent with `list_dir`'s
+`max_depth <= 0` handling. Two regressions cover separator numbering and non-positive
+limits. Full registered validation passes (root2,957passed/9skipped, Council38,
+job-search84; Ruff/format and Pyright clean). No inference, provider, permission,
+evidence-schema or scope change; live C6 continuity and scrutiny-fed repair remain
+open.
+
 ## October 26 attended evidence/search corrections
 
 Native repair receives bounded prior observations and preserves chronological
