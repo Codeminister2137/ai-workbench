@@ -25,10 +25,14 @@ This repository uses a two-branch integration model.
 - `develop` is periodically promoted to `master` via fast-forward or a clean
   merge commit when the accumulated work is stable and presentable.
 - `develop` is never deleted; it is the permanent integration branch.
+- Investigate read-only here if useful, but create or resume a focused working
+  branch before editing. Do not implement or commit task changes directly here
+  without an explicit owner exception for that task.
 
 ### Feature branches
 
-For non-trivial work, create a focused branch from `develop`:
+Before the first repository edit, verify the branch and create a focused branch
+from `develop` (or resume the applicable existing working branch):
 
 ```powershell
 git switch develop
@@ -42,8 +46,16 @@ Use branch names that describe the work, such as:
 - `docs/architecture-decisions`
 - `fix/provider-timeout-errors`
 
-Small documentation or mechanical fixes may happen directly on `develop`
-when they are trivial, bounded, and clearly not in-progress feature work.
+This applies to documentation and mechanical fixes too. A clean checkout, branch
+cleanup or handoff saying "continue/work only on develop" identifies the base and
+integration target; it does not authorize direct development there. Only an
+explicit owner request for direct edits on `develop` waives the rule for that task.
+
+If edits already exist on `develop`, create the focused branch at its current tip
+with `git switch -c ...` and verify the changes carried over. Preserve all work;
+do not reset, discard or stash it merely to change branches. After validation,
+merge through the normal integration workflow. Start any further fix on a working
+branch rather than editing `develop` after the merge.
 
 ### Promoting `develop` to `master`
 

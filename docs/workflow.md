@@ -397,7 +397,11 @@ When a decision changes: supersede the old ADR, add the new ADR, then update arc
 Update local `CURRENT_CONTEXT.md` at the end of non-trivial work when present so the next session has the latest completed work, conflicts/risks, validation status, and next plan. `CURRENT_CONTEXT.md` carries only the **current** state; move superseded window blocks, old handoffs and completed-work history to `docs/session-history.md` instead of appending them there.
 
 ## 8. Git
-For substantial work use a focused branch/commit series. Before completion inspect:
+Before the first repository edit, create or resume a focused branch from `develop`;
+this includes documentation and mechanical fixes. `develop` is the integration
+target, not the implementation workspace. Direct edits require an explicit owner
+exception for the task. Follow [the Git workflow](git-workflow.md) and keep commits
+focused. Before completion inspect:
 ```text
 git diff
 git status

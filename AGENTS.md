@@ -908,12 +908,31 @@ This repository uses a two-branch integration model:
 Codex must:
 
 * always branch from `develop` for new work;
+* verify the current branch before the first repository edit, then create or
+  resume a focused `feature/`, `fix/` or `docs/` branch; read-only investigation
+  may start on `develop`;
+* never implement or commit task changes directly on `develop`, including small
+  documentation and mechanical fixes, unless the owner explicitly authorizes
+  direct edits for that specific task;
 * always target `develop` as the merge destination for feature branches;
 * never merge directly to `master`;
 * never push directly to `master` — promotion to master requires explicit
   owner approval and instruction.
 
-For substantial work:
+Owner clarification (2026-10-28): `develop` is the integration destination, not
+the development workspace. A clean checkout on `develop`, a completed branch
+cleanup, or a handoff saying "continue on develop" / "work only on develop"
+does not waive the feature-branch workflow. Treat those phrases as identifying
+the base and merge target unless direct edits are explicitly requested. Keep
+handoffs consistent with this rule rather than copying ambiguous wording forward.
+
+If task edits have already started on `develop`, preserve them by creating the
+focused branch at the current tip before further edits (`git switch -c ...`).
+Verify that all changes carried over; do not reset, discard or stash user work
+merely to obtain a clean branch. Integration into `develop` follows validation
+and the normal merge workflow; further fixes belong on a working branch.
+
+For implementation work:
 
 * use a focused branch off `develop`;
 * keep commits logically grouped;
