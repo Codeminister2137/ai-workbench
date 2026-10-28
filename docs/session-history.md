@@ -2,6 +2,12 @@
 
 ## 2026-10-28 — local Operator release gates and availability review
 
+The owner authorized useful development spending covered by existing approved
+hackathon credits/allowances for the remaining hackathon, with no owner-funded
+charges or overage. This supersedes earlier proposed session/cumulative dollar
+ceilings; finite per-run bounds and actual credit-only admission remain required.
+Recording, public Operator pushes and submission remain separately unapproved.
+
 Prepared a private local Operator clone from external-actions branch 3213b3d.
 Local commit 68e684b reconciles stale release-checklist wording with current
 owner authorization; its patch remains private and unapplied to the sibling.
