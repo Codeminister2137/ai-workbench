@@ -668,13 +668,26 @@ def test_resource_profile_cannot_exceed_declared_model_window(admitted, monkeypa
 
 
 def test_tools_incapable_route_rejected_when_tools_required():
-    catalog = load_model_catalog(CATALOG)
+    meta = next(
+        item
+        for item in load_model_catalog(CATALOG)
+        if item.backend.route_id == "meta/muse-spark-1.3"
+    )
+    text_only = replace(
+        meta,
+        backend=replace(
+            meta.backend,
+            route=replace(meta.backend.route, route_id="test/chat-only"),
+            capabilities=replace(meta.backend.capabilities, tools=False),
+        ),
+    )
+    catalog = (text_only,)
     chat_only = coding_task_profile(
         privacy_class=PrivacyClass.EXTERNAL_ALLOWED,
         cost_policy_tier=CostPolicyTier.PREPAID_CREDITS_ALLOWED,
-        route_id_override="meta/muse-spark-1.3",
+        route_id_override="test/chat-only",
     )
-    assert recommend_model(chat_only, catalog).selected.backend.route_id == "meta/muse-spark-1.3"
+    assert recommend_model(chat_only, catalog).selected.backend.route_id == "test/chat-only"
 
     with_tools = replace(
         chat_only,
