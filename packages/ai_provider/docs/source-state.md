@@ -41,6 +41,16 @@ endpoint but returned proposed tool calls as ordinary text, executing no tools
 and leaving the seed unchanged. Tool-calling workflow acceptance remains missing;
 this single configured task does not establish general model quality.
 
+Metadata-only follow-up on 2026-10-28 retrieved the deployment's exact
+[pinned tokenizer configuration](https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct/resolve/c03e6d358207e414f1eca0bb1891e29f1db0e242/tokenizer_config.json).
+Its template includes tool definitions and the `<tool_call>` / `<tool_response>`
+markers. This rules out an absent tool-aware template in that upstream revision;
+it does not establish the live server's rendered prompt or raw response. The
+pilot's visible output used fenced JSON rather than tool-call markers. The cause
+of that behavior remains unestablished. A fresh diagnostic should retain bounded,
+whitelisted transport/parser observations before another coding trial; do not
+execute fenced JSON as tools or reinterpret the consumed trial as successful.
+
 [Modal budgets](https://modal.com/docs/guide/budgets) distinguishes the usage
 budget before credits from the net-spend limit after credits. A default spend
 limit may permit out-of-pocket charges. Credit-only development must verify

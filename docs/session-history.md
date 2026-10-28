@@ -25,10 +25,18 @@ Validation: 754 provider tests, Ruff and Pyright pass; the registered final
 workspace check passed 3,037 root tests / 24 skips, 38 Council and 84 job-search.
 
 Further private C6 preparation adds fixed-origin bounded forwarding, exact-byte
-automated assessment controls and Windows outer process-tree ownership. Nineteen
+automated assessment controls and Windows outer process-tree ownership. Twenty-one
 admission/forwarding/checkpoint controls and three actual process controls pass.
 All C6 workflow model/reviewer outputs remain scripted. Current account facts
 and a reviewed activation seal are still required; no live C6 run occurred.
+
+Final private Operator candidate fe80b85 also corrects the submission draft's
+existing-public-repository reference. Final packages were rebuilt and scanned;
+the final wheel has identical installed payload bytes to the independently tested
+wheel. The local patch remains unapplied to the sibling and unpublished.
+Metadata-only inspection confirms the pinned Qwen tokenizer has a tool-aware
+template; why the live pilot emitted fenced JSON remains unknown. No Modal
+deployment or inference was restarted for this follow-up.
 
 ## 2026-10-28 — shared Responses support and C6 offline foreground rehearsal
 
