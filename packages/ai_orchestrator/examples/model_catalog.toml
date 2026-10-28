@@ -575,7 +575,8 @@ billing_source = "modal_runtime_billing"
 cost_policy_tier = "prepaid_credits_allowed"
 quality = "standard"
 latency = "interactive"
-notes = "Modal-hosted vLLM inference endpoint. Requires MODAL_API_KEY and a deployment base_url set via user_config or route override. Tool calling is enabled; streaming is supported. Cost is per-second GPU runtime, not per token, so the estimate below is illustrative based on L4 pricing and expected throughput. Provisional pending measured latency and context capacity."
+base_url = "https://kubajaworski999--ai-projects-qwen25-coder-7b-instruct-server.us-east.modal.direct/v1"
+notes = "Modal-hosted vLLM inference endpoint served by deploy/modal/qwen25-coder-7b/modal_app.py. Requires MODAL_API_KEY. Tool calling is enabled; streaming is supported. Cost is per-second GPU runtime, not per token, so the estimate below is illustrative based on L4 pricing and expected throughput. Provisional pending measured latency and context capacity."
 
 [models.capabilities]
 chat = true

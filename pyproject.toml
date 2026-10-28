@@ -21,6 +21,9 @@ dev = [
     "pre-commit>=4.0,<5.0",
     "pdoc>=16.0.0",
 ]
+modal-deploy = [
+    "modal>=1.6.3",
+]
 research-token-count = [
     "tokenizers==0.23.2",
 ]
