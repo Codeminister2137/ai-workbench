@@ -1,5 +1,47 @@
 # Session History
 
+## 2026-10-28 - public Operator update, final milestone order and credential guards
+
+The owner authorized the reviewed public source update and clarified that demo
+recording/upload and judge access are the final hackathon milestones after current
+engineering. Published Operator candidate d445286 through PR#1 (merge dabed903),
+then public instruction/checklist corrections through documentation-only PR#2
+(merge3aa01fc). Fresh known-credential/private-identifier scans passed before each
+publication. The first merge's tree exactly matches the tested candidate; the
+second changes only AGENTS, release checklist and BUILD_LOG. No deployment,
+recording, judge grant or submission occurred. The clean sibling checkout now
+uses chore/continue-operator-20261028 based on origin/main3aa01fc; its previous
+feature branch is retained. Workbench source/plans were not published.
+
+Updated private implementation/handoff/acceptance plans and canonical workflow:
+engineering/integration/representative acceptance continue; old ready-to-freeze
+or only-judge-deployment wording does not schedule those final milestones now.
+
+The owner accepted guards first as a sequence, not an exclusive choice against
+credential-store migration. ADR-076 records the first bounded slice: project-owned
+credential-path operations are refused; known credential tool arguments and tool
+results/metadata/errors are withheld; native agent/API request builders and
+external-CLI launch prompts refuse known credentials before transport/startup.
+Credential storage remains unchanged. Configured authentication values, including
+trimmed forms, are matched without logging them. Same-scope process effects and
+captures, native clients' independent file access, unknown/encoded secrets and
+semantic private data remain outside the guarantee. General protection is still
+incomplete; this is not a sandbox or broader private-source transmission grant.
+
+Four protocol fixture files now use authentication tokens distinct from their
+prompt/model text, retaining protocol assertions under the stricter boundary.
+Validation:full3,089root/25skips,38Council,84job-search passed. Final provider772
+and agent57/1skip checks cover authentication normalization and call-ID refusal;
+Ruff/format/Pyright pass. Synthetic controls include real subprocess stdout, MCP
+metadata, fake.env reads, nested values and completion/stream transport refusal.
+No real inference or new dependencies. Evidence:artifacts/secret-guards-20261028.
+
+Verified official Gmail setup guidance:open Plugins,install Gmail and connect the
+intended Google account. Current discovery still shows uninstalled; no mail was
+read or sent. This assistant connection is separate from future Workbench OAuth.
+Security sequencing and milestone order are resolved; Gmail setup and the actual
+Baseten onboarding instructions remain next owner input.
+
 ## 2026-10-28 - credential audit and metadata-only bridge approval
 
 The owner approved metadata-only Operator descriptions. Replaced the previous

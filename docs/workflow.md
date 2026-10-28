@@ -201,6 +201,14 @@ For prompt/model/orchestration changes:
 
 ## Current product priorities
 
+Owner clarification (2026-10-28): continue Remote AI Operator / Workbench
+engineering, integration and representative coding/continuity acceptance now.
+Demo recording/upload and judge-access provisioning are the final hackathon work
+near submission. Old ready-to-freeze or "only judge deployment remains" notes do
+not make those tasks immediate priorities. Ordinary tests remain development work.
+Public source updates may proceed when explicitly authorized; that does not
+authorize recording, judge grants or submission.
+
 On 2026-10-10 the owner selected **CLI -> job search -> business -> Council**,
 reflecting their real needs. Use this order for planning and candidate selection;
 it supersedes older Council-first milestone guidance. Provider/Orchestrator work
