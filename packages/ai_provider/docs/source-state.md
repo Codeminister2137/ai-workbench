@@ -39,6 +39,13 @@ setup; event-issued credentials must instead follow their own onboarding scope.
 Public examples do not establish an event key's entitlement to other models,
 Responses, Messages, management APIs or dedicated deployments.
 
+Offline implementation now provides `ProviderKind.BASETEN` through a thin
+`BasetenChatClient` over the shared transport. Its event configuration helper
+explicitly selects the dedicated environment credential/model without personal-key
+fallback; ordinary Baseten configurations use the personal-key convention.
+Streaming asks for final usage; successful metadata excludes raw reasoning.
+This is not live acceptance, a quota reader or admission to automatic routing.
+
 The [reasoning guide](https://docs.baseten.co/inference/model-apis/reasoning)
 documents always-on reasoning for Muse Spark Open, separate `reasoning_content`
 and final `content`, and reasoning tokens included in billed completion usage.

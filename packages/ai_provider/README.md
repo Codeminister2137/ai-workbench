@@ -20,6 +20,8 @@ answers, or implement job-search logic.
   reasoning replay and refuses Contributor variants; live coding quality remains
   separate from protocol support.
 - Provider factory for configured chat clients.
+- Baseten Chat Completions, streaming usage and tools, with an explicit event-key
+  configuration helper and reasoning removed from successful response metadata.
 - Experimental, opt-in OpenRouter free-only API client with per-call exact-price,
   tool-support and daily-quota checks; no deposit or paid fallback.
 - OpenCode Go adapter with model discovery, per-request session headers and
@@ -76,6 +78,39 @@ response = client.complete(
 print(response.message.content)
 print(response.backend.provider, response.backend.model)
 ```
+
+## Baseten protocol integration
+
+`ProviderKind.BASETEN` uses `https://inference.baseten.co/v1` and the existing
+Chat Completions transport. Ordinary configurations resolve `BASETEN_API_KEY`;
+an explicit `BackendConfig.api_key` takes precedence. Event access is separate:
+
+```python
+from ai_provider.adapters.baseten import baseten_hackathon_config
+from ai_provider.factory import create_chat_client
+
+# Configuration only: requires an already-loaded BASETEN_HACKATHON_API_KEY.
+# Does not read .env, send a request or print the credential.
+client = create_chat_client(baseten_hackathon_config())
+```
+
+The helper requires the event credential without personal/generic-key fallback,
+selects `meta-models/muse-spark-open-1026`, and refuses request model overrides
+that would leave that alias. Use this helper for event access rather than the
+ordinary `BackendConfig.from_env` personal-key convention. Backend configuration
+representations omit API keys.
+
+Streaming requests ask for final usage. Separate reasoning fields are removed from
+successful response/delta metadata; final text uses only the provider's `content`
+field. Reported completion totals already include reasoning tokens. No raw
+reasoning continuation is retained for this adapter. Error diagnostics remain
+subject to the existing provider error policy.
+
+This is offline protocol support, not live model acceptance or a billing cap.
+No Baseten route is added to automatic selection/fallback. Verify actual credit
+eligibility, balance, expiry and prevention of owner-funded charges before live
+admission. Existing privacy checks still apply; published ZDR does not authorize
+private payloads. See [source state](docs/source-state.md) for official links.
 
 ## Streaming
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from ai_provider.adapters.baseten import BasetenChatClient
 from ai_provider.adapters.meta import MetaResponsesChatClient
 from ai_provider.adapters.modal import ModalRuntimeChatClient
 from ai_provider.adapters.ollama import OllamaChatClient
@@ -37,6 +38,9 @@ def create_chat_client(config: BackendConfig) -> ChatClient:
 
     if config.provider is ProviderKind.MODAL:
         return ModalRuntimeChatClient(config)
+
+    if config.provider is ProviderKind.BASETEN:
+        return BasetenChatClient(config)
 
     if config.provider in {ProviderKind.OPENAI, ProviderKind.REQUESTY, ProviderKind.GOOGLE}:
         return OpenAICompatibleChatClient(config)

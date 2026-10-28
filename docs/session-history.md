@@ -1,5 +1,36 @@
 # Session History
 
+## 2026-10-29 - Baseten offline provider integration
+
+Continued from clean develop1548ffb on feature/baseten-chat-contract-20261028.
+Added ProviderKind.BASETEN and a thin Chat Completions adapter using the existing
+transport. Ordinary personal-key configuration is distinct from the explicit
+baseten_hackathon_config helper, which requires the event credential and exact
+alias without key fallback. Event-model overrides fail before transport; streamed
+requests ask for final usage. Successful metadata omits separate reasoning fields
+without double-counting reasoning tokens. No automatic catalog/fallback route,
+new dependency, secret relocation or live inference was introduced.
+
+Fixed a bounded credential exposure found in the touched configuration: api_key
+is excluded from BackendConfig's default representation. Serialization is unchanged;
+this is not a sandbox or general privacy guarantee. Updated README/interface/source
+state, environment placeholders and the explicit provider test-suite registration.
+
+Validation:789 provider tests and10 suite-runner checks pass; Ruff/format/Pyright
+pass. The full root run yielded3101pass/31skip and five failures from the omitted
+new-test registration, then corrected and rechecked via the affected suites. No
+second full-root run was needed for that one-line registration correction. Initial
+SDK-only CLI import failures were traced to subprocess paths and resolved using
+explicit workspace PYTHONPATH; the configured interpreter lacks Ruff, so the
+existing native repository Ruff executable was used. No installation/configuration
+change. Private validation receipt:artifacts/baseten-chat-contract-20261029.
+
+Owner confirms the credential retrieval link was already consumed by them. It was
+not reopened. Expiry, effective limits, remaining credits and no-overage behavior
+remain unverified; live Baseten admission remains closed. C6 continuity and hosted
+delegation acceptance remain open; no consumed/copied scripts or new unattended
+window were launched. Demo/judge access remain final milestones.
+
 ## 2026-10-28 - Gmail verified and Baseten onboarding inspected
 
 Started clean on develop at1f38003; created docs/baseten-onboarding-20261028

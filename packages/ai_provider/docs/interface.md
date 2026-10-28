@@ -272,6 +272,14 @@ statement that Chat Completions is always the best protocol. ADR-020 records tha
 each hosted adapter should document whether it uses Chat Completions, Responses,
 Anthropic Messages, or another API shape, and why.
 
+Baseten uses the existing Chat Completions protocol at
+`https://inference.baseten.co/v1`. Its thin adapter keeps Baseten's identity,
+requests final streaming usage and removes reasoning text from successful
+response metadata. Offline contracts cover tools, history, streaming and host
+input refusal. No model inventory, live allowance reader or automatic catalog
+route is introduced. The explicit event configuration helper and its admission
+limits are documented in the [README](../README.md#baseten-protocol-integration).
+
 OpenCode Go now supports all three documented endpoints:
 
 - **Chat Completions** at `https://opencode.ai/inference/go/openai/v1` via

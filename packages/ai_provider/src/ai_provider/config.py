@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 
 from ai_provider.errors import ProviderError, ProviderErrorCategory
@@ -20,6 +20,7 @@ class ProviderKind(StrEnum):
     OPENCODE_GO = "opencode_go"
     META = "meta"
     MODAL = "modal"
+    BASETEN = "baseten"
 
 
 @dataclass(frozen=True, slots=True)
@@ -29,7 +30,7 @@ class BackendConfig:
     provider: ProviderKind
     model: str
     base_url: str | None = None
-    api_key: str | None = None
+    api_key: str | None = field(default=None, repr=False)
     timeout_seconds: float = 60.0
     require_free_model: bool = False
 
@@ -111,5 +112,7 @@ def _provider_api_key(provider: ProviderKind) -> str | None:
             return os.getenv("META_API_KEY")
         case ProviderKind.MODAL:
             return os.getenv("MODAL_API_KEY")
+        case ProviderKind.BASETEN:
+            return os.getenv("BASETEN_API_KEY")
         case ProviderKind.OLLAMA:
             return None

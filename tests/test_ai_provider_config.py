@@ -12,6 +12,14 @@ from ai_provider.config import BackendConfig
 from ai_provider.factory import create_chat_client
 
 
+def test_backend_config_repr_omits_credentials() -> None:
+    config = BackendConfig(
+        provider=ProviderKind.OPENAI, model="fixture", api_key="synthetic-config-credential"
+    )
+    assert "synthetic-config-credential" not in repr(config)
+    assert "api_key" not in repr(config)
+
+
 def test_backend_config_loads_from_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AI_PROVIDER_KIND", "ollama")
     monkeypatch.setenv("AI_PROVIDER_MODEL", "llama3.2")
