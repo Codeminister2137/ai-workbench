@@ -3,9 +3,11 @@
 **Status:** Accepted
 **Date:** 2026-10-28
 
-Add `AccessMethod.MODAL_RUNTIME`, `ProviderKind.MODAL`, and
-`BillingSource.MODAL_RUNTIME_BILLING` so Modal-hosted OpenAI-compatible
-inference endpoints (e.g., vLLM/SGLang) can be selected by the orchestrator.
+Add `AccessMethod.MODAL_RUNTIME`, `ProviderKind.MODAL`, and two
+Modal billing sources (`MODAL_TOKEN_BILLING` for per-token Shared Endpoints /
+Model API, `MODAL_RUNTIME_BILLING` for per-second serverless GPU/CPU) so
+Modal-hosted OpenAI-compatible inference endpoints can be selected by the
+orchestrator.
 The first catalog route is `modal/qwen/qwen2.5-coder-7b-instruct` using
 `Qwen/Qwen2.5-Coder-7B-Instruct`. Modal's per-second GPU billing is tracked as
 a runtime source; hackathon vs monthly credit tags stay outside the app.

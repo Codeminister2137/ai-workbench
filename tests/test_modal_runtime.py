@@ -25,6 +25,7 @@ CATALOG = "packages/ai_orchestrator/examples/model_catalog.toml"
 
 def test_access_method_and_billing_source_exist() -> None:
     assert AccessMethod.MODAL_RUNTIME.value == "modal_runtime"
+    assert BillingSource.MODAL_TOKEN_BILLING.value == "modal_token_billing"
     assert BillingSource.MODAL_RUNTIME_BILLING.value == "modal_runtime_billing"
 
 

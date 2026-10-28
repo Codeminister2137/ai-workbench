@@ -234,6 +234,10 @@ def _default_billing_source(provider: str, access_method: AccessMethod) -> str:
         return BillingSource.OPENAI_API_BILLING.value
     if provider == "meta":
         return BillingSource.META_API_BILLING.value
+    if access_method is AccessMethod.MODAL_RUNTIME:
+        return BillingSource.MODAL_RUNTIME_BILLING.value
+    if provider == "modal":
+        return BillingSource.MODAL_TOKEN_BILLING.value
     return BillingSource.OPENAI_API_BILLING.value
 
 
@@ -257,7 +261,11 @@ def _default_cost_policy_tier(
         BillingSource.KIRO_SUBSCRIPTION_ALLOWANCE,
     }:
         return CostPolicyTier.ALLOWANCES_ALLOWED.value
-    if billing_source is BillingSource.REQUESTY_BILLING:
+    if billing_source in {
+        BillingSource.REQUESTY_BILLING,
+        BillingSource.MODAL_TOKEN_BILLING,
+        BillingSource.MODAL_RUNTIME_BILLING,
+    }:
         return CostPolicyTier.PREPAID_CREDITS_ALLOWED.value
     return CostPolicyTier.BILLING_ALLOWED.value
 

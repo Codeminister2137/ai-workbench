@@ -23,10 +23,14 @@ runtime-like.
 1. Add `AccessMethod.MODAL_RUNTIME` to distinguish Modal-hosted endpoints from
 generic provider APIs.
 2. Add `ProviderKind.MODAL` with API-key resolution from `MODAL_API_KEY`.
-3. Add `BillingSource.MODAL_RUNTIME_BILLING` as a single source. The distinction
-between hackathon credits and monthly free credits is kept outside the app
-(e.g., via user-config priority or allowance labels), not in the billing source
-enum.
+3. Add two distinct billing sources:
+   - `BillingSource.MODAL_TOKEN_BILLING` for Modal Shared Endpoints / Model API
+     routes billed per token.
+   - `BillingSource.MODAL_RUNTIME_BILLING` for Modal serverless GPU/CPU container
+     routes billed per second of compute time.
+   The distinction between hackathon credits and monthly free credits within each
+   surface is kept outside the app (e.g., via user-config priority or allowance
+   labels), not in the billing source enum.
 4. Add `ModalRuntimeChatClient` in `ai_provider/adapters/modal.py`. It inherits
 from `OpenAICompatibleChatClient` to reuse the Chat Completions protocol, but
 overrides `backend` and `base_url` so that:
