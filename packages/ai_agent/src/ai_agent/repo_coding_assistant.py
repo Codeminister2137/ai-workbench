@@ -3759,14 +3759,27 @@ def _run_native_agent(
         getattr(args, "approval_policy", ApprovalPolicyPreset.INTERACTIVE.value)
     )
     permission_policy = PermissionPolicy.from_approval_preset(approval_policy)
-    approval_callback = (
-        approve
-        if any(
-            permission_policy.action_for_category(category).value == "ask_user"
-            for category in ToolCategory
-        )
-        else None
+    asks_user = any(
+        permission_policy.action_for_category(category).value == "ask_user"
+        for category in ToolCategory
     )
+    operator_base_url = getattr(args, "operator_base_url", None)
+    operator_access_token = getattr(args, "operator_access_token", None)
+    if operator_base_url:
+        if not operator_access_token:
+            raise ProviderError(
+                "--operator-access-token is required when --operator-base-url is set.",
+                category=ProviderErrorCategory.CONFIGURATION,
+            )
+        from ai_agent.operator_bridge import OperatorApprovalBridge
+
+        approval_callback = OperatorApprovalBridge(
+            operator_base_url, operator_access_token, repo_root
+        )
+    elif asks_user:
+        approval_callback = approve
+    else:
+        approval_callback = None
     client = create_chat_client(config)
     child_depth = int(getattr(args, "_delegation_depth", 0))
 
