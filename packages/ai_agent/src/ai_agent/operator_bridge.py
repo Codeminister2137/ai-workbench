@@ -13,6 +13,7 @@ import json
 import time
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import httpx
 
@@ -62,7 +63,7 @@ class OperatorApprovalBridge:
         *,
         poll_interval_seconds: float = 1.0,
         timeout_seconds: float = 300.0,
-        client_factory: Callable[..., httpx.Client] = httpx.Client,
+        client_factory: Callable[..., Any] = httpx.Client,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.headers = {
@@ -104,7 +105,7 @@ class OperatorApprovalBridge:
 
         return self._wait_for_resolution(client, action["id"])
 
-    def _wait_for_resolution(self, client: httpx.Client, action_id: str) -> bool:
+    def _wait_for_resolution(self, client: Any, action_id: str) -> bool:
         deadline = time.monotonic() + self.timeout
         while time.monotonic() < deadline:
             try:

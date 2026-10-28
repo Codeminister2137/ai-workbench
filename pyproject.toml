@@ -65,6 +65,8 @@ exclude = [
 ]
 pythonVersion = "3.13"
 typeCheckingMode = "standard"
+venvPath = "."
+venv = ".venv"
 extraPaths = [
     "packages/ai_provider/src",
     "packages/ai_orchestrator/src",

@@ -6,8 +6,10 @@ import pytest
 from ai_orchestrator import ExecutionTarget, load_model_catalog, recommend_model
 from ai_orchestrator.models import (
     AccessMethod,
+    AuthMethod,
     BillingSource,
     CostPolicyTier,
+    LatencyTarget,
     PrivacyClass,
     QualityThreshold,
     TaskCapability,
@@ -54,6 +56,7 @@ def test_modal_client_requires_base_url() -> None:
         api_key="test-key",
     )
     client = create_chat_client(config)
+    assert isinstance(client, ModalRuntimeChatClient)
     with pytest.raises(ProviderError, match="base_url"):
         _ = client.base_url
 
@@ -65,7 +68,7 @@ def test_backend_config_from_execution_target_accepts_modal_runtime() -> None:
         product="modal",
         model="Qwen/Qwen2.5-Coder-7B-Instruct",
         access_method=AccessMethod.MODAL_RUNTIME,
-        auth_method="api_key",
+        auth_method=AuthMethod.API_KEY,
         billing_source=BillingSource.MODAL_RUNTIME_BILLING,
         cost_policy_tier=CostPolicyTier.PREPAID_CREDITS_ALLOWED,
         base_url="https://owner--modal.modal.run/v1",
@@ -83,7 +86,7 @@ def test_catalog_selects_modal_route_with_tools() -> None:
         privacy_class=PrivacyClass.EXTERNAL_ALLOWED,
         required_capabilities=frozenset({TaskCapability.CHAT, TaskCapability.TOOLS}),
         quality_threshold=QualityThreshold.STANDARD,
-        latency_target="interactive",
+        latency_target=LatencyTarget.INTERACTIVE,
         max_expected_latency_seconds=None,
         cost_policy_tier=CostPolicyTier.PREPAID_CREDITS_ALLOWED,
         user_route_id_override="modal/qwen/qwen2.5-coder-7b-instruct",

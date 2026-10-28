@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 from ai_agent.contracts import ToolCall, ToolCategory
@@ -64,7 +65,7 @@ def test_bridge_submits_and_approves(tmp_path: Path) -> None:
     assert bridge(_tool_call(), ToolCategory.WRITE) is True
     assert client.calls[0][0] == "POST"
     assert client.calls[0][1] == "http://operator.local/api/external-actions"
-    payload = client.calls[0][2]
+    payload = cast(dict[str, Any], client.calls[0][2])
     assert payload["description"].startswith("[write] write_file")
     assert len(payload["candidate_digest"]) == 64
     assert client.calls[-1][0] == "GET"
@@ -106,7 +107,7 @@ def test_bridge_truncates_long_arguments(tmp_path: Path) -> None:
         call_id="c2", name="write_file", arguments={"path": "src/x.py", "content": long_content}
     )
     bridge(call, ToolCategory.WRITE)
-    payload = client.calls[0][2]
+    payload = cast(dict[str, Any], client.calls[0][2])
     assert "\\u2026" in payload["description"]
     assert len(long_content) > 400
 
