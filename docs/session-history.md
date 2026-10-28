@@ -1,5 +1,23 @@
 # Session History
 
+## 2026-10-28 - Gmail verified and Baseten onboarding inspected
+
+Started clean on develop at1f38003; created docs/baseten-onboarding-20261028
+before documentation edits. Gmail search/read now work in the refreshed session;
+no reinstall or connection change was needed. Read the event onboarding and an
+older generic welcome email, then followed all five relevant documentation links.
+The one-time credential retrieval link was not opened or persisted. No mail send,
+inference, account setting change, public publication or unattended work occurred.
+
+Saved sanitized grant-specific findings and unknowns in ignored
+docs/plans/remote-ai-operator-2026/BASETEN-ONBOARDING.md; reusable official API,
+billing and privacy findings are in packages/ai_provider/docs/source-state.md.
+Event expiry, effective account limits and hard no-overage behavior are unresolved.
+Recommended next slice is offline contract preparation with synthetic credentials,
+then account/grant verification before any separately admitted live acceptance.
+C6 continuity and hosted-delegation acceptance remain incomplete; copied/consumed
+trial scripts were not launched. Demo/judge access remain final milestones.
+
 ## 2026-10-28 - public Operator update, final milestone order and credential guards
 
 The owner authorized the reviewed public source update and clarified that demo

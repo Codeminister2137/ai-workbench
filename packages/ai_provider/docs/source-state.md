@@ -29,6 +29,57 @@ Read the actual grant/onboarding instructions before choosing a route. A key in
 an environment variable does not enable a provider adapter or authorize inference.
 Account observations and grant details remain private runtime context.
 
+### Model APIs documentation rechecked 2026-10-28
+
+The [Chat Completions reference](https://docs.baseten.co/reference/inference-api/chat-completions)
+specifies `POST https://inference.baseten.co/v1/chat/completions`, OpenAI-compatible
+messages/tools and `Authorization: Bearer <key>` (also accepts `Api-Key`). The
+[quickstart](https://docs.baseten.co/quickstart) describes ordinary personal-key
+setup; event-issued credentials must instead follow their own onboarding scope.
+Public examples do not establish an event key's entitlement to other models,
+Responses, Messages, management APIs or dedicated deployments.
+
+The [reasoning guide](https://docs.baseten.co/inference/model-apis/reasoning)
+documents always-on reasoning for Muse Spark Open, separate `reasoning_content`
+and final `content`, and reasoning tokens included in billed completion usage.
+Supported effort values are low/medium/high/xhigh (default xhigh); none/minimal
+still reason at low. This is published behavior, not tested event-route behavior.
+Do not enable raw reasoning logging from documentation examples.
+
+[Vision](https://docs.baseten.co/inference/model-apis/vision) and
+[audio](https://docs.baseten.co/inference/model-apis/audio) describe image_url,
+video_url and audio_url content parts. Muse's published limits include 8 images
+(10 MB each), 2 videos (200 MB/300 seconds each), 4 audio files (25 MB/5 minutes
+each), 200 MB combined media and a 100 MiB request body. Video ignores audio;
+send audio separately. Media support does not authorize uploading private files.
+
+[Pricing](https://www.baseten.co/pricing/) lists ordinary Muse rates per million
+tokens: $1.25 input, $0.15 cached input, $4.25 output. A search-index version of
+the model-library page disagreed on rate labels/model spelling; the opened pricing
+table and the actual event onboarding take precedence for their respective scopes.
+These rates are not verified prices for an event-specific alias.
+[Limits](https://docs.baseten.co/inference/model-apis/pricing-and-limits) are
+model/account specific: TPM includes input/output and cached tokens; RPM is separate.
+The documented model-details GET can expose effective limits, but event-key access
+to that management endpoint remains untested.
+
+[Billing](https://docs.baseten.co/organization/billing) distinguishes credit usage
+from overage and budget alerts from enforcement. An ordinary budget only notifies
+by default; enforced budgets reject Model API requests, not dedicated/training
+workloads. General credit documentation is not proof of an event hard cap. Verify
+the actual credit pool, expiry and charge prevention before inference.
+
+Baseten's [Security Practices](https://www.baseten.co/security-practices/)
+(updated September 15) state no training on customer content and zero retention of
+Model API inputs/outputs, subject to customer-controlled logging/configurations
+and third-party choices. Async input queues can retain requests up to 72 hours;
+security/authentication logs can remain up to four years. The
+[Privacy Policy](https://www.baseten.co/privacy-policy/) (September 23) separates
+customer content governed by the customer agreement/DPA from account/usage/support
+information retained as needed, with legal and aggregated-data exceptions and
+international processing. Published ZDR is not a project privacy grant, proof of
+event-specific contractual terms, or a guarantee about all metadata.
+
 ## Reading and refreshing provider knowledge
 
 This file is the repository agent's first provider-knowledge entry point. Keep
