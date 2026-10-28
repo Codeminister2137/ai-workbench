@@ -3,7 +3,8 @@
 **Checked:** 2026-10-13; Gemini individual-access retirement verified 2026-10-14.
 Published limits and account observations can expire.
 
-**Latest scoped update:** 2026-10-28, Baseten key-scope documentation and
+**Latest scoped update:** 2026-10-29, Baseten management metadata/key-scope
+documentation; 2026-10-28,
 Modal/Qwen tool-calling prerequisites and
 credit-only deployment admission; 2026-10-25, Go coding-agent requirements/limits rechecked
 and OpenRouter credits/privacy and local CLI
@@ -28,6 +29,19 @@ key's eligible endpoints, credit pool, expiry, retention terms or overage policy
 Read the actual grant/onboarding instructions before choosing a route. A key in
 an environment variable does not enable a provider adapter or authorize inference.
 Account observations and grant details remain private runtime context.
+
+### Management metadata scope rechecked 2026-10-29
+
+The [model-details endpoint](https://docs.baseten.co/reference/management-api/model-apis/gets-a-model-api-by-name)
+documents `GET https://api.baseten.co/v1/model_apis/{encoded_model_name}`. Its
+prices and rate limits may include workspace overlays; otherwise limits can be
+catalog defaults. This response is not a credit-balance/expiry/overage guarantee.
+The [API-key guide](https://docs.baseten.co/organization/api-keys) distinguishes
+personal, team and organization-management keys. Inference-only team keys cannot
+deploy/manage; keys can also restrict models/environments. A management-endpoint
+authorization refusal alone does not establish invalid inference credentials or
+explain a particular event key's exact scope. Preserve that uncertainty rather
+than probing inference, broadening key privileges or substituting another key.
 
 ### Model APIs documentation rechecked 2026-10-28
 
