@@ -1,5 +1,37 @@
 # Session History
 
+## 2026-10-28 — Modal inference endpoint deployed and verified
+
+Branch `feature/go-cli-completion-acceptance-20261025`; commits `cb3eca5`
+(Workbench→Remote AI Operator external-actions bridge) and `1d66ad7`
+(Modal vLLM deployment). Working tree clean; full root suite **2979 passed,
+9 skipped**; Ruff/format clean.
+
+Completed slices:
+- Added `deploy/modal/qwen25-coder-7b/modal_app.py` + README to serve
+  `Qwen/Qwen2.5-Coder-7B-Instruct` on an L4 GPU with vLLM 0.21.0.
+- Created Modal secret `modal-runtime-api-key` (`MODAL_API_KEY`/`VLLM_API_KEY`)
+  and wrote the key to local `.env`.
+- Deployed to `https://kubajaworski999--ai-projects-qwen25-coder-7b-instruct-server.us-east.modal.direct/v1`,
+  verified `/health`, `/v1/models` and a `/v1/chat/completions` probe.
+- Worked around FlashInfer JIT compile failure with `VLLM_USE_FLASHINFER_SAMPLER=0`.
+- Wired the live `base_url` into the catalog route
+  `modal/qwen/qwen2.5-coder-7b-instruct`.
+- Added `modal` to a new `modal-deploy` dependency group.
+- Stopped the app after verification to preserve credits.
+
+Also completed earlier in the same feature branch: Meta Model API route,
+Modal runtime billing-source split, and the neutral Workbench↔Remote AI
+Operator `/api/external-actions` contract with UI support.
+
+Open / blocked:
+- Remote AI Operator hackathon release (video, public push, form submission)
+  remains **BLOCKED** on explicit owner release authorization.
+- Hosted judge Meta grant/access mechanism still needs owner decision and a
+  finite allowance.
+- C6 process-continuity live trial and `meta-baseline-gates-v1` remain ready but
+  not started.
+
 ## 2026-10-26 — attended closeout after usage-limit interruption
 
 Unattended window started14:41:41Z/15:41:41CET with fixed19Z/20local deadline.
