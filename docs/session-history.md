@@ -32,6 +32,14 @@ Open / blocked:
 - C6 process-continuity live trial and `meta-baseline-gates-v1` remain ready but
   not started.
 
+## 2026-10-28 — branch cleanup and push to develop
+
+Merged the stale `feature/go-cli-completion-acceptance-20261025` branch into
+`develop` (merge commit `3f0f2b8`), fixed post-merge pyright/type issues
+(`031803e`: httpx dependency, test enum literals, response/client protocols),
+configured pyright `venvPath`/`venv`, and pushed `develop` to `origin/develop`.
+`feature/go-cli-completion-acceptance-20261025` deleted locally.
+
 ## 2026-10-26 — attended closeout after usage-limit interruption
 
 Unattended window started14:41:41Z/15:41:41CET with fixed19Z/20local deadline.
