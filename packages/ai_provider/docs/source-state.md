@@ -3,7 +3,8 @@
 **Checked:** 2026-10-13; Gemini individual-access retirement verified 2026-10-14.
 Published limits and account observations can expire.
 
-**Latest scoped update:** 2026-10-28, Modal/Qwen tool-calling prerequisites and
+**Latest scoped update:** 2026-10-28, Baseten key-scope documentation and
+Modal/Qwen tool-calling prerequisites and
 credit-only deployment admission; 2026-10-25, Go coding-agent requirements/limits rechecked
 and OpenRouter credits/privacy and local CLI
 payload tracing; 2026-10-24, OpenRouter free inventory and the declared
@@ -17,6 +18,16 @@ evaluation limits. It is documentation, not a live quota registry or executable
 routing configuration. The [model catalog](../../ai_orchestrator/examples/model_catalog.toml)
 contains declared route capabilities; native readers report supported account
 observations. Neither establishes coding quality by itself.
+
+## Baseten key scopes checked 2026-10-28
+
+Baseten's official [environment-scoped key announcement](https://www.baseten.co/resources/changelog/environment-scoped-api-keys/)
+documents restrictions by model/environment for team keys. This establishes that
+keys can have different access scopes; it does not establish a particular event
+key's eligible endpoints, credit pool, expiry, retention terms or overage policy.
+Read the actual grant/onboarding instructions before choosing a route. A key in
+an environment variable does not enable a provider adapter or authorize inference.
+Account observations and grant details remain private runtime context.
 
 ## Reading and refreshing provider knowledge
 

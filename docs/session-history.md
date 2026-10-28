@@ -1,5 +1,47 @@
 # Session History
 
+## 2026-10-28 - credential audit and metadata-only bridge approval
+
+The owner approved metadata-only Operator descriptions. Replaced the previous
+argument-value/workspace-path summary with tool/category, workspace fingerprint
+and top-level argument types/sizes. Argument names are omitted because arbitrary
+keys can also contain private data. Candidate/base/evidence digests and approval
+semantics remain unchanged. ADR-075 records the rationale and the reduced phone
+review context; no detailed mode is implicitly authorized.
+
+Validation:8bridge tests; full3,059root/24skips,38Council and84job-search pass;
+Ruff/format and Pyright pass. Tests cover nested values, arbitrary argument names,
+workspace paths and distinct same-sized actions retaining distinct digests.
+
+A local credential audit checked2,643reachable Git blobs across Workbench and the
+sibling Operator,49,710local text/database files,299CLI histories and the fresh
+Operator wheel/sdist. No current-key matches outside the expected ignored root.env
+were found in those scanned areas. Pattern-only history findings were classified
+as opaque encrypted-content fields, not discovered credentials. No encrypted data
+was decoded/logged. Current Modal inference credentials are populated; Operator's
+CLI uses process environment and does not require a duplicate.env. An inherited
+Modify permission for an unresolved Windows SID remains unmodified. These checks
+are scoped evidence, not proof of every credential's absence or security.
+
+A fake-data local AgentLoop control confirmed that read_file('.env') under a
+read-only policy feeds the synthetic value to the next model request. No actual
+credential/external model was used. This confirms the existing restricted-input
+plan B gap. The owner was asked to choose host secret-input/output guards first
+(recommended) versus credential-store migration first or retaining isolation;
+no disputed security scope was implemented. Private evidence:
+artifacts/credential-audit-20261028/ASSESSMENT.md.
+
+Recorded the owner's new grant/account observations privately. Existing Go
+metadata collection successfully returned current allowance windows without
+inference; the overage setting remains owner-reported. The module CLI produced
+an already-imported-module runpy warning; closed-schema observations were retained
+and parsed offline without another account request. Baseten onboarding and special
+key semantics await the owner's email. Gmail was suggested but is not confirmed
+connected; no mailbox read/send occurred. Low-priority newsletter/email ingestion
+and shared dashboard/Orchestrator allowance visibility are parked in docs/ideas.md.
+No provider generation, secret relocation/rotation, public push, recording,
+submission, new dependency or renewed unattended window occurred.
+
 ## 2026-10-28 - second-window closeout
 
 Work started16:15:35UTC /17:15:35Warsaw/Budapest with fixed deadline19:00UTC /

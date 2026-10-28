@@ -146,7 +146,7 @@ class OpenCodeGoSourceInfo(SourceInfo):
         *,
         timeout_seconds: float = 15,
     ) -> AccountAllowance:
-        """Read account-wide Go usage percentages from the documented usage endpoint.
+        """Read account-wide Go usage percentages from the observed usage endpoint.
 
         The endpoint reports rolling (5-hour), weekly and monthly percentages plus
         reset timestamps for the whole Go account. It does not decompose usage by

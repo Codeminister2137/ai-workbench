@@ -11,6 +11,23 @@ terminal process environment, never in committed code or documentation.
 - `.env.*` is ignored by Git.
 - `!.env.example` is explicitly allowed by `.gitignore`.
 
+Git ignore prevents normal source tracking; it does not stop tools or commands
+from reading a file. The current generic `read_file` tool enforces workspace
+boundaries rather than a secret-file denylist: a permitted `.env` read can enter
+the next model request. A local synthetic control verified this on 2026-10-28
+without real credentials or external requests. General input/output protection
+is still [planned](repo-assistant/restricted-input-plan.md#b--general-repository-protection-planned-not-implemented).
+Use only the authorized reviewed/isolated task scope; do not treat a read-only
+profile as secret isolation.
+
+Sibling applications need not duplicate this file. Remote AI Operator's CLI
+reads provider credentials from its process environment; it does not automatically
+load a sibling Workbench `.env`. Supply credentials only through the selected
+runtime's authorized loading/secret mechanism. Modal inference's `MODAL_API_KEY`
+is distinct from the Modal SDK's account credentials in its user configuration.
+Keep credential presence checks and audits value-free; do not copy keys into
+diagnostics, public source, commands, screenshots or model messages.
+
 Create your local file by copying the example:
 
 ```powershell

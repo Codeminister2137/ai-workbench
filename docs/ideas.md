@@ -4,6 +4,45 @@ This file parks useful future ideas that should not be loaded into the active
 implementation path until they become scheduled work. Items here are not accepted
 architecture decisions or current requirements.
 
+## Email ingestion and newsletter digests
+
+Owner-requested, low priority (2026-10-28): let Workbench read selected mail,
+including provider onboarding messages, and digest newsletters for useful facts,
+links and opportunities across the connected applications.
+
+- Investigate a read-only mail connection and explicit message/label selection;
+  the current assistant's Gmail connection does not automatically grant Workbench
+  an OAuth token or permission to read an entire mailbox.
+- Preserve message/link provenance, dates and uncertainty; distinguish private
+  correspondence from public articles reached through newsletter links.
+- Treat email and linked pages as untrusted input, not instructions to execute
+  commands, reveal credentials or expand access. Do not echo keys or signed links.
+- Decide local processing, permitted external processors, retention/deletion and
+  cross-application sharing before implementation. Sending mail is separate scope.
+
+This records the idea only; no mailbox worker, schedule or persistence is approved.
+
+## Account balances, allowance windows and reset visibility
+
+Owner-requested, low priority but important for long-term usability (2026-10-28):
+show provider credit balances, subscription usage, reset times and overage state
+in the app, and make the same observations available to `ai_orchestrator`.
+
+- Reuse `ai_provider` account/source readers and neutral observations rather than
+  separate dashboard and routing scrapers. Go already exposes account-wide usage
+  percentages/reset times; other supported native readers cover additional sources.
+- Report source, checked time, account/route scope and stale/unknown status.
+  Percentages, token usage, provider balances and estimated cost are different facts.
+- Preserve explicit unknowns where a provider offers no supported billing API;
+  investigate documented read-only access first and allow labelled manual reports
+  when needed. A visible balance is not proof that overage is disabled.
+- Keep credentials and private account figures out of public source and worker
+  prompts. The Orchestrator may consume evidence under existing admission policy;
+  a dashboard display must not silently relax billing/privacy restrictions.
+
+Detailed UI, refresh cadence and storage choices remain future decisions. This
+idea does not authorize a background monitor or a new persistence/service layer.
+
 ## Reduce redundant agent calls and context work
 
 Owner-requested backlog (2026-10-19): investigate avoidable model/allowance cost
