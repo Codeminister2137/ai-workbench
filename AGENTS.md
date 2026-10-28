@@ -895,54 +895,21 @@ Do not declare an AI improvement based on a single example.
 
 ### Branch strategy
 
-This repository uses a two-branch integration model:
+Owner clarification (2026-10-28): before any edit, including documentation or
+mechanical fixes, verify the branch and create/resume a focused `feature/`, `fix/`
+or `docs/` branch based on `develop`. Read-only investigation may start on develop.
+`develop` is the permanent integration target: merge completed, validated work
+there; do further fixes on a working branch. Direct develop edits/commits require
+an explicit owner exception for that task. A clean checkout, branch cleanup or
+"continue/work only on develop" handoff identifies the base/target, not an exception.
+Keep handoffs consistent. If edits already exist on develop, preserve them with
+`git switch -c ...` and verify they carried over; do not discard, reset or stash
+user work merely to change branches. Keep commits frequent, focused and reviewable,
+with imperative messages and no unrelated changes.
 
-* **`master`** is the stable, portfolio-facing branch. It only receives
-  changes via explicit promotion from `develop` at a stable milestone.
-  Never commit directly to `master` or target it with feature branches.
-* **`develop`** is the permanent integration branch. All feature and fix
-  branches are created from `develop` and merged back into `develop`.
-* **Feature branches** (`feature/`, `fix/`, `docs/`) branch from `develop`
-  and merge back into `develop` when complete and validated.
-
-Codex must:
-
-* always branch from `develop` for new work;
-* verify the current branch before the first repository edit, then create or
-  resume a focused `feature/`, `fix/` or `docs/` branch; read-only investigation
-  may start on `develop`;
-* never implement or commit task changes directly on `develop`, including small
-  documentation and mechanical fixes, unless the owner explicitly authorizes
-  direct edits for that specific task;
-* always target `develop` as the merge destination for feature branches;
-* never merge directly to `master`;
-* never push directly to `master` — promotion to master requires explicit
-  owner approval and instruction.
-
-Owner clarification (2026-10-28): `develop` is the integration destination, not
-the development workspace. A clean checkout on `develop`, a completed branch
-cleanup, or a handoff saying "continue on develop" / "work only on develop"
-does not waive the feature-branch workflow. Treat those phrases as identifying
-the base and merge target unless direct edits are explicitly requested. Keep
-handoffs consistent with this rule rather than copying ambiguous wording forward.
-
-If task edits have already started on `develop`, preserve them by creating the
-focused branch at the current tip before further edits (`git switch -c ...`).
-Verify that all changes carried over; do not reset, discard or stash user work
-merely to obtain a clean branch. Integration into `develop` follows validation
-and the normal merge workflow; further fixes belong on a working branch.
-
-For implementation work:
-
-* use a focused branch off `develop`;
-* keep commits logically grouped;
-* avoid unrelated changes;
-* commit often enough that each commit describes one coherent change;
-* use clear imperative commit messages;
-* prefer several reviewable commits over one large mixed commit.
-
-See `docs/git-workflow.md` for the full repository workflow including the
-promotion process from `develop` to `master`.
+`master` is stable and portfolio-facing. Never target it with feature branches or
+commit/push/merge to it directly; promotion from develop at a stable milestone needs
+explicit owner approval and instruction. See `docs/git-workflow.md` for details.
 
 Before completion:
 
