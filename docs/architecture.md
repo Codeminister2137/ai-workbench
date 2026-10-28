@@ -18,6 +18,12 @@ provider/model/endpoint. It is not answer text or durable history; input admissi
 counts it. Ollama preserves multi-turn thinking without an implicit adapter cache.
 See the [high-priority conformance plan](documentation-conformance-plan.md).
 
+ADR-073 extends that contract to shared Responses tools and stateless native replay.
+The adapter preserves tool-call/result identity, native output order and assistant
+phase; Meta requests opaque encrypted reasoning with `store:false`. Rewritten
+messages and other routes do not replay stale native state. No server-managed
+conversation storage or new approval policy is introduced.
+
 Native coding fallback may transfer complete observable messages/tool history
 transiently when the destination request leaves at least 20% context headroom
 after input, tools, reserved output and framing (ADR-059). Otherwise retain the

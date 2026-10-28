@@ -55,6 +55,11 @@ zero-to-one scaling: the first request starts a container and receives HTTP503
 until a replica is ready. Use an explicitly bounded readiness wait before the
 task; this does not justify generic inference retries or a fallback-policy change.
 
+The [Go guide](https://opencode.ai/v2/docs/console/go/) rechecked 2026-10-28
+documents the Responses endpoint under `/inference/go/openai/v1/responses`.
+The Responses subclass now uses that canonical default; caller-supplied endpoint
+overrides remain supported. This correction is not a live compatibility result.
+
 ### OpenCode Go — rechecked 2026-10-25: bounded coding admission
 
 The [official Go guide](https://opencode.ai/v2/docs/console/go/) still lists
@@ -824,6 +829,17 @@ explicit overrides, scope isolation and unknown/small capacities. This does not
 change account settings or establish live acceptance.
 
 ### Meta Model API - published facts refreshed 2026-10-27
+
+2026-10-28 protocol refresh: [tool calling](https://dev.meta.ai/docs/tool-calling)
+documents flat Responses function definitions, function-call/result items and
+matching call ids. [Responses](https://dev.meta.ai/docs/protocols/responses)
+supports encrypted-only reasoning replay with `include` and `store:false`; replay
+requires a summary field and preserves assistant commentary phase. Workbench now
+implements these in the shared Responses adapter under ADR-073. Offline agent
+read/tool-result loops cover Meta, generic Responses and Go Responses. This is
+software-path evidence, not live model-quality or C6 acceptance. Published Muse
+Spark Standard prices remain USD1.25 input/USD4.25 output per million tokens on
+the [pricing page](https://dev.meta.ai/docs/pricing-rate-limits), rechecked today.
 
 [Official pricing](https://dev.meta.ai/docs/pricing-rate-limits) lists Standard
 Muse Spark1.3/1.2/1.1 at USD1.25 input and USD4.25 output per million tokens,

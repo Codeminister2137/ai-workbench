@@ -52,9 +52,10 @@ class MetaResponsesChatClient(OpenAIResponsesChatClient):
             provider=self.config.provider.value,
         )
         payload = super()._responses_payload(request, stream=stream)
-        # Repository content is never stored on Meta's side. Server-side response
-        # storage would need its own privacy decision, so it stays off here.
+        # Do not request server-managed conversation storage. This API flag does
+        # not establish the provider's separate operational logging practices.
         payload["store"] = False
+        payload["include"] = ["reasoning.encrypted_content"]
         return payload
 
 

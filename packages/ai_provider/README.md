@@ -15,6 +15,10 @@ answers, or implement job-search logic.
 - Ollama chat and streaming adapter.
 - OpenAI-compatible Chat Completions adapter for OpenAI, Requesty, Google
   Gemini-compatible routes, and OpenCode Go.
+- Shared Responses tools and streaming for Meta/OpenAI-compatible routes, with
+  transient origin-bound native continuation. Meta enforces stateless encrypted
+  reasoning replay and refuses Contributor variants; live coding quality remains
+  separate from protocol support.
 - Provider factory for configured chat clients.
 - Experimental, opt-in OpenRouter free-only API client with per-call exact-price,
   tool-support and daily-quota checks; no deposit or paid fallback.

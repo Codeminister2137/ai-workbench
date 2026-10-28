@@ -100,6 +100,15 @@ change answer text, usage, tool calls or exact-origin continuation replay.
 
 ### Streaming
 
+The shared Responses adapter translates flat function definitions and typed
+`function_call`/`function_call_output` history, matching ids before sending results.
+Both complete and streamed responses deliver normalized calls only after argument
+validation; failed responses cannot deliver executable calls. Native order, message
+phase and encrypted reasoning travel transiently through ADR-055 continuation,
+separate from ordinary metadata. Rewritten messages or a different origin do not
+replay that state. Meta explicitly requests encrypted content with `store:false`.
+This protocol support does not establish a model's live coding quality.
+
 `ChatClient.stream(request)` yields `AIStreamEvent` values:
 
 - `AIStreamDelta`: one text delta with raw provider metadata;

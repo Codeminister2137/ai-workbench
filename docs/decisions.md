@@ -1,3 +1,14 @@
+## ADR-073 - Shared Responses tools and stateless continuation
+
+**Status:** Accepted and implemented; live C6 acceptance open
+**Date:** 2026-10-28
+
+The owner selected shared Responses tool serialization/parsing and stateless,
+origin-bound continuation through the existing neutral contracts. Meta keeps
+`store:false` and Contributor refusal. No server-managed history or approval-policy
+change. Detailed ADR:
+[ADR-073](decisions/ADR-073-shared-responses-tools-and-stateless-continuation.md).
+
 ## ADR-072 - Modal runtime provider route
 
 **Status:** Accepted

@@ -89,7 +89,7 @@ def test_responses_client_sends_session_header(monkeypatch):
         assert headers["authorization"] == "Bearer test-key"
         assert headers["user-agent"] == "ai_projects/0.1.0"
         assert headers["x-opencode-session"] == "session-resp"
-        assert request.full_url == "https://opencode.ai/inference/go/v1/responses"
+        assert request.full_url == "https://opencode.ai/inference/go/openai/v1/responses"
         return Response(
             {
                 "output": [
@@ -391,6 +391,15 @@ def test_responses_finish_reason_maps_status_and_incomplete_details(monkeypatch)
         BackendConfig(provider=ProviderKind.OPENAI, model="gpt-5", api_key="test-key")
     )
     for extra, expected in cases:
+        if extra.get("status") == "failed":
+            with pytest.raises(ProviderError, match="failed response"):
+                client.complete(
+                    AIRequest(
+                        messages=(AIMessage(MessageRole.USER, "Hi"),),
+                        privacy_class=PrivacyClass.EXTERNAL_ALLOWED,
+                    )
+                )
+            continue
         response = client.complete(
             AIRequest(
                 messages=(AIMessage(MessageRole.USER, "Hi"),),

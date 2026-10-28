@@ -15,7 +15,7 @@ from ai_provider.config import BackendConfig, ProviderKind
 from ai_provider.contracts import AIRequest
 from ai_provider.errors import ProviderError, ProviderErrorCategory
 
-GO_RESPONSES_BASE_URL = "https://opencode.ai/inference/go/v1"
+GO_RESPONSES_BASE_URL = "https://opencode.ai/inference/go/openai/v1"
 GO_USER_AGENT = "ai_projects/0.1.0"
 
 
