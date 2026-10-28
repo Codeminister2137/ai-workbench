@@ -1,11 +1,11 @@
 """Bridge Workbench terminal approvals to the Remote AI Operator task API.
 
-The bridge sends digests plus a description containing the workspace path and
-tool argument values (individual strings truncated to 400 characters). Those
-values can include source, diffs or commands; truncation is not redaction. The
-operator phone/web UI records approve/reject/cancel, and the Workbench applies
-the prepared tool effect only after approval. Use only suitably authorized input
-and destinations; the argument-description privacy policy remains an owner choice.
+The bridge sends action digests and metadata: tool/category, a workspace
+fingerprint, and argument types/sizes. Descriptions omit argument names/values
+and the workspace path. The operator UI records approve/reject/cancel; Workbench
+applies the prepared tool effect only after approval. Metadata does not let the
+owner inspect the exact command or diff; review those through an authorized
+channel before approving the digest-bound action.
 """
 
 from __future__ import annotations
@@ -30,27 +30,34 @@ def _sha256(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def _summarize_arguments(arguments: dict, max_length: int = 400) -> str:
-    """Return a compact, phone-friendly summary of tool arguments.
-
-    Long string values are truncated for readability. This does not redact source,
-    commands or secrets and does not establish a metadata-only privacy boundary.
-    """
-
-    summary: dict[str, object] = {}
-    for key, value in arguments.items():
-        if isinstance(value, str) and len(value) > max_length:
-            value = value[:max_length] + "…"
-        summary[key] = value
-    return json.dumps(summary, ensure_ascii=True, sort_keys=True)
+def _summarize_arguments(arguments: dict) -> str:
+    """Describe top-level JSON types/sizes without names or nested values."""
+    items: list[dict[str, object]] = []
+    for value in arguments.values():
+        if value is None:
+            item: dict[str, object] = {"type": "null"}
+        elif isinstance(value, bool):
+            item = {"type": "boolean"}
+        elif isinstance(value, (int, float)):
+            item = {"type": "number"}
+        elif isinstance(value, str):
+            item = {"type": "string", "characters": len(value)}
+        elif isinstance(value, (list, tuple)):
+            item = {"type": "array", "items": len(value)}
+        elif isinstance(value, dict):
+            item = {"type": "object", "members": len(value)}
+        else:
+            item = {"type": "unsupported"}
+        items.append(item)
+    return json.dumps({"count": len(items), "items": items}, sort_keys=True)
 
 
 def _describe(approval_call: ToolCall, category: ToolCategory, workspace: Path) -> str:
     args_summary = _summarize_arguments(approval_call.arguments)
     return (
         f"[{category.value}] {approval_call.name}\n"
-        f"workspace: {workspace}\n"
-        f"arguments: {args_summary}"
+        f"workspace_sha256: {_sha256(str(workspace.resolve()))}\n"
+        f"arguments_metadata: {args_summary}"
     )
 
 

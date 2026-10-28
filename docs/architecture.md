@@ -119,6 +119,12 @@ bounds. Funded children retain the exact approved client and admission guards.
 This is tool-level authority, not OS isolation; see
 [ADR-074](decisions/ADR-074-delegation-inherits-supervisor-authority.md).
 
+The optional Remote AI Operator approval bridge transmits action digests and
+metadata-only descriptions, without workspace paths or argument names/values.
+It retains exact-action binding; the owner must inspect command/diff content
+through an authorized channel. See
+[ADR-075](decisions/ADR-075-metadata-only-operator-approval-descriptions.md).
+
 ADR-049 adds a distinct foreground `coding-chat` mode. `ai_agent.coding_chat`
 owns conversation continuity over injected turn execution; `coding_chat_cli`
 binds existing coding-session/foreground tools to the current CLI executor.

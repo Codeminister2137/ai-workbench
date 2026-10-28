@@ -1,3 +1,13 @@
+## ADR-075 - Metadata-only Operator approval descriptions
+
+**Status:** Accepted and implemented, 2026-10-28.
+
+Owner-approved bridge descriptions contain tool/category, workspace fingerprint
+and argument types/sizes. Private argument names/values and workspace paths are
+omitted; exact-action digest binding remains. Phone review needs a separate
+authorized content-review channel. See
+[ADR-075](decisions/ADR-075-metadata-only-operator-approval-descriptions.md).
+
 ## ADR-074 - Delegation inherits supervisor authority
 
 **Status:** Accepted owner direction, implemented 2026-10-28.
