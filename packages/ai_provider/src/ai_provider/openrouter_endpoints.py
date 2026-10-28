@@ -54,12 +54,17 @@ def _endpoints_url(model_id: str) -> str:
     return f"{BASE_URL}/models/{quote(author, safe='')}/{quote(slug, safe=':')}/endpoints"
 
 
-def _number(row: dict[str, Any], name: str) -> float | None:
+def _number(row: dict[str, Any], name: str, *, maximum: float | None = None) -> float | None:
     value = row.get(name)
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return None
-    candidate = float(value)
-    return candidate if math.isfinite(candidate) else None
+    try:
+        candidate = float(value)
+    except OverflowError:
+        return None
+    if not math.isfinite(candidate) or candidate < 0:
+        return None
+    return candidate if maximum is None or candidate <= maximum else None
 
 
 def _positive_int(row: dict[str, Any], name: str) -> int | None:
@@ -81,7 +86,9 @@ def _prices(row: dict[str, Any]) -> dict[str, Any] | None:
     prices = {
         key: value
         for key, value in pricing.items()
-        if isinstance(value, (str, int, float)) and not isinstance(value, bool)
+        if isinstance(value, (str, int, float))
+        and not isinstance(value, bool)
+        and (not isinstance(value, float) or math.isfinite(value))
     }
     return prices or None
 
@@ -108,8 +115,8 @@ def _parse_endpoint(
         provider=provider,
         endpoint=_text(row, "tag"),
         status=status if type(status) is int else None,
-        uptime_1d_percent=_number(row, "uptime_last_1d"),
-        uptime_30m_percent=_number(row, "uptime_last_30m"),
+        uptime_1d_percent=_number(row, "uptime_last_1d", maximum=100),
+        uptime_30m_percent=_number(row, "uptime_last_30m", maximum=100),
         latency_seconds=_number(row, "latency_last_30m"),
         throughput_tokens_per_second=_number(row, "throughput_last_30m"),
         quantization=_text(row, "quantization"),
@@ -171,6 +178,8 @@ def read_openrouter_endpoint_availability(
             for endpoint in (_parse_endpoint(row, model, observed_at) for row in rows)
             if endpoint is not None
         )
+        if rows and not endpoints:
+            raise ValueError("Endpoint metadata contained no usable provider rows")
     except (OSError, ValueError, TypeError) as error:
         reason = "metadata_request_failed"
         if isinstance(error, HTTPError):

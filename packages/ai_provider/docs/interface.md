@@ -186,6 +186,11 @@ acceptance evidence for this repository.
 the public OpenRouter endpoints API for one model id. It sends no prompt, calls
 no model, needs no credential, and never discovers credential files.
 
+The OpenRouter reader accepts uptime only within 0–100 and finite, nonnegative
+latency/throughput. Invalid values remain unknown. An advertised list containing
+no usable provider rows is a metadata failure, rather than evidence that no
+endpoints are advertised. Partially usable lists retain their valid rows.
+
 ### `CapabilityScore` and `CapabilityPrior`
 
 Published, dated capability results used as a **selection prior**. They are not

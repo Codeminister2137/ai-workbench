@@ -1,5 +1,29 @@
 # Session History
 
+## 2026-10-28 — local Operator release gates and availability review
+
+Prepared a private local Operator clone from external-actions branch 3213b3d.
+Local commit 68e684b reconciles stale release-checklist wording with current
+owner authorization; its patch remains private and unapplied to the sibling.
+Fresh locked-source and independent-wheel runs each passed 142 tests and 69
+subtests, with 8 skips. Wheel/sdist builds and known-secret/private-identifier
+scans passed. No recording, public push, submission, hosted deployment or judge
+grant occurred. Historical hosted/Docker evidence was not rerun against this
+candidate. Exact release scope and judge delivery remain owner decisions.
+
+Reviewed cross-source availability using existing neutral records. Corrected
+OpenRouter invalid numeric observations and malformed-list handling without
+changing routing. The [review](repo-assistant/model-availability-review.md)
+maps existing readers, unknowns and the recommended advisory next slice.
+Validation: 754 provider tests, Ruff and Pyright pass; the registered final
+workspace check passed 3,037 root tests / 24 skips, 38 Council and 84 job-search.
+
+Further private C6 preparation adds fixed-origin bounded forwarding, exact-byte
+automated assessment controls and Windows outer process-tree ownership. Nineteen
+admission/forwarding/checkpoint controls and three actual process controls pass.
+All C6 workflow model/reviewer outputs remain scripted. Current account facts
+and a reviewed activation seal are still required; no live C6 run occurred.
+
 ## 2026-10-28 — shared Responses support and C6 offline foreground rehearsal
 
 During the owner-authorized window ending15:00Warsaw/Budapest,implemented shared

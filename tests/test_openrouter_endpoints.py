@@ -140,6 +140,59 @@ def test_endpoint_rows_without_a_provider_are_skipped(monkeypatch):
     assert len(result.endpoints) == 1
 
 
+@pytest.mark.parametrize("rows", [[{"tag": "orphan"}], [None, {}, "invalid"]])
+def test_unusable_rows_do_not_claim_no_endpoints_are_advertised(monkeypatch, rows):
+    transport(monkeypatch, rows=rows)
+    result = read_openrouter_endpoint_availability(MODEL)
+    assert result.status == "unavailable"
+    assert result.reason == "metadata_request_failed"
+    assert result.endpoints == ()
+
+
+@pytest.mark.parametrize("value", [-1, 101, float("inf"), float("nan"), 10**400, True])
+def test_invalid_uptime_does_not_distort_availability_summary(monkeypatch, value):
+    transport(monkeypatch, rows=[endpoint(uptime_last_1d=value, uptime_last_30m=value)])
+    result = read_openrouter_endpoint_availability(MODEL)
+    assert result.status == "observed"
+    assert result.endpoints[0].uptime_1d_percent is None
+    assert result.endpoints[0].uptime_30m_percent is None
+    assert result.summary()["best_uptime_1d_percent"] is None
+
+
+@pytest.mark.parametrize("value", [-1, float("inf"), float("nan"), 10**400, True])
+def test_invalid_performance_observations_stay_unknown(monkeypatch, value):
+    transport(monkeypatch, rows=[endpoint(latency_last_30m=value, throughput_last_30m=value)])
+    record = read_openrouter_endpoint_availability(MODEL).endpoints[0]
+    assert record.latency_seconds is None
+    assert record.throughput_tokens_per_second is None
+
+
+def test_zero_performance_and_percentage_boundaries_are_valid(monkeypatch):
+    transport(
+        monkeypatch,
+        rows=[
+            endpoint(
+                uptime_last_1d=0, uptime_last_30m=100, latency_last_30m=0, throughput_last_30m=0
+            )
+        ],
+    )
+    record = read_openrouter_endpoint_availability(MODEL).endpoints[0]
+    assert record.uptime_1d_percent == 0
+    assert record.uptime_30m_percent == 100
+    assert record.latency_seconds == 0
+    assert record.throughput_tokens_per_second == 0
+
+
+def test_nonfinite_numeric_prices_do_not_escape_json_safe_observation(monkeypatch):
+    transport(
+        monkeypatch,
+        rows=[endpoint(pricing={"prompt": "0", "completion": float("nan"), "other": float("inf")})],
+    )
+    result = read_openrouter_endpoint_availability(MODEL)
+    assert result.endpoints[0].prices == {"prompt": "0"}
+    json.dumps(result.to_dict(), allow_nan=False)
+
+
 @pytest.mark.parametrize(
     "status,reason", [(404, "model_not_found"), (401, "authentication_failed")]
 )

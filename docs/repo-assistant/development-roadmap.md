@@ -196,6 +196,13 @@ earlier trials are unchanged; see the current baseline assessment for r/s/t evid
 
 ## Planned: reliable model availability across sources
 
+October 28 follow-up: the [code/contract review](model-availability-review.md)
+maps existing evidence and missing source readers. OpenRouter observation
+validation now rejects impossible numeric values and distinguishes malformed
+rows from an advertised empty result. Broader integration remains planned;
+the recommended next slice is an on-demand advisory report using existing
+contracts, with unknowns preserved and routing unchanged.
+
 Owner direction, 2026-10-21: plan a reliable way to check model availability for
 every configured source. Defer implementation while completing the paid-native
 CLI baseline. The stale `gpt-5.5` ChatGPT route demonstrates why executable/auth
