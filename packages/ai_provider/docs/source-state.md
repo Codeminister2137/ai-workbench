@@ -44,8 +44,10 @@ this single configured task does not establish general model quality.
 [Modal budgets](https://modal.com/docs/guide/budgets) distinguishes the usage
 budget before credits from the net-spend limit after credits. A default spend
 limit may permit out-of-pocket charges. Credit-only development must verify
-remaining eligible credits and the actual net-spend limit before deployment;
-zero historical billed cost does not establish either. Account observations stay
+remaining eligible credits and check the net-spend setting before deployment;
+zero historical billed cost does not establish either. If the setting is unavailable,
+record it as unknown and require the finite compute bound to fit verified eligible
+credits with headroom; never assume an account cap exists. Account observations stay
 in private runtime evidence. Runtime cost is compute time, not a per-token price.
 
 [Modal Servers](https://modal.com/docs/guide/servers) do not queue requests during
