@@ -1,5 +1,24 @@
 # Session History
 
+## 2026-10-28 - second-window closeout
+
+Work started16:15:35UTC /17:15:35Warsaw/Budapest with fixed deadline19:00UTC /
+20:00local. New admissions ended at18:44:15UTC /19:44:15local, ahead of the
+18:45UTC cleanup cutoff. Remaining hosted trial envelopes cannot fit preparation,
+execution, review and cleanup before that cutoff; fresh C6/fallback facts, bridge
+privacy and public release decisions remain open. This is not baseline completion.
+
+All owned model/integration work has exited; Modal diagnostics are stopped. Final
+handoff and exact work-stop/power receipts are private under
+artifacts/unattended-20261028-1615. Default sleep remains ten minutes after work
+stops; owner cancellation is .\cancel-sleep.cmd. Scheduling is distinguished from
+an actual Windows sleep transition. No public push or master changes occurred.
+
+Final package comparison verified all19payload members against the actual working
+source; Git comparison matches after CRLF normalization (external_actions.py has
+line-ending-only differences). The initial strict-byte comparison failure and
+follow-up diagnosis are preserved. No package source difference was ignored.
+
 ## 2026-10-28 - synthetic bridge round trip and refreshed Operator packages
 
 A local real HTTP Operator app (private candidate d445286) and the Workbench
