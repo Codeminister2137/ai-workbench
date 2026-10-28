@@ -64,6 +64,7 @@ app = modal.App("ai-projects-qwen25-coder-7b-instruct")
 @app.server(
     image=vllm_image,
     gpu="L4",
+    max_containers=1,
     scaledown_window=30,
     startup_timeout=STARTUP_TIMEOUT_SECONDS,
     volumes={
@@ -92,6 +93,9 @@ class Server:
             "--max-model-len",
             "32768",
             "--enforce-eager",
+            "--enable-auto-tool-choice",
+            "--tool-call-parser",
+            "hermes",
             "--disable-fastapi-docs",
             "--uvicorn-log-level=info",
         ]

@@ -3,7 +3,8 @@
 **Checked:** 2026-10-13; Gemini individual-access retirement verified 2026-10-14.
 Published limits and account observations can expire.
 
-**Latest scoped update:** 2026-10-25, Go coding-agent requirements/limits rechecked
+**Latest scoped update:** 2026-10-28, Modal/Qwen tool-calling prerequisites and
+credit-only deployment admission; 2026-10-25, Go coding-agent requirements/limits rechecked
 and OpenRouter credits/privacy and local CLI
 payload tracing; 2026-10-24, OpenRouter free inventory and the declared
 free route; capacity comparison below; OpenRouter limits/privacy, Codex
@@ -28,6 +29,29 @@ A date alone does not make a fact currently reliable: prices, model availability
 quota and entitlement need fresh admission evidence before execution. Unknown or
 contradictory evidence remains explicit. Account balances, credentials, prompts
 and private transcripts do not belong in this public reference.
+
+### Modal runtime — deployment prerequisites checked 2026-10-28
+
+[Qwen's function-calling guide](https://qwen.readthedocs.io/en/v2.5/framework/function_call.html)
+and [vLLM's tool-calling reference](https://docs.vllm.ai/en/stable/features/tool_calling/)
+require automatic tool choice and the Hermes parser for Qwen2.5 tool calls. The
+deployment now supplies both flags; previous plain-chat probes did not exercise
+that capability. A bounded synthetic coding pilot subsequently reached the live
+endpoint but returned proposed tool calls as ordinary text, executing no tools
+and leaving the seed unchanged. Tool-calling workflow acceptance remains missing;
+this single configured task does not establish general model quality.
+
+[Modal budgets](https://modal.com/docs/guide/budgets) distinguishes the usage
+budget before credits from the net-spend limit after credits. A default spend
+limit may permit out-of-pocket charges. Credit-only development must verify
+remaining eligible credits and the actual net-spend limit before deployment;
+zero historical billed cost does not establish either. Account observations stay
+in private runtime evidence. Runtime cost is compute time, not a per-token price.
+
+[Modal Servers](https://modal.com/docs/guide/servers) do not queue requests during
+zero-to-one scaling: the first request starts a container and receives HTTP503
+until a replica is ready. Use an explicitly bounded readiness wait before the
+task; this does not justify generic inference retries or a fallback-policy change.
 
 ### OpenCode Go — rechecked 2026-10-25: bounded coding admission
 

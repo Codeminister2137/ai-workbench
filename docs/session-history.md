@@ -1,5 +1,69 @@
 # Session History
 
+## 2026-10-28 — bounded Modal task measured; coding failed and app stopped
+
+After the owner supplied current credit headroom, ran one fresh synthetic
+Workbench normalization task. Readiness took120.312seconds; its only model call
+took11.5458seconds and reported673input/170output tokens. The model printed
+proposed tool calls as text; zero tools ran, source stayed unchanged and independent
+validation failed. No inference retry or host-authored recovery was substituted.
+The measurement slice is complete with a failed coding outcome, not accepted
+general coding/tool quality.
+
+The trial stopped its inference app. Immediate inventory was still stopping, so
+the receipt withheld cleanup success; later read-only inventory verified stopped
+and zero tasks. Approximate GPU-only costUSD0.032 from observed app lifetime and
+account rate; exact total remains unknown and excludes no costs by assumption.
+Evidence:private `artifacts/modal-workbench-20261028b/ASSESSMENT.md` and receipts.
+
+An earlier attempt a stopped at the first startup503 before inference. Diagnosis
+confirmed Modal Servers reject requests until a replica is ready; b declared a
+bounded503readiness wait and preserved response bodies. Both attempts and verdicts
+remain unchanged. Seven offline lifecycle controls and six adapter tests pass;
+deployment lint passes. Source now enables Hermes tools and caps scaling at one
+container; runbook/provider-state notes distinguish readiness from inference retry.
+
+Next C6 is at an existing owner decision:trial-only route-limit trigger versus a
+new in-session route command versus omitting cross-route coverage. A private
+labelled proxy is recommended; no C6 inference or disputed implementation started.
+
+## 2026-10-28 — enforce working branches before edits
+
+Owner corrected direct development on develop. Created
+`fix/modal-workbench-acceptance-20261028` at `b7ad1b1` and carried all uncommitted
+task edits across; develop was not advanced. AGENTS and workflow guides now
+require a focused branch before any repository edit, including documentation and
+mechanical fixes, unless the owner explicitly authorizes a task-specific direct
+edit exception. Removed the contradictory small-fix exception and corrected the
+local handoff's instruction to work directly on develop.
+
+Owner also supplied current Modal dashboard credit figures privately. The
+remaining-credit blocker is resolved; the workspace net-spend setting remains
+unknown and was not changed. Credit admission uses a finite compute bound with
+verified headroom rather than silently imposing the recommended zero-spend setting.
+
+## 2026-10-28 — Modal Workbench task prepared offline
+
+Owner selected Modal measurement, C6 continuity, Operator release gates and model
+availability work in that order, on develop. Before deploying, investigation found
+that the Qwen server lacked vLLM automatic tool-choice/Hermes parsing flags. Added
+the documented flags and updated deployment/provider references. This host change
+is not live tool-calling acceptance.
+
+Private preparation `artifacts/modal-workbench-20261028a/` contains fresh finite
+bounds and a scripted Workbench AgentLoop read/edit/validate rehearsal: 400
+independent normalization cases pass, including Unicode and input preservation.
+Focused Modal adapter tests: 6 passed; deployment Ruff/format and full Pyright pass.
+Five offline lifecycle controls cover cleanup after failed deployment/task, credit
+refusal and refusal to report success while the app remains active.
+Read-only account metadata was collected without inference or deployment; it does
+not establish remaining eligible credit or the workspace net-spend limit. Owner
+dashboard facts are pending before live admission under the no-owner-funds rule.
+Existing standalone Modal SDK is usable without a dependency installation.
+
+No live task, deployment, recording, public push or submission was performed;
+slices 2–4 have not started. The original C6 preparation remains unchanged.
+
 ## 2026-10-28 — Modal inference endpoint deployed and verified
 
 Branch `feature/go-cli-completion-acceptance-20261025`; commits `cb3eca5`
