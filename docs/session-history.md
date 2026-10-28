@@ -1,5 +1,24 @@
 # Session History
 
+## 2026-10-28 — shared Responses support and C6 offline foreground rehearsal
+
+During the owner-authorized window ending15:00Warsaw/Budapest,implemented shared
+Responses tools and stateless native continuation (ADR-073). Source,streaming,
+failure,origin isolation and actual file-tool loops pass;739provider tests and
+Pyright pass. Registered full validation after updating the tools-incapable fixture
+passes3,022root/24skips,Council38and job-search84. Earlier instruction-budget
+overflow was caused by repeated Git wording;semantic consolidation preserves the
+new branch policy within the existing64kdefault. Failed evidence remains private.
+
+Fresh private C6 preparation drives one actual foreground CLI through two turns,
+a labelled quota-triggered protocol switch,and the same running owned process.
+Independent session/history/instruction/protected-input/index/cleanup checks pass;
+foreign-path and frozen-write controls contain their attempts. Model,auxiliary and
+scrutiny outputs are scripted;source/companion are host reference data. Live C6
+remains incomplete;credit-only admission facts and a fresh live controller are
+still required. No model call or production quality promotion is claimed.
+Evidence:`artifacts/cli-c6-continuity-20261028af/ASSESSMENT.md`.
+
 ## 2026-10-28 — bounded Modal task measured; coding failed and app stopped
 
 After the owner supplied current credit headroom, ran one fresh synthetic

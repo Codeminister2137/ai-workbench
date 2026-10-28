@@ -1,5 +1,22 @@
 # CLI Development Foundation Roadmap
 
+## October 28 shared Responses tools and C6 offline foreground composition
+
+ADR-073 implements the owner-approved shared Responses tool/stream/result protocol
+and transient origin-bound native replay. Meta keeps `store:false` and Contributor
+refusal. Real adapter/agent file-read loops pass offline across Meta,generic
+Responses and Go Responses;this is not live model-quality acceptance.
+
+The owner selected a trial-only quota proxy for C6,not a new route command. Fresh
+private preparation now drives two turns through one real foreground CLI,injects
+a labelled429,uses real fallback into another protocol,and polls/stops the same
+running handle. Independent audit verifies one saved conversation,complete
+instructions/prior task/report,protected inputs/index and owned cleanup. Foreign
+path/frozen-write controls contain their attempts. Auxiliary/scrutiny/model
+responses are scripted;live C6/M4/M5 remains open. Current prepaid/allowance-only
+billing facts and a fresh finite live controller are still prerequisites.
+Evidence:`artifacts/cli-c6-continuity-20261028af/ASSESSMENT.md` (private).
+
 ## October 27 Meta Model API provider route
 
 The owner chose a dedicated Meta adapter over a generic base-URL override, because

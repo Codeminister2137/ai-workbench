@@ -1,5 +1,23 @@
 # Distance to established baseline CLI usability
 
+## October 28 — shared Responses tools; C6 complete offline composition
+
+The Meta Workbench route previously lacked tools despite provider support.
+ADR-073 now translates tools/results,normalizes complete/streamed calls and failed
+responses,and preserves transient native order/phase/encrypted state on the same
+origin only. Meta retains `store:false`;capabilities do not assert live quality.
+
+Fresh C6 offline preparation exercises the actual foreground CLI,required scripted
+scrutiny,real tools/validation and a labelled quota-triggered protocol switch
+without losing the running process handle. Independent saved-session/history,
+instruction,protected-input/index and cleanup audit passes;foreign-path and frozen
+write controls contain attempted effects. All model/support outputs are scripted
+and the implementation/companion are host rehearsal data. This is complete offline
+composition evidence,not real-model C6,M4 or M5 acceptance. Current credit-only
+admission and a separately prepared finite live controller remain required.
+Original ae and consumed failed preparation outcomes are unchanged. Private
+assessment:`artifacts/cli-c6-continuity-20261028af/ASSESSMENT.md`.
+
 ## October 27 C6 fixture prepared, live trial still open
 
 A fresh sealed fixture now exists for the process/session-continuity question
