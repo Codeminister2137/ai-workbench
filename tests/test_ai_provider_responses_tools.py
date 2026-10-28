@@ -178,7 +178,9 @@ def test_native_output_order_phase_and_encrypted_continuation_are_preserved(clie
 @pytest.mark.parametrize("mismatch", ["provider", "model", "base_url", "role"])
 def test_continuation_cannot_cross_origin_or_role(mismatch):
     client = OpenAIResponsesChatClient(
-        BackendConfig(ProviderKind.OPENAI, "test-model", api_key="test")
+        BackendConfig(
+            ProviderKind.OPENAI, "test-model", api_key="synthetic-transport-credential-only"
+        )
     )
     response = client._response_from_raw(
         completed(

@@ -1,3 +1,13 @@
+## ADR-076 - Host credential guards before storage migration
+
+**Status:** Owner-approved sequence; first slice implemented, 2026-10-28.
+
+Credential-file, known-credential tool-output and model-input guards come first.
+Credential-store migration remains a complementary later design, not an exclusive
+alternative. Existing storage is retained; this is not full privacy protection or
+an OS sandbox. See
+[ADR-076](decisions/ADR-076-host-credential-guards-before-storage-migration.md).
+
 ## ADR-075 - Metadata-only Operator approval descriptions
 
 **Status:** Accepted and implemented, 2026-10-28.

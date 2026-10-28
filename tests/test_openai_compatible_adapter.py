@@ -290,7 +290,11 @@ def test_stream_data_and_done_allow_optional_sse_colon_space(monkeypatch, data_s
         ),
     )
     client = OpenAICompatibleChatClient(
-        BackendConfig(provider=ProviderKind.REQUESTY, model="fixture", api_key="fixture")
+        BackendConfig(
+            provider=ProviderKind.REQUESTY,
+            model="fixture",
+            api_key="synthetic-transport-credential-only",
+        )
     )
     events = list(
         client.stream(
@@ -343,7 +347,11 @@ class TestStreamingCalls:
             lambda *args, **kwargs: FakeStreamingHttpResponse(chunks),
         )
         client = OpenAICompatibleChatClient(
-            BackendConfig(provider=ProviderKind.OPENAI, model="fixture", api_key="fixture")
+            BackendConfig(
+                provider=ProviderKind.OPENAI,
+                model="fixture",
+                api_key="synthetic-transport-credential-only",
+            )
         )
         events = list(
             client.stream(
@@ -374,7 +382,11 @@ class TestStreamingCalls:
             lambda *args, **kwargs: FakeStreamingHttpResponse(chunks),
         )
         client = OpenAICompatibleChatClient(
-            BackendConfig(provider=ProviderKind.OPENAI, model="fixture", api_key="fixture")
+            BackendConfig(
+                provider=ProviderKind.OPENAI,
+                model="fixture",
+                api_key="synthetic-transport-credential-only",
+            )
         )
         with pytest.raises(ProviderError, match="integer index"):
             list(

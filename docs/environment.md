@@ -11,14 +11,19 @@ terminal process environment, never in committed code or documentation.
 - `.env.*` is ignored by Git.
 - `!.env.example` is explicitly allowed by `.gitignore`.
 
-Git ignore prevents normal source tracking; it does not stop tools or commands
-from reading a file. The current generic `read_file` tool enforces workspace
-boundaries rather than a secret-file denylist: a permitted `.env` read can enter
-the next model request. A local synthetic control verified this on 2026-10-28
-without real credentials or external requests. General input/output protection
-is still [planned](repo-assistant/restricted-input-plan.md#b--general-repository-protection-planned-not-implemented).
-Use only the authorized reviewed/isolated task scope; do not treat a read-only
-profile as secret isolation.
+Git ignore prevents normal source tracking; it does not stop arbitrary commands
+from reading a file. An October28 synthetic audit demonstrated the former `.env`
+tool-to-model path. The subsequent owner-approved guard now refuses credential-file
+operations in project-owned tools and known credential values in tool arguments,
+results/metadata/errors and model requests. It retains existing credential loading.
+See [ADR-076](decisions/ADR-076-host-credential-guards-before-storage-migration.md).
+
+Known values come from configured credentials and secret-named environment
+variables (ambient values must be at least 16 characters). Unknown/unloaded keys,
+encodings, semantic private data and native clients' independent file access are
+not comprehensively protected. Arbitrary shell effects remain possible under their
+existing grant. This is not an OS sandbox; general input/output protection is still
+[incomplete](repo-assistant/restricted-input-plan.md). Keep authorized task scopes.
 
 Sibling applications need not duplicate this file. Remote AI Operator's CLI
 reads provider credentials from its process environment; it does not automatically

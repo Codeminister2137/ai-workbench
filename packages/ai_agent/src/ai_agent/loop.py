@@ -106,6 +106,17 @@ class AgentLoop:
         privacy_class: PrivacyClass = PrivacyClass.LOCAL_ONLY,
     ) -> AgentResult:
         """Execute a prompt and any requested tools until a final answer is returned."""
+        from ai_provider.credential_guard import credential_values, enforce_credential_policy
+
+        self.context = replace(
+            self.context,
+            credential_secrets=credential_values(
+                (
+                    *self.context.credential_secrets,
+                    getattr(getattr(self.client, "config", None), "api_key", None),
+                )
+            ),
+        )
         if self._host_delegation is None and any(
             item.name == "delegate_task" for item in self.registry.list_definitions()
         ):
@@ -155,18 +166,18 @@ class AgentLoop:
                     )
                 self.context.delegation.budget.consume()
             try:
-                response = self.client.complete(
-                    AIRequest(
-                        messages=tuple(messages),
-                        model=model,
-                        temperature=self.temperature,
-                        top_p=self.top_p,
-                        privacy_class=privacy_class,
-                        tools=tuple(
-                            _tool_definition(tool) for tool in self.registry.list_definitions()
-                        ),
-                    )
+                request = AIRequest(
+                    messages=tuple(messages),
+                    model=model,
+                    temperature=self.temperature,
+                    top_p=self.top_p,
+                    privacy_class=privacy_class,
+                    tools=tuple(
+                        _tool_definition(tool) for tool in self.registry.list_definitions()
+                    ),
                 )
+                enforce_credential_policy(request, extra=self.context.credential_secrets)
+                response = self.client.complete(request)
             except ToolCallFormatError as exc:
                 model_output_errors += 1
                 self._check_deadline(messages)

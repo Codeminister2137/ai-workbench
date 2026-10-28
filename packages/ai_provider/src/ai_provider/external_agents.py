@@ -1060,6 +1060,9 @@ def run_external_agent(
     deadline: float | None = None,
 ) -> ExternalAgentResult:
     """Run an official coding client using its native prompt transport."""
+    from ai_provider.credential_guard import enforce_credential_policy
+
+    enforce_credential_policy(prompt)
     from ai_provider.coding_sessions import ACTIVE_SESSION
 
     session = ACTIVE_SESSION.get()

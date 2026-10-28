@@ -9,6 +9,7 @@ from typing import Any
 
 from ai_agent.contracts import ToolCategory, ToolDefinition, ToolParameter, ToolResult
 from ai_agent.tools.base import BaseTool, ToolContext
+from ai_agent.tools.credential_paths import is_credential_path
 
 
 def _enumerated_lines(content: str):
@@ -40,7 +41,7 @@ def _workspace_entries(base: Path, context: ToolContext):
         ]
         for name in (*directories, *files):
             path = directory / name
-            if not name.startswith(".") and name != "__pycache__":
+            if not name.startswith(".") and name != "__pycache__" and not is_credential_path(path):
                 if context.is_within_workspace(path):
                     yield path
 

@@ -126,6 +126,11 @@ class AnthropicMessagesChatClient:
         yield AIStreamFinal(response=final_response)
 
     def _messages_payload(self, request: AIRequest, *, stream: bool) -> dict[str, Any]:
+        from ai_provider.credential_guard import enforce_credential_policy
+
+        enforce_credential_policy(
+            request, extra=(self.config.api_key, _provider_api_key(self.config.provider))
+        )
         # The Messages API accepts only user/assistant roles inside ``messages``;
         # the system prompt must be carried by the top-level ``system`` parameter.
         system_parts = [

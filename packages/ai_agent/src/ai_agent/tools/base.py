@@ -5,14 +5,17 @@ from __future__ import annotations
 import math
 import os
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+
+from ai_provider.credential_guard import contains_credentials
 
 if TYPE_CHECKING:
     from ai_agent.delegation_scope import DelegationScope
 
 from ai_agent.contracts import ToolCall, ToolDefinition, ToolResult
+from ai_agent.tools.credential_paths import is_credential_path
 
 
 @dataclass(frozen=True, slots=True)
@@ -23,6 +26,7 @@ class ToolContext:
     env: dict[str, str] = field(default_factory=dict)
     delegation: DelegationScope | None = field(default=None, repr=False, compare=False)
     inherit_environment: bool = True
+    credential_secrets: tuple[str, ...] = field(default=(), repr=False, compare=False)
 
     def command_environment(self) -> dict[str, str]:
         """Preserve ordinary parent behavior; delegated processes get a host allowlist."""
@@ -84,25 +88,63 @@ class BaseTool(ABC):
 
     def run(self, call: ToolCall, context: ToolContext) -> ToolResult:
         """Run the tool for a ToolCall request."""
+        call_id = (
+            None
+            if contains_credentials(call.call_id, extra=context.credential_secrets)
+            else call.call_id
+        )
         try:
             self.validate_arguments(call.arguments)
-            result = self.execute(call.arguments, context)
-            if result.call_id is None and call.call_id is not None:
+            if contains_credentials(call.arguments, extra=context.credential_secrets):
                 return ToolResult(
-                    name=result.name,
-                    output=result.output,
-                    call_id=call.call_id,
-                    is_error=result.is_error,
-                    metadata=result.metadata,
+                    name=self.definition.name,
+                    output="Credential-bearing tool arguments refused; no operation was attempted.",
+                    call_id=call_id,
+                    is_error=True,
                 )
-            return result
+            if self.definition.name in {
+                "read_file",
+                "create_file",
+                "edit_file",
+                "list_dir",
+                "find_files",
+                "grep_search",
+            }:
+                raw_path = call.arguments.get("path", ".")
+                if isinstance(raw_path, str) and (
+                    is_credential_path(Path(raw_path))
+                    or is_credential_path(context.resolve_path(raw_path))
+                ):
+                    return ToolResult(
+                        name=self.definition.name,
+                        output=(
+                            "Credential-file operation refused; no file operation was attempted."
+                        ),
+                        call_id=call_id,
+                        is_error=True,
+                    )
+            result = self.execute(call.arguments, context)
         except Exception as exc:  # noqa: BLE001
-            return ToolResult(
+            result = ToolResult(
                 name=self.definition.name,
                 output=f"Error executing tool {self.definition.name}: {exc}",
-                call_id=call.call_id,
+                call_id=call_id,
                 is_error=True,
             )
+        if result.call_id is None and call_id is not None:
+            result = replace(result, call_id=call_id)
+        if contains_credentials(result, extra=context.credential_secrets):
+            return ToolResult(
+                name=self.definition.name,
+                output=(
+                    "Credential-bearing tool output withheld. Effects may already have occurred; "
+                    "inspect locally before continuing."
+                ),
+                call_id=call_id,
+                is_error=True,
+                metadata={"credential_output_refused": True},
+            )
+        return result
 
     def validate_arguments(self, arguments: dict[str, Any]) -> None:
         """Enforce declared parameter types before approval or side effects.

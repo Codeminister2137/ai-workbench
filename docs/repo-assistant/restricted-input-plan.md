@@ -31,7 +31,18 @@ zero-price/quota/classification guards remain; model tool requests do not execut
 preparation never creates a client. Use synthetic/mock input first. Live route
 availability/model quality are separate and cannot be claimed from mocked tests.
 
-## B — general repository protection (planned, not implemented)
+## B — general repository protection (incomplete)
+
+October28 update: the owner approved host credential guards first and later
+credential-store assessment as complementary steps (ADR-076). A bounded subset is
+implemented: known credential paths in project-owned tools, known-credential
+arguments/results/metadata/error refusal, native agent/API request checks and
+official CLI launch-prompt checks. Fake-data controls include real process output
+and MCP serialization. Existing credential loading is retained.
+
+This does not complete B or enable general private repository access. Unknown or
+unloaded secrets, arbitrary encodings, private semantic data, native clients'
+independent tools and unrestricted command effects remain open.
 
 Goal: permit useful ordinary coding while preventing genuinely private data and
 keys from reaching external model messages. The current workspace/category

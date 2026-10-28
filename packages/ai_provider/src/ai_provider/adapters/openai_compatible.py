@@ -193,6 +193,11 @@ class OpenAICompatibleChatClient:
         yield AIStreamFinal(response=final_response)
 
     def _chat_payload(self, request: AIRequest, *, stream: bool) -> dict[str, Any]:
+        from ai_provider.credential_guard import enforce_credential_policy
+
+        enforce_credential_policy(
+            request, extra=(self.config.api_key, _provider_api_key(self.config.provider))
+        )
         self._verify_request_model(request)
         payload: dict[str, Any] = {
             "model": request.model or self.config.model,

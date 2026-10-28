@@ -316,7 +316,9 @@ def test_go_kimi_continuation_reaches_real_tool_loop(monkeypatch, tmp_path):
 
     monkeypatch.setattr("ai_provider.adapters.openai_compatible.urlopen", send)
     client = OpenCodeGoChatClient(
-        BackendConfig(ProviderKind.OPENCODE_GO, "kimi-k2.7-code", api_key="test")
+        BackendConfig(
+            ProviderKind.OPENCODE_GO, "kimi-k2.7-code", api_key="synthetic-transport-only"
+        )
     )
     result = AgentLoop(
         client,

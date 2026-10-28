@@ -23,7 +23,9 @@ def adapter(request, monkeypatch):
         if provider is ProviderKind.OLLAMA
         else (openai_compatible, openai_compatible.OpenAICompatibleChatClient)
     )
-    client = client_type(BackendConfig(provider=provider, model="fixture", api_key="fixture"))
+    client = client_type(
+        BackendConfig(provider=provider, model="fixture", api_key="synthetic-transport-only")
+    )
 
     def respond(body, *, stream=False):
         class Response:

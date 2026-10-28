@@ -140,6 +140,11 @@ class OpenAIResponsesChatClient:
         yield AIStreamFinal(response=final_response)
 
     def _responses_payload(self, request: AIRequest, *, stream: bool) -> dict[str, Any]:
+        from ai_provider.credential_guard import enforce_credential_policy
+
+        enforce_credential_policy(
+            request, extra=(self.config.api_key, _provider_api_key(self.config.provider))
+        )
         payload: dict[str, Any] = {
             "model": request.model or self.config.model,
             "input": self._input_items(request),
