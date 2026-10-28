@@ -562,3 +562,37 @@ source_url = "https://dev.meta.ai/docs/pricing-rate-limits"
 
 [models.metadata]
 provisional = true
+
+[[models]]
+route_id = "modal/qwen/qwen2.5-coder-7b-instruct"
+provider = "modal"
+product = "modal"
+model = "Qwen/Qwen2.5-Coder-7B-Instruct"
+location = "external"
+access_method = "modal_runtime"
+auth_method = "api_key"
+billing_source = "modal_runtime_billing"
+cost_policy_tier = "prepaid_credits_allowed"
+quality = "standard"
+latency = "interactive"
+notes = "Modal-hosted vLLM inference endpoint. Requires MODAL_API_KEY and a deployment base_url set via user_config or route override. Tool calling is enabled; streaming is supported. Cost is per-second GPU runtime, not per token, so the estimate below is illustrative based on L4 pricing and expected throughput. Provisional pending measured latency and context capacity."
+
+[models.capabilities]
+chat = true
+streaming = true
+tools = true
+structured_output = false
+multimodal_input = false
+embeddings = false
+
+[models.context_limits]
+context_window_tokens = 131072
+runtime_context_tokens = 32768
+
+[models.estimate]
+input_cost_per_million_tokens = 0.01
+output_cost_per_million_tokens = 0.03
+source = "Illustrative L4 GPU runtime estimate; actual cost is per-second and depends on traffic shape."
+
+[models.metadata]
+provisional = true

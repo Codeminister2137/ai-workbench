@@ -32,7 +32,7 @@ def test_cli_orchestrated_repair_reruns_validation_until_passed(
     )
     prepared = _EXAMPLE.run_coding_prompt(
         "Create a helper.",
-        _EXAMPLE.coding_task_profile(model_override="qwen2.5-coder:14b"),
+        _EXAMPLE.coding_task_profile(model_override="gpt-oss:20b"),
         catalog,
     )
     prepared = replace(
@@ -112,7 +112,7 @@ def test_cli_orchestrated_repair_reruns_validation_until_passed(
                 "--provider",
                 "ollama",
                 "--model",
-                "qwen2.5-coder:14b",
+                "gpt-oss:20b",
                 "--execute",
                 "--away-minutes",
                 "30",
@@ -158,10 +158,10 @@ def test_cli_orchestrated_repair_reruns_validation_until_passed(
             "validation_status": "passed",
             "progress": "failure_changed",
             "changed_paths": [],
-            "effective_route_id": "ollama/qwen2.5-coder:14b",
+            "effective_route_id": "ollama/gpt-oss:20b",
             "fallback_attempts": [
-                {"route_id": "ollama/qwen2.5-coder:14b", "status": "finished"},
-                {"route_id": "ollama/qwen2.5-coder:14b", "status": "finished"},
+                {"route_id": "ollama/gpt-oss:20b", "status": "finished"},
+                {"route_id": "ollama/gpt-oss:20b", "status": "finished"},
             ],
         }
     ]

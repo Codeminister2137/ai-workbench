@@ -75,6 +75,7 @@ class AccessMethod(StrEnum):
 
     LOCAL_RUNTIME = "local_runtime"
     PROVIDER_API = "provider_api"
+    MODAL_RUNTIME = "modal_runtime"
     CODEX_CLI = "codex_cli"
     ANTIGRAVITY_CLI = "antigravity_cli"
     COPILOT_CLI = "copilot_cli"
@@ -111,6 +112,7 @@ class BillingSource(StrEnum):
     GITHUB_COPILOT_SUBSCRIPTION_ALLOWANCE = "github_copilot_subscription_allowance"
     KIRO_SUBSCRIPTION_ALLOWANCE = "kiro_subscription_allowance"
     META_API_BILLING = "meta_api_billing"
+    MODAL_RUNTIME_BILLING = "modal_runtime_billing"
 
 
 class CostPolicyTier(StrEnum):

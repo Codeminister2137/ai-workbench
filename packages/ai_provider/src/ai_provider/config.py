@@ -19,6 +19,7 @@ class ProviderKind(StrEnum):
     GOOGLE = "google"
     OPENCODE_GO = "opencode_go"
     META = "meta"
+    MODAL = "modal"
 
 
 @dataclass(frozen=True, slots=True)
@@ -108,5 +109,7 @@ def _provider_api_key(provider: ProviderKind) -> str | None:
             return os.getenv("OPENCODE_API_KEY")
         case ProviderKind.META:
             return os.getenv("META_API_KEY")
+        case ProviderKind.MODAL:
+            return os.getenv("MODAL_API_KEY")
         case ProviderKind.OLLAMA:
             return None

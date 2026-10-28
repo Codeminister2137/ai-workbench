@@ -1396,6 +1396,15 @@ def _execute_request(
         provider_override=args.provider,
         model_override=args.model,
     )
+    if args.native_tools and args.execute:
+        # A tool-enabled turn must be routed to a model that can actually call tools.
+        # Without this guard a tools-incapable route (e.g. meta/muse-spark-1.3) is
+        # admissible for an implement run and returns a text answer with no edits,
+        # producing a silent no-op. The research profile already requires TOOLS.
+        profile = replace(
+            profile,
+            required_capabilities=profile.required_capabilities | {TaskCapability.TOOLS},
+        )
     delegated_summary = None
     if args.shared_tools == "coding":
         from ai_provider.foreground_tools import ACTIVE_FOREGROUND
@@ -2834,6 +2843,10 @@ def _fallback_target_incompatibility(
             # already validated the configuration, and the route's credentials and
             # model are checked again when it actually executes.
             return None
+        if config.provider is ProviderKind.MODAL:
+            # Modal deployments expose a user-controlled OpenAI-compatible endpoint;
+            # a /models inventory probe is not guaranteed, so construction is enough.
+            return None
         # OpenCode Go serves chat under ``/go/openai/v1`` but its model inventory
         # under ``/go/v1``; using the chat base URL here would probe a 404 and
         # wrongly mark a usable route incompatible.
@@ -2877,7 +2890,17 @@ def _print_fallback_readiness(args: argparse.Namespace, repo_root: Path) -> int:
             task_type=TaskType.GENERAL,
             required_capabilities=frozenset({TaskCapability.CHAT, TaskCapability.TOOLS}),
         )
-    elif getattr(args, "native_tools", False) or getattr(args, "shared_tools", None):
+    elif getattr(args, "native_tools", False) and args.execute:
+        profile = replace(
+            profile,
+            required_capabilities=profile.required_capabilities | {TaskCapability.TOOLS},
+        )
+        catalog = native_coding_catalog(catalog, profile)
+    elif getattr(args, "shared_tools", None):
+        profile = replace(
+            profile,
+            required_capabilities=profile.required_capabilities | {TaskCapability.TOOLS},
+        )
         catalog = native_coding_catalog(catalog, profile)
     result = prepare_execution(
         args.prompt or "Inspect fallback readiness",

@@ -37,8 +37,8 @@ scales (`percent_correct` vs `percent_resolved`) must never be averaged.
 
 ## Mapping table
 
-Route ids are the 20 routes declared in
-`packages/ai_orchestrator/examples/model_catalog.toml` as verified on 2026-10-27.
+Route ids are the 21 routes declared in
+`packages/ai_orchestrator/examples/model_catalog.toml` as verified on 2026-10-28.
 The Meta row was added on 2026-10-27 and the OpenRouter free-variant row on
 2026-10-24; the leaderboard snapshots remain those collected on 2026-10-22.
 
@@ -49,33 +49,34 @@ The Meta row was added on 2026-10-27 and the OpenRouter free-variant row on
 | `ollama/qwen2.5-coder:14b` | `qwen2.5-coder:14b` | Qwen2.5-Coder | Aider `openai/Qwen/Qwen2.5-Coder-32B-Instruct`, 8.0% `percent_correct`, `edit=diff`, 2024-12-22; SWE-bench `qwen2.5 coder 32b instruct` (9.0 mini-SWE-agent, 2025-08-03; 38.0 Skywork-SWE-32B, 2025-06-16) | `family` | size gap: 14b vs 32b | Aider + SWE-bench rows | 2026-10-22 |
 | `ollama/qwen3:14b` | `qwen3:14b` | Qwen3 | Aider `openrouter/qwen/qwen3-32b`, 40.0% `percent_correct`, `edit=diff`, 2025-05-08 (also `openai/qwen3-235b-a22b`, 59.6%) | `family` | size gap: 14b vs 32b / 235b | Aider polyglot rows | 2026-10-22 |
 | `openai/codex-gpt-6.1-sol` | `gpt-6.1-sol` | GPT-6.1 | â€” | `unmatched` | neither snapshot contains a GPT-6 row | no GPT-6 row in either snapshot | 2026-10-22 |
-| `openai/codex-gpt-5.5` | `gpt-5.5` | GPT-5 | Aider `openai/gpt-5`, 88.0% `percent_correct`, `edit=diff; reasoning=high`, 2025-08-23 (86.7 medium, 81.3 low) | `family` | version gap: 5.5 vs 5.0; also a rolling family with materially different scores per reasoning level | Aider polyglot rows | 2026-10-22 |
+| `openai/codex-gpt-5.5` | `gpt-5.5` | GPT-5 | SWE-bench `gpt 5.2`, 72.8% `percent_resolved`, mini-SWE-agent, 2026-02-17 | `family` | version gap: 5.5 vs 5.2 | SWE-bench row | 2026-10-28 |
 | `google/ai-studio-gemini-3.1-pro` | `gemini-3.1-pro` | Gemini 3 Pro | SWE-bench `gemini 3 pro`, 69.6 `percent_resolved`, mini-SWE-agent, 2026-02-26 (also `gemini 3 pro preview` 74.2 verified, mini-SWE-agent, 2025-11-18) | `family` | version gap: 3.1 vs 3.0; Aider carries no Gemini 3 rows at all | SWE-bench rows | 2026-10-22 |
 | `google/ai-studio-gemini-3.8-flash` | `gemini-3.8-flash` | Gemini 3 Flash | SWE-bench `gemini 3 flash`, 75.8 `percent_resolved`, mini-SWE-agent, 2026-02-17 | `family` | version gap: 3.8 vs 3.0 | SWE-bench row | 2026-10-22 |
 | `google/antigravity-gemini-3.1-pro-high` | `gemini-3.1-pro-high` | Gemini 3 Pro | SWE-bench `gemini 3 pro`, 69.6 `percent_resolved`, mini-SWE-agent, 2026-02-26 | `family` | version gap plus the `-high` effort suffix, which no leaderboard measures | SWE-bench row | 2026-10-22 |
 | `google/antigravity-gemini-3.8-flash-high` | `gemini-3.8-flash-high` | Gemini 3 Flash | SWE-bench `gemini 3 flash`, 75.8 `percent_resolved`, mini-SWE-agent, 2026-02-17 | `family` | version gap plus the `-high` effort suffix | SWE-bench row | 2026-10-22 |
 | `github/copilot-cli-auto` | `auto` | provider-selected | â€” | `unmatched` | the model id is not fixed; the provider picks per request, so a static prior cannot describe this route | catalog declares `model = "auto"` | 2026-10-22 |
 | `kiro/auto` | `auto` | provider-selected | â€” | `unmatched` | same as above | catalog declares `model = "auto"` | 2026-10-22 |
-| `openai/api-gpt-5.1` | `gpt-5.1` | GPT-5 | Aider `openai/gpt-5`, 88.0% `percent_correct`, `edit=diff; reasoning=high`, 2025-08-23 | `family` | version gap: 5.1 vs 5.0 | Aider polyglot rows | 2026-10-22 |
-| `openai/api-gpt-5-mini` | `gpt-5-mini` | GPT-5 | Aider `openai/gpt-5`, 88.0% `percent_correct`, `edit=diff; reasoning=high`, 2025-08-23 | `family` | version/size gap: the mini tier is unmeasured; the flagship score is the only GPT-5 row | Aider polyglot rows | 2026-10-22 |
+| `openai/api-gpt-5.1` | `gpt-5.1` | GPT-5 | SWE-bench `gpt 5.1`, 66.0% `percent_resolved`, mini-SWE-agent, 2025-11-20 | `exact` | normalized identity matches the pinned row | SWE-bench row | 2026-10-28 |
+| `openai/api-gpt-5-mini` | `gpt-5-mini` | GPT-5 | SWE-bench `gpt 5 mini`, 59.8% `percent_resolved`, mini-SWE-agent, 2025-08-07 | `exact` | normalized identity matches the pinned row | SWE-bench row | 2026-10-28 |
 | `requesty/free-google/gemma-4-31b-it` | `google/gemma-4-31b-it` | Gemma | Aider `openrouter/google/gemma-3-27b-it`, 4.9% `percent_correct`, `edit=whole`, 2025-03-15 | `family` | version + size gap: Gemma 3 27b vs Gemma 4 31b; the matched row is also the weakest-edit-format tier, so it is a weak prior | Aider polyglot row | 2026-10-22 |
-| `requesty/openai/gpt-5.1` | `openai/gpt-5.1` | GPT-5 | Aider `openai/gpt-5`, 88.0% `percent_correct`, `edit=diff; reasoning=high`, 2025-08-23 | `family` | version gap: 5.1 vs 5.0 | Aider polyglot rows | 2026-10-22 |
-| `requesty/openai/gpt-5-mini` | `openai/gpt-5-mini` | GPT-5 | Aider `openai/gpt-5`, 88.0% `percent_correct`, `edit=diff; reasoning=high`, 2025-08-23 | `family` | version/size gap: mini tier unmeasured | Aider polyglot rows | 2026-10-22 |
+| `requesty/openai/gpt-5.1` | `openai/gpt-5.1` | GPT-5 | SWE-bench `gpt 5.1`, 66.0% `percent_resolved`, mini-SWE-agent, 2025-11-20 | `exact` | normalized identity matches the pinned row | SWE-bench row | 2026-10-28 |
+| `requesty/openai/gpt-5-mini` | `openai/gpt-5-mini` | GPT-5 | SWE-bench `gpt 5 mini`, 59.8% `percent_resolved`, mini-SWE-agent, 2025-08-07 | `exact` | normalized identity matches the pinned row | SWE-bench row | 2026-10-28 |
 | `opencode-go/go-kimi-k2.7-code` | `kimi-k2.7-code` | Kimi K2 | SWE-bench `kimi k2.5`, 70.8 `percent_resolved`, mini-SWE-agent, 2026-02-17 (also `kimi k2` 71.2 Lingxi v1.5, 2025-10-14; Aider `openrouter/moonshotai/kimi-k2` 59.1% `percent_correct`, `edit=diff`, 2025-07-17) | `family` | version gap: K2.7 vs K2.5/K2.0; the route is also a code-tuned variant the leaderboards do not distinguish | SWE-bench + Aider rows | 2026-10-22 |
 | `openrouter/free-google/gemma-4-31b-it:free` | `google/gemma-4-31b-it:free` | Gemma | none | `unmatched` | the `:free` serving variant has no measured row, and the matcher refuses to inherit the paid Gemma row for a differently served variant | no leaderboard row for the `:free` variant | 2026-10-24 |
 | `meta/muse-spark-1.3` | `muse-spark-1.3` | Muse Spark | none | `unmatched` | neither snapshot contains a Muse Spark row, and the matcher attaches no prior to an unrecognized family | no leaderboard row for Muse Spark | 2026-10-27 |
+| `modal/qwen/qwen2.5-coder-7b-instruct` | `Qwen/Qwen2.5-Coder-7B-Instruct` | Qwen2.5-Coder | Aider `openai/Qwen/Qwen2.5-Coder-32B-Instruct`, 8.0% `percent_correct`, `edit=diff`, 2024-12-22; SWE-bench `qwen2.5 coder 32b instruct` (9.0 mini-SWE-agent, 2025-08-03; 38.0 Skywork-SWE-32B, 2025-06-16) | `family` | size gap: 7b vs 32b | Aider + SWE-bench rows | 2026-10-28 |
 
-## Coverage summary (verified 2026-10-25)
+## Coverage summary (verified 2026-10-28)
 
 | Confidence | Count | Route ids |
 | --- | --- | --- |
-| `exact` | 0 | â€” |
-| `family` | 14 | `ollama/gpt-oss:20b`, `ollama/qwen2.5-coder:14b`, `ollama/qwen3:14b`, `openai/codex-gpt-5.5`, `google/ai-studio-gemini-3.1-pro`, `google/ai-studio-gemini-3.8-flash`, `google/antigravity-gemini-3.1-pro-high`, `google/antigravity-gemini-3.8-flash-high`, `openai/api-gpt-5.1`, `openai/api-gpt-5-mini`, `requesty/free-google/gemma-4-31b-it`, `requesty/openai/gpt-5.1`, `requesty/openai/gpt-5-mini`, `opencode-go/go-kimi-k2.7-code` |
+| `exact` | 4 | `openai/api-gpt-5.1`, `openai/api-gpt-5-mini`, `requesty/openai/gpt-5.1`, `requesty/openai/gpt-5-mini` |
+| `family` | 11 | `ollama/gpt-oss:20b`, `ollama/qwen2.5-coder:14b`, `ollama/qwen3:14b`, `openai/codex-gpt-5.5`, `google/ai-studio-gemini-3.1-pro`, `google/ai-studio-gemini-3.8-flash`, `google/antigravity-gemini-3.1-pro-high`, `google/antigravity-gemini-3.8-flash-high`, `requesty/free-google/gemma-4-31b-it`, `opencode-go/go-kimi-k2.7-code`, `modal/qwen/qwen2.5-coder-7b-instruct` |
 | `alias` | 0 | â€” |
 | `unmatched` | 6 | `ollama/deepseek-coder-v2:16b`, `openai/codex-gpt-6.1-sol`, `github/copilot-cli-auto`, `kiro/auto`, `openrouter/free-google/gemma-4-31b-it:free`, `meta/muse-spark-1.3` |
 
-14 + 6 = 20 routes, matching the declared catalog. Exact identifier-set comparison
-on 2026-10-27 found 20 unique table rows, no missing routes and no extra routes.
+4 + 11 + 6 = 21 routes, matching the declared catalog. Exact identifier-set comparison
+on 2026-10-28 found 21 unique table rows, no missing routes and no extra routes.
 **No route achieved
 `exact`**, because neither leaderboard publishes any of our pinned,
 current-generation ids verbatim. **Every `unmatched` route stays ungraded** â€”

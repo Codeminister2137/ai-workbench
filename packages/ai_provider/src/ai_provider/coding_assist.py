@@ -55,6 +55,7 @@ def backend_config_from_execution_target(target: ExecutionTarget) -> BackendConf
     if target.access_method not in {
         AccessMethod.LOCAL_RUNTIME,
         AccessMethod.PROVIDER_API,
+        AccessMethod.MODAL_RUNTIME,
     }:
         raise ValueError(
             f"Execution target access method {target.access_method.value!r} "

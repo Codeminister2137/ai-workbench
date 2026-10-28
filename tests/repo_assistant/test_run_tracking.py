@@ -324,7 +324,7 @@ def test_primary_preparation_failure_closes_orchestrated_run_and_remaining_stage
         "--provider",
         "ollama",
         "--model",
-        "qwen2.5-coder:14b",
+        "gpt-oss:20b",
         "--execute",
         "--orchestrated",
         "--away-minutes",
