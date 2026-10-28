@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 from ai_agent.contracts import ToolCategory, ToolDefinition, ToolParameter, ToolResult
@@ -32,9 +32,9 @@ class DelegateTaskTool(BaseTool):
         return ToolDefinition(
             name="delegate_task",
             description=(
-                "Delegate bounded coding support to a local read-only child model. "
-                "Use this for file inspection, source summarization or test-case drafting. "
-                "Architecture, implementation decisions and edits remain with the primary."
+                "Delegate coding within the host-bound parent authority and shared budget. "
+                "Use this for scoped inspection, implementation and validation when granted. "
+                "A model request cannot escalate the supervisor's actual authority."
             ),
             category=ToolCategory.CUSTOM,
             parameters=(
@@ -47,6 +47,49 @@ class DelegateTaskTool(BaseTool):
                     ),
                     required=True,
                 ),
+                ToolParameter(
+                    name="permission_profile",
+                    type_name="string",
+                    description=(
+                        "Inherit actual parent permissions or request a narrower "
+                        "profile; never escalates parent authority."
+                    ),
+                    required=False,
+                    enum_values=(
+                        "inherit",
+                        "read_only",
+                        "interactive",
+                        "workspace_write",
+                        "trusted_local",
+                    ),
+                ),
+                ToolParameter(
+                    name="allowed_tools",
+                    type_name="array",
+                    description="Optional narrower tool names.",
+                    required=False,
+                    item_type_name="string",
+                ),
+                ToolParameter(
+                    name="allowed_paths",
+                    type_name="array",
+                    description=(
+                        "Optional workspace-relative file-tool paths; commands require "
+                        "an explicit command set when paths are narrowed."
+                    ),
+                    required=False,
+                    item_type_name="string",
+                ),
+                ToolParameter(
+                    name="allowed_commands",
+                    type_name="array",
+                    description=(
+                        "Optional exact permitted command strings; does not grant "
+                        "OS isolation or broader parent privileges."
+                    ),
+                    required=False,
+                    item_type_name="string",
+                ),
             ),
         )
 
@@ -58,7 +101,37 @@ class DelegateTaskTool(BaseTool):
                 output="Error: 'task' parameter is required.",
                 is_error=True,
             )
-        return self.runner(task.strip(), context)
+        scope = context.delegation
+        overrides = {
+            name: arguments.get(name)
+            for name in ("allowed_tools", "allowed_paths", "allowed_commands")
+        }
+        profile = arguments.get("permission_profile", "inherit")
+        if scope is None:
+            if profile != "inherit" or any(value is not None for value in overrides.values()):
+                return ToolResult(
+                    self.definition.name,
+                    "Error: no host-bound parent authority for permission overrides.",
+                    is_error=True,
+                )
+            return self.runner(task.strip(), context)
+        try:
+            child = scope.narrow(
+                profile=profile,
+                tools=tuple(overrides["allowed_tools"])
+                if overrides["allowed_tools"] is not None
+                else None,
+                paths=tuple(overrides["allowed_paths"])
+                if overrides["allowed_paths"] is not None
+                else None,
+                commands=tuple(overrides["allowed_commands"])
+                if overrides["allowed_commands"] is not None
+                else None,
+            )
+            with scope.budget.child():
+                return self.runner(task.strip(), replace(context, delegation=child))
+        except ValueError as error:
+            return ToolResult(self.definition.name, "Error: " + str(error), is_error=True)
 
 
 def coding_tools_with_delegation(runner: DelegatedTaskRunner) -> ToolRegistry:

@@ -1,5 +1,32 @@
 # Session History
 
+## 2026-10-28 - inherited implementation-worker authority
+
+Implemented the owner's October27 requirement on a feature branch: delegated
+workers inherit actual supervisor tools and live permissions or narrower explicit
+profiles/tool/path/command grants. Nested workers share original reply/tool and
+deadline limits, preserve ancestor restrictions and reserve the parent's report.
+Funded workers reuse the approved parent client; catalog edits cannot mint a new
+billing grant. Delegated shell/process environments exclude ambient credential
+variables. These are tool-level controls, not an OS sandbox. ADR-074 records the
+existing owner decision; no new service, dependency or storage format was added.
+
+Full validation:3,055 root tests passed/24skipped, Council38, job-search84. Final
+focused tests40passed include two new pinned-executor guard controls and updated
+MCP instructions. Ruff passes; Pyright zero errors. Earlier full v3 had one
+Windows10053 socket abort in the revoked-scope HTTP test; the complete HTTP module
+and fresh full v4 passed. Original failure remains preserved; its originating
+cause is unknown. Hosted parent/child acceptance and live C6 remain incomplete.
+No private Workbench source was sent to hosted workers for this implementation.
+
+Real Meta Workbench task ag independently completed a public Operator digest fix:
+8calls/7tools,147project tests plus69subtests/8skips and16host cases. Private Operator
+candidate d445286 is unpublished. Standard uncached token estimate USD0.1863825 is
+not an account bill. Modal diagnostic apps d/e never started a model container,
+remained503 and were stopped; concurrency target1 did not resolve startup.
+Underlying platform allocation/startup cause remains unknown. The unfinished ah
+trial copy was never launched. No public push/recording/submission occurred.
+
 ## 2026-10-28 — second window: Operator bridge client lifetime
 
 The owner authorized a new unattended window until 20:00 Budapest and meaningful

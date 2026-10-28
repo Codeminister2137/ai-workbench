@@ -109,6 +109,7 @@ def _local_read_only_delegated_task_runner(
     parent_profile: TaskProfile | None = None,
     is_active: Callable[[], bool] | None = None,
     deadline: float | None = None,
+    catalog_snapshot: tuple[Any, ...] | None = None,
 ):
     def active() -> bool:
         return (is_active is None or is_active()) and (
@@ -116,7 +117,14 @@ def _local_read_only_delegated_task_runner(
         )
 
     def run(task: str, context: ToolContext) -> ToolResult:
-        if not active():
+        scope = context.delegation
+        if scope is not None and deadline is not None:
+            scope.budget.tighten_deadline(deadline)
+
+        def child_active():
+            return active() and (scope is None or scope.active())
+
+        if not child_active():
             return ToolResult(
                 name="delegate_task", output="Error: delegation scope expired.", is_error=True
             )
@@ -131,11 +139,30 @@ def _local_read_only_delegated_task_runner(
             required_capabilities=frozenset({TaskCapability.CHAT, TaskCapability.TOOLS}),
             quality_threshold=QualityThreshold.STANDARD,
             latency_target=LatencyTarget.BACKGROUND,
-            cost_policy_tier=CostPolicyTier.LOCAL_ONLY,
+            cost_policy_tier=parent.cost_policy_tier
+            if scope is not None
+            else CostPolicyTier.LOCAL_ONLY,
         )
-        catalog = load_model_catalog(catalog_path)
+        catalog = (
+            catalog_snapshot if catalog_snapshot is not None else load_model_catalog(catalog_path)
+        )
+        if scope is not None:
+            catalog = tuple(
+                entry
+                for entry in catalog
+                if (
+                    (entry.backend.provider, entry.backend.model, entry.backend.route.base_url)
+                    in scope.backends
+                    if scope.backends is not None
+                    else entry.backend.access_method.value == "local_runtime"
+                    and entry.backend.location.value == "local"
+                    and entry.backend.route.billing_source.value == "local_free"
+                )
+            )
         remaining = deadline - time.perf_counter() if deadline is not None else timeout_seconds
-        if not active() or remaining <= 0:
+        if scope is not None and scope.budget.deadline is not None:
+            remaining = min(remaining, scope.budget.deadline - time.perf_counter())
+        if not child_active() or remaining <= 0:
             return ToolResult(
                 name="delegate_task", output="Error: delegation scope expired.", is_error=True
             )
@@ -155,7 +182,16 @@ def _local_read_only_delegated_task_runner(
             )
 
         target = orchestration.execution_plan.target
-        if target.access_method.value != "local_runtime":
+        if target.access_method.value not in {"local_runtime", "provider_api", "modal_runtime"}:
+            return ToolResult(
+                name="delegate_task",
+                output=(
+                    "Error: this child executor cannot use the selected access method; "
+                    "no API billing substitution was made."
+                ),
+                is_error=True,
+            )
+        if scope is None and target.access_method.value != "local_runtime":
             return ToolResult(
                 name="delegate_task",
                 output=(
@@ -171,8 +207,15 @@ def _local_read_only_delegated_task_runner(
             base_url=target.base_url,
             timeout_seconds=target.timeout_seconds,
         )
-        registry = read_search_tool_registry()
-        if is_active is not None or deadline is not None:
+        registry = scope.child_registry() if scope is not None else read_search_tool_registry()
+        if (
+            scope is not None
+            and scope.depth < scope.max_depth
+            and scope.registry.get("delegate_task") is not None
+            and (scope.tools is None or "delegate_task" in scope.tools)
+        ):
+            registry.register(scope.wrap(DelegateTaskTool(run)))
+        if scope is None and (is_active is not None or deadline is not None):
             registry = scoped_registry(
                 registry,
                 PermissionManager(PermissionPolicy.read_only()),
@@ -181,28 +224,103 @@ def _local_read_only_delegated_task_runner(
                 "current-invocation",
                 active,
             )
-        client = create_chat_client(config)
-        if is_active is not None or deadline is not None:
-            client = _ScopedDelegationClient(client, config, active, deadline)
+        pinned = (
+            scope is not None
+            and scope.approved_client is not None
+            and (target.provider, target.model, target.base_url)
+            == (
+                scope.approved_client.backend.provider,
+                scope.approved_client.backend.model,
+                scope.approved_client.backend.base_url,
+            )
+        )
+        if scope is not None and target.access_method.value != "local_runtime" and not pinned:
+            return ToolResult(
+                name="delegate_task",
+                output=(
+                    "Error: no approved funded child executor; "
+                    "no credential or billing substitution was made."
+                ),
+                is_error=True,
+            )
+        approved_client = scope.approved_client if scope is not None else None
+        if (
+            pinned
+            and scope is not None
+            and (
+                scope.request_timeout_seconds is None
+                or scope.request_timeout_seconds > config.timeout_seconds
+            )
+        ):
+            return ToolResult(
+                name="delegate_task",
+                output=(
+                    "Error: approved executor timeout cannot fit the child bound; "
+                    "executor guards were retained."
+                ),
+                is_error=True,
+            )
+        if pinned:
+            assert approved_client is not None
+            client = approved_client
+        else:
+            client = create_chat_client(config)
+            if scope is not None and client.backend.location.value != "local":
+                return ToolResult(
+                    name="delegate_task",
+                    output=(
+                        "Error: child catalog does not match a local executor; "
+                        "no new funded processor was used."
+                    ),
+                    is_error=True,
+                )
+        effective_deadline = scope.budget.deadline if scope is not None else deadline
+        if scope is not None or is_active is not None or deadline is not None:
+            client = _ScopedDelegationClient(
+                client, config, child_active, effective_deadline, pinned=pinned
+            )
         agent = AgentLoop(
             client,
             registry,
             context,
             max_iterations=max_iterations,
+            **(
+                {
+                    "deadline": effective_deadline,
+                    "permissions": PermissionManager(PermissionPolicy.permissive()),
+                }
+                if scope is not None
+                else {}
+            ),
         )
         result = agent.run(
-            _delegated_task_prompt(task),
+            (
+                "Original parent objective:\n"
+                + scope.objective
+                + "\n\nDelegated subtask:\n"
+                + task
+                + "\nUse only the host-granted tools and report actual effects; "
+                "this is a delegated task, not new authority."
+            )
+            if scope is not None
+            else _delegated_task_prompt(task),
+            **({"system_prompt": scope.instructions} if scope is not None else {}),
             model=config.model,
             privacy_class=PrivacyClass(profile.privacy_class.value),
         )
         failed_count = sum(1 for item in result.tool_results if item.is_error)
+        incomplete = not result.response.message.content.strip() or bool(
+            getattr(result.response, "tool_calls", ())
+        )
         output = "\n".join(
             [
-                "Delegated task status: " + ("failed" if failed_count else "completed"),
+                "Delegated task status: "
+                + ("failed" if failed_count or incomplete else "completed"),
                 f"Route: {target.route_id}",
                 f"Model: {target.model}",
-                "Tool surface: read/search only; nested delegation, writes, "
-                "and shell are disabled.",
+                ("Tool surface: " + ", ".join(item.name for item in registry.list_definitions()))
+                if scope is not None
+                else "Tool surface: read/search only; no bound parent grant was supplied.",
                 f"Iterations: {result.iterations}",
                 f"Tool results: {len(result.tool_results)} total, {failed_count} failed",
                 "Child final response:",
@@ -212,7 +330,7 @@ def _local_read_only_delegated_task_runner(
         return ToolResult(
             name="delegate_task",
             output=output,
-            is_error=failed_count > 0,
+            is_error=failed_count > 0 or incomplete,
             metadata={
                 "route_id": target.route_id,
                 "model": target.model,
@@ -234,9 +352,12 @@ class _ScopedDelegationClient:
         config: BackendConfig,
         active: Callable[[], bool],
         deadline: float | None,
+        *,
+        pinned: bool = False,
     ):
         self.client, self.config = client, config
         self.active, self.deadline = active, deadline
+        self.pinned = pinned
 
     @property
     def backend(self) -> BackendInfo:
@@ -250,7 +371,13 @@ class _ScopedDelegationClient:
 
     def complete(self, request: AIRequest) -> AIResponse:
         remaining = self._check()
-        if remaining is not None:
+        if remaining is not None and self.pinned and remaining < self.config.timeout_seconds:
+            raise ProviderError(
+                "Remaining child time cannot cover the approved executor; "
+                "no guard-free replacement was created.",
+                category=ProviderErrorCategory.TIMEOUT,
+            )
+        if remaining is not None and not self.pinned:
             self.client = create_chat_client(
                 replace(self.config, timeout_seconds=min(self.config.timeout_seconds, remaining))
             )
@@ -259,7 +386,7 @@ class _ScopedDelegationClient:
         return response
 
     def stream(self, request: AIRequest) -> Iterator[AIStreamEvent]:
-        raise NotImplementedError("Bounded read-only delegation uses completion requests only")
+        raise NotImplementedError("Bounded delegation uses completion requests only")
 
 
 def _delegated_task_prompt(task: str) -> str:
@@ -335,7 +462,9 @@ def handle_mcp_message(
         if registry.get("delegate_task") is not None:
             instructions += (
                 " The delegate_task tool provides bounded delegation to a "
-                "local-only child agent with read/search tools only."
+                "child agent using host-granted supervisor permissions and resource limits; "
+                "model arguments may narrow authority, never expand it. Unbound legacy "
+                "runners remain local and read-only."
             )
         return {
             "jsonrpc": "2.0",

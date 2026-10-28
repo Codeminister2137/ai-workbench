@@ -1,3 +1,12 @@
+## ADR-074 - Delegation inherits supervisor authority
+
+**Status:** Accepted owner direction, implemented 2026-10-28.
+
+Implementation workers inherit actual host-bound supervisor tools/permissions or
+receive narrower grants. Descendants share finite reply/tool/deadline limits and
+funded children retain the exact approved client. This is tool enforcement, not
+OS isolation. See [ADR-074](decisions/ADR-074-delegation-inherits-supervisor-authority.md).
+
 ## ADR-073 - Shared Responses tools and stateless continuation
 
 **Status:** Accepted and implemented; live C6 acceptance open

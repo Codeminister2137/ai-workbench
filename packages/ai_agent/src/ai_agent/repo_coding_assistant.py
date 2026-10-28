@@ -1416,6 +1416,7 @@ def _execute_request(
             foreground.delegation_factory = lambda active, deadline: (
                 _local_read_only_delegated_task_runner(
                     catalog_path=args.catalog,
+                    catalog_snapshot=catalog,
                     parent_profile=profile,
                     timeout_seconds=args.timeout_seconds,
                     max_iterations=min(args.max_action_rounds, 8),
@@ -3780,11 +3781,14 @@ def _run_native_agent(
         approval_callback = approve
     else:
         approval_callback = None
-    client = create_chat_client(config)
+    client = getattr(args, "_delegation_client", None)
+    if client is None:
+        client = create_chat_client(config)
     child_depth = int(getattr(args, "_delegation_depth", 0))
 
     def run_delegated_task(task: str, context: ToolContext) -> ToolResult:
-        if child_depth >= 1:
+        grant = context.delegation
+        if grant is None and child_depth >= 1:
             return ToolResult(
                 name="delegate_task",
                 output="Error: nested delegation is disabled for bounded CLI runs.",
@@ -3801,22 +3805,41 @@ def _run_native_agent(
                 required_capabilities=frozenset({TaskCapability.CHAT, TaskCapability.TOOLS}),
                 quality_threshold=QualityThreshold.STANDARD,
                 latency_target=LatencyTarget.BACKGROUND,
-                cost_policy_tier=CostPolicyTier.LOCAL_ONLY,
-                privacy_class=OrchestratorPrivacyClass.LOCAL_ONLY,
+                cost_policy_tier=profile.cost_policy_tier
+                if grant is not None
+                else CostPolicyTier.LOCAL_ONLY,
+                privacy_class=profile.privacy_class
+                if grant is not None
+                else OrchestratorPrivacyClass.LOCAL_ONLY,
             )
+            child_catalog = native_coding_catalog(
+                getattr(args, "_delegation_catalog", None)
+                or load_model_catalog(
+                    getattr(
+                        args,
+                        "catalog",
+                        Path("packages/ai_orchestrator/examples/model_catalog.toml"),
+                    )
+                ),
+                child_profile,
+            )
+            if grant is not None:
+                child_catalog = tuple(
+                    entry
+                    for entry in child_catalog
+                    if (
+                        (entry.backend.provider, entry.backend.model, entry.backend.route.base_url)
+                        in grant.backends
+                        if grant.backends is not None
+                        else entry.backend.access_method.value == "local_runtime"
+                        and entry.backend.location.value == "local"
+                        and entry.backend.route.billing_source.value == "local_free"
+                    )
+                )
             child_orchestration = prepare_execution(
                 task,
                 child_profile,
-                native_coding_catalog(
-                    load_model_catalog(
-                        getattr(
-                            args,
-                            "catalog",
-                            Path("packages/ai_orchestrator/examples/model_catalog.toml"),
-                        )
-                    ),
-                    child_profile,
-                ),
+                child_catalog,
                 review_prompt=False,
                 timeout_seconds=getattr(args, "timeout_seconds", 180.0),
             )
@@ -3840,9 +3863,39 @@ def _run_native_agent(
                     f"model={child_config.model}"
                 )
             child_args = argparse.Namespace(**vars(args))
-            child_args._delegation_depth = child_depth + 1
+            child_args._delegation_depth = grant.depth if grant is not None else child_depth + 1
+            child_args._delegation_scope = grant
+            approved = grant.approved_client if grant is not None else None
+            target = child_orchestration.execution_plan.target
+            if approved is not None and (target.provider, target.model, target.base_url) != (
+                approved.backend.provider,
+                approved.backend.model,
+                approved.backend.base_url,
+            ):
+                approved = None
+            if (
+                grant is not None
+                and target.access_method.value != "local_runtime"
+                and approved is None
+            ):
+                return ToolResult(
+                    name="delegate_task",
+                    output=(
+                        "Error: no approved funded child executor; "
+                        "no new billing source was acquired."
+                    ),
+                    is_error=True,
+                )
+            child_args._delegation_client = approved
             child_result = _run_native_agent(
-                task,
+                (
+                    "Original parent objective:\n"
+                    + grant.objective
+                    + "\n\nDelegated subtask:\n"
+                    + task
+                )
+                if grant is not None
+                else task,
                 child_config,
                 child_profile,
                 child_args,
@@ -3917,16 +3970,20 @@ def _run_native_agent(
         system_prompt = _system_prompt_with_final_response_contract(
             build_native_tool_system_prompt(args.system)
         )
-        native_client = prepare_native_coding_client(
-            client,
-            config,
-            args,
-            progress_callback or print,
-            client_factory=create_chat_client,
+        native_client = (
+            client
+            if getattr(args, "_delegation_client", None) is not None
+            else prepare_native_coding_client(
+                client,
+                config,
+                args,
+                progress_callback or print,
+                client_factory=create_chat_client,
+            )
         )
         client = native_client
         fallback_history = getattr(args, "_fallback_history", ())
-        if fallback_history:
+        if fallback_history and getattr(args, "_delegation_client", None) is None:
             from ai_provider.fallback_context import FallbackHistoryClient
 
             client = FallbackHistoryClient(
@@ -3964,14 +4021,69 @@ def _run_native_agent(
         "Reserve replies for validation, correction and the final report.\n"
         "Other guards may stop earlier; this ceiling grants no new actions or time."
     )
+    from ai_agent.delegation_scope import DelegationBudget, DelegationScope
+    from ai_agent.tools.delegation import DelegateTaskTool
+
+    granted = getattr(args, "_delegation_scope", None)
+    if granted is not None:
+        registry = granted.child_registry()
+        if (
+            granted.depth < granted.max_depth
+            and granted.registry.get("delegate_task") is not None
+            and (granted.tools is None or "delegate_task" in granted.tools)
+        ):
+            registry.register(granted.wrap(DelegateTaskTool(run_delegated_task)))
+        manager = PermissionManager(PermissionPolicy.permissive())
+        system_prompt = granted.instructions
+    else:
+        manager = PermissionManager(policy=permission_policy, approval_callback=approval_callback)
+        shared_budget = getattr(args, "_delegation_budget", None)
+        if shared_budget is None:
+            shared_budget = DelegationBudget(
+                args.max_action_rounds,
+                getattr(getattr(args, "fallback_session", None), "deadline", None),
+            )
+            args._delegation_budget = shared_budget
+        backend_info = getattr(client, "backend", None)
+        configured_catalog = getattr(args, "_delegation_catalog", None)
+        if configured_catalog is None:
+            catalog_file = Path(
+                getattr(args, "catalog", None)
+                or "packages/ai_orchestrator/examples/model_catalog.toml"
+            )
+            configured_catalog = load_model_catalog(catalog_file) if catalog_file.is_file() else ()
+            args._delegation_catalog = configured_catalog
+        permitted_backends = {
+            (
+                config.provider.value,
+                config.model,
+                config.base_url or getattr(backend_info, "base_url", None),
+            )
+        }
+        if config.provider is ProviderKind.OLLAMA:
+            permitted_backends.update(
+                (entry.backend.provider, entry.backend.model, entry.backend.route.base_url)
+                for entry in configured_catalog
+                if entry.backend.access_method.value == "local_runtime"
+                and entry.backend.location.value == "local"
+                and entry.backend.route.billing_source.value == "local_free"
+            )
+        granted = DelegationScope(
+            registry,
+            manager,
+            repo_root.resolve(),
+            shared_budget,
+            instructions=system_prompt,
+            objective=prompt,
+            backends=frozenset(permitted_backends),
+            approved_client=client,
+            request_timeout_seconds=config.timeout_seconds,
+        )
     agent = AgentLoop(
         client,
         registry,
-        ToolContext(workspace_root=repo_root),
-        permissions=PermissionManager(
-            policy=permission_policy,
-            approval_callback=approval_callback,
-        ),
+        ToolContext(workspace_root=repo_root, delegation=granted),
+        permissions=manager,
         max_iterations=args.max_action_rounds,
         deadline=getattr(getattr(args, "fallback_session", None), "deadline", None),
         diagnostic=progress_callback,

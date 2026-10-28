@@ -113,6 +113,12 @@ foreground run tracking, delegated-source rendering, local support, repair and s
 reusable modules. Command dispatch composes them; provider storage/adapters and
 orchestrator policy keep their existing boundaries.
 
+Delegated implementation uses the supervisor's host-bound tools and live
+permissions, optional narrower grants and shared finite reply/tool/deadline
+bounds. Funded children retain the exact approved client and admission guards.
+This is tool-level authority, not OS isolation; see
+[ADR-074](decisions/ADR-074-delegation-inherits-supervisor-authority.md).
+
 ADR-049 adds a distinct foreground `coding-chat` mode. `ai_agent.coding_chat`
 owns conversation continuity over injected turn execution; `coding_chat_cli`
 binds existing coding-session/foreground tools to the current CLI executor.

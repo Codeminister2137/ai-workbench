@@ -1,5 +1,14 @@
 # CLI Development Foundation Roadmap
 
+## October 28 inherited delegation authority
+
+ADR-074 implements the owner's implementation-worker requirement: actual parent
+tools and live permissions, optional narrower profiles/tools/paths/commands,
+bounded nesting, shared reply/tool/deadline accounting and exact approved-client
+reuse. Deterministic fixtures demonstrate edits and real Python validation;
+hosted parent/child acceptance remains open. External CLI model requests remain
+outside the MCP host's descendant accounting. Tool restrictions are not OS isolation.
+
 ## October 28 shared Responses tools and C6 offline foreground composition
 
 ADR-073 implements the owner-approved shared Responses tool/stream/result protocol

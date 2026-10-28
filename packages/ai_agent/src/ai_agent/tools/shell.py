@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import subprocess
 import sys
 from typing import Any
@@ -67,8 +66,7 @@ class RunCommandTool(BaseTool):
                 is_error=True,
             )
 
-        env = os.environ.copy()
-        env.update(context.env)
+        env = context.command_environment()
 
         # On Windows, run in powershell; on Unix, run with default shell
         if sys.platform == "win32":

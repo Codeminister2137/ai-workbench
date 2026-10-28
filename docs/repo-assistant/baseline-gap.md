@@ -1,5 +1,17 @@
 # Distance to established baseline CLI usability
 
+## October 28 inherited implementation-worker authority
+
+The previous universal read-only child restriction is removed when a host-bound
+supervisor grant is available (ADR-074). Deterministic evidence includes actual
+child edits/validation, narrower scopes, live permissions/revocation, shared nested
+budgets and retained executor guards. The registered suite passed 3,055 root tests
+with 24 skips, Council38 and job-search84; subsequent focused coverage adds two
+executor-guard cases and checks corrected MCP instructions (40 pass). An earlier
+full run had a Windows10053 socket abort; the whole HTTP module and fresh full run
+passed, but that abort's originating cause remains unknown. No hosted nested
+delegation acceptance or general baseline parity is claimed.
+
 ## October 28 — fresh Meta Workbench coding effect
 
 A fresh bounded Workbench AgentLoop using Meta Muse Spark 1.3 authored a real

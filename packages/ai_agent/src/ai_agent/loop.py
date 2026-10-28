@@ -6,7 +6,7 @@ import math
 import time
 from collections import Counter
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from ai_provider import (
@@ -69,6 +69,7 @@ class AgentLoop:
         self.client = client
         self.registry = registry
         self.context = context
+        self._host_delegation = context.delegation
         self.permissions = permissions or PermissionManager()
         self.max_iterations = max_iterations
         self.deadline = deadline
@@ -105,6 +106,35 @@ class AgentLoop:
         privacy_class: PrivacyClass = PrivacyClass.LOCAL_ONLY,
     ) -> AgentResult:
         """Execute a prompt and any requested tools until a final answer is returned."""
+        if self._host_delegation is None and any(
+            item.name == "delegate_task" for item in self.registry.list_definitions()
+        ):
+            from ai_agent.delegation_scope import DelegationBudget, DelegationScope
+
+            self.context = replace(
+                self.context,
+                delegation=DelegationScope(
+                    self.registry,
+                    self.permissions,
+                    self.context.workspace_root.resolve(),
+                    DelegationBudget(self.max_iterations, self.deadline),
+                    instructions=system_prompt or "",
+                    objective=prompt,
+                    backends=frozenset(
+                        {
+                            (
+                                self.client.backend.provider,
+                                self.client.backend.model,
+                                self.client.backend.base_url,
+                            )
+                        }
+                    ),
+                    approved_client=self.client,
+                    request_timeout_seconds=getattr(
+                        getattr(self.client, "config", None), "timeout_seconds", None
+                    ),
+                ),
+            )
         messages: list[AIMessage] = []
         if system_prompt:
             messages.append(AIMessage(MessageRole.SYSTEM, system_prompt))
@@ -117,6 +147,13 @@ class AgentLoop:
 
         for iteration in range(1, self.max_iterations + 1):
             self._check_deadline(messages)
+            if self.context.delegation is not None:
+                if not self.context.delegation.active():
+                    raise ProviderError(
+                        "Parent delegation authority expired.",
+                        category=ProviderErrorCategory.NON_RETRYABLE,
+                    )
+                self.context.delegation.budget.consume()
             try:
                 response = self.client.complete(
                     AIRequest(
@@ -244,6 +281,8 @@ class AgentLoop:
 
             for call in tool_calls:
                 self._check_deadline(messages)
+                if self.context.delegation is not None:
+                    self.context.delegation.budget.consume_tool()
                 agent_call = ToolCall(name=call.name, arguments=call.arguments, call_id=call.id)
                 tool = self.registry.get(call.name)
                 if tool is None:

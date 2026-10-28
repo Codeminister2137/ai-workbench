@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 import math
+import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from ai_agent.delegation_scope import DelegationScope
 
 from ai_agent.contracts import ToolCall, ToolDefinition, ToolResult
 
@@ -17,6 +21,35 @@ class ToolContext:
 
     workspace_root: Path
     env: dict[str, str] = field(default_factory=dict)
+    delegation: DelegationScope | None = field(default=None, repr=False, compare=False)
+    inherit_environment: bool = True
+
+    def command_environment(self) -> dict[str, str]:
+        """Preserve ordinary parent behavior; delegated processes get a host allowlist."""
+        allowed = {
+            "PATH",
+            "PATHEXT",
+            "SYSTEMROOT",
+            "WINDIR",
+            "COMSPEC",
+            "TEMP",
+            "TMP",
+            "HOME",
+            "USERPROFILE",
+            "APPDATA",
+            "LOCALAPPDATA",
+            "PROGRAMFILES",
+            "PROGRAMFILES(X86)",
+            "LANG",
+            "LC_ALL",
+        }
+        environment = (
+            os.environ.copy()
+            if self.inherit_environment
+            else {name: value for name, value in os.environ.items() if name.upper() in allowed}
+        )
+        environment.update(self.env)
+        return environment
 
     def resolve_path(self, relative_or_absolute: Path | str) -> Path:
         """Resolve a path safely against workspace root."""

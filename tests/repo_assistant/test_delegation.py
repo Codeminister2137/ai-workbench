@@ -341,7 +341,7 @@ def test_native_agent_can_delegate_small_write_task(tmp_path: Path, monkeypatch)
         ollama_command="ollama",
         ollama_startup_timeout_seconds=1.0,
         system=None,
-        max_action_rounds=3,
+        max_action_rounds=4,  # Two parent + two child replies share one original allowance.
         approval_policy="trusted_local",
         ollama_log_file=None,
         ollama_profile=None,

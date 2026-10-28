@@ -35,6 +35,130 @@ tools = true
     return path
 
 
+@pytest.mark.parametrize("remaining", [60.0, 1.0])
+def test_pinned_child_retains_original_executor_guard(monkeypatch, remaining):
+    from ai_provider import AIRequest, BackendConfig, ProviderError, ProviderKind
+
+    calls = []
+
+    class GuardedClient:
+        backend = BackendInfo("ollama", "child-model", BackendLocation.LOCAL)
+
+        def complete(self, request):
+            calls.append(request)
+            raise ProviderError("original admission guard refused")
+
+        def stream(self, request):
+            raise NotImplementedError
+
+    def forbidden(config):
+        pytest.fail("Pinned executor was replaced, dropping its admission guard")
+
+    monkeypatch.setattr(mcp_server, "create_chat_client", forbidden)
+    monkeypatch.setattr(mcp_server.time, "perf_counter", lambda: 0.0)
+    client = GuardedClient()
+    scoped = mcp_server._ScopedDelegationClient(
+        client,
+        BackendConfig(provider=ProviderKind.OLLAMA, model="child-model", timeout_seconds=30),
+        lambda: True,
+        remaining,
+        pinned=True,
+    )
+    request = AIRequest(messages=(AIMessage(MessageRole.USER, "bounded child"),))
+    expected = "original admission guard" if remaining == 60.0 else "Remaining child time"
+    with pytest.raises(ProviderError, match=expected):
+        scoped.complete(request)
+    assert scoped.client is client
+    assert len(calls) == (1 if remaining == 60.0 else 0)
+
+
+@pytest.mark.parametrize("read_only", [False, True])
+def test_host_bound_shared_child_can_write_only_with_parent_grant(monkeypatch, tmp_path, read_only):
+    from ai_agent.delegation_scope import DelegationBudget, DelegationScope
+    from ai_agent.permissions import PermissionManager, PermissionPolicy
+    from ai_agent.tools import CreateFileTool, ToolRegistry
+    from ai_agent.tools.delegation import DelegateTaskTool
+
+    requests = []
+
+    class Client:
+        backend = BackendInfo("ollama", "child-model", BackendLocation.LOCAL)
+
+        def complete(self, request):
+            requests.append(request)
+            calls = (
+                (
+                    AIToolCall(
+                        "write",
+                        "create_file",
+                        {"path": "child.txt", "content": "actual child effect"},
+                    ),
+                )
+                if len(requests) == 1
+                else ()
+            )
+            return AIResponse(
+                AIMessage(MessageRole.ASSISTANT, "" if calls else "Child report", tool_calls=calls),
+                self.backend,
+                tool_calls=calls,
+            )
+
+    monkeypatch.setattr(mcp_server, "create_chat_client", lambda config: Client())
+    runner = mcp_server._local_read_only_delegated_task_runner(
+        catalog_path=child_catalog(tmp_path), timeout_seconds=5, max_iterations=3
+    )
+    registry = ToolRegistry((CreateFileTool(), DelegateTaskTool(runner)))
+    manager = PermissionManager(
+        PermissionPolicy.read_only() if read_only else PermissionPolicy.permissive()
+    )
+    scope = DelegationScope(
+        registry,
+        manager,
+        tmp_path,
+        DelegationBudget(8),
+        instructions="Complete required instructions",
+        objective="Original implementation goal",
+    )
+    result = registry.execute(
+        ToolCall("delegate_task", {"task": "Create child.txt"}),
+        ToolContext(tmp_path, delegation=scope),
+    )
+    assert result.is_error is read_only
+    assert (tmp_path / "child.txt").exists() is not read_only
+    assert requests[0].messages[0].content == "Complete required instructions"
+    assert "Original implementation goal" in requests[0].messages[1].content
+    assert scope.budget.replies_remaining == 6
+
+
+def test_shared_child_cannot_acquire_ungranted_inference_backend(monkeypatch, tmp_path):
+    from ai_agent.delegation_scope import DelegationBudget, DelegationScope
+    from ai_agent.permissions import PermissionManager, PermissionPolicy
+    from ai_agent.tools import ToolRegistry
+    from ai_agent.tools.delegation import DelegateTaskTool
+
+    monkeypatch.setattr(
+        mcp_server,
+        "create_chat_client",
+        lambda config: pytest.fail("Unfunded backend must not create a client"),
+    )
+    runner = mcp_server._local_read_only_delegated_task_runner(
+        catalog_path=child_catalog(tmp_path), timeout_seconds=5, max_iterations=2
+    )
+    registry = ToolRegistry((DelegateTaskTool(runner),))
+    scope = DelegationScope(
+        registry,
+        PermissionManager(PermissionPolicy.permissive()),
+        tmp_path,
+        DelegationBudget(8),
+        backends=frozenset(),
+    )
+    result = registry.execute(
+        ToolCall("delegate_task", {"task": "No new funding"}),
+        ToolContext(tmp_path, delegation=scope),
+    )
+    assert result.is_error and "not ready" in result.output
+
+
 def test_unconfigured_shared_delegation_refuses_without_inference(tmp_path):
     registry = shared_tool_registry("coding")
     result = registry.execute(

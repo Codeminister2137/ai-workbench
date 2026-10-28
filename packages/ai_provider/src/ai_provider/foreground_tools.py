@@ -30,6 +30,9 @@ class ForegroundTools:
     """Runtime ownership survives routes, but never the CLI's lifetime."""
 
     def __init__(self, workspace: Path, session: CodingSession | None = None):
+        from ai_agent.delegation_scope import DelegationBudget
+
+        self.delegation_budget = DelegationBudget(8)
         self.workspace = workspace.resolve()
         self.session = session
         self.supervisor = session.supervisor if session else ProcessSupervisor(workspace)
@@ -94,6 +97,8 @@ class ForegroundTools:
             config.shared_task_id,
             config.shared_run_id,
             lambda: host.active(token),
+            delegation_budget=self.delegation_budget,
+            delegation_deadline=deadline,
         )
         if self.session:
             registry = self.session.observe_registry(

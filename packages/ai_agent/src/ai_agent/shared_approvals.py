@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from ai_agent.contracts import ToolCall, ToolCategory, ToolDefinition, ToolResult
+from ai_agent.delegation_scope import DelegationBudget, DelegationScope
 from ai_agent.permissions import PermissionManager
 from ai_agent.tools.base import BaseTool, ToolContext, ToolRegistry
 
@@ -144,10 +145,12 @@ class ScopedTool(BaseTool):
         task_id: str,
         run_id: str,
         is_active: Callable[[], bool] | None = None,
+        delegation: DelegationScope | None = None,
     ):
         self.tool, self.permissions = tool, permissions
         self.workspace, self.task_id, self.run_id = workspace.resolve(), task_id, run_id
         self.is_active = is_active or (lambda: True)
+        self.delegation = delegation
 
     @property
     def definition(self) -> ToolDefinition:
@@ -160,6 +163,12 @@ class ScopedTool(BaseTool):
         if context.workspace_root.resolve() != self.workspace:
             raise ValueError("Shared approval workspace changed")
         call = ToolCall(self.definition.name, arguments)
+        if (
+            self.definition.name == "delegate_task"
+            and context.delegation is None
+            and self.delegation is not None
+        ):
+            context = replace(context, delegation=self.delegation)
         authorized = self.is_active() and self.permissions.check_and_authorize(self.tool, call)
         # The owner may exit while the human is considering the request.
         authorized = authorized and self.is_active()
@@ -196,12 +205,24 @@ def scoped_registry(
     task_id: str,
     run_id: str,
     is_active: Callable[[], bool] | None = None,
+    *,
+    delegation_budget: DelegationBudget | None = None,
+    delegation_deadline: float | None = None,
 ) -> ToolRegistry:
     if not task_id or not run_id:
         raise ValueError("Shared coding requires task and run identity")
+    if delegation_budget is not None and delegation_deadline is not None:
+        delegation_budget.tighten_deadline(delegation_deadline)
+    delegation = DelegationScope(
+        registry,
+        permissions,
+        workspace.resolve(),
+        delegation_budget or DelegationBudget(8, delegation_deadline),
+        is_active or (lambda: True),
+    )
     return ToolRegistry(
         tuple(
-            ScopedTool(tool, permissions, workspace, task_id, run_id, is_active)
+            ScopedTool(tool, permissions, workspace, task_id, run_id, is_active, delegation)
             for definition in registry.list_definitions()
             if (tool := registry.get(definition.name))
         )

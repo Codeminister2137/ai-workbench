@@ -85,8 +85,12 @@ def test_codex_mcp_registry_includes_bounded_delegate_task(tmp_path: Path) -> No
 
     assert initialized is not None
     assert (
-        "local-only child agent with read/search tools only"
+        "host-granted supervisor permissions and resource limits"
         in initialized["result"]["instructions"]
+    )
+    assert (
+        "Unbound legacy runners remain local and read-only"
+        in (initialized["result"]["instructions"])
     )
     assert listed is not None
     tools = {tool["name"]: tool for tool in listed["result"]["tools"]}

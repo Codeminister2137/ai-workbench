@@ -33,13 +33,13 @@ class ProcessSupervisor:
         self.lock = threading.RLock()
         self.closed = False
 
-    def start(self, argv: list[str], cwd: str = ".") -> str:
+    def start(self, argv: list[str], cwd: str = ".", *, env: dict[str, str] | None = None) -> str:
         with self.lock:
             if self.closed:
                 raise ValueError("Process supervisor has closed; no new children can start")
-            return self._start(argv, cwd)
+            return self._start(argv, cwd) if env is None else self._start(argv, cwd, env=env)
 
-    def _start(self, argv: list[str], cwd: str) -> str:
+    def _start(self, argv: list[str], cwd: str, *, env: dict[str, str] | None = None) -> str:
         directory = (self.workspace / cwd).resolve()
         if not directory.is_relative_to(self.workspace) or not directory.is_dir():
             raise ValueError("Process working directory must be inside the workspace")
@@ -52,6 +52,7 @@ class ProcessSupervisor:
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             shell=False,
+            env=env,
         )
         handle = uuid.uuid4().hex
         owned = OwnedProcess(process)
@@ -178,7 +179,15 @@ class ProcessTool(BaseTool):
             argv = arguments.get("argv")
             if not isinstance(argv, list):
                 raise ValueError("argv must be an array")
-            handle = self.supervisor.start(argv, arguments.get("cwd", "."))
+            handle = self.supervisor.start(
+                argv,
+                arguments.get("cwd", "."),
+                **(
+                    {"env": context.command_environment()}
+                    if not context.inherit_environment
+                    else {}
+                ),
+            )
             result = self.supervisor.status(handle)
         else:
             handle = arguments["process_handle"]

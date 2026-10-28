@@ -155,14 +155,17 @@ Required tools must remain available during eligible fallback. Codex's native
 conversation and coding-session handoff are authoritative.
 
 The shared coding profile exposes `delegate_task` on native and official-client
-routes. The CLI binds the selected catalog and parent privacy to a bounded local
-read-only child runner. The Orchestrator selects the child independently of the
-primary model override. Children can inspect sources and draft test cases; they
-cannot edit, run commands, delegate again or own architecture/implementation
-decisions. Interactive policy requires approval of the delegation operation.
-Unavailable local execution is an explicit tool failure, not permission to use
-an external child. Each foreground invocation checks scope and deadline before
-and after child model calls; revoked child responses cannot initiate new reads.
+routes. The CLI binds the original catalog snapshot, parent privacy and actual
+supervisor permissions. Children can edit and validate when that grant permits it.
+Optional profiles, tool/path lists and exact command lists can narrow authority.
+Nested delegation shares the original reply/tool allowance and deadline, reserves
+the parent's report and has maximum depth two. Live parent permission and scope
+checks apply before subsequent effects. Interactive approval remains real.
+Funded children must reuse the exact approved parent client and its admission
+guards; unavailable execution never authorizes another billing source. External
+CLI provider calls are outside the MCP host's observable descendant reply budget.
+Legacy unbound local runners remain read-only. These tool restrictions are not
+an OS sandbox. See [ADR-074](../decisions/ADR-074-delegation-inherits-supervisor-authority.md).
 Bare shared-tool registries without a configured runner refuse delegation.
 `--delegate-context` remains a separate optional preparatory extraction pass.
 
@@ -230,8 +233,8 @@ files were untouched. Broader negative claims require evidence for that scope.
 Conversation history retains user requests, final agent reports and the
 host-observed execution outcome, including failed validation or tool errors.
 It does not persist raw tool arguments/output as additional conversation turns.
-Bounded local delegation checks its invocation and deadline before each child
-read/search operation, including multiple tools requested in one model response.
+Bounded delegation checks its invocation and deadline before each child
+operation, including multiple tools requested in one model response.
 A tool already running may finish; expiry prevents subsequent tools and model
 requests rather than forcibly interrupting that tool.
 Native coding turns also check their absolute execution deadline around model
