@@ -93,12 +93,22 @@ class CodingChatInput:
                     self.write("coding_chat_input: expired or invalid approval answer refused")
                 return
             if text.strip():
-                text = text.removeprefix("/steer ")
+                if text.startswith("/steer "):
+                    text = text.removeprefix("/steer ")
+                elif text.lstrip().startswith("/"):
+                    # Idle input refuses unknown slash commands; queueing one here would
+                    # hand a command-looking string to the model as a coding request.
+                    self.write(
+                        "coding_chat_input: unknown command during a turn; prefix a "
+                        "request that begins with '/' with /steer"
+                    )
+                    return
                 if not text.strip():
                     return
-                self.pending.append(
+                pending_entry = (
                     self.stage(text) if self.stage and not text.startswith("/") else text
                 )
+                self.pending.append(pending_entry)
                 if self.ticket is not None and text.strip().lower() in {"yes", "no"}:
                     self.write(
                         "coding_chat_input: bare yes/no is queued chat, not an approval. "

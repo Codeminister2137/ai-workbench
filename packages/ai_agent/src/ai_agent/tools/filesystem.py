@@ -18,6 +18,9 @@ class ReadFileTool(BaseTool):
             name="read_file",
             description=(
                 "Read content from a file with optional line range (1-indexed). "
+                "Omitting bounds returns the entire file and consumes conversation context. "
+                "For large files, locate relevant symbols with grep_search first, then "
+                "supply start_line and end_line for focused excerpts. "
                 "Set line_numbers=False to obtain literal text for exact edit anchors."
             ),
             category=ToolCategory.READ,

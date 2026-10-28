@@ -140,15 +140,9 @@ def test_saved_reader_snapshot_reproduction():
             indent=2,
         )
     )
-    assert len(catalog["models"]) == 19
-    assert agreements == 14
-    assert {item["route"] for item in disagreements} == {
-        "openai/codex-gpt-5.5",
-        "openai/api-gpt-5.1",
-        "openai/api-gpt-5-mini",
-        "requesty/openai/gpt-5.1",
-        "requesty/openai/gpt-5-mini",
-    }
+    assert len(catalog["models"]) == 21
+    assert agreements == 21
+    assert disagreements == []
 
 
 def test_decimal_version_is_not_folded_into_integer():

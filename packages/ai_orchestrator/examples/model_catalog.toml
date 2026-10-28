@@ -531,3 +531,69 @@ context_window_tokens = 256000
 
 [models.metadata]
 provisional = true
+
+[[models]]
+route_id = "meta/muse-spark-1.3"
+provider = "meta"
+model = "muse-spark-1.3"
+location = "external"
+access_method = "provider_api"
+auth_method = "api_key"
+billing_source = "meta_api_billing"
+cost_policy_tier = "prepaid_credits_allowed"
+quality = "standard"
+latency = "interactive"
+base_url = "https://api.meta.ai/v1"
+notes = "Meta Model API Standard tier via the Responses protocol; requires META_API_KEY. Standard content is not used to train Meta models, and the adapter therefore refuses Contributor variants. Reasoning and visible output share max_output_tokens. Published facts checked 2026-10-27; account entitlement, quality and context capacity are unevaluated. Meta has no hard provider spending cap, so local admission bounds are the only spending guard. Set cost_policy_tier to billing_allowed once the prepaid credit balance is exhausted."
+
+[models.capabilities]
+chat = true
+streaming = true
+tools = false
+structured_output = false
+multimodal_input = false
+embeddings = false
+
+[models.estimate]
+input_cost_per_million_tokens = 1.25
+output_cost_per_million_tokens = 4.25
+source = "Meta Model API pricing page, checked 2026-10-27"
+source_url = "https://dev.meta.ai/docs/pricing-rate-limits"
+
+[models.metadata]
+provisional = true
+
+[[models]]
+route_id = "modal/qwen/qwen2.5-coder-7b-instruct"
+provider = "modal"
+product = "modal"
+model = "Qwen/Qwen2.5-Coder-7B-Instruct"
+location = "external"
+access_method = "modal_runtime"
+auth_method = "api_key"
+billing_source = "modal_runtime_billing"
+cost_policy_tier = "prepaid_credits_allowed"
+quality = "standard"
+latency = "interactive"
+base_url = "https://kubajaworski999--ai-projects-qwen25-coder-7b-instruct-server.us-east.modal.direct/v1"
+notes = "Modal-hosted vLLM inference endpoint served by deploy/modal/qwen25-coder-7b/modal_app.py. Requires MODAL_API_KEY. Tool calling is enabled; streaming is supported. Cost is per-second GPU runtime, not per token, so the estimate below is illustrative based on L4 pricing and expected throughput. Provisional pending measured latency and context capacity."
+
+[models.capabilities]
+chat = true
+streaming = true
+tools = true
+structured_output = false
+multimodal_input = false
+embeddings = false
+
+[models.context_limits]
+context_window_tokens = 131072
+runtime_context_tokens = 32768
+
+[models.estimate]
+input_cost_per_million_tokens = 0.01
+output_cost_per_million_tokens = 0.03
+source = "Illustrative L4 GPU runtime estimate; actual cost is per-second and depends on traffic shape."
+
+[models.metadata]
+provisional = true

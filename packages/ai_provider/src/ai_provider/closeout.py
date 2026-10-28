@@ -5,6 +5,24 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping, Sequence
 
+from ai_provider.turn_usage import ACTIVE_USAGE
+
+REPORT_SCOPE = "repository_tool_actions_v1"
+REPORT_SCOPE_NOTICE = (
+    "Agent narrative describes repository/tool actions. It does not certify absence "
+    "of provider inference, host bookkeeping, test artifacts or other host effects. "
+    "Host observations take precedence; technical claims still require evidence and review."
+)
+
+
+def observed_inference() -> dict[str, int] | None:
+    """Snapshot adapter receipts, without implying a census of host network traffic."""
+    ledger = ACTIVE_USAGE.get()
+    if ledger is None:
+        return None
+    return {"adapter_attempts": ledger.attempts, "completed_responses": ledger.responses}
+
+
 AUXILIARY_RESPONSE_NOTICE = (
     "Auxiliary advice (unverified). This pass does not edit files or run tests; "
     "claims below are not completion or validation evidence."
@@ -20,6 +38,10 @@ Do not emit a duplicate summary; answer the request normally and clearly
 distinguish proposed or agent-reported changes from independently verified
 results. The CLI's validation and execution fields come from recorded evidence,
 not from claims in your response.
+Your narrative has repository/tool-action scope: statements about no edits or no
+network activity refer to your repository/tool actions, not provider inference or
+all host effects. State that scope when reporting effects. Explicit broader claims
+still need evidence; the scope label does not verify arbitrary technical claims.
 The CLI host may create or update session/orchestration databases and logs during
 the task, independently of your tools. If mentioning those artifacts, distinguish
 host bookkeeping from your own edits. Their presence at your first inspection
@@ -100,7 +122,12 @@ def _agent_outcome(response: str | None) -> str:
             continue
         candidate = candidate.removeprefix("- ")
         if len(candidate) > 200:
-            candidate = candidate[:197].rstrip() + "..."
+            # Keep full links in the report rather than clipping a destination.
+            candidate = (
+                "See the agent report below for the linked outcome."
+                if "](" in candidate or "][" in candidate
+                else candidate[:197].rstrip() + "..."
+            )
         return (
             f"Agent-reported outcome: {candidate} "
             "(workspace changes are not independently attributed by the CLI)."
@@ -293,6 +320,18 @@ def format_cli_closeout(
             f"- Notes: {'; '.join(notes)}",
             "",
             *review_lines,
+            "### Host observations and report scope",
+            (
+                "Observed adapter calls in this CLI invocation: "
+                f"{inference['adapter_attempts']} attempts, "
+                f"{inference['completed_responses']} completed responses."
+                if (inference := observed_inference()) is not None
+                else "Adapter call observations unavailable; inference counts are unknown."
+            ),
+            "These receipts are not a network audit; uninstrumented or external-client "
+            "inference and other host effects remain unknown.",
+            REPORT_SCOPE_NOTICE,
+            "",
             "### Agent report — draft with unresolved scrutiny"
             if unresolved_review
             else "### Agent report",

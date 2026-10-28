@@ -82,6 +82,34 @@ achieved **33 ok / 3 error**; `gemini-4-argon-contributor` remains unsupported o
 all three endpoints, `mimo-v2.5-pro` remains upstream-unsupported, and
 `longcat-2.0` remains unavailable.
 
+## Meta Model API
+
+Checked 2026-10-27. See the dated [Meta findings](source-state.md#meta-model-api---published-facts-refreshed-2026-10-27)
+and the [official pricing page](https://dev.meta.ai/docs/pricing-rate-limits).
+
+| Model | Model ID | Recommended role | Evidence / limitation |
+| --- | --- | --- | --- |
+| Muse Spark 1.3 Standard | `muse-spark-1.3` | Candidate implementation model while Meta credits are the most available paid route | Quality unevaluated against this repository's tasks; the route is a Standard-tier direct endpoint |
+| Muse Spark 1.2 Standard | `muse-spark-1.2` | Fallback if 1.3 is unavailable or clearly worse | Same limitation; no measured comparison exists yet |
+
+The direct route uses the Responses protocol at `https://api.meta.ai/v1` and is
+served by `MetaResponsesChatClient`, which extends the generic
+`OpenAIResponsesChatClient`. It sets `store: false` so repository content is not
+persisted provider-side, and it refuses three things: non-`muse-` model ids,
+Contributor variants (Meta trains on request content there in exchange for
+discounted pricing), and local-only privacy classes through the shared privacy
+policy.
+
+Standard Muse pricing is USD1.25 per million input tokens and USD4.25 per million
+output tokens, with cached input at USD0.15. Reasoning and visible output share
+`max_output_tokens`. A live probe on 2026-10-27 returned **no visible text** at a
+64-token cap and `link ok` at 512 tokens with 456 of those 467 tokens spent on
+reasoning, so budget output generously rather than tightly. Meta's dashboard spend
+setting only sends an alert; it is not a hard cap, so local admission bounds remain
+the spending guard. The catalog route is `meta/muse-spark-1.3` at
+`prepaid_credits_allowed`; lower it to `billing_allowed` only when charging the
+owner's account is intended.
+
 ## Capability prior coverage — checked 2026-10-22
 
 Where an *internet* capability prior exists for the routes above, and where it

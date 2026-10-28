@@ -11,6 +11,21 @@ from ai_agent.contracts import ToolCategory, ToolDefinition, ToolParameter, Tool
 from ai_agent.tools.base import BaseTool, ToolContext
 
 
+def _enumerated_lines(content: str):
+    """Yield one-based line numbers with editor-style line breaks.
+
+    ``str.splitlines`` also breaks on form feeds, vertical tabs and Unicode line
+    separators, so a file containing any of those would report line numbers that
+    do not match an editor or ``grep``. Only ``\\n`` ends a line here, and a
+    trailing ``\\r`` from CRLF input is removed.
+    """
+    lines = content.split("\n")
+    if lines and lines[-1] == "":
+        lines.pop()
+    for number, line in enumerate(lines, start=1):
+        yield number, line.removesuffix("\r")
+
+
 def _workspace_entries(base: Path, context: ToolContext):
     """Walk visible entries without traversing links or Windows junctions."""
     for directory, directories, files in base.walk(follow_symlinks=False):
@@ -90,9 +105,19 @@ class FindFilesTool(BaseTool):
                 is_error=True,
             )
 
+        # A non-positive limit asks for nothing; see list_dir's max_depth handling.
+        if max_results <= 0:
+            return ToolResult(
+                name="find_files",
+                output=f"No files matching pattern {pattern!r} found in {raw_path}.",
+                metadata={"pattern": pattern, "count": 0},
+            )
+
         matches: list[str] = []
         for item in _workspace_entries(target_path, context):
-            if fnmatch.fnmatch(item.name, pattern):
+            if fnmatch.fnmatch(item.name, pattern) or item.relative_to(target_path).full_match(
+                pattern
+            ):
                 try:
                     rel = item.relative_to(context.workspace_root)
                     matches.append(str(rel))
@@ -197,6 +222,14 @@ class GrepSearchTool(BaseTool):
                 is_error=True,
             )
 
+        # A non-positive limit asks for nothing; see list_dir's max_depth handling.
+        if max_matches <= 0:
+            return ToolResult(
+                name="grep_search",
+                output=f"No matches found for query {query!r}.",
+                metadata={"query": query, "matches": 0},
+            )
+
         # Stop discovery when the content scan reaches the match limit.
         if target_path.is_file():
             paths_iter = [target_path]
@@ -211,7 +244,11 @@ class GrepSearchTool(BaseTool):
                 resolved = file_path.resolve()
                 if not context.is_within_workspace(resolved):
                     continue
-                content = resolved.read_text(encoding="utf-8", errors="ignore")
+                content = resolved.read_text(encoding="utf-8")
+                # Runtime databases and other binary files are not source text.
+                # Ignoring decode failures can also fabricate a matching token.
+                if "\0" in content:
+                    continue
             except Exception:  # noqa: BLE001
                 continue
 
@@ -220,7 +257,7 @@ class GrepSearchTool(BaseTool):
             except ValueError:
                 rel_path = file_path
 
-            for line_no, line in enumerate(content.splitlines(), start=1):
+            for line_no, line in _enumerated_lines(content):
                 if regex.search(line):
                     results.append(f"{rel_path}:{line_no}: {line.strip()}")
                     match_count += 1

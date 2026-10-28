@@ -138,6 +138,54 @@ def test_oversized_source_refuses_before_analysis(
     assert bounded_source_reads and source.stat().st_size > MAX_FILE_BYTES
 
 
+def test_scrutiny_receives_real_navigation_preview_apply_and_replay_refusal(
+    tmp_path, jedi_required
+):
+    from argparse import Namespace
+
+    from ai_agent.contracts import ToolResult
+    from ai_agent.scrutiny_workflow import _observed_tool_evidence
+
+    source, caller = package_fixture(tmp_path)
+    before = (source.read_bytes(), caller.read_bytes())
+    context = ToolContext(tmp_path)
+    navigation = PythonNavigateTool().run(
+        ToolCall(
+            "python_navigate",
+            {"path": "sample_pkg/models.py", "line": 1, "column": 7, "operation": "references"},
+        ),
+        context,
+    )
+    store, proposed = preview(tmp_path, source, 1, 7, "Gadget")
+    assert (source.read_bytes(), caller.read_bytes()) == before
+    call = ToolCall("rename_apply", {"plan_id": proposed.metadata["plan_id"]})
+    applied = RenameApplyTool(store).run(call, context)
+    refused = RenameApplyTool(store).run(call, context)
+    assert not navigation.is_error and not applied.is_error and refused.is_error
+
+    evidence = _observed_tool_evidence(
+        Namespace(
+            _scrutiny_tool_results=(
+                navigation,
+                proposed,
+                applied,
+                refused,
+                ToolResult("run_command", "2 passed", metadata={"exit_code": 0}),
+            )
+        )
+    )
+    assert "Tool: python_navigate" in evidence and "sample_pkg/client.py" in evidence
+    assert "Tool: rename_preview" in evidence and "No files were changed" in evidence
+    assert proposed.metadata["plan_sha256"] in evidence
+    assert evidence.count("Tool: rename_apply") == 2
+    assert "Applied rename plan" in evidence and "already used" in evidence
+    for changed in applied.metadata["applied"]:
+        assert changed["path"] in evidence and changed["sha256"] in evidence
+    assert evidence.index("Tool: rename_preview") < evidence.index("Applied rename plan")
+    assert evidence.index("Applied rename plan") < evidence.index("already used")
+    assert "2 passed" in evidence and len(evidence) <= 12_000
+
+
 class TestRenamePreview:
     def test_apply_refuses_a_file_grown_past_the_limit_before_any_write(
         self, tmp_path, jedi_required, monkeypatch

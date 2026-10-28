@@ -1,5 +1,343 @@
 # Session History
 
+## 2026-10-28 — Modal inference endpoint deployed and verified
+
+Branch `feature/go-cli-completion-acceptance-20261025`; commits `cb3eca5`
+(Workbench→Remote AI Operator external-actions bridge) and `1d66ad7`
+(Modal vLLM deployment). Working tree clean; full root suite **2979 passed,
+9 skipped**; Ruff/format clean.
+
+Completed slices:
+- Added `deploy/modal/qwen25-coder-7b/modal_app.py` + README to serve
+  `Qwen/Qwen2.5-Coder-7B-Instruct` on an L4 GPU with vLLM 0.21.0.
+- Created Modal secret `modal-runtime-api-key` (`MODAL_API_KEY`/`VLLM_API_KEY`)
+  and wrote the key to local `.env`.
+- Deployed to `https://kubajaworski999--ai-projects-qwen25-coder-7b-instruct-server.us-east.modal.direct/v1`,
+  verified `/health`, `/v1/models` and a `/v1/chat/completions` probe.
+- Worked around FlashInfer JIT compile failure with `VLLM_USE_FLASHINFER_SAMPLER=0`.
+- Wired the live `base_url` into the catalog route
+  `modal/qwen/qwen2.5-coder-7b-instruct`.
+- Added `modal` to a new `modal-deploy` dependency group.
+- Stopped the app after verification to preserve credits.
+
+Also completed earlier in the same feature branch: Meta Model API route,
+Modal runtime billing-source split, and the neutral Workbench↔Remote AI
+Operator `/api/external-actions` contract with UI support.
+
+Open / blocked:
+- Remote AI Operator hackathon release (video, public push, form submission)
+  remains **BLOCKED** on explicit owner release authorization.
+- Hosted judge Meta grant/access mechanism still needs owner decision and a
+  finite allowance.
+- C6 process-continuity live trial and `meta-baseline-gates-v1` remain ready but
+  not started.
+
+## 2026-10-26 — attended closeout after usage-limit interruption
+
+Unattended window started14:41:41Z/15:41:41CET with fixed19Z/20local deadline.
+Last confirmed checkpoint16:34:41Z; interrupted full-test log lastwrite16:36:04Z.
+Automatic approval review then rejected the next command because usage was exhausted;
+the command did not execute. No work is claimed for the gap. Owner resumed attended
+work at20:23local; clock verified19:23:51Z. Immediate slice was validated and closed;
+no additional paid trial was started. Wider C6/M4/frozen-review work remains incomplete.
+
+Host fixes retain bounded prior native receipts for repair and initial/repair history
+for re-review, reset observations between invocations, deliver process receipts, skip
+NUL-bearing/invalid UTF-8 search content and support base-relative recursive globs.
+Four additional cases include real SQLite and owned-child effects. Focused84passed;
+final registered3,077passed/3skipped,Ruff/format/Pyright pass. Original ab/ac/ad results
+and27,560historical files/509protected ad inputs/index remain unchanged. Logs:
+`artifacts/repair-search-process-attended-full-20261026.log` and
+`artifacts/repair-search-process-pyright-20261026.log`.
+
+Current window sleep receipt records cancellation18:30:08Z/19:30:08local, helper94312
+absent. Attended CancelAll signalled all timers; an old October23 receipt lacks its
+acknowledgement, but all eight registered helper PIDs are absent. Original receipts
+are preserved; no new timer or physical sleep transition is claimed. The old stale
+registration remains a documented tooling follow-up, outside this immediate slice.
+
+## 2026-10-26 — ad C5 effects verified; original bound stop before report
+
+Fresh ad on76bbd3c:9Go/1local,21returnedproposals/20executed tools,82.14seconds.
+Actual semantic navigation, nonmutating preview/exact plan apply changed two intended
+sources; eight model cases, host rerun, semantic oracle and applied hashes pass.
+Next proposal crossed original20-tool initial cap; no report/required scrutiny/
+frozen review.509protected inputs/27,560history/index and owned cleanup verified.
+Consumed incomplete,not extended/replayed/regraded. Search returned runtime SQLite
+content and recursive glob missed tests; both separately reproduced for host repair.
+Assessment: `artifacts/cli-semantic-postflight-20261026ad/final-assessment.md`.
+
+## 2026-10-26 — host semantic scrutiny evidence correction
+
+C5 preparation reproduced scrutiny dropping real Jedi navigation, preview and apply
+receipts. Host correction forwards these tools and selected bounded plan/path/hash
+metadata, including partial errors and explicit omitted-file counts. Real Jedi
+nonmutating preview/two-file apply/reused-plan refusal and bounded metadata cases
+pass; full registered3,073passed/3skipped,Ruff/format/Pyright pass. No permission,
+rename lifetime, provider or public API change. Live capability proof remains open.
+
+## 2026-10-26 — ac frozen review stopped within task scope guards
+
+Fresh ac on981072b:6Go/1local,19returned proposals/17executed tools,92.40seconds.
+The fixture rejected run_command outside frozen-review authorization before batch
+execution; exact command intent unknown because only argument digest retained.
+No candidate report/required scrutiny.507inputs/26,500history/index and owned cleanup
+verified;host4regression cases pass. Actual public HTTP200/body112744bytes/SHA256
+and private-network zero-connection refusal verified,without provenance-delivery
+completion. Original consumed result retained. Assessment:
+`artifacts/cli-public-postflight-20261026ac/final-assessment.md`.
+
+## 2026-10-26 — stopped ab and host scrutiny-evidence correction
+
+ab observed active CPython3.14.4 versus a fake workspace hint,one real pytest pass,
+expected RuffF821 and Pyrightassignment-type return1. Required scrutiny questioned
+the version missing from its evidence and treated host execution status as candidate
+text. Repair exhausted24-tool cap:10Go/2local,26returned proposals20executed6rejected,
+174.83seconds.516frozen inputs/24,374history/index and cleanup verified. Accepted
+final report/re-review absent;original candidate/reviewer/stages preserved,not resumed.
+Host source correction retains recent runtime/fetch receipts,last successful fetch
+before refusal,and separates host evidence from raw candidate text. Four regressions
+exercise actual tools/budget pressure/real prompt composition. Final full3,071pass/
+3skip,Ruff/format/Pyright pass. This is implementation evidence,not automatic reviewer
+accuracy or live scrutiny-fed repair. C4 model-free officialPython-json fetch succeeds
+with112744retainedbytes/digest and private-network refusal;fresh frozen fix review/
+C4live question is next. Active unattended window/deadline remain in the private plan.
+
+## 2026-10-26 — unattended start and native-Go portable-skill case aa
+
+Owner authorized a new unattended window14:41:41Z/15:41:41CET until19Z/20local;
+20minutecloseoutreserve and rolling sleep fallback recorded in the private active
+plan. Prior usage-limit interruption is not work. Fresh sealed aa was unconsumed,
+successful smoke confirmed,current entitlement/privacy/quota refreshed before launch.
+Actual native-Go single-shot CLI selected review-repo-change with checked Git/tool
+prerequisites,complete root/nested instructions and six-tool read_only authority.
+Both staged/unstaged seeded regressions were identified with correct concreteexamples;
+no model test execution/writes occurred or were claimed. Required scrutiny passed.
+Six Go/two local calls,eightproposals,114.98seconds;511frozeninputs/22249history/index
+unchanged;rawreport/hostreceipts and ownedcleanup verified. Three passing host checks
+cover identity/prerequisites only. Reviewprecisionqualified: "any discount>0" overlooks
+50%/zeroprice equality; host discloses exact condition,without replacing rawreport or
+claiming automatic CLI correction. Selected C2 delivery/authority is verified,not
+unqualified reviewer accuracy or fullM2/M5. Next independent candidate:C3 runtime and
+real test/lint/type diagnostics. Evidence: artifacts/cli-skill-postflight-20261026aa/.
+
+## 2026-10-26 — z synthetic coding and cold frozen review completed
+
+Fresh z uses production a373098 and a small status-counting task, distinct from
+consumed span/link/notice trials. The model implements one-pass normalized counts,
+adds three meaningful companions, executes 16 cases and delivers a supported report.
+A second cold worker retains the original task/report in one saved conversation,
+reviews exact host-accepted frozen bytes read-only, executes the same 16 cases and
+delivers a supported substantive review. Required scrutiny passes both phases with
+no format issues. Independent reruns and separate host oracles pass. No live repair,
+host source recovery, replacement reports, bounds extensions or regrading occurred.
+Sixteen Go/four local calls, 24 proposals, 520.94 seconds; all 508 protected inputs,
+16,811 historical files and scratch index unchanged; raw reports/scoped metadata,
+two exited workers and owned runtime/listener cleanup verified. Source stays fixture-
+only. Narrow coding/current-report/cold-review acceptance is complete; general CLI/
+M4/capability/fallback and successful live scrutiny-fed repair remain incomplete.
+Evidence: artifacts/cli-status-continuity-20261026z/ and cli-status-postflight-20261026z/.
+
+## 2026-10-26 — y frozen review of current host corrections completed
+
+Fresh y reviewed the reference-preview correction and native reply-ceiling notice at
+405cb52. Ten Go/two local calls, 19 proposals, 234.40 seconds; required scrutiny passed
+without format limitations. Model execution and independent host rerun passed all
+182 selected cases. All 509 frozen inputs, 15,231 prior evidence files, fixture index,
+raw report/host metadata and owned cleanup verified. Semantic assessment supports
+current source/test/effect claims. Two proposed commands were refused before execution;
+the report's one executed test run is accurate. No live repair was needed or claimed.
+Full registered root checks: 3,067 passed/3 skipped; Ruff/format/Pyright pass.
+Evidence: artifacts/cli-budget-review-20261026y/ and cli-budget-postflight-20261026y/.
+The source fixes remain host recovery/implementation; w/x remain consumed incomplete.
+General paid CLI/M4/capability acceptance and successful live scrutiny-fed repair
+remain incomplete. No push/merge, private payload, billing change or trial extension.
+
+## 2026-10-26 — action-budget visibility after consumed x
+
+x used ten Go/two local completions and 15 read/search/Git proposals in 94.62seconds,
+exhausting the correctly aligned ten-round initial limit without edits/tests/report.
+Required scrutiny failed on the absent response; frozen review was not reached.
+All 506 protected inputs and 13,106 prior evidence files and owned cleanup verified.
+The host implements the six-line static native reply-ceiling notice with three
+actual-request cases and an updated exact-system assertion.180 focused cases pass.
+This is host-written code; x remains consumed incomplete. Evidence:
+artifacts/cli-action-budget-postflight-20261026x/. Fresh frozen review is still due.
+
+## 2026-10-26 — reference recovery after consumed w
+
+w stopped incomplete at its declared host ten-primary-reply initial cap. Ten Go/
+one local calls, 15 proposals, 203.14 seconds; model tests failed three of 51 cases,
+then the model corrected the candidate but did not revalidate/report/reach required
+scrutiny or frozen review. Host audit preserved all 505 protected inputs and 9,937
+historical files and verified owned cleanup. Later host-only 51 tests passed.
+The root adopts the one-line reference-marker fix with six independent host cases,
+explicitly as host recovery. See artifacts/cli-reference-postflight-20261026w/.
+The fixture configured 17 production rounds but capped initial coding at ten replies;
+future fresh coding must align those bounds. No consumed result was resumed/regraded.
+
+## 2026-10-26 artifact links and real preview defect
+
+Corrected Windows chat-link guidance to slash-prefixed absolute local targets and
+removed a stale current-roadmap pending-decision statement. Client rendering remains
+unconfirmed. Reproduced a separate real CLI defect: 200-character preview truncation
+split long inline Markdown destinations while the full report retained them.
+
+Fresh u attempted model coding then cold-restart frozen review. A too-narrow host
+AST guard rejected private preview helpers, so u stopped incomplete before tests,
+final report or review. 8 Go/1 local calls, 15 proposals, 282.74 seconds; 504 protected inputs,
+5,743 historical files and owned cleanup verified. The original candidate/five tests
+remain unchanged. Host-only tests found three escaped/angle-path gaps. The final
+root implementation a2bb69c is a smaller host-written seven-line fallback with eleven
+host regressions; it is not a promoted model solution or retrospective u acceptance.
+
+Fresh v reviewed the current host fix under new sealed bounds. 25 guards, scripted
+report correction/revalidation/re-review, 39 selected cases, negative digest calibration,
+smoke and current admission passed before paid inference. Live v: 7 Go/2 local, 11 proposals,
+152.99 seconds; 39 tests and required scrutiny passed. Independent checks confirmed 507
+inputs/8,364 historical files unchanged, raw report retention and owned cleanup. Minor
+prose-count errors are qualified in its postflight assessment; original reports remain.
+Current full validation passed 3,058 tests with three skips; Ruff/format/Pyright passed.
+No push/merge.
+Broader M4, capabilities and successful live scrutiny-fed repair remain incomplete.
+
+## 2026-10-26 scoped host observations and fresh closeout acceptance
+
+The owner approved ADR-070's host facts plus repository/tool-action report scope.
+Commit e999366 implements it in closeout delivery, raw conversation metadata/history
+and required-review context. Commit 361e033 clarifies focused native inspection
+without changing reads or trimming required instructions/history.
+
+Broader frozen questions r and s stopped incomplete: r exhausted estimated context
+after whole-file reads; s exceeded its initial tool reserve. Their inputs, original
+results and cleanup evidence remain preserved. Neither was resumed or regraded.
+The current baseline assessment records exact causes, usage and independent checks.
+
+Fresh t reduced the question to the closeout envelope and four protected cases.
+Preparation passed 25 guards, scripted report-only correction/revalidation/re-review,
+a negative digest calibration and smoke checks before current privacy/quota admission.
+Live t used four Go/two local calls and ten proposals in 102.33 seconds. The primary
+report, tests, source identity and effect scope were independently checked. Required
+frozen scrutiny passed with disclosed report-format limitations under ADR-066; all
+506 inputs and 4,174 historical files stayed unchanged and owned cleanup was verified.
+The raw response is retained exactly; display applies existing duplicate-heading
+normalization. A mistaken independent display-identity assertion was corrected with
+its original failure retained, without changing the trial or any model response.
+
+The narrow completion/report-fidelity question is established. General CLI parity,
+broader continuity/capability milestones and live scrutiny-fed repair remain open.
+Final registered validation passed 3,047 tests with three skips; Pyright reported
+zero errors, and source lint/format checks passed. No merge or push was performed.
+
+## 2026-10-25 public-layout review and reporting decision boundary
+
+Frozen review o passed mechanical/required-scrutiny gates but incorrectly claimed
+the six tests checked imported-source byte identity; a host guard performed that
+comparison. Fresh p made three identity comparisons visible in the protected tests,
+with a deterministic mismatched-copy rejection, but live p stopped at a pre-execution
+directory guard before tests/report. The exact rejected path was discarded; the
+combined guard cannot establish whether it was an escape or an unlisted in-root path.
+Its failed-batch proposal count was also missing. All inputs and owned cleanup were
+preserved. These consumed outcomes were not replayed or regraded.
+
+Fresh q restored normal directory navigation in a history-free public Git archive:
+499 committed files, six declared probe/config inputs, no ignored private files or
+original Git/recovery history. New receipts preserve proposal counts and safe path
+classification. Its 25 guards and scripted report-only correction/revalidation/
+re-review passed. Live q used six Go/two local calls and 16 primary tool proposals
+in 272.83 seconds. Nine tests passed; 505 inputs and 1,000 historical evidence files
+were unchanged, required scrutiny passed and owned cleanup was independently checked.
+Technical findings and test/manifest attribution were supported. The final report's
+unqualified no-network sentence still lacks an explicit actor boundary.
+
+The owner was presented with two concrete prospective closeout examples: strict
+host-wide effect claims, or explicit host facts with agent-action scope. The latter
+was recommended for clarity without another model/service, but remains a proposal.
+No reporting/acceptance contract was changed, no consumed result promoted, and no
+further paid trial started while that material decision was pending.
+
+## 2026-10-25 frozen review n and negative reporting scope
+
+Fresh ordinary tool-enabled review n supported the host invocation-scope patch;
+required local scrutiny passed, six frozen inputs stayed unchanged, three tests
+passed and owned cleanup was verified. It used eight Go/two local calls, ten tool
+proposals and 296.08 seconds. Its original controller completed mechanically.
+Independent assessment qualified report fidelity because the report claimed no
+network calls although inference used provider traffic. No model-authored edit or
+optional network-tool call was observed; those narrower claims are supported.
+
+The prospective instruction correction scopes negative side-effect claims in all
+primary prompt modes and response scrutiny. It introduces no new privacy, transport,
+approval, persisted-data or verdict policy. Original evidence remains consumed;
+external detection does not prove the ordinary workflow caught the claim.
+
+The reporting correction passed 104 focused tests, full registered suites with
+3,043 passes/three skips, Ruff and configured Pyright. Live semantic acceptance
+remains a separately bounded question.
+
+## 2026-10-25 continuity m and scrutiny evidence scope
+
+Fresh three-process trial m preserved the saved conversation through diagnosis,
+clarified coding and frozen inspection. Correct model-authored source and five
+companions passed 11 tests and 1,593 independent oracle cases; protected and frozen
+inputs were preserved. Required local scrutiny falsely attributed coding-phase
+changes to frozen review, and the saved draft overclaimed runtime bookkeeping
+preservation. The workflow stopped incomplete. Its 14 Go/four local calls,
+20 tool proposals and 480.20 seconds stayed within the original bounds; owned
+worker/runtime cleanup was verified. Original evidence remains consumed.
+
+Investigation exposed ambiguous production evidence scope. The prospective fix
+labels invocation-start fingerprints separately from Git state, marks missing
+baselines unknown, identifies current-attempt receipts and states runtime
+bookkeeping exclusions. Three regression cases cover actual supplied review
+prompts for unchanged, changed and unavailable baselines. No raw m prompt was
+logged; the exact inference cause remains unknown. No verdict policy change or
+retroactive acceptance is implied.
+
+The framing correction passed 63 focused tests, a final 40-test scrutiny rerun,
+full registered suites (3,040 passed, three skipped), Ruff and configured Pyright.
+
+## 2026-10-25 saved-session teardown correction
+
+Fresh Go trials j/k diagnosed the cleanup defect but stopped at private fixture
+guards before final coding reports and required frozen reviews. Original results
+remain consumed/incomplete, with owned cleanup verified. Independent postflight
+found lost exception chaining in k's candidate. The subsequent production fix and
+eleven real-session/owned-child regressions are host-authored, separately attributed
+from those trials. Terminal cleanup failure no longer skips foreground teardown;
+uncertain cleanup persists interrupted state and restores active caller contexts.
+
+The fix passed 82 focused tests, targeted Ruff lint/format and Pyright. Fresh full
+registered validation passed 3,037 tests with three skips. A separately bounded
+one-call static Go review found no concrete change-induced defect in six frozen
+public files, which remained unchanged. That review used no tools or auxiliary/
+scrutiny stages and treated supplied test results as host observations. It does
+not replace the missing phases of j/k or establish general workflow parity.
+
+The owner resumed attended work after a usage interruption. The unattended
+window was superseded; its sleep receipt acknowledged cancellation and no helper
+was running. An older stale registration caused a missing-ack warning. The prior
+full test log ended without a result; it was preserved and fresh validation began.
+No test pass or work during the interruption is inferred from that partial log.
+
+## 2026-10-25 bounded Go coding/review completion
+
+Fresh trial i completed the small orchestrated coding and read-only frozen-review
+question within its original 32-call/40-tool/7,200-second allowance: nine Go calls,
+four local support calls, 19 tools and 630.83 seconds including owned cleanup.
+Independent assessment accepted both current reports, five unchanged original
+tests, three additive companions, eight passing tests per phase and 3,616 oracle
+cases. The review auxiliary proposed a tool in its tool-free pass; production
+rejected it without execution and preserved the auxiliary-error status. Required
+validation and final scrutiny passed. No live repair was needed or established.
+
+The scoped completion/report-fidelity gate is complete; the broader roadmap is
+incomplete. Existing live fallback evidence remains separate. Original h and i
+receipts were preserved without replay or regrading. Assessment and cleanup
+evidence are under `artifacts/go-completion-postflight-20261025i/` and original
+trial evidence under `artifacts/cli-clean-workflow-20261025i/`. No production code,
+provider selection, service, dependency, approval policy or billing source changed.
+
 ## 2026-10-24 allowance-derived fallback ordering; Kiro fallback target exhausted
 
 Fallback ordering became an explicit, configurable chain. `fallback_candidates`

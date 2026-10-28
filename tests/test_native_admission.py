@@ -7,6 +7,7 @@ from types import SimpleNamespace
 
 import pytest
 from ai_orchestrator import load_model_catalog, recommend_model
+from ai_orchestrator.models import CostPolicyTier, PrivacyClass, TaskCapability
 from ai_provider import (
     AIMessage,
     AIRequest,
@@ -664,3 +665,20 @@ def test_resource_profile_cannot_exceed_declared_model_window(admitted, monkeypa
         None,
     )
     assert isinstance(wrapped, NativeCodingClient) and wrapped.context_tokens == 4096
+
+
+def test_tools_incapable_route_rejected_when_tools_required():
+    catalog = load_model_catalog(CATALOG)
+    chat_only = coding_task_profile(
+        privacy_class=PrivacyClass.EXTERNAL_ALLOWED,
+        cost_policy_tier=CostPolicyTier.PREPAID_CREDITS_ALLOWED,
+        route_id_override="meta/muse-spark-1.3",
+    )
+    assert recommend_model(chat_only, catalog).selected.backend.route_id == "meta/muse-spark-1.3"
+
+    with_tools = replace(
+        chat_only,
+        required_capabilities=frozenset({TaskCapability.CHAT, TaskCapability.TOOLS}),
+    )
+    with pytest.raises(ValueError, match="No model candidate satisfied"):
+        recommend_model(with_tools, catalog)

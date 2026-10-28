@@ -1,5 +1,182 @@
 # CLI Development Foundation Roadmap
 
+## October 27 Meta Model API provider route
+
+The owner chose a dedicated Meta adapter over a generic base-URL override, because
+the route must stay usable after the hackathon on the owner's own Meta account and
+because Meta content-training consent should be an explicit admission rule rather
+than a catalogue note. `ProviderKind.META` resolves `META_API_KEY`; new
+`MetaResponsesChatClient` inherits `OpenAIResponsesChatClient`, defaults to
+`https://api.meta.ai/v1`, forces `store: false`, refuses non-`muse-` ids on both the
+configured and per-request model, and refuses Contributor variants because Meta
+trains on their request content. `BillingSource.META_API_BILLING` plus the
+`meta/muse-spark-1.3` route at `prepaid_credits_allowed` make the cost boundary
+explicit; the route's estimate uses the published Standard prices
+(USD1.25/4.25 per million input/output tokens, checked 2026-10-27). Ten tests
+(nine mocked transport/admission cases plus one environment-key case) cover factory
+routing, wrong-provider and wrong-model refusal, refusal of a per-request
+Contributor override, endpoint override, the `store: false` payload, streaming
+deltas and local-only privacy refusal. Validation: root **2968 passed / 9 skipped**,
+Ruff/format clean (336 files), Pyright 0 errors, and a plan-mode CLI run selects
+`meta/muse-spark-1.3` without inference. No live call, account probe or quality
+acceptance was performed.
+
+## October 27 Meta live connectivity smoke
+
+Four synthetic probes (no repository content, under USD0.01 total) confirmed
+authentication, `system`-role input, `store: false` and provider-reported usage on
+`muse-spark-1.3`. They also produced one operational fact: at a 64-token output cap
+the answer was empty with `finish_reason: length`, while the same prompt at 512
+tokens returned `link ok` after 467 output tokens, 456 of them reasoning. Muse Spark
+therefore spends roughly 95% of its output budget on reasoning, so tightly capped
+requests silently return nothing and budgets must be sized for reasoning plus answer.
+Recorded in `packages/ai_provider/docs/source-state.md` and `model-catalog.md`. This is
+connectivity and accounting evidence only, not quality acceptance.
+
+## October 27 in-turn slash-command handling
+
+Idle coding-chat input refuses an unrecognized slash command instead of treating it as
+a request, but the in-flight reader queued it: typing `/model ...` during a running
+turn silently became the next coding request, and the model received a command string
+as owner text. In-flight input now refuses unknown slash commands with the same
+guidance and offers `/steer` for a literal request that begins with `/`. One focused
+regression covers refusal and the `/steer` escape. No approval, queue-ordering or
+steering semantics changed; idle commands, approvals and bare `yes`/`no` handling are
+untouched.
+
+## October 27 C6 trial fixture prepared offline
+
+The process/session-continuity question now has a fresh sealed fixture at
+`artifacts/cli-c6-continuity-20261027ae-preparation-v1/` (private). It is built from
+the public archive of commit `10695c2`, adds a synthetic `plan_jobs` task with 15
+protected cases, and adds a protected bounded long job. Verified offline only: the
+seed fails all 15 protected cases (non-vacuity), a host reference implementation plus
+companion passes 16/16, and the long job runs 6.09s producing 11 lines ending in
+`complete`, so a second-turn poll can distinguish partial progress from completion.
+The launch harness, route switch and process-handle continuity are **not** built and
+no paid trial was prepared or launched. Two harness constraints are now recorded:
+the existing z harness runs each phase in a fresh child process, so it cannot carry a
+shared host process handle, and C6 needs one persistent foreground CLI process driving
+two scripted turns plus an offline route switch, verified offline before any paid run.
+
+## October 27 search evidence fidelity correction
+
+Review of the previous search slice found two host-only defects. `grep_search`
+numbered lines with `str.splitlines`, which also breaks on form feeds, vertical tabs
+and Unicode separators, so a match after a page break was reported on a line an editor
+does not show. Lines now break only on `\n` (a trailing `\r` is removed), so reported
+locations match an editor or `grep`. Both search tools also checked their result bound
+only after appending the first match, so `max_results`/`max_matches` of zero or less
+returned one result; they now return none, consistent with `list_dir`'s
+`max_depth <= 0` handling. Two regressions cover separator numbering and non-positive
+limits. Full registered validation passes (root2,957passed/9skipped, Council38,
+job-search84; Ruff/format and Pyright clean). No inference, provider, permission,
+evidence-schema or scope change; live C6 continuity and scrutiny-fed repair remain
+open.
+
+## October 26 attended evidence/search corrections
+
+Native repair receives bounded prior observations and preserves chronological
+initial/repair receipts for re-review; invocation reset prevents cross-task carryover.
+Process receipts reach scrutiny. Search excludes NUL-bearing/invalid UTF-8 content
+and supports base-relative recursive globs. Final registered3,077passed/3skipped,
+Ruff/format/Pyright pass. These host fixes are not live C6 or scrutiny-fed repair
+acceptance. Required fresh frozen review and broader baseline work remain open.
+Owner ended unattended mode at20:23local; no new paid trial or sleep was started.
+
+## October 26 C5 effects observed; complete delivery remains open
+
+Fresh ad performed correct two-file Jedi navigation/preview/apply and eight model
+tests, independently checked by the host. The original initial tool allowance ended
+before a final report, required scrutiny or frozen review. It remains consumed
+incomplete despite correct effects; protections/history/index/owned cleanup pass.
+See baseline-gap.md and `artifacts/cli-semantic-postflight-20261026ad/final-assessment.md`.
+
+## October 26 semantic evidence preparation
+
+Scrutiny now receives Python navigation and semantic rename preview/apply receipts,
+including bounded applied path/hash metadata and explicit omissions. Actual Jedi
+preview/apply/reuse-refusal and partial-metadata regressions pass; full3,073passed/
+3skipped,Ruff/format/Pyright pass. Permissions and ephemeral plan semantics are
+unchanged. Selected live C5 evidence remains prospective; see baseline-gap.md.
+
+## October 26 frozen review/provenance stop
+
+Fresh ac observed public fetch provenance and zero-connection private refusal,
+then its declared frozen-review guard rejected a command proposal before execution.
+No accepted report or required scrutiny followed; ac remains consumed incomplete.
+Independent input/history/index/cleanup checks and four host regressions pass.
+Command intent is unknown. Source981072b's live frozen review remains unestablished;
+the next independent capability slice is C5 semantic navigation/rename. See
+baseline-gap.md and `artifacts/cli-public-postflight-20261026ac/final-assessment.md`.
+
+## October 26 runtime/fetch scrutiny evidence
+
+Consumed ab correctly executed the C3 diagnostics but did not complete required
+report repair. Its failure exposed missing runtime receipts and host-status/candidate
+mixing in scrutiny input. The host now retains bounded recent runtime/fetch provenance
+(including a successful fetch followed by refusal) and separates host evidence from
+candidate text. Four new regressions and the full3,071passed/3skipped gate pass with
+Ruff/format/Pyright. Frozen review/live acceptance remains prospective; no old trial
+is repaired or regraded. See baseline-gap.md and the ab stopped assessment.
+
+## October 26 selected native-Go C2 evidence
+
+Fresh aa invokes the canonical portable review skill through the single-shot native
+Go CLI with checked prerequisites, complete root/nested instructions, six inspection
+tools and read_only policy. Both Git snapshots are reviewed, no model tests/writes
+are claimed, required scrutiny and independent effects/host validation/cleanup pass.
+Reviewer precision remains qualified by a disclosed overbroad discount trigger; the
+host's correction is not automatic CLI repair. This covers selected native C2 delivery
+and authority, not all C1-C6/M2/M5 or installed-client parity. See baseline-gap.md.
+
+## October 26 coding/current-report/cold-review acceptance
+
+Fresh z completes the small synthetic status-counting coding question and a cold
+read-only review in the same saved conversation. Both model-authored reports are
+supported; 16 selected cases and required scrutiny pass in each phase. Independent
+host reruns/oracles, all 508 protected inputs/16,811 historical files, frozen bytes,
+continuity/raw retention and owned cleanup pass. Sixteen Go/four local calls and
+24 proposals consumed 520.94 seconds within original bounds. No live repair or host
+source recovery was needed; source remains in the evidence fixture. This closes
+that narrow completion/report-fidelity question, not general M4/capability/fallback
+parity or successful live scrutiny-fed repair. See baseline-gap.md and the z postflight.
+
+## October 26 artifact-link preview correction
+
+Reference-style links now receive the same conservative pointer when overlong,
+with six host regressions. This is host recovery from consumed incomplete w,
+not an accepted Go coding result or a claim that v reviewed the new behavior.
+w stopped at its declared initial coding cap before revalidation/report/review;
+its fixture configured 17 production rounds despite that ten-reply cap. Align
+future preparation; fresh x did align the caps but exhausted ten inspection rounds
+without implementation/report. Both trials remain incomplete. The host now exposes
+the actual native reply ceiling in the system prompt, preserving enforcement and
+history. Fresh y completes frozen review of both current host corrections: 182 selected
+cases and required scrutiny pass; all 509 frozen inputs/15,231 historical files and
+owned cleanup verified. Full registered validation passes 3,067 tests/3 skips, with
+Ruff/format/Pyright pass. No consumed allowance may resume. This is a completed
+bounded review, not accepted Go coding/cold-restart or general baseline parity.
+
+Host-written a2bb69c prevents truncation from splitting long inline-link/image
+destinations, leaving complete links in the agent report. Fresh v passed its 39-case
+frozen review with required scrutiny, independent effects/report checks and cleanup;
+full registered validation passed 3,058 tests with three skips. The earlier coding/cold-restart
+trial u remains incomplete after a too-narrow host fixture guard rejected private
+helpers. This does not establish M4 or broader capability parity. See baseline-gap.md
+for exact provenance, evidence, minor report-count qualifications and remaining gates.
+
+## October 25 reporting contract
+
+ADR-070 implements the owner-approved separation of host adapter/validation facts
+from raw agent narration scoped to repository/tool actions, including prospective
+conversation metadata. Unknown effects remain unknown and required scrutiny remains
+binding. October 26 fresh t completed a frozen four-case envelope review with required
+scrutiny, independent effect/report checks and cleanup. Review-format limitations
+were disclosed under ADR-066. This closes that narrow reporting question; broader
+continuity/capability parity and live scrutiny-fed repair remain open. Consumed
+earlier trials are unchanged; see the current baseline assessment for r/s/t evidence.
+
 ## Planned: reliable model availability across sources
 
 Owner direction, 2026-10-21: plan a reliable way to check model availability for
@@ -21,12 +198,60 @@ validation and review, and share the existing repair-cycle cap. Unreadable
 re-review stops repair rather than reusing stale findings. A pass with non-empty
 `format_issues` shows the review limitation in closeout.
 
-Focused offline regressions cover these behaviors. Live model-quality and
-integrated report-fidelity acceptance remain incomplete. The minimal loop is
+Focused offline regressions cover these behaviors. The scoped live completion/
+report-fidelity result is recorded below; general model quality and successful
+live scrutiny-fed repair remain unestablished. The minimal loop is
 the owner-approved design; the full research refinement guard set is deferred.
 Research and pending matcher choices are preserved in the dated artifact briefs.
 
-## Current paid-route baseline: 2026-10-24
+## Historical paid-route checkpoint: 2026-10-25, before ADR-070 approval
+
+Later o/p/q evidence leaves report-contract interpretation pending with the owner.
+Question q used the normal public repository layout, passed nine tests and required
+scrutiny, preserved 505 inputs and supported its technical/test-identity findings,
+but still used unqualified no-network wording. No source/permission/provider change
+or retrospective grade change resolves that wording automatically. Host-fact and
+actor-scope delivery examples are prepared for a prospective owner decision; further
+paid repetition was paused at that boundary. The subsequent owner approval and
+fresh t result are recorded at the top of this roadmap and in the current baseline
+assessment; consumed q retains its original outcome.
+
+Frozen host-patch review n passed its mechanical and required-scrutiny gates, with
+supported technical findings, three tests and no model writes. Its unqualified
+no-network-calls claim still prevents an unqualified report-fidelity pass. Primary
+and review instructions now distinguish tool actions from inference/host effects;
+this prospective correction does not regrade n or establish general semantic safety.
+
+Fresh M4 trial m completed correct coding and a read-only frozen inspection across
+three cold processes, but required final scrutiny misattributed prior coding edits
+to the review phase. Its draft also made an unsupported bookkeeping-state claim.
+It remains incomplete despite passing independent effects/tests/oracle checks.
+Production scrutiny evidence now labels invocation scope and runtime exclusions;
+this prospective framing correction does not establish live reviewer reliability.
+
+Subsequent saved-session cleanup trials j/k are incomplete: both stopped at
+private fixture guards before final coding reports and frozen review. Retain their
+original results. The concrete production teardown defect was fixed separately
+by the host, with real-session/owned-child regressions; this is implementation
+progress toward M4, not model-authored acceptance or a completed M4 milestone.
+See [the follow-up assessment](baseline-gap.md) for provenance and evidence.
+
+The fresh bounded Go trial i completed production orchestrated coding and frozen
+review with two independently supported reports, five unchanged originals, three
+new companion tests, eight passing tests per phase, 3,616 oracle cases and verified
+owned cleanup. It used nine Go and four local support calls, 19 tool proposals and
+630.83 seconds inside its original 32-call/40-tool/7,200-second bounds. The local
+review auxiliary's tool proposal was rejected without execution; the CLI retained
+its auxiliary-error status while required validation and final scrutiny passed.
+
+The small-workflow completion/report-fidelity gate is now complete; existing live
+fallback evidence is separate. The broader foundation roadmap remains incomplete:
+this small task does not establish representative daily conversation, all selected
+route/client capability checks, IDE-host independence, general parity or successful
+live scrutiny-fed repair. Preserve the original h failure and all consumed trials.
+See [the current assessment](baseline-gap.md) for the exact evidence and limits.
+
+## Historical paid-route checkpoint: 2026-10-24
 
 The shell/PID ownership repairs, MCP warning policy and advisory scrutiny repair
 are integrated. Offline acceptance-controller and Go two-turn harness checks do

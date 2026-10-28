@@ -1,3 +1,44 @@
+## ADR-072 - Modal runtime provider route
+
+**Status:** Accepted
+**Date:** 2026-10-28
+
+Add `AccessMethod.MODAL_RUNTIME`, `ProviderKind.MODAL`, and two
+Modal billing sources (`MODAL_TOKEN_BILLING` for per-token Shared Endpoints /
+Model API, `MODAL_RUNTIME_BILLING` for per-second serverless GPU/CPU) so
+Modal-hosted OpenAI-compatible inference endpoints can be selected by the
+orchestrator.
+The first catalog route is `modal/qwen/qwen2.5-coder-7b-instruct` using
+`Qwen/Qwen2.5-Coder-7B-Instruct`. Modal's per-second GPU billing is tracked as
+a runtime source; hackathon vs monthly credit tags stay outside the app.
+
+Detailed ADR: `docs/decisions/ADR-072-modal-runtime-provider-route.md`
+
+## ADR-071 - Dedicated Meta Model API provider route
+
+**Status:** Accepted
+**Date:** 2026-10-27
+
+Add `ProviderKind.META` and a dedicated `MetaResponsesChatClient` that inherits
+the generic Responses adapter, defaults to `https://api.meta.ai/v1`, refuses
+Contributor variants and non-`muse-` models, and forces `store: false`. The
+catalog route `meta/muse-spark-1.3` is `prepaid_credits_allowed` while prepaid
+credit remains; the owner's own Meta account keeps the route available after the
+event.
+
+Detailed ADR: `docs/decisions/ADR-071-meta-model-api-provider-route.md`
+
+## ADR-070 - Host observations and scoped agent reports
+
+**Status:** Accepted
+**Date:** 2026-10-25
+
+The owner approved explicit host adapter/validation observations alongside raw agent
+reports scoped to repository/tool actions, preserved prospectively in conversation
+history. Unknown effects remain unknown; consumed trials are unchanged.
+
+Detailed ADR: `docs/decisions/ADR-070-host-observations-and-scoped-agent-reports.md`
+
 **Date:** 2026-09-19
 
 Use `pdoc` as the initial generated Python API documentation tool and add

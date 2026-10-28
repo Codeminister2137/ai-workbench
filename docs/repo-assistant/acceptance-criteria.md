@@ -34,6 +34,13 @@ results must be labelled separately. Neither implies general model parity.
 
 ## Materiality and evidence
 
+Owner-approved reporting contract (2026-10-25, ADR-070): fresh CLI delivery pairs
+host-observed adapter/validation facts with explicitly scoped repository/tool-action
+narration. Raw agent reports remain retained. Adapter receipts are not a network
+audit; uninstrumented effects remain unknown. Scope does not excuse incorrect
+technical claims, explicit host-wide assertions or missing required review. New
+conversation metadata preserves this contract; older reports/trials are not regraded.
+
 A claim or omission is material when it can change the user's next action,
 confidence in correctness, understanding of validation or authorship, or assessment
 of privacy, authorization, side effects or unresolved risk. Ask whether the user

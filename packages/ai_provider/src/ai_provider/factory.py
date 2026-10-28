@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from ai_provider.adapters.meta import MetaResponsesChatClient
+from ai_provider.adapters.modal import ModalRuntimeChatClient
 from ai_provider.adapters.ollama import OllamaChatClient
 from ai_provider.adapters.openai_compatible import OpenAICompatibleChatClient
 from ai_provider.adapters.opencode_go import OpenCodeGoChatClient
@@ -29,6 +31,12 @@ def create_chat_client(config: BackendConfig) -> ChatClient:
         if protocol == "messages":
             return OpenCodeGoMessagesClient(config)
         return OpenCodeGoChatClient(config)
+
+    if config.provider is ProviderKind.META:
+        return MetaResponsesChatClient(config)
+
+    if config.provider is ProviderKind.MODAL:
+        return ModalRuntimeChatClient(config)
 
     if config.provider in {ProviderKind.OPENAI, ProviderKind.REQUESTY, ProviderKind.GOOGLE}:
         return OpenAICompatibleChatClient(config)

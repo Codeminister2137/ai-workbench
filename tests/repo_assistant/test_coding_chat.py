@@ -31,6 +31,36 @@ def controller(tmp_path: Path, budget: int = 64_000) -> CodingChatController:
     )
 
 
+def test_scoped_report_keeps_raw_text_host_counts_and_old_reports_unmarked(tmp_path):
+    from ai_provider.closeout import REPORT_SCOPE
+
+    chat = controller(tmp_path)
+    chat.turn("Earlier task", lambda _: CodingTurnResult(0, "Earlier report", "completed"))
+    raw = "No network calls were performed."
+    chat.turn(
+        "Review",
+        lambda _: CodingTurnResult(
+            0,
+            raw,
+            "completed",
+            report_scope=REPORT_SCOPE,
+            inference_observation={"adapter_attempts": 8, "completed_responses": 6},
+        ),
+    )
+    reports = [m for m in chat.store.list_messages("conversation") if m.role == "assistant"]
+    assert reports[1].content == raw
+    assert "report_scope" not in (reports[0].metadata or {})
+    assert (reports[1].metadata or {}).get("inference_observation") == {
+        "adapter_attempts": 8,
+        "completed_responses": 6,
+    }
+    history = chat.history()
+    assert REPORT_SCOPE in history
+    assert raw in history
+    assert "Unmarked earlier reports retain their original scope" in history
+    assert '"completed_responses": 6' in history
+
+
 def test_followup_preserves_owner_decisions_and_failed_validation(tmp_path: Path) -> None:
     chat = controller(tmp_path)
     requests: list[CodingTurnRequest] = []
@@ -104,6 +134,23 @@ def test_queued_input_is_scoped_to_its_conversation(tmp_path: Path):
     second = controller(other)
     with pytest.raises(CodingChatInputError, match="different conversation"):
         second.turn(queued, lambda request: pytest.fail("must not execute"))
+
+
+def test_inflight_unknown_slash_command_is_refused_not_queued_as_a_request():
+    from ai_agent.coding_chat_input import CodingChatInput
+
+    written = []
+    terminal = CodingChatInput(written.append)
+
+    terminal.feed("/model gpt-oss:20b")
+    assert not terminal.pending
+    assert any("unknown command during a turn" in text for text in written)
+
+    # A literal request that begins with '/' stays reachable through /steer.
+    terminal.feed("/steer /model gpt-oss:20b")
+    assert list(terminal.pending) == ["/model gpt-oss:20b"]
+    original = next(text for text in written if "unknown command" in text)
+    assert "/steer" in original
 
 
 def test_multiple_inflight_corrections_use_latest_request_with_all_owner_context(tmp_path):

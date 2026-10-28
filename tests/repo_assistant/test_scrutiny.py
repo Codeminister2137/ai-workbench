@@ -582,6 +582,324 @@ def test_long_tool_output_retains_terminal_result_with_explicit_middle_omission(
     assert "middle omitted" in evidence and len(evidence) <= 12_000
 
 
+def test_semantic_receipt_metadata_is_bounded_and_excludes_unrelated_fields():
+    from argparse import Namespace
+
+    from ai_agent.contracts import ToolResult
+    from ai_agent.scrutiny_workflow import _observed_tool_evidence
+
+    files = [f"changed_{index}.py" for index in range(32)]
+    evidence = _observed_tool_evidence(
+        Namespace(
+            _scrutiny_tool_results=(
+                ToolResult(
+                    "rename_preview",
+                    "Preview only",
+                    metadata={
+                        "files": files,
+                        "applied": False,
+                    },
+                ),
+                ToolResult(
+                    "rename_apply",
+                    "Partially applied; reconcile remaining files",
+                    is_error=True,
+                    metadata={
+                        "applied": [
+                            {"path": name, "sha256": str(index) * 64, "unrelated": "EXCLUDED_VALUE"}
+                            for index, name in enumerate(files)
+                        ]
+                    },
+                ),
+            )
+        )
+    )
+    assert '"applied": false' in evidence
+    assert '"files_omitted": 24' in evidence
+    assert '"applied_files_omitted": 24' in evidence
+    assert "changed_0.py" in evidence and "changed_31.py" not in evidence
+    assert "EXCLUDED_VALUE" not in evidence
+    assert "is_error=True" in evidence and "Partially applied" in evidence
+    assert len(evidence) <= 12_000
+
+
+def test_scrutiny_retains_owned_process_start_status_stop_and_unknown_handle(tmp_path):
+    import sys
+    import time
+    from argparse import Namespace
+
+    from ai_agent.contracts import ToolCall
+    from ai_agent.processes import ProcessSupervisor, ProcessTool
+    from ai_agent.scrutiny_workflow import _observed_tool_evidence
+    from ai_agent.tools.base import ToolContext
+
+    supervisor = ProcessSupervisor(tmp_path)
+    context = ToolContext(tmp_path)
+    try:
+        started = ProcessTool(supervisor, "start").run(
+            ToolCall(
+                "process_start",
+                {
+                    "argv": [
+                        sys.executable,
+                        "-u",
+                        "-c",
+                        "import time; print('OWNED_CHILD_READY', flush=True); time.sleep(30)",
+                    ]
+                },
+            ),
+            context,
+        )
+        assert not started.is_error
+        handle = started.metadata["process_handle"]
+        end = time.monotonic() + 5
+        while True:
+            observed = ProcessTool(supervisor, "status").run(
+                ToolCall("process_status", {"process_handle": handle}), context
+            )
+            if "OWNED_CHILD_READY" in observed.output:
+                break
+            assert time.monotonic() < end
+            time.sleep(0.01)
+        stopped = ProcessTool(supervisor, "stop").run(
+            ToolCall("process_stop", {"process_handle": handle}), context
+        )
+        refused = ProcessTool(supervisor, "status").run(
+            ToolCall("process_status", {"process_handle": "not-owned"}), context
+        )
+        assert not stopped.is_error and stopped.metadata["returncode"] is not None
+        assert refused.is_error
+        evidence = _observed_tool_evidence(
+            Namespace(_scrutiny_tool_results=(started, observed, stopped, refused))
+        )
+        for name in ("process_start", "process_status", "process_stop"):
+            assert f"Tool: {name}" in evidence
+        assert handle in evidence and "OWNED_CHILD_READY" in evidence
+        assert "Unknown process handle" in evidence and "is_error=True" in evidence
+        assert evidence.index("Tool: process_start") < evidence.index("Tool: process_stop")
+        assert len(evidence) <= 12_000
+    finally:
+        supervisor.close()
+    assert all(owned.process.poll() is not None for owned in supervisor.processes.values())
+
+
+def test_runtime_receipt_survives_later_large_reads_with_recent_validation(tmp_path):
+    import sys
+    from argparse import Namespace
+
+    from ai_agent.contracts import ToolCall, ToolResult
+    from ai_agent.scrutiny_workflow import _observed_tool_evidence
+    from ai_agent.tools.base import ToolContext
+    from ai_agent.tools.python_runtime import PythonRuntimeTool
+
+    runtime = PythonRuntimeTool().run(ToolCall("python_runtime", {}), ToolContext(tmp_path))
+    evidence = _observed_tool_evidence(
+        Namespace(
+            _scrutiny_tool_results=(
+                runtime,
+                *(ToolResult("read_file", f"later-read-{i}\n" + "x" * 4000) for i in range(20)),
+                ToolResult("run_command", "LATEST: 1 passed", metadata={"exit_code": 0}),
+            )
+        )
+    )
+    assert "Tool: python_runtime" in evidence
+    assert sys.version.split()[0] in evidence
+    assert "workspace_venv_active" in evidence
+    assert "LATEST: 1 passed" in evidence
+    assert evidence.index("Tool: python_runtime") < evidence.index("LATEST: 1 passed")
+    assert len(evidence) <= 12_000
+
+
+def test_public_fetch_and_runtime_provenance_survive_later_read_volume(tmp_path):
+    import hashlib
+    from argparse import Namespace
+
+    from ai_agent.contracts import ToolCall, ToolResult
+    from ai_agent.scrutiny_workflow import _observed_tool_evidence
+    from ai_agent.tools.base import ToolContext
+    from ai_agent.tools.python_runtime import PythonRuntimeTool
+    from ai_agent.tools.research import FetchURLTool
+    from ai_agent.tools.research_http import FetchedSource
+
+    body = b"Public documentation example."
+    url = "https://docs.python.org/3.14/library/json.html"
+    receipt = {
+        "requested_url": url,
+        "final_url": url,
+        "http_status": 200,
+        "sha256": hashlib.sha256(body).hexdigest(),
+        "bytes_retained": len(body),
+        "truncated": False,
+    }
+    context = ToolContext(tmp_path)
+    runtime = PythonRuntimeTool().run(ToolCall("python_runtime", {}), context)
+    fetched = FetchURLTool(
+        lambda *args: None,
+        fetcher=lambda _: FetchedSource(body, "text/plain", "utf-8", receipt),
+    ).run(ToolCall("fetch_url", {"url": url}), context)
+    assert not fetched.is_error
+    evidence = _observed_tool_evidence(
+        Namespace(
+            _scrutiny_tool_results=(
+                runtime,
+                fetched,
+                ToolResult("fetch_url", "PRIVATE GUARD REFUSAL", is_error=True),
+                *(ToolResult("read_file", "later data " + "x" * 4000) for _ in range(20)),
+                ToolResult("run_command", "LATEST VALIDATION"),
+            )
+        )
+    )
+    assert "Tool: python_runtime" in evidence and "Tool: fetch_url" in evidence
+    assert url in evidence and receipt["sha256"] in evidence
+    assert "PRIVATE GUARD REFUSAL" in evidence
+    assert '"http_status": 200' in evidence and '"truncated": false' in evidence
+    assert evidence.index("Tool: python_runtime") < evidence.index("Tool: fetch_url")
+    assert evidence.index("Tool: fetch_url") < evidence.index("LATEST VALIDATION")
+    assert len(evidence) <= 12_000
+
+
+@pytest.mark.parametrize(
+    "candidate", ["Observed the interpreter.", "Execution status: my own claim."]
+)
+def test_scrutiny_separates_candidate_from_host_status_and_retains_runtime(tmp_path, candidate):
+    import sys
+    import time
+    from argparse import Namespace
+    from unittest.mock import Mock
+
+    from ai_agent.contracts import ToolCall
+    from ai_agent.scrutiny_workflow import run_orchestrated_scrutiny
+    from ai_agent.tools.base import ToolContext
+    from ai_agent.tools.python_runtime import PythonRuntimeTool
+    from ai_provider.repair_state import workspace_fingerprints
+
+    from .support import _implementation_scrutiny_result
+
+    runtime = PythonRuntimeTool().run(ToolCall("python_runtime", {}), ToolContext(tmp_path))
+    args = Namespace(
+        prompt="Report runtime and expected negative diagnostics.",
+        timeout_seconds=5,
+        start_ollama=False,
+        ollama_command="ollama",
+        ollama_startup_timeout_seconds=5,
+        ollama_log_file=None,
+        ollama_profile=None,
+        _scrutiny_tool_results=(runtime,),
+    )
+    tracker = Mock(
+        initial_workspace=workspace_fingerprints(tmp_path), deadline=time.perf_counter() + 30
+    )
+    requests = []
+
+    def review(prompt, *a, **kwargs):
+        requests.append((prompt, kwargs["system_prompt"]))
+        return _implementation_scrutiny_result()
+
+    run_orchestrated_scrutiny(
+        args=args,
+        tracker=tracker,
+        repo_root=tmp_path,
+        profile=_EXAMPLE.coding_task_profile(model_override="qwen2.5-coder:14b"),
+        catalog=(),
+        validation_stage=None,
+        assistant_response_text=candidate,
+        execution_status="completed_with_tool_errors",
+        deadline=None,
+        coding_runner=Mock(side_effect=review),
+    )
+    prompt, system = requests[0]
+    response = prompt.split("Candidate assistant response:\n", 1)[1]
+    assistant = response.split(
+        "\n\nScrutinize the candidate response using the required report format.", 1
+    )[0]
+    host = response.split("# Host-observed execution evidence", 1)[1]
+    assert assistant.strip() == candidate
+    assert "Execution status: completed_with_tool_errors" in host
+    assert "Tool: python_runtime" in host and sys.version.split()[0] in host
+    assert "not authored by the assistant" in host
+    assert "nonzero tool receipt" in system
+
+
+@pytest.mark.parametrize("baseline", ["unchanged", "changed", "unavailable"])
+def test_scrutiny_distinguishes_existing_git_diff_from_current_invocation_changes(
+    tmp_path, baseline
+):
+    import time
+    from argparse import Namespace
+    from unittest.mock import Mock
+
+    from ai_agent.contracts import ToolResult
+    from ai_agent.scrutiny_workflow import run_orchestrated_scrutiny
+    from ai_provider.repair_state import workspace_fingerprints
+
+    from .support import _implementation_scrutiny_result
+
+    source = tmp_path / "already_edited.py"
+    source.write_text("earlier coding result\n")
+    initial = None if baseline == "unavailable" else workspace_fingerprints(tmp_path)
+    if baseline == "changed":
+        source.write_text("new edit during this invocation\n")
+    args = Namespace(
+        prompt="Review the existing uncommitted change read-only.",
+        timeout_seconds=5,
+        start_ollama=False,
+        ollama_command="ollama",
+        ollama_startup_timeout_seconds=5,
+        ollama_log_file=None,
+        ollama_profile=None,
+        _scrutiny_tool_results=(
+            ToolResult("git_diff", "Existing Git diff: earlier coding result"),
+            ToolResult("run_command", "11 passed", metadata={"exit_code": 0}),
+        ),
+    )
+    tracker = Mock(
+        initial_workspace=initial,
+        deadline=time.perf_counter() + 30,
+        start_stage=lambda *a, **kw: None,
+        complete_stage=lambda *a, **kw: None,
+    )
+    requests = []
+
+    def review(prompt, *a, **kwargs):
+        requests.append((prompt, kwargs["system_prompt"]))
+        return _implementation_scrutiny_result()
+
+    run_orchestrated_scrutiny(
+        args=args,
+        tracker=tracker,
+        repo_root=tmp_path,
+        profile=_EXAMPLE.coding_task_profile(model_override="qwen2.5-coder:14b"),
+        catalog=(),
+        validation_stage=None,
+        assistant_response_text="Inspected the existing change; no write tools used.",
+        execution_status="completed",
+        deadline=None,
+        coding_runner=Mock(side_effect=review),
+    )
+    prompt, system = requests[0]
+    assert "relative to this invocation's start" in prompt
+    assert "Git diff/status do not establish when or by whom a change was made" in prompt
+    assert "do not establish that runtime bookkeeping was untouched" in prompt
+    assert "Existing Git diff: earlier coding result" in prompt and "11 passed" in prompt
+    assert "current invocation, including earlier repair attempts" in prompt
+    assert "read-only request can inspect earlier uncommitted changes" in system
+    assert "No network tools does not mean" in system
+    assert "Delivery contract: Agent narrative describes repository/tool actions" in system
+    assert "None means unknown" in system
+    assert "Scope does not excuse incorrect technical claims" in system
+    assert "Flag unsupported broader claims" in " ".join(system.split())
+    if baseline == "unchanged":
+        assert "No fingerprint differences observed" in prompt
+    elif baseline == "changed":
+        assert "Observed changed/deleted paths:\nalready_edited.py" in prompt
+        assert "No fingerprint differences observed" not in prompt
+    else:
+        assert (
+            "Start snapshot unavailable; current-invocation change attribution is unknown" in prompt
+        )
+        assert "No fingerprint differences observed" not in prompt
+
+
 @pytest.mark.parametrize("verdict", ["pass", "needs_revision"])
 def test_old_review_cannot_certify_changed_input_after_incomplete_repair(verdict):
     from ai_provider.closeout import format_cli_closeout

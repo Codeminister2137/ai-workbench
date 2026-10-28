@@ -215,6 +215,18 @@ are labelled as not applied or independently verified. Review findings are advis
 this does not automatically rewrite the answer or prove every concern is valid.
 Passing-review and no-review output retain the ordinary Agent report presentation.
 
+Orchestrated scrutiny distinguishes workspace fingerprints since this invocation
+started from Git diffs/status, which can include earlier edits. Missing start
+snapshots leave attribution unknown. Fingerprints exclude runtime logs, databases
+and caches; they do not prove those artifacts were untouched. Current-attempt tool
+receipts provide bounded evidence. These labels help reviewers assess temporal
+claims but do not guarantee a correct model verdict.
+
+Primary and review instructions also distinguish observed tool actions from model
+inference and host bookkeeping. Not using a network tool does not establish zero
+provider traffic; not invoking an edit tool does not establish that all runtime
+files were untouched. Broader negative claims require evidence for that scope.
+
 Conversation history retains user requests, final agent reports and the
 host-observed execution outcome, including failed validation or tool errors.
 It does not persist raw tool arguments/output as additional conversation turns.
@@ -231,6 +243,11 @@ requested log path. Interruption closes that file and restores terminal output.
 
 ## Current limits
 
+- Teardown attempts foreground cleanup even if terminal cleanup raises. Incomplete
+  teardown or process observation leaves the saved session `interrupted`, requiring
+  explicit reconciliation before resume. Active caller contexts are restored and
+  cleanup exceptions propagate with Python's normal exception chaining. A failed
+  cleanup attempt does not prove every owned process was stopped.
 - Expiry prevents subsequent requests, tools and approvals and rejects late
   success. Running tools are not forcibly interrupted. Interactive idle input
   expires automatically; blocking noninteractive input is checked when it
@@ -267,3 +284,7 @@ requested log path. Interruption closes that file and restores terminal output.
   conversations resume through `--coding-session`, not `--chat-session`.
 - Full C1-C6 installed-client coverage, long-conversation quality comparisons
   and measured delegation economics remain migration acceptance work.
+- Prompt instructions and a passing model scrutiny verdict do not certify absence
+  of host network or runtime-file effects. Explicit separation of host inference
+  facts from agent tool-action narration is a proposed reporting-contract change,
+  pending the owner's decision; the current format and verdict policy remain intact.

@@ -364,6 +364,20 @@ def build_argument_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--operator-base-url",
+        action=UserDefaultAction,
+        help=(
+            "Remote AI Operator base URL (e.g. http://127.0.0.1:8765). When set, "
+            "interactive approvals are sent to the operator's external-action API "
+            "and the CLI blocks until the owner approves via the phone/web UI."
+        ),
+    )
+    parser.add_argument(
+        "--operator-access-token",
+        action=UserDefaultAction,
+        help="Bearer token for the Remote AI Operator (local owner mode).",
+    )
+    parser.add_argument(
         "--max-latency-seconds", type=_nonnegative_finite_float, help="Hard latency constraint."
     )
     parser.add_argument(

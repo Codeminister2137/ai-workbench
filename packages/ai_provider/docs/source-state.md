@@ -3,7 +3,8 @@
 **Checked:** 2026-10-13; Gemini individual-access retirement verified 2026-10-14.
 Published limits and account observations can expire.
 
-**Latest scoped update:** 2026-10-25, OpenRouter credits/privacy and local CLI
+**Latest scoped update:** 2026-10-25, Go coding-agent requirements/limits rechecked
+and OpenRouter credits/privacy and local CLI
 payload tracing; 2026-10-24, OpenRouter free inventory and the declared
 free route; capacity comparison below; OpenRouter limits/privacy, Codex
 data-policy scope and the OpenRouter request-contract refresh were also checked
@@ -27,6 +28,23 @@ A date alone does not make a fact currently reliable: prices, model availability
 quota and entitlement need fresh admission evidence before execution. Unknown or
 contradictory evidence remains explicit. Account balances, credentials, prompts
 and private transcripts do not belong in this public reference.
+
+### OpenCode Go — rechecked 2026-10-25: bounded coding admission
+
+The [official Go guide](https://opencode.ai/v2/docs/console/go/) still lists
+Kimi K2.7 Code and requires typical coding-agent traffic, the client's own user
+agent and a stable `x-opencode-session` conversation identifier. It lists a $60
+Go monthly allowance for this model, with $0.95 input/$4 output/$0.19 cached-read
+per million tokens; five-hour and weekly windows are 20% and 50% of the monthly
+allowance. These published amounts are not current account headroom or token
+budgets. Default workspace privacy blocks paid endpoints that train on request
+data; actual route eligibility and saved settings still require scoped checks.
+
+Fresh model-list and account-allowance metadata were checked before the bounded
+October 25 coding/review trial and again afterward. Account observations remain
+private runtime evidence. The completed small task supplies scoped workflow
+evidence, not general model quality, independent quota pools or a spending grant.
+No Extra Usage, purchase or billing-source change was enabled by this work.
 
 ### OpenRouter — refreshed 2026-10-25: credits, privacy and CLI payload
 
@@ -778,3 +796,57 @@ existing defaults. Context insufficiency refuses without silently reducing this
 model's default. Deterministic transport/admission tests cover normal/streaming,
 explicit overrides, scope isolation and unknown/small capacities. This does not
 change account settings or establish live acceptance.
+
+### Meta Model API - published facts refreshed 2026-10-27
+
+[Official pricing](https://dev.meta.ai/docs/pricing-rate-limits) lists Standard
+Muse Spark1.3/1.2/1.1 at USD1.25 input and USD4.25 output per million tokens,
+USD0.15 cached input. Standard content is not used to train Meta models;
+Contributor variants exchange content-training permission for discounted pricing.
+[Overview](https://dev.meta.ai/docs/overview) lists api.meta.ai/v1 and Responses
+support. These published facts establish neither account access/credit nor an
+enforced spending limit. Route entitlement, billing/retention settings and actual
+usage still require scoped admission. No account observations or secrets recorded.
+Meta billing control correction, checked 2026-10-27: the official
+[spend-limit alert help](https://dev.meta.ai/help/billing/spend-limit-alert)
+explicitly says Model API has no hard usage spending cap. The setting sends an
+email alert; usage above it remains payable. Do not label that alert a hard cap or
+set a provider-cap verification flag from it. Local admission bounds are distinct
+from provider billing guarantees. This corrects any earlier assumption that the
+direct API dashboard can enforce such a cap; no account settings were changed.
+Meta reasoning/output accounting, checked2026-10-27: official
+[reasoning guide](https://dev.meta.ai/docs/reasoning) and
+[Responses guide](https://dev.meta.ai/docs/protocols/responses) state reasoning
+and visible output share max_output_tokens and billed output totals. Numeric
+output_tokens_details.reasoning_tokens and input_tokens_details.cached_tokens
+provide accounting breakdown without private reasoning text. An unset effort is
+provider default; do not assume a fixed level. Incomplete/max_output_tokens means
+the requested output limit was reached, not that all consumed tokens were reasoning.
+
+Meta Responses protocol details, checked 2026-10-27 from the official
+[Responses guide](https://dev.meta.ai/docs/protocols/responses): `input` accepts
+message roles `developer`, `system`, `user` and `assistant`, multiple system
+messages, and typed content blocks; top-level `instructions` is equivalent to a
+developer message and is not persisted across `previous_response_id`. `store`
+defaults to true, so a non-persistent client must send `store: false`. Reasoning
+continuity needs either `include: ["reasoning.encrypted_content"]` with
+`store: false` or server-managed `previous_response_id`; the two cannot be
+combined (HTTP 400). `max_output_tokens` has a minimum of 16 and shares the
+context window with input (`input_tokens + max_output_tokens` must fit), so the
+full window is never a valid output cap. Non-streaming requests are subject to a
+server-side time limit and can return HTTP 504; streaming is exempt. The API also
+rejects `truncation: "auto"` and `frequency_penalty`/`presence_penalty`, and
+`reasoning.effort: "none"` is unsupported for Muse Spark. Prompt caching is
+available (`prompt_cache_retention` hint), so repeated long instructions may bill
+at the cached input rate.
+
+Measured live on 2026-10-27 with four synthetic probes that contained no repository
+content (`artifacts/meta-smoke-20261027/`): authentication, `system`-role input,
+`store: false` and provider-reported usage all work against `muse-spark-1.3`. One
+operational fact matters for budgeting: at `max_output_tokens: 64` the response
+carried **no visible text** and reported `finish_reason: length`, because all 64
+output tokens were reasoning; the same prompt at `max_output_tokens: 512` returned
+`link ok` after 467 output tokens, **456 of them reasoning**. Muse Spark therefore
+spent roughly 95% of its output budget on reasoning even for a trivial prompt, so a
+small cap silently produces empty answers. The four probes cost under USD0.01 in
+total. This is a small connectivity/accounting observation, not quality acceptance.
