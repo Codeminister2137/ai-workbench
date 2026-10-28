@@ -1,5 +1,27 @@
 # Session History
 
+## 2026-10-28 - synthetic bridge round trip and refreshed Operator packages
+
+A local real HTTP Operator app (private candidate d445286) and the Workbench
+OperatorApprovalBridge completed approve/reject/cancel/timeout cases. The real
+permission callback allowed a synthetic file write only after automated approval;
+all other outcomes left no file. Persisted API state and candidate digest matched.
+The owned server exited. This is synthetic integration evidence, not physical
+phone acceptance, hosted continuity or permission to transmit private arguments.
+Corrected misleading bridge documentation: descriptions include workspace and
+argument values, and truncation does not redact source or commands. The pending
+owner privacy-policy choice remains unresolved; runtime behavior is unchanged.
+Private receipts:artifacts/unattended-20261028-1615/bridge-loopback-effects.json.
+
+Refreshed wheel/sdist for d445286. The independent installed-wheel suite passed
+147tests/8skips/69subtests with source-path injection disabled; installed import
+location verified. Known-credential/private-identifier scan found no matches in
+72tracked files,83reachable blobs and both packages. This is a literal scan,
+not proof that every possible secret is absent. The initial non-isolated build
+lacked setuptools in the selected environment; normal isolated offline build
+succeeded with the declared backend. No dependency or source change was needed.
+Packages remain local; no public push, release, recording or submission occurred.
+
 ## 2026-10-28 - inherited implementation-worker authority
 
 Implemented the owner's October27 requirement on a feature branch: delegated

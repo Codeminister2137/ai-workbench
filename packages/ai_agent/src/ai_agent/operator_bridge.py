@@ -1,9 +1,11 @@
 """Bridge Workbench terminal approvals to the Remote AI Operator task API.
 
-The bridge carries only digests and a human-readable description; actual source,
-diffs and commands stay inside the Workbench. The operator phone/web UI shows the
-description and records the owner's approve/reject/cancel decision, then the
-Workbench applies the already-prepared tool effect only after receiving approval.
+The bridge sends digests plus a description containing the workspace path and
+tool argument values (individual strings truncated to 400 characters). Those
+values can include source, diffs or commands; truncation is not redaction. The
+operator phone/web UI records approve/reject/cancel, and the Workbench applies
+the prepared tool effect only after approval. Use only suitably authorized input
+and destinations; the argument-description privacy policy remains an owner choice.
 """
 
 from __future__ import annotations
@@ -31,8 +33,8 @@ def _sha256(text: str) -> str:
 def _summarize_arguments(arguments: dict, max_length: int = 400) -> str:
     """Return a compact, phone-friendly summary of tool arguments.
 
-    Long string values are truncated so the description stays readable and does
-    not expose large diffs or file contents through the operator.
+    Long string values are truncated for readability. This does not redact source,
+    commands or secrets and does not establish a metadata-only privacy boundary.
     """
 
     summary: dict[str, object] = {}
