@@ -91,6 +91,16 @@ Redeploy later with the same `modal deploy` command above.
 
 ## Tool calling
 
+The Server explicitly sets `target_concurrency=1` to enable demand-based
+autoscaling, alongside `max_containers=1` and the 30-second idle window. A maximum
+container cap alone does not enable autoscaling. A bounded October 28 deployment
+with neither a target nor a warm minimum received requests but started zero
+containers; Server-specific stats located that failure before vLLM startup.
+The fresh deployment with an explicit target also failed to start a container.
+The target is a documented autoscaler prerequisite, not a demonstrated remedy
+for that observed platform behavior. Both bounded apps were stopped; the remaining
+startup cause is unknown. Do not infer a vLLM or model failure from those 503s.
+
 The server passes `--enable-auto-tool-choice --tool-call-parser hermes` to vLLM.
 Qwen2.5's tokenizer template supports this format. Plain chat probes alone do not
 verify the tool-calling path used by the Workbench agent loop.

@@ -1,5 +1,17 @@
 # Distance to established baseline CLI usability
 
+## October 28 — fresh Meta Workbench coding effect
+
+A fresh bounded Workbench AgentLoop using Meta Muse Spark 1.3 authored a real
+standalone Operator digest-contract fix and five companion tests. After exact-byte
+automated Codex assessment, unchanged project tests passed (147 tests, 8 skips,
+69 subtests), plus 16 independent host cases. Seven actual tool effects and eight
+provider calls were recorded; model report counts match the receipts. General
+instructions were retained and the two-path/four-tool pilot restriction was
+declared. No physical owner approval or general CLI parity is claimed. This
+supplies real Meta tool-workflow evidence; live C6 process/fallback acceptance
+remains open. Private evidence: `artifacts/meta-operator-digest-20261028ag`.
+
 ## October 28 — shared Responses tools; C6 complete offline composition
 
 The Meta Workbench route previously lacked tools despite provider support.

@@ -65,6 +65,16 @@ zero-to-one scaling: the first request starts a container and receives HTTP503
 until a replica is ready. Use an explicitly bounded readiness wait before the
 task; this does not justify generic inference retries or a fallback-policy change.
 
+Two fresh October 28 diagnostic deployments timed out before inference, with
+Server-specific stats reporting zero containers started. The effective first
+configuration lacked a concurrency target; the second explicitly set one but
+still did not start a container. Both were stopped with zero tasks. Declare
+`target_concurrency` for demand autoscaling as the Server documentation requires,
+but do not present that setting alone as a proven startup remedy. The observed
+failure is before vLLM and its underlying platform cause remains unknown.
+Function-only current-stats APIs do not support Servers; use the SDK's
+`Server.stats()` / `Server.autoscaler.settings()` for this boundary.
+
 The [Go guide](https://opencode.ai/v2/docs/console/go/) rechecked 2026-10-28
 documents the Responses endpoint under `/inference/go/openai/v1/responses`.
 The Responses subclass now uses that canonical default; caller-supplied endpoint

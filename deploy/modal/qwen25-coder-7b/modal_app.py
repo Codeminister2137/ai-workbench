@@ -64,6 +64,7 @@ app = modal.App("ai-projects-qwen25-coder-7b-instruct")
 @app.server(
     image=vllm_image,
     gpu="L4",
+    target_concurrency=1,
     max_containers=1,
     scaledown_window=30,
     startup_timeout=STARTUP_TIMEOUT_SECONDS,
