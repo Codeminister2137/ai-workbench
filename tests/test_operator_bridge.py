@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, cast
 
+import httpx
 import pytest
 from ai_agent.contracts import ToolCall, ToolCategory
 from ai_agent.operator_bridge import OperatorApprovalBridge, OperatorBridgeError
@@ -134,3 +135,30 @@ def test_bridge_raises_on_http_error(tmp_path: Path) -> None:
 
     with pytest.raises(OperatorBridgeError):
         bridge(_tool_call(), ToolCategory.WRITE)
+
+
+@pytest.mark.parametrize("resolution,approved", [("approved", True), ("rejected", False)])
+def test_bridge_keeps_real_http_client_open_until_resolution(
+    tmp_path: Path, resolution: str, approved: bool
+) -> None:
+    clients: list[httpx.Client] = []
+    methods: list[str] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        assert not clients[0].is_closed
+        methods.append(request.method)
+        if request.method == "POST":
+            return httpx.Response(200, json={"id": "a" * 32, "status": "submitted"})
+        return httpx.Response(200, json={"status": resolution})
+
+    def factory(**kwargs: Any) -> httpx.Client:
+        client = httpx.Client(transport=httpx.MockTransport(handle), **kwargs)
+        clients.append(client)
+        return client
+
+    bridge = OperatorApprovalBridge(
+        "http://operator.local", "token", tmp_path, client_factory=factory
+    )
+    assert bridge(_tool_call(), ToolCategory.WRITE) is approved
+    assert methods == ["POST", "GET"]
+    assert clients[0].is_closed

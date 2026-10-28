@@ -100,10 +100,9 @@ class OperatorApprovalBridge:
                 )
                 response.raise_for_status()
                 action = response.json()
+                return self._wait_for_resolution(client, action["id"])
         except httpx.HTTPError as exc:
             raise OperatorBridgeError(f"Failed to submit external action: {exc}") from exc
-
-        return self._wait_for_resolution(client, action["id"])
 
     def _wait_for_resolution(self, client: Any, action_id: str) -> bool:
         deadline = time.monotonic() + self.timeout

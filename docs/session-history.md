@@ -1,5 +1,20 @@
 # Session History
 
+## 2026-10-28 — second window: Operator bridge client lifetime
+
+The owner authorized a new unattended window until 20:00 Budapest and meaningful
+Meta/Modal development use within existing credits, with no out-of-pocket charges
+and a USD100 daily ceiling. The private plan reserves USD95 for this window to
+leave headroom for earlier use. Publication/recording/submission remain separate.
+
+Integration review found that the approval bridge closed its HTTP client after
+submission, then attempted polling with that closed client. Polling now remains
+inside the client context. Real httpx transport regressions cover approval and
+rejection, and confirm closure after resolution. Validation: six focused tests,
+Ruff/Pyright, and full 3,039 root /24 skips, Council38 and job-search84 pass.
+The separate argument-description privacy choice is queued with the owner;
+no broader transmission policy was silently selected.
+
 ## 2026-10-28 — local Operator release gates and availability review
 
 The owner authorized useful development spending covered by existing approved
