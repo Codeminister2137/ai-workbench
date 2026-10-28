@@ -82,6 +82,8 @@ GROUPS = {
         "tests/test_shell_process_ownership.py",
         "tests/test_pid_publication.py",
         "tests/test_shared*.py",
+        "tests/test_hosted_delegation_acceptance.py",
+        "tests/test_hosted_delegation_controller.py",
         "tests/test_delegation_scope.py",
         "tests/test_semantic_refactor.py",
         "tests/test_coding_sessions.py",

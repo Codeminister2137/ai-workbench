@@ -1,5 +1,45 @@
 # Session History
 
+## 2026-10-29 - bounded metadata diagnosis and fresh nested-delegation preparation
+
+Started clean developc4914f8; created feature/baseten-metadata-c6-preparation-20261029
+before edits. One fixed-origin, no-redirect/retry metadata GET used only the event
+credential against the documented Baseten model-details endpoint. It returned403
+with "Authorization error". The reporting service is api.baseten.co; the exact
+underlying authorization policy remains unknown. Official key documentation
+allows inference-only scopes but does not prove this key's scope or inference
+validity. No alternate key, privilege change or inference probe was attempted.
+Private sanitized evidence:artifacts/baseten-metadata-20261029/observation.json.
+Owner was asked for dashboard/organizer expiry and exhausted-credit terms.
+
+Implemented a new offline-only hosted-delegation acceptance runner using existing
+retained child-process ownership and sanitized worker environment. It invokes
+fresh loopback Meta Responses protocol tests through the actual child executor,
+not copied old harnesses. Scripted parent/child/grandchild calls perform an actual
+scoped edit and protected command validation, with inherited instructions,
+original reply/tool bounds and pinned approved-client reuse. Controls prove
+read-only/protected-path refusal and shared-budget exhaustion while preserving
+earlier effects. A host-started direct child remains running across delegation,
+is observed by the parent and stopped; closed/new-supervisor controls apply.
+The synthetic digest source and every model report are scripted, not model work.
+
+Fresh outer case artifacts/hosted-delegation-20261029d passed four checks, retained
+source-byte snapshots/digests and verified Windows process-job cleanup. Earlier
+offline casesa/b/c remain unchanged; a/b exact source preimages were supplemented
+afterward only after matching their original receipt hashes. The runner has no
+live option, requires fresh artifact paths, and bounds work90s plus cleanup5s.
+Skipped/failed checks, changed declared sources or uncertain cleanup cannot pass
+merely because the child exited0. Completed receipts no longer retain a stale
+process-started stage label.
+
+Validation:agent group440pass/21skip; final controller6checks and suite registry10
+pass; actual outer four-case rehearsal passes; Ruff/format and targeted Pyright
+pass. No full-root rerun for this test/controller slice. Original af manifest
+still matches all7declared source hashes; no old trial launched/regraded or live
+activation seal created. C6 live protocol switching, real hosted parent/child
+quality and the full public Operator HTTP contract remain incomplete. No public
+push/deployment, mail send, inference, new dependency or unattended window.
+
 ## 2026-10-29 - Baseten offline provider integration
 
 Continued from clean develop1548ffb on feature/baseten-chat-contract-20261028.

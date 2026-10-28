@@ -169,6 +169,26 @@ an OS sandbox. See [ADR-074](../decisions/ADR-074-delegation-inherits-supervisor
 Bare shared-tool registries without a configured runner refuse delegation.
 `--delegate-context` remains a separate optional preparatory extraction pass.
 
+Offline integration preparation is available through
+`scripts/hosted-delegation-acceptance.py --output-dir artifacts/<fresh-name>`.
+It uses the actual Meta Responses adapter over an owned loopback HTTP fixture,
+the existing child executor and actual file/command/process tools. Scripted
+parent/child/grandchild replies exercise inherited writes/validation, read-only
+and protected-path refusal, and original reply-budget exhaustion with effects
+retained. A host-started direct child remains owned across the nested calls and
+is then stopped. The reference implementation and all model reports are scripted;
+the task is a synthetic digest exercise, not full Operator HTTP-contract or
+real-model acceptance. Commands are pinned fixture checks, not general CLI limits.
+
+The runner permits no live activation, strips worker credentials, requires a fresh
+artifact directory, archives the declared source bytes/hashes and bounds work to
+90 seconds plus 5 seconds of cleanup. A zero exit cannot pass skipped/failed
+required checks, changed declared sources or unverified cleanup. Windows cleanup
+was exercised through the existing retained process job. The receipts are offline
+preparation evidence, never credit observations or authorization for live trials.
+Live C6 protocol switching, real parent/child quality and hosted deployment still
+need their separately admitted acceptance runs.
+
 An empty or whitespace-only native final report fails the turn, including after
 successful tools. Earlier effects and their receipts remain available for host
 inspection; this failure does not automatically replay tools or retry the model.
