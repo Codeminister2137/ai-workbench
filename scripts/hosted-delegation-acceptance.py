@@ -21,10 +21,24 @@ from ai_provider.acceptance_processes import OwnedChild
 from ai_provider.acceptance_runtime import worker_environment
 
 ROOT = Path(__file__).resolve().parents[1]
-TEST = "tests/test_hosted_delegation_acceptance.py"
+TESTS = (
+    "tests/test_hosted_delegation_acceptance.py",
+    "tests/repo_assistant/test_protocol_continuity.py",
+)
+REQUIRED_CLASSES = {
+    f"test_nested_delegation_over_real_transport[{mode}-{provider}]": (
+        "tests.test_hosted_delegation_acceptance"
+    )
+    for mode in ("complete", "read_only", "outside_scope", "budget_exhausted")
+    for provider in ("meta", "baseten")
+}
+REQUIRED_CLASSES["test_two_turn_chat_preserves_process_and_history_across_protocol_fallback"] = (
+    "tests.repo_assistant.test_protocol_continuity"
+)
+REQUIRED_CASES = frozenset(REQUIRED_CLASSES)
 SOURCES = (
     "scripts/hosted-delegation-acceptance.py",
-    TEST,
+    *TESTS,
     "packages/ai_agent/src/ai_agent/loop.py",
     "packages/ai_agent/src/ai_agent/mcp_server.py",
     "packages/ai_agent/src/ai_agent/delegation_scope.py",
@@ -32,7 +46,16 @@ SOURCES = (
     "packages/ai_agent/src/ai_agent/processes.py",
     "packages/ai_provider/src/ai_provider/adapters/meta.py",
     "packages/ai_provider/src/ai_provider/adapters/openai_responses.py",
+    "packages/ai_provider/src/ai_provider/adapters/baseten.py",
+    "packages/ai_provider/src/ai_provider/adapters/openai_compatible.py",
+    "packages/ai_orchestrator/src/ai_orchestrator/catalog.py",
+    "packages/ai_orchestrator/src/ai_orchestrator/models.py",
     "packages/ai_provider/src/ai_provider/acceptance_processes.py",
+    "packages/ai_agent/src/ai_agent/repo_coding_assistant.py",
+    "packages/ai_agent/src/ai_agent/coding_chat_cli.py",
+    "packages/ai_provider/src/ai_provider/foreground_tools.py",
+    "packages/ai_provider/src/ai_provider/coding_sessions.py",
+    "packages/ai_provider/src/ai_provider/execution_fallback.py",
 )
 
 
@@ -60,7 +83,8 @@ def main(argv: list[str] | None = None) -> int:
         "source_sha256": hashes,
         "work_seconds": 90,
         "cleanup_seconds": 5,
-        "maximum_scripted_http_calls": 36,
+        "maximum_scripted_http_calls": 80,
+        "required_cases": sorted(REQUIRED_CASES),
         "cleanup_verified": False,
         "hosted_model_acceptance": "unestablished",
     }
@@ -79,7 +103,7 @@ def main(argv: list[str] | None = None) -> int:
                 sys.executable,
                 "-m",
                 "pytest",
-                TEST,
+                *TESTS,
                 "-q",
                 "--tb=short",
                 "-p",
@@ -96,8 +120,19 @@ def main(argv: list[str] | None = None) -> int:
         report = ET.parse(output / "junit.xml").getroot()
         cases = report.findall(".//testcase")
         receipt["checks"] = len(cases)
-        receipt["required_checks_passed"] = len(cases) == 4 and not any(
-            case.find(tag) is not None for case in cases for tag in ("failure", "error", "skipped")
+        receipt["observed_cases"] = [case.get("name") for case in cases]
+        receipt["required_checks_passed"] = (
+            len(cases) == len(REQUIRED_CASES)
+            and {case.get("name") for case in cases} == REQUIRED_CASES
+            and all(
+                case.get("classname") == REQUIRED_CLASSES.get(case.get("name", ""))
+                for case in cases
+            )
+            and not any(
+                case.find(tag) is not None
+                for case in cases
+                for tag in ("failure", "error", "skipped")
+            )
         )
         receipt["declared_sources_unchanged"] = all(
             hashlib.sha256((ROOT / name).read_bytes()).hexdigest() == expected

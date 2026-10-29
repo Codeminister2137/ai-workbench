@@ -63,6 +63,12 @@ local, free, included allowances, and prepaid-credit routes, but rejects metered
 billing. The repo assistant can apply a private `allowances_allowed` preference
 through `user-config.toml`; that ceiling also rejects Requesty prepaid routes.
 
+Baseten catalog entries use `baseten_api_billing`. They default to
+`billing_allowed`, including event model aliases: an identifier or configured
+credential does not establish prepaid entitlement. A narrower tier must be
+declared explicitly from verified route/account evidence. This metadata does not
+read credits or authorize inference; no Baseten route is enabled by default.
+
 `fallback_candidates(profile, catalog, initial_target)` in
 `ai_orchestrator.fallback` ranks same-tier replacements after usage exhaustion.
 It releases initial route/model overrides while preserving task requirements,

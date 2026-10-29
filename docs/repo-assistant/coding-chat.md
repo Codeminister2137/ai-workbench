@@ -171,7 +171,8 @@ Bare shared-tool registries without a configured runner refuse delegation.
 
 Offline integration preparation is available through
 `scripts/hosted-delegation-acceptance.py --output-dir artifacts/<fresh-name>`.
-It uses the actual Meta Responses adapter over an owned loopback HTTP fixture,
+It uses the actual Meta Responses and Baseten Chat Completions adapters over
+owned loopback HTTP fixtures (eight nested cases: four scenarios per protocol),
 the existing child executor and actual file/command/process tools. Scripted
 parent/child/grandchild replies exercise inherited writes/validation, read-only
 and protected-path refusal, and original reply-budget exhaustion with effects
@@ -180,10 +181,19 @@ is then stopped. The reference implementation and all model reports are scripted
 the task is a synthetic digest exercise, not full Operator HTTP-contract or
 real-model acceptance. Commands are pinned fixture checks, not general CLI limits.
 
+A ninth case invokes the actual two-turn foreground coding CLI. Scripted Meta
+HTTP429 responses trigger Baseten fallback, preserving original instructions,
+saved owner/report history and the same running process handle/PID. The second
+turn observes and stops that child. This uses fresh deterministic fixtures;
+historical C6 trials are not replayed or regraded. The controller permits at most
+80 scripted HTTP calls across its declared cases and checks their exact names
+and classes, not just a passing test count.
+
 The runner permits no live activation, strips worker credentials, requires a fresh
 artifact directory, archives the declared source bytes/hashes and bounds work to
 90 seconds plus 5 seconds of cleanup. A zero exit cannot pass skipped/failed
-required checks, changed declared sources or unverified cleanup. Windows cleanup
+required checks, duplicate/missing/unexpected case identities, changed declared
+sources or unverified cleanup. Windows cleanup
 was exercised through the existing retained process job. The receipts are offline
 preparation evidence, never credit observations or authorization for live trials.
 Live C6 protocol switching, real parent/child quality and hosted deployment still

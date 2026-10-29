@@ -1,5 +1,28 @@
 # Session History
 
+## 2026-10-29 - Baseten nested delegation and fresh protocol continuity
+
+On feature/baseten-delegation-contract-20261029 from develop276ea26, extended
+scripted loopback nesting to actual Baseten Chat Completions alongside Meta
+Responses. The new fixture exposed missing Baseten orchestrator billing identity;
+added baseten_api_billing with conservative billing_allowed default, not inferred
+prepaid entitlement or automatic routing. Four scenarios per protocol exercise
+inherited tools/paths/commands, protected checks, shared bounds and owned cleanup.
+
+Fresh actual two-turn coding CLI case starts a bounded child on Meta, injects429,
+falls back to Baseten, retains instructions/objective/report history and the same
+running handle/PID, then observes/stops it. Reports and replies are all scripted,
+not model-quality/live-C6 evidence. The outer runner now validates exact names and
+classes for nine cases, rejecting duplicate/missing/wrong checks; it archives20
+declared source files, retains90swork+5scleanup, with at most80scripted HTTPcalls.
+
+Validation:668agent/orchestrator pass21skip;103affected CLI/controller/history/
+fallback/suite checks pass3skip; Ruff/format/Pyright pass. Fresh bounded outerb
+passes9checks with verified cleanup/source equality. Evidence remains private at
+artifacts/hosted-delegation-baseten-20261029b; a preserves its original8case run.
+Original C6af/ah and older hosted-delegation receipts unchanged. No inference,
+authenticated metadata retry, public push/deployment or unattended window.
+
 ## 2026-10-29 - Baseten 403 follow-up and refusal coverage
 
 Started clean develop94c0387 on fix/baseten-403-investigation-20261029. Inspected

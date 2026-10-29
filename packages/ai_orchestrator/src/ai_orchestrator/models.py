@@ -112,6 +112,7 @@ class BillingSource(StrEnum):
     GITHUB_COPILOT_SUBSCRIPTION_ALLOWANCE = "github_copilot_subscription_allowance"
     KIRO_SUBSCRIPTION_ALLOWANCE = "kiro_subscription_allowance"
     META_API_BILLING = "meta_api_billing"
+    BASETEN_API_BILLING = "baseten_api_billing"
     MODAL_TOKEN_BILLING = "modal_token_billing"
     MODAL_RUNTIME_BILLING = "modal_runtime_billing"
 

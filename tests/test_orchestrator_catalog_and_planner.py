@@ -48,6 +48,27 @@ class TestEstimateValidation:
             load_model_catalog(path)
 
 
+def test_baseten_catalog_identity_does_not_assume_prepaid_entitlement(tmp_path: Path) -> None:
+    path = tmp_path / "catalog.toml"
+    path.write_text(
+        '[[models]]\nprovider = "baseten"\n'
+        'model = "meta-models/muse-spark-open-1026"\nlocation = "external"\n',
+        encoding="utf-8",
+    )
+    catalog = load_model_catalog(path)
+    backend = catalog[0].backend
+    assert backend.billing_source is BillingSource.BASETEN_API_BILLING
+    assert backend.cost_policy_tier is CostPolicyTier.BILLING_ALLOWED
+    with pytest.raises(ValueError, match="requires cost policy billing_allowed"):
+        recommend_model(
+            TaskProfile(
+                privacy_class=PrivacyClass.EXTERNAL_ALLOWED,
+                cost_policy_tier=CostPolicyTier.PREPAID_CREDITS_ALLOWED,
+            ),
+            catalog,
+        )
+
+
 def test_load_model_catalog_reads_toml_entries(tmp_path: Path) -> None:
     catalog_path = tmp_path / "models.toml"
     catalog_path.write_text(

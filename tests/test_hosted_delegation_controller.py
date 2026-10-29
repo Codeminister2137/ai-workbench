@@ -34,7 +34,15 @@ def test_consumed_receipt_cannot_be_overwritten(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize(
-    "failure", ["required_test_skipped", "cleanup_unverified", "source_changed"]
+    "failure",
+    [
+        "required_test_skipped",
+        "cleanup_unverified",
+        "source_changed",
+        "duplicate_case",
+        "wrong_class",
+        "missing_case",
+    ],
 )
 def test_zero_exit_cannot_promote_missing_evidence(tmp_path, monkeypatch, failure):
     monkeypatch.setattr(controller, "ROOT", tmp_path)
@@ -48,10 +56,18 @@ def test_zero_exit_cannot_promote_missing_evidence(tmp_path, monkeypatch, failur
         def __init__(self, argv, *, env, **kwargs):
             assert "META_API_KEY" not in env
             assert "BASETEN_HACKATHON_API_KEY" not in env
-            cases = "<testcase/>" * 3 + (
-                "<testcase><skipped/></testcase>"
-                if failure == "required_test_skipped"
-                else "<testcase/>"
+            names = sorted(controller.REQUIRED_CASES)
+            if failure == "duplicate_case":
+                names[-1] = names[0]
+            if failure == "missing_case":
+                names.pop()
+            cases = "".join(
+                f'<testcase name="{name}" classname="'
+                + ("wrong_class" if failure == "wrong_class" else controller.REQUIRED_CLASSES[name])
+                + '">'
+                + ("<skipped/>" if failure == "required_test_skipped" and index == 0 else "")
+                + "</testcase>"
+                for index, name in enumerate(names)
             )
             (target / "junit.xml").write_text("<testsuites>" + cases + "</testsuites>")
 
@@ -71,6 +87,9 @@ def test_zero_exit_cannot_promote_missing_evidence(tmp_path, monkeypatch, failur
     assert receipt["status"] == "failed"
     assert receipt["exit_code"] == 0
     assert receipt["stage"] == "finished"
+    assert receipt["required_checks_passed"] is (
+        failure in {"cleanup_unverified", "source_changed"}
+    )
 
 
 def test_no_live_activation_option(tmp_path, monkeypatch):

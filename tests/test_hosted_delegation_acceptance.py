@@ -20,7 +20,8 @@ from ai_agent.tools.shell import RunCommandTool
 from ai_orchestrator import CostPolicyTier, TaskProfile
 from ai_orchestrator import PrivacyClass as RoutingPrivacy
 from ai_provider import BackendConfig, PrivacyClass, ProviderError, ProviderKind, create_chat_client
-from ai_provider.adapters import openai_responses
+from ai_provider.adapters import openai_compatible, openai_responses
+from ai_provider.adapters.baseten import BASETEN_HACKATHON_MODEL
 
 INSTRUCTIONS = "Synthetic acceptance: preserve protected checks and report observed effects."
 OBJECTIVE = "Implement the synthetic action digest and validate it within inherited authority."
@@ -71,8 +72,9 @@ def response(*calls, text="Scripted report; inspect host evidence before accepta
     }
 
 
+@pytest.mark.parametrize("provider", ["meta", "baseten"])
 @pytest.mark.parametrize("mode", ["complete", "read_only", "outside_scope", "budget_exhausted"])
-def test_nested_delegation_over_real_responses_transport(tmp_path, monkeypatch, mode, request):
+def test_nested_delegation_over_real_transport(tmp_path, monkeypatch, provider, mode, request):
     """Use scripted replies with actual HTTP, tools, commands and owned processes."""
     candidate = tmp_path / "candidate.py"
     candidate.write_text("def action_digest(action):\n    return 'seeded-defect'\n")
@@ -98,20 +100,47 @@ def test_nested_delegation_over_real_responses_transport(tmp_path, monkeypatch, 
     requests = []
     replies = []
     server_errors = []
+    model = "muse-spark-1.3" if provider == "meta" else BASETEN_HACKATHON_MODEL
+    endpoint = "/responses" if provider == "meta" else "/chat/completions"
 
     class Handler(BaseHTTPRequestHandler):
         def do_POST(self):
             try:
-                assert self.path == "/v1/responses"
+                assert self.path == "/v1" + endpoint
                 assert self.headers.get("Authorization") == "Bearer synthetic-loopback-only"
                 size = int(self.headers["Content-Length"])
                 assert 0 < size <= 131072
                 body = json.loads(self.rfile.read(size))
-                assert body["model"] == "muse-spark-1.3"
-                assert body["store"] is False
+                assert body["model"] == model
+                if provider == "meta":
+                    assert body["store"] is False
                 assert len(requests) < len(replies)
                 requests.append(body)
-                encoded = json.dumps(replies[len(requests) - 1]).encode()
+                reply = replies[len(requests) - 1]
+                if provider == "baseten":
+                    calls = [item for item in reply["output"] if item["type"] == "function_call"]
+                    message = {"role": "assistant", "content": None}
+                    if calls:
+                        message["tool_calls"] = [
+                            {
+                                "id": item["call_id"],
+                                "type": "function",
+                                "function": {
+                                    "name": item["name"],
+                                    "arguments": item["arguments"],
+                                },
+                            }
+                            for item in calls
+                        ]
+                    else:
+                        message["content"] = reply["output"][0]["content"][0]["text"]
+                    reply = {
+                        "choices": [
+                            {"message": message, "finish_reason": "tool_calls" if calls else "stop"}
+                        ],
+                        "usage": {"prompt_tokens": 5, "completion_tokens": 2, "total_tokens": 7},
+                    }
+                encoded = json.dumps(reply).encode()
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(encoded)))
@@ -137,22 +166,29 @@ def test_nested_delegation_over_real_responses_transport(tmp_path, monkeypatch, 
     base_url = f"http://127.0.0.1:{server.server_port}/v1"
     client = create_chat_client(
         BackendConfig(
-            provider=ProviderKind.META,
-            model="muse-spark-1.3",
+            provider=ProviderKind(provider),
+            model=model,
             base_url=base_url,
             api_key="synthetic-loopback-only",
             timeout_seconds=1,
         )
     )
     # No unregistered origin or fresh child client can silently escape this fixture.
-    original_open = openai_responses.urlopen
+    transport = openai_responses if provider == "meta" else openai_compatible
+    original_open = transport.urlopen
 
     def loopback_only(request, *, timeout):
-        assert request.full_url == base_url + "/responses"
+        assert request.full_url == base_url + endpoint
         assert timeout <= 1
         return original_open(request, timeout=timeout)
 
-    monkeypatch.setattr(openai_responses, "urlopen", loopback_only)
+    monkeypatch.setattr(transport, "urlopen", loopback_only)
+    other_transport = openai_compatible if provider == "meta" else openai_responses
+    monkeypatch.setattr(
+        other_transport,
+        "urlopen",
+        lambda *_args, **_kwargs: pytest.fail("Unexpected alternate protocol transport"),
+    )
     monkeypatch.setattr(
         mcp_server,
         "create_chat_client",
@@ -160,14 +196,14 @@ def test_nested_delegation_over_real_responses_transport(tmp_path, monkeypatch, 
     )
     catalog = tmp_path / "catalog.toml"
     catalog.write_text(f'''[[models]]
-route_id = "scripted-meta-loopback"
-provider = "meta"
-product = "meta"
-model = "muse-spark-1.3"
+route_id = "scripted-{provider}-loopback"
+provider = "{provider}"
+product = "{provider}"
+model = "{model}"
 location = "external"
 access_method = "provider_api"
 auth_method = "api_key"
-billing_source = "meta_api_billing"
+billing_source = "{provider}_api_billing"
 cost_policy_tier = "prepaid_credits_allowed"
 quality = "standard"
 latency = "background"
@@ -261,7 +297,7 @@ tools = true
         budget,
         instructions=INSTRUCTIONS,
         objective=OBJECTIVE,
-        backends=frozenset({("meta", "muse-spark-1.3", base_url)}),
+        backends=frozenset({(provider, model, base_url)}),
         approved_client=client,
         request_timeout_seconds=1,
     )

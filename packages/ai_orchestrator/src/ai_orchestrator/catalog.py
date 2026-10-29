@@ -234,6 +234,8 @@ def _default_billing_source(provider: str, access_method: AccessMethod) -> str:
         return BillingSource.OPENAI_API_BILLING.value
     if provider == "meta":
         return BillingSource.META_API_BILLING.value
+    if provider == "baseten":
+        return BillingSource.BASETEN_API_BILLING.value
     if access_method is AccessMethod.MODAL_RUNTIME:
         return BillingSource.MODAL_RUNTIME_BILLING.value
     if provider == "modal":
