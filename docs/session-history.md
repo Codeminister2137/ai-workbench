@@ -1,5 +1,36 @@
 # Session History
 
+## 2026-10-29 - ADR-078 implemented and observed in a funded run
+
+Owner approved option A for the shared delegation result contract: keep `is_error`
+as historical tool-error evidence and add an explicit execution-completeness fact.
+Implemented as one shared `assess_execution` fact used by the MCP bridge, the native
+`delegate_task` tool and the CLI delegation status, with `execution_complete` and
+`execution_reason` in metadata. Complete execution still requires independent
+validation. New deterministic coverage: MCP delegation cases and native delegation
+report/status tests; full public gate 3188 passed, 26 skipped; changed files Ruff
+and Pyright clean. Offline delegation rehearsal passed 9 scripted checks with
+cleanup verified and declared sources unchanged.
+
+Then continued funded development with Meta and Modal inside the existing prepaid
+bounds. Phase `meta-delegation-20261029e` PASSED: a real child made one accepted
+edit and the contract was observed live as `is_error=true` plus
+`execution_complete=true` (reason `final response returned (finish_reason=stop)`)
+beside one recorded host refusal. Child-triggered and host-independent Modal
+validations both passed 21 checks with verified Sandbox cleanup. Host review of the
+child diff was accurate and the intended change was integrated as public commit
+`4f82977` on `fix/action-resolution-20261029`; public suite 154 passed, 8 skipped,
+90 subtests.
+
+Two earlier fresh phases were consumed as my own sizing faults and preserved
+unchanged: c stopped at the parent's three-turn limit inside eight shared replies
+(USD0.47561300 reserved, no validation), and d hit a grant `max_requests` of eight
+against a twelve-reply shared budget (USD0.49113300 reserved, no validation). Phase
+e fixed both causes with one constants set, a grant/budget assertion and a
+one-edit-then-validate instruction. None of these failures was a provider, guard,
+validation or contract defect; nothing was regraded or replayed, and no Modal spend
+occurred in c or d.
+
 ## 2026-10-29 - Real funded parent/child coding and reporting boundary
 
 Continued immediately after initial actual credit use, without a renewed inference
