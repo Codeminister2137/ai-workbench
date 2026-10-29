@@ -40,6 +40,7 @@ from ai_provider import (
 )
 
 from ai_agent.contracts import ToolCall, ToolCategory, ToolDefinition, ToolResult
+from ai_agent.execution_status import assess_execution
 from ai_agent.loop import AgentLoop
 from ai_agent.permissions import PermissionManager, PermissionPolicy
 from ai_agent.shared_approvals import TerminalApproval, scoped_registry
@@ -319,10 +320,14 @@ def _local_read_only_delegated_task_runner(
         incomplete = not result.response.message.content.strip() or bool(
             getattr(result.response, "tool_calls", ())
         )
+        # Legacy boolean keeps its historical meaning (any tool error or a
+        # truncated child run); execution completeness is reported separately.
+        status = assess_execution(result.response)
         output = "\n".join(
             [
                 "Delegated task status: "
                 + ("failed" if failed_count or incomplete else "completed"),
+                status.render(),
                 f"Route: {target.route_id}",
                 f"Model: {target.model}",
                 ("Tool surface: " + ", ".join(item.name for item in registry.list_definitions()))
@@ -350,6 +355,8 @@ def _local_read_only_delegated_task_runner(
                 "iterations": result.iterations,
                 "tool_results": len(result.tool_results),
                 "tool_errors": tool_errors,
+                "execution_complete": status.complete,
+                "execution_reason": status.reason,
                 "child_response": result.response.message.content.strip(),
             },
         )

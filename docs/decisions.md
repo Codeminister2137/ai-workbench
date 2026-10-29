@@ -1,3 +1,13 @@
+## ADR-078 - Delegation execution completeness reported separately
+
+**Status:** Owner-approved and implemented, 2026-10-29.
+
+`delegate_task` keeps its historical `is_error` meaning (any tool error or an
+unusable final response) and adds `execution_complete`/`execution_reason` facts.
+A complete execution still requires independent validation of the reported
+effects. Both delegation paths and the CLI status use the same fact. See
+[ADR-078](decisions/ADR-078-delegation-execution-completeness.md).
+
 ## ADR-077 - File state bound to remote Operator approvals
 
 **Status:** Owner-approved and implemented, 2026-10-29.

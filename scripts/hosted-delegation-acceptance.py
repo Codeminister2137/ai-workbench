@@ -41,6 +41,7 @@ SOURCES = (
     *TESTS,
     "packages/ai_agent/src/ai_agent/loop.py",
     "packages/ai_agent/src/ai_agent/mcp_server.py",
+    "packages/ai_agent/src/ai_agent/execution_status.py",
     "packages/ai_agent/src/ai_agent/delegation_scope.py",
     "packages/ai_agent/src/ai_agent/tools/delegation.py",
     "packages/ai_agent/src/ai_agent/processes.py",

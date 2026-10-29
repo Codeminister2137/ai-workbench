@@ -370,3 +370,91 @@ def test_native_agent_can_delegate_small_write_task(tmp_path: Path, monkeypatch)
     )
     assert "Child final response:\nchild complete" in result.tool_results[0].output
     assert any(event.startswith("delegated_agent_activity: model_request -") for event in events)
+    assert result.tool_results[0].metadata["execution_complete"] is True
+    assert (
+        result.tool_results[0].metadata["execution_reason"]
+        == "final response returned (finish_reason=unknown)"
+    )
+    assert "Execution complete: true" in result.tool_results[0].output
+
+
+def _delegated_reply(content: str = "child recovered", finish_reason=None):
+    from ai_provider import AIMessage, AIResponse, BackendInfo, BackendLocation, FinishReason
+
+    return AIResponse(
+        message=AIMessage(_EXAMPLE.MessageRole.ASSISTANT, content),
+        backend=BackendInfo("ollama", "child", BackendLocation.LOCAL),
+        finish_reason=finish_reason or FinishReason.STOP,
+    )
+
+
+def test_delegated_task_output_separates_execution_fact_from_tool_errors() -> None:
+    output = _EXAMPLE._format_delegated_task_output(
+        task="Fix and validate",
+        response=_delegated_reply(),
+        iterations=3,
+        tool_results=(
+            _EXAMPLE.ToolResult("run_command", "command failed", is_error=True),
+            _EXAMPLE.ToolResult("run_command", "19 checks passed"),
+        ),
+    )
+
+    assert "Delegated task status: failed" in output
+    assert "Execution complete: true (final response returned (finish_reason=stop));" in output
+    assert "task outcome still requires independent validation" in output
+    assert "Tool results: 2 total, 1 failed" in output
+
+
+@pytest.mark.parametrize(
+    "case,reason", [("empty", "empty final response"), ("length", "provider output length limit")]
+)
+def test_delegated_task_output_reports_incomplete_execution(case: str, reason: str) -> None:
+    from ai_provider import FinishReason
+
+    output = _EXAMPLE._format_delegated_task_output(
+        task="Fix and validate",
+        response=_delegated_reply(
+            "" if case == "empty" else "child partial report",
+            finish_reason=FinishReason.LENGTH if case == "length" else FinishReason.STOP,
+        ),
+        iterations=1,
+        tool_results=(),
+    )
+
+    assert f"Execution complete: false ({reason});" in output
+
+
+def test_delegation_status_distinguishes_recovered_and_incomplete_runs() -> None:
+    clean = _EXAMPLE.ToolResult(
+        "delegate_task",
+        "clean",
+        metadata={"execution_complete": True},
+    )
+    recovered = _EXAMPLE.ToolResult(
+        "delegate_task",
+        "recovered",
+        is_error=True,
+        metadata={"execution_complete": True},
+    )
+    incomplete = _EXAMPLE.ToolResult(
+        "delegate_task",
+        "incomplete",
+        metadata={"execution_complete": False},
+    )
+
+    assert (
+        _EXAMPLE._delegation_status_after_native_tools("disabled", (clean,))
+        == "completed: native delegate_task"
+    )
+    assert (
+        _EXAMPLE._delegation_status_after_native_tools("disabled", (recovered,))
+        == "completed with earlier tool errors: native delegate_task"
+    )
+    assert (
+        _EXAMPLE._delegation_status_after_native_tools("disabled", (incomplete,))
+        == "incomplete: native delegate_task"
+    )
+    assert (
+        _EXAMPLE._delegation_status_after_native_tools("accepted: local context", (recovered,))
+        == "accepted: local context; completed with earlier tool errors: native delegate_task"
+    )

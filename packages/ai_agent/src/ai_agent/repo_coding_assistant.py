@@ -34,6 +34,7 @@ from ai_orchestrator import PrivacyClass as OrchestratorPrivacyClass
 from ai_provider import (
     AIMessage,
     AIRequest,
+    AIResponse,
     BackendConfig,
     MessageRole,
     PrivacyClass,
@@ -216,6 +217,7 @@ from ai_agent.chat_context import (
 from ai_agent.delegation_context import (
     assemble_delegation_context,
 )
+from ai_agent.execution_status import assess_execution
 from ai_agent.external_execution import ExternalExecutionSettings
 from ai_agent.external_reporting import (
     activity_preview as _activity_preview,
@@ -3924,7 +3926,7 @@ def _run_native_agent(
 
         output = _format_delegated_task_output(
             task=task,
-            child_output=child_result.response.message.content,
+            response=child_result.response,
             iterations=child_result.iterations,
             tool_results=child_result.tool_results,
         )
@@ -3934,6 +3936,7 @@ def _run_native_agent(
                 f"iterations={child_result.iterations} "
                 f"tool_results={len(child_result.tool_results)}"
             )
+        execution = assess_execution(child_result.response)
         return ToolResult(
             name="delegate_task",
             output=output,
@@ -3941,6 +3944,8 @@ def _run_native_agent(
             metadata={
                 "iterations": child_result.iterations,
                 "tool_results": len(child_result.tool_results),
+                "execution_complete": execution.complete,
+                "execution_reason": execution.reason,
             },
         )
 
@@ -4214,16 +4219,18 @@ def _contains_textual_tool_request(content: str, tool_names: set[str]) -> bool:
 def _format_delegated_task_output(
     *,
     task: str,
-    child_output: str,
+    response: AIResponse,
     iterations: int,
     tool_results: Sequence[ToolResult],
 ) -> str:
     """Build a bounded child-agent handoff for the primary model."""
 
+    child_output = response.message.content
     failed_count = sum(1 for result in tool_results if result.is_error)
     status = "failed" if failed_count else "completed"
     lines = [
         f"Delegated task status: {status}",
+        assess_execution(response).render(),
         f"Task: {_activity_preview(task, limit=240)}",
         f"Iterations: {iterations}",
         f"Tool results: {len(tool_results)} total, {failed_count} failed",
@@ -4251,11 +4258,20 @@ def _delegation_status_after_native_tools(
     delegated_results = [result for result in tool_results if result.name == "delegate_task"]
     if not delegated_results:
         return current_status
-    native_status = (
-        "failed: native delegate_task"
-        if any(result.is_error for result in delegated_results)
-        else "completed: native delegate_task"
-    )
+    # Historical tool errors and execution completeness are separate facts, so a
+    # recovered child run is not reported as a failed delegation.
+    facts = []
+    for result in delegated_results:
+        metadata = getattr(result, "metadata", None)
+        fact = metadata.get("execution_complete") if isinstance(metadata, dict) else None
+        if isinstance(fact, bool):
+            facts.append(fact)
+    if any(fact is False for fact in facts):
+        native_status = "incomplete: native delegate_task"
+    elif any(result.is_error for result in delegated_results):
+        native_status = "completed with earlier tool errors: native delegate_task"
+    else:
+        native_status = "completed: native delegate_task"
     if current_status == "disabled":
         return native_status
     return f"{current_status}; {native_status}"

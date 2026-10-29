@@ -166,6 +166,14 @@ guards; unavailable execution never authorizes another billing source. External
 CLI provider calls are outside the MCP host's observable descendant reply budget.
 Legacy unbound local runners remain read-only. These tool restrictions are not
 an OS sandbox. See [ADR-074](../decisions/ADR-074-delegation-inherits-supervisor-authority.md).
+
+Delegation results report two separate facts. `is_error` keeps its historical
+meaning: at least one tool result failed, or the child returned no usable final
+response. `execution_complete`/`execution_reason` (in metadata, plus an
+`Execution complete:` output line) say whether the child stopped on a final
+answer or stopped mid-work. Neither accepts an outcome: recovery must be checked
+against current, independently observed effects. See
+[ADR-078](../decisions/ADR-078-delegation-execution-completeness.md).
 Bare shared-tool registries without a configured runner refuse delegation.
 `--delegate-context` remains a separate optional preparatory extraction pass.
 

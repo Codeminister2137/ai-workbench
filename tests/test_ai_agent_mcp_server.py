@@ -2,7 +2,9 @@ from io import StringIO
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
 from ai_agent import mcp_server as _MCP_SERVER
+from ai_agent.contracts import ToolResult
 from ai_agent.mcp_server import (
     codex_mcp_tool_registry,
     handle_mcp_message,
@@ -12,6 +14,7 @@ from ai_agent.mcp_server import (
 from ai_agent.tool_profiles import INSPECTION_PROFILE
 from ai_agent.tools import CreateFileTool, ReadFileTool, ToolContext
 from ai_orchestrator import AccessMethod, TaskCapability
+from ai_provider import FinishReason
 
 
 def test_mcp_initialize_and_tools_list(tmp_path: Path) -> None:
@@ -136,10 +139,18 @@ def test_mcp_write_message_escapes_non_ascii_for_stdio_transport() -> None:
     assert "\u2011" not in text
 
 
-def test_mcp_delegate_task_runs_local_read_only_child_agent(
+def _delegate_through_mcp(
     tmp_path: Path,
     monkeypatch,
-) -> None:
+    *,
+    content: str = "child findings",
+    pending_response: bool = False,
+    pending_message: bool = False,
+    finish_reason: FinishReason = FinishReason.STOP,
+    tool_results: tuple[ToolResult, ...] = (),
+) -> tuple[dict, object]:
+    """Call the MCP delegate_task tool with a synthetic child run."""
+
     class FakeAgentLoop:
         def __init__(self, client, registry, context, *, max_iterations):
             self.client = client
@@ -149,9 +160,16 @@ def test_mcp_delegate_task_runs_local_read_only_child_agent(
 
         def run(self, prompt, *, model, privacy_class):
             return SimpleNamespace(
-                response=SimpleNamespace(message=SimpleNamespace(content="child findings")),
+                response=SimpleNamespace(
+                    message=SimpleNamespace(
+                        content=content,
+                        tool_calls=("pending",) if pending_message else (),
+                    ),
+                    tool_calls=("pending",) if pending_response else (),
+                    finish_reason=finish_reason,
+                ),
                 iterations=1,
-                tool_results=(),
+                tool_results=tool_results,
             )
 
     target = SimpleNamespace(
@@ -168,11 +186,10 @@ def test_mcp_delegate_task_runs_local_read_only_child_agent(
         failure_reason=None,
         status=SimpleNamespace(value="ready"),
     )
-    captured_profile = None
+    captured: dict[str, object] = {}
 
     def fake_prepare_execution(prompt, profile, *args, **kwargs):
-        nonlocal captured_profile
-        captured_profile = profile
+        captured["profile"] = profile
         return orchestration
 
     monkeypatch.setattr(_MCP_SERVER, "load_model_catalog", lambda path: ())
@@ -181,7 +198,7 @@ def test_mcp_delegate_task_runs_local_read_only_child_agent(
     monkeypatch.setattr(_MCP_SERVER, "AgentLoop", FakeAgentLoop)
     registry = codex_mcp_tool_registry(catalog_path=tmp_path / "catalog.toml")
 
-    response = handle_mcp_message(
+    reply = handle_mcp_message(
         {
             "jsonrpc": "2.0",
             "id": 6,
@@ -191,21 +208,108 @@ def test_mcp_delegate_task_runs_local_read_only_child_agent(
         registry=registry,
         context=ToolContext(workspace_root=tmp_path),
     )
+    assert reply is not None
+    return reply, captured
 
-    assert response is not None
-    assert response["result"]["isError"] is False
-    text = response["result"]["content"][0]["text"]
-    structured = response["result"]["structuredContent"]
-    assert "Delegated task status: completed" in text
+
+def test_mcp_delegate_task_reports_execution_fact_after_recovered_tool_error(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    reply, captured = _delegate_through_mcp(
+        tmp_path,
+        monkeypatch,
+        tool_results=(ToolResult("read_file", "synthetic earlier failure", is_error=True),),
+    )
+
+    result = reply["result"]
+    # ADR-078: the legacy boolean keeps reporting historical tool errors.
+    assert result["isError"] is True
+    text = result["content"][0]["text"]
+    structured = result["structuredContent"]
+    assert "Delegated task status: failed" in text
+    assert "Execution complete: true (final response returned (finish_reason=stop));" in text
+    assert "task outcome still requires independent validation" in text
+    assert "Tool error evidence (historical; recovery is not independently verified):" in text
+    assert "read_file: synthetic earlier failure" in text
     assert "Route: local-child" in text
     assert "Tool surface: read/search only" in text
-    assert "child findings" in text
     assert structured["output"] == text
     assert structured["metadata"]["child_response"] == "child findings"
-    assert captured_profile is not None
-    assert captured_profile.required_capabilities == frozenset(
-        {TaskCapability.CHAT, TaskCapability.TOOLS}
+    assert structured["metadata"]["execution_complete"] is True
+    assert structured["metadata"]["tool_errors"] == [
+        {"name": "read_file", "output": "synthetic earlier failure", "truncated": False}
+    ]
+    profile = captured["profile"]
+    assert profile.required_capabilities == frozenset({TaskCapability.CHAT, TaskCapability.TOOLS})
+
+
+def test_mcp_delegate_task_clean_run_is_complete_without_error_evidence(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    reply, _ = _delegate_through_mcp(tmp_path, monkeypatch)
+
+    result = reply["result"]
+    assert result["isError"] is False
+    text = result["content"][0]["text"]
+    assert "Delegated task status: completed" in text
+    assert "Execution complete: true (final response returned (finish_reason=stop));" in text
+    assert "Tool error evidence" not in text
+    assert result["structuredContent"]["metadata"]["tool_errors"] == []
+    assert result["structuredContent"]["metadata"]["execution_complete"] is True
+
+
+@pytest.mark.parametrize(
+    "content,pending_response,pending_message,finish_reason,legacy_error,reason",
+    [
+        ("", False, False, FinishReason.STOP, True, "empty final response"),
+        ("child findings", True, False, FinishReason.STOP, True, "unresolved tool calls"),
+        ("child findings", False, True, FinishReason.STOP, False, "unresolved tool calls"),
+        (
+            "child findings",
+            False,
+            False,
+            FinishReason.LENGTH,
+            False,
+            "provider output length limit",
+        ),
+        (
+            "child findings",
+            False,
+            False,
+            FinishReason.ERROR,
+            False,
+            "provider error finish reason",
+        ),
+    ],
+)
+def test_mcp_delegate_task_reports_why_execution_is_incomplete(
+    tmp_path: Path,
+    monkeypatch,
+    content: str,
+    pending_response: bool,
+    pending_message: bool,
+    finish_reason: FinishReason,
+    legacy_error: bool,
+    reason: str,
+) -> None:
+    reply, _ = _delegate_through_mcp(
+        tmp_path,
+        monkeypatch,
+        content=content,
+        pending_response=pending_response,
+        pending_message=pending_message,
+        finish_reason=finish_reason,
     )
+
+    result = reply["result"]
+    assert result["isError"] is legacy_error
+    text = result["content"][0]["text"]
+    assert f"Execution complete: false ({reason});" in text
+    metadata = result["structuredContent"]["metadata"]
+    assert metadata["execution_complete"] is False
+    assert metadata["execution_reason"] == reason
 
 
 def test_mcp_tools_call_rejects_unknown_or_outside_workspace_tool(tmp_path: Path) -> None:
