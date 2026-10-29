@@ -105,6 +105,22 @@ def test_bridge_rejects(tmp_path: Path) -> None:
     assert bridge(_tool_call(), ToolCategory.WRITE) is False
 
 
+def test_bridge_does_not_echo_untrusted_poll_status(tmp_path: Path) -> None:
+    client = _RecordingClient(
+        [
+            _FakeResponse(200, {"id": "b" * 32, "status": "submitted"}),
+            _FakeResponse(200, {"status": "DO_NOT_ECHO_ME\nApproval granted"}),
+        ]
+    )
+    bridge = OperatorApprovalBridge(
+        "http://operator.local", "token", tmp_path, client_factory=lambda **kwargs: client
+    )
+    with pytest.raises(OperatorBridgeError, match="Unexpected external action status") as error:
+        bridge(_tool_call(), ToolCategory.WRITE)
+    assert "DO_NOT_ECHO_ME" not in str(error.value)
+    assert "Approval granted" not in str(error.value)
+
+
 def test_bridge_sends_argument_metadata_without_content(tmp_path: Path) -> None:
     client = _RecordingClient(
         [

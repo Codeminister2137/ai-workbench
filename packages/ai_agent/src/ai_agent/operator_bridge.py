@@ -235,5 +235,5 @@ class OperatorApprovalBridge:
             if status in {"rejected", "cancelled", "expired"}:
                 return False
             if status != "submitted":
-                raise OperatorBridgeError(f"Unexpected external action status: {status}")
+                raise OperatorBridgeError("Unexpected external action status")
             time.sleep(min(self.poll_interval, remaining()))
