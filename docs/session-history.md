@@ -1,5 +1,29 @@
 # Session History
 
+## 2026-10-29 - Current-base and remote-approval verification
+
+Live remote refs confirmed the eligibility branch at e212dfd and main at3aa01fc.
+The original feature used stale local main69ae783. A local current-main candidate
+now carries the checker fixes without losing the published external-action API/UI.
+Only build-log/release documentation conflicts required resolution; an inherited
+condition was formatted without behavioral change. Candidate05b949c passes176tests,
+8skips,69subtests, plus Ruff/format. Its offline-built source archive also passes176;
+87sdist/26wheel entries were inspected, exact application/checker/docs verified and
+private runtime/venv/handoff paths and named provider credentials excluded.
+
+An archive-only preview with the separately held action-resolution4f82977 passes
+183tests,8skips,90subtests. Five local cross-repository cases verify actual API
+approval/rejection, concurrent-file refusal, nonce/replay controls and one-use
+concurrent resolutions (exactly1of8requests succeeds). Decisions are scripted;
+no physical owner approval, inference, deployment or held-branch adoption occurred.
+
+Workbenchf705870 removes arbitrary remote status text from approval diagnostics;
+57bridge tests passed with1skip, Ruff/Pyright clean. Final registered offline gate:
+3192workspace+38Council+84job-search passed,26skipped; full Pyright0errors.
+A fresh read-only remote-access inspection corrected another stale handoff fact;
+remaining access verification requires attended owner checks, not an unattended
+service/account change. No public push/release, video, judge delivery or submission.
+
 ## 2026-10-29 - Resumed connected development
 
 The early stop was premature. On resumption the existing SDK/dependencies plus

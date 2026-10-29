@@ -128,6 +128,18 @@ information retained as needed, with legal and aggregated-data exceptions and
 international processing. Published ZDR is not a project privacy grant, proof of
 event-specific contractual terms, or a guarantee about all metadata.
 
+### Baseten reasoning review - rechecked 2026-10-29
+
+The [reasoning guide](https://docs.baseten.co/inference/model-apis/reasoning)
+still documents always-on reasoning for ordinary Muse Spark Open, default xhigh,
+and separate reasoning/final content. Together with the
+[Chat Completions reference](https://docs.baseten.co/reference/inference-api/chat-completions),
+these inspected pages did not establish a new reasoning-replay requirement for
+this adapter. That limited review does not prove that none exists or establish
+live event-alias tool/stream behavior. Existing metadata filtering and offline
+tool-history controls remain unchanged; no speculative continuation or shared
+request-interface extension was added. Ordinary-model documentation does not
+establish event-specific entitlement, prices, remaining credit or effective effort.
 ## Reading and refreshing provider knowledge
 
 This file is the repository agent's first provider-knowledge entry point. Keep
