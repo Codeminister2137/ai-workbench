@@ -1,5 +1,33 @@
 # Session History
 
+## 2026-10-29 - Meta-only submission constraint and pre-unattended handoff
+
+Owner relayed the organizer rule: every model called by the judged artifact at
+runtime must be a Meta model; third-party libraries, APIs and coding tools are
+otherwise allowed. The constraint was accepted and recorded in
+[ADR-079](/docs/decisions/ADR-079-hackathon-submission-meta-only-runtime.md), with
+the detailed inventory and pre-submission checklist in local
+`docs/plans/remote-ai-operator-2026/SUBMISSION-ELIGIBILITY.md`. Remote Operator
+already satisfies it structurally (`scripted`/`meta` CLI modes, `muse-*` grant
+validation, fixed Meta endpoint), while ai-workbench stays out of the judged
+runtime by default unless a Meta-only profile is added later.
+
+Baseten factual questions were resolved by the owner from the dashboard and the
+organizers: event credits are valid only for the hackathon duration, the owner
+will not be additionally charged, and the remaining balance cannot be checked. A
+live synthetic acceptance is prepared but still awaits the owner's explicit
+spend go-ahead.
+
+A Pyright typing error in `tests/test_ai_agent_mcp_server.py` (captured profile
+accessed through `dict[str, object]`) was fixed on a working branch and merged to
+`develop`. `develop` was then pushed to `origin/develop` after the pre-push hook
+passed.
+
+The session handed off to a 2-hour unattended Codex window at 14:40 local time,
+with a recorded plan at `docs/plans/unattended-work-plan.md`. The planned next
+slice was a conditional Baseten acceptance or, if not approved, deterministic
+submission-eligibility verification.
+
 ## 2026-10-29 - ADR-078 implemented and observed in a funded run
 
 Owner approved option A for the shared delegation result contract: keep `is_error`
