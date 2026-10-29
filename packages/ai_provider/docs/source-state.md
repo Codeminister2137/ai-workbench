@@ -30,6 +30,12 @@ coding/repair workflow now exercised direct Standard Responses and protected Mod
 CPU validation. This establishes that scoped workflow's actual software path,
 not general model parity, parent/child acceptance, live C6 or a Baseten entitlement.
 Local reservations are conservative estimates, not provider billing guarantees.
+Subsequent real parent/child work reused the pinned funded Meta executor and
+performed actual scoped public-source edits plus child-triggered and independent
+Modal validation. This establishes those concrete effects, while the consumed
+acceptance remains incomplete because delegation's historical-error status gate
+requires an explicit recovery/result-contract resolution. Failed originals are
+preserved; this does not establish general model quality or live C6 acceptance.
 The [Modal billing guide](https://modal.com/docs/guide/billing) describes metered
 resource usage; an observed bill is not interchangeable with remaining grant
 credit or proof of a net-spend cap. Account observations remain private evidence.

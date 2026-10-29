@@ -309,6 +309,13 @@ def _local_read_only_delegated_task_runner(
             privacy_class=PrivacyClass(profile.privacy_class.value),
         )
         failed_count = sum(1 for item in result.tool_results if item.is_error)
+        # Keep the reporting component's actual evidence. A count alone cannot
+        # establish which operation failed or whether later work recovered it.
+        tool_errors = [
+            {"name": item.name, "output": item.output[:4000], "truncated": len(item.output) > 4000}
+            for item in result.tool_results
+            if item.is_error
+        ]
         incomplete = not result.response.message.content.strip() or bool(
             getattr(result.response, "tool_calls", ())
         )
@@ -323,6 +330,12 @@ def _local_read_only_delegated_task_runner(
                 else "Tool surface: read/search only; no bound parent grant was supplied.",
                 f"Iterations: {result.iterations}",
                 f"Tool results: {len(result.tool_results)} total, {failed_count} failed",
+                *(
+                    ["Tool error evidence (historical; recovery is not independently verified):"]
+                    + [f"{item['name']}: {item['output']}" for item in tool_errors]
+                    if tool_errors
+                    else []
+                ),
                 "Child final response:",
                 result.response.message.content.strip() or "(empty)",
             ]
@@ -336,6 +349,7 @@ def _local_read_only_delegated_task_runner(
                 "model": target.model,
                 "iterations": result.iterations,
                 "tool_results": len(result.tool_results),
+                "tool_errors": tool_errors,
                 "child_response": result.response.message.content.strip(),
             },
         )

@@ -1,5 +1,48 @@
 # Session History
 
+## 2026-10-29 - Real funded parent/child coding and reporting boundary
+
+Continued immediately after initial actual credit use, without a renewed inference
+approval. Fresh phases meta-delegation-20261029a/b used actual pinned Standard Meta
+client and existing AgentLoop/DelegationScope/shared budgets. Public-only synthetic
+tasks fixed Unicode nonce TypeError and nonstring get() identifier handling. First
+fixture omitted the exact command grant for a path-narrowed CUSTOM validator; the
+existing guard correctly refused it. Host final18checks passed. Preserved failure;
+offline scope tests then proved the corrected binding and Windows manifest target
+exclusion before a fresh, different implementation task.
+
+Second child actually edited source and invoked Modal validation:19checks pass.
+Independent final19checks pass, protected bytes unchanged and every owned Sandbox/
+outer process cleanup verified. Parent accurately distinguished reported validation
+from own inspection. Original result remains INCOMPLETE because its prepared gate
+required delegate_task.is_error=false; the wrapper counts all historical tool
+errors. It discarded the actual first failed operation/text, so that particular
+cause remains unknown. Fixed this bounded observability defect by retaining named,
+explicitly bounded/truncation-labelled tool error evidence in output/metadata.
+Status/boolean semantics are unchanged pending owner result-contract decision.
+Focused delegation/MCP/acceptance checks48pass, CLI delegation/context37pass;
+changed-file Ruff check/format and Pyright pass with zero diagnostics.
+
+Local public commit311c6a3 on fix/action-resolution-20261029 includes reviewed nonce/
+identifier fixes and synthetic tests, following26ac4ba. Full154pass8skip90subtests;
+changed files lint/format pass. Whole-repo lint found existing web.py403 E731,
+confirmed at26ac4ba, untouched. origin/main3aa01fc and historical localmain69ae783
+unchanged, no push/deploy. Only public source and synthetic protected tests reached
+Meta/Modal; private controller/infra/plans/inbox and credentials remained host-side.
+
+New phases17Meta calls,67495input/4207output, reservedUSD1.04563825; published-rate
+estimate0.1022485, not invoice. Three actual Modal validations reserved0.99total,
+exact bill unknown. Prior coding phase/grants remain separate and consumed. Full
+Meta commitments including old20 and new1+2+2 stay25within50. No Baseten inference,
+fallback, GPU retry, copied C6 launch or new unattended window. Baseten event
+expiry/exhaustion/personal-charge facts remain unverified; factual question pending.
+
+Decision prepared privately in artifacts/meta-delegation-20261029b/ASSESSMENT.md:
+recommend preserve legacy is_error and add execution_complete with supervisor-
+verified recovery, rather than redefining existing boolean semantics. Both retain
+actual errors and independent task validation. No automatic completion claim from
+model text; consumed receipts remain unchanged.
+
 ## 2026-10-29 - Actual Meta and Modal credit-backed development
 
 Owner reiterated continuing until a material decision or all work blocked, with

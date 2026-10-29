@@ -128,6 +128,15 @@ def test_host_bound_shared_child_can_write_only_with_parent_grant(monkeypatch, t
     assert requests[0].messages[0].content == "Complete required instructions"
     assert "Original implementation goal" in requests[0].messages[1].content
     assert scope.budget.replies_remaining == 6
+    if read_only:
+        errors = result.metadata["tool_errors"]
+        assert len(errors) == 1
+        assert errors[0]["name"] == "create_file"
+        assert errors[0]["output"]
+        assert errors[0]["truncated"] is False
+        assert errors[0]["output"] in result.output
+    else:
+        assert result.metadata["tool_errors"] == []
 
 
 def test_shared_child_cannot_acquire_ungranted_inference_backend(monkeypatch, tmp_path):
