@@ -76,3 +76,104 @@ def test_catalog_contains_only_selected_meta_route():
     assert [model["route_id"] for model in tomllib.loads(catalog)["models"]] == [
         "meta/muse-spark-1.3"
     ]
+
+
+def test_chat_reuses_existing_cli_history_and_one_shared_transport_budget(tmp_path, monkeypatch):
+    """Real coding-chat controller, synthetic replies; never network or physical approvals."""
+    import contextlib
+
+    from ai_agent import coding_chat_cli
+    from ai_provider.chat_transcripts import SQLiteChatTranscriptStore
+
+    root = tmp_path / "public"
+    root.mkdir()
+    (root / ".git").mkdir()
+    (root / "AGENTS.md").write_text("Synthetic public fixture. Do not edit files.")
+    database = tmp_path / "existing.sqlite3"
+    database.touch()
+    SQLiteChatTranscriptStore(database)
+    bodies = []
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self, size):
+            return json.dumps(
+                {
+                    "id": "synthetic",
+                    "status": "completed",
+                    "output": [
+                        {
+                            "type": "message",
+                            "role": "assistant",
+                            "content": [{"type": "output_text", "text": "Synthetic reply"}],
+                        }
+                    ],
+                    "usage": {"input_tokens": 10, "output_tokens": 2},
+                }
+            ).encode()
+
+    class Opener:
+        def open(self, request, *, timeout):
+            bodies.append(json.loads(request.data))
+            return Response()
+
+    def conversation(controller, execute, **kwargs):
+        for index in range(8):
+            assert controller.turn(f"Synthetic owner turn {index}", execute).returncode == 0
+        controller.turn("Ninth synthetic turn must not reach network", execute)
+        pytest.fail("Expected the shared allowance to stop the conversation")
+
+    monkeypatch.setenv("META_API_KEY", "synthetic-no-real-key")
+    monkeypatch.setattr(launcher, "build_opener", lambda *args: Opener())
+    monkeypatch.setattr(coding_chat_cli, "run_terminal_conversation", conversation)
+    monkeypatch.setattr(
+        coding_chat_cli.CodingChatInput, "in_flight", lambda self: contextlib.nullcontext()
+    )
+    run = tmp_path / "run"
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "meta-develop",
+            "--chat",
+            "--repo-root",
+            str(root),
+            "--session-db",
+            str(database),
+            "--run-dir",
+            str(run),
+        ],
+    )
+    assert launcher.main() == 2
+    assert len(bodies) == 8
+    assert "Synthetic owner turn 0" in json.dumps(bodies[1])
+    assert "Synthetic reply" in json.dumps(bodies[1])
+    assert len(json.loads((run / "receipt.json").read_text())["requests"]) == 8
+
+
+def test_chat_refuses_missing_database_before_creating_any_run_storage(tmp_path, monkeypatch):
+    root = tmp_path / "public"
+    root.mkdir()
+    (root / ".git").mkdir()
+    (root / "AGENTS.md").write_text("Synthetic instructions")
+    run = tmp_path / "run"
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "meta-develop",
+            "--chat",
+            "--repo-root",
+            str(root),
+            "--session-db",
+            str(tmp_path / "absent.sqlite3"),
+            "--run-dir",
+            str(run),
+        ],
+    )
+    with pytest.raises(SystemExit, match="2"):
+        launcher.main()
+    assert not run.exists()

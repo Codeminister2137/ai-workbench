@@ -1,16 +1,19 @@
 param(
     [Parameter(Mandatory = $true)] [string] $RepoRoot,
-    [Parameter(Mandatory = $true)] [string] $TaskFile,
+    [string] $TaskFile,
     [Parameter(Mandatory = $true)] [string] $RunDirectory,
     [string] $PythonExecutable,
-    [switch] $Check
+    [switch] $Check,
+    [switch] $Chat,
+    [string] $SessionDatabase
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $targetRoot = (Resolve-Path -LiteralPath $RepoRoot).Path
-$taskPath = (Resolve-Path -LiteralPath $TaskFile).Path
+if (!$Chat -and !$TaskFile) { throw '-TaskFile is required outside -Chat.' }
+$taskPath = if ($TaskFile) { (Resolve-Path -LiteralPath $TaskFile).Path } else { $null }
 $runPath = if ([IO.Path]::IsPathRooted($RunDirectory)) {
     [IO.Path]::GetFullPath($RunDirectory)
 } else {
@@ -36,9 +39,11 @@ if ($previousPythonPath) { $sourcePaths += $previousPythonPath }
 $launcherArgs = @(
     (Join-Path $PSScriptRoot 'meta-develop.py'),
     '--repo-root', $targetRoot,
-    '--task-file', $taskPath,
     '--run-dir', $runPath
 )
+if ($taskPath) { $launcherArgs += @('--task-file', $taskPath) }
+if ($Chat) { $launcherArgs += '--chat' }
+if ($SessionDatabase) { $launcherArgs += @('--session-db', (Resolve-Path -LiteralPath $SessionDatabase).Path) }
 if ($Check) { $launcherArgs += '--check' }
 $resultCode = 1
 try {

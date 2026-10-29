@@ -22,9 +22,13 @@ RESERVE = (
 ) / Decimal(1000000)
 
 
+class AllowanceExhausted(ValueError):
+    """Expected stop of the shared foreground allowance."""
+
+
 def reserve(receipt: dict, elapsed: float, size: int) -> dict:
     if len(receipt["requests"]) >= MAX_CALLS or elapsed >= 900:
-        raise ValueError("Named task request/time allowance exhausted")
+        raise AllowanceExhausted("Named task request/time allowance exhausted")
     call = {
         "index": len(receipt["requests"]) + 1,
         "request_bytes": size,
@@ -89,14 +93,27 @@ class NoRedirect(HTTPRedirectHandler):
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-root", type=Path, required=True)
-    parser.add_argument("--task-file", type=Path, required=True)
+    parser.add_argument("--task-file", type=Path)
+    parser.add_argument("--chat", action="store_true", help="Use existing foreground coding-chat")
+    parser.add_argument("--session-db", type=Path, help="Existing coding-chat transcript database")
     parser.add_argument("--run-dir", type=Path, required=True)
     parser.add_argument(
         "--check", action="store_true", help="Validate local setup without inference"
     )
     args = parser.parse_args()
     root = args.repo_root.resolve(strict=True)
-    task = args.task_file.resolve(strict=True).read_text(encoding="utf-8")
+    if not args.chat and args.task_file is None:
+        parser.error("--task-file is required outside --chat")
+    if args.session_db is not None and not args.chat:
+        parser.error("--session-db requires --chat")
+    task = args.task_file.resolve(strict=True).read_text(encoding="utf-8") if args.task_file else ""
+    session_db = (
+        args.session_db or Path(__file__).resolve().parents[1] / "data/repo-assistant-chats.sqlite3"
+    )
+    if args.chat and not session_db.is_file():
+        parser.error(
+            "--chat requires an existing transcript database; no new storage is provisioned"
+        )
     if not (root / ".git").exists() or not (root / "AGENTS.md").is_file():
         parser.error("Expected an explicit repository with AGENTS.md")
     if args.check:
@@ -108,6 +125,7 @@ def main() -> int:
                     "max_calls": MAX_CALLS,
                     "max_reserved_usd": str(RESERVE * MAX_CALLS),
                     "inference_calls": 0,
+                    "mode": "coding-chat" if args.chat else "implement",
                 }
             )
         )
@@ -188,9 +206,14 @@ def main() -> int:
     openai_responses.urlopen = transport
     record()
     try:
+        if args.chat:
+            print(
+                f"Meta chat: {MAX_CALLS} total API calls, USD2 maximum, "
+                "15-minute admission window. /exit ends chat."
+            )
         status = cli_main(
-            [
-                task,
+            ([task] if task else [])
+            + [
                 "--repo-root",
                 str(root),
                 "--provider",
@@ -200,7 +223,7 @@ def main() -> int:
                 "--model",
                 "muse-spark-1.3",
                 "--mode",
-                "implement",
+                "coding-chat" if args.chat else "implement",
                 "--execute",
                 "--native-tools",
                 "--shared-tools",
@@ -210,7 +233,7 @@ def main() -> int:
                 "--cost-policy",
                 "prepaid_credits_allowed",
                 "--approval-policy",
-                "workspace_write",
+                "interactive" if args.chat else "workspace_write",
                 "--skip-prompt-review",
                 "--max-action-rounds",
                 "8",
@@ -221,9 +244,17 @@ def main() -> int:
                 "--log-file",
                 str(run / "assistant.log"),
             ]
+            + (["--coding-session-db", str(session_db.resolve())] if args.chat else [])
         )
         receipt.update(status="cli_finished", exit_code=status)
         return status
+    except AllowanceExhausted:
+        receipt.update(status="allowance_exhausted", exit_code=2)
+        print(
+            "Meta session allowance exhausted; stopped before another request. "
+            "Effects and receipts retained."
+        )
+        return 2
     except BaseException as error:
         receipt.update(status="failed", error_type=type(error).__name__)
         raise
