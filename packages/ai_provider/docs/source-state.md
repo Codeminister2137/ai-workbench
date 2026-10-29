@@ -993,6 +993,21 @@ change account settings or establish live acceptance.
 
 ### Meta Model API - published facts refreshed 2026-10-27
 
+Native coding client compatibility, checked 2026-10-29:
+[Meta's coding-agent guide](https://dev.meta.ai/docs/coding-agents) documents
+Codex with the Responses API and Muse Wonder 1.0; its
+[framework guide](https://dev.meta.ai/docs/agent-frameworks) describes the local
+model catalog needed by Codex. Locally, Codex 0.165.0 parsed that catalog and
+loaded an opt-in profile offline. The supplied top-level
+`model_supports_reasoning_summaries` override caused strict startup failure in
+this installed client; omitting that override while declaring support in the
+catalog passed. This is a version-specific observation, not a universal removal.
+[JetBrains Codex documentation](https://www.jetbrains.com/help/ai-assistant/codex-agent.html)
+limits built-in BYOK to OpenAI-issued keys. Its
+[custom ACP integration](https://www.jetbrains.com/help/ai-assistant/acp.html)
+is a separate possible route, not a tested Meta integration. Offline checks
+establish neither live model access nor spending protection.
+
 2026-10-28 protocol refresh: [tool calling](https://dev.meta.ai/docs/tool-calling)
 documents flat Responses function definitions, function-call/result items and
 matching call ids. [Responses](https://dev.meta.ai/docs/protocols/responses)

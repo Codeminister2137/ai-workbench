@@ -3014,3 +3014,19 @@ now have documentation paths: [reviewer output formatting](research/reviewer-out
 and the [route-family matcher proposal](research/route-family-matcher-proposal-20261023.md).
 Their dated findings and proposal status are preserved. Existing published history
 is retained; removing private paths from the current tip does not erase history.
+
+## 2026-10-29 — Opt-in Meta Codex installation
+
+Owner approved the recommended public Operator-only first pilot and installing
+the prepared native Codex profile/catalog. Both files were created without
+overwriting existing files; normal Codex defaults and authentication were unchanged.
+Codex 0.165.0 loaded the installed profile through an offline supported command
+with a closed-loopback provider override and credentials removed (exit 0).
+No inference was requested, and no rendered prompt was retained. This verifies
+configuration loading, not live Wonder access, billing entitlement or task quality.
+
+JetBrains documents third-party API keys as unsupported in built-in Codex.
+The terminal CLI is the immediate route; a separate custom ACP agent is possible
+but remains unconfigured and untested. Private Workbench processing remains
+unapproved. The public native pilot still needs finite enforced bounds before
+its first live request; no OpenCode installer or new model call was run here.
