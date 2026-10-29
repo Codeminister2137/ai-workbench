@@ -192,7 +192,9 @@ def test_unknown_tool_and_permission_denial_have_distinct_feedback(tmp_path, unk
 
 
 def test_iteration_limit_preserves_effect_and_observed_history(tmp_path: Path) -> None:
+    from ai_agent.repo_coding_assistant import _error_cause_kind
     from ai_provider import ProviderError, ProviderErrorCategory
+    from ai_provider.closeout import format_cli_closeout
 
     client = FakeClient()
     with pytest.raises(ProviderError, match="exceeded max_iterations=1") as captured:
@@ -202,11 +204,23 @@ def test_iteration_limit_preserves_effect_and_observed_history(tmp_path: Path) -
             ToolContext(tmp_path),
             permissions=PermissionManager(policy=PermissionPolicy.permissive()),
             max_iterations=1,
-        ).run("Create the file", privacy_class=PrivacyClass.LOCAL_ONLY)
+        ).run("PRIVATE_LOOP_PROMPT_SENTINEL", privacy_class=PrivacyClass.LOCAL_ONLY)
     assert captured.value.category is ProviderErrorCategory.NON_RETRYABLE
     assert (tmp_path / "out.txt").read_text() == "done"
     assert captured.value.partial_messages[-1].role is MessageRole.TOOL
     assert captured.value.partial_messages[-1].tool_call_id == "call-1"
+    assert client.calls == 1
+    closeout = format_cli_closeout(
+        response_text=None,
+        status="failed",
+        execution_status="failed",
+        failure_reason=str(captured.value),
+        provider=captured.value.provider,
+        category=captured.value.category.value,
+        cause_kind=_error_cause_kind(captured.value),
+    )
+    assert "cause_kind=AgentIterationLimitExceeded" in closeout
+    assert "PRIVATE_LOOP_PROMPT_SENTINEL" not in closeout
 
 
 def test_delegation_tool_runs_bounded_child_task(tmp_path: Path) -> None:

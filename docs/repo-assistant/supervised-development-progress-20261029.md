@@ -114,3 +114,15 @@ Conservative cumulative commitments now Meta65.830672/75 and Modal9.90/10,
 including all prior grants/outstanding reservations. Owner was asked whether
 to raise cumulative Modal cap to15 using existing eligible credits; no answer
 means no grant. No historical allowance was changed or unused reserve refunded.
+
+## Known host iteration-stop diagnostics
+
+While further cloud budget awaited the owner, host investigated the observed
+unknown-cause closeout. AgentLoop constructed its own iteration-limit error without
+origin metadata. It now attaches a fixed AgentIterationLimitExceeded cause through
+the existing ProviderError.raw_error path, so existing CLI projection identifies
+the host stop without copying prompts/tool output or attributing an unknown
+provider failure. Category, retry behavior, bounds, prior effects and partial
+history remain unchanged. A real-loop regression checks retained file/history,
+one call only, actual closeout cause and private-prompt sentinel exclusion.
+Agent-loop and launcher subset35passed; no inference/cloud/private transmission.

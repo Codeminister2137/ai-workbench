@@ -32,6 +32,10 @@ from ai_agent.permissions import PermissionManager
 from ai_agent.tools.base import ToolContext, ToolRegistry
 
 
+class AgentIterationLimitExceeded(RuntimeError):
+    """Known host-loop stop, distinct from a provider or tool failure."""
+
+
 @dataclass(frozen=True, slots=True)
 class AgentResult:
     """Final response and tool execution history from an agent run."""
@@ -359,6 +363,7 @@ class AgentLoop:
             "earlier tool effects remain and must be inspected before continuing.",
             category=ProviderErrorCategory.NON_RETRYABLE,
             provider=self.client.backend.provider,
+            raw_error=AgentIterationLimitExceeded(),
         )
         error.partial_messages = tuple(messages)
         raise error
