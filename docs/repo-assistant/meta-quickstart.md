@@ -1,0 +1,46 @@
+# Bounded Meta development now
+
+Use the existing Workbench CLI through `scripts/meta-develop.py` for one focused
+public-repository coding task. No new installation, service, scheduler or database.
+Run from the configured project environment, for example:
+
+```powershell
+uv run --locked --no-sync python scripts/meta-develop.py `
+  --repo-root artifacts/meta-acp-coding-20261029/worktree `
+  --task-file artifacts/meta-cli-coding-20261029/task.txt `
+  --run-dir artifacts/my-next-meta-task --check
+```
+
+`--check` performs local setup checks without inference. Remove it to execute a
+**new authorized task**, with a new task file and unused run directory. The example
+task has already been completed: do not replay it. Check the current handoff for
+remaining aggregate funding and approved data scope before each new allocation.
+
+The launcher loads only `META_API_KEY` from the local environment file, selects
+Spark1.3 Standard, and invokes the existing native-tool implementation runner.
+It snapshots only the Meta route into its catalog, avoiding other fallback routes.
+Per invocation: eight actual HTTP requests, complete input128KiB/request, output
+8192 tokens, request90seconds, admission window15minutes. Full conservative
+reservation before each send totals at most USD1.630208, inside the named USD2
+envelope. Failures retain reservations; no automatic reset/resume or budget renewal.
+These are local controls, not a provider billing cap or an aggregate account ledger.
+Budget allocation across separate invocations still belongs to the supervising
+workflow. Context/instructions are refused if too large, never silently trimmed.
+
+Declared first-task exceptions: low reasoning, source editing only, workspace-write
+policy, no orchestrated stages or local Ollama reviewer. Native shell/custom tools
+still require real approval. Generated Operator code must execute only in its
+approved isolated runner, not the credential host. Host review and independent
+Modal checks complete this workflow; the launcher does not certify its own output.
+No automatic multi-task unattended loop or private Workbench transmission is granted.
+Use existing coding-chat when a separately approved interactive conversation is
+needed; this helper intentionally runs a single bounded task.
+
+Acceptance on2026-10-29: three real Meta calls/18136tokens, approximately15seconds,
+actual public checker edit; host-authored regression tests; protected export checks
+8/8 and full public suite184passed8skipped69subtests in Modal with cleanup verified.
+Two original full-suite fixture failures were preserved and diagnosed (omitted
+sample, then64KiB file limit blocking a deliberate65537byte test fixture). A fresh
+bounded full-suite diagnostic used128KiB child files; product policy was unchanged.
+Evidence: local `artifacts/meta-cli-coding-20261029/`. This establishes the concrete
+workflow, not general model quality, unattended continuity or Baseten acceptance.
