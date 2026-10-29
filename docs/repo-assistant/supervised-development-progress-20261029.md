@@ -44,3 +44,34 @@ cleanup verified. The Meta review/fix conversation completed within eight calls
 and the two-turn coordinator exited cleanly. Local evidence:
 `artifacts/meta-integrated-candidate-20261029/`. This supports these concrete
 supervised effects, not general model parity or production autonomous approval.
+
+## Hosted access-code correction
+
+Meta authored a minimal ASCII input guard and unit/HTTP regressions after an
+isolated baseline reproduced TypeError for Unicode access-code input. Invalid
+input now receives the existing refusal without echo or cookie; valid login
+and timing-safe ASCII comparison remain. Independent protected checks covered
+six malformed/wrong values and valid login; full Modal suite198passed8skipped
+115subtests, exact cleanup verified. The two-turn coordinator exited0 after
+six Meta requests and the final report correctly attributed execution to the
+supervisor. Public local commit74dc3cb, evidence
+`artifacts/meta-hosted-input-20261029/`. No publication/deployment.
+
+## Hosted logout/cleanup race
+
+An independent baseline showed purge replacing a stale revocation snapshot could
+undo a concurrent logout. Meta authored a standard-library RLock correction and
+two regressions, retaining process-local logout, restart semantics and public
+contracts. Host reviewed the final diff and verified the concurrency regression
+fails against immutable original source. Candidate protected checks and full
+Modal suite passed:200tests8skips115subtests, exact cleanup verified; Ruff clean.
+
+Both finite eight-request worker runs stopped at their iteration limits. First
+left only an import; the separately allocated repair produced the source/tests
+but no final response. Original failures are preserved, with code acceptance
+recorded separately from coordinator completion. No failed grant was extended
+or reset. Evidence: `artifacts/meta-hosted-revocation-20261029/` and
+`artifacts/meta-hosted-revocation-repair-20261029/`. This exposed a practical
+request-headroom limitation, not a provider transport error or general quality
+conclusion. The next worker task must account for discovery/edit/report calls
+before starting within a fresh finite allowance.
