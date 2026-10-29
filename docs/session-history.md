@@ -3030,3 +3030,28 @@ The terminal CLI is the immediate route; a separate custom ACP agent is possible
 but remains unconfigured and untested. Private Workbench processing remains
 unapproved. The public native pilot still needs finite enforced bounds before
 its first live request; no OpenCode installer or new model call was run here.
+
+## 2026-10-29 — Attended Meta ACP connection trial
+
+Owner approved trying a separate ACP agent. Registered Meta Wonder (connection
+trial), preserving existing Kiro and normal Codex defaults. Reused installed
+codex-acp 2.4.0/native Codex 0.165.0/Node 24.19.0, with a separate runtime and
+temporary local relay. The relay holds the actual key outside agent subprocess
+environment and enforces one shared named allowance across restarts: four calls,
+USD3 maximum reservation, 128KiB/request, 8192 output tokens, 180s/request and
+30 minutes from the first admitted call. Prior grants remain unchanged.
+
+Declared connection-only exceptions disable shell/MCP forwarding and remove all
+outbound tools; the test allows synthetic or public Operator workspace context.
+These do not redefine general CLI/delegation permissions or establish coding
+acceptance. Sixteen deterministic guard checks passed. Offline initialization,
+model/effort selection and private-workspace refusal passed. The live synthetic
+round trip returned exactly META ACP OK with 1513 input/24 output tokens. Published
+price estimate USD0.006532 is not an invoice; full USD0.704512 reservation remains.
+No project source, generated-code execution, additional raw prompt/reasoning
+logging or new package download. Ordinary Codex conversation state remains in its
+separate runtime. PyCharm UI selection is still owner-observed.
+
+Original offline legacy-policy failure and local namespace-tool refusal were
+preserved and diagnosed before correction. Neither reached Meta. Evidence stays
+local under artifacts/meta-acp-trial-20261029; no public push or release.
