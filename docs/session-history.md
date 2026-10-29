@@ -15,18 +15,24 @@ runtime by default unless a Meta-only profile is added later.
 Baseten factual questions were resolved by the owner from the dashboard and the
 organizers: event credits are valid only for the hackathon duration, the owner
 will not be additionally charged, and the remaining balance cannot be checked. A
-live synthetic acceptance is prepared but still awaits the owner's explicit
-spend go-ahead.
+bounded live synthetic acceptance was then run with owner-approved hackathon
+credits: 4 chat-completion calls to `meta-models/muse-spark-open-1026`, all
+returned responses, 1,168 total tokens, sources unchanged. The offline adapter's
+request/response translation matches real behavior; tool-call and streaming live
+coverage remain for a later slice if useful. Receipt:
+`artifacts/baseten-live-acceptance-20261029b/receipt.json`.
 
 A Pyright typing error in `tests/test_ai_agent_mcp_server.py` (captured profile
 accessed through `dict[str, object]`) was fixed on a working branch and merged to
 `develop`. `develop` was then pushed to `origin/develop` after the pre-push hook
-passed.
+passed. A new `scripts/baseten-synthetic-acceptance.py` harness was added and
+pushed with the live acceptance receipt.
 
 The session handed off to a 2-hour unattended Codex window at 14:40 local time,
-with a recorded plan at `docs/plans/unattended-work-plan.md`. The planned next
-slice was a conditional Baseten acceptance or, if not approved, deterministic
-submission-eligibility verification.
+with a recorded plan at `docs/plans/unattended-work-plan.md` and prompt at
+`docs/plans/unattended-codex-prompt-20261029.md`. The planned next slice is
+deterministic submission-eligibility work; demo recording and judge access remain
+blocked on owner/organizer input.
 
 ## 2026-10-29 - ADR-078 implemented and observed in a funded run
 
