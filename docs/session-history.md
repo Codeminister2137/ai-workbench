@@ -3055,3 +3055,9 @@ separate runtime. PyCharm UI selection is still owner-observed.
 Original offline legacy-policy failure and local namespace-tool refusal were
 preserved and diagnosed before correction. Neither reached Meta. Evidence stays
 local under artifacts/meta-acp-trial-20261029; no public push or release.
+
+Owner subsequently confirmed that Meta Wonder responded correctly in PyCharm AI
+Chat. The local ledger independently records the second call with HTTP200,
+2613 input/25 output tokens. Two requests remain in the same trial allowance;
+USD1.409024 aggregate reservation is retained. This establishes the actual IDE
+chat route as well as the protocol harness; coding tools remain disabled.
