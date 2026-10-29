@@ -302,9 +302,10 @@ def test_private_input_refused_before_transport(client: BasetenChatClient) -> No
     assert error.value.category is ProviderErrorCategory.PRIVACY_POLICY
 
 
-@pytest.mark.parametrize("status", [401, 402, 429])
+@pytest.mark.parametrize("status", [401, 402, 403, 429])
+@pytest.mark.parametrize("stream", [False, True])
 def test_http_refusal_does_not_retry_or_change_credential(
-    client: BasetenChatClient, monkeypatch: pytest.MonkeyPatch, status: int
+    client: BasetenChatClient, monkeypatch: pytest.MonkeyPatch, status: int, stream: bool
 ) -> None:
     calls = 0
 
@@ -316,8 +317,15 @@ def test_http_refusal_does_not_retry_or_change_credential(
 
     monkeypatch.setattr("ai_provider.adapters.openai_compatible.urlopen", transport)
     with pytest.raises(ProviderError) as error:
-        client.complete(request())
+        if stream:
+            list(client.stream(request()))
+        else:
+            client.complete(request())
     assert calls == 1
     assert error.value.provider == "baseten"
     assert EVENT_KEY not in str(error.value)
     assert error.value.retryable is (status == 429)
+    if status in {401, 403}:
+        # The established category covers both failures; it cannot identify
+        # whether an event key is invalid or lacks permission on another API.
+        assert error.value.category is ProviderErrorCategory.AUTHENTICATION

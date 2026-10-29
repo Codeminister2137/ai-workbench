@@ -1,5 +1,24 @@
 # Session History
 
+## 2026-10-29 - Baseten 403 follow-up and refusal coverage
+
+Started clean develop94c0387 on fix/baseten-403-investigation-20261029. Inspected
+the consumed request and refreshed official authorization/path documentation.
+Bearer authentication and URL-encoded slash match the published contract. Local
+checks found one well-formed event-key assignment and no process override or
+whitespace/quote contamination; no credential/hash was retained. No newer Baseten
+mail was found. These observations do not establish key validity or historical
+credential bytes. Restricted management scope remains plausible, not proven;
+the original receipt lacks response headers/request ID. No authenticated retry,
+inference, key/privilege change, mail send or public push occurred.
+
+Expanded offline Baseten HTTP refusal tests to 403 and streaming, preserving the
+existing category/no-retry/no-key-switch behavior. All21 adapter tests pass;
+Ruff/format and targeted Pyright pass, and git diff --check is clean.
+Organizer/account permission evidence is needed to distinguish the server-side
+cause; event expiry and exhausted-credit/no-owner-charge facts remain unresolved.
+Private assessment:artifacts/baseten-403-investigation-20261029/ASSESSMENT.md.
+
 ## 2026-10-29 - bounded metadata diagnosis and fresh nested-delegation preparation
 
 Started clean developc4914f8; created feature/baseten-metadata-c6-preparation-20261029

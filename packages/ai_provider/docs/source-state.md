@@ -43,6 +43,13 @@ authorization refusal alone does not establish invalid inference credentials or
 explain a particular event key's exact scope. Preserve that uncertainty rather
 than probing inference, broadening key privileges or substituting another key.
 
+The model-details reference explicitly accepts both Bearer and legacy Api-Key
+authentication. The pricing/limits guide requires URL encoding a model slug's
+slash as `%2F`. A request already following those documented forms has no
+documented header/path correction merely because it returned 403. Published key
+format validation can detect malformed local input, but cannot establish key
+validity, ownership, entitlements or the service's internal refusal reason.
+
 ### Model APIs documentation rechecked 2026-10-28
 
 The [Chat Completions reference](https://docs.baseten.co/reference/inference-api/chat-completions)
@@ -81,8 +88,8 @@ table and the actual event onboarding take precedence for their respective scope
 These rates are not verified prices for an event-specific alias.
 [Limits](https://docs.baseten.co/inference/model-apis/pricing-and-limits) are
 model/account specific: TPM includes input/output and cached tokens; RPM is separate.
-The documented model-details GET can expose effective limits, but event-key access
-to that management endpoint remains untested.
+The documented model-details GET can expose effective limits, but inference
+entitlement alone does not establish access to that management endpoint.
 
 [Billing](https://docs.baseten.co/organization/billing) distinguishes credit usage
 from overage and budget alerts from enforcement. An ordinary budget only notifies
