@@ -2,7 +2,23 @@
 
 Use the existing Workbench CLI through `scripts/meta-develop.py` for one focused
 public-repository coding task. No new installation, service, scheduler or database.
-Run from the configured project environment, for example:
+Run from the configured project environment using either entry point below.
+
+In a Windows project terminal, the companion launcher supplies the existing
+package paths without changing directories or importing the whole `.env`:
+
+```powershell
+.\scripts\meta-develop.ps1 `
+  -RepoRoot artifacts/meta-acp-coding-20261029/worktree `
+  -TaskFile artifacts/meta-cli-coding-20261029/task.txt `
+  -RunDirectory artifacts/my-next-meta-task -Check
+```
+
+It uses the existing project `.venv` by default; pass `-PythonExecutable` to use
+the IDE's configured interpreter instead. It installs nothing. Remove `-Check`
+only for a fresh authorized task, not the already-completed example below.
+
+The equivalent Python entry point is:
 
 ```powershell
 uv run --locked --no-sync python scripts/meta-develop.py `
