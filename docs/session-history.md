@@ -1,5 +1,20 @@
 # Session History
 
+## 2026-10-29 - Unattended receipt review
+
+Reviewed the consumed Baseten receipt offline: four responses, 688 input and 480
+output tokens (1,168 total), matching before/after hashes for five protected files.
+Three responses ended at the output limit with empty final content; one contained
+the expected text. The harness marks received responses as passed without an
+exact-content assertion. This supports connectivity/basic translation, not general
+model quality, streaming or tool-call acceptance. Reported dollar cost is unknown.
+No additional live acceptance or paid inference was run before the owner resumed development at 13:49Z.
+
+Workbench started clean at `942e024`, equal to its remote-tracking develop ref;
+the unattended prompt's expected `391cde7` was stale. Local onboarding notes were
+reconciled with the completed allowance. Operator verification findings and the
+fresh-execution limitation are recorded in the current local handoff.
+
 ## 2026-10-29 - Meta-only submission constraint and pre-unattended handoff
 
 Owner relayed the organizer rule: every model called by the judged artifact at
