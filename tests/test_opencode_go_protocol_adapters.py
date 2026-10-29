@@ -407,3 +407,97 @@ def test_responses_finish_reason_maps_status_and_incomplete_details(monkeypatch)
             )
         )
         assert response.finish_reason is expected, extra
+
+
+def test_messages_finish_reason_maps_stop_sequence(monkeypatch):
+    cases = [
+        ("end_turn", FinishReason.STOP),
+        ("stop_sequence", FinishReason.STOP),
+        ("max_tokens", FinishReason.LENGTH),
+        ("tool_use", FinishReason.UNKNOWN),
+    ]
+    pending = [reason for reason, _ in cases]
+
+    def send(request, *, timeout):
+        reason = pending.pop(0)
+        return Response(
+            {
+                "content": [{"type": "text", "text": "hi"}],
+                "usage": {"input_tokens": 1, "output_tokens": 1},
+                "stop_reason": reason,
+            }
+        )
+
+    monkeypatch.setattr("ai_provider.adapters.anthropic_messages.urlopen", send)
+
+    client = OpenCodeGoMessagesClient(
+        BackendConfig(
+            provider=ProviderKind.OPENCODE_GO, model="claude-haiku-5-5", api_key="test-key"
+        )
+    )
+    for reason, expected in cases:
+        response = client.complete(
+            AIRequest(
+                messages=(AIMessage(MessageRole.USER, "Hi"),),
+                privacy_class=PrivacyClass.EXTERNAL_ALLOWED,
+            )
+        )
+        assert response.finish_reason is expected, reason
+
+
+def test_messages_stream_maps_stop_reason(monkeypatch):
+    from ai_provider.contracts import AIStreamFinal
+
+    cases = [
+        ("end_turn", FinishReason.STOP),
+        ("stop_sequence", FinishReason.STOP),
+        ("max_tokens", FinishReason.LENGTH),
+        ("tool_use", FinishReason.UNKNOWN),
+        (None, FinishReason.STOP),
+    ]
+
+    for reason, expected in cases:
+        if reason is None:
+            chunks = [
+                {"type": "message_start", "message": {"usage": {"input_tokens": 1}}},
+                {"type": "content_block_delta", "delta": {"text": "hi"}},
+                {"type": "message_delta", "usage": {"output_tokens": 1}},
+                {"type": "message_stop"},
+            ]
+        else:
+            chunks = [
+                {"type": "message_start", "message": {"usage": {"input_tokens": 1}}},
+                {"type": "content_block_delta", "delta": {"text": "hi"}},
+                {
+                    "type": "message_delta",
+                    "delta": {"stop_reason": reason},
+                    "usage": {"output_tokens": 1},
+                },
+                {"type": "message_stop"},
+            ]
+
+        def send(request, *, timeout, _chunks=chunks):
+            return Response(_chunks)
+
+        monkeypatch.setattr("ai_provider.adapters.anthropic_messages.urlopen", send)
+
+        client = OpenCodeGoMessagesClient(
+            BackendConfig(
+                provider=ProviderKind.OPENCODE_GO,
+                model="claude-haiku-5-5",
+                api_key="test-key",
+            )
+        )
+        events = list(
+            client.stream(
+                AIRequest(
+                    messages=(AIMessage(MessageRole.USER, "Hi"),),
+                    privacy_class=PrivacyClass.EXTERNAL_ALLOWED,
+                )
+            )
+        )
+        assert events[0].content == "hi"
+        assert isinstance(events[-1], AIStreamFinal)
+        assert events[-1].response.finish_reason is expected, reason
+        assert events[-1].response.usage.input_tokens == 1
+        assert events[-1].response.usage.output_tokens == 1

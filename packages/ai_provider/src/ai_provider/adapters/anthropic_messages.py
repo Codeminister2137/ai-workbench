@@ -93,15 +93,32 @@ class AnthropicMessagesChatClient:
         content_parts: list[str] = []
         final_raw: dict[str, Any] | None = None
         usage_chunk: dict[str, Any] | None = None
+        stop_reason: str | None = None
 
         for raw_chunk in self._stream_messages(payload):
             event_type = raw_chunk.get("type")
             if event_type == "message_stop":
                 continue
+            if event_type == "message_start":
+                message = raw_chunk.get("message")
+                if isinstance(message, dict) and final_raw is None:
+                    final_raw = message
+                    if isinstance(message.get("usage"), dict):
+                        usage_chunk = {"usage": dict(message["usage"])}
+                continue
             if event_type == "message_delta":
                 usage = raw_chunk.get("usage")
                 if isinstance(usage, dict):
-                    usage_chunk = usage
+                    prior_usage = (usage_chunk or {}).get("usage", {})
+                    usage_chunk = {"usage": {**prior_usage, **usage}}
+                delta = raw_chunk.get("delta")
+                if isinstance(delta, dict):
+                    reason = delta.get("stop_reason")
+                    if isinstance(reason, str) and reason:
+                        stop_reason = reason
+                        final_raw = raw_chunk
+                elif final_raw is None:
+                    final_raw = raw_chunk
                 continue
             if event_type == "content_block_delta":
                 delta = raw_chunk.get("delta", {})
@@ -119,7 +136,9 @@ class AnthropicMessagesChatClient:
             message=AIMessage(role=MessageRole.ASSISTANT, content="".join(content_parts)),
             backend=self._backend_for_model(model),
             usage=self._usage_from_response(usage_chunk or final_raw or {}),
-            finish_reason=FinishReason.STOP,
+            finish_reason=(
+                self._finish_reason(stop_reason) if stop_reason is not None else FinishReason.STOP
+            ),
             latency_ms=(time.perf_counter() - started) * 1000,
             raw_metadata=self._safe_metadata(final_raw or {}),
         )
@@ -351,7 +370,7 @@ class AnthropicMessagesChatClient:
 
     @staticmethod
     def _finish_reason(raw_reason: object) -> FinishReason:
-        if raw_reason == "end_turn":
+        if raw_reason in ("end_turn", "stop_sequence"):
             return FinishReason.STOP
         if raw_reason == "max_tokens":
             return FinishReason.LENGTH

@@ -258,11 +258,19 @@ local L3 CLI measurement overrides a band for a specific task.
 | Account allowance observation | No | No | Via API | No | No | Unavailable: no official endpoint |
 | Route availability observation | No | No | Via API | No | No | No |
 | External execution | No | Implemented | Implemented | Implemented | Implemented | Implemented |
-| Tool calling | Not yet | Future trigger | Implemented | Future trigger | Future trigger | Implemented |
+| Tool calling | Implemented | Future trigger | Implemented | Future trigger | Future trigger | Implemented except Messages-protocol models |
 | Structured output | Not yet | Future trigger | Future trigger | Future trigger | Future trigger | Future trigger |
 | Embeddings | Not yet | Future trigger | Future trigger | Future trigger | Future trigger | Future trigger |
 
 The interface should not pretend every backend supports every feature. New capabilities should be added only when a real consumer needs them.
+
+Ollama tool calling is implemented in `adapters/ollama.py`: request tools are
+sent, assistant tool calls are parsed, and the backend reports
+`tools=True`. The Messages-protocol path (`adapters/anthropic_messages.py`,
+including `OpenCodeGoMessagesClient`) does not send or parse tools and
+reports `tools=False`; streamed `stop_reason` values map to the shared
+`FinishReason` (`end_turn`/`stop_sequence` → `STOP`,
+`max_tokens` → `LENGTH`).
 
 ## Hosted API Shape
 

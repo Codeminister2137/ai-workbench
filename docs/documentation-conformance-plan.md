@@ -191,3 +191,25 @@ but multi-turn continuity across requests requires the caller to pass a stable
 adapter docstrings state this explicitly. No new regression tests were added because
 no functional gap was demonstrated — every divergence is a working divergence already
 covered by existing offline checks. Whole-repository conformance remains incomplete.
+
+The shared Anthropic Messages adapter (`anthropic_messages.py`, inherited by
+`opencode_go_messages.py`) had the same truncation-hiding shape in streaming as
+the Responses adapter had in completion: `stream()` hardcoded
+`finish_reason=STOP` and ignored the documented `message_delta.delta.stop_reason`,
+so a `max_tokens` truncation was reported as a clean stop. It now captures that
+`stop_reason` and maps it through the existing `FinishReason` enum
+(`end_turn`/`stop_sequence` → `STOP`, `max_tokens` → `LENGTH`, other values →
+`UNKNOWN`); streams that omit `stop_reason` keep the historical `STOP` default.
+The non-streaming mapping adds the documented `stop_sequence` clean-stop value,
+which was previously reported as `UNKNOWN`. Regressions
+`test_messages_finish_reason_maps_stop_sequence` and
+`test_messages_stream_maps_stop_reason` lock the mapping. The provider capability
+matrix in `packages/ai_provider/docs/interface.md` is also corrected: Ollama tool
+calling is implemented (it sends/parses tools and reports `tools=True`), and
+OpenCode Go tool calling is qualified except for Messages-protocol models, whose
+adapter does not send/parse tools and reports `tools=False`. No live inference,
+routing, privacy, persistence or dependency change follows.
+
+Host review additionally corrected streamed usage accumulation: preserve input
+counts from `message_start` while updating cumulative counts from `message_delta`.
+The streaming regression now checks both counts and the `stop_sequence` mapping.
