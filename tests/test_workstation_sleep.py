@@ -336,6 +336,44 @@ def test_cancel_all_whatif_does_not_create_control_state(tmp_path):
     assert not control.exists()
 
 
+@pytest.mark.parametrize("identity", ["dead", "reused"])
+def test_cancel_all_retains_inactive_receipt_without_false_acknowledgement(tmp_path, identity):
+    control = tmp_path / "control"
+    control.mkdir()
+    receipt = tmp_path / "old.json"
+    # The harness process is alive; an impossible start time proves PID reuse.
+    import os
+
+    state = {
+        "status": "sleep_scheduled",
+        "process_id": 2147483647 if identity == "dead" else os.getpid(),
+        "process_started_utc": "2000-01-01T00:00:00Z",
+    }
+    original = json.dumps(state)
+    receipt.write_text(original)
+    (control / "timer-old.json").write_text(json.dumps({"receipt_path": str(receipt)}))
+    result = run_helper(
+        f"& '{SCRIPT.as_posix()}' -CancelAll -ControlDirectory '{control.as_posix()}'"
+    )
+    assert result.returncode == 0, result.stderr
+    assert "Inactive timer receipt retained" in result.stdout
+    assert "no active registered timer remains pending" in result.stdout
+    assert receipt.read_text() == original
+
+
+def test_cancel_all_unknown_process_identity_stays_pending(tmp_path):
+    control = tmp_path / "control"
+    control.mkdir()
+    receipt = tmp_path / "unknown.json"
+    receipt.write_text(json.dumps({"status": "sleep_scheduled"}))
+    (control / "timer-unknown.json").write_text(json.dumps({"receipt_path": str(receipt)}))
+    result = run_helper(
+        f"& '{SCRIPT.as_posix()}' -CancelAll -ControlDirectory '{control.as_posix()}'"
+    )
+    assert result.returncode != 0
+    assert "acknowledgement missing" in result.stderr
+
+
 def test_renewal_cannot_revive_an_expired_lease(tmp_path):
     receipt = tmp_path / "expired.json"
     lease = tmp_path / "lease"

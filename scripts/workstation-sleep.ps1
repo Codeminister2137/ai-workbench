@@ -37,6 +37,26 @@ function Read-CancelGeneration {
     }
     return ''
 }
+function Test-TimerProcessPending($State) {
+    # Old receipts survive crashes/logoffs. Preserve them without claiming an
+    # acknowledgement or sleep transition from a process that no longer exists.
+    if (-not $State.PSObject.Properties['process_id']) { return $true }
+    $timerProcess = Get-Process -Id $State.process_id -ErrorAction SilentlyContinue
+    if (-not $timerProcess) { return $false }
+    try {
+        $started = $timerProcess.StartTime.ToUniversalTime()
+        if ($State.PSObject.Properties['process_started_utc']) {
+            return $started -eq ([datetimeoffset]::Parse($State.process_started_utc)).UtcDateTime
+        }
+        if ($State.PSObject.Properties['recorded_utc']) {
+            return $started -le ([datetimeoffset]::Parse($State.recorded_utc)).UtcDateTime
+        }
+    } catch {
+        # Unknown identity remains pending rather than hiding a live timer.
+        return $true
+    }
+    return $true
+}
 function Write-AtomicText([string]$Path, [string]$Text) {
     $temporary = "$Path.$([guid]::NewGuid()).tmp"
     try {
@@ -68,13 +88,18 @@ if ($CancelAll) {
         $pending = @($pending | Where-Object {
             if (-not (Test-Path -LiteralPath $_)) { return $true }
             $state = Read-ControlText $_ | ConvertFrom-Json
-            $state.status -eq 'sleep_scheduled'
+            if ($state.status -ne 'sleep_scheduled') { return $false }
+            if (-not (Test-TimerProcessPending $state)) {
+                Write-Warning "Inactive timer receipt retained; no acknowledgement or sleep outcome established: $_"
+                return $false
+            }
+            return $true
         })
         if ($pending.Count -eq 0) { break }
         Start-Sleep -Milliseconds 100
     } while ([datetimeoffset]::UtcNow -lt $waitUntil)
     if ($pending.Count) { throw "Cancellation sent; acknowledgement missing for: $($pending -join ', ')" }
-    Write-Output 'sleep_status: cancellation acknowledged; no registered timer remains pending (submitted power requests cannot be undone)'
+    Write-Output 'sleep_status: no active registered timer remains pending (inactive receipts are retained; submitted power requests cannot be undone)'
     return
 }
 if ($Renew) {
@@ -204,6 +229,7 @@ function Write-SleepReceipt([string]$Status) {
             transition_times_utc = $sleepTransitionTimesUtc
             transition_times_warsaw = $sleepTransitionTimesWarsaw
             process_id = $PID
+            process_started_utc = (Get-Process -Id $PID).StartTime.ToUniversalTime().ToString('o')
             cancel_path = $CancelPath
             force = $false
             wake_events_disabled = $false

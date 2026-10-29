@@ -47,6 +47,11 @@ This cancels all timers created by this repository's updated helper, including
 completion timers, without paths or identifiers. It broadcasts cancellation and
 waits up to five seconds for registered timers' receipts; missing acknowledgements
 produce a nonzero exit and identify the unresolved receipts. It is safe to repeat.
+Inactive timer processes are reported separately while their original receipts
+are retained. New receipts record process start time so a reused PID cannot be
+mistaken for the timer. An absent process establishes neither an acknowledged
+cancellation nor a Windows sleep transition. Unknown process identity remains
+pending and produces a nonzero exit.
 It does not cancel unrelated Windows or third-party power schedules. A future
 explicitly authorized timer can start normally; this is not a permanent no-sleep
 setting. Do not automatically rearm or renew after owner cancellation during the
