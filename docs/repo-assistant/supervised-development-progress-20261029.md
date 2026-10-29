@@ -126,3 +126,45 @@ provider failure. Category, retry behavior, bounds, prior effects and partial
 history remain unchanged. A real-loop regression checks retained file/history,
 one call only, actual closeout cause and private-prompt sentinel exclusion.
 Agent-loop and launcher subset35passed; no inference/cloud/private transmission.
+
+## Approved development continuation
+
+Owner explicitly raised cumulative Modal development ceiling from10to15USD using
+existing eligible credits so independently validated Meta development can continue.
+Meta75USD unchanged; all prior usage/outstanding reservations remain counted.
+No purchases/overage/judge allocation or private Workbench payload permission.
+The prior pending-budget checkpoint is historical, superseded by this grant.
+
+## Escaped credential echo correction
+
+Protected synthetic baseline proved serialized argument matching missed keys
+containing quotes/backslashes. Meta authored iterative decoded key/value/list
+checking and regressions including400-level nested values and decoded receipts.
+Host independently proved original-source failure and fixed behavior; full Modal
+206passed8skip129subtests, cleanup verified and Ruff clean. Two-turn worker
+completed; local61a2108 integrated. Evidence
+`artifacts/meta-escaped-credential-20261029/` and its fresh validation phase.
+Original host-fixture failures remain preserved; neither a missing synthetic
+grant flag nor original/fixed exception-type mismatch is a product failure.
+
+## Diagnostic redaction order
+
+Meta moved decoded-value redaction before JSON/Python diagnostic formatting for
+incomplete responses and HTTP errors, preserving useful safe details, categories,
+status, bounds and reservations. Tests parse formatted details, retain durable
+receipts/failure events and check session-key cleanup. Host identified incorrect
+assertRaises around paused Operator.run and a weak encoded-text oracle; fresh
+Meta repair corrected those. Host supplied two decoded saved-event assertions.
+Immutable-original red, protected candidate green and full Modal208passed8skip
+132subtests, exact cleanup verified, Ruff clean. Local9d70683 integrated.
+Evidence `artifacts/meta-diagnostic-redaction-20261029/` and repair phase.
+Both16request original and8request repair stopped without final reports; code
+accepted separately by host. A speculative600-level recursion hypothesis was
+NOT reproduced (normal MetaFailure observed); no speculative refactor followed.
+
+Conservative commitments now Meta74.740672/75 and Modal12.54/15, including all
+prior grants. Read-only inspection confirmed old ACPcoding-b still0calls but
+expires_at=null (first-call window), so its full8 remains outstanding; no grant
+was retired or ledger/config changed. Requests for Meta cumulative100 and selected
+private Workbench routing are pending, not approved. Current implementation
+completed; another paid Meta coding task needs budget authority.
