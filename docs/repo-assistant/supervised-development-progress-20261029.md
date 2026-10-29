@@ -86,3 +86,31 @@ without reporting the wrong envelope or hitting an unrelated eight-round limit.
 Offline real-controller tests cover eight and twelve requests, context retention,
 matching round/receipt bounds and refusal before an excess network send:
 16passed, Ruff check/format clean. Private implementation was not sent to Meta.
+
+## Attachment/logout atomicity
+
+Meta serialized claims and key attachment under the existing hosted RLock after
+a protected baseline proved a concurrent logout could be followed by restoration
+of its key. Host review caught immediate barrier release in the first regression;
+Meta corrected scheduling and added key-borrow refusal in the same finite task.
+Original immutable source fails that regression; candidate and complete isolated
+Modal suite pass201tests8skips115subtests. Ruff clean and exact cleanup verified.
+Meta completed both turns with truthful test attribution; local commit5cfcd8a
+integrated into the preferred candidate. Evidence
+`artifacts/meta-attach-logout-20261029/`. No public delivery or auth-policy change.
+
+## Task approval input correction
+
+Meta authored nonce type/ASCII refusal and controller/HTTP regressions after an
+isolated baseline reproduced Unicode TypeError escaping normal409 handling.
+Host verified wrong values preserve state/events/source and exact valid nonce
+still applies. Immutable-original regression fails; candidate full isolated Modal
+suite203passed8skipped123subtests, exact cleanup verified, Ruff clean. Evidence
+`artifacts/meta-approval-input-20261029/`. Meta's first-turn report completed;
+second-turn optional simplification exhausted shared12request cap, no further
+edits/final report. Original failure retained, code accepted separately.
+
+Conservative cumulative commitments now Meta65.830672/75 and Modal9.90/10,
+including all prior grants/outstanding reservations. Owner was asked whether
+to raise cumulative Modal cap to15 using existing eligible credits; no answer
+means no grant. No historical allowance was changed or unused reserve refunded.
