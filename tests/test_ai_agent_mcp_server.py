@@ -13,7 +13,7 @@ from ai_agent.mcp_server import (
 )
 from ai_agent.tool_profiles import INSPECTION_PROFILE
 from ai_agent.tools import CreateFileTool, ReadFileTool, ToolContext
-from ai_orchestrator import AccessMethod, TaskCapability
+from ai_orchestrator import AccessMethod, TaskCapability, TaskProfile
 from ai_provider import FinishReason
 
 
@@ -148,7 +148,7 @@ def _delegate_through_mcp(
     pending_message: bool = False,
     finish_reason: FinishReason = FinishReason.STOP,
     tool_results: tuple[ToolResult, ...] = (),
-) -> tuple[dict, object]:
+) -> tuple[dict, dict[str, TaskProfile]]:
     """Call the MCP delegate_task tool with a synthetic child run."""
 
     class FakeAgentLoop:
@@ -186,7 +186,7 @@ def _delegate_through_mcp(
         failure_reason=None,
         status=SimpleNamespace(value="ready"),
     )
-    captured: dict[str, object] = {}
+    captured: dict[str, TaskProfile] = {}
 
     def fake_prepare_execution(prompt, profile, *args, **kwargs):
         captured["profile"] = profile
