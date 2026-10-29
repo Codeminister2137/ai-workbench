@@ -1,5 +1,20 @@
 # Session History
 
+## 2026-10-29 - Owner return and native Meta client preparation
+
+Owner returned during closeout. The resumed sleep timer acknowledged cancellation
+at15:10:59Z /16:10:59Europe/Warsaw; no completion timer was armed. Original deadline
+15:40Z stayed fixed. Unattended span13:40:42-15:10:59Z was90min17sec, including the
+initial approximately5min interruption. Work continued attended on the new request.
+
+Prepared a draft opt-in Codex/Muse Wonder profile and model catalog, checked against
+installed Codex0.165.0 and official Meta/OpenAI guidance. Native catalog parsing and
+strict startup validation passed after isolating one incompatible top-level summary
+flag; original diagnostics retained. No user config write, installer execution or
+inference call occurred. Public Operator versus private Workbench payload scope is
+an owner decision before a native Meta coding pilot; no existing privacy boundary
+was silently expanded. Draft configuration is local, with no embedded credential.
+
 ## 2026-10-29 - Current-base and remote-approval verification
 
 Live remote refs confirmed the eligibility branch at e212dfd and main at3aa01fc.

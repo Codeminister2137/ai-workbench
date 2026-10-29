@@ -140,6 +140,27 @@ live event-alias tool/stream behavior. Existing metadata filtering and offline
 tool-history controls remain unchanged; no speculative continuation or shared
 request-interface extension was added. Ordinary-model documentation does not
 establish event-specific entitlement, prices, remaining credit or effective effort.
+### Meta native coding clients and Muse Wonder - checked 2026-10-29
+
+Meta's [coding-agent guide](https://dev.meta.ai/docs/coding-agents) explicitly
+configures Codex over Responses with `muse-wonder-1.0`, and recommends the OpenAI
+Responses adapter for OpenCode's encrypted-reasoning continuation. The
+[model guide](https://dev.meta.ai/docs/models) lists Wonder on Model API Standard;
+Wonder Full is a separate Muse Code subscription offering, not selected by effort.
+[Published pricing](https://dev.meta.ai/docs/pricing-rate-limits): Wonder $4 input,
+ $0.20 cached input, $20 output per million tokens. Spark Standard remains
+ $1.25 / $0.15 / $4.25. These are published rates, not account credit/access observations.
+
+For app-server use, the [framework guide](https://dev.meta.ai/docs/agent-frameworks)
+registers a local `model_catalog_json` file because Meta's standard model-list shape
+differs from Codex's catalog. Codex 0.165.0 locally accepted a draft Wonder catalog
+and normal/strict startup configuration without requesting inference. In this
+installed build strict startup rejected the documented top-level
+`model_supports_reasoning_summaries` override; dropping just that field passed,
+with summary support still declared in the catalog. Preserve this version-specific
+observed discrepancy rather than claiming the documented field is universally
+removed. No native Meta inference/quality, account entitlement, installed profile,
+credit guard or private-Workbench data permission is established by offline parsing.
 ## Reading and refreshing provider knowledge
 
 This file is the repository agent's first provider-knowledge entry point. Keep
