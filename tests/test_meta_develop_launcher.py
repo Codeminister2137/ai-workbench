@@ -78,11 +78,14 @@ def test_catalog_contains_only_selected_meta_route():
     ]
 
 
-def test_chat_reuses_existing_cli_history_and_one_shared_transport_budget(tmp_path, monkeypatch):
+@pytest.mark.parametrize("calls", [8, 12])
+def test_chat_reuses_existing_cli_history_and_one_shared_transport_budget(
+    tmp_path, monkeypatch, calls
+):
     """Real coding-chat controller, synthetic replies; never network or physical approvals."""
     import contextlib
 
-    from ai_agent import coding_chat_cli
+    from ai_agent import cli, coding_chat_cli
     from ai_provider.chat_transcripts import SQLiteChatTranscriptStore
 
     root = tmp_path / "public"
@@ -93,6 +96,14 @@ def test_chat_reuses_existing_cli_history_and_one_shared_transport_budget(tmp_pa
     database.touch()
     SQLiteChatTranscriptStore(database)
     bodies = []
+    original_main = cli.main
+
+    def bounded_main(args):
+        assert args[args.index("--max-action-rounds") + 1] == str(calls)
+        return original_main(args)
+
+    monkeypatch.setattr(launcher, "MAX_CALLS", calls)
+    monkeypatch.setattr(cli, "main", bounded_main)
 
     class Response:
         def __enter__(self):
@@ -123,9 +134,9 @@ def test_chat_reuses_existing_cli_history_and_one_shared_transport_budget(tmp_pa
             return Response()
 
     def conversation(controller, execute, **kwargs):
-        for index in range(8):
+        for index in range(calls):
             assert controller.turn(f"Synthetic owner turn {index}", execute).returncode == 0
-        controller.turn("Ninth synthetic turn must not reach network", execute)
+        controller.turn("Over-budget synthetic turn must not reach network", execute)
         pytest.fail("Expected the shared allowance to stop the conversation")
 
     monkeypatch.setenv("META_API_KEY", "synthetic-no-real-key")
@@ -149,10 +160,13 @@ def test_chat_reuses_existing_cli_history_and_one_shared_transport_budget(tmp_pa
         ],
     )
     assert launcher.main() == 2
-    assert len(bodies) == 8
+    assert len(bodies) == calls
     assert "Synthetic owner turn 0" in json.dumps(bodies[1])
     assert "Synthetic reply" in json.dumps(bodies[1])
-    assert len(json.loads((run / "receipt.json").read_text())["requests"]) == 8
+    receipt = json.loads((run / "receipt.json").read_text())
+    assert len(receipt["requests"]) == calls
+    assert receipt["max_requests"] == calls
+    assert receipt["max_reserved_usd"] == str(launcher.RESERVE * calls)
 
 
 def test_chat_refuses_missing_database_before_creating_any_run_storage(tmp_path, monkeypatch):

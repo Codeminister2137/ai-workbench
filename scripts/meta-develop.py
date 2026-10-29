@@ -199,7 +199,7 @@ def main() -> int:
 
     receipt = {
         "max_requests": MAX_CALLS,
-        "max_reserved_usd": "2.00",
+        "max_reserved_usd": str(RESERVE * MAX_CALLS),
         "requests": [],
         "status": "running",
     }
@@ -251,7 +251,7 @@ def main() -> int:
         policy_scope.enter_context(hands_off_file_policy(args.hands_off))
         if args.chat:
             print(
-                f"Meta chat: {MAX_CALLS} total API calls, USD2 maximum, "
+                f"Meta chat: {MAX_CALLS} total API calls, USD{RESERVE * MAX_CALLS} maximum, "
                 "15-minute admission window. /exit ends chat."
             )
         status = cli_main(
@@ -279,7 +279,7 @@ def main() -> int:
                 "interactive" if args.chat and not args.hands_off else "workspace_write",
                 "--skip-prompt-review",
                 "--max-action-rounds",
-                "8",
+                str(MAX_CALLS),
                 "--timeout-seconds",
                 "90",
                 "--command-timeout-seconds",

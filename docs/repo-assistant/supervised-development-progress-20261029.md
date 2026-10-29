@@ -75,3 +75,14 @@ or reset. Evidence: `artifacts/meta-hosted-revocation-20261029/` and
 request-headroom limitation, not a provider transport error or general quality
 conclusion. The next worker task must account for discovery/edit/report calls
 before starting within a fresh finite allowance.
+
+## Development launcher bound consistency
+
+Host corrected hard-coded eight action rounds and USD2 receipt/banner values to
+derive from the task's existing MAX_CALLS bound. Default remains eight calls;
+no CLI option, permission, aggregate grant or payload boundary was added. Fresh
+supervised tasks can explicitly choose an appropriately reserved finite cap
+without reporting the wrong envelope or hitting an unrelated eight-round limit.
+Offline real-controller tests cover eight and twelve requests, context retention,
+matching round/receipt bounds and refusal before an excess network send:
+16passed, Ruff check/format clean. Private implementation was not sent to Meta.
