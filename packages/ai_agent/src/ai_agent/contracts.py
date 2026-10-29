@@ -92,6 +92,8 @@ class ToolCall:
     name: str
     arguments: dict[str, Any]
     call_id: str | None = None
+    # Supplied by trusted tool approval_call(), never model arguments or wire data.
+    approval_paths: tuple[str, ...] | None = field(default=None, repr=False)
 
 
 @dataclass(frozen=True, slots=True)

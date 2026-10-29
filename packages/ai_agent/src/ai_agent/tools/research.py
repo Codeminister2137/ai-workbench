@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urljoin
 
-from ai_agent.contracts import ToolCategory, ToolDefinition, ToolParameter, ToolResult
+from ai_agent.contracts import ToolCall, ToolCategory, ToolDefinition, ToolParameter, ToolResult
 from ai_agent.research_evidence import ResearchSources
 from ai_agent.research_reports import report_advisories
 from ai_agent.tools.base import BaseTool, ToolContext, ToolRegistry
@@ -130,6 +130,11 @@ class ResearchReportTool(BaseTool):
         self.record = record
         self.write = write
         self.validate = validate
+
+    def approval_call(self, call: ToolCall) -> ToolCall:
+        if not self.write:
+            return call
+        return ToolCall(call.name, call.arguments, call.call_id, approval_paths=(str(self.target),))
 
     @property
     def definition(self) -> ToolDefinition:

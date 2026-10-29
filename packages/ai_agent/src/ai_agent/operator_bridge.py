@@ -20,6 +20,7 @@ from typing import Any
 
 import httpx
 
+from ai_agent.approval_file_state import capture_file_state
 from ai_agent.contracts import ToolCall, ToolCategory
 
 
@@ -106,6 +107,16 @@ class OperatorApprovalBridge:
             return seconds
 
         remaining()
+        approval_paths = approval_call.approval_paths
+
+        def file_state() -> str:
+            if approval_paths is None:
+                raise OperatorBridgeError("Write tool has not declared file approval targets")
+            try:
+                return capture_file_state(self.workspace, approval_paths, remaining)
+            except (OSError, ValueError) as exc:
+                raise OperatorBridgeError("File approval state unavailable or unsafe") from exc
+
         description = _describe(approval_call, category, self.workspace)
         operation_json = json.dumps(
             {"tool": approval_call.name, "arguments": approval_call.arguments},
@@ -113,7 +124,9 @@ class OperatorApprovalBridge:
             sort_keys=True,
         )
         candidate_digest = _sha256(operation_json)
-        base_digest = _sha256(str(self.workspace))
+        base_digest = (
+            file_state() if category is ToolCategory.WRITE else _sha256(str(self.workspace))
+        )
         evidence_digest = _sha256(f"{category.value}:{approval_call.name}")
         binding = {
             "candidate_digest": candidate_digest,
@@ -167,6 +180,11 @@ class OperatorApprovalBridge:
                         raise OperatorBridgeError(
                             "Pending tool action changed while awaiting approval"
                         )
+                    if approved and category is ToolCategory.WRITE and file_state() != base_digest:
+                        raise OperatorBridgeError(
+                            "File state changed while awaiting approval; fresh approval required"
+                        )
+                    remaining()
                     return approved
                 except OperatorBridgeError:
                     if time.perf_counter() >= deadline:

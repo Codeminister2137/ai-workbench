@@ -169,6 +169,15 @@ an OS sandbox. See [ADR-074](../decisions/ADR-074-delegation-inherits-supervisor
 Bare shared-tool registries without a configured runner refuse delegation.
 `--delegate-context` remains a separate optional preparatory extraction pass.
 
+When remote Operator approval is selected, create/edit, configured research-report
+writes and prepared rename application bind their declared file state across the
+approval wait. Workbench hashes local target evidence into `base_digest` and
+refuses a stale action before returning approval; it does not resubmit it
+automatically. File contents/paths remain local. Unknown write tools need a trusted
+target declaration. This does not freeze later writes or arbitrary command inputs;
+shell approvals retain operation-only semantics. See
+[ADR-077](../decisions/ADR-077-file-state-bound-operator-approval.md).
+
 Offline integration preparation is available through
 `scripts/hosted-delegation-acceptance.py --output-dir artifacts/<fresh-name>`.
 It uses the actual Meta Responses and Baseten Chat Completions adapters over

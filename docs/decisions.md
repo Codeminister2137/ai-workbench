@@ -1,3 +1,12 @@
+## ADR-077 - File state bound to remote Operator approvals
+
+**Status:** Owner-approved and implemented, 2026-10-29.
+
+Remote file mutations bind declared target state across the approval wait;
+concurrent changes require fresh approval. Metadata-only privacy remains;
+command-input protection is separate, and writes are not made atomic. See
+[ADR-077](decisions/ADR-077-file-state-bound-operator-approval.md).
+
 ## ADR-076 - Host credential guards before storage migration
 
 **Status:** Owner-approved sequence; first slice implemented, 2026-10-28.

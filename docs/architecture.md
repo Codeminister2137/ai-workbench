@@ -128,9 +128,11 @@ The callback verifies the polled action identity/digests and unchanged tool
 arguments before accepting approval. Its single round-trip deadline is capped
 by the CLI execution deadline; late approval is refused. Best-effort cancellation
 has a separate one-second request timeout. In-flight HTTP operations are not an
-OS-enforced wall-clock bound. The current base digest identifies the workspace,
-not file preimages: intervening file changes do not invalidate argument-only
-approval. File-state binding is an owner decision pending investigation evidence.
+OS-enforced wall-clock bound. File writes now bind declared target state through
+the base digest and reject changes across the approval wait. Tools provide paths
+locally; only the aggregate digest leaves Workbench. Command inputs remain outside
+this guarantee, and the later write is not atomic with the callback's last check.
+See [ADR-077](decisions/ADR-077-file-state-bound-operator-approval.md).
 
 ADR-049 adds a distinct foreground `coding-chat` mode. `ai_agent.coding_chat`
 owns conversation continuity over injected turn execution; `coding_chat_cli`

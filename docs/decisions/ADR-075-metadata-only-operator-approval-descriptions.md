@@ -35,7 +35,7 @@ Mock HTTP transport tests inspect actual submission JSON, including nested value
 arbitrary argument names, workspace paths and same-sized distinct actions. Existing
 client-lifetime, approval, rejection and transport-failure coverage remains active.
 
-## Verification follow-up — 2026-10-29
+## Verification follow-up — 2026-10-29, before ADR-077
 
 The Workbench callback now checks the returned action ID and all three digests
 on every full poll response, and refuses tool-argument mutation during the wait.
@@ -53,3 +53,7 @@ An independent synthetic reproduction confirms an intervening file edit can be
 overwritten by an approved full-file operation. Binding approval to file state
 would change that contract and remains pending the owner's decision; no new
 file-state policy is implied by the response-validation corrections.
+
+Subsequently the owner approved targeted file-state preconditions. File-write
+base-digest semantics are now amended by [ADR-077](ADR-077-file-state-bound-operator-approval.md).
+Metadata-only descriptions and the separate content-review requirement remain.

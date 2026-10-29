@@ -1,5 +1,39 @@
 # Session History
 
+## 2026-10-29 - Owner-approved file state bound to Operator approvals
+
+Owner accepted the recommended targeted file-state checks after the concurrent-
+edit reproduction. Implemented on feature/operator-file-state-approval-20261029
+from develop82470e7. Trusted file tools provide host-only approval_paths: create/
+edit target, configured research report, all prepared rename files. Remote write
+approvals without declared targets refuse rather than silently retaining weaker
+semantics. Shell-command input protection remains separate and unchanged.
+
+Local file-state evidence covers target existence/resolution, identity/mode/size/
+mtime/content SHA256 and parent identities. Its aggregate hash replaces the write
+base_digest; public fields/schema and metadata-only descriptions remain. Unsafe,
+inaccessible or unstable snapshots refuse, with no credential-file content read.
+An approved reply is accepted only if current declared state still matches.
+Intervening edits, same-byte replacements, deletions, creations and restored-mtime
+content changes refuse fresh execution. Unrelated sibling changes remain allowed.
+Existing rename apply-time preconditions remain. No file locks, atomic-write or
+arbitrary-command input guarantee; no automatic resubmission or source disclosure.
+ADR077 records the actual owner decision and its concurrent-edit rationale.
+
+Initial snapshot tests exposed Windows pathstat/fstat ctime disagreement after
+writes, traced with synthetic local diagnostics before rerunning. Compared state
+uses identity/mode/size/mtime and content hash, not that inconsistent field.
+Private actual-public-ASGI composition passes3host-scripted cases: approve,
+reject, and remote-approved/local-stale refusal preserving the owner edit.
+Evidence:artifacts/operator-file-state-20261029a. Older consumed boundary
+characterizations remain historical; no old trial regraded. No inference, public
+Operator edit/push/deployment, dependency installation or unattended window.
+
+Validation:full registered3178workspace pass26skip,38Council pass,84job-search
+pass (3300total). Focused bridge56pass1symlinkskip; final actual-public ASGI3cases
+pass. Ruff/format/Pyright and git diff --check clean. Source snapshots retained;
+fresh final ASGI receipt in artifacts/operator-file-state-20261029b.
+
 ## 2026-10-29 - Operator bridge response binding and deadline corrections
 
 From developd1c6bbc on fix/operator-approval-roundtrip-20261029, corrected the

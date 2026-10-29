@@ -316,6 +316,7 @@ class RenameApplyTool(BaseTool):
                 "complete_diff": plan.diff,
             },
             call.call_id,
+            approval_paths=tuple(str(change.path) for change in plan.changes),
         )
 
     def execute(self, arguments: dict[str, Any], context: ToolContext) -> ToolResult:

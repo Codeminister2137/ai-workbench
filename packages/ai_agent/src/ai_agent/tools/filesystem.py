@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from ai_agent.contracts import ToolCategory, ToolDefinition, ToolParameter, ToolResult
+from ai_agent.contracts import ToolCall, ToolCategory, ToolDefinition, ToolParameter, ToolResult
 from ai_agent.tools.base import BaseTool, ToolContext
 
 
@@ -148,6 +148,12 @@ class ReadFileTool(BaseTool):
 class CreateFileTool(BaseTool):
     """Tool for creating a brand new file."""
 
+    def approval_call(self, call: ToolCall) -> ToolCall | None:
+        path = call.arguments.get("path")
+        if not isinstance(path, str) or not path.strip():
+            return None
+        return ToolCall(call.name, call.arguments, call.call_id, approval_paths=(path,))
+
     @property
     def definition(self) -> ToolDefinition:
         return ToolDefinition(
@@ -232,6 +238,12 @@ class CreateFileTool(BaseTool):
 
 class EditFileTool(BaseTool):
     """Tool for targeted editing of an existing file via exact string replacement."""
+
+    def approval_call(self, call: ToolCall) -> ToolCall | None:
+        path = call.arguments.get("path")
+        if not isinstance(path, str) or not path.strip():
+            return None
+        return ToolCall(call.name, call.arguments, call.call_id, approval_paths=(path,))
 
     @property
     def definition(self) -> ToolDefinition:
