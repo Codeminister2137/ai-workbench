@@ -3775,7 +3775,20 @@ def _run_native_agent(
         from ai_agent.operator_bridge import OperatorApprovalBridge
 
         approval_callback = OperatorApprovalBridge(
-            operator_base_url, operator_access_token, repo_root
+            operator_base_url,
+            operator_access_token,
+            repo_root,
+            deadline=min(
+                (
+                    bound
+                    for bound in (
+                        getattr(args, "_execution_deadline", None),
+                        getattr(getattr(args, "fallback_session", None), "deadline", None),
+                    )
+                    if bound is not None
+                ),
+                default=None,
+            ),
         )
     elif asks_user:
         approval_callback = approve

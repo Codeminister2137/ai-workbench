@@ -30,6 +30,7 @@ class _RecordingClient:
     def __init__(self, responses: list[_FakeResponse]):
         self.responses = list(responses)
         self.calls: list[tuple[str, str, object]] = []
+        self.binding: dict[str, Any] = {}
 
     def __enter__(self):
         return self
@@ -37,13 +38,19 @@ class _RecordingClient:
     def __exit__(self, *args):
         return False
 
-    def post(self, url: str, *, headers=None, json=None):
+    def post(self, url: str, *, headers=None, json=None, timeout=None):
         self.calls.append(("POST", url, json))
-        return self.responses.pop(0)
+        assert isinstance(json, dict)
+        response = self.responses.pop(0)
+        body = cast(dict[str, Any], response.json())
+        self.binding = {"id": body["id"], **json}
+        return response
 
-    def get(self, url: str, *, headers=None):
+    def get(self, url: str, *, headers=None, timeout=None):
         self.calls.append(("GET", url, None))
-        return self.responses.pop(0)
+        response = self.responses.pop(0)
+        response._json = {**self.binding, **cast(dict[str, Any], response.json())}
+        return response
 
 
 def _tool_call(name: str = "write_file", path: str = "src/x.py") -> ToolCall:
@@ -123,8 +130,8 @@ def test_bridge_omits_nested_values_and_argument_names(tmp_path: Path) -> None:
     def handle(request: httpx.Request) -> httpx.Response:
         if request.method == "POST":
             payloads.append(json.loads(request.content))
-            return httpx.Response(200, json={"id": "metadata-test"})
-        return httpx.Response(200, json={"status": "approved"})
+            return httpx.Response(200, json={"id": "a" * 32, **payloads[-1]})
+        return httpx.Response(200, json={"id": "a" * 32, **payloads[-1], "status": "approved"})
 
     bridge = OperatorApprovalBridge(
         "http://operator.local",
@@ -176,8 +183,8 @@ def test_metadata_does_not_replace_exact_action_binding(tmp_path: Path) -> None:
     def handle(request: httpx.Request) -> httpx.Response:
         if request.method == "POST":
             payloads.append(json.loads(request.content))
-            return httpx.Response(200, json={"id": "binding-test"})
-        return httpx.Response(200, json={"status": "approved"})
+            return httpx.Response(200, json={"id": "a" * 32, **payloads[-1]})
+        return httpx.Response(200, json={"id": "a" * 32, **payloads[-1], "status": "approved"})
 
     bridge = OperatorApprovalBridge(
         "http://operator.local",
@@ -223,13 +230,15 @@ def test_bridge_keeps_real_http_client_open_until_resolution(
 ) -> None:
     clients: list[httpx.Client] = []
     methods: list[str] = []
+    binding = {}
 
     def handle(request: httpx.Request) -> httpx.Response:
         assert not clients[0].is_closed
         methods.append(request.method)
         if request.method == "POST":
-            return httpx.Response(200, json={"id": "a" * 32, "status": "submitted"})
-        return httpx.Response(200, json={"status": resolution})
+            binding.update(id="a" * 32, **json.loads(request.content))
+            return httpx.Response(200, json={**binding, "status": "submitted"})
+        return httpx.Response(200, json={**binding, "status": resolution})
 
     def factory(**kwargs: Any) -> httpx.Client:
         client = httpx.Client(transport=httpx.MockTransport(handle), **kwargs)
@@ -242,3 +251,149 @@ def test_bridge_keeps_real_http_client_open_until_resolution(
     assert bridge(_tool_call(), ToolCategory.WRITE) is approved
     assert methods == ["POST", "GET"]
     assert clients[0].is_closed
+
+
+@pytest.mark.parametrize("stage", ["submit", "poll"])
+@pytest.mark.parametrize("field", ["candidate_digest", "base_digest", "evidence_digest"])
+def test_approved_response_must_match_submitted_digests(tmp_path, stage, field):
+    binding = {}
+    methods = []
+
+    def handle(request):
+        methods.append(request.method)
+        if request.method == "POST":
+            binding.update(id="a" * 32, **json.loads(request.content))
+        body = {**binding, "status": "approved"}
+        if (request.method == "POST") is (stage == "submit"):
+            body[field] = "0" * 64
+        return httpx.Response(200, json=body)
+
+    bridge = OperatorApprovalBridge(
+        "http://operator.local",
+        "synthetic-token",
+        tmp_path,
+        client_factory=lambda **kwargs: httpx.Client(
+            transport=httpx.MockTransport(handle), **kwargs
+        ),
+    )
+    with pytest.raises(OperatorBridgeError, match="does not match"):
+        bridge(_tool_call(), ToolCategory.WRITE)
+    assert methods == (["POST"] if stage == "submit" else ["POST", "GET"])
+
+
+@pytest.mark.parametrize("identifier", ["../approve", "x" * 32, None])
+def test_malformed_submission_id_cannot_choose_poll_path(tmp_path, identifier):
+    methods = []
+
+    def handle(request):
+        methods.append(request.method)
+        return httpx.Response(200, json={**json.loads(request.content), "id": identifier})
+
+    bridge = OperatorApprovalBridge(
+        "http://operator.local",
+        "synthetic-token",
+        tmp_path,
+        client_factory=lambda **kwargs: httpx.Client(
+            transport=httpx.MockTransport(handle), **kwargs
+        ),
+    )
+    with pytest.raises(OperatorBridgeError, match="identifier"):
+        bridge(_tool_call(), ToolCategory.WRITE)
+    assert methods == ["POST"]
+
+
+@pytest.mark.parametrize("phase", ["before_submit", "during_submit", "during_poll"])
+def test_one_deadline_refuses_late_approval_and_bounds_cleanup(tmp_path, monkeypatch, phase):
+    clock = [10.0]
+    monkeypatch.setattr("ai_agent.operator_bridge.time.perf_counter", lambda: clock[0])
+    methods = []
+    binding = {}
+
+    def handle(request):
+        methods.append((request.method, request.url.path))
+        timeout = request.extensions["timeout"]
+        assert all(0 < value <= 1 for value in timeout.values())
+        if request.url.path.endswith("/cancel"):
+            return httpx.Response(200, json={**binding, "status": "cancelled"})
+        if request.method == "POST":
+            binding.update(id="a" * 32, **json.loads(request.content))
+            if phase == "during_submit":
+                clock[0] = 12.0
+        else:
+            clock[0] = 12.0
+        return httpx.Response(200, json={**binding, "status": "approved"})
+
+    bridge = OperatorApprovalBridge(
+        "http://operator.local",
+        "synthetic-token",
+        tmp_path,
+        timeout_seconds=30,
+        deadline=9.0 if phase == "before_submit" else 11.0,
+        client_factory=lambda **kwargs: httpx.Client(
+            transport=httpx.MockTransport(handle), **kwargs
+        ),
+    )
+    with pytest.raises(OperatorBridgeError, match="timed out"):
+        bridge(_tool_call(), ToolCategory.WRITE)
+    assert len(methods) == {"before_submit": 0, "during_submit": 2, "during_poll": 3}[phase]
+    if methods:
+        assert methods[-1] == ("POST", "/api/external-actions/" + "a" * 32 + "/cancel")
+
+
+@pytest.mark.parametrize("value", [0, -1, float("inf"), float("nan"), True])
+def test_polling_bounds_must_be_finite_positive(tmp_path, value):
+    for option in ("poll_interval_seconds", "timeout_seconds"):
+        with pytest.raises(ValueError, match="finite positive"):
+            OperatorApprovalBridge("http://operator.local", "token", tmp_path, **{option: value})
+
+
+@pytest.mark.parametrize("mutation", ["wrong_id", "missing_digest", "not_object"])
+def test_poll_rejects_malformed_or_different_approved_action(tmp_path, mutation):
+    binding = {}
+
+    def handle(request):
+        if request.method == "POST":
+            binding.update(id="a" * 32, **json.loads(request.content))
+            return httpx.Response(200, json={"id": binding["id"], "status": "submitted"})
+        body = {**binding, "status": "approved"}
+        if mutation == "wrong_id":
+            body["id"] = "b" * 32
+        elif mutation == "missing_digest":
+            del body["candidate_digest"]
+        else:
+            return httpx.Response(200, json=[body])
+        return httpx.Response(200, json=body)
+
+    bridge = OperatorApprovalBridge(
+        "http://operator.local",
+        "synthetic-token",
+        tmp_path,
+        client_factory=lambda **kwargs: httpx.Client(
+            transport=httpx.MockTransport(handle), **kwargs
+        ),
+    )
+    with pytest.raises(OperatorBridgeError):
+        bridge(_tool_call(), ToolCategory.WRITE)
+
+
+def test_approval_cannot_authorize_arguments_mutated_during_wait(tmp_path):
+    call = _tool_call()
+    binding = {}
+
+    def handle(request):
+        if request.method == "POST":
+            binding.update(id="a" * 32, **json.loads(request.content))
+            return httpx.Response(200, json={"id": binding["id"]})
+        call.arguments["content"] = "changed after submission"
+        return httpx.Response(200, json={**binding, "status": "approved"})
+
+    bridge = OperatorApprovalBridge(
+        "http://operator.local",
+        "synthetic-token",
+        tmp_path,
+        client_factory=lambda **kwargs: httpx.Client(
+            transport=httpx.MockTransport(handle), **kwargs
+        ),
+    )
+    with pytest.raises(OperatorBridgeError, match="changed while awaiting"):
+        bridge(call, ToolCategory.WRITE)

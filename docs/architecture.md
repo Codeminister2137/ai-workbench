@@ -124,6 +124,13 @@ metadata-only descriptions, without workspace paths or argument names/values.
 It retains exact-action binding; the owner must inspect command/diff content
 through an authorized channel. See
 [ADR-075](decisions/ADR-075-metadata-only-operator-approval-descriptions.md).
+The callback verifies the polled action identity/digests and unchanged tool
+arguments before accepting approval. Its single round-trip deadline is capped
+by the CLI execution deadline; late approval is refused. Best-effort cancellation
+has a separate one-second request timeout. In-flight HTTP operations are not an
+OS-enforced wall-clock bound. The current base digest identifies the workspace,
+not file preimages: intervening file changes do not invalidate argument-only
+approval. File-state binding is an owner decision pending investigation evidence.
 
 ADR-049 adds a distinct foreground `coding-chat` mode. `ai_agent.coding_chat`
 owns conversation continuity over injected turn execution; `coding_chat_cli`

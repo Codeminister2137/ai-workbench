@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import time
 from collections.abc import Callable
 from pathlib import Path
@@ -72,8 +73,16 @@ class OperatorApprovalBridge:
         *,
         poll_interval_seconds: float = 1.0,
         timeout_seconds: float = 300.0,
+        deadline: float | None = None,
         client_factory: Callable[..., Any] = httpx.Client,
     ) -> None:
+        if any(
+            isinstance(value, bool) or not math.isfinite(value) or value <= 0
+            for value in (poll_interval_seconds, timeout_seconds)
+        ):
+            raise ValueError("Approval polling and timeout must be finite positive seconds")
+        if deadline is not None and (isinstance(deadline, bool) or not math.isfinite(deadline)):
+            raise ValueError("Approval deadline must be finite")
         self.base_url = base_url.rstrip("/")
         self.headers = {
             "Authorization": f"Bearer {access_token}",
@@ -82,9 +91,21 @@ class OperatorApprovalBridge:
         self.workspace = Path(workspace).resolve()
         self.poll_interval = poll_interval_seconds
         self.timeout = timeout_seconds
+        self.deadline = deadline
         self._client_factory = client_factory
 
     def __call__(self, approval_call: ToolCall, category: ToolCategory) -> bool:
+        deadline = time.perf_counter() + self.timeout
+        if self.deadline is not None:
+            deadline = min(deadline, self.deadline)
+
+        def remaining() -> float:
+            seconds = deadline - time.perf_counter()
+            if seconds <= 0:
+                raise OperatorBridgeError("External action approval timed out")
+            return seconds
+
+        remaining()
         description = _describe(approval_call, category, self.workspace)
         operation_json = json.dumps(
             {"tool": approval_call.name, "arguments": approval_call.arguments},
@@ -94,35 +115,100 @@ class OperatorApprovalBridge:
         candidate_digest = _sha256(operation_json)
         base_digest = _sha256(str(self.workspace))
         evidence_digest = _sha256(f"{category.value}:{approval_call.name}")
+        binding = {
+            "candidate_digest": candidate_digest,
+            "base_digest": base_digest,
+            "evidence_digest": evidence_digest,
+        }
 
         try:
-            with self._client_factory(timeout=self.timeout) as client:
+            with self._client_factory(timeout=remaining()) as client:
                 response = client.post(
                     f"{self.base_url}/api/external-actions",
                     headers=self.headers,
                     json={
                         "description": description,
-                        "candidate_digest": candidate_digest,
-                        "base_digest": base_digest,
-                        "evidence_digest": evidence_digest,
+                        **binding,
                     },
+                    timeout=remaining(),
                 )
                 response.raise_for_status()
                 action = response.json()
-                return self._wait_for_resolution(client, action["id"])
+                if not isinstance(action, dict):
+                    raise OperatorBridgeError("Invalid external action response")
+                action_id = action.get("id")
+                if (
+                    not isinstance(action_id, str)
+                    or len(action_id) != 32
+                    or any(character not in "0123456789abcdef" for character in action_id)
+                ):
+                    raise OperatorBridgeError("Invalid external action identifier")
+                # The public submission acknowledgement omits digests. Verify
+                # any echoed fields; every subsequent full action must match.
+                self._verify_binding(
+                    action, {name: value for name, value in binding.items() if name in action}
+                )
+                try:
+                    remaining()
+                    approved = self._wait_for_resolution(
+                        client, {"id": action_id, **binding}, remaining
+                    )
+                    if (
+                        approved
+                        and _sha256(
+                            json.dumps(
+                                {"tool": approval_call.name, "arguments": approval_call.arguments},
+                                ensure_ascii=True,
+                                sort_keys=True,
+                            )
+                        )
+                        != candidate_digest
+                    ):
+                        raise OperatorBridgeError(
+                            "Pending tool action changed while awaiting approval"
+                        )
+                    return approved
+                except OperatorBridgeError:
+                    if time.perf_counter() >= deadline:
+                        # Cleanup cannot authorize the action. Preserve the existing
+                        # best-effort cancellation with a separate one-second cap.
+                        try:
+                            client.post(
+                                f"{self.base_url}/api/external-actions/{action_id}/cancel",
+                                headers=self.headers,
+                                timeout=min(1.0, self.timeout),
+                            )
+                        except httpx.HTTPError:
+                            pass
+                    raise
         except httpx.HTTPError as exc:
             raise OperatorBridgeError(f"Failed to submit external action: {exc}") from exc
+        except (ValueError, KeyError, TypeError) as exc:
+            raise OperatorBridgeError("Invalid external action response") from exc
 
-    def _wait_for_resolution(self, client: Any, action_id: str) -> bool:
-        deadline = time.monotonic() + self.timeout
-        while time.monotonic() < deadline:
+    @staticmethod
+    def _verify_binding(action: dict, binding: dict) -> None:
+        if any(action.get(name) != value for name, value in binding.items()):
+            raise OperatorBridgeError("External action response does not match the pending action")
+
+    def _wait_for_resolution(
+        self, client: Any, binding: dict, remaining: Callable[[], float]
+    ) -> bool:
+        action_id = binding["id"]
+        while True:
             try:
                 response = client.get(
                     f"{self.base_url}/api/external-actions/{action_id}",
                     headers=self.headers,
+                    timeout=remaining(),
                 )
                 response.raise_for_status()
-                status = response.json()["status"]
+                remaining()
+                action = response.json()
+                if not isinstance(action, dict):
+                    raise OperatorBridgeError("Invalid external action response")
+                self._verify_binding(action, binding)
+                status = action["status"]
             except httpx.HTTPError as exc:
                 raise OperatorBridgeError(f"Failed to poll external action: {exc}") from exc
 
@@ -132,13 +218,4 @@ class OperatorApprovalBridge:
                 return False
             if status != "submitted":
                 raise OperatorBridgeError(f"Unexpected external action status: {status}")
-            time.sleep(self.poll_interval)
-
-        try:
-            client.post(
-                f"{self.base_url}/api/external-actions/{action_id}/cancel",
-                headers=self.headers,
-            )
-        except httpx.HTTPError:
-            pass
-        raise OperatorBridgeError("External action approval timed out")
+            time.sleep(min(self.poll_interval, remaining()))

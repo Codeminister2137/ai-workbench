@@ -1,5 +1,34 @@
 # Session History
 
+## 2026-10-29 - Operator bridge response binding and deadline corrections
+
+From developd1c6bbc on fix/operator-approval-roundtrip-20261029, corrected the
+Workbench callback to verify full polled action ID/digests and unchanged tool
+arguments before accepting remote approval. Public acknowledgement shape remains
+compatible; missing/mismatched full-action fields fail closed. One deadline now
+covers submission/polling/late-response checks and inherits the CLI execution
+bound. Best-effort timeout cancellation has a separate1srequest cap. This is
+not hard interruption of in-flight synchronous HTTP and does not create a sandbox.
+
+Actual local public Operator ASGI routes verified scripted approve/reject and
+wrong-nonce/replay refusal; no public source change, listening service, inference
+or physical human approval. Initial private checker failures preserved: the
+default testserver host was rejected, then an adapter omitted JSON Content-Type;
+corrected freshc passes. Existing public environment dependencies were reused
+under the configured Workbench SDK without installation or configuration changes.
+
+Agent/CLI regression1676pass24skip preceded the final argument-mutation check;
+final focused bridge29tests pass. Finald adds2actual-public-contract cases and
+1characterization of the unresolved state boundary (32total). Nine-case fresh
+outerc passes, with verified source equality/process cleanup. Final Ruff/format,
+targeted Pyright and git diff --check pass; private evidence retains source hashes.
+
+Independent local characterization proves the current base digest binds the
+workspace path, not file contents; a concurrent file change can be overwritten
+by an approved full-file edit. Owner decision pending: targeted file-state
+preconditions versus retaining explicit operation-only semantics. No disputed
+file-state policy was implemented. Metadata-only privacy remains ADR075.
+
 ## 2026-10-29 - Baseten nested delegation and fresh protocol continuity
 
 On feature/baseten-delegation-contract-20261029 from develop276ea26, extended

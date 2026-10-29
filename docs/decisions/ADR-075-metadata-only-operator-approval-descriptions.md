@@ -34,3 +34,22 @@ or claim that arbitrary local commands are isolated.
 Mock HTTP transport tests inspect actual submission JSON, including nested values,
 arbitrary argument names, workspace paths and same-sized distinct actions. Existing
 client-lifetime, approval, rejection and transport-failure coverage remains active.
+
+## Verification follow-up — 2026-10-29
+
+The Workbench callback now checks the returned action ID and all three digests
+on every full poll response, and refuses tool-argument mutation during the wait.
+The public submit acknowledgement omits digests and remains compatible; any echoed
+digest must match. Submission, polling and post-response checks share one finite
+deadline, capped by the caller's execution deadline. A late approved response
+cannot authorize execution. Timeout cancellation remains best effort with a
+separate one-second request timeout; synchronous HTTP is not hard OS isolation.
+Local composition with the actual public Operator routes verifies approval,
+rejection, wrong-nonce and replay refusal, without inference or human approval.
+
+This preserves metadata-only descriptions and existing digest meanings. In
+particular, base_digest hashes the workspace path, not the target file's bytes.
+An independent synthetic reproduction confirms an intervening file edit can be
+overwritten by an approved full-file operation. Binding approval to file state
+would change that contract and remains pending the owner's decision; no new
+file-state policy is implied by the response-validation corrections.
