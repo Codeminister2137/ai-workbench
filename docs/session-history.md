@@ -1,5 +1,46 @@
 # Session History
 
+## 2026-10-29 - Actual Meta and Modal credit-backed development
+
+Owner reiterated continuing until a material decision or all work blocked, with
+using Meta/Baseten/Modal development credits highest priority. This supersedes
+the temporary inference hold within existing prepaid grants/privacy boundaries.
+Started feature/credit-backed-development-20261029 from develope71532a.
+
+Fresh read-only ledger/account audit preceded work. Existing cumulativeUSD50Meta
+authority and accepted local spending controls retained; full old phone allocation
+plus retired consumption conservatively commit20, so freshUSD1 fits without
+resetting grants. A real public Operator concurrency defect reproduced eight
+successful resolutions for one pending action. Two Standardmuse-spark-1.3 calls
+(low reasoning,8192output,128KiBinput,90srequest,120sowned-host bound) proposed and
+repaired a compare-and-swap fix. Durable pre-send reservations totalUSD0.11610325;
+reported tokens6392input/9971output implyUSD0.05036675 at current standard rates
+before cache discounts,not an invoice or fresh remaining-balance reading.
+
+Modal actually validated the public candidate inside bounded nonroot/network-
+blocked CPU Sandboxes with no secrets/volumes/ports/OIDC. First setup attempt
+created an ephemeral App but no Sandbox: a host constructor omitted checks, traced
+and corrected before the new candidate phase. First candidate fixed concurrent
+consumption but failed expiry companion checks. The second Meta proposal repaired
+that; host review corrected an expiry update that would roll back on refusal.
+Final17protected checks passed on Modal with owned Sandbox termination/poll verified.
+All failed/consumed inputs retained. Three finite compute reservations of0.33USD
+(including setup failure) fit the existing credit-only authority; exact billed
+cost remains unknown. No replay of old GPU d/e or C6af/ah scripts.
+
+Applied only public source/tests to a new local sibling branch
+fix/action-resolution-20261029, commit26ac4ba; no push/merge-to-main/deploy.
+Full public suite152pass8skip77subtests; final capture-binding test correction
+5pass8subtests; public Ruff check/format clean. Known-credential/private-source
+scan passed, actual module bytes match the Modal-validated candidate. Authorship
+and host recovery recorded in public BUILD_LOG. No private Workbench code/plans
+in provider/cloud payloads; only public module, sanitized task and synthetic checks.
+
+Private evidence artifacts/credit-development-20261029. Baseten remains blocked
+on event credit-expiry/exhaustion/personal-billing facts, not proof of invalid
+inference from its management403. Fresh factual owner question pending; other
+routes continue. No new unattended window, mail send, publication or judge access.
+
 ## 2026-10-29 - Owner-approved file state bound to Operator approvals
 
 Owner accepted the recommended targeted file-state checks after the concurrent-

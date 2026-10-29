@@ -3,7 +3,8 @@
 **Checked:** 2026-10-13; Gemini individual-access retirement verified 2026-10-14.
 Published limits and account observations can expire.
 
-**Latest scoped update:** 2026-10-29, Baseten management metadata/key-scope
+**Latest scoped update:** 2026-10-29, Meta Standard pricing rechecked and live
+Meta/public-source coding with bounded Modal CPU validation; Baseten management metadata/key-scope
 documentation; 2026-10-28,
 Modal/Qwen tool-calling prerequisites and
 credit-only deployment admission; 2026-10-25, Go coding-agent requirements/limits rechecked
@@ -19,6 +20,19 @@ evaluation limits. It is documentation, not a live quota registry or executable
 routing configuration. The [model catalog](../../ai_orchestrator/examples/model_catalog.toml)
 contains declared route capabilities; native readers report supported account
 observations. Neither establishes coding quality by itself.
+
+## Live development evidence — 2026-10-29
+
+The [Meta pricing page](https://dev.meta.ai/docs/pricing-rate-limits) still lists
+Muse Spark1.3 Standard at USD1.25 input/USD4.25 output and USD0.15 cached input per
+million tokens; Standard content is not used for training. A bounded public-source
+coding/repair workflow now exercised direct Standard Responses and protected Modal
+CPU validation. This establishes that scoped workflow's actual software path,
+not general model parity, parent/child acceptance, live C6 or a Baseten entitlement.
+Local reservations are conservative estimates, not provider billing guarantees.
+The [Modal billing guide](https://modal.com/docs/guide/billing) describes metered
+resource usage; an observed bill is not interchangeable with remaining grant
+credit or proof of a net-spend cap. Account observations remain private evidence.
 
 ## Baseten key scopes checked 2026-10-28
 
