@@ -5,6 +5,7 @@ param(
     [string] $PythonExecutable,
     [switch] $Check,
     [switch] $Chat,
+    [switch] $HandsOff,
     [string] $SessionDatabase
 )
 
@@ -43,6 +44,7 @@ $launcherArgs = @(
 )
 if ($taskPath) { $launcherArgs += @('--task-file', $taskPath) }
 if ($Chat) { $launcherArgs += '--chat' }
+if ($HandsOff) { $launcherArgs += '--hands-off' }
 if ($SessionDatabase) { $launcherArgs += @('--session-db', (Resolve-Path -LiteralPath $SessionDatabase).Path) }
 if ($Check) { $launcherArgs += '--check' }
 $resultCode = 1

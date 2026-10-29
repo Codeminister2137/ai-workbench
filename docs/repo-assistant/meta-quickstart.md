@@ -2,6 +2,23 @@
 
 ## Interactive terminal chat
 
+For owner-authorized hands-off file development, add `-HandsOff` (Python:
+`--hands-off`). It grants workspace reads/searches/writes and **denies** shell and
+custom tools without prompting. It never answers a human approval prompt. The
+existing policy override is confined to the foreground launcher process and
+restored after normal exit/error; shared configuration and ordinary interactive
+mode remain unchanged. Generated Operator code is validated independently in the
+approved isolated runner by the supervising developer. Production actions,
+private-data routing and new architecture retain owner decisions.
+
+This mode was exercised in a supervised Meta code/test repair: the supervisor
+caught a decorator-placement error, Meta corrected it within the original bounds,
+and independent Modal validation passed185tests8skips69subtests plus4protected
+hash-seed checks. No approval clicks or host execution of generated code occurred.
+The worker hit its six-call cap before its repaired-turn final report; the
+incomplete worker outcome is preserved separately from host acceptance of the
+verified code. Local evidence: `artifacts/meta-hands-off-20261029/`.
+
 From the Workbench project terminal:
 
 ```powershell

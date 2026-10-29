@@ -44,3 +44,21 @@ The worker authored the documentation; the host supplied feedback/verification
 and the completion report. No software behavior changed; no runtime tests were
 needed for the documentation edit. Existing passing Operator suite evidence remains
 the earlier184tests/8skips/69subtests, not a new test run for this experiment.
+
+## Subsequent owner-authorized hands-off coding run
+
+The owner requested hands-off development approvals. The foreground launcher now
+supports `-HandsOff`/`--hands-off`: existing workspace reads/searches/writes are
+allowed; shell/custom tools are denied without prompting. No human approval is
+simulated and no global/project-default policy is changed. Permission factory
+scope is restored on normal exit and exception; deterministic tests cover both.
+
+Meta authored a stable diagnostic-order fix and a cross-hash-seed regression.
+The supervisor found a misplaced existing parameterization decorator in the first
+test edit and supplied that concrete finding; Meta corrected it. Independent
+Modal validation passed185tests8skips69subtests plus4protected cases, with exact
+cleanup. Six calls exhausted the original allowance before the repaired-turn
+final report; original worker exit2 is preserved. Host separately accepted the
+verified source/tests, with only AST-equivalent formatting. No approval clicks,
+generated-code execution on host, quota extension or changed production policy.
+Evidence remains local under `artifacts/meta-hands-off-20261029/`.

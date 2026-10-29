@@ -7,6 +7,7 @@ fallback or unattended multi-task scheduler. Artifacts are per-task evidence.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import os
 import time
@@ -24,6 +25,40 @@ RESERVE = (
 
 class AllowanceExhausted(ValueError):
     """Expected stop of the shared foreground allowance."""
+
+
+@contextlib.contextmanager
+def hands_off_file_policy(enabled: bool):
+    """Scope existing permissions to auto file edits and denied shell/custom tools.
+
+    The override exists only in this foreground launcher process. It neither
+    supplies human approvals nor changes shared configuration or product policy.
+    """
+    if not enabled:
+        yield
+        return
+    from dataclasses import replace
+
+    from ai_agent.contracts import PermissionAction
+    from ai_agent.permissions import ApprovalPolicyPreset, PermissionPolicy
+
+    descriptor = PermissionPolicy.__dict__["from_approval_preset"]
+    original = PermissionPolicy.from_approval_preset
+
+    @classmethod
+    def scoped(cls, preset):
+        policy = original(preset)
+        if ApprovalPolicyPreset(preset) == ApprovalPolicyPreset.WORKSPACE_WRITE:
+            return replace(
+                policy, shell_action=PermissionAction.DENY, custom_action=PermissionAction.DENY
+            )
+        return policy
+
+    PermissionPolicy.from_approval_preset = scoped
+    try:
+        yield
+    finally:
+        PermissionPolicy.from_approval_preset = descriptor
 
 
 def reserve(receipt: dict, elapsed: float, size: int) -> dict:
@@ -95,6 +130,11 @@ def main() -> int:
     parser.add_argument("--repo-root", type=Path, required=True)
     parser.add_argument("--task-file", type=Path)
     parser.add_argument("--chat", action="store_true", help="Use existing foreground coding-chat")
+    parser.add_argument(
+        "--hands-off",
+        action="store_true",
+        help="Auto scoped file edits; deny shell/custom tools without prompting",
+    )
     parser.add_argument("--session-db", type=Path, help="Existing coding-chat transcript database")
     parser.add_argument("--run-dir", type=Path, required=True)
     parser.add_argument(
@@ -126,6 +166,7 @@ def main() -> int:
                     "max_reserved_usd": str(RESERVE * MAX_CALLS),
                     "inference_calls": 0,
                     "mode": "coding-chat" if args.chat else "implement",
+                    "hands_off_file_edits": args.hands_off,
                 }
             )
         )
@@ -204,8 +245,10 @@ def main() -> int:
 
     original = openai_responses.urlopen
     openai_responses.urlopen = transport
+    policy_scope = contextlib.ExitStack()
     record()
     try:
+        policy_scope.enter_context(hands_off_file_policy(args.hands_off))
         if args.chat:
             print(
                 f"Meta chat: {MAX_CALLS} total API calls, USD2 maximum, "
@@ -233,7 +276,7 @@ def main() -> int:
                 "--cost-policy",
                 "prepaid_credits_allowed",
                 "--approval-policy",
-                "interactive" if args.chat else "workspace_write",
+                "interactive" if args.chat and not args.hands_off else "workspace_write",
                 "--skip-prompt-review",
                 "--max-action-rounds",
                 "8",
@@ -259,6 +302,7 @@ def main() -> int:
         receipt.update(status="failed", error_type=type(error).__name__)
         raise
     finally:
+        policy_scope.close()
         openai_responses.urlopen = original
         receipt["elapsed_seconds"] = time.monotonic() - started
         record()

@@ -177,3 +177,34 @@ def test_chat_refuses_missing_database_before_creating_any_run_storage(tmp_path,
     with pytest.raises(SystemExit, match="2"):
         launcher.main()
     assert not run.exists()
+
+
+@pytest.mark.parametrize("raises", [False, True])
+def test_hands_off_grants_file_edits_denies_execution_and_restores_policy(raises):
+    from ai_agent.contracts import PermissionAction
+    from ai_agent.permissions import PermissionPolicy
+
+    original = PermissionPolicy.__dict__["from_approval_preset"]
+    try:
+        with launcher.hands_off_file_policy(True):
+            policy = PermissionPolicy.from_approval_preset("workspace_write")
+            assert (
+                policy.read_action
+                == policy.search_action
+                == policy.write_action
+                == PermissionAction.ALLOW
+            )
+            assert policy.shell_action == policy.custom_action == PermissionAction.DENY
+            assert (
+                PermissionPolicy.from_approval_preset("read_only").write_action
+                == PermissionAction.DENY
+            )
+            if raises:
+                raise RuntimeError("synthetic scope failure")
+    except RuntimeError:
+        assert raises
+    assert PermissionPolicy.__dict__["from_approval_preset"] is original
+    assert (
+        PermissionPolicy.from_approval_preset("workspace_write").shell_action
+        == PermissionAction.ASK_USER
+    )
