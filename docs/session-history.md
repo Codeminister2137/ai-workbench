@@ -1,5 +1,29 @@
 # Session History
 
+## 2026-10-29 - Resumed connected development
+
+The early stop was premature. On resumption the existing SDK/dependencies plus
+explicit source paths restored validation without installing packages. Operator
+13d505e fixes runtime-grant checks, file errors and BOM credential scanning;
+8db8673 adds the Baseten-authored invalid-model reporting fix with a declared
+host correction; c7499c8 cleans log whitespace. Local suite and extracted sdist:
+160passed,8skipped,69subtests; Ruff clean. Wheel/sdist built offline and inspected
+for required source checker/docs and exclusion of private runtime/venv/handoff.
+
+Meta review: output-limited,7682tokens,no accepted review. First Baseten proposal:
+1352tokens,host guard rejection; exact cause unknown because final output was not
+retained before guard evaluation. Both failures are preserved without replay.
+Fresh Baseten report fix:8465tokens; host restored existing runtime diagnostics.
+Two fresh Modal CPU fixtures passed23and26protected checks, exact cleanup verified.
+Only public Operator source and synthetic checks left the host. No private
+Workbench source/plans, credentials, judge data or payloads were transmitted.
+
+Workbench1abdd4b handles stale timer records/PID reuse without rewriting historical
+receipts or claiming a Windows sleep transition.22helper tests, Ruff and targeted
+Pyright passed. Corrected full offline gate:3191workspace+38Council+84job-search
+passed,26skipped; earlier missing-source subprocess failures remain preserved.
+No public push/release, deployment, video, judge delivery or submission occurred.
+
 ## 2026-10-29 - Unattended receipt review
 
 Reviewed the consumed Baseten receipt offline: four responses, 688 input and 480
