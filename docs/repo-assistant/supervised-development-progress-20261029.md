@@ -204,3 +204,122 @@ were changed. Underlying cause remains unknown; no particular VPN or router is
 blamed. Process-only TCP DNS workaround proposed, owner answer pending; no TLS
 verification bypass. Source/test validation and corrected live acceptance remain
 incomplete; preserved failures are not graded as successful trials.
+
+## Recovered network and real two-model acceptance - 2026-10-30
+
+Owner rebooted after a WSL crash and reported normal connectivity. Native DNS
+resolved Meta again; no TCP DNS workaround or machine network configuration
+change was made. The underlying outage cause remains unknown. Reboot recovery
+alone does not attribute the fault to this project.
+
+Fresh isolated full-suite validation passed225tests,8skips,132subtests with
+cleanup verified. The unchanged-failure no-progress fix was committed5aa5b49
+and locally integrated with the controller into the Operator candidate.
+
+Corrected liveC completed successfully:3real Meta calls, implementer source
+changes,8protected independent checks, exact candidate hash and verified Modal
+cleanup, followed by Meta supervisor acceptance without Codex continuations.
+This demonstrates one bounded real two-model task, not unlimited unattended
+reliability. Original failed trials and their allocations remain preserved.
+
+A fresh16request Meta phase uses that same loop to develop reusable public
+JSON role adapters and regressions, with3protected Modal checks available. The
+host retains instructions, boundaries, budget and validation authority. No new
+dependency, service, private source transfer or production approval change.
+That phase autonomously repaired a candidate syntax error, then passed232tests.
+Host review found incorrect decision-class discovery. A fresh Meta-to-Meta repair
+removed guessing/fallback, imported the canonical controller and added malformed
+payload/foreign-class regressions. Final236passed8skip132subtests, independent
+protected checks and cleanup verified; host formatted files/removed unused import.
+Public e254e43 locally integrated. Original attempts remain unchanged.
+
+## Reusable foreground launcher
+
+`scripts/meta-supervised-develop.py` reuses the existing bounded Meta transport
+and the reviewed public controller/JsonRoles. It handles both roles without
+Codex writing continuations. Public Operator repository identity, fixed source
+targets, complete instructions/context, exact initial bytes, validator files and
+request budget are bound into an admission digest. `--check` performs no model
+request or credential loading. The host records the digest in the fresh phase's
+AUTHORIZED marker only after allocating within the approved cumulative allowance.
+That marker is host task admission under standing owner authority, not a claim
+of physical human approval.
+
+Example preparation (replace placeholders with an independently reviewed job):
+
+```text
+python scripts/meta-supervised-develop.py --repo-root <public-worktree> --phase <fresh-validator-phase> --task-file <public-task.txt> --file src/remote_operator/example.py --context src/remote_operator/development.py --max-calls 8 --check
+```
+
+After host admission, use the same arguments without `--check`. A pre-existing
+receipt prevents replay. `PHASE/STOP` cooperatively stops the controller. There is
+no owner-return deadline or sleep, but finite shared requests/tasks/repairs and
+validator allowances still apply. Models cannot change task files, permissions,
+budget, protected runner or host code. Complete candidate snapshots go to the
+existing isolated Modal runner; exact file hashes and verified cleanup are required.
+
+Host control imports use a separately frozen reviewed public source tree, with a
+pinned whole-tree digest, rather than the candidate checkout. Prepared validator
+host imports and privileged bootstrap also use that frozen tree. Updating it
+requires substantive review and successful independent validation of new source;
+never simply copy the latest candidate or refresh the digest to clear a refusal.
+These are local developer artifacts, not a public app runtime dependency.
+
+First real launcher task completed in3Meta calls: a public developer guide and
+its complete scripted offline example. The example executed only in Modal;
+236tests passed and cleanup/source hashes verified. Host review corrected a few
+documentation overclaims; those corrections are attributed to the host.
+
+Review also found a stop poll missing between candidate writes and validator
+launch. A host regression reproduces a stop arriving during a write; a fresh
+4request Meta phase completed that fix in3calls through this same launcher.
+Final independent validation passed237tests,8skips,132subtests and the corrected
+guide example; cleanup verified. Public a9ad874 locally integrated. The reviewed
+host snapshot was updated only after that validation to include the stop fix.
+Root launcher/admission tests33passed including the existing launcher regressions.
+Conservative commitments including final validation are99.730672Meta/100 and19.47Modal/30,
+not invoices. Requested cumulative Meta125 is pending, not granted. No inference
+above100 is authorized. Original Baseten acceptance is not repeated.
+
+## Baseten implementer loop - 2026-10-30
+
+Owner asked to stop the Codex meta-loop and continue with a supervised loop over
+the free hackathon credits, prioritising Baseten because those credits expire.
+The assistant acts as supervisor. No new service, daemon, storage or dependency
+was introduced. The root repository keeps its private payloads local; only public
+Operator source is sent to the provider.
+
+Baseten route: `meta-models/muse-spark-open-1026` through the existing adapter
+and event key. The shared CLI native agent caps output at 8192 tokens while
+Baseten reasons at xhigh by default, so its first implement run exhausted the
+budget before the final report. The cause is identified; the route was not
+retried through that path. A bounded local implementer
+(`artifacts/baseten-loop-eligibility-20261030/baseten_implement.py`) sends one
+request, sets `reasoning_effort=low`, allows 16384 output tokens, records usage
+and writes full-file proposals without touching the repository.
+
+Slice 1, public branch `fix/eligibility-env-whitespace-baseten-20261030`
+(commit 9b14b89, from b2e944c): normalize each dotenv line before the optional
+`export` prefix is stripped. Baseten's proposal was accepted after host review.
+Supervisor correction: the original task named vertical tab and form feed as
+defects, but `str.splitlines` splits on them, so those inputs were already
+refused. The real regressions were a non-breaking space after `export` and a BOM
+before `export` on a later line, both of which previously produced the key
+`export<ws>OPENAI_API_KEY` and reported the file eligible. The host relabelled
+the regressions, replaced the fragile expected-value branch with an explicit
+parametrization, and added the public BUILD_LOG and eligibility documentation.
+
+Evidence: a negative control with the pre-change script reported ELIGIBLE for the
+non-breaking-space and mid-file-BOM inputs; the fixed script refuses both.
+Targeted checker tests 55passed; full public suite 202passed,8skips,69subtests on
+Windows with the existing virtual environment; Ruff check/format clean. Usage:
+1 Baseten request, 4800 input / 5688 output tokens, 15.9s, no retry.
+Cumulative review counts unchanged (Meta99.730672/100, Modal19.47/30).
+The same change was then integrated into the local candidate branch
+`feature/operator-integrated-candidate-20261029` as commit 6733e8a. The naive
+file copy would have reverted the candidate's sorted violation ordering, so the
+host restored it before committing. Candidate validation: 254passed,9skips,
+132subtests including the hash-seed ordering test, Ruff clean, no generated code
+executed outside the existing host test process. A stray worktree .venv created
+by an ad-hoc ruff invocation was removed; the worktree is clean. No new Baseten
+request was needed for the integration.

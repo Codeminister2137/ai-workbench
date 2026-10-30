@@ -1,0 +1,18 @@
+{
+  "_comment": "Example loop config — copy to loop-config.json and edit. supervisor_model: model for supervisor/orchestrator decisions. implementer_model: model for implementation tasks. deadline_hours: max wall-clock hours per loop. branch: git branch to work on. objectives: list of tasks for the loop to achieve.",
+  "supervisor_model": "anthropic/claude-4-sonnet",
+  "implementer_model": "openai/gpt-5-mini",
+  "deadline_hours": 4,
+  "branch": "main",
+  "objectives": [
+    {
+      "id": "obj-001",
+      "kind": "implement",
+      "worktree": "./worktrees/obj-001",
+      "allowlist": ["src/**", "tests/**"],
+      "files": ["src/index.ts", "src/utils.ts"],
+      "max_calls": 20,
+      "objective": "Implement feature X and ensure tests pass."
+    }
+  ]
+}
