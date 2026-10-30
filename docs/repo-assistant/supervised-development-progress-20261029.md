@@ -315,3 +315,11 @@ Targeted checker tests 55passed; full public suite 202passed,8skips,69subtests o
 Windows with the existing virtual environment; Ruff check/format clean. Usage:
 1 Baseten request, 4800 input / 5688 output tokens, 15.9s, no retry.
 Cumulative review counts unchanged (Meta99.730672/100, Modal19.47/30).
+The same change was then integrated into the local candidate branch
+`feature/operator-integrated-candidate-20261029` as commit 6733e8a. The naive
+file copy would have reverted the candidate's sorted violation ordering, so the
+host restored it before committing. Candidate validation: 254passed,9skips,
+132subtests including the hash-seed ordering test, Ruff clean, no generated code
+executed outside the existing host test process. A stray worktree .venv created
+by an ad-hoc ruff invocation was removed; the worktree is clean. No new Baseten
+request was needed for the integration.
