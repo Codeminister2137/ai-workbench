@@ -1,5 +1,9 @@
 """Chat with the Baseten supervisor to draft one queue objective.
 
+This module is a bridge to direct supervisor interaction: it forwards a user goal
+and optional file context to the Baseten supervisor model and returns a single
+bounded queue objective proposal as JSON.
+
 Usage example:
     python scripts/plan-with-supervisor.py \
         --goal "Add focused regression tests for check_submission_eligibility.py" \
@@ -8,6 +12,14 @@ Usage example:
 The script sends the goal and file context to the Baseten event model, asks it
 to propose exactly one queue objective entry, and prints the JSON proposal.
 Review and edit the output before adding it to a queue.
+
+Flags:
+    --queue: Path to a queue file to append the proposal to. If the file does not
+        exist it is created; if it contains a JSON array, JSON object, or JSONL,
+        the proposal is appended appropriately.
+    --launch: When set (requires --queue), launches the unattended development
+        loop (scripts/unattended-development-loop.py) with the queued objective,
+        using an auto-generated run directory and deadline.
 """
 
 from __future__ import annotations
