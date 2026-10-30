@@ -29,6 +29,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
+import loop_notify  # noqa: E402 - sibling script, path must precede import
+
 LAUNCHER = ROOT / "scripts/baseten-supervised-develop.py"
 PYTHON = ROOT / ".venv/Scripts/python.exe"
 VALIDATOR_TEMPLATE = ROOT / "artifacts/meta-loop-final-candidate-validation-20261030/modal-exec.py"
@@ -54,6 +57,71 @@ def now() -> str:
 def record(path: Path, entry: dict) -> None:
     with path.open("a", encoding="utf-8") as stream:
         stream.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+
+def load_completed_objectives(ledger_text: str) -> set[str]:
+    """Return objective ids with a recorded ``objective-end`` entry.
+
+    Only clean completions count: errors, deadline skips and missing-file
+    skips rerun on resume, since their precondition may have changed.
+    """
+    completed: set[str] = set()
+    for line in ledger_text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            entry = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if (
+            isinstance(entry, dict)
+            and entry.get("kind") == "objective-end"
+            and isinstance(entry.get("objective"), str)
+        ):
+            completed.add(entry["objective"])
+    return completed
+
+
+def stale_objective_dirs(run_dir: Path, item: dict) -> list[Path]:
+    """Return per-objective artifact dirs that must not survive a rerun."""
+    kind = item.get("kind")
+    name = item.get("id", "")
+    if kind == "implement":
+        return [run_dir / "phases" / name]
+    if kind == "workbench-implement":
+        return [run_dir / "workbench" / name]
+    if kind == "propose":
+        return [run_dir / "proposals" / name]
+    return []
+
+
+def summarize_results(
+    results: list[dict],
+    totals: dict,
+    started: str,
+    finished: str,
+    deadline_iso: str,
+    supervisor_model: str,
+    implementer_model: str,
+) -> dict:
+    """Build the machine-readable run summary written as ``report.json``."""
+    by_status: dict[str, int] = {}
+    for entry in results:
+        status = str(entry.get("status", "unknown"))
+        by_status[status] = by_status.get(status, 0) + 1
+    return {
+        "objectives": results,
+        "by_status": by_status,
+        "requests": totals.get("requests", 0),
+        "input_tokens": totals.get("input_tokens", 0),
+        "output_tokens": totals.get("output_tokens", 0),
+        "started": started,
+        "finished": finished,
+        "deadline": deadline_iso,
+        "supervisor_model": supervisor_model,
+        "implementer_model": implementer_model,
+    }
 
 
 def run(
@@ -465,9 +533,12 @@ def main(argv=None) -> int:
     run_dir.mkdir(parents=True, exist_ok=True)
     log = run_dir / "ledger.jsonl"
     report = run_dir / "report.md"
+    report_json = run_dir / "report.json"
     stop_file = run_dir / "STOP"
     totals = {"requests": 0, "input_tokens": 0, "output_tokens": 0}
     lines = [f"# Unattended development report - {args.deadline_utc}", ""]
+    results: list[dict] = []
+    resumed = load_completed_objectives(log.read_text(encoding="utf-8") if log.exists() else "")
     started = now()
     record(
         log,
@@ -479,6 +550,8 @@ def main(argv=None) -> int:
             "implementer_model": args.implementer_model,
         },
     )
+    if resumed:
+        record(log, {"at": started, "kind": "resume", "already_done": sorted(resumed)})
 
     rolling_sleep_started = False
     if args.rolling_sleep:
@@ -538,12 +611,51 @@ def main(argv=None) -> int:
     def expired() -> bool:
         return time.time() >= deadline_epoch - 300 or stop_file.exists()
 
+    def ping(event: str, subject: str, body: str) -> None:
+        try:
+            receipt = loop_notify.send_ping(
+                subject=subject, body=body, run_dir=run_dir, event=event
+            )
+            record(
+                log,
+                {
+                    "at": now(),
+                    "kind": "notify",
+                    "event": event,
+                    "live": receipt.get("live", False),
+                    "success": receipt.get("success", False),
+                },
+            )
+        except Exception as error:
+            record(
+                log,
+                {
+                    "at": now(),
+                    "kind": "notify",
+                    "event": event,
+                    "success": False,
+                    "error": type(error).__name__,
+                },
+            )
+
     try:
         for item in queue:
             if expired():
                 lines.append(f"- `{item['id']}`: skipped, deadline or stop reached")
                 record(log, {"at": now(), "kind": "skipped", "objective": item["id"]})
+                results.append(
+                    {"id": item["id"], "kind": item["kind"], "status": "skipped-deadline"}
+                )
                 continue
+            if item["id"] in resumed:
+                lines.append(f"- `{item['id']}`: skipped, already done in a prior session")
+                record(log, {"at": now(), "kind": "skipped-resumed", "objective": item["id"]})
+                results.append(
+                    {"id": item["id"], "kind": item["kind"], "status": "skipped-resumed"}
+                )
+                continue
+            for stale in stale_objective_dirs(run_dir, item):
+                shutil.rmtree(stale, ignore_errors=True)
             record(log, {"at": now(), "kind": "objective-start", "objective": item["id"]})
             try:
                 if item["kind"] == "implement":
@@ -560,7 +672,14 @@ def main(argv=None) -> int:
                                 "missing": missing,
                             },
                         )
-                        record(log, {"at": now(), "kind": "objective-end", "objective": item["id"]})
+                        results.append(
+                            {
+                                "id": item["id"],
+                                "kind": item["kind"],
+                                "status": "skipped-missing",
+                                "missing": missing,
+                            }
+                        )
                         continue
                     # Always start from a clean public worktree so stale model edits do not
                     # leak between objectives or into the next admission snapshot.
@@ -596,6 +715,15 @@ def main(argv=None) -> int:
                     if result.get("host_error"):
                         detail += f" host_error={result['host_error'][:120]}"
                     lines.append(f"- `{item['id']}`: {detail}")
+                    results.append(
+                        {
+                            "id": item["id"],
+                            "kind": item["kind"],
+                            "status": result["final"],
+                            "requests": result["requests"],
+                            "detail": detail,
+                        }
+                    )
                 elif item["kind"] == "workbench-implement":
                     files = {}
                     wt = Path(item["worktree"]).resolve()
@@ -619,6 +747,17 @@ def main(argv=None) -> int:
                     if receipt.get("validation_errors"):
                         detail += f" errors={receipt['validation_errors'][:1]}"
                     lines.append(f"- `{item['id']}`: {detail}")
+                    results.append(
+                        {
+                            "id": item["id"],
+                            "kind": item["kind"],
+                            "status": "workbench"
+                            if receipt.get("applied")
+                            else "workbench-not-applied",
+                            "requests": 1,
+                            "detail": detail,
+                        }
+                    )
                 elif item["kind"] == "propose":
                     files = {}
                     for name in item["files"]:
@@ -642,6 +781,15 @@ def main(argv=None) -> int:
                         f"- `{item['id']}`: proposal valid={receipt['valid']} "
                         f"finish={receipt['finish_reason']} files={len(files)}"
                     )
+                    results.append(
+                        {
+                            "id": item["id"],
+                            "kind": item["kind"],
+                            "status": "proposal-valid" if receipt["valid"] else "proposal-invalid",
+                            "requests": 1,
+                            "detail": f"finish={receipt['finish_reason']} files={len(files)}",
+                        }
+                    )
                 else:
                     raise ValueError(f"Unknown kind {item['kind']!r}")
                 record(log, {"at": now(), "kind": "objective-end", "objective": item["id"]})
@@ -655,6 +803,21 @@ def main(argv=None) -> int:
                         "objective": item["id"],
                         "error": type(error).__name__,
                     },
+                )
+                results.append(
+                    {
+                        "id": item["id"],
+                        "kind": item.get("kind", "unknown"),
+                        "status": "error",
+                        "error": type(error).__name__,
+                    }
+                )
+                ping(
+                    f"objective-error-{item['id']}",
+                    f"[loop] {run_dir.name} objective {item['id']} failed",
+                    f"Objective {item['id']} ({item.get('kind')}) raised "
+                    f"{type(error).__name__}: {str(error)[:500]}\n"
+                    f"Run: {run_dir}\nLedger: {log}",
                 )
     finally:
         total_tokens = totals["input_tokens"] + totals["output_tokens"]
@@ -672,10 +835,26 @@ def main(argv=None) -> int:
             f"- Implementer model: {args.implementer_model}",
         ]
         report.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        finished = now()
+        report_json.write_text(
+            json.dumps(
+                summarize_results(
+                    results,
+                    totals,
+                    started,
+                    finished,
+                    deadline.isoformat(),
+                    args.supervisor_model,
+                    args.implementer_model,
+                ),
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
         record(
             log,
             {
-                "at": now(),
+                "at": finished,
                 "kind": "finish",
                 **totals,
                 "supervisor_model": args.supervisor_model,
@@ -750,6 +929,30 @@ def main(argv=None) -> int:
             )
             # Give the helper a moment to write its receipt, but do not block.
             time.sleep(2)
+        errors = sum(1 for entry in results if entry.get("status") == "error")
+        sleep_note = "rolling sleep was already started"
+        for receipt_name in ("sleep-closeout.json", "sleep-continue.json"):
+            receipt_file = run_dir / receipt_name
+            if receipt_file.exists():
+                try:
+                    receipt_data = json.loads(receipt_file.read_text(encoding="utf-8"))
+                except (OSError, json.JSONDecodeError):
+                    receipt_data = {}
+                sleep_note = (
+                    f"{receipt_data.get('status', 'unknown')} "
+                    f"(planned {receipt_data.get('planned_sleep_warsaw', 'unknown')}; "
+                    f"verify {receipt_file})"
+                )
+        ping(
+            "run-finished",
+            f"[loop] {run_dir.name} finished: {len(results)} objectives, "
+            f"{totals['requests']} requests",
+            f"Objectives: {len(results)} ({errors} errors)\n"
+            f"Requests: {totals['requests']}, "
+            f"tokens {totals['input_tokens']} in / {totals['output_tokens']} out\n"
+            f"Sleep: {sleep_note}\n"
+            f"Report: {report}\nLedger: {log}",
+        )
     print(
         json.dumps(
             {
