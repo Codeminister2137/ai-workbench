@@ -73,6 +73,11 @@ def run(
     )
 
 
+# Modal snapshot byte bound lives in the validator template
+# (artifacts/meta-loop-final-candidate-validation-20261030/modal-exec.py);
+# raised to 1MB for the 2026-10-30 hackathon session.
+# TODO: consider a --local-validation flag to run pytest directly in the
+# Operator worktree when the Modal snapshot bound is still exceeded.
 def prepare_phase(phase: Path, worktree: Path, deadline_epoch: float, name: str) -> None:
     phase.mkdir(parents=True, exist_ok=False)
     shutil.copy2(
@@ -380,6 +385,7 @@ def workbench_implement(
     proposal = json.loads(proposal_path.read_text(encoding="utf-8"))
     if set(proposal) != {"changes"}:
         receipt["applied"] = False
+        (out / "receipt.json").write_text(json.dumps(receipt, indent=2), encoding="utf-8")
         return receipt
     # Apply changes under the Workbench worktree.
     for rel_path, content in proposal["changes"].items():
@@ -403,16 +409,28 @@ def workbench_implement(
     receipt["applied"] = validation_ok
     receipt["changed"] = changed
     if validation_ok:
+        # Auto-fix lint/format issues before staging so the pre-commit hook
+        # never modifies files mid-commit (which would fail the commit).
+        ruff = ROOT / ".venv/Scripts/ruff.exe"
+        ruff_bin = str(ruff) if ruff.exists() else "ruff"
+        for rel_path in changed:
+            if rel_path.endswith(".py"):
+                run([ruff_bin, "check", "--fix", str(worktree / rel_path)], timeout=120)
+                run([ruff_bin, "format", str(worktree / rel_path)], timeout=120)
         run(["git", "-C", str(worktree), "add", "-A"], timeout=120)
         commit = run(
             ["git", "-C", str(worktree), "commit", "-m", f"{out.name}: supervised Workbench slice"],
             timeout=180,
         )
         receipt["commit"] = commit.stdout.strip().splitlines()[:1]
+        receipt["commit_returncode"] = commit.returncode
+        receipt["commit_stderr"] = commit.stderr.strip()[-500:]
+        (out / "receipt.json").write_text(json.dumps(receipt, indent=2), encoding="utf-8")
     else:
         receipt["validation_errors"] = validation_errors
         run(["git", "-C", str(worktree), "checkout", "--", "."], timeout=120)
         run(["git", "-C", str(worktree), "clean", "-fdq"], timeout=120)
+        (out / "receipt.json").write_text(json.dumps(receipt, indent=2), encoding="utf-8")
     return receipt
 
 
@@ -522,6 +540,20 @@ def main(argv=None) -> int:
             try:
                 if item["kind"] == "implement":
                     worktree = Path(item["worktree"]).resolve()
+                    missing = [name for name in item["allowlist"] if not (worktree / name).exists()]
+                    if missing:
+                        lines.append(f"- `{item['id']}`: skipped, missing: {missing}")
+                        record(
+                            log,
+                            {
+                                "at": now(),
+                                "kind": "skipped-missing",
+                                "objective": item["id"],
+                                "missing": missing,
+                            },
+                        )
+                        record(log, {"at": now(), "kind": "objective-end", "objective": item["id"]})
+                        continue
                     # Always start from a clean public worktree so stale model edits do not
                     # leak between objectives or into the next admission snapshot.
                     run(["git", "-C", str(worktree), "checkout", "--", "."], timeout=120)
@@ -657,12 +689,37 @@ def main(argv=None) -> int:
                 timeout=180,
             )
         else:
-            # Closeout sleep: cancel the deadline guard, then schedule ten minutes.
+            # Closeout sleep: cancel the deadline guard, then schedule.
+            # When the queue finishes well before the deadline, keep a rolling
+            # guard until the deadline instead of sleeping in ten minutes, so an
+            # outer agent can continue the authorized window. Non-blocking: the
+            # helper writes its own receipt; waiting here hung closeout before.
             run([str(CANCEL)], timeout=120)
-            receipt = run_dir / "sleep-closeout.json"
-            cancel = run_dir / "sleep-closeout.cancel"
-            run(
-                [
+            remaining = deadline_epoch - time.time()
+            if remaining > 900:
+                receipt = run_dir / "sleep-continue.json"
+                cancel = run_dir / "sleep-continue.cancel"
+                closeout_args = [
+                    "powershell.exe",
+                    "-NoProfile",
+                    "-NonInteractive",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(CLOSE),
+                    "-Sleep",
+                    "-Rolling",
+                    "-SleepAtUtc",
+                    deadline.isoformat(),
+                    "-ReceiptPath",
+                    str(receipt),
+                    "-CancelPath",
+                    str(cancel),
+                ]
+            else:
+                receipt = run_dir / "sleep-closeout.json"
+                cancel = run_dir / "sleep-closeout.cancel"
+                closeout_args = [
                     "powershell.exe",
                     "-NoProfile",
                     "-NonInteractive",
@@ -677,9 +734,14 @@ def main(argv=None) -> int:
                     str(receipt),
                     "-CancelPath",
                     str(cancel),
-                ],
-                timeout=180,
+                ]
+            subprocess.Popen(
+                closeout_args,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
             )
+            # Give the helper a moment to write its receipt, but do not block.
+            time.sleep(2)
     print(
         json.dumps(
             {

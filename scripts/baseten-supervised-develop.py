@@ -40,6 +40,14 @@ MAX_RESPONSE_BYTES = 1048576
 
 
 def _resolve_model(cli_model: str | None, role: str | None = None) -> str:
+    """Resolve the model to use.
+
+    Precedence:
+    1. --model (cli_model) if provided and non-empty
+    2. role-specific env vars (SUPERVISOR_MODEL for supervisor, IMPLEMENTER_MODEL for implementer)
+    3. generic env vars (SUPERVISOR_MODEL / IMPLEMENTER_MODEL fallback)
+    4. hardcoded default (MODEL)
+    """
     if cli_model is not None:
         stripped = cli_model.strip() if isinstance(cli_model, str) else ""
         if stripped:
@@ -250,6 +258,13 @@ def execute(args, job, admission, model: str | None = None) -> int:
         )
         reports = set(phase.glob("modal-[0-9]*.json")) - before
         if len(reports) != 1:
+            (phase / "validator-error.json").write_text(
+                json.dumps(
+                    {"error": "no-fresh-receipt", "before": len(before)},
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
             raise RuntimeError("No fresh independent validation receipt")
         report = json.loads(next(iter(reports)).read_text(encoding="utf-8"))
         exact = all(
@@ -258,8 +273,31 @@ def execute(args, job, admission, model: str | None = None) -> int:
             for name, raw in snapshot.items()
         )
         if not report.get("cleanup_verified") or report.get("failure") or not exact:
-            raise RuntimeError("Unknown or stale isolated validation")
+            (phase / "validator-error.json").write_text(
+                json.dumps(
+                    {
+                        "failure": report.get("failure"),
+                        "diagnostics": report.get("diagnostics"),
+                        "exact": exact,
+                        "cleanup_verified": report.get("cleanup_verified"),
+                        "exit_code": report.get("exit_code"),
+                    },
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
+            raise RuntimeError(
+                f"Unknown or stale isolated validation: failure={report.get('failure')} "
+                f"diagnostics={report.get('diagnostics')}"
+            )
         if type(report.get("exit_code")) is not int:
+            (phase / "validator-error.json").write_text(
+                json.dumps(
+                    {"error": "missing-exit-status", "exit_code": report.get("exit_code")},
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
             raise RuntimeError("Missing isolated exit status")
         return ValidationResult(report["exit_code"] == 0, report.get("output", "")[:4000])
 
