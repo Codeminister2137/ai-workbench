@@ -280,3 +280,38 @@ Root launcher/admission tests33passed including the existing launcher regression
 Conservative commitments including final validation are99.730672Meta/100 and19.47Modal/30,
 not invoices. Requested cumulative Meta125 is pending, not granted. No inference
 above100 is authorized. Original Baseten acceptance is not repeated.
+
+## Baseten implementer loop - 2026-10-30
+
+Owner asked to stop the Codex meta-loop and continue with a supervised loop over
+the free hackathon credits, prioritising Baseten because those credits expire.
+The assistant acts as supervisor. No new service, daemon, storage or dependency
+was introduced. The root repository keeps its private payloads local; only public
+Operator source is sent to the provider.
+
+Baseten route: `meta-models/muse-spark-open-1026` through the existing adapter
+and event key. The shared CLI native agent caps output at 8192 tokens while
+Baseten reasons at xhigh by default, so its first implement run exhausted the
+budget before the final report. The cause is identified; the route was not
+retried through that path. A bounded local implementer
+(`artifacts/baseten-loop-eligibility-20261030/baseten_implement.py`) sends one
+request, sets `reasoning_effort=low`, allows 16384 output tokens, records usage
+and writes full-file proposals without touching the repository.
+
+Slice 1, public branch `fix/eligibility-env-whitespace-baseten-20261030`
+(commit 9b14b89, from b2e944c): normalize each dotenv line before the optional
+`export` prefix is stripped. Baseten's proposal was accepted after host review.
+Supervisor correction: the original task named vertical tab and form feed as
+defects, but `str.splitlines` splits on them, so those inputs were already
+refused. The real regressions were a non-breaking space after `export` and a BOM
+before `export` on a later line, both of which previously produced the key
+`export<ws>OPENAI_API_KEY` and reported the file eligible. The host relabelled
+the regressions, replaced the fragile expected-value branch with an explicit
+parametrization, and added the public BUILD_LOG and eligibility documentation.
+
+Evidence: a negative control with the pre-change script reported ELIGIBLE for the
+non-breaking-space and mid-file-BOM inputs; the fixed script refuses both.
+Targeted checker tests 55passed; full public suite 202passed,8skips,69subtests on
+Windows with the existing virtual environment; Ruff check/format clean. Usage:
+1 Baseten request, 4800 input / 5688 output tokens, 15.9s, no retry.
+Cumulative review counts unchanged (Meta99.730672/100, Modal19.47/30).
