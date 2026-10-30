@@ -127,7 +127,7 @@ def fetch_public_url(
                 "GET",
                 target,
                 headers={
-                    "User-Agent": "AI-projects-research/1.0",
+                    "User-Agent": "ai-workbench-research/1.0",
                     "Accept": "text/*, application/json, application/xhtml+xml",
                     "Accept-Encoding": "identity",
                 },

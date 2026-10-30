@@ -80,7 +80,7 @@ def search_json(
                 target,
                 body=body,
                 headers={
-                    "User-Agent": "AI-projects-research/1.0",
+                    "User-Agent": "ai-workbench-research/1.0",
                     "Accept": "application/json",
                     "Accept-Encoding": "identity",
                     "Content-Type": "application/json",

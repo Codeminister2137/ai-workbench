@@ -1257,7 +1257,7 @@ absolute local file targets, verifying that the target exists; a report-title
 fragment that fails to render as a link is insufficient. These are evidence
 links, not summary-type labels, and do not replace the actual outcome or limits.
 For Windows local-file Markdown links, use a slash-prefixed target such as
-`[assessment](/C:/Users/Jakub/PycharmProjects/AI-projects/docs/repo-assistant/baseline-gap.md)`.
+`[assessment](/C:/Users/Jakub/PycharmProjects/ai-workbench/docs/repo-assistant/baseline-gap.md)`.
 Do not use bare `C:/...` targets, which can be parsed as URI schemes. Verify file
 existence separately from client rendering/opening; do not claim the latter without
 observing it or receiving owner confirmation.

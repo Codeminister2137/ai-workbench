@@ -19,6 +19,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -84,18 +85,25 @@ def prepare_phase(phase: Path, worktree: Path, deadline_epoch: float, name: str)
         ROOT / "artifacts/meta-loop-final-candidate-validation-20261030/run-modal.cjs", phase
     )
     text = VALIDATOR_TEMPLATE.read_text(encoding="utf-8")
-    text = text.replace(
-        "PHASE = Path("
-        "'C:/Users/Jakub/PycharmProjects/AI-projects/artifacts/meta-loop-final-candidate-validation-20261030'"
-        ")",
+    # Location-independent anchors: match any PHASE/WORKTREE assignment the
+    # template carries, so checkouts may live anywhere. Each must match exactly
+    # once; a silent no-match would write a validator pointed at stale paths.
+    text, phase_hits = re.subn(
+        r"^PHASE = Path\('.*?'\)$",
         f"PHASE = Path({str(phase).replace(chr(92), '/')!r})",
+        text,
+        count=1,
+        flags=re.MULTILINE,
     )
-    text = text.replace(
-        "WORKTREE = Path("
-        "'C:/Users/Jakub/PycharmProjects/AI-projects/artifacts/meta-loop-controller-20261030/worktree'"
-        ")",
+    text, worktree_hits = re.subn(
+        r"^WORKTREE = Path\('.*?'\)$",
         f"WORKTREE = Path({str(worktree).replace(chr(92), '/')!r})",
+        text,
+        count=1,
+        flags=re.MULTILINE,
     )
+    if phase_hits != 1 or worktree_hits != 1:
+        raise ValueError("Validator template lost its PHASE/WORKTREE anchors")
     (phase / "modal-exec.py").write_text(text, encoding="utf-8")
     (phase / "checks.txt").write_text(
         "import os\n"
