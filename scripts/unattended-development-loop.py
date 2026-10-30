@@ -455,8 +455,6 @@ def main(argv=None) -> int:
     )
 
     rolling_sleep_started = False
-    rolling_receipt = run_dir / "sleep-rolling-receipt.json"
-    rolling_cancel = run_dir / "sleep-rolling.cancel"
     if args.rolling_sleep:
         rolling_sleep_started = True
         deadline_str = deadline.isoformat()
@@ -477,10 +475,6 @@ def main(argv=None) -> int:
                     deadline_str,
                     "-ProtectedUntilUtc",
                     deadline_str,
-                    "-ReceiptPath",
-                    str(rolling_receipt),
-                    "-CancelPath",
-                    str(rolling_cancel),
                 ],
                 timeout=180,
             )
@@ -495,9 +489,12 @@ def main(argv=None) -> int:
                         "Bypass",
                         "-File",
                         str(CLOSE),
-                        "-Renew",
-                        "-ReceiptPath",
-                        str(rolling_receipt),
+                        "-Rolling",
+                        "-Sleep",
+                        "-SleepAtUtc",
+                        deadline_str,
+                        "-ProtectedUntilUtc",
+                        deadline_str,
                     ],
                     timeout=180,
                 )
