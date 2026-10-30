@@ -9,6 +9,8 @@ import pytest
 spec = importlib.util.spec_from_file_location(
     "meta_develop", Path(__file__).parents[1] / "scripts/meta-develop.py"
 )
+assert spec is not None
+assert spec.loader is not None
 launcher = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(launcher)
 URL = "https://api.meta.ai/v1/responses"

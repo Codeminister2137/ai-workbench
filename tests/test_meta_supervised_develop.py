@@ -10,6 +10,8 @@ import pytest
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts/meta-supervised-develop.py"
 spec = importlib.util.spec_from_file_location("meta_supervised_develop", SCRIPT)
+assert spec is not None
+assert spec.loader is not None
 launcher = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(launcher)
 
