@@ -191,3 +191,16 @@ Current cumulative reservations89.910672Meta/100 and14.85Modal/15. Modal20
 request pending. Preserve original failures and all grants; no private Workbench
 payload, release, new service or sleep schedule. Plan and exact next admission
 steps in local docs/plans/hackathon-supervised-development-loop-20261030.md.
+
+## Modal30 and network interruption - 2026-10-30
+
+Owner raised cumulative Modal ceiling to30USD and prioritized reliable Meta
+development over Operator showcase wiring. New validation stopped at SDK channel
+connection failure before any app/sandbox was observed. Read-only investigation
+found system resolver failures across unrelated sites, TCP DNS replies despite
+failed ordinary/UDP queries, working rawTCP443, no active loop processes or
+obvious connection accumulation. No system DNS/proxy/firewall/routes/services
+were changed. Underlying cause remains unknown; no particular VPN or router is
+blamed. Process-only TCP DNS workaround proposed, owner answer pending; no TLS
+verification bypass. Source/test validation and corrected live acceptance remain
+incomplete; preserved failures are not graded as successful trials.
