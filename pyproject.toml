@@ -56,6 +56,10 @@ target-version = "py313"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+# E501 is not auto-fixable (ruff format does not wrap comments/strings),
+# so it fails commits that --fix cannot repair. Pre-commit already runs
+# `ruff check --fix` and `ruff format`; ignore the unfixable line-length rule.
+ignore = ["E501"]
 
 [tool.pyright]
 include = ["packages", "apps", "tests"]
