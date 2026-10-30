@@ -22,7 +22,7 @@ Use fresh absolute paths in an existing writable run-artifact directory. The
 following is a template, **not a command to execute during attended work**:
 
 ```powershell
-$sleepScript = 'C:\Users\Jakub\PycharmProjects\AI-projects\scripts\workstation-sleep.ps1'
+$sleepScript = 'C:\Users\Jakub\PycharmProjects\ai-workbench\scripts\workstation-sleep.ps1'
 $sleepReceipt = '<fresh absolute run directory>\sleep-startup.json'
 $sleepCancel = '<fresh absolute run directory>\sleep-startup.cancel'
 $sleepDeadline = '<fixed future UTC deadline, e.g. 2026-10-21T18:00:00Z>'

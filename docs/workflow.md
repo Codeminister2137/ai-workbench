@@ -105,7 +105,7 @@ automatically at the start of a summary. Use descriptive Markdown links with
 verified absolute local file targets. A title that fails to render as a link
 is insufficient; links do not replace the actual outcome and limitations.
 On Windows, use a slash-prefixed Markdown target such as
-`[assessment](/C:/Users/Jakub/PycharmProjects/AI-projects/docs/repo-assistant/baseline-gap.md)`.
+`[assessment](/C:/Users/Jakub/PycharmProjects/ai-workbench/docs/repo-assistant/baseline-gap.md)`.
 A bare `C:/...` target can be parsed as a URI scheme and lose the local-file link.
 Verify that the file exists; rendering/opening in the owner's client still requires
 client observation and must not be claimed solely from a filesystem check.
