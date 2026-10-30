@@ -204,3 +204,79 @@ were changed. Underlying cause remains unknown; no particular VPN or router is
 blamed. Process-only TCP DNS workaround proposed, owner answer pending; no TLS
 verification bypass. Source/test validation and corrected live acceptance remain
 incomplete; preserved failures are not graded as successful trials.
+
+## Recovered network and real two-model acceptance - 2026-10-30
+
+Owner rebooted after a WSL crash and reported normal connectivity. Native DNS
+resolved Meta again; no TCP DNS workaround or machine network configuration
+change was made. The underlying outage cause remains unknown. Reboot recovery
+alone does not attribute the fault to this project.
+
+Fresh isolated full-suite validation passed225tests,8skips,132subtests with
+cleanup verified. The unchanged-failure no-progress fix was committed5aa5b49
+and locally integrated with the controller into the Operator candidate.
+
+Corrected liveC completed successfully:3real Meta calls, implementer source
+changes,8protected independent checks, exact candidate hash and verified Modal
+cleanup, followed by Meta supervisor acceptance without Codex continuations.
+This demonstrates one bounded real two-model task, not unlimited unattended
+reliability. Original failed trials and their allocations remain preserved.
+
+A fresh16request Meta phase uses that same loop to develop reusable public
+JSON role adapters and regressions, with3protected Modal checks available. The
+host retains instructions, boundaries, budget and validation authority. No new
+dependency, service, private source transfer or production approval change.
+That phase autonomously repaired a candidate syntax error, then passed232tests.
+Host review found incorrect decision-class discovery. A fresh Meta-to-Meta repair
+removed guessing/fallback, imported the canonical controller and added malformed
+payload/foreign-class regressions. Final236passed8skip132subtests, independent
+protected checks and cleanup verified; host formatted files/removed unused import.
+Public e254e43 locally integrated. Original attempts remain unchanged.
+
+## Reusable foreground launcher
+
+`scripts/meta-supervised-develop.py` reuses the existing bounded Meta transport
+and the reviewed public controller/JsonRoles. It handles both roles without
+Codex writing continuations. Public Operator repository identity, fixed source
+targets, complete instructions/context, exact initial bytes, validator files and
+request budget are bound into an admission digest. `--check` performs no model
+request or credential loading. The host records the digest in the fresh phase's
+AUTHORIZED marker only after allocating within the approved cumulative allowance.
+That marker is host task admission under standing owner authority, not a claim
+of physical human approval.
+
+Example preparation (replace placeholders with an independently reviewed job):
+
+```text
+python scripts/meta-supervised-develop.py --repo-root <public-worktree> --phase <fresh-validator-phase> --task-file <public-task.txt> --file src/remote_operator/example.py --context src/remote_operator/development.py --max-calls 8 --check
+```
+
+After host admission, use the same arguments without `--check`. A pre-existing
+receipt prevents replay. `PHASE/STOP` cooperatively stops the controller. There is
+no owner-return deadline or sleep, but finite shared requests/tasks/repairs and
+validator allowances still apply. Models cannot change task files, permissions,
+budget, protected runner or host code. Complete candidate snapshots go to the
+existing isolated Modal runner; exact file hashes and verified cleanup are required.
+
+Host control imports use a separately frozen reviewed public source tree, with a
+pinned whole-tree digest, rather than the candidate checkout. Prepared validator
+host imports and privileged bootstrap also use that frozen tree. Updating it
+requires substantive review and successful independent validation of new source;
+never simply copy the latest candidate or refresh the digest to clear a refusal.
+These are local developer artifacts, not a public app runtime dependency.
+
+First real launcher task completed in3Meta calls: a public developer guide and
+its complete scripted offline example. The example executed only in Modal;
+236tests passed and cleanup/source hashes verified. Host review corrected a few
+documentation overclaims; those corrections are attributed to the host.
+
+Review also found a stop poll missing between candidate writes and validator
+launch. A host regression reproduces a stop arriving during a write; a fresh
+4request Meta phase completed that fix in3calls through this same launcher.
+Final independent validation passed237tests,8skips,132subtests and the corrected
+guide example; cleanup verified. Public a9ad874 locally integrated. The reviewed
+host snapshot was updated only after that validation to include the stop fix.
+Root launcher/admission tests33passed including the existing launcher regressions.
+Conservative commitments including final validation are99.730672Meta/100 and19.47Modal/30,
+not invoices. Requested cumulative Meta125 is pending, not granted. No inference
+above100 is authorized. Original Baseten acceptance is not repeated.
