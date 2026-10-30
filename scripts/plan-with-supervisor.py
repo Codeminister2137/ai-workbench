@@ -13,7 +13,9 @@ Review and edit the output before adding it to a queue.
 from __future__ import annotations
 
 import argparse
+import datetime
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -111,6 +113,30 @@ def _parse_json_object(text: str) -> dict:
     return json.loads(text[start : end + 1])
 
 
+def _append_to_queue(queue_path: str, proposal: dict) -> None:
+    p = Path(queue_path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    if not p.exists() or p.stat().st_size == 0:
+        p.write_text(json.dumps([proposal], indent=2) + "\n", encoding="utf-8")
+        return
+    try:
+        existing = json.loads(p.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        # Treat as JSONL - append one JSON line
+        with p.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(proposal) + "\n")
+        return
+    if isinstance(existing, list):
+        existing.append(proposal)
+        p.write_text(json.dumps(existing, indent=2) + "\n", encoding="utf-8")
+    elif isinstance(existing, dict):
+        # Single object previously - convert to list
+        p.write_text(json.dumps([existing, proposal], indent=2) + "\n", encoding="utf-8")
+    else:
+        with p.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(proposal) + "\n")
+
+
 def plan_objective(user_goal: str, files: list[str]) -> dict:
     """Ask the Baseten supervisor to propose one queue objective entry."""
     client = LowReasoningClient(
@@ -148,11 +174,42 @@ def main(argv=None) -> int:
         default="",
         help="Comma-separated file paths relative to the worktree/cwd",
     )
+    parser.add_argument("--queue", default=None, help="Path to queue file to append proposal")
+    parser.add_argument(
+        "--launch", action="store_true", help="Launch unattended development loop after queueing"
+    )
+    parser.add_argument("--branch", default=None, help="Branch name for unattended loop")
     args = parser.parse_args(argv)
 
     files = [p.strip() for p in args.files.split(",") if p.strip()]
     proposal = plan_objective(args.goal, files)
     print(json.dumps(proposal, indent=2, ensure_ascii=False))
+
+    if args.queue:
+        _append_to_queue(args.queue, proposal)
+
+    if args.launch:
+        if not args.queue:
+            parser.error("--launch requires --queue")
+        deadline = datetime.datetime.now(datetime.UTC) + datetime.timedelta(hours=2.5)
+        deadline_str = deadline.isoformat().replace("+00:00", "Z")
+        timestamp = datetime.datetime.now(datetime.UTC).strftime("%Y%m%d-%H%M%S")
+        run_dir = Path("artifacts/baseten-unattended-20261030") / timestamp
+        run_dir.mkdir(parents=True, exist_ok=True)
+        branch = args.branch or proposal.get("branch") or proposal.get("id") or ""
+        cmd = [
+            sys.executable,
+            "scripts/unattended-development-loop.py",
+            "--queue",
+            str(args.queue),
+            "--run-dir",
+            str(run_dir),
+            "--deadline-utc",
+            deadline_str,
+            "--branch",
+            str(branch),
+        ]
+        subprocess.run(cmd, check=True)
     return 0
 
 
