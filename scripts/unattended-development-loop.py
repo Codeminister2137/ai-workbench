@@ -115,7 +115,26 @@ def prepare_phase(phase: Path, worktree: Path, deadline_epoch: float, name: str)
     )
 
 
-def admission(worktree: Path, task: Path, allowlist: list[str], phase: Path, calls: int) -> str:
+def _launcher_env(supervisor_model: str, implementer_model: str) -> dict[str, str]:
+    env = os.environ.copy()
+    env["SUPERVISOR_MODEL"] = supervisor_model
+    env["IMPLEMENTER_MODEL"] = implementer_model
+    return env
+
+
+def admission(
+    worktree: Path,
+    task: Path,
+    allowlist: list[str],
+    phase: Path,
+    calls: int,
+    *,
+    supervisor_model: str | None = None,
+    implementer_model: str | None = None,
+) -> str:
+    env = None
+    if supervisor_model is not None and implementer_model is not None:
+        env = _launcher_env(supervisor_model, implementer_model)
     result = run(
         [
             str(PYTHON),
@@ -130,7 +149,8 @@ def admission(worktree: Path, task: Path, allowlist: list[str], phase: Path, cal
             "--max-calls",
             str(calls),
             "--check",
-        ]
+        ],
+        env=env,
     )
     if result.returncode != 0:
         raise RuntimeError(f"admission refused: {result.stderr[-400:]}")
@@ -144,9 +164,23 @@ def execute(
     phase: Path,
     calls: int,
     timeout: int = 900,
+    *,
+    supervisor_model: str | None = None,
+    implementer_model: str | None = None,
 ) -> dict:
-    digest = admission(worktree, task, allowlist, phase, calls)
+    digest = admission(
+        worktree,
+        task,
+        allowlist,
+        phase,
+        calls,
+        supervisor_model=supervisor_model,
+        implementer_model=implementer_model,
+    )
     (phase / "AUTHORIZED").write_text(digest, encoding="utf-8")
+    env = None
+    if supervisor_model is not None and implementer_model is not None:
+        env = _launcher_env(supervisor_model, implementer_model)
     result = run(
         [
             str(PYTHON),
@@ -161,6 +195,7 @@ def execute(
             "--max-calls",
             str(calls),
         ],
+        env=env,
         timeout=max(60, timeout),
     )
     receipt = json.loads((phase / "receipt.json").read_text(encoding="utf-8"))
@@ -392,6 +427,11 @@ def main(argv=None) -> int:
     parser.add_argument("--implementer-model", default=DEFAULT_IMPLEMENTER_MODEL)
     args = parser.parse_args(argv)
 
+    if not isinstance(args.supervisor_model, str) or not args.supervisor_model.strip():
+        parser.error("--supervisor-model must be a non-empty string")
+    if not isinstance(args.implementer_model, str) or not args.implementer_model.strip():
+        parser.error("--implementer-model must be a non-empty string")
+
     deadline = datetime.fromisoformat(args.deadline_utc.replace("Z", "+00:00")).astimezone(UTC)
     deadline_epoch = deadline.timestamp()
     queue = json.loads(args.queue.read_text(encoding="utf-8"))
@@ -500,6 +540,8 @@ def main(argv=None) -> int:
                         phase,
                         item["max_calls"],
                         timeout=int(max(60, min(900, deadline_epoch - time.time() - 300))),
+                        supervisor_model=args.supervisor_model,
+                        implementer_model=args.implementer_model,
                     )
                     totals["requests"] += result["requests"]
                     for usage in result["usage"]:

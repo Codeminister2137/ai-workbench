@@ -39,6 +39,40 @@ REQUEST_TIMEOUT_SECONDS = 150.0
 MAX_RESPONSE_BYTES = 1048576
 
 
+def _resolve_model(cli_model: str | None, role: str | None = None) -> str:
+    if cli_model is not None:
+        stripped = cli_model.strip() if isinstance(cli_model, str) else ""
+        if stripped:
+            return stripped
+    if role == "supervisor":
+        env_val = os.getenv("SUPERVISOR_MODEL")
+        if env_val and env_val.strip():
+            return env_val.strip()
+    elif role == "implementer":
+        env_val = os.getenv("IMPLEMENTER_MODEL")
+        if env_val and env_val.strip():
+            return env_val.strip()
+    else:
+        env_val = os.getenv("SUPERVISOR_MODEL")
+        if env_val and env_val.strip():
+            return env_val.strip()
+        env_val = os.getenv("IMPLEMENTER_MODEL")
+        if env_val and env_val.strip():
+            return env_val.strip()
+        # fallback to either if role-specific empty but generic check failed
+        for key in ("SUPERVISOR_MODEL", "IMPLEMENTER_MODEL"):
+            v = os.getenv(key)
+            if v and v.strip():
+                return v.strip()
+    # role-specific fallback: if no role-specific env, try the other
+    if role is not None:
+        for key in ("SUPERVISOR_MODEL", "IMPLEMENTER_MODEL"):
+            v = os.getenv(key)
+            if v and v.strip():
+                return v.strip()
+    return MODEL
+
+
 def read_key() -> str:
     values = [
         line.partition("=")[2].strip().strip("\"'")
@@ -71,7 +105,7 @@ def build_client(key: str, model: str | None = None):
     )
     from ai_provider.config import BackendConfig, ProviderKind
 
-    effective_model = model if model is not None else MODEL
+    effective_model = _resolve_model(model)
 
     class LowReasoningClient(BasetenChatClient):
         def _chat_payload(self, request, *, stream):
@@ -95,7 +129,7 @@ def build_client(key: str, model: str | None = None):
 def execute(args, job, admission, model: str | None = None) -> int:
     from ai_provider.contracts import AIMessage, AIRequest, MessageRole, PrivacyClass
 
-    effective_model = model if model is not None else MODEL
+    initial_model = _resolve_model(model)
     phase = Path(job["phase"])
     if (phase / "AUTHORIZED").read_text(encoding="utf-8").strip() != admission:
         raise ValueError("Exact prepared job has not been admitted")
@@ -106,7 +140,7 @@ def execute(args, job, admission, model: str | None = None) -> int:
         "name": phase.name,
         "admission_sha256": admission,
         "max_requests": args.max_calls,
-        "model": effective_model,
+        "model": initial_model,
         "reasoning_effort": REASONING_EFFORT,
         "max_output_tokens": MAX_OUTPUT_TOKENS,
         "requests": [],
@@ -121,9 +155,19 @@ def execute(args, job, admission, model: str | None = None) -> int:
     from remote_operator.development import ValidationResult, run_development_loop
     from remote_operator.development_json import JsonRoles
 
-    client = build_client(read_key(), effective_model)
+    key = read_key()
+    clients: dict[str, object] = {}
+
+    def get_client_for_model(m: str):
+        if m not in clients:
+            clients[m] = build_client(key, m)
+        return clients[m]
+
+    def get_model_for_role(role: str) -> str:
+        return _resolve_model(model, role=role)
 
     def send(role, payload):
+        actual_model = get_model_for_role(role)
         if (phase / "STOP").exists():
             raise ValueError("Host stop requested before model request")
         schema = (
@@ -147,16 +191,22 @@ def execute(args, job, admission, model: str | None = None) -> int:
             raise ValueError("Prompt exceeds the admitted bound")
         request = AIRequest(
             messages=(AIMessage(role=MessageRole.USER, content=prompt),),
-            model=effective_model,
+            model=actual_model,
             max_output_tokens=MAX_OUTPUT_TOKENS,
             privacy_class=PrivacyClass.PUBLIC_OR_LOW_RISK,
             metadata={"purpose": "supervised-public-development", "role": role},
         )
         started = time.perf_counter()
-        call = {"index": len(receipt["requests"]) + 1, "role": role, "status": "sending"}
+        call = {
+            "index": len(receipt["requests"]) + 1,
+            "role": role,
+            "status": "sending",
+            "model": actual_model,
+        }
         receipt["requests"].append(call)
         record()
         try:
+            client = get_client_for_model(actual_model)
             response = client.complete(request)
         except BaseException as error:
             call.update(status="transport_failed", error_type=type(error).__name__)
@@ -254,7 +304,7 @@ def main(argv=None) -> int:
             parser.error("--model must be a non-empty string")
         effective_model = args.model.strip()
     else:
-        effective_model = MODEL
+        effective_model = _resolve_model(None)
     job, admission = prepare(args)
     verify_trusted_source()
     if args.check:
