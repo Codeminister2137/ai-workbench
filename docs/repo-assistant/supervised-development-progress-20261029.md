@@ -168,3 +168,26 @@ expires_at=null (first-call window), so its full8 remains outstanding; no grant
 was retired or ledger/config changed. Requests for Meta cumulative100 and selected
 private Workbench routing are pending, not approved. Current implementation
 completed; another paid Meta coding task needs budget authority.
+
+## Model-supervised development loop - 2026-10-30
+
+Owner explicitly approved cumulative Meta100 and requested hackathon-model
+supervision/implementation without an owner-return deadline or sleep. Meta
+authored a provider-neutral controller and tests; host review prompted path,
+stop, missing/empty hash and validator-feedback corrections. Host completed
+one feedback assignment and independent regressions. Public feature commit
+2c71db5 passed224tests8skips132subtests in isolated Modal, cleanup/Ruff verified.
+
+Temporary reviewed host wiring actually connected Meta supervisor and implementer
+without Codex continuation between turns. First live attempt stopped at resolver
+error, later resolution recovered (underlying transient cause unknown). Fresh
+trial exchanged6real calls but host protected fixture contained an encoding
+error; models saw the failure and never changed protected policy. Validation
+allowance stopped further checks; this is NOT successful live acceptance.
+Corrected fixture is prepared and host expectation verified. Unchanged-failure
+no-progress fix/test also prepared, not yet full-tested or integrated.
+
+Current cumulative reservations89.910672Meta/100 and14.85Modal/15. Modal20
+request pending. Preserve original failures and all grants; no private Workbench
+payload, release, new service or sleep schedule. Plan and exact next admission
+steps in local docs/plans/hackathon-supervised-development-loop-20261030.md.
