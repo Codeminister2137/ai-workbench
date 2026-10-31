@@ -317,6 +317,42 @@ def closeout_immediate_sleep(rolling_sleep_started: bool, remaining: float) -> b
     return bool(rolling_sleep_started and remaining <= 900)
 
 
+OWN_SLEEP_CANCEL_FILES = ("sleep-continue.cancel", "sleep-closeout.cancel")
+
+
+def cancel_own_sleep_guards(run_dir: Path) -> None:
+    """Cancel only this run's sleep timers via their own cancel files.
+
+    Never runs the cancel-all helper here: that would also kill an outer
+    unattended-window fallback (run-13 ate the window timer this way).
+    """
+    for name in OWN_SLEEP_CANCEL_FILES:
+        try:
+            (run_dir / name).write_text("cancelled", encoding="utf-8")
+        except OSError:
+            pass
+
+
+def closeout_sleep_note(run_dir: Path, *, final: bool) -> str:
+    """Owner-facing sleep note; rolling guards are labeled internal."""
+    note = "rolling sleep was already started"
+    for receipt_name in ("sleep-closeout.json", "sleep-continue.json"):
+        receipt_file = run_dir / receipt_name
+        if receipt_file.exists():
+            try:
+                receipt_data = json.loads(receipt_file.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                receipt_data = {}
+            note = (
+                f"{receipt_data.get('status', 'unknown')} "
+                f"(planned {receipt_data.get('planned_sleep_warsaw', 'unknown')}; "
+                f"verify {receipt_file})"
+            )
+    if final:
+        return f"FINAL sleep scheduled: {note}"
+    return f"rolling guard (internal, no action needed): {note}"
+
+
 def commit_outcome(returncode: int, stdout: str, stderr: str) -> str:
     """Map a `git commit` result to a ledger status.
 
@@ -923,7 +959,7 @@ def main(argv=None) -> int:
         if immediate:
             # Notify before the blocking sleep: after wake the network may be
             # down and the ping fails (run-11 lost its email this way).
-            ping("run-finished", subject, finished_body("immediate sleep requested"))
+            ping("run-finished", subject, finished_body("FINAL: immediate sleep requested"))
             run(
                 [
                     "powershell.exe",
@@ -938,12 +974,13 @@ def main(argv=None) -> int:
                 timeout=180,
             )
         else:
-            # Closeout sleep: cancel the deadline guard, then schedule.
+            # Closeout sleep: cancel only this run's guards, then schedule.
             # When the queue finishes well before the deadline, keep a rolling
             # guard until the deadline instead of sleeping in ten minutes, so an
             # outer agent can continue the authorized window. Non-blocking: the
             # helper writes its own receipt; waiting here hung closeout before.
-            run([str(CANCEL)], timeout=120)
+            cancel_own_sleep_guards(run_dir)
+            final_sleep = remaining <= 900
             if remaining > 900:
                 receipt = run_dir / "sleep-continue.json"
                 cancel = run_dir / "sleep-continue.cancel"
@@ -990,19 +1027,7 @@ def main(argv=None) -> int:
             )
             # Give the helper a moment to write its receipt, but do not block.
             time.sleep(2)
-            sleep_note = "rolling sleep was already started"
-            for receipt_name in ("sleep-closeout.json", "sleep-continue.json"):
-                receipt_file = run_dir / receipt_name
-                if receipt_file.exists():
-                    try:
-                        receipt_data = json.loads(receipt_file.read_text(encoding="utf-8"))
-                    except (OSError, json.JSONDecodeError):
-                        receipt_data = {}
-                    sleep_note = (
-                        f"{receipt_data.get('status', 'unknown')} "
-                        f"(planned {receipt_data.get('planned_sleep_warsaw', 'unknown')}; "
-                        f"verify {receipt_file})"
-                    )
+            sleep_note = closeout_sleep_note(run_dir, final=final_sleep)
             ping("run-finished", subject, finished_body(sleep_note))
     print(
         json.dumps(

@@ -81,3 +81,28 @@ def test_commit_outcome_maps_empty_tree_to_noop():
         == "accepted-noop"
     )
     assert driver.commit_outcome(1, "", "lock failed") == "commit-failed"
+
+
+def test_cancel_own_sleep_guards_touches_only_run_files(tmp_path):
+    driver.cancel_own_sleep_guards(tmp_path)
+    assert (tmp_path / "sleep-continue.cancel").exists()
+    assert (tmp_path / "sleep-closeout.cancel").exists()
+    assert len(list(tmp_path.iterdir())) == 2
+
+
+def test_closeout_sleep_note_labels_rolling_and_final(tmp_path):
+    import json
+
+    assert driver.closeout_sleep_note(tmp_path, final=False).startswith(
+        "rolling guard (internal, no action needed)"
+    )
+    assert driver.closeout_sleep_note(tmp_path, final=True).startswith("FINAL sleep scheduled")
+    (tmp_path / "sleep-continue.json").write_text(
+        json.dumps({"status": "sleep_scheduled", "planned_sleep_warsaw": "2026-10-31 20:38:09"}),
+        encoding="utf-8",
+    )
+    rolling = driver.closeout_sleep_note(tmp_path, final=False)
+    assert "rolling guard (internal" in rolling
+    assert "sleep_scheduled" in rolling and "20:38" in rolling
+    (tmp_path / "sleep-continue.json").write_text("not json", encoding="utf-8")
+    assert "unknown" in driver.closeout_sleep_note(tmp_path, final=True)
