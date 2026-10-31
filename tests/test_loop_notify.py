@@ -1,8 +1,10 @@
 """Offline checks for loop email pings; real delivery is never attempted."""
 
+import dataclasses
 import importlib.util
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -65,10 +67,79 @@ def test_transport_failure_is_captured_not_raised(tmp_path, monkeypatch):
     monkeypatch.setattr(
         notify, "read_gmail_config", lambda root=notify.ROOT: ("owner@example.com", "pw")
     )
+    monkeypatch.setattr(notify, "time", SimpleNamespace(sleep=lambda seconds: None))
     receipt = notify.send_ping(subject="s", body="b", run_dir=tmp_path, event="broken")
     assert receipt["success"] is False
     assert receipt["live"] is False
+    assert receipt["attempts"] == 3
     assert "smtp down" in receipt["error_message"]
+
+
+@dataclasses.dataclass
+class PingResult:
+    success: bool
+    recipient: str
+    timestamp_utc: str
+    error_message: str | None
+
+
+def test_ping_retries_raising_transport_then_succeeds(tmp_path, monkeypatch):
+    calls = []
+    sleeps = []
+
+    class Flaky:
+        def send(self, **kwargs):
+            calls.append(kwargs)
+            if len(calls) < 3:
+                raise OSError("getaddrinfo failed")
+            return PingResult(True, kwargs["to_email"], "t", None)
+
+    class SenderModule:
+        def YagmailEmailTransport(self, email, password):
+            return Flaky()
+
+        def DryRunEmailTransport(self):
+            raise AssertionError("live path expected")
+
+    monkeypatch.setattr(notify, "_load_sender", lambda: SenderModule())
+    monkeypatch.setattr(
+        notify, "read_gmail_config", lambda root=notify.ROOT: ("owner@example.com", "pw")
+    )
+    monkeypatch.setattr(notify, "time", SimpleNamespace(sleep=sleeps.append))
+    receipt = notify.send_ping(subject="s", body="b", run_dir=tmp_path, event="flaky")
+    assert receipt["success"] is True
+    assert receipt["live"] is True
+    assert receipt["attempts"] == 3
+    assert len(calls) == 3
+    assert sleeps == [30, 30]
+
+
+def test_ping_retries_returned_failure_then_succeeds(tmp_path, monkeypatch):
+    calls = []
+
+    class Flapping:
+        def send(self, **kwargs):
+            calls.append(kwargs)
+            if len(calls) < 2:
+                return PingResult(False, kwargs["to_email"], "t", "dns down")
+            return PingResult(True, kwargs["to_email"], "t", None)
+
+    class SenderModule:
+        def YagmailEmailTransport(self, email, password):
+            return Flapping()
+
+        def DryRunEmailTransport(self):
+            raise AssertionError("live path expected")
+
+    monkeypatch.setattr(notify, "_load_sender", lambda: SenderModule())
+    monkeypatch.setattr(
+        notify, "read_gmail_config", lambda root=notify.ROOT: ("owner@example.com", "pw")
+    )
+    monkeypatch.setattr(notify, "time", SimpleNamespace(sleep=lambda seconds: None))
+    receipt = notify.send_ping(subject="s", body="b", run_dir=tmp_path, event="flap")
+    assert receipt["success"] is True
+    assert receipt["attempts"] == 2
+    assert len(calls) == 2
 
 
 def test_gmail_config_precedence(tmp_path, monkeypatch):
