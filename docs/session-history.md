@@ -3097,3 +3097,101 @@ uses one of four sandbox calls, within cumulative5. Actual owner approval clicks
 are now required before source edits/test actions can continue. Prepared task and
 evidence remain local under artifacts/meta-acp-coding-20261029. No public push,
 private Workbench payload, generated host-code execution or deployment occurred.
+
+
+## 2026-10-31 — earlier windows (handoff archived at 14:38Z window start)
+
+The live handoff below was superseded when the 14:38→19:38Z unattended window started. Preserved verbatim for continuity; stale commit pointers and timer states refer to the earlier windows, not the current one.
+
+# Current context - 2026-10-31 UNATTENDED 5h ACTIVE (14:38→19:38Z), plan in docs/plans/unattended-work-plan.md
+
+## Shipped (all on origin)
+
+- ai-workbench `develop` @ 823ce41: loop resume + report.json + Gmail pings,
+  WoL sender tool. Ruff E501 ignored repo-wide; proactive fix before staging.
+- Operator `main` @ 1f85ac1 (public GitHub): supervisor chat/plan/approve (3a)
+  + drain worker with reconcile/resume + stdlib-SMTP notifier (3b). pytest 314
+  + 143 subtests, unittest 224 OK, ruff clean, scan clean. Judges' Modal
+  deployment untouched by the source merge.
+- Root folder renamed to `ai-workbench`; all 24 worktree links repaired.
+- Remote story proven: WoL LAN + off-LAN PASS (static .12, WAN UDP 61234 -> :9,
+  BIOS PCI-E wake on, firewall all ON); Tailscale connects; Termux wakes.
+- No loop running, no sleep timers. Note: sessions opened before the rename
+  still use the old root path; prefer opening fresh sessions at `ai-workbench`.
+
+## Next-session plan executed (NO model calls, NO deploys)
+
+- queue-v8.json drafted (23 objectives, all paths/allowlists verified, 115
+  enforced max_calls ceiling); snapshot 575KB vs 1MB (473KB headroom, no diet).
+  Run prep needs: worktree update to main + fresh branch (driver never switches
+  branches). Awaiting owner approval of queue + allowance + window.
+- Hosted: supervisor routes wired on both apps, but 0 hosted isolation tests;
+  drain is CLI-only (judges can't run approved plans on hosted UI).
+  Judge-grant amount brief queued.
+- Option B: operator contract side already exists (external_actions.py + API);
+  only the Workbench adapter remains. Defer-vs-build brief queued.
+- Public-IP slice merged to develop @ e862370 and pushed (gate green:
+  pyright + full pytest passed). ai-workbench develop == origin/develop.
+- Roadmap recorded: docs/plans/product-roadmap-20261031.md (P1-P9 incl.
+  weekly digest backlog, credit strategy, crunch Nov 2 eve, dashboard→workbench).
+- WINDOW 12:16Z→15:20Z: owner returned ~13:19Z, now ATTENDED. Sleep
+  fallback cancelled (receipt sleep_cancelled 13:25Z). No sleep timers armed.
+- RUN-10 FAILED all 23 (stopped-unknown-validator): my parents[2] rename fix
+  broke phase copies (trusted path resolved inside run dir). Fixed (TRUSTED
+  anchor + per-phase preflight), proven live (315 passed in Modal), merged
+  ca05328 + pushed. Post-mortem in run-10/NOTE-cause-and-fix.md. ~$1.2 burned.
+- Serve wrapper verified localhost + tailnet; owner runs start + schtasks
+  (elevated) before leaving.
+- RUN-11 FINISHED 13:18Z: 18/23 committed (315→332 passed), 4 rejected
+  (genuine collection errors, mislabeled no-fresh-receipt), 1 empty-tree
+  no-op (meta-log-r2, line already existed). Post-mortem: run-11/NOTE.
+- Closeout slept the PC at 13:18:42Z (driver --rolling-sleep slept
+  immediately, 100 min before deadline) and the finished email died on
+  post-wake DNS with no retry. Owner woke via power button; sleep was
+  tooling-intended but wrongly immediate; wake was correct.
+- FIX BRANCH fix/loop-closeout-v8-20261031: retry-tolerant validator
+  freshness + first-error preservation, closeout sleep only near deadline,
+  ping-before-sleep, notify retry x3, accepted-noop status, 7 new tests.
+  Gate: pyright 0, pytest 3096+32 skip, 0 fail. Merged cdcf49e + pushed.
+- D2 SHIPPED LIVE: owner saved OPERATOR_JUDGE_MODEL; redeployed with
+  --strategy recreate (UTF-8 console needed for the ✓ glyph); live
+  /api/config shows judge_login:true. Run-11 email resent live:true.
+- SLICES ON MAIN: feature/baseten-run-v8 merged main (1 conflict in
+  hosted.py, kept D2 refactor + slice log line), 5 slice-introduced ruff
+  errors fixed, gate 340 passed + ruff clean, merged 726267f + pushed.
+  Owner approved the main promotion.
+- V9 DONE (run-12): 3/4 committed (340→343 passed), 13 requests.
+  sandbox fix PROVEN live (accepted after retry path). hosted-error r4
+  failed 3rd time (broke 31 tests incl. judges; retry byte-identical →
+  correctly rejected as stale). Recommend DROPPING hosted slice.
+  Email live:true attempts:1. Sleep guard CANCELLED (verified
+  sleep_cancelled); PC stays awake for remote resume. v9 branch holds
+  3 commits, unmerged. Owner away; awaiting remote-resume test report.
+- PHONE TASK FIXED: run rejected (409) because Docker Desktop was down ->
+  validation failed -> task paused. Started Docker (engine 29.2.1),
+  revalidated 6ab69d4: 7/7 pass, now awaiting_approval. Owner approves
+  from phone. Suggest Docker Desktop start-at-logon to prevent recurrence.
+- PHONE UI FIXED (8efea97 on operator main, pushed, serve restarted):
+  selecting a task now fills the request box with that task's prompt;
+  entering awaiting_approval shows a message pointing at the approve
+  button; approve without a nonce explains itself. node --check clean,
+  served app.js verified. NOTE: approval nonces last ~10 min; revalidated
+  6ab69d4 (7/7 pass), fresh nonce to ~14:47Z. Nonce lifetime is a
+  follow-up decision (security-sensitive).
+- D3 SMOKE PASSED: bridge submit → approve → callback True over real HTTP.
+- Baseten: ONE hackathon key; recorded loop spend ≈$7 of $100 (rough lower
+  bound at Spark Standard prices; run-2/pilots unrecorded).
+- D1 prep done: run worktree on feature/baseten-run-v8-20261031 @ main 1f85ac1,
+  clean. No live Baseten balance endpoint exists; owner confirms credits from
+  dashboard. Window type still open (attended vs unattended).
+- D2 verdict: judge BYOK viable (key attach exists, Modal hosting live);
+  needs judge identity + self-grant slice (planned, not implemented).
+- D3 verdict: already built both sides; 57 bridge tests green; E2E smoke left.
+- CORRECTION: no data was ever lost. The "vanished" session-history content
+  was pre-commit's stash during the push gate; observing mid-gate looked like a
+  revert. All 36 lines (28 old + 8 new) verified present. Lesson: unstaged
+  files legitimately disappear DURING a push and return after; check the gate
+  state before diagnosing loss. Policy question withdrawn.
+- Push gate root cause found + fixed: pyright.exe uv trampoline broke on the
+  rename (ruff.exe is a real binary, unaffected); `python -m pyright` worked.
+  Force-reinstalled pyright; launcher healthy again.
