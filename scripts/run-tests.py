@@ -117,6 +117,7 @@ GROUPS = {
         "tests/test_meta_supervised_develop.py",
         "tests/test_loop_notify.py",
         "tests/test_loop_resume.py",
+        "tests/test_wake_on_lan.py",
     ),
     "research": (
         "tests/test_research_*.py",
