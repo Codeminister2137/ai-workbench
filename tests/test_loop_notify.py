@@ -90,3 +90,55 @@ def test_gmail_config_precedence(tmp_path, monkeypatch):
     monkeypatch.delenv("GMAIL_EMAIL")
     monkeypatch.delenv("GMAIL_PASSWORD")
     assert notify.read_gmail_config(tmp_path) == ("job@example.com", "jobpw")
+
+
+def test_ping_carries_public_ip(tmp_path, monkeypatch):
+    captured = {}
+
+    class Capturing:
+        def send(self, **kwargs):
+            captured.update(kwargs)
+            from types import SimpleNamespace
+
+            return SimpleNamespace(
+                success=True,
+                recipient=kwargs["to_email"],
+                timestamp_utc="t",
+                error_message=None,
+            )
+
+    class SenderModule:
+        def YagmailEmailTransport(self, email, password):
+            return Capturing()
+
+        def DryRunEmailTransport(self):
+            raise AssertionError("live path expected")
+
+    monkeypatch.setattr(notify, "_load_sender", lambda: SenderModule())
+    monkeypatch.setattr(
+        notify, "read_gmail_config", lambda root=notify.ROOT: ("owner@example.com", "pw")
+    )
+    monkeypatch.setattr(notify, "public_ip", lambda **kwargs: "203.0.113.7")
+    receipt = notify.send_ping(subject="s", body="b", run_dir=tmp_path, event="ip")
+    assert receipt["public_ip"] == "203.0.113.7"
+    assert "Public IP: 203.0.113.7" in captured["contents"]
+
+
+def test_public_ip_fails_soft(tmp_path, monkeypatch):
+    monkeypatch.setattr(notify, "read_gmail_config", lambda root=notify.ROOT: None)
+    monkeypatch.setattr(notify, "public_ip", lambda **kwargs: None)
+    receipt = notify.send_ping(
+        subject="s",
+        body="b",
+        run_dir=tmp_path,
+        event="noip",
+        recipient="owner@example.com",
+        dry_run=True,
+    )
+    assert receipt["public_ip"] is None
+    monkeypatch.setattr(
+        notify.urllib.request,
+        "urlopen",
+        lambda *args, **kwargs: (_ for _ in ()).throw(OSError("down")),
+    )
+    assert notify.public_ip() is None
