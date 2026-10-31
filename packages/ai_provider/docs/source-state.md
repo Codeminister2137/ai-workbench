@@ -41,6 +41,15 @@ OpenCode `deepseek-v4.1-flash` returned HTTP 429 (transient; retry later).
 Total eval spend a few grant cents. Snapshots under `artifacts/route-evals/`.
 This establishes plumbing + one micro-task per route, not general quality.
 
+Round 2 the same day: the eval now carries the ADR-063 public attestation
+(`metadata.public_or_synthetic`, honest: the prompt is fixed and synthetic),
+which satisfies the OpenRouter free-tier retention guard. Free-tier capacity
+is flaky per model: `recursive/flint-v1.0:free` 503, `xingchen-agi/xing4.0`
+429, `nvidia/nemotron-3.5-super-vl:free` 404, but
+`dots-studio/dots-3-note-preview:free` PASS (~54/314t, $0). Requesty
+`novita/ling-3.1-flash` 403 again (account/route refusal, stands). OpenCode
+429 again (~20 min later, still limited).
+
 ## Live development evidence — 2026-10-29
 
 The [Meta pricing page](https://dev.meta.ai/docs/pricing-rate-limits) still lists

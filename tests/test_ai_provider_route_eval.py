@@ -42,6 +42,7 @@ def test_run_eval_grades_and_records_usage(monkeypatch):
     assert result.latency_ms is not None
     assert calls[0].max_output_tokens == 1024
     assert calls[0].temperature == 0.0
+    assert calls[0].metadata == {"public_or_synthetic": True}
 
 
 def test_run_eval_captures_transport_failure():
