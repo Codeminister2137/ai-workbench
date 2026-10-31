@@ -21,6 +21,26 @@ routing configuration. The [model catalog](../../ai_orchestrator/examples/model_
 contains declared route capabilities; native readers report supported account
 observations. Neither establishes coding quality by itself.
 
+## Live route sweep + micro-eval — 2026-10-31
+
+`ai_provider.route_probe` (free list-endpoint sweep, no inference): with
+account keys, OpenRouter 416 models, Requesty 809, Meta 9
+(`muse-spark-1.3` listed, non-contributor), OpenCode Go 28. Without keys the
+same endpoints answer publicly except Meta (401, reachable). The keyed
+OpenRouter count (416) differs from the public count (452): the two views
+are not identical. Local Ollama down (not running). Snapshots under
+`artifacts/route-probes/` (git-ignored).
+
+`ai_provider.route_eval` (one fixed 3-line completion task, deterministic
+exec-based grading, 1024 output cap, synthetic prompt only): Meta
+`muse-spark-1.3` PASS (~49/411t), Baseten `meta-models/muse-spark-open-1026`
+PASS (~186/444t). OpenRouter `:free` was refused by the repo's own guard
+(free-plan privacy-filter entitlement unverified; doc conflict unresolved).
+Requesty zero-price pick `novita/ling-3.1-flash` returned HTTP 403.
+OpenCode `deepseek-v4.1-flash` returned HTTP 429 (transient; retry later).
+Total eval spend a few grant cents. Snapshots under `artifacts/route-evals/`.
+This establishes plumbing + one micro-task per route, not general quality.
+
 ## Live development evidence — 2026-10-29
 
 The [Meta pricing page](https://dev.meta.ai/docs/pricing-rate-limits) still lists
