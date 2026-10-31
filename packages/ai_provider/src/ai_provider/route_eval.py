@@ -101,6 +101,9 @@ def run_eval(client: Any, route: str, model: str) -> EvalResult:
         temperature=0.0,
         max_output_tokens=MAX_OUTPUT_TOKENS,
         privacy_class=PrivacyClass.PUBLIC_OR_LOW_RISK,
+        # Fixed synthetic prompt: satisfies the ADR-063 public attestation
+        # branch of the OpenRouter free-tier retention guard.
+        metadata={"public_or_synthetic": True},
     )
     started = time.monotonic()
     try:
