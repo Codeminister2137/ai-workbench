@@ -106,3 +106,10 @@ def test_closeout_sleep_note_labels_rolling_and_final(tmp_path):
     assert "sleep_scheduled" in rolling and "20:38" in rolling
     (tmp_path / "sleep-continue.json").write_text("not json", encoding="utf-8")
     assert "unknown" in driver.closeout_sleep_note(tmp_path, final=True)
+
+
+def test_should_mail_error_only_first_mid_run_error():
+    assert driver.should_mail_error(0, 0) is False
+    assert driver.should_mail_error(5, 0) is True
+    assert driver.should_mail_error(5, 1) is False
+    assert driver.should_mail_error(0, 1) is False

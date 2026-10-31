@@ -353,6 +353,16 @@ def closeout_sleep_note(run_dir: Path, *, final: bool) -> str:
     return f"rolling guard (internal, no action needed): {note}"
 
 
+def should_mail_error(requests: int, mailed_errors: int) -> bool:
+    """Mail only the first mid-run error: failed-fast runs report via finished.
+
+    Every error is still recorded in the ledger and counted in the
+    run-finished mail; this cap only stops inbox floods (run-13 mailed six
+    times for an admission refusal).
+    """
+    return requests > 0 and mailed_errors == 0
+
+
 def commit_outcome(returncode: int, stdout: str, stderr: str) -> str:
     """Map a `git commit` result to a ledger status.
 
@@ -611,6 +621,7 @@ def main(argv=None) -> int:
     report_json = run_dir / "report.json"
     stop_file = run_dir / "STOP"
     totals = {"requests": 0, "input_tokens": 0, "output_tokens": 0}
+    mailed_errors = 0
     lines = [f"# Unattended development report - {args.deadline_utc}", ""]
     results: list[dict] = []
     resumed = load_completed_objectives(log.read_text(encoding="utf-8") if log.exists() else "")
@@ -887,13 +898,15 @@ def main(argv=None) -> int:
                         "error": type(error).__name__,
                     }
                 )
-                ping(
-                    f"objective-error-{item['id']}",
-                    f"[loop] {run_dir.name} objective {item['id']} failed",
-                    f"Objective {item['id']} ({item.get('kind')}) raised "
-                    f"{type(error).__name__}: {str(error)[:500]}\n"
-                    f"Run: {run_dir}\nLedger: {log}",
-                )
+                if should_mail_error(totals["requests"], mailed_errors):
+                    mailed_errors += 1
+                    ping(
+                        f"objective-error-{item['id']}",
+                        f"[loop] {run_dir.name} objective {item['id']} failed (first error; rest in ledger)",
+                        f"Objective {item['id']} ({item.get('kind')}) raised "
+                        f"{type(error).__name__}: {str(error)[:500]}\n"
+                        f"Run: {run_dir}\nLedger: {log}",
+                    )
     finally:
         total_tokens = totals["input_tokens"] + totals["output_tokens"]
         lines += [
