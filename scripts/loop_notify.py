@@ -8,6 +8,8 @@ otherwise. Every ping writes a JSON receipt under the run directory.
 Standing boundary: pings go only to the owner's own Gmail address, for run
 events (objective error, run finished, sleep scheduled) carrying run metadata
 (counts, statuses, timings) only. Never prompts, credentials, or third parties.
+Each ping also carries the host's current public IP (best effort) so the owner
+can reach the machine from outside the home network.
 """
 
 from __future__ import annotations
@@ -17,6 +19,7 @@ import dataclasses
 import json
 import os
 import sys
+import urllib.request
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -70,6 +73,22 @@ def _load_sender():
     return sender
 
 
+def public_ip(*, timeout: float = 10) -> str | None:
+    """Return the host's public IP, or None when it cannot be determined.
+
+    Best effort only: any transport failure, timeout, or implausible answer
+    yields None instead of raising, so notification can never break a run.
+    """
+    try:
+        with urllib.request.urlopen("https://api.ipify.org", timeout=timeout) as response:
+            answer = response.read(64).decode("ascii", errors="strict").strip()
+    except Exception:  # noqa: BLE001 - address lookup must fail soft
+        return None
+    if not answer or len(answer) > 45 or any(char.isspace() for char in answer):
+        return None
+    return answer
+
+
 def send_ping(
     *,
     subject: str,
@@ -92,6 +111,9 @@ def send_ping(
     target = (recipient or owner).strip()
     if not target or (owner and target != owner):
         raise ValueError("Loop pings are restricted to the owner's Gmail address")
+    address = public_ip()
+    if address is not None:
+        body = f"{body}\n\nPublic IP: {address}"
     notifications = run_dir / "notifications"
     notifications.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
@@ -119,7 +141,7 @@ def send_ping(
             "transport_name": "failed",
             "live": False,
         }
-    payload.update({"event": event, "subject": subject})
+    payload.update({"event": event, "subject": subject, "public_ip": address})
     receipt_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     return payload
 
