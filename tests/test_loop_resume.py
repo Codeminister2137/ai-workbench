@@ -65,3 +65,19 @@ def test_summarize_results_counts_and_totals():
     assert summary["finished"] == "finish"
     assert summary["supervisor_model"] == "sup"
     assert len(summary["objectives"]) == 4
+
+
+def test_closeout_immediate_sleep_only_near_deadline():
+    assert driver.closeout_immediate_sleep(True, 6000.0) is False
+    assert driver.closeout_immediate_sleep(True, 900.0) is True
+    assert driver.closeout_immediate_sleep(True, 60.0) is True
+    assert driver.closeout_immediate_sleep(False, 60.0) is False
+
+
+def test_commit_outcome_maps_empty_tree_to_noop():
+    assert driver.commit_outcome(0, "[branch x] msg", "") == "committed"
+    assert (
+        driver.commit_outcome(1, "On branch x\nnothing to commit, working tree clean", "")
+        == "accepted-noop"
+    )
+    assert driver.commit_outcome(1, "", "lock failed") == "commit-failed"

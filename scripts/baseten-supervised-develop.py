@@ -31,6 +31,22 @@ digest = shared.digest
 verify_trusted_source = shared.verify_trusted_source
 prepare = shared.prepare
 
+
+def snapshot_receipts(phase: Path) -> dict[Path, str]:
+    """Snapshot Modal receipt contents so a retry can prove freshness."""
+    return {path: digest(path.read_bytes()) for path in phase.glob("modal-[0-9]*.json")}
+
+
+def fresh_reports(before: dict[Path, str], phase: Path) -> set[Path]:
+    """Receipts that are new or changed since `before` was snapshotted.
+
+    A validator retry overwrites the same receipt filename, so freshness
+    means new or changed content, not merely a new filename.
+    """
+    after = snapshot_receipts(phase)
+    return {path for path, text in after.items() if before.get(path) != text}
+
+
 MODEL = "meta-models/muse-spark-open-1026"
 ENV_NAME = "BASETEN_HACKATHON_API_KEY"
 MAX_OUTPUT_TOKENS = 16384
@@ -242,7 +258,15 @@ def execute(args, job, admission, model: str | None = None) -> int:
         for name in VALIDATOR_FILES[:3]:
             if digest((phase / name).read_bytes()) != job["validator_hashes"][name]:
                 raise ValueError("Protected validator changed")
-        before = set(phase.glob("modal-[0-9]*.json"))
+
+        def record_error(payload: dict) -> None:
+            # Preserve the first validator failure: a retry overwrites phase
+            # artifacts, and the first error explains why the retry happened.
+            error_file = phase / "validator-error.json"
+            if not error_file.exists():
+                error_file.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+        before = snapshot_receipts(phase)
         env = {
             key: value
             for key, value in os.environ.items()
@@ -256,15 +280,9 @@ def execute(args, job, admission, model: str | None = None) -> int:
             timeout=240,
             check=False,
         )
-        reports = set(phase.glob("modal-[0-9]*.json")) - before
+        reports = fresh_reports(before, phase)
         if len(reports) != 1:
-            (phase / "validator-error.json").write_text(
-                json.dumps(
-                    {"error": "no-fresh-receipt", "before": len(before)},
-                    indent=2,
-                ),
-                encoding="utf-8",
-            )
+            record_error({"error": "no-fresh-receipt", "before": len(before)})
             raise RuntimeError("No fresh independent validation receipt")
         report = json.loads(next(iter(reports)).read_text(encoding="utf-8"))
         exact = all(
@@ -273,31 +291,21 @@ def execute(args, job, admission, model: str | None = None) -> int:
             for name, raw in snapshot.items()
         )
         if not report.get("cleanup_verified") or report.get("failure") or not exact:
-            (phase / "validator-error.json").write_text(
-                json.dumps(
-                    {
-                        "failure": report.get("failure"),
-                        "diagnostics": report.get("diagnostics"),
-                        "exact": exact,
-                        "cleanup_verified": report.get("cleanup_verified"),
-                        "exit_code": report.get("exit_code"),
-                    },
-                    indent=2,
-                ),
-                encoding="utf-8",
+            record_error(
+                {
+                    "failure": report.get("failure"),
+                    "diagnostics": report.get("diagnostics"),
+                    "exact": exact,
+                    "cleanup_verified": report.get("cleanup_verified"),
+                    "exit_code": report.get("exit_code"),
+                }
             )
             raise RuntimeError(
                 f"Unknown or stale isolated validation: failure={report.get('failure')} "
                 f"diagnostics={report.get('diagnostics')}"
             )
         if type(report.get("exit_code")) is not int:
-            (phase / "validator-error.json").write_text(
-                json.dumps(
-                    {"error": "missing-exit-status", "exit_code": report.get("exit_code")},
-                    indent=2,
-                ),
-                encoding="utf-8",
-            )
+            record_error({"error": "missing-exit-status", "exit_code": report.get("exit_code")})
             raise RuntimeError("Missing isolated exit status")
         return ValidationResult(report["exit_code"] == 0, report.get("output", "")[:4000])
 

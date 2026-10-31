@@ -312,6 +312,24 @@ def execute(
     }
 
 
+def closeout_immediate_sleep(rolling_sleep_started: bool, remaining: float) -> bool:
+    """True only when rolling mode is on and the window is nearly over."""
+    return bool(rolling_sleep_started and remaining <= 900)
+
+
+def commit_outcome(returncode: int, stdout: str, stderr: str) -> str:
+    """Map a `git commit` result to a ledger status.
+
+    A clean tree (model produced no changes) is an accepted no-op, not a
+    failure: the suite already passed on the unchanged worktree.
+    """
+    if returncode == 0:
+        return "committed"
+    if "nothing to commit" in f"{stdout}\n{stderr}":
+        return "accepted-noop"
+    return "commit-failed"
+
+
 def verify_and_commit(worktree: Path, objective_id: str, branch: str, log: Path) -> dict:
     venv = Path("C:/Users/Jakub/PycharmProjects/remote-ai-operator/.venv/Scripts/python.exe")
     env = os.environ.copy()
@@ -344,8 +362,8 @@ def verify_and_commit(worktree: Path, objective_id: str, branch: str, log: Path)
             timeout=180,
         )
         outcome = {
-            "status": "committed" if commit.returncode == 0 else "commit-failed",
-            "commit": commit.stdout.strip().splitlines()[:1],
+            "status": commit_outcome(commit.returncode, commit.stdout or "", commit.stderr or ""),
+            "commit": (commit.stdout or "").strip().splitlines()[:1],
             "suite": suite_tail[-1],
         }
     record(log, {"at": now(), "objective": objective_id, "branch": branch, **outcome})
@@ -882,7 +900,30 @@ def main(argv=None) -> int:
                 "implementer_model": args.implementer_model,
             },
         )
-        if rolling_sleep_started:
+        errors = sum(1 for entry in results if entry.get("status") == "error")
+        remaining = deadline_epoch - time.time()
+        # Immediate sleep only when the window is nearly over: finishing early
+        # must keep a rolling guard to the deadline so an outer agent can
+        # continue the authorized window (run-11 slept 100 min early here).
+        immediate = closeout_immediate_sleep(rolling_sleep_started, remaining)
+        subject = (
+            f"[loop] {run_dir.name} finished: {len(results)} objectives, "
+            f"{totals['requests']} requests"
+        )
+
+        def finished_body(sleep_note: str) -> str:
+            return (
+                f"Objectives: {len(results)} ({errors} errors)\n"
+                f"Requests: {totals['requests']}, "
+                f"tokens {totals['input_tokens']} in / {totals['output_tokens']} out\n"
+                f"Sleep: {sleep_note}\n"
+                f"Report: {report}\nLedger: {log}"
+            )
+
+        if immediate:
+            # Notify before the blocking sleep: after wake the network may be
+            # down and the ping fails (run-11 lost its email this way).
+            ping("run-finished", subject, finished_body("immediate sleep requested"))
             run(
                 [
                     "powershell.exe",
@@ -903,7 +944,6 @@ def main(argv=None) -> int:
             # outer agent can continue the authorized window. Non-blocking: the
             # helper writes its own receipt; waiting here hung closeout before.
             run([str(CANCEL)], timeout=120)
-            remaining = deadline_epoch - time.time()
             if remaining > 900:
                 receipt = run_dir / "sleep-continue.json"
                 cancel = run_dir / "sleep-continue.cancel"
@@ -950,30 +990,20 @@ def main(argv=None) -> int:
             )
             # Give the helper a moment to write its receipt, but do not block.
             time.sleep(2)
-        errors = sum(1 for entry in results if entry.get("status") == "error")
-        sleep_note = "rolling sleep was already started"
-        for receipt_name in ("sleep-closeout.json", "sleep-continue.json"):
-            receipt_file = run_dir / receipt_name
-            if receipt_file.exists():
-                try:
-                    receipt_data = json.loads(receipt_file.read_text(encoding="utf-8"))
-                except (OSError, json.JSONDecodeError):
-                    receipt_data = {}
-                sleep_note = (
-                    f"{receipt_data.get('status', 'unknown')} "
-                    f"(planned {receipt_data.get('planned_sleep_warsaw', 'unknown')}; "
-                    f"verify {receipt_file})"
-                )
-        ping(
-            "run-finished",
-            f"[loop] {run_dir.name} finished: {len(results)} objectives, "
-            f"{totals['requests']} requests",
-            f"Objectives: {len(results)} ({errors} errors)\n"
-            f"Requests: {totals['requests']}, "
-            f"tokens {totals['input_tokens']} in / {totals['output_tokens']} out\n"
-            f"Sleep: {sleep_note}\n"
-            f"Report: {report}\nLedger: {log}",
-        )
+            sleep_note = "rolling sleep was already started"
+            for receipt_name in ("sleep-closeout.json", "sleep-continue.json"):
+                receipt_file = run_dir / receipt_name
+                if receipt_file.exists():
+                    try:
+                        receipt_data = json.loads(receipt_file.read_text(encoding="utf-8"))
+                    except (OSError, json.JSONDecodeError):
+                        receipt_data = {}
+                    sleep_note = (
+                        f"{receipt_data.get('status', 'unknown')} "
+                        f"(planned {receipt_data.get('planned_sleep_warsaw', 'unknown')}; "
+                        f"verify {receipt_file})"
+                    )
+            ping("run-finished", subject, finished_body(sleep_note))
     print(
         json.dumps(
             {

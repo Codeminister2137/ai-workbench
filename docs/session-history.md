@@ -1,5 +1,13 @@
 # Session History
 
+## 2026-10-31 - Remote plan complete: rename, wake drill, 3b, operator main merge
+
+- Root folder renamed AI-projects -> ai-workbench by owner; all 24 worktree links repaired, uv sync clean, smoke green. No commit needed (local admin).
+- Wake drill PASS: BIOS PCI-E wake on; Termux one-liner wakes over LAN; off-LAN wakes via FunBox forward (WAN UDP 61234 -> 192.168.1.12:9) with owner-set static IP. Tailscale connects post-wake. No WoL/VPN page on FunBox; static DHCP UI broken (worked around on the PC). Wake-only exposure accepted.
+- Operator 3b shipped and merged: supervisor-drain worker (reconcile/resume, approval boundary) + stdlib-SMTP notifier + CLI + 16 tests + docs, merged to main @ 1f85ac1 and pushed to public GitHub with owner release approval. pytest 314 + 143 subtests, unittest 224 OK, ruff clean, scan clean.
+- Four loop emails went to kubajaworski999+jobs@gmail.com (2 tests, 2 smokes).
+- No paid inference used; no live model authorship claimed for scripted paths.
+
 ## 2026-10-29 - Owner return and native Meta client preparation
 
 Owner returned during closeout. The resumed sleep timer acknowledged cancellation
@@ -3061,3 +3069,31 @@ Chat. The local ledger independently records the second call with HTTP200,
 2613 input/25 output tokens. Two requests remain in the same trial allowance;
 USD1.409024 aggregate reservation is retained. This establishes the actual IDE
 chat route as well as the protocol harness; coding tools remain disabled.
+
+## 2026-10-29 — Meta ACP coding tools and first stopped task
+
+Owner requested continuing to real development through the ACP agent. Added local
+developer wiring for public file inspection, expected-hash edits and Python checks
+through the existing Modal sandbox supervisor. Native host execution and unrelated
+MCP tools remain unavailable in this finite first task. Ten path/edit guards and
+18 relay/namespace checks passed. Codex's namespaced MCP tools required reversible
+translation to Meta's flat function format and back, including replay. The actual
+live read calls established tool routing; this is not yet coding acceptance.
+
+A separate Operator worktree based on05b949c remains unchanged. One isolated Modal
+baseline reproduced the eligibility checker's false eligible result for an
+export-prefixed non-Meta credential; nonroot execution and cleanup verified.
+Meta then inspected public files and proposed checker edits, but native ACP edit
+approvals were cancelled by the automated client. No source edits were applied.
+The client continued after cancellation and eventually hit the128KiB request bound.
+Five calls consumed49978input/4353output tokens,33488cached input; fullUSD3.52256
+reservation retained. Original failed results/proposals/ledger remain unchanged.
+The client now stops on first native permission request and preserves its details.
+
+Prepared a fresh attended phase with a256KiB bound, six calls/USD8, separate ledger
+and the same real UI approvals; offline configuration passed. Original funding
+remains fully counted: at most48.75 of cumulative50 Meta; existing Modal phase
+uses one of four sandbox calls, within cumulative5. Actual owner approval clicks
+are now required before source edits/test actions can continue. Prepared task and
+evidence remain local under artifacts/meta-acp-coding-20261029. No public push,
+private Workbench payload, generated host-code execution or deployment occurred.

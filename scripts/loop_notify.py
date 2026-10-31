@@ -19,6 +19,7 @@ import dataclasses
 import json
 import os
 import sys
+import time
 import urllib.request
 from datetime import UTC, datetime
 from pathlib import Path
@@ -119,6 +120,7 @@ def send_ping(
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     receipt_path = notifications / f"{event}-{stamp}.json"
     live_config = config if not dry_run else None
+    attempts = 0
     try:
         if live_config is not None:
             transport = sender.YagmailEmailTransport(live_config[0], live_config[1])
@@ -128,10 +130,29 @@ def send_ping(
             transport = sender.DryRunEmailTransport()
             transport_name = "dry_run"
             use_live = False
-        result = transport.send(to_email=target, subject=subject, contents=body, attachments=None)
+        # Retry transient send failures (e.g. DNS down right after a
+        # sleep/wake cycle): run-11 lost its finished email this way.
+        result = None
+        for attempt in range(3):
+            attempts = attempt + 1
+            try:
+                result = transport.send(
+                    to_email=target, subject=subject, contents=body, attachments=None
+                )
+            except Exception:
+                result = None
+                if attempt == 2:
+                    raise
+                time.sleep(30)
+                continue
+            if result.success or attempt == 2:
+                break
+            time.sleep(30)
+        assert result is not None
         payload = dataclasses.asdict(result)
         payload["live"] = bool(use_live and result.success)
         payload["transport_name"] = transport_name
+        payload["attempts"] = attempts
     except Exception as error:  # noqa: BLE001 - ping must never break a run
         payload = {
             "success": False,
@@ -140,6 +161,7 @@ def send_ping(
             "error_message": f"{type(error).__name__}: {str(error)[:300]}",
             "transport_name": "failed",
             "live": False,
+            "attempts": attempts,
         }
     payload.update({"event": event, "subject": subject, "public_ip": address})
     receipt_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
