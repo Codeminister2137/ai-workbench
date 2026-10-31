@@ -50,6 +50,13 @@ is flaky per model: `recursive/flint-v1.0:free` 503, `xingchen-agi/xing4.0`
 `novita/ling-3.1-flash` 403 again (account/route refusal, stands). OpenCode
 429 again (~20 min later, still limited).
 
+Round 3: Requesty novita 403 body is a provider-edge refusal (`error code:
+1010` from Novita via Requesty routing), not our account. Second zero-price
+pick `nvidia/nemotron-3.5-lightning-30b-a3b` PASS (~57/302t, $0), so the
+Requesty route works; model choice matters. OpenCode 429 persists ~45 min
+across three models and all three protocols (responses/chat/messages):
+account-level limit, retry tomorrow.
+
 ## Live development evidence — 2026-10-29
 
 The [Meta pricing page](https://dev.meta.ai/docs/pricing-rate-limits) still lists
