@@ -130,6 +130,7 @@ def run(
     cwd: Path | None = None,
     env: dict[str, str] | None = None,
     timeout: int = 600,
+    input: str | None = None,
 ) -> subprocess.CompletedProcess:
     return subprocess.run(
         command,
@@ -138,6 +139,7 @@ def run(
         capture_output=True,
         text=True,
         timeout=timeout,
+        input=input,
         check=False,
     )
 
@@ -170,8 +172,16 @@ def prepare_phase(phase: Path, worktree: Path, deadline_epoch: float, name: str)
         count=1,
         flags=re.MULTILINE,
     )
-    if phase_hits != 1 or worktree_hits != 1:
-        raise ValueError("Validator template lost its PHASE/WORKTREE anchors")
+    trusted = ROOT / "artifacts/meta-loop-trusted-host-20261030"
+    text, trusted_hits = re.subn(
+        r"^TRUSTED = Path\('.*?'\)$",
+        f"TRUSTED = Path({str(trusted).replace(chr(92), '/')!r})",
+        text,
+        count=1,
+        flags=re.MULTILINE,
+    )
+    if phase_hits != 1 or worktree_hits != 1 or trusted_hits != 1:
+        raise ValueError("Validator template lost its PHASE/WORKTREE/TRUSTED anchors")
     (phase / "modal-exec.py").write_text(text, encoding="utf-8")
     (phase / "checks.txt").write_text(
         "import os\n"
@@ -194,6 +204,17 @@ def prepare_phase(phase: Path, worktree: Path, deadline_epoch: float, name: str)
         ),
         encoding="utf-8",
     )
+    # Local preflight: prove the validator builds its snapshot before any
+    # model call is spent. Consumes no allowance and reaches no network.
+    preflight = run(
+        [str(PYTHON), str(phase / "modal-exec.py"), "--prepare-only", "--full-suite"],
+        input='{"code": ""}',
+        timeout=120,
+    )
+    if preflight.returncode != 0:
+        raise ValueError(
+            f"Validator preflight failed for {name}: {(preflight.stderr or '')[-500:]}"
+        )
 
 
 def _launcher_env(supervisor_model: str, implementer_model: str) -> dict[str, str]:
