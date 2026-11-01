@@ -116,6 +116,7 @@ GROUPS = {
         "tests/test_meta_develop_launcher.py",
         "tests/test_meta_supervised_develop.py",
         "tests/test_loop_notify.py",
+        "tests/test_sender_unify.py",
         "tests/test_mail_digest.py",
         "tests/test_loop_resume.py",
         "tests/test_baseten_receipts.py",
