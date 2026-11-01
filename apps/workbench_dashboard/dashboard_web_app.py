@@ -1,0 +1,411 @@
+"""Workbench dashboard: local status, chat, plans, runs, and owner inbox."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import socket
+import threading
+from http import HTTPStatus
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from typing import Any, cast
+from urllib.parse import parse_qs, urlparse
+
+from ai_orchestrator.evidence import merge_probe_eval
+from ai_provider.chat_transcripts import SQLiteChatTranscriptStore
+from dashboard_chat import DashboardChat
+from dashboard_config import DEFAULT_CONFIG_PATH, DEFAULT_DATA_DIR, DashboardConfig, load_config
+from dashboard_stores import DashboardStores, StoreError
+
+ROOT = Path(__file__).parent
+STATIC_ROOT = ROOT / "web"
+REPO_ROOT = ROOT.parent.parent
+MAX_REQUEST_BYTES = 512_000
+REQUEST_TIMEOUT_SECONDS = 5.0
+DEFAULT_PORT = 8766
+
+
+class InvalidRequest(ValueError):
+    def __init__(self, status: int, message: str):
+        super().__init__(message)
+        self.status = status
+
+
+def latest_snapshot(directory: Path, prefix: str) -> tuple[Path | None, list[dict]]:
+    """Read the newest `{prefix}-*.json` snapshot rows, tolerating absence."""
+    try:
+        files = sorted(directory.glob(f"{prefix}-*.json"))
+    except OSError:
+        return None, []
+    if not files:
+        return None, []
+    latest = files[-1]
+    try:
+        payload = json.loads(latest.read_text(encoding="utf-8"))
+    except (ValueError, UnicodeError, OSError):
+        return latest, []
+    rows = payload if isinstance(payload, list) else []
+    return latest, [row for row in rows if isinstance(row, dict)]
+
+
+def evidence_snapshot(repo_root: Path = REPO_ROOT) -> dict[str, Any]:
+    """Merge the newest probe/eval snapshots into dashboard evidence rows."""
+    probe_file, probes = latest_snapshot(repo_root / "artifacts" / "route-probes", "route-probe")
+    eval_file, evals = latest_snapshot(repo_root / "artifacts" / "route-evals", "route-eval")
+    merged = merge_probe_eval(probes, evals)
+    return {
+        "available": bool(probes or evals),
+        "probe_snapshot": probe_file.name if probe_file else None,
+        "eval_snapshot": eval_file.name if eval_file else None,
+        "routes": [
+            {"route": item.route, "reachable": item.reachable, "passed_eval": item.passed_eval}
+            for item in merged
+        ],
+    }
+
+
+class DashboardRequestHandler(SimpleHTTPRequestHandler):
+    config_path = DEFAULT_CONFIG_PATH
+    data_dir = DEFAULT_DATA_DIR
+    repo_root = REPO_ROOT
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, directory=str(STATIC_ROOT), **kwargs)
+
+    def setup(self) -> None:
+        super().setup()
+        self.connection.settimeout(REQUEST_TIMEOUT_SECONDS)
+
+    def _trusted_request(self) -> bool:
+        port = cast(tuple[str, int], self.server.server_address)[1]
+        hosts = {f"127.0.0.1:{port}", f"localhost:{port}"}
+        host = self.headers.get("Host")
+        origin = self.headers.get("Origin")
+        if (
+            len(self.headers.get_all("Host", [])) != 1
+            or host not in hosts
+            or (origin is not None and origin != f"http://{host}")
+        ):
+            self.send_error(HTTPStatus.FORBIDDEN, "Untrusted request origin")
+            return False
+        return True
+
+    def _stores(self) -> DashboardStores:
+        return DashboardStores(self.data_dir)
+
+    def _chat(self, config: DashboardConfig) -> DashboardChat:
+        store = SQLiteChatTranscriptStore(self.data_dir / "chats.sqlite3")
+        return DashboardChat(store, config, self.repo_root)
+
+    def do_GET(self) -> None:
+        if not self._trusted_request():
+            return
+        parsed = urlparse(self.path)
+        path = parsed.path
+        if path == "/":
+            self.path = "/index.html"
+            return super().do_GET()
+        if not path.startswith("/api/"):
+            return super().do_GET()
+        try:
+            config = load_config(self.config_path)
+        except ValueError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=500)
+        try:
+            if path == "/api/status":
+                return self._send_json({"ok": True, **self._status(config)})
+            if path == "/api/evidence":
+                return self._send_json({"ok": True, **evidence_snapshot(self.repo_root)})
+            if path == "/api/chat/sessions":
+                return self._send_chat_sessions(config)
+            if path.startswith("/api/chat/sessions/") and path.endswith("/messages"):
+                session_id = path[len("/api/chat/sessions/") : -len("/messages")]
+                return self._send_chat_messages(config, session_id)
+            if path == "/api/plans":
+                return self._send_collection(self._stores().plans, parsed.query)
+            if path.startswith("/api/plans/"):
+                return self._send_item(self._stores().plans, path[len("/api/plans/") :])
+            if path == "/api/runs":
+                return self._send_collection(self._stores().runs, parsed.query)
+            if path.startswith("/api/runs/"):
+                return self._send_item(self._stores().runs, path[len("/api/runs/") :])
+            if path == "/api/inbox":
+                return self._send_inbox(parsed.query)
+            if path.startswith("/api/inbox/"):
+                return self._send_item(self._stores().inbox, path[len("/api/inbox/") :])
+        except (StoreError, ValueError) as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        return self._send_json({"ok": False, "error": "Unknown endpoint"}, status=404)
+
+    def do_POST(self) -> None:
+        if not self._trusted_request():
+            return
+        path = urlparse(self.path).path
+        if not path.startswith("/api/"):
+            self.send_error(HTTPStatus.NOT_FOUND, "Unknown endpoint")
+            return
+        try:
+            payload = self._read_json_body()
+            config = load_config(self.config_path)
+        except InvalidRequest as exc:
+            self.close_connection = True
+            return self._send_json({"ok": False, "error": str(exc)}, status=exc.status)
+        except ValueError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=500)
+        try:
+            if path == "/api/chat/sessions":
+                return self._create_chat_session(config, payload)
+            if path.startswith("/api/chat/sessions/") and path.endswith("/messages"):
+                session_id = path[len("/api/chat/sessions/") : -len("/messages")]
+                return self._post_chat_message(config, session_id, payload)
+            if path == "/api/inbox":
+                return self._create_inbox_task(payload)
+            if path.startswith("/api/inbox/") and path.endswith("/answer"):
+                item_id = path[len("/api/inbox/") : -len("/answer")]
+                return self._answer_inbox_task(item_id, payload)
+            if path.startswith("/api/inbox/") and path.endswith("/close"):
+                item_id = path[len("/api/inbox/") : -len("/close")]
+                return self._close_inbox_task(item_id)
+        except (StoreError, ValueError) as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        return self._send_json({"ok": False, "error": "Unknown endpoint"}, status=404)
+
+    def _status(self, config: DashboardConfig) -> dict[str, Any]:
+        stores = self._stores()
+        evidence = evidence_snapshot(self.repo_root)
+        plans, plan_total = stores.plans.list(limit=1)
+        runs, _run_total = stores.runs.list(limit=3)
+        current_plan = plans[0] if plans else None
+        return {
+            "title": config.title,
+            "provider": config.provider,
+            "model": config.model,
+            "open_inbox": stores.open_inbox_count(),
+            "plan_total": plan_total,
+            "current_plan": (
+                {"id": current_plan.get("id"), "title": current_plan.get("title")}
+                if current_plan
+                else None
+            ),
+            "recent_runs": [
+                {"id": run.get("id"), "title": run.get("title"), "status": run.get("status")}
+                for run in runs
+            ],
+            "evidence": {
+                "available": evidence["available"],
+                "routes": len(evidence["routes"]),
+                "passed": sum(1 for row in evidence["routes"] if row["passed_eval"] is True),
+            },
+        }
+
+    def _send_chat_sessions(self, config: DashboardConfig) -> None:
+        sessions = self._chat(config).list_sessions()
+        self._send_json(
+            {
+                "ok": True,
+                "sessions": [
+                    {
+                        "id": record.session_id,
+                        "title": record.title,
+                        "updated_at_utc": record.updated_at_utc,
+                        "privacy_class": record.privacy_class,
+                    }
+                    for record in sessions
+                ],
+            }
+        )
+
+    def _send_chat_messages(self, config: DashboardConfig, session_id: str) -> None:
+        try:
+            messages = self._chat(config).list_messages(session_id)
+        except ValueError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=404)
+        self._send_json(
+            {
+                "ok": True,
+                "messages": [
+                    {
+                        "id": message.message_id,
+                        "order": message.message_order,
+                        "role": message.role,
+                        "content": message.content,
+                        "provider": message.provider,
+                        "model": message.model,
+                    }
+                    for message in messages
+                ],
+            }
+        )
+
+    def _create_chat_session(self, config: DashboardConfig, payload: dict) -> None:
+        title = payload.get("title", "")
+        if not isinstance(title, str):
+            return self._send_json({"ok": False, "error": "Title must be a string"}, status=400)
+        record = self._chat(config).create_session(title=title)
+        self._send_json({"ok": True, "id": record.session_id, "title": record.title})
+
+    def _post_chat_message(self, config: DashboardConfig, session_id: str, payload: dict) -> None:
+        text = payload.get("text", "")
+        if not isinstance(text, str) or not text.strip():
+            return self._send_json({"ok": False, "error": "Message text is required"}, status=400)
+        try:
+            outcome = self._chat(config).send(session_id, text)
+        except ValueError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=404)
+        self._send_json(
+            {
+                "ok": outcome.execution_status == "completed",
+                "response_text": outcome.response_text,
+                "execution_status": outcome.execution_status,
+                "failure_reason": outcome.failure_reason,
+                "provider": outcome.provider,
+                "model": outcome.model,
+            }
+        )
+
+    def _send_collection(self, collection, query: str) -> None:
+        params = parse_qs(query)
+        try:
+            limit = min(max(int(params.get("limit", ["20"])[0]), 1), 100)
+            offset = max(int(params.get("offset", ["0"])[0]), 0)
+        except ValueError:
+            return self._send_json({"ok": False, "error": "Invalid limit or offset"}, status=400)
+        items, total = collection.list(limit=limit, offset=offset)
+        self._send_json({"ok": True, "items": items, "total": total})
+
+    def _send_item(self, collection, item_id: str) -> None:
+        item = collection.get(item_id)
+        if item is None:
+            return self._send_json({"ok": False, "error": "Not found"}, status=404)
+        self._send_json({"ok": True, "item": item})
+
+    def _send_inbox(self, query: str) -> None:
+        params = parse_qs(query)
+        wanted = params.get("status", [None])[0]
+        if wanted is not None and wanted not in {"open", "answered", "closed"}:
+            return self._send_json({"ok": False, "error": "Invalid status filter"}, status=400)
+        items, total = self._stores().inbox.list(limit=100)
+        if wanted is not None:
+            items = [item for item in items if item.get("status") == wanted]
+        self._send_json({"ok": True, "items": items, "total": total})
+
+    def _create_inbox_task(self, payload: dict) -> None:
+        stores = self._stores()
+        if not stores.check_supervisor_token(self.headers.get("X-Supervisor-Token")):
+            return self._send_json({"ok": False, "error": "Supervisor token required"}, status=403)
+        title = payload.get("title", "")
+        body = payload.get("body", "")
+        task_type = payload.get("type", "")
+        if not all(isinstance(value, str) for value in (title, body, task_type)):
+            return self._send_json(
+                {"ok": False, "error": "title, body, and type must be strings"}, status=400
+            )
+        record = stores.create_inbox_task(
+            title=title,
+            body=body,
+            task_type=task_type,
+            plan_id=payload.get("plan_id"),
+            task_id=payload.get("task_id"),
+            context_refs=payload.get("context_refs"),
+            options=payload.get("options"),
+        )
+        self._send_json({"ok": True, "id": record["id"]})
+
+    def _answer_inbox_task(self, item_id: str, payload: dict) -> None:
+        answer = payload.get("answer", "")
+        option_index = payload.get("option_index")
+        if not isinstance(answer, str) or (
+            option_index is not None and not isinstance(option_index, int)
+        ):
+            return self._send_json({"ok": False, "error": "Invalid answer payload"}, status=400)
+        try:
+            record = self._stores().answer_inbox_task(
+                item_id, answer=answer, option_index=option_index
+            )
+        except StoreError as exc:
+            status = 404 if "not found" in str(exc).lower() else 400
+            return self._send_json({"ok": False, "error": str(exc)}, status=status)
+        self._send_json({"ok": True, "id": record["id"], "status": record["status"]})
+
+    def _close_inbox_task(self, item_id: str) -> None:
+        try:
+            record = self._stores().close_inbox_task(item_id)
+        except StoreError as exc:
+            status = 404 if "not found" in str(exc).lower() else 400
+            return self._send_json({"ok": False, "error": str(exc)}, status=status)
+        self._send_json({"ok": True, "id": record["id"], "status": record["status"]})
+
+    def _send_json(self, payload: dict | list, status: int = 200) -> None:
+        body = json.dumps(payload).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _read_json_body(self) -> dict:
+        media_type = self.headers.get("Content-Type", "").split(";", 1)[0].strip().lower()
+        if media_type != "application/json":
+            raise InvalidRequest(415, "Content-Type must be application/json")
+        lengths = self.headers.get_all("Content-Length", [])
+        if self.headers.get("Transfer-Encoding") or len(lengths) != 1:
+            raise InvalidRequest(400, "One Content-Length is required")
+        try:
+            length = int(lengths[0])
+        except ValueError:
+            raise InvalidRequest(400, "Invalid Content-Length") from None
+        if not 0 < length <= MAX_REQUEST_BYTES:
+            raise InvalidRequest(413, "Request body exceeds allowed size")
+        expired = threading.Event()
+
+        def abort_read():
+            expired.set()
+            try:
+                self.connection.shutdown(socket.SHUT_RD)
+            except OSError:
+                pass
+
+        timer = threading.Timer(REQUEST_TIMEOUT_SECONDS, abort_read)
+        timer.daemon = True
+        timer.start()
+        try:
+            raw = self.rfile.read(length)
+            if expired.is_set() or len(raw) != length:
+                raise InvalidRequest(408, "Incomplete request body")
+            payload = json.loads(raw)
+            if not isinstance(payload, dict):
+                raise InvalidRequest(400, "JSON body must be an object")
+            return payload
+        except (ValueError, UnicodeError) as exc:
+            if isinstance(exc, InvalidRequest):
+                raise
+            raise InvalidRequest(400, "Invalid JSON body") from None
+        except OSError:
+            raise InvalidRequest(408, "Request body timed out") from None
+        finally:
+            timer.cancel()
+            timer.join(timeout=1)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Run the Workbench dashboard UI.")
+    parser.add_argument("--host", default="127.0.0.1", choices=("127.0.0.1", "localhost"))
+    parser.add_argument("--port", type=int, default=DEFAULT_PORT)
+    parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
+    parser.add_argument("--data-dir", type=Path, default=DEFAULT_DATA_DIR)
+    return parser
+
+
+def main() -> None:
+    args = build_parser().parse_args()
+    DashboardRequestHandler.config_path = args.config
+    DashboardRequestHandler.data_dir = args.data_dir
+    server = ThreadingHTTPServer((args.host, args.port), DashboardRequestHandler)
+    print(f"Workbench dashboard: http://{args.host}:{args.port}")
+    server.serve_forever()
+
+
+if __name__ == "__main__":
+    main()
