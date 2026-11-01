@@ -29,7 +29,6 @@ function Get-DashboardProcess {
     Get-CimInstance Win32_Process |
         Where-Object {
             $_.CommandLine -and
-            $_.CommandLine.Contains("workbench_dashboard") -and
             $_.CommandLine.Contains("dashboard_web_app.py") -and
             $_.CommandLine.Contains("--port") -and
             $_.CommandLine.Contains([string]$Port)
@@ -71,7 +70,7 @@ function Invoke-Stop {
         return
     }
     $existing | ForEach-Object {
-        Stop-Process -Id $_.ProcessId -Force
+        Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
         Write-Host "Stopped dashboard PID $($_.ProcessId)"
     }
 }

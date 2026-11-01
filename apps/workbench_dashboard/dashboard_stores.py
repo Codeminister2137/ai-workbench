@@ -17,6 +17,8 @@ MAX_RESPONSE_BYTES = 100_000
 MAX_OPEN_TASKS = 50
 INBOX_TYPES = ("decision", "clarification")
 INBOX_STATUSES = ("open", "answered", "closed")
+IDEA_SOURCES = ("owner", "third-party")
+IDEA_STATUSES = ("new", "reviewing", "adopted", "parked", "declined")
 
 
 class StoreError(ValueError):
@@ -95,6 +97,7 @@ class DashboardStores:
         self.plans = JsonCollection(data_dir / "plans")
         self.runs = JsonCollection(data_dir / "runs")
         self.inbox = JsonCollection(data_dir / "inbox")
+        self.ideas = JsonCollection(data_dir / "ideas")
 
     @property
     def token_path(self) -> Path:
@@ -185,3 +188,50 @@ class DashboardStores:
         record["status"] = "closed"
         self.inbox.put(item_id, record)
         return record
+
+    def create_idea(
+        self,
+        *,
+        title: str,
+        body: str,
+        source: str,
+        contact: str | None = None,
+    ) -> dict:
+        """Capture one idea; source tags owner vs third-party origin."""
+        title = title.strip()
+        if not title:
+            raise StoreError("Idea needs a title")
+        if source not in IDEA_SOURCES:
+            raise StoreError(f"Idea source must be one of {IDEA_SOURCES}")
+        now = _utc_now()
+        record = {
+            "id": uuid.uuid4().hex,
+            "title": title,
+            "body": body,
+            "source": source,
+            "contact": (contact or "").strip() or None,
+            "status": "new",
+            "created_at": now,
+            "reviewed_at": None,
+            "decision": None,
+        }
+        self.ideas.put(record["id"], record)
+        return record
+
+    def set_idea_status(self, item_id: str, *, status: str, decision: str | None = None) -> dict:
+        """Move one idea through triage; the record stays as the audit trail."""
+        record = self.ideas.get(item_id)
+        if record is None:
+            raise StoreError("Idea not found")
+        if status not in IDEA_STATUSES:
+            raise StoreError(f"Idea status must be one of {IDEA_STATUSES}")
+        record["status"] = status
+        record["decision"] = (decision or "").strip() or None
+        record["reviewed_at"] = _utc_now()
+        self.ideas.put(item_id, record)
+        return record
+
+    def new_idea_count(self) -> int:
+        """Count untriaged ideas for the Home badge."""
+        items, _total = self.ideas.list(limit=1000)
+        return sum(1 for item in items if item.get("status") == "new")

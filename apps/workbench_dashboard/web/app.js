@@ -4,6 +4,7 @@
 const view = document.getElementById("view");
 const toasts = document.getElementById("toasts");
 const badge = document.getElementById("inbox-badge");
+const ideasBadge = document.getElementById("ideas-badge");
 
 function toast(message, ok) {
   const el = document.createElement("div");
@@ -47,8 +48,15 @@ async function refreshBadge() {
     } else {
       badge.hidden = true;
     }
+    if (status.new_ideas > 0) {
+      ideasBadge.textContent = status.new_ideas;
+      ideasBadge.hidden = false;
+    } else {
+      ideasBadge.hidden = true;
+    }
   } catch (err) {
     badge.hidden = true;
+    ideasBadge.hidden = true;
   }
 }
 
@@ -77,6 +85,8 @@ async function renderHome() {
       <div>
         <div class="card"><h2>Inbox</h2>
           <p>${status.open_inbox} open task(s). <a href="#/inbox">Open inbox</a></p></div>
+        <div class="card"><h2>Ideas</h2>
+          <p>${status.new_ideas} untriaged. <a href="#/ideas">Open ideas</a></p></div>
         <div class="card"><h2>Chat</h2>
           <form class="inline" id="quick-chat"><input type="text" name="text" placeholder="Ask the supervisor..." required>
           <button type="submit">Send</button></form></div>
@@ -260,6 +270,49 @@ async function renderInbox(id) {
   view.innerHTML = `<h1>Inbox</h1><ul class="plain">${items}</ul>`;
 }
 
+async function renderIdeas(id) {
+  if (id) {
+    const payload = await api("/api/ideas/" + encodeURIComponent(id));
+    const item = payload.item;
+    const opts = ["new", "reviewing", "adopted", "parked", "declined"].map((s) =>
+      `<option value="${s}"${item.status === s ? " selected" : ""}>${s}</option>`).join("");
+    view.innerHTML = `<h1>Idea</h1><p><a href="#/ideas">All ideas</a></p>
+      <div class="card"><h2>${esc(item.title)}</h2>
+      <p class="muted">${esc(item.source)}${item.contact ? " · " + esc(item.contact) : ""} · ${esc(item.status)}</p>
+      <p>${esc(item.body || "")}</p>
+      ${item.decision ? `<p><strong>Decision:</strong> ${esc(item.decision)}</p>` : ""}
+      <form id="review-form" class="inline">
+        <select name="status">${opts}</select>
+        <input type="text" name="decision" placeholder="Decision note..." value="${esc(item.decision || "")}">
+        <button type="submit">Save triage</button>
+      </form></div>`;
+    document.getElementById("review-form").addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      try {
+        await api("/api/ideas/" + encodeURIComponent(id) + "/review", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({status: ev.target.status.value, decision: ev.target.decision.value}),
+        });
+        toast("Triage saved", true);
+        render();
+      } catch (err) {
+        toast(err.message, false);
+      }
+    });
+    return;
+  }
+  const payload = await api("/api/ideas");
+  const items = payload.items.length
+    ? payload.items.map((t) =>
+        `<li><a href="#/ideas/${esc(t.id)}">${esc(t.title)}</a>
+         <span class="muted">${esc(t.source)} · ${esc(t.status)}</span></li>`).join("")
+    : '<li class="muted">No ideas captured yet — use + New.</li>';
+  view.innerHTML = `<h1>Ideas</h1>
+    <p class="muted">Capture inbox for brain-dumps and third-party wishes. Triage in planning sessions.</p>
+    <ul class="plain">${items}</ul>`;
+}
+
 function renderSchedule() {
   view.innerHTML = `<h1>Schedule</h1>
     <p class="muted">Read-only until the P5 scheduler exists. Queued work today lives in plans and runs.</p>`;
@@ -283,6 +336,7 @@ async function render() {
     else if (name === "plans") await renderPlans(id);
     else if (name === "runs") await renderRuns(id);
     else if (name === "inbox") await renderInbox(id);
+    else if (name === "ideas") await renderIdeas(id);
     else if (name === "schedule") renderSchedule();
     else view.innerHTML = "<h1>Not found</h1>";
   } catch (err) {
@@ -321,6 +375,19 @@ document.querySelectorAll("[data-create]").forEach((btn) => {
         });
         toast("Inbox item created", true);
         location.hash = "#/inbox/" + out.id;
+      } else if (kind === "idea") {
+        const title = prompt("Idea title:");
+        if (!title) return;
+        const body = prompt("Describe the idea:", "") || "";
+        const third = confirm("Third-party idea? OK = someone else's, Cancel = mine.");
+        const contact = third ? (prompt("Whose idea (name/contact, optional):", "") || "") : "";
+        const out = await api("/api/ideas", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({title, body, source: third ? "third-party" : "owner", contact}),
+        });
+        toast("Idea captured", true);
+        location.hash = "#/ideas/" + out.id;
       }
     } catch (err) {
       toast(err.message, false);

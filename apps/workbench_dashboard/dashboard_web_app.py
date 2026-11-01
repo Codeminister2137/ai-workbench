@@ -132,8 +132,12 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 return self._send_item(self._stores().runs, path[len("/api/runs/") :])
             if path == "/api/inbox":
                 return self._send_inbox(parsed.query)
+            if path == "/api/ideas":
+                return self._send_ideas(parsed.query)
             if path.startswith("/api/inbox/"):
                 return self._send_item(self._stores().inbox, path[len("/api/inbox/") :])
+            if path.startswith("/api/ideas/"):
+                return self._send_item(self._stores().ideas, path[len("/api/ideas/") :])
         except (StoreError, ValueError) as exc:
             return self._send_json({"ok": False, "error": str(exc)}, status=400)
         return self._send_json({"ok": False, "error": "Unknown endpoint"}, status=404)
@@ -161,12 +165,17 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 return self._post_chat_message(config, session_id, payload)
             if path == "/api/inbox":
                 return self._create_inbox_task(payload)
+            if path == "/api/ideas":
+                return self._create_idea(payload)
             if path.startswith("/api/inbox/") and path.endswith("/answer"):
                 item_id = path[len("/api/inbox/") : -len("/answer")]
                 return self._answer_inbox_task(item_id, payload)
             if path.startswith("/api/inbox/") and path.endswith("/close"):
                 item_id = path[len("/api/inbox/") : -len("/close")]
                 return self._close_inbox_task(item_id)
+            if path.startswith("/api/ideas/") and path.endswith("/review"):
+                item_id = path[len("/api/ideas/") : -len("/review")]
+                return self._review_idea(item_id, payload)
         except (StoreError, ValueError) as exc:
             return self._send_json({"ok": False, "error": str(exc)}, status=400)
         return self._send_json({"ok": False, "error": "Unknown endpoint"}, status=404)
@@ -182,6 +191,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             "provider": config.provider,
             "model": config.model,
             "open_inbox": stores.open_inbox_count(),
+            "new_ideas": stores.new_idea_count(),
             "plan_total": plan_total,
             "current_plan": (
                 {"id": current_plan.get("id"), "title": current_plan.get("title")}
@@ -334,6 +344,54 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         except StoreError as exc:
             status = 404 if "not found" in str(exc).lower() else 400
             return self._send_json({"ok": False, "error": str(exc)}, status=status)
+        self._send_json({"ok": True, "id": record["id"], "status": record["status"]})
+
+    def _send_ideas(self, query: str) -> None:
+        from dashboard_stores import IDEA_SOURCES, IDEA_STATUSES
+
+        params = parse_qs(query)
+        wanted_status = params.get("status", [None])[0]
+        wanted_source = params.get("source", [None])[0]
+        if wanted_status is not None and wanted_status not in IDEA_STATUSES:
+            return self._send_json({"ok": False, "error": "Invalid status filter"}, status=400)
+        if wanted_source is not None and wanted_source not in IDEA_SOURCES:
+            return self._send_json({"ok": False, "error": "Invalid source filter"}, status=400)
+        items, total = self._stores().ideas.list(limit=100)
+        if wanted_status is not None:
+            items = [item for item in items if item.get("status") == wanted_status]
+        if wanted_source is not None:
+            items = [item for item in items if item.get("source") == wanted_source]
+        self._send_json({"ok": True, "items": items, "total": total})
+
+    def _create_idea(self, payload: dict) -> None:
+        title = payload.get("title", "")
+        body = payload.get("body", "")
+        source = payload.get("source", "owner")
+        contact = payload.get("contact")
+        if not all(isinstance(value, str) for value in (title, body, source)):
+            return self._send_json(
+                {"ok": False, "error": "title, body, and source must be strings"}, status=400
+            )
+        if contact is not None and not isinstance(contact, str):
+            return self._send_json({"ok": False, "error": "contact must be a string"}, status=400)
+        try:
+            record = self._stores().create_idea(
+                title=title, body=body, source=source, contact=contact
+            )
+        except StoreError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        self._send_json({"ok": True, "id": record["id"]})
+
+    def _review_idea(self, item_id: str, payload: dict) -> None:
+        status = payload.get("status", "")
+        decision = payload.get("decision", "")
+        if not isinstance(status, str) or not isinstance(decision, str):
+            return self._send_json({"ok": False, "error": "Invalid review payload"}, status=400)
+        try:
+            record = self._stores().set_idea_status(item_id, status=status, decision=decision)
+        except StoreError as exc:
+            code = 404 if "not found" in str(exc).lower() else 400
+            return self._send_json({"ok": False, "error": str(exc)}, status=code)
         self._send_json({"ok": True, "id": record["id"], "status": record["status"]})
 
     def _send_json(self, payload: dict | list, status: int = 200) -> None:

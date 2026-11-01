@@ -148,6 +148,45 @@ def test_inbox_flow_and_token_gate(dashboard_server, tmp_path) -> None:
     assert gated["ok"] is True
 
 
+def test_ideas_capture_filter_and_triage(dashboard_server) -> None:
+    mine = post_json(
+        dashboard_server,
+        "/api/ideas",
+        {"title": "Owner thought", "body": "Faster loop.", "source": "owner"},
+    )
+    assert mine["ok"] is True
+    theirs = post_json(
+        dashboard_server,
+        "/api/ideas",
+        {
+            "title": "Friend wish",
+            "body": "Plant app.",
+            "source": "third-party",
+            "contact": "Friend",
+        },
+    )
+    assert theirs["ok"] is True
+
+    status = get_json(dashboard_server, "/api/status")
+    assert status["new_ideas"] == 2
+
+    third_party = get_json(dashboard_server, "/api/ideas?source=third-party")
+    assert [item["id"] for item in third_party["items"]] == [theirs["id"]]
+
+    detail = get_json(dashboard_server, f"/api/ideas/{theirs['id']}")
+    assert detail["item"]["contact"] == "Friend"
+
+    reviewed = post_json(
+        dashboard_server,
+        f"/api/ideas/{theirs['id']}/review",
+        {"status": "adopted", "decision": "Prototype"},
+    )
+    assert reviewed["status"] == "adopted"
+
+    remaining = get_json(dashboard_server, "/api/ideas?status=new")
+    assert [item["id"] for item in remaining["items"]] == [mine["id"]]
+
+
 def test_untrusted_origin_refused(dashboard_server) -> None:
     request = Request(
         f"{dashboard_server}/api/status", headers={"Origin": "https://evil.invalid"}, method="GET"
