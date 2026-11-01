@@ -211,10 +211,11 @@ def _ai_stubs():
 
 
 class _FakeClient:
-    def __init__(self, text="- item needs a reply"):
+    def __init__(self, text="- item needs a reply", finish="stop"):
         makers = _ai_stubs()
         self.requests = []
         self._text = text
+        self._finish = finish
         self._makers = makers
 
     def complete(self, request):
@@ -239,6 +240,7 @@ class _FakeClient:
                 base_url="https://example.invalid",
                 capabilities=ModelCapabilities(),
             ),
+            finish_reason=self._finish,
             usage=UsageMetadata(
                 source=UsageSource.PROVIDER_REPORTED,
                 input_tokens=10000,
@@ -296,3 +298,9 @@ def test_summarize_cli_roundtrip(monkeypatch, tmp_path, capsys):
     saved = json.loads(out.read_text(encoding="utf-8"))
     assert saved["summary"] == "done"
     assert saved["model"] == "muse-spark-1.3"
+
+
+def test_summarize_truncated_is_an_error():
+    client = _FakeClient("", finish="length")
+    with pytest.raises(digest.DigestError, match="summary-truncated"):
+        digest.summarize_digest([{"subject": "s", "snippet": "b"}], client=client)

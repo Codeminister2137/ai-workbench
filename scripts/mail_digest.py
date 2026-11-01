@@ -29,7 +29,7 @@ SUMMARY_MODEL = "muse-spark-1.3"
 SUMMARY_INPUT_USD_PER_M = 1.25
 SUMMARY_OUTPUT_USD_PER_M = 4.25
 MAX_SUMMARY_CHARS = 60_000
-SUMMARY_MAX_OUTPUT_TOKENS = 1024
+SUMMARY_MAX_OUTPUT_TOKENS = 2048
 
 _URL_RE = re.compile(r"https?://[^\s<>'\"]+")
 
@@ -265,6 +265,8 @@ def summarize_digest(messages: list, *, client=None) -> dict:
         raise
     except Exception as error:
         raise DigestError(_classify(error)) from None
+    if str(response.finish_reason) == "length":
+        raise DigestError("summary-truncated")
     usage = response.usage
     estimate = (
         (usage.input_tokens or 0) * SUMMARY_INPUT_USD_PER_M
@@ -273,6 +275,7 @@ def summarize_digest(messages: list, *, client=None) -> dict:
     return {
         "summary": response.message.content,
         "model": SUMMARY_MODEL,
+        "finish_reason": str(response.finish_reason),
         "input_tokens": usage.input_tokens,
         "output_tokens": usage.output_tokens,
         "estimated_usd": round(estimate, 6),
