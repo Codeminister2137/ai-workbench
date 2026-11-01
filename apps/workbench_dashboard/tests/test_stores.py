@@ -58,3 +58,29 @@ def test_plans_round_trip(stores) -> None:
     assert total == 1
     assert items[0]["title"] == "First"
     assert stores.plans.get("missing") is None
+
+
+def test_idea_capture_and_triage(stores) -> None:
+    idea = stores.create_idea(
+        title="Third-party wish",
+        body="An app that waters plants.",
+        source="third-party",
+        contact="Friend",
+    )
+    assert idea["status"] == "new"
+    assert idea["source"] == "third-party"
+    assert stores.new_idea_count() == 1
+
+    reviewed = stores.set_idea_status(idea["id"], status="adopted", decision="Prototype it")
+    assert reviewed["status"] == "adopted"
+    assert reviewed["decision"] == "Prototype it"
+    assert stores.new_idea_count() == 0
+
+
+def test_idea_create_validates_source_and_title(stores) -> None:
+    with pytest.raises(StoreError, match="title"):
+        stores.create_idea(title="  ", body="b", source="owner")
+    with pytest.raises(StoreError, match="source"):
+        stores.create_idea(title="t", body="b", source="stranger")
+    with pytest.raises(StoreError, match="not found"):
+        stores.set_idea_status("missing", status="adopted")

@@ -31,6 +31,9 @@ inspect the owned process only.
 - Inbox: decisions/clarifications assigned to the owner; answers flow
   back as record updates. Creation requires the supervisor token when
   `data/supervisor.token` exists.
+- Ideas: fast capture inbox for brain-dumps, tagged `owner` or
+  `third-party` (with optional contact); triage to
+  reviewing/adopted/parked/declined with a decision note.
 - Feedback standard: every action shows a visible receipt — success,
   progress, or the exact error. Silent no-ops are defects.
 
