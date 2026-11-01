@@ -106,7 +106,7 @@ end-to-end workflow acceptance.
 | Prototype | [AI Council](apps/ai_council/README.md) and [job-search workflows](apps/job_search/README.md) | Council currently uses local Ollama. Job-search preparation and guarded delivery exist; broader automation and real Openings deployment are not established. |
 | Planned | General repository egress protection and broader application workflows | The [restricted-input plan](docs/repo-assistant/restricted-input-plan.md) distinguishes the implemented single reviewed-input path from future general protection. See the [roadmap](docs/repo-assistant/development-roadmap.md) for priorities. |
 | Planned direction | Unified agent/provider dashboard | The [architecture](docs/architecture.md) describes the vision. A unified management UI is not implemented; its detailed product and data decisions remain open. |
-| Not implemented | Mobile-to-PC remote control | The repository has local browser/MCP endpoints, but no implemented phone controller or remote-control workflow. This would be future work, not a current capability. |
+| Prototype (companion repo) | Mobile-to-PC remote control | Supervised chat-first phone UI, run settings, review/approve and hosted judge mode live in the separate remote-operator repo; this repository has only local browser/MCP endpoints and no built-in phone controller. A P3 thin-client bridge between them is in progress. |
 
 ## Quick Start
 

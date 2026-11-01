@@ -7,8 +7,7 @@ The organizer rule binds the judged runtime to Meta models. Remote Operator meet
 it structurally (scripted/meta modes only, `muse-*` grant validation, fixed Meta
 endpoint); the Workbench is excluded from the judged path by default. See
 [ADR-079](decisions/ADR-079-hackathon-submission-meta-only-runtime.md) and the
-[submission eligibility](plans/remote-ai-operator-2026/SUBMISSION-ELIGIBILITY.md)
-inventory.
+remote-operator repo's tracked `docs/submission-eligibility.md` inventory.
 
 ## ADR-078 - Delegation execution completeness reported separately
 
