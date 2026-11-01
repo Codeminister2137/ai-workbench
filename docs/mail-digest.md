@@ -1,6 +1,6 @@
-# Mail digest (slice 1)
+# Mail digest (slices 1-2)
 
-Local-only Gmail probe and fetch. No hosted calls, no sending.
+Gmail probe/fetch plus optional hosted summary. Slice 1 (--probe, --fetch) is local-only: no hosted calls, no sending. Slice 2 (--summarize) sends subject+snippet lines to Meta Standard (a no-training route) and reports usage plus a USD estimate.
 
 ## Usage
 
@@ -10,6 +10,9 @@ python scripts/mail_digest.py --probe
 
 # Fetch the latest N INBOX mails (newest first) into a JSON file
 python scripts/mail_digest.py --fetch 10 --out digest.json
+
+# Summarize a digest via the hosted model (spends grant cents)
+python scripts/mail_digest.py --summarize digest.json --out summary.json
 ```
 
 ## Credentials
@@ -17,6 +20,9 @@ python scripts/mail_digest.py --fetch 10 --out digest.json
 Reuses `read_gmail_config` from `scripts/loop_notify.py`: process
 environment (`GMAIL_EMAIL` / `GMAIL_PASSWORD`), then repo-root `.env`,
 then `apps/job_search/job-email/.env`.
+
+`--summarize` needs `META_API_KEY` (process env, else repo-root `.env`)
+and refuses digests over 60,000 characters with `digest-too-large`.
 
 ## Output schema
 

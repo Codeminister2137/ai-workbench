@@ -16,13 +16,20 @@ import email.policy
 import imaplib
 import importlib.util
 import json
+import os
 import re
+import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 IMAP_HOST = "imap.gmail.com"
 SNIPPET_LEN = 200
 MAX_URLS = 20
+SUMMARY_MODEL = "muse-spark-1.3"
+SUMMARY_INPUT_USD_PER_M = 1.25
+SUMMARY_OUTPUT_USD_PER_M = 4.25
+MAX_SUMMARY_CHARS = 60_000
+SUMMARY_MAX_OUTPUT_TOKENS = 1024
 
 _URL_RE = re.compile(r"https?://[^\s<>'\"]+")
 
@@ -189,17 +196,117 @@ def fetch_latest(count: int) -> list[dict]:
             client.logout()
 
 
+def _meta_api_key() -> str | None:
+    """Meta key from process env, else repository-root .env (never logged)."""
+    key = os.environ.get("META_API_KEY", "").strip()
+    if key:
+        return key
+    env_file = HERE.parent / ".env"
+    if env_file.is_file():
+        for line in env_file.read_text(encoding="utf-8").splitlines():
+            name, sep, value = line.partition("=")
+            if sep and name.strip() == "META_API_KEY" and value.strip():
+                return value.strip().strip("\"'")
+    return None
+
+
+def _summary_client():
+    sys.path.insert(0, str(HERE.parent / "packages" / "ai_provider" / "src"))
+    from ai_provider.adapters.meta import MetaResponsesChatClient
+    from ai_provider.config import BackendConfig, ProviderKind
+
+    key = _meta_api_key()
+    if not key:
+        raise DigestError("missing-meta-key")
+    return MetaResponsesChatClient(
+        BackendConfig(provider=ProviderKind.META, model=SUMMARY_MODEL, api_key=key)
+    )
+
+
+def summarize_digest(messages: list, *, client=None) -> dict:
+    """Summarize one local digest via Meta Standard (no-training route).
+
+    Sends subject+snippet lines only, capped at MAX_SUMMARY_CHARS. Returns
+    the summary text plus provider-reported usage and a USD estimate.
+    """
+    if not messages:
+        raise DigestError("empty-digest")
+    lines = []
+    for item in messages:
+        lines.append(f"- {item.get('subject', '')} | {item.get('snippet', '')}")
+    body = "\n".join(lines)
+    if len(body) > MAX_SUMMARY_CHARS:
+        raise DigestError("digest-too-large")
+    sys.path.insert(0, str(HERE.parent / "packages" / "ai_provider" / "src"))
+    from ai_provider.contracts import (
+        AIMessage,
+        AIRequest,
+        MessageRole,
+        PrivacyClass,
+    )
+
+    actor = client or _summary_client()
+    request = AIRequest(
+        messages=(
+            AIMessage(
+                MessageRole.SYSTEM,
+                "Summarize these mail items as short bullets: what each needs, "
+                "if anything. Skip newsletters and noise in one line.",
+            ),
+            AIMessage(MessageRole.USER, body),
+        ),
+        model=SUMMARY_MODEL,
+        max_output_tokens=SUMMARY_MAX_OUTPUT_TOKENS,
+        privacy_class=PrivacyClass.EXTERNAL_ALLOWED,
+    )
+    try:
+        response = actor.complete(request)
+    except DigestError:
+        raise
+    except Exception as error:
+        raise DigestError(_classify(error)) from None
+    usage = response.usage
+    estimate = (
+        (usage.input_tokens or 0) * SUMMARY_INPUT_USD_PER_M
+        + (usage.output_tokens or 0) * SUMMARY_OUTPUT_USD_PER_M
+    ) / 1_000_000
+    return {
+        "summary": response.message.content,
+        "model": SUMMARY_MODEL,
+        "input_tokens": usage.input_tokens,
+        "output_tokens": usage.output_tokens,
+        "estimated_usd": round(estimate, 6),
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--probe", action="store_true", help="verify IMAP SSL login")
     group.add_argument("--fetch", type=int, metavar="N", help="fetch latest N INBOX mails")
-    parser.add_argument("--out", type=Path, default=None, help="JSON output path for --fetch")
+    group.add_argument(
+        "--summarize", type=Path, metavar="DIGEST", help="summarize a digest JSON via hosted model"
+    )
+    parser.add_argument(
+        "--out", type=Path, default=None, help="JSON output path for --fetch/--summarize"
+    )
     args = parser.parse_args(argv)
     if args.probe:
         ok, reason = probe()
         print("PROBE_OK" if ok else f"PROBE_FAIL {reason}")
         return 0 if ok else 1
+    if args.summarize is not None:
+        if args.out is None:
+            parser.error("--summarize requires --out <json>")
+        try:
+            messages = json.loads(args.summarize.read_text(encoding="utf-8"))
+            result = summarize_digest(messages)
+        except DigestError as error:
+            print(f"SUMMARIZE_FAIL {error.reason}")
+            return 1
+        args.out.write_text(json.dumps(result, indent=2), encoding="utf-8")
+        print(f"SUMMARIZE_OK {result['estimated_usd']}")
+        return 0
     if args.fetch is None or args.fetch < 1:
         parser.error("--fetch N requires N >= 1")
     if args.out is None:
