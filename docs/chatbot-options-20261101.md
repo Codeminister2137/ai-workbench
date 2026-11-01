@@ -303,5 +303,16 @@ P2/L3 program work: per-task-class quality/cost frontiers measured by
 the L3 ladder, producing a tiering policy. Approved inside eval scope.
 
 Workbench bot: complex management of various code is the priority.
-The owner's message was truncated mid-sentence ("no..."); the
-completion is an open question, not an assumed requirement.
+It runs LOCAL - no hosting needed (models may still be remote, under
+privacy classes). A local supervisor is likely beneficial (reliable,
+cheap) but needs research: the L3 ladder plus local-vs-hosted
+task-class comparison answers whether local models clear the bar.
+Owner designation: the workbench bot is the "most unsafe" bot - the
+dashboard is built around it, a growing ecosystem runs through it, and
+mostly-unrestricted access is both powerful and dangerous. Recorded
+rule: the local bot gets the strongest internal guardrails
+(permissions, approvals, audit), not the weakest; local does not mean
+trusted. Each new chat capability (edits, run control, delegation)
+needs its approval story before it ships; v1 answering without tools
+is a safety feature, not just a scope limit. Remote use goes through
+the P3 thin client, keeping this bot off the public internet.
