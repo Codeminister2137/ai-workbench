@@ -5,7 +5,7 @@
 - Root folder renamed AI-projects -> ai-workbench by owner; all 24 worktree links repaired, uv sync clean, smoke green. No commit needed (local admin).
 - Wake drill PASS: BIOS PCI-E wake on; Termux one-liner wakes over LAN; off-LAN wakes via FunBox forward (WAN UDP 61234 -> 192.168.1.12:9) with owner-set static IP. Tailscale connects post-wake. No WoL/VPN page on FunBox; static DHCP UI broken (worked around on the PC). Wake-only exposure accepted.
 - Operator 3b shipped and merged: supervisor-drain worker (reconcile/resume, approval boundary) + stdlib-SMTP notifier + CLI + 16 tests + docs, merged to main @ 1f85ac1 and pushed to public GitHub with owner release approval. pytest 314 + 143 subtests, unittest 224 OK, ruff clean, scan clean.
-- Four loop emails went to kubajaworski999+jobs@gmail.com (2 tests, 2 smokes).
+- Four loop emails went to the owner Gmail (+jobs alias; 2 tests, 2 smokes).
 - No paid inference used; no live model authorship claimed for scripted paths.
 
 ## 2026-10-29 - Owner return and native Meta client preparation
@@ -729,7 +729,7 @@ Completed slices:
   `Qwen/Qwen2.5-Coder-7B-Instruct` on an L4 GPU with vLLM 0.21.0.
 - Created Modal secret `modal-runtime-api-key` (`MODAL_API_KEY`/`VLLM_API_KEY`)
   and wrote the key to local `.env`.
-- Deployed to `https://kubajaworski999--ai-projects-qwen25-coder-7b-instruct-server.us-east.modal.direct/v1`,
+- Deployed to `https://<modal-workspace>--ai-projects-qwen25-coder-7b-instruct-server.us-east.modal.direct/v1`,
   verified `/health`, `/v1/models` and a `/v1/chat/completions` probe.
 - Worked around FlashInfer JIT compile failure with `VLLM_USE_FLASHINFER_SAMPLER=0`.
 - Wired the live `base_url` into the catalog route

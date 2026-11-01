@@ -69,7 +69,7 @@ git push origin master
 ```
 
 Do not promote to `master` mid-feature or to satisfy a deadline. The goal
-is that `master` always reflects a coherent, working state.
+is that `master` always reflects a coherent, working state. Standing promotion gate (owner rule): before every promotion, verify (1) docs and READMEs are accurate and digestible to both humans and AI (no stale capability claims, no dead links to ignored paths), and (2) a privacy/vulnerability pass over the merged range: no credentials or personal identifiers in tracked files, secrets gitignored, and any change to public hosted APIs, remote access, wake/port-forwarding, or mail stays inside the documented privacy boundary. Fix findings on a working branch first; promotion approval is conditional on this gate passing.
 
 ### Retiring working branches
 
