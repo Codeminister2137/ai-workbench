@@ -62,6 +62,19 @@ checks every second while waiting; cancellation cannot undo a sleep request
 already submitted. An owner return or attended switch requires cancellation and
 verification before resuming work. Never delete markers or reuse receipt paths.
 
+## Attended-presence override — owner requested 2026-11-01
+
+When the owner is at the PC and says so (or is clearly interacting), no sleep
+may be scheduled: cancel every pending timer via `.\cancel-sleep.cmd`, verify
+each `sleep_cancelled` receipt plus helper exit, and record the override in
+the handoff with its start time. Do not renew, re-arm, or schedule closeout
+sleep while the override stands — a lease expiring under an attending owner
+is the failure this option prevents (observed 2026-11-01: fallback fired at
+19:02:39Z while the owner was present because renewal lapsed during message
+handling). Heartbeats and inbox polls continue; only power actions pause.
+Re-arm only on the owner's explicit direction (e.g. they leave again), with a
+fresh receipt path and the unchanged hard deadline.
+
 ## Closeout and interruption
 
 The existing default remains sleep ten minutes after normal completion, including
