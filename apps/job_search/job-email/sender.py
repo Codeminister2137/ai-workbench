@@ -29,7 +29,7 @@ class EmailTransport(Protocol):
         to_email: str,
         subject: str,
         contents: str,
-        attachments: str,
+        attachments: str | None,
     ) -> SendReceipt:
         """Deliver the email message and return a verifiable transmission receipt."""
         ...
@@ -40,7 +40,7 @@ class DryRunEmailTransport:
 
     def __init__(self, *, check_attachment_exists: bool = False) -> None:
         self.check_attachment_exists = check_attachment_exists
-        self.sent_deliveries: list[dict[str, str]] = []
+        self.sent_deliveries: list[dict[str, str | None]] = []
 
     def send(
         self,
@@ -48,7 +48,7 @@ class DryRunEmailTransport:
         to_email: str,
         subject: str,
         contents: str,
-        attachments: str,
+        attachments: str | None,
     ) -> SendReceipt:
         if not to_email or "@" not in to_email:
             return SendReceipt(
@@ -59,7 +59,9 @@ class DryRunEmailTransport:
                 transport_name="dry_run",
             )
 
-        if self.check_attachment_exists and not os.path.exists(attachments):
+        if self.check_attachment_exists and (
+            attachments is None or not os.path.exists(attachments)
+        ):
             return SendReceipt(
                 success=False,
                 recipient=to_email,
@@ -97,7 +99,7 @@ class YagmailEmailTransport:
         to_email: str,
         subject: str,
         contents: str,
-        attachments: str,
+        attachments: str | None,
     ) -> SendReceipt:
         try:
             from importlib import import_module
