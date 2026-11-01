@@ -179,3 +179,120 @@ def test_fetch_auth_fail_prints_no_secrets(fake_imap, tmp_path, capsys):
     printed = capsys.readouterr().out
     assert "FETCH_FAIL auth" in printed
     assert CREDS[1] not in printed
+
+
+def _ai_stubs():
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "packages/ai_provider/src"))
+    from ai_provider.contracts import (
+        AIMessage,
+        AIResponse,
+        BackendInfo,
+        BackendLocation,
+        MessageRole,
+        ModelCapabilities,
+        PrivacyClass,
+        UsageMetadata,
+        UsageSource,
+    )
+
+    return (
+        AIMessage,
+        AIResponse,
+        BackendInfo,
+        BackendLocation,
+        MessageRole,
+        ModelCapabilities,
+        PrivacyClass,
+        UsageMetadata,
+        UsageSource,
+    )
+
+
+class _FakeClient:
+    def __init__(self, text="- item needs a reply"):
+        makers = _ai_stubs()
+        self.requests = []
+        self._text = text
+        self._makers = makers
+
+    def complete(self, request):
+        (
+            AIMessage,
+            AIResponse,
+            BackendInfo,
+            BackendLocation,
+            MessageRole,
+            ModelCapabilities,
+            PrivacyClass,
+            UsageMetadata,
+            UsageSource,
+        ) = self._makers
+        self.requests.append(request)
+        return AIResponse(
+            message=AIMessage(MessageRole.ASSISTANT, self._text),
+            backend=BackendInfo(
+                provider="meta",
+                model="muse-spark-1.3",
+                location=BackendLocation.EXTERNAL,
+                base_url="https://example.invalid",
+                capabilities=ModelCapabilities(),
+            ),
+            usage=UsageMetadata(
+                source=UsageSource.PROVIDER_REPORTED,
+                input_tokens=10000,
+                output_tokens=500,
+                total_tokens=10500,
+            ),
+        )
+
+
+def test_summarize_reports_usage_and_cost():
+    makers = _ai_stubs()
+    PrivacyClass = makers[6]
+    client = _FakeClient()
+    result = digest.summarize_digest(
+        [{"subject": "Hi", "snippet": "please reply"}],
+        client=client,
+    )
+    (request,) = client.requests
+    assert request.model == "muse-spark-1.3"
+    assert request.max_output_tokens == digest.SUMMARY_MAX_OUTPUT_TOKENS
+    assert request.privacy_class is PrivacyClass.EXTERNAL_ALLOWED
+    assert result["summary"] == "- item needs a reply"
+    assert result["input_tokens"] == 10000
+    assert result["output_tokens"] == 500
+    assert result["estimated_usd"] == round((10000 * 1.25 + 500 * 4.25) / 1_000_000, 6)
+
+
+def test_summarize_refuses_empty_and_oversize():
+    with pytest.raises(digest.DigestError, match="empty-digest"):
+        digest.summarize_digest([], client=_FakeClient())
+    big = [{"subject": "s", "snippet": "x" * (digest.MAX_SUMMARY_CHARS + 1)}]
+    with pytest.raises(digest.DigestError, match="digest-too-large"):
+        digest.summarize_digest(big, client=_FakeClient())
+
+
+def test_summarize_missing_key(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(digest, "_meta_api_key", lambda: None)
+    with pytest.raises(digest.DigestError, match="missing-meta-key"):
+        digest.summarize_digest([{"subject": "s", "snippet": "b"}])
+    src = tmp_path / "digest.json"
+    src.write_text(json.dumps([{"subject": "s", "snippet": "b"}]), encoding="utf-8")
+    out = tmp_path / "summary.json"
+    assert digest.main(["--summarize", str(src), "--out", str(out)]) == 1
+    assert "SUMMARIZE_FAIL missing-meta-key" in capsys.readouterr().out
+    assert not out.exists()
+
+
+def test_summarize_cli_roundtrip(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(digest, "_summary_client", lambda: _FakeClient("done"))
+    src = tmp_path / "digest.json"
+    src.write_text(json.dumps([{"subject": "s", "snippet": "b"}]), encoding="utf-8")
+    out = tmp_path / "summary.json"
+    assert digest.main(["--summarize", str(src), "--out", str(out)]) == 0
+    assert "SUMMARIZE_OK 0.014625" in capsys.readouterr().out
+    saved = json.loads(out.read_text(encoding="utf-8"))
+    assert saved["summary"] == "done"
+    assert saved["model"] == "muse-spark-1.3"
