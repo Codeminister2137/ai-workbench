@@ -1,0 +1,24 @@
+:root { color-scheme: light dark; }
+body { font-family: system-ui, sans-serif; margin: 0 auto; max-width: 960px; padding: 0 1rem 3rem; }
+header { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 0; border-bottom: 1px solid #8884; position: sticky; top: 0; background: inherit; }
+nav a { margin-right: 1rem; text-decoration: none; }
+nav a.active { font-weight: bold; text-decoration: underline; }
+.badge { background: #c00; color: #fff; border-radius: 1rem; padding: 0 0.5rem; font-size: 0.8rem; }
+#create-wrap { position: relative; }
+#create-menu { position: absolute; right: 0; background: inherit; border: 1px solid #888; padding: 0.5rem; display: flex; flex-direction: column; gap: 0.25rem; z-index: 10; }
+.columns { display: grid; grid-template-columns: 3fr 2fr; gap: 1rem; }
+.card { border: 1px solid #8884; border-radius: 0.5rem; padding: 0.75rem 1rem; margin-bottom: 1rem; }
+.card h2 { margin-top: 0; font-size: 1.1rem; }
+.muted { opacity: 0.7; }
+#toasts { position: fixed; bottom: 1rem; right: 1rem; display: flex; flex-direction: column; gap: 0.5rem; }
+.toast { border: 1px solid #888; border-radius: 0.5rem; padding: 0.5rem 0.75rem; background: inherit; max-width: 24rem; }
+.toast.ok { border-color: #0a0; }
+.toast.err { border-color: #c00; }
+.msg { border-top: 1px solid #8884; padding: 0.5rem 0; white-space: pre-wrap; }
+.msg .role { font-weight: bold; }
+form.inline { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
+input[type="text"], textarea { flex: 1; font: inherit; }
+button { font: inherit; cursor: pointer; }
+ul.plain { list-style: none; padding-left: 0; }
+ul.plain li { margin-bottom: 0.4rem; }
+@media (max-width: 700px) { .columns { grid-template-columns: 1fr; } }

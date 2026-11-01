@@ -78,4 +78,5 @@ extraPaths = [
     "packages/ai_agent/src",
     "apps/ai_council",
     "apps/job_search/job-email",
+    "apps/workbench_dashboard",
 ]

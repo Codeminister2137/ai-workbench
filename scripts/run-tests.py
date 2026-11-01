@@ -128,6 +128,7 @@ GROUPS = {
         "tests/test_acceptance_usage.py",
     ),
     "council": ("apps/ai_council/tests/test_*.py",),
+    "dashboard": ("apps/workbench_dashboard/tests/test_*.py",),
     "job-search": ("apps/job_search/job-email/test_*.py",),
     "live": ("tests/integration/test_*.py",),
 }

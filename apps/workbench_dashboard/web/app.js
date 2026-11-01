@@ -1,0 +1,332 @@
+"use strict";
+/* Dashboard UI: hash routing, one create menu, a visible receipt for every action. */
+
+const view = document.getElementById("view");
+const toasts = document.getElementById("toasts");
+const badge = document.getElementById("inbox-badge");
+
+function toast(message, ok) {
+  const el = document.createElement("div");
+  el.className = "toast " + (ok === false ? "err" : "ok");
+  el.textContent = message;
+  toasts.appendChild(el);
+  setTimeout(() => el.remove(), 6000);
+}
+
+async function api(path, options) {
+  let response;
+  try {
+    response = await fetch(path, options);
+  } catch (err) {
+    throw new Error("Request failed: " + err.message);
+  }
+  let payload = null;
+  try {
+    payload = await response.json();
+  } catch (err) {
+    throw new Error("Bad server reply on " + path + " (HTTP " + response.status + ")");
+  }
+  if (!response.ok || payload.ok === false) {
+    throw new Error(payload.error || ("HTTP " + response.status + " on " + path));
+  }
+  return payload;
+}
+
+function esc(text) {
+  return String(text).replace(/[&<>"']/g, (ch) => (
+    {"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[ch]
+  ));
+}
+
+async function refreshBadge() {
+  try {
+    const status = await api("/api/status");
+    if (status.open_inbox > 0) {
+      badge.textContent = status.open_inbox;
+      badge.hidden = false;
+    } else {
+      badge.hidden = true;
+    }
+  } catch (err) {
+    badge.hidden = true;
+  }
+}
+
+async function renderHome() {
+  const status = await api("/api/status");
+  const plan = status.current_plan
+    ? `<a href="#/plans/${esc(status.current_plan.id)}">${esc(status.current_plan.title || status.current_plan.id)}</a>`
+    : '<span class="muted">No plan yet</span>';
+  const runs = status.recent_runs.length
+    ? status.recent_runs.map((r) =>
+        `<li><a href="#/runs/${esc(r.id)}">${esc(r.title || r.id)}</a> <span class="muted">${esc(r.status || "")}</span></li>`).join("")
+    : '<li class="muted">No runs recorded</li>';
+  view.innerHTML = `
+    <h1>${esc(status.title)}</h1>
+    <p class="muted">Backend: ${esc(status.provider)} / ${esc(status.model)}</p>
+    <div class="columns">
+      <div>
+        <div class="card"><h2>Active plan</h2><p>${plan}</p>
+          <p class="muted">${esc(status.plan_total)} plan(s) on file. <a href="#/plans">All plans</a></p></div>
+        <div class="card"><h2>Recent runs</h2><ul class="plain">${runs}</ul></div>
+        <div class="card"><h2>Evidence</h2>
+          <p>${status.evidence.available
+            ? `${esc(status.evidence.passed)} passed / ${esc(status.evidence.routes)} routes. <a href="#/runs">Details in Runs</a>`
+            : 'No route snapshots yet. Run the provider probe/eval CLIs to populate.'}</p></div>
+      </div>
+      <div>
+        <div class="card"><h2>Inbox</h2>
+          <p>${status.open_inbox} open task(s). <a href="#/inbox">Open inbox</a></p></div>
+        <div class="card"><h2>Chat</h2>
+          <form class="inline" id="quick-chat"><input type="text" name="text" placeholder="Ask the supervisor..." required>
+          <button type="submit">Send</button></form></div>
+        <div class="card"><h2>Scheduled</h2>
+          <p class="muted">No scheduler yet — see P5. <a href="#/schedule">Schedule view</a></p></div>
+      </div>
+    </div>`;
+  document.getElementById("quick-chat").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const text = ev.target.text.value.trim();
+    if (!text) return;
+    try {
+      const session = await api("/api/chat/sessions", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({title: text.slice(0, 60)}),
+      });
+      toast("Chat started", true);
+      location.hash = "#/chat/" + session.id + "?q=" + encodeURIComponent(text);
+    } catch (err) {
+      toast(err.message, false);
+    }
+  });
+}
+
+async function renderChatList() {
+  const payload = await api("/api/chat/sessions");
+  const items = payload.sessions.length
+    ? payload.sessions.map((s) =>
+        `<li><a href="#/chat/${esc(s.id)}">${esc(s.title)}</a>
+         <span class="muted">${esc(s.updated_at_utc)} · ${esc(s.privacy_class)}</span></li>`).join("")
+    : '<li class="muted">No chats yet — use + New.</li>';
+  view.innerHTML = `<h1>Chat</h1>
+    <p class="muted">Supervisor answers; turns cannot run tools yet. Full transcripts stay local.</p>
+    <ul class="plain">${items}</ul>`;
+}
+
+async function renderChatThread(id, initial) {
+  const payload = await api("/api/chat/sessions/" + encodeURIComponent(id) + "/messages");
+  const msgs = payload.messages.map((m) =>
+    `<div class="msg"><span class="role">${esc(m.role)}</span>
+     <span class="muted">${m.provider ? esc(m.provider + "/" + (m.model || "")) : ""}</span>
+     <div>${esc(m.content)}</div></div>`).join("");
+  view.innerHTML = `<h1>Chat</h1><p><a href="#/chat">All chats</a></p>
+    <div id="thread">${msgs || '<p class="muted">No messages yet.</p>'}</div>
+    <form class="inline" id="chat-form"><input type="text" name="text" placeholder="Message..." required>
+    <button type="submit">Send</button></form>`;
+  const form = document.getElementById("chat-form");
+  async function send(text) {
+    const btn = form.querySelector("button");
+    btn.disabled = true;
+    btn.textContent = "Sending...";
+    try {
+      const out = await api("/api/chat/sessions/" + encodeURIComponent(id) + "/messages", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({text}),
+      });
+      toast("Answer received (" + out.execution_status + ")", true);
+      render();
+    } catch (err) {
+      toast(err.message, false);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Send";
+    }
+  }
+  form.addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    const text = ev.target.text.value.trim();
+    if (text) send(text);
+  });
+  if (initial) send(initial);
+}
+
+async function renderPlans(id) {
+  if (id) {
+    const payload = await api("/api/plans/" + encodeURIComponent(id));
+    view.innerHTML = `<h1>Plan</h1><p><a href="#/plans">All plans</a></p>
+      <pre>${esc(JSON.stringify(payload.item, null, 2))}</pre>`;
+    return;
+  }
+  const payload = await api("/api/plans");
+  const items = payload.items.length
+    ? payload.items.map((p) =>
+        `<li><a href="#/plans/${esc(p.id)}">${esc(p.title || p.id)}</a>
+         <span class="muted">${esc(p.status || "")}</span></li>`).join("")
+    : '<li class="muted">No plans on file. Plans are created by Workbench flows.</li>';
+  view.innerHTML = `<h1>Plans</h1><ul class="plain">${items}</ul><p class="muted">${payload.total} total.</p>`;
+}
+
+async function renderRuns(id) {
+  if (id) {
+    const payload = await api("/api/runs/" + encodeURIComponent(id));
+    view.innerHTML = `<h1>Run</h1><p><a href="#/runs">All runs</a></p>
+      <pre>${esc(JSON.stringify(payload.item, null, 2))}</pre>`;
+    return;
+  }
+  const payload = await api("/api/runs");
+  const items = payload.items.length
+    ? payload.items.map((r) =>
+        `<li><a href="#/runs/${esc(r.id)}">${esc(r.title || r.id)}</a>
+         <span class="muted">${esc(r.status || "")}</span></li>`).join("")
+    : '<li class="muted">No runs recorded.</li>';
+  let evidence = "";
+  try {
+    const ev = await api("/api/evidence");
+    evidence = ev.available
+      ? `<h2>Route evidence</h2><ul class="plain">${ev.routes.map((row) =>
+          `<li>${esc(row.route)} — ${row.reachable ? "reachable" : "unreachable"}${
+            row.passed_eval === true ? ", eval PASS" : row.passed_eval === false ? ", eval FAIL" : ""}</li>`).join("")}</ul>
+        <p class="muted">${esc(ev.probe_snapshot || "no probe")} · ${esc(ev.eval_snapshot || "no eval")}</p>`
+      : '<p class="muted">No route snapshots yet.</p>';
+  } catch (err) {
+    evidence = '<p class="muted">Evidence unavailable: ' + esc(err.message) + "</p>";
+  }
+  view.innerHTML = `<h1>Runs</h1><ul class="plain">${items}</ul>${evidence}`;
+}
+
+async function renderInbox(id) {
+  if (id) {
+    const payload = await api("/api/inbox/" + encodeURIComponent(id));
+    const item = payload.item;
+    const options = (item.options || []).map((opt, i) =>
+      `<label><input type="radio" name="opt" value="${i}"> ${esc(opt)}</label><br>`).join("");
+    const refs = (item.context_refs || []).map((r) => `<li>${esc(r)}</li>`).join("");
+    view.innerHTML = `<h1>Inbox task</h1><p><a href="#/inbox">All tasks</a></p>
+      <div class="card"><h2>${esc(item.title)}</h2>
+      <p class="muted">${esc(item.type)} · ${esc(item.status)} · from ${esc(item.created_by || "")}</p>
+      <p>${esc(item.body || "")}</p>
+      ${refs ? `<ul class="plain">${refs}</ul>` : ""}
+      ${item.answer ? `<p><strong>Answer:</strong> ${esc(item.answer)}</p>` : ""}
+      ${item.status === "closed" ? '<p class="muted">Closed; answers are immutable.</p>' : `
+      <form id="answer-form">
+        ${options}
+        <div class="inline"><input type="text" name="answer" placeholder="Your answer...">
+        <button type="submit">Answer</button></div>
+      </form>
+      <p><button id="close-btn">Close task</button></p>`}</div>`;
+    const form = document.getElementById("answer-form");
+    if (form) form.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const checked = form.querySelector("input[name=opt]:checked");
+      try {
+        await api("/api/inbox/" + encodeURIComponent(id) + "/answer", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({
+            answer: ev.target.answer.value,
+            option_index: checked ? Number(checked.value) : null,
+          }),
+        });
+        toast("Answer recorded", true);
+        render();
+      } catch (err) {
+        toast(err.message, false);
+      }
+    });
+    const closeBtn = document.getElementById("close-btn");
+    if (closeBtn) closeBtn.addEventListener("click", async () => {
+      try {
+        await api("/api/inbox/" + encodeURIComponent(id) + "/close", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: "{}",
+        });
+        toast("Task closed", true);
+        render();
+      } catch (err) {
+        toast(err.message, false);
+      }
+    });
+    return;
+  }
+  const payload = await api("/api/inbox");
+  const items = payload.items.length
+    ? payload.items.map((t) =>
+        `<li><a href="#/inbox/${esc(t.id)}">${esc(t.title)}</a>
+         <span class="muted">${esc(t.type)} · ${esc(t.status)}</span></li>`).join("")
+    : '<li class="muted">Inbox zero. The supervisor assigns decisions here.</li>';
+  view.innerHTML = `<h1>Inbox</h1><ul class="plain">${items}</ul>`;
+}
+
+function renderSchedule() {
+  view.innerHTML = `<h1>Schedule</h1>
+    <p class="muted">Read-only until the P5 scheduler exists. Queued work today lives in plans and runs.</p>`;
+}
+
+async function render() {
+  document.querySelectorAll("nav a").forEach((a) => a.classList.remove("active"));
+  const raw = (location.hash || "#/home").slice(2);
+  const [path, query] = raw.split("?");
+  const [name, id] = path.split("/");
+  const active = document.querySelector(`nav a[data-view="${name}"]`);
+  if (active) active.classList.add("active");
+  try {
+    if (name === "home") await renderHome();
+    else if (name === "chat" && id) {
+      const q = new URLSearchParams(query || "").get("q");
+      if (q) history.replaceState(null, "", "#/chat/" + id);
+      await renderChatThread(id, q);
+    }
+    else if (name === "chat") await renderChatList();
+    else if (name === "plans") await renderPlans(id);
+    else if (name === "runs") await renderRuns(id);
+    else if (name === "inbox") await renderInbox(id);
+    else if (name === "schedule") renderSchedule();
+    else view.innerHTML = "<h1>Not found</h1>";
+  } catch (err) {
+    view.innerHTML = `<h1>Something failed</h1><p>${esc(err.message)}</p>`;
+    toast(err.message, false);
+  }
+  refreshBadge();
+}
+
+document.getElementById("create-btn").addEventListener("click", () => {
+  document.getElementById("create-menu").hidden =
+    !document.getElementById("create-menu").hidden;
+});
+document.querySelectorAll("[data-create]").forEach((btn) => {
+  btn.addEventListener("click", async () => {
+    document.getElementById("create-menu").hidden = true;
+    const kind = btn.dataset.create;
+    try {
+      if (kind === "chat") {
+        const title = prompt("Chat title:", "Dashboard chat") || "Dashboard chat";
+        const session = await api("/api/chat/sessions", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({title}),
+        });
+        toast("Chat created", true);
+        location.hash = "#/chat/" + session.id;
+      } else if (kind === "inbox") {
+        const title = prompt("Inbox item title:");
+        if (!title) return;
+        const body = prompt("Details:", "") || "";
+        const out = await api("/api/inbox", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({title, body, type: "clarification"}),
+        });
+        toast("Inbox item created", true);
+        location.hash = "#/inbox/" + out.id;
+      }
+    } catch (err) {
+      toast(err.message, false);
+    }
+  });
+});
+
+window.addEventListener("hashchange", render);
+render();
