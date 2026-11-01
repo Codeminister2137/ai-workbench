@@ -29,6 +29,7 @@ from ai_provider.config import BackendConfig, ProviderKind
 from ai_provider.contracts import AIMessage, AIRequest, MessageRole, PrivacyClass
 from ai_provider.errors import ProviderError, ProviderErrorCategory
 from ai_provider.factory import create_chat_client
+from ai_provider.secrets import load_dotenv
 from ai_provider.source_info import _utc_now
 
 TASK = (
@@ -704,6 +705,7 @@ def main(argv: list[str] | None = None) -> int:
     if unknown:
         parser.error(f"unknown task id(s): {', '.join(unknown)} (choose from {' '.join(TASKS)})")
     gate = tasks[0] if tasks else "T0"
+    load_dotenv()
     credentials = {
         name: os.getenv(name) or None
         for name in (

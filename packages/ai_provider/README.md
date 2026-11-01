@@ -148,6 +148,18 @@ For hosted providers, `AI_PROVIDER_API_KEY` is used first. Provider-specific
 fallbacks include `OPENAI_API_KEY`, `REQUESTY_API_KEY`, `GEMINI_API_KEY`, and
 `GOOGLE_API_KEY`. Do not commit real API keys.
 
+## Secret handling
+
+The repo-root `.env` file is the local secret store: gitignored,
+owner-only on disk, and never pasted into prompts, transcripts, logs,
+or reports — by agents or by code. Provider modules read credentials
+only from process environment; `ai_provider.secrets.load_dotenv()` is
+the single harness that fills process env from the store. It returns
+loaded variable NAMES only, never values; existing process env wins by
+default so CI and explicit exports keep precedence. CLIs that need
+hosted credentials (e.g. `route_eval`) call it at startup instead of
+growing their own file readers.
+
 ## Repo-Aware Coding Assistant
 
 The stable workspace command is:
