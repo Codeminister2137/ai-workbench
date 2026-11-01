@@ -1,6 +1,22 @@
 # Chatbot directions — owner planning brief (2026-11-01)
 
-Worker-drafted research brief. No product code. Status: draft for owner planning.
+Worker-drafted research brief, verified by the parent agent against the
+roadmap and code. Owner decision recorded below.
+
+## Owner decision (2026-11-01, chat)
+
+Agreed with the recommendation, with one correction and one ordering fix:
+
+- Correction: "anything built in the operator is throwaway or needs
+  porting" is too harsh. Remote-operator will be transformed somewhat
+  after the hackathon anyway; while the hackathon runs, building there
+  is fine whenever something fits better there than in ai-workbench.
+  A stronger competition submission is worth blurry post-hackathon
+  ownership.
+- Order: B first, then A. D as a mode inside B. C held for P7/plan-04.
+- Future dashboard note (owner): multi-monitor support eventually -
+  feasible in a web app via separate windows over the shared backend;
+  not now.
 
 ## Inputs read
 
