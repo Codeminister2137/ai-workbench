@@ -190,6 +190,7 @@ def _ai_stubs():
         AIResponse,
         BackendInfo,
         BackendLocation,
+        FinishReason,
         MessageRole,
         ModelCapabilities,
         PrivacyClass,
@@ -207,6 +208,7 @@ def _ai_stubs():
         PrivacyClass,
         UsageMetadata,
         UsageSource,
+        FinishReason,
     )
 
 
@@ -229,6 +231,7 @@ class _FakeClient:
             PrivacyClass,
             UsageMetadata,
             UsageSource,
+            FinishReason,
         ) = self._makers
         self.requests.append(request)
         return AIResponse(
@@ -240,7 +243,7 @@ class _FakeClient:
                 base_url="https://example.invalid",
                 capabilities=ModelCapabilities(),
             ),
-            finish_reason=self._finish,
+            finish_reason=FinishReason(self._finish),
             usage=UsageMetadata(
                 source=UsageSource.PROVIDER_REPORTED,
                 input_tokens=10000,
