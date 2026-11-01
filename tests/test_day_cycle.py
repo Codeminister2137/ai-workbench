@@ -1,11 +1,18 @@
-from __future__ import annotations
+"""Day-cycle verdict logic; service checks are never executed here."""
 
+import importlib.util
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+SCRIPT = Path(__file__).resolve().parents[1] / "scripts/day_cycle.py"
+_spec = importlib.util.spec_from_file_location("day_cycle", SCRIPT)
+assert _spec is not None and _spec.loader is not None
+_module = importlib.util.module_from_spec(_spec)
+sys.modules[_spec.name] = _module
+_spec.loader.exec_module(_module)
 
-from day_cycle import GitState, close_verdict
+GitState = _module.GitState
+close_verdict = _module.close_verdict
 
 
 def test_close_verdict_clean_trees() -> None:
