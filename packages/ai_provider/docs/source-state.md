@@ -25,7 +25,8 @@ observations. Neither establishes coding quality by itself.
 
 `scripts/l3_ladder.py` now resolves candidates through the orchestrator
 catalog with cost-tier gating (ADR-080); `ai_provider.route_eval` walks the
-ordered list (max 3, tier-blocked routes recorded, never attempted).
+ordered list (tier-blocked recorded, never attempted; free routes walk all
+resolved, paid cap 3 unless raised, parked streak of 2 stops a route).
 First-row live-list auto-pick retired after the Nov 1–2 failures below.
 
 Last auto-pick run (`route-eval-T0-T3-20261102T082939Z.json`, all routes,

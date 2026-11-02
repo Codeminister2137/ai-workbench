@@ -186,3 +186,31 @@ def test_main_runs_offline_with_tmp_catalog(monkeypatch, tmp_path, capsys) -> No
     assert "snapshot:" in out and "resolved:" in out
     assert list((tmp_path / "snap").glob("route-eval-T0-*.json")) != []
     assert list((tmp_path / "snap").glob("ladder-resolved-*.json")) != []
+
+
+def test_resolve_route_zero_returns_full_live_list(monkeypatch) -> None:
+    from ai_orchestrator.catalog import load_model_catalog
+
+    catalog = load_model_catalog(
+        Path(__file__).resolve().parents[1] / "packages/ai_orchestrator/examples/model_catalog.toml"
+    )
+    live = ["m1:free", "m2:free", "m3:free", "m4:free", "m5:free"]
+    monkeypatch.setattr(_module.route_eval, "list_free_candidates", lambda route, creds: list(live))
+    candidates, _note = resolve_route(
+        "openrouter",
+        catalog=catalog,
+        credentials={},
+        allow_tier=PREPAID,
+        max_candidates=0,
+        skip=frozenset(),
+        live_refresh=True,
+    )
+    for model in live:
+        assert model in candidates
+
+
+def test_main_rejects_negative_max_candidates(capsys) -> None:
+    with pytest.raises(SystemExit) as exc:
+        _module.main(["--max-candidates", "-1"])
+    assert exc.value.code == 2
+    assert "--max-candidates" in capsys.readouterr().err

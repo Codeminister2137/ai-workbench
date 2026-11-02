@@ -142,6 +142,10 @@ class OperatorApprovalBridge:
                     json={
                         "description": description,
                         **binding,
+                        # Align the server-side window with the local
+                        # deadline so the phone shows the window the bridge
+                        # actually waits; the server clamps to [30, 3600].
+                        "expires_seconds": max(30, min(3600, int(remaining()))),
                     },
                     timeout=remaining(),
                 )
@@ -220,13 +224,32 @@ class OperatorApprovalBridge:
                     headers=self.headers,
                     timeout=remaining(),
                 )
-                response.raise_for_status()
+                try:
+                    response.raise_for_status()
+                except httpx.HTTPStatusError as exc:
+                    # A 502/503/504 mid-poll (e.g. operator redeploy) is as
+                    # transient as a transport blip: retry on the normal poll
+                    # cadence until the deadline. Other statuses fail fast.
+                    if exc.response.status_code not in (502, 503, 504):
+                        raise
+                    remaining()
+                    time.sleep(min(self.poll_interval, remaining()))
+                    continue
                 remaining()
                 action = response.json()
                 if not isinstance(action, dict):
                     raise OperatorBridgeError("Invalid external action response")
                 self._verify_binding(action, binding)
                 status = action["status"]
+            except httpx.TransportError:
+                # Transient poll failure (reset connection, DNS blip, read
+                # timeout): the poll is an idempotent read, so retry on the
+                # normal poll cadence until the approval deadline instead of
+                # abandoning a pending phone approval. HTTP status errors
+                # still fail fast below.
+                remaining()
+                time.sleep(min(self.poll_interval, remaining()))
+                continue
             except httpx.HTTPError as exc:
                 raise OperatorBridgeError(f"Failed to poll external action: {exc}") from exc
 

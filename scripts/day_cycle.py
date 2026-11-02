@@ -24,6 +24,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
+from ai_provider.secrets import load_dotenv
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 OPERATOR_ROOT = REPO_ROOT.parent / "remote-ai-operator"
 SNAPSHOT_DIR = REPO_ROOT / "artifacts" / "day-cycle"
@@ -305,7 +307,25 @@ def command_close() -> int:
     return 1
 
 
-def start_detached(label: str, argv: list[str] | str, cwd: Path) -> bool:
+SERVICE_ENV_ALLOWLIST: dict[str, tuple[str, ...]] = {
+    "operator-serve": ("OPERATOR_ACCESS_TOKEN",),
+}
+"""Secret-store names each replayed service may receive (values never logged)."""
+
+
+def service_env(label: str, *, store: Path | None = None) -> dict[str, str]:
+    """Allowlisted secret-store values for one replayed service."""
+    load_dotenv(store)
+    return {
+        name: os.environ[name]
+        for name in SERVICE_ENV_ALLOWLIST.get(label, ())
+        if os.environ.get(name)
+    }
+
+
+def start_detached(
+    label: str, argv: list[str] | str, cwd: Path, env: dict[str, str] | None = None
+) -> bool:
     """Start one service detached with logs; never raises."""
     logs = SNAPSHOT_DIR / "service-logs"
     try:
@@ -322,6 +342,7 @@ def start_detached(label: str, argv: list[str] | str, cwd: Path) -> bool:
             stdout=out,
             stderr=err,
             stdin=subprocess.DEVNULL,
+            env={**os.environ, **(env or {})},
             creationflags=creation,
             start_new_session=True,
         )
@@ -348,6 +369,7 @@ def command_open() -> int:
         if port_open("127.0.0.1", port):
             report.append(f"{label}: already listening on {port}")
             continue
+        env: dict[str, str] = {}
         if label == "ollama":
             ok = start_detached(label, ["ollama", "serve"], REPO_ROOT)
         else:
@@ -356,8 +378,12 @@ def command_open() -> int:
                 report.append(f"{label}: missing and no snapshot command to replay")
                 failed = True
                 continue
-            ok = start_detached(label, cmdline, cwd)
-        report.append(f"{label}: {'start requested' if ok else 'START FAILED'} on {port}")
+            env = service_env(label)
+            ok = start_detached(label, cmdline, cwd, env=env)
+        secret = ""
+        if label in SERVICE_ENV_ALLOWLIST:
+            secret = " (token from secret store)" if env else " (NO TOKEN in secret store)"
+        report.append(f"{label}: {'start requested' if ok else 'START FAILED'} on {port}{secret}")
         failed = failed or not ok
     _docker_ok, docker_line = ensure_docker()
     report.append(docker_line)

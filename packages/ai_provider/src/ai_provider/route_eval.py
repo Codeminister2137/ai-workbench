@@ -443,6 +443,9 @@ _PARKED_CATEGORIES = frozenset(
 )
 _PARKED_STATUS = re.compile(r"\b(401|403|429)\b")
 
+PARKED_STREAK_LIMIT = 2
+"""Consecutive parked errors that stop a candidate walk (account-level wall)."""
+
 
 def _is_parked_refusal(error: Exception) -> bool:
     """Account-level refusals (auth/rate-limit, incl. raw 401/403/429 markers).
@@ -667,18 +670,26 @@ def run_candidate_ladder(
 
     The first candidate that returns a gradeable answer (no transport error)
     runs the rest of its ladder; transport/refusal errors record one row and
-    move to the next candidate, up to ``max_attempts``. An empty list records
+    move to the next candidate, up to ``max_attempts`` (``<= 0`` walks the
+    whole list). Two consecutive parked errors stop the walk: an
+    account-level wall will not clear for the next model. An empty list records
     a ``no-model`` skip. Callers resolve and tier-gate the candidate order;
     this walk never substitutes its own picks.
     """
     gate = tasks[0] if tasks else "T0"
     overrides = max_output_tokens or {}
     results: list[EvalResult] = []
-    for model in list(models)[: max(0, max_attempts)]:
+    attempts = list(models) if max_attempts <= 0 else list(models)[:max_attempts]
+    parked_streak = 0
+    for model in attempts:
         client = build(model)
         first = run_eval(client, route, model, task_id=gate, max_output_tokens=overrides.get(gate))
         results.append(first)
         if first.error is not None:
+            parked = first.error.startswith("parked:")
+            parked_streak = parked_streak + 1 if parked else 0
+            if parked_streak >= PARKED_STREAK_LIMIT:
+                return results
             continue
         if first.passed or not stop_on_fail:
             results.extend(
@@ -833,7 +844,7 @@ def main(argv: list[str] | None = None) -> int:
         "--max-candidates",
         type=int,
         default=3,
-        help="walk attempts per route before moving on (default: 3)",
+        help="walk attempts per route; 0 walks all resolved (default: 3)",
     )
     args = parser.parse_args(argv)
     tasks = tuple(args.tasks) if args.tasks is not None else TASKS
@@ -844,8 +855,8 @@ def main(argv: list[str] | None = None) -> int:
         overrides = parse_output_overrides(args.max_output_tokens)
     except ValueError as exc:
         parser.error(str(exc))
-    if args.max_candidates < 1:
-        parser.error("--max-candidates must be at least 1")
+    if args.max_candidates < 0:
+        parser.error("--max-candidates must be 0 or more (0 walks all)")
     if args.candidates is None:
         parser.error("--candidates PATH is required (JSON {route: [models...]})")
     try:

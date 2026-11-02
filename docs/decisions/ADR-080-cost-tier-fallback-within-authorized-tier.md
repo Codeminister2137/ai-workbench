@@ -6,7 +6,7 @@ Status: Accepted by the owner, 2026-11-02.
 
 When reaching a model fails (transport error, account refusal, provider-edge
 refusal), the ladder and future routed work try the next candidate **within
-the already-authorized cost tier** — up to 3 models per route — instead of
+the already-authorized cost tier**: free routes walk every resolved candidate, paid routes walk 3 unless the run raises the cap, and two consecutive parked (account-level) refusals stop a route — instead of
 stopping at the first failure. Stopping and reporting stays an option only
 where continuing risks ballooning cost.
 
@@ -32,7 +32,8 @@ escalation always needs approval.
   answer, recording every attempt — error rows for skipped candidates, a
   `no-model` skip for empty lists. A graded FAIL counts as reached (the
   model was measured); only transport/refusal errors advance the walk. The
-  walk never substitutes its own picks.
+  walk never substitutes its own picks. Two consecutive parked errors end the walk
+early (`PARKED_STREAK_LIMIT`); CLI `--max-candidates 0` walks everything resolved.
 - Policy (`scripts/l3_ladder.py`, caller side): resolves candidates through
   `recommend_model` over the orchestrator catalog (selected + alternatives),
   applies the tier gates above, refreshes free routes from live $0-verified
@@ -64,3 +65,12 @@ today catalog order still leads and measurement only records.
 - `route_eval.main` requires `--candidates`; ad-hoc runs go through
   `scripts/l3_ladder.py`, which writes a `ladder-resolved-*` audit record
   beside each snapshot.
+
+## Scheduling (owner, 2026-11-02)
+
+Full sweeps (notably free walk-all runs) do not run on a daily schedule:
+quota burn without a question behind it. Allowed triggers: explicit owner
+request, new-model onboarding events, or P5 emergency mode (near refresh
+with remaining balance to burn, never promoting to prepaid). The default ladder
+stays capped; `--max-candidates 0` is an explicit per-run choice,
+never a standing schedule.
