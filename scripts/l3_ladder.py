@@ -76,6 +76,11 @@ def eval_profile(route: str, tier: CostPolicyTier) -> TaskProfile:
     )
 
 
+def _cap(items: list[str], max_candidates: int) -> list[str]:
+    """Apply the walk cap; ``<= 0`` means walk everything resolved."""
+    return items if max_candidates <= 0 else items[:max_candidates]
+
+
 def catalog_order(
     route: str, catalog: tuple, tier: CostPolicyTier, max_candidates: int
 ) -> list[str]:
@@ -90,7 +95,7 @@ def catalog_order(
     for model in ordered:
         if model not in seen:
             seen.append(model)
-    return seen[: max(0, max_candidates)]
+    return _cap(seen, max_candidates)
 
 
 def recent_failed_models(snapshot_dir: Path, *, limit_files: int = 5) -> set[tuple[str, str]]:
@@ -145,7 +150,7 @@ def resolve_route(
         )
         skipped = sorted(model for failed_route, model in skip if failed_route == route)
         note = f"catalog={preferred} live={live} skipped={skipped}"
-        return ordered[: max(0, max_candidates)], note
+        return _cap(ordered, max_candidates), note
     note = f"catalog={preferred} live-refresh={'off' if route in FREE_ROUTES else 'n/a'}"
     return preferred, note
 
@@ -237,7 +242,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--max-candidates",
         type=int,
         default=3,
-        help="walk attempts per route before moving on (default: 3)",
+        help="walk attempts per route; 0 walks all resolved (default: 3)",
     )
     parser.add_argument(
         "--no-live-refresh",
@@ -260,8 +265,8 @@ def main(argv: list[str] | None = None) -> int:
         overrides = route_eval.parse_output_overrides(args.max_output_tokens)
     except ValueError as exc:
         parser.error(str(exc))
-    if args.max_candidates < 1:
-        parser.error("--max-candidates must be at least 1")
+    if args.max_candidates < 0:
+        parser.error("--max-candidates must be 0 or more (0 walks all)")
     try:
         catalog = load_model_catalog(args.catalog)
     except (OSError, ValueError) as exc:

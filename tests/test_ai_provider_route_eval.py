@@ -713,3 +713,74 @@ def test_run_all_routes_filter_skips_unwanted(monkeypatch):
     results = run_all({}, models={"a": ["m"], "b": ["m"]}, routes=["b"], tasks=("T0",))
     assert seen == ["b"]
     assert [(item.route, item.model) for item in results] == [("b", "m")]
+
+
+def test_run_candidate_ladder_zero_walks_all():
+    def build(model):
+        return ScriptedClient([("def add2", ConnectionError("down"))])
+
+    results = run_candidate_ladder(build, "r", ["a", "b", "c", "d"], tasks=("T0",), max_attempts=0)
+    assert [item.model for item in results] == ["a", "b", "c", "d"]
+
+
+def test_run_candidate_ladder_stops_on_parked_streak():
+    seen = []
+
+    def build(model):
+        seen.append(model)
+        if model == "good":
+            return ScriptedClient(_LADDER_MARKS)
+        return ScriptedClient([("def add2", ConnectionError("HTTP Error 429"))])
+
+    results = run_candidate_ladder(build, "r", ["a", "b", "good"], tasks=("T0",))
+    assert seen == ["a", "b"]
+    assert all(item.error and item.error.startswith("parked:") for item in results)
+
+
+def test_run_candidate_ladder_nonparked_errors_keep_walking():
+    seen = []
+
+    def build(model):
+        seen.append(model)
+        if model == "good":
+            return ScriptedClient(_LADDER_MARKS)
+        return ScriptedClient([("def add2", ConnectionError("HTTP Error 503"))])
+
+    results = run_candidate_ladder(build, "r", ["a", "b", "good"], tasks=("T0",))
+    assert seen == ["a", "b", "good"]
+    assert results[-1].passed is True
+
+
+def test_main_rejects_negative_max_candidates(capsys, tmp_path):
+    cand = tmp_path / "c.json"
+    cand.write_text(json.dumps({"meta": ["m"]}), encoding="utf-8")
+    with pytest.raises(SystemExit) as exc:
+        route_eval.main(["--candidates", str(cand), "--max-candidates", "-1"])
+    assert exc.value.code == 2
+    assert "--max-candidates" in capsys.readouterr().err
+
+
+def test_main_zero_max_candidates_walks_all(monkeypatch, tmp_path, capsys):
+    cand = tmp_path / "c.json"
+    cand.write_text(json.dumps({"meta": ["m1", "m2", "m3", "m4"]}), encoding="utf-8")
+    seen = []
+
+    def build(model):
+        seen.append(model)
+        return ScriptedClient([("def add2", ConnectionError("down"))])
+
+    monkeypatch.setattr(route_eval, "_clients", lambda creds: {"meta": build})
+    code = route_eval.main(
+        [
+            "--candidates",
+            str(cand),
+            "--snapshot-dir",
+            str(tmp_path / "snap"),
+            "--tasks",
+            "T0",
+            "--max-candidates",
+            "0",
+        ]
+    )
+    assert code == 0
+    assert seen == ["m1", "m2", "m3", "m4"]
