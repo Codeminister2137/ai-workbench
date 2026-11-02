@@ -62,7 +62,7 @@ async def _request(
     try:
         sdk = importlib.import_module("mcp")
         transport_module = importlib.import_module("mcp.client.streamable_http")
-        http = importlib.import_module("httpx2")
+        http = importlib.import_module("httpx")
     except ImportError as exc:
         raise RuntimeError(
             "Install the ai-agent ide optional extra to use the PyCharm bridge"

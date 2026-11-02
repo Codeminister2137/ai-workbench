@@ -190,7 +190,7 @@ class OperatorApprovalBridge:
                         )
                     remaining()
                     return approved
-                except OperatorBridgeError:
+                except (OperatorBridgeError, KeyError, TypeError, ValueError):
                     # Abandoned for any reason (timeout, binding mismatch,
                     # invalid response, changed state): cancel best-effort so
                     # the phone never offers an approval nobody waits for.

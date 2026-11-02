@@ -868,3 +868,32 @@ def test_binding_mismatch_cancels_server_side_action(tmp_path):
     with pytest.raises(OperatorBridgeError, match="does not match"):
         bridge(_tool_call(), ToolCategory.WRITE)
     assert ("POST", "/api/external-actions/" + "a" * 32 + "/cancel") in methods
+
+
+@pytest.mark.parametrize("poll_body", ["missing_status", "invalid_json"])
+def test_malformed_poll_payload_still_cancels_server_side_action(tmp_path, poll_body):
+    methods = []
+    binding = {}
+
+    def handle(request):
+        methods.append((request.method, request.url.path))
+        if request.url.path.endswith("/cancel"):
+            return httpx.Response(200, json={**binding, "status": "cancelled"})
+        if request.method == "POST":
+            binding.update(id="a" * 32, **json.loads(request.content))
+            return httpx.Response(200, json={"id": binding["id"], "status": "submitted"})
+        if poll_body == "invalid_json":
+            return httpx.Response(200, content=b"not json")
+        return httpx.Response(200, json={**binding})
+
+    bridge = OperatorApprovalBridge(
+        "http://synthetic.invalid",
+        "synthetic-token",
+        tmp_path,
+        client_factory=lambda **kwargs: httpx.Client(
+            transport=httpx.MockTransport(handle), **kwargs
+        ),
+    )
+    with pytest.raises(OperatorBridgeError, match="Invalid external action response"):
+        bridge(_tool_call(), ToolCategory.WRITE)
+    assert ("POST", "/api/external-actions/" + "a" * 32 + "/cancel") in methods
