@@ -9,20 +9,20 @@
 <body>
 <header>
   <nav id="nav">
-    <a href="#/home" data-view="home">Home</a>
-    <a href="#/chat" data-view="chat">Chat</a>
-    <a href="#/plans" data-view="plans">Plans</a>
-    <a href="#/runs" data-view="runs">Runs</a>
-    <a href="#/inbox" data-view="inbox">Inbox <span id="inbox-badge" class="badge" hidden></span></a>
-    <a href="#/ideas" data-view="ideas">Ideas <span id="ideas-badge" class="badge" hidden></span></a>
-    <a href="#/schedule" data-view="schedule">Schedule</a>
+    <a href="#/home" data-view="home" title="Status overview">Home</a>
+    <a href="#/chat" data-view="chat" title="Supervisor chat sessions">Chat</a>
+    <a href="#/plans" data-view="plans" title="Plans on file">Plans</a>
+    <a href="#/runs" data-view="runs" title="Runs and route evidence">Runs</a>
+    <a href="#/inbox" data-view="inbox" title="Owner inbox tasks">Inbox <span id="inbox-badge" class="badge" hidden></span></a>
+    <a href="#/ideas" data-view="ideas" title="Captured ideas to triage">Ideas <span id="ideas-badge" class="badge" hidden></span></a>
+    <a href="#/schedule" data-view="schedule" title="Schedule (read-only placeholder)">Schedule</a>
   </nav>
   <div id="create-wrap">
     <button id="create-btn" title="New chat, plan note, or inbox item">+ New</button>
     <div id="create-menu" hidden>
-      <button data-create="chat">New chat</button>
-      <button data-create="inbox">New inbox item</button>
-      <button data-create="idea">New idea</button>
+      <button data-create="chat" title="Start a supervisor chat">New chat</button>
+      <button data-create="inbox" title="Add an inbox task">New inbox item</button>
+      <button data-create="idea" title="Capture an idea">New idea</button>
     </div>
   </div>
 </header>
