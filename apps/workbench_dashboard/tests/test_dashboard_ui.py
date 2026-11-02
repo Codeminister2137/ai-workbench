@@ -35,13 +35,20 @@ def test_chat_cancel_does_not_create_session() -> None:
     assert 'const title = picked || "Dashboard chat";' in js
 
 
-def test_viewing_new_idea_marks_it_reviewing() -> None:
-    """Opening an idea detail auto-triages `new` -> `reviewing` (badge clears)."""
+def test_viewing_idea_does_not_mutate() -> None:
+    """Opening an idea detail never transitions status by itself."""
     js = _read("app.js")
-    assert "await markIdeaSeen(id, payload.item);" in js
+    assert "await markIdeaSeen(id, payload.item);" not in js
+
+
+def test_mark_seen_button_drives_transition() -> None:
+    """An explicit Mark seen button (new ideas only) posts reviewing."""
+    js = _read("app.js")
+    assert 'id="mark-seen-btn"' in js
+    assert 'item.status === "new" ? `' in js
+    assert "markIdeaSeen(id, item)" in js
     assert 'item.status !== "new"' in js
     assert 'status: "reviewing"' in js
-    assert 'decision: item.decision || ""' in js
 
 
 def test_static_controls_have_titles() -> None:
@@ -59,7 +66,7 @@ def test_dynamic_buttons_have_titles() -> None:
     """Every button rendered by app.js templates carries a tooltip title."""
     js = _read("app.js")
     buttons = re.findall(r"<button\b[^>]*>", js)
-    assert len(buttons) == 5
+    assert len(buttons) == 6
     for tag in buttons:
         assert "title=" in tag, f"button without title: {tag}"
 

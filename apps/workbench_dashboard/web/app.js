@@ -287,7 +287,6 @@ async function markIdeaSeen(id, item) {
 async function renderIdeas(id) {
   if (id) {
     const payload = await api("/api/ideas/" + encodeURIComponent(id));
-    await markIdeaSeen(id, payload.item);
     const item = payload.item;
     const opts = ["new", "reviewing", "adopted", "parked", "declined"].map((s) =>
       `<option value="${s}"${item.status === s ? " selected" : ""}>${s}</option>`).join("");
@@ -296,6 +295,7 @@ async function renderIdeas(id) {
       <p class="muted">${esc(item.source)}${item.contact ? " · " + esc(item.contact) : ""} · ${esc(item.status)}</p>
       <p>${esc(item.body || "")}</p>
       ${item.decision ? `<p><strong>Decision:</strong> ${esc(item.decision)}</p>` : ""}
+      ${item.status === "new" ? `<p><button id="mark-seen-btn" title="Mark this idea seen (moves it out of new)">Mark seen</button></p>` : ""}
       <form id="review-form" class="inline">
         <select name="status" title="Triage status">${opts}</select>
         <input type="text" name="decision" placeholder="Decision note..." title="Decision note (optional)" value="${esc(item.decision || "")}">
@@ -314,6 +314,11 @@ async function renderIdeas(id) {
       } catch (err) {
         toast(err.message, false);
       }
+    });
+    const seenBtn = document.getElementById("mark-seen-btn");
+    if (seenBtn) seenBtn.addEventListener("click", async () => {
+      await markIdeaSeen(id, item);
+      render();
     });
     return;
   }
