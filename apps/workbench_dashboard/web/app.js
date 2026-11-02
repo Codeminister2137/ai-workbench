@@ -88,8 +88,8 @@ async function renderHome() {
         <div class="card"><h2>Ideas</h2>
           <p>${status.new_ideas} untriaged. <a href="#/ideas">Open ideas</a></p></div>
         <div class="card"><h2>Chat</h2>
-          <form class="inline" id="quick-chat"><input type="text" name="text" placeholder="Ask the supervisor..." required>
-          <button type="submit">Send</button></form></div>
+          <form class="inline" id="quick-chat"><input type="text" name="text" placeholder="Ask the supervisor..." title="Ask the supervisor (starts a new chat)" required>
+          <button type="submit" title="Start a chat with this question">Send</button></form></div>
         <div class="card"><h2>Scheduled</h2>
           <p class="muted">No scheduler yet — see P5. <a href="#/schedule">Schedule view</a></p></div>
       </div>
@@ -132,8 +132,8 @@ async function renderChatThread(id, initial) {
      <div>${esc(m.content)}</div></div>`).join("");
   view.innerHTML = `<h1>Chat</h1><p><a href="#/chat">All chats</a></p>
     <div id="thread">${msgs || '<p class="muted">No messages yet.</p>'}</div>
-    <form class="inline" id="chat-form"><input type="text" name="text" placeholder="Message..." required>
-    <button type="submit">Send</button></form>`;
+    <form class="inline" id="chat-form"><input type="text" name="text" placeholder="Message..." title="Message the supervisor" required>
+    <button type="submit" title="Send message">Send</button></form>`;
   const form = document.getElementById("chat-form");
   async function send(text) {
     const btn = form.querySelector("button");
@@ -222,10 +222,10 @@ async function renderInbox(id) {
       ${item.status === "closed" ? '<p class="muted">Closed; answers are immutable.</p>' : `
       <form id="answer-form">
         ${options}
-        <div class="inline"><input type="text" name="answer" placeholder="Your answer...">
-        <button type="submit">Answer</button></div>
+        <div class="inline"><input type="text" name="answer" placeholder="Your answer..." title="Type your answer">
+        <button type="submit" title="Record answer">Answer</button></div>
       </form>
-      <p><button id="close-btn">Close task</button></p>`}</div>`;
+      <p><button id="close-btn" title="Close this task (answers become immutable)">Close task</button></p>`}</div>`;
     const form = document.getElementById("answer-form");
     if (form) form.addEventListener("submit", async (ev) => {
       ev.preventDefault();
@@ -270,9 +270,24 @@ async function renderInbox(id) {
   view.innerHTML = `<h1>Inbox</h1><ul class="plain">${items}</ul>`;
 }
 
+async function markIdeaSeen(id, item) {
+  if (!item || item.status !== "new") return;
+  try {
+    await api("/api/ideas/" + encodeURIComponent(id) + "/review", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({status: "reviewing", decision: item.decision || ""}),
+    });
+    item.status = "reviewing";
+  } catch (err) {
+    /* Render the fetched copy; the badge refreshes anyway. */
+  }
+}
+
 async function renderIdeas(id) {
   if (id) {
     const payload = await api("/api/ideas/" + encodeURIComponent(id));
+    await markIdeaSeen(id, payload.item);
     const item = payload.item;
     const opts = ["new", "reviewing", "adopted", "parked", "declined"].map((s) =>
       `<option value="${s}"${item.status === s ? " selected" : ""}>${s}</option>`).join("");
@@ -282,9 +297,9 @@ async function renderIdeas(id) {
       <p>${esc(item.body || "")}</p>
       ${item.decision ? `<p><strong>Decision:</strong> ${esc(item.decision)}</p>` : ""}
       <form id="review-form" class="inline">
-        <select name="status">${opts}</select>
-        <input type="text" name="decision" placeholder="Decision note..." value="${esc(item.decision || "")}">
-        <button type="submit">Save triage</button>
+        <select name="status" title="Triage status">${opts}</select>
+        <input type="text" name="decision" placeholder="Decision note..." title="Decision note (optional)" value="${esc(item.decision || "")}">
+        <button type="submit" title="Save triage status and note">Save triage</button>
       </form></div>`;
     document.getElementById("review-form").addEventListener("submit", async (ev) => {
       ev.preventDefault();
@@ -356,7 +371,9 @@ document.querySelectorAll("[data-create]").forEach((btn) => {
     const kind = btn.dataset.create;
     try {
       if (kind === "chat") {
-        const title = prompt("Chat title:", "Dashboard chat") || "Dashboard chat";
+        const picked = prompt("Chat title:", "Dashboard chat");
+        if (picked === null) return;
+        const title = picked || "Dashboard chat";
         const session = await api("/api/chat/sessions", {
           method: "POST",
           headers: {"Content-Type": "application/json"},
