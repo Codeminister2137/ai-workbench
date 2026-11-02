@@ -195,3 +195,22 @@ def test_untrusted_origin_refused(dashboard_server) -> None:
         urlopen(request, timeout=5)
     assert raised.value.code == 403
     raised.value.close()
+
+
+def test_filtered_totals_count_matches(dashboard_server) -> None:
+    first = post_json(
+        dashboard_server,
+        "/api/inbox",
+        {"title": "One", "body": "1", "type": "decision", "options": ["A"]},
+    )
+    post_json(
+        dashboard_server,
+        "/api/inbox",
+        {"title": "Two", "body": "2", "type": "decision"},
+    )
+    post_json(dashboard_server, f"/api/inbox/{first['id']}/answer", {"answer": "done"})
+    answered = get_json(dashboard_server, "/api/inbox?status=answered")
+    assert answered["total"] == 1
+    assert len(answered["items"]) == 1
+    still_open = get_json(dashboard_server, "/api/inbox?status=open")
+    assert still_open["total"] == 1

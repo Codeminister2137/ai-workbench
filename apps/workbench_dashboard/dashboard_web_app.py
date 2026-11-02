@@ -295,10 +295,10 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         wanted = params.get("status", [None])[0]
         if wanted is not None and wanted not in {"open", "answered", "closed"}:
             return self._send_json({"ok": False, "error": "Invalid status filter"}, status=400)
-        items, total = self._stores().inbox.list(limit=100)
+        items, _total = self._stores().inbox.list(limit=100)
         if wanted is not None:
             items = [item for item in items if item.get("status") == wanted]
-        self._send_json({"ok": True, "items": items, "total": total})
+        self._send_json({"ok": True, "items": items, "total": len(items)})
 
     def _create_inbox_task(self, payload: dict) -> None:
         stores = self._stores()
@@ -356,12 +356,12 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             return self._send_json({"ok": False, "error": "Invalid status filter"}, status=400)
         if wanted_source is not None and wanted_source not in IDEA_SOURCES:
             return self._send_json({"ok": False, "error": "Invalid source filter"}, status=400)
-        items, total = self._stores().ideas.list(limit=100)
+        items, _total = self._stores().ideas.list(limit=100)
         if wanted_status is not None:
             items = [item for item in items if item.get("status") == wanted_status]
         if wanted_source is not None:
             items = [item for item in items if item.get("source") == wanted_source]
-        self._send_json({"ok": True, "items": items, "total": total})
+        self._send_json({"ok": True, "items": items, "total": len(items)})
 
     def _create_idea(self, payload: dict) -> None:
         title = payload.get("title", "")
