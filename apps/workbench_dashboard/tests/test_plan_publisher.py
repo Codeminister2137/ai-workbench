@@ -53,7 +53,8 @@ def test_sync_run_upsert(tmp_path) -> None:
     sync_run(stores, run_id="w4", title="W4 fix", status="committed", branch="fix/x")
     updated = sync_run(stores, run_id="w4", title="W4 fix", status="merged", commit="abc1234")
     assert updated["status"] == "merged"
-    assert stores.runs.get("w4") is not None and stores.runs.get("w4")["status"] == "merged"
+    got = stores.runs.get("w4")
+    assert got is not None and got["status"] == "merged"
 
 
 def test_sync_decision_dedupes_open_title(tmp_path) -> None:
