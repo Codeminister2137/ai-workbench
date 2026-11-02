@@ -27,5 +27,12 @@
 ## Scope note
 
 Items 1–2 ride with STT v1 (client-side). Item 3 is server/pipeline work and
-is NOT part of STT v1; it needs its own brief (translator choice, where the
-step runs, how mistranslation risk is surfaced).
+is NOT part of STT v1; it needs its own brief (where the step runs, how
+mistranslation risk is surfaced).
+
+## Decided (owner, 2026-11-02)
+
+- Day-one languages: English MUST work; Polish heavily recommended. Further
+  languages only after a cost-vs-reward evaluation.
+- Translator: Meta chat translation now (hackathon credits), free alternative
+  later — mirroring the STT decision.
