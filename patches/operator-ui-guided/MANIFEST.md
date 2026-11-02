@@ -15,6 +15,7 @@
 | `app.css` | `src/remote_operator/app.css` | full-file replacement |
 | `DESIGN.md` | — (review doc, not applied) | doc |
 | `MANIFEST.md` | — (this file, not applied) | doc |
+| `tests/split-parser.test.mjs` | — (parser unit test, not applied) | test |
 
 No `.py` changes. No API changes.
 
@@ -37,6 +38,9 @@ From the `remote-ai-operator` checkout:
 
 ## V2 (Finding E = B, 2026-11-02)
 Adds approval-subject header + PASS/FAIL checklist card + run review context (2 new IDs: approvalSubject, approvalChecklist). Re-verified: 91/91 IDs, node clean.
+
+## V3 (split diff, 2026-11-02)
+Side-by-side old/new split view in Review (4 new IDs). Re-verified: 91/91 IDs, 101/101 JS refs, node clean, parser tests 5/5 groups.
 
 ## Verified here (without sibling writes)
 
