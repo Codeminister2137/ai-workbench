@@ -37,8 +37,8 @@ scales (`percent_correct` vs `percent_resolved`) must never be averaged.
 
 ## Mapping table
 
-Route ids are the 21 routes declared in
-`packages/ai_orchestrator/examples/model_catalog.toml` as verified on 2026-10-28.
+Route ids are the 25 routes declared in
+`packages/ai_orchestrator/examples/model_catalog.toml` as verified on 2026-11-02.
 The Meta row was added on 2026-10-27 and the OpenRouter free-variant row on
 2026-10-24; the leaderboard snapshots remain those collected on 2026-10-22.
 
@@ -66,17 +66,23 @@ The Meta row was added on 2026-10-27 and the OpenRouter free-variant row on
 | `meta/muse-spark-1.3` | `muse-spark-1.3` | Muse Spark | none | `unmatched` | neither snapshot contains a Muse Spark row, and the matcher attaches no prior to an unrecognized family | no leaderboard row for Muse Spark | 2026-10-27 |
 | `modal/qwen/qwen2.5-coder-7b-instruct` | `Qwen/Qwen2.5-Coder-7B-Instruct` | Qwen2.5-Coder | Aider `openai/Qwen/Qwen2.5-Coder-32B-Instruct`, 8.0% `percent_correct`, `edit=diff`, 2024-12-22; SWE-bench `qwen2.5 coder 32b instruct` (9.0 mini-SWE-agent, 2025-08-03; 38.0 Skywork-SWE-32B, 2025-06-16) | `family` | size gap: 7b vs 32b | Aider + SWE-bench rows | 2026-10-28 |
 
-## Coverage summary (verified 2026-10-28)
+| `baseten/baseten-hackathon-meta-models/muse-spark-open-1026` | `meta-models/muse-spark-open-1026` | Muse Spark | none | `unmatched` | neither snapshot contains a Muse Spark row (same as the Meta direct route); the Baseten alias adds no measured identity | no leaderboard row for Muse Spark | 2026-11-02 |
+| `opencode-go/go-deepseek-v4.1-flash` | `deepseek-v4.1-flash` | DeepSeek V4 | none | `unmatched` | snapshots list only DeepSeek V3 rows and rolling aliases (`deepseek-chat`, `deepseek-reasoner`); no V4 row | no DeepSeek V4 row in either snapshot | 2026-11-02 |
+| `requesty/free-nvidia/nemotron-3.5-lightning-30b-a3b` | `nvidia/nemotron-3.5-lightning-30b-a3b` | NVIDIA Nemotron | none | `unmatched` | neither snapshot contains a Nemotron row | no Nemotron row in either snapshot | 2026-11-02 |
+| `openrouter/free-dots-studio/dots-3-note-preview:free` | `dots-studio/dots-3-note-preview:free` | dots-studio | none | `unmatched` | the `:free` serving variant has no measured row, and no dots row exists in either snapshot | no leaderboard row for the `:free` variant | 2026-11-02 |
+
+## Coverage summary (verified 2026-11-02)
 
 | Confidence | Count | Route ids |
 | --- | --- | --- |
 | `exact` | 4 | `openai/api-gpt-5.1`, `openai/api-gpt-5-mini`, `requesty/openai/gpt-5.1`, `requesty/openai/gpt-5-mini` |
 | `family` | 11 | `ollama/gpt-oss:20b`, `ollama/qwen2.5-coder:14b`, `ollama/qwen3:14b`, `openai/codex-gpt-5.5`, `google/ai-studio-gemini-3.1-pro`, `google/ai-studio-gemini-3.8-flash`, `google/antigravity-gemini-3.1-pro-high`, `google/antigravity-gemini-3.8-flash-high`, `requesty/free-google/gemma-4-31b-it`, `opencode-go/go-kimi-k2.7-code`, `modal/qwen/qwen2.5-coder-7b-instruct` |
 | `alias` | 0 | â€” |
-| `unmatched` | 6 | `ollama/deepseek-coder-v2:16b`, `openai/codex-gpt-6.1-sol`, `github/copilot-cli-auto`, `kiro/auto`, `openrouter/free-google/gemma-4-31b-it:free`, `meta/muse-spark-1.3` |
+| `unmatched` | 10 | `ollama/deepseek-coder-v2:16b`, `openai/codex-gpt-6.1-sol`, `github/copilot-cli-auto`, `kiro/auto`, `openrouter/free-google/gemma-4-31b-it:free`, `meta/muse-spark-1.3`, `baseten/baseten-hackathon-meta-models/muse-spark-open-1026`, `opencode-go/go-deepseek-v4.1-flash`, `requesty/free-nvidia/nemotron-3.5-lightning-30b-a3b`, `openrouter/free-dots-studio/dots-3-note-preview:free` |
 
-4 + 11 + 6 = 21 routes, matching the declared catalog. Exact identifier-set comparison
-on 2026-10-28 found 21 unique table rows, no missing routes and no extra routes.
+4 + 11 + 10 = 25 routes, matching the declared catalog. Exact identifier-set comparison
+on 2026-11-02 found 25 unique table rows, no missing routes and no extra routes.
+Scope note 2026-11-02: only pinned GPT-5 rows achieve `exact` (four rows, added 2026-10-28); the sentence below predates them.
 **No route achieved
 `exact`**, because neither leaderboard publishes any of our pinned,
 current-generation ids verbatim. **Every `unmatched` route stays ungraded** â€”
