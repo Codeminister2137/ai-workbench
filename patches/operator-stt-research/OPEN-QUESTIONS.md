@@ -2,6 +2,18 @@
 
 Research: `RESEARCH.md` in this directory. No code written; sibling untouched.
 
+## Decided (owner, 2026-11-02)
+
+- Q1: browser-cloud STT accepted for hackathon/personal use with mitigations
+  (short utterances, per-tap mic, honest label); company product gets the
+  whisper/DPA-covered path later. Matches the hackathon/company split.
+- Q2: test phone is Xiaomi Redmi Note 13 Pro 5G, mobile Chrome. PC browser
+  is Firefox (dictation v1 targets the phone; Firefox desktop lacks the API).
+- Q3: answered by verification -- phone route is Tailnet HTTPS (secure
+  context satisfied).
+- Q5: NO auto-send, ever for v1. Dictation fills the textarea; the user
+  reviews AND can edit before Send (STT is never trusted verbatim).
+
 1. **Browser-vendor cloud STT acceptable?** The recommended free path (Web Speech
    API) sends short voice clips to the phone browser's vendor (Google on
    Chrome/Android) for transcription. Typed-equivalent transcripts then flow as
