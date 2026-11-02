@@ -95,3 +95,17 @@ never yanks the user otherwise.
 - View order/labels (Demo/Supervise/Review/Activity) — rename freely.
 - Whether Approve-plan should ALSO stay in Chat (duplicate needs a second
   ID + handler; not done).
+## V2 addendum (Finding E = B, owner 2026-11-02)
+
+- Review view gains an **approval subject header** (`#approvalSubject`):
+  kind (Demo task vs Supervised run + run/thread), task id, attempt
+  number, injected marker, actor (scripted vs live runner), candidate/base
+  digests, prompt first line. Answers "am I approving a real thing, and
+  which one" even when diffs look identical across scripted runs.
+- Review view gains a **checklist card** (`#approvalChecklist`) with
+  PASS/FAIL rows: candidate fingerprinted, validation passed, approval
+  window fresh. All rows are client-computable from the review payload;
+  server-side byte binding at approve time is unchanged.
+- Run Review buttons pass `{run_id, thread_id, thread_topic}` as review
+  context (thread topic resolved from the loaded chooser, no new API).
+- Split demo/supervised review screens: parked as a post-event follow-up.

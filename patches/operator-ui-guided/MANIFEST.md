@@ -35,6 +35,9 @@ From the `remote-ai-operator` checkout:
 4. Manual phone pass: Flow A in the Demo view, Flow B in Supervise,
    approvals in Review.
 
+## V2 (Finding E = B, 2026-11-02)
+Adds approval-subject header + PASS/FAIL checklist card + run review context (2 new IDs: approvalSubject, approvalChecklist). Re-verified: 91/91 IDs, node clean.
+
 ## Verified here (without sibling writes)
 
 - `node --check`: pass.
