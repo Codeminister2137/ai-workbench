@@ -164,5 +164,6 @@ triage agent later. Complements the owner-task inbox (assigned work) with
 an idea inbox (candidate work).
 
 Cross-cutting chat requirement (same session): every chat surface stays
-interruptible — user turns get answers without breaking in-flight runs
+interruptible â€” user turns get answers without breaking in-flight runs
 (steering queue, non-blocking turns). Owner-confirmed P4 behavior.
+- (2026-11-02, via operator Owner-replies thread) Workbench dashboard needs a workers view: running workers, their status etc. \u2014 development must be visualized clearly for the user.
