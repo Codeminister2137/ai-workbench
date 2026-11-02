@@ -31,8 +31,8 @@ For each expected service (operator serve :8765, dashboard :8766,
 Ollama :11434) it reports `already listening` or starts the missing
 one — replaying the exact snapshotted command line, or `ollama serve`
 for Ollama — then re-checks every port, reports Docker daemon state
-(start Docker Desktop manually when it is down; the helper never
-starts GUI apps), and smoke-imports the workspace packages. It exits
+(starting Docker Desktop itself when the daemon is down, then waiting
+up to three minutes for the daemon), and smoke-imports the workspace packages. It exits
 nonzero with explicit lines for anything still not listening.
 
 After a green `open`, continue with the handoff in `CURRENT_CONTEXT.md`

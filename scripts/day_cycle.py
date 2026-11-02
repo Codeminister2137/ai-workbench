@@ -15,9 +15,12 @@ import argparse
 import dataclasses
 import datetime
 import json
+import os
 import socket
 import subprocess
 import sys
+import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -80,18 +83,19 @@ def git_state(root: Path) -> GitState:
     if code or code_s or code_h:
         return GitState(str(root), "?", False, 0, 0, "?")
     try:
-        ahead_n = int(ahead.strip().split()[0]) if not code_a else 0
-        behind_n = int(behind.strip().split()[0]) if not code_b else 0
+        ahead_n = int(without_warnings(ahead).strip().split()[0]) if not code_a else 0
+        behind_n = int(without_warnings(behind).strip().split()[0]) if not code_b else 0
     except (ValueError, IndexError):
         ahead_n, behind_n = 0, 0
-    untracked = tuple(sorted(line for line in untracked_raw.splitlines() if line.strip()))
+    cleaned = without_warnings(untracked_raw)
+    untracked = tuple(sorted(line for line in cleaned.splitlines() if line.strip()))
     return GitState(
         root=str(root),
-        branch=branch.strip(),
-        clean=not status.strip(),
+        branch=without_warnings(branch).strip(),
+        clean=not without_warnings(status).strip(),
         ahead=ahead_n,
         behind=behind_n,
-        head=head.strip(),
+        head=without_warnings(head).strip(),
         untracked=untracked,
     )
 
@@ -154,6 +158,87 @@ def docker_state() -> dict[str, object]:
     """Check the Docker daemon without starting anything."""
     code, output = run_command(["docker", "version", "--format", "{{.Server.Version}}"], timeout=30)
     return {"available": code == 0, "server_version": output.strip() if code == 0 else None}
+
+
+def without_warnings(text: str) -> str:
+    """Drop stderr `warning: ` lines from combined command output."""
+    kept = [line for line in text.splitlines(keepends=True) if not line.startswith("warning: ")]
+    return "".join(kept)
+
+
+def docker_desktop_candidates() -> list[Path]:
+    """Well-known Docker Desktop install paths (Windows)."""
+    roots: list[Path] = []
+    for env in ("ProgramFiles", "ProgramW6432"):
+        value = os.environ.get(env)
+        if value:
+            roots.append(Path(value))
+    if not roots:
+        roots.append(Path("C:/Program Files"))
+    return [root / "Docker" / "Docker" / "Docker Desktop.exe" for root in roots]
+
+
+def parse_process_count(output: str) -> int:
+    """Parse the @(Get-Process ...).Count output; 0 when unreadable."""
+    try:
+        return max(0, int(output.strip().split()[0]))
+    except (ValueError, IndexError):
+        return 0
+
+
+def docker_desktop_running() -> bool:
+    """Check whether Docker Desktop runs (without starting anything)."""
+    code, output = run_command(
+        [
+            "powershell",
+            "-NoProfile",
+            "-Command",
+            "@(Get-Process 'Docker Desktop' -ErrorAction SilentlyContinue).Count",
+        ],
+        timeout=30,
+    )
+    return code == 0 and parse_process_count(output) > 0
+
+
+def ensure_docker(
+    *,
+    wait_seconds: float = 180,
+    poll_seconds: float = 5,
+    state_fn: Callable[[], dict[str, object]] = docker_state,
+    running_fn: Callable[[], bool] = docker_desktop_running,
+    launch_fn: Callable[[Path], bool] | None = None,
+    sleep_fn: Callable[[float], None] = time.sleep,
+    candidates_fn: Callable[[], list[Path]] = docker_desktop_candidates,
+) -> tuple[bool, str]:
+    """Start Docker Desktop when the daemon is down; report the outcome."""
+    if state_fn()["available"]:
+        return True, "docker: daemon up"
+    if not running_fn():
+        exe = next((path for path in candidates_fn() if path.exists()), None)
+        if exe is None:
+            return (
+                False,
+                "docker: daemon down, Desktop not found at known paths "
+                "(start Docker Desktop manually)",
+            )
+        if launch_fn is None:
+            started = start_detached("docker-desktop", [str(exe)], REPO_ROOT)
+        else:
+            started = launch_fn(exe)
+        if not started:
+            return (
+                False,
+                "docker: daemon down, Desktop launch FAILED (start Docker Desktop manually)",
+            )
+    deadline = time.monotonic() + wait_seconds
+    while time.monotonic() < deadline:
+        sleep_fn(poll_seconds)
+        if state_fn()["available"]:
+            return True, "docker: daemon up (Desktop started it)"
+    return (
+        False,
+        f"docker: daemon still down after {wait_seconds:.0f}s (start Docker Desktop manually)",
+    )
 
 
 def write_snapshot(payload: dict) -> Path:
@@ -254,8 +339,6 @@ def command_open() -> int:
     report: list[str] = []
     failed = False
 
-    import time
-
     checks = [
         ("operator-serve", OPERATOR_PORT, OPERATOR_ROOT),
         ("dashboard", DASHBOARD_PORT, REPO_ROOT / "apps" / "workbench_dashboard"),
@@ -276,12 +359,8 @@ def command_open() -> int:
             ok = start_detached(label, cmdline, cwd)
         report.append(f"{label}: {'start requested' if ok else 'START FAILED'} on {port}")
         failed = failed or not ok
-    docker = docker_state()
-    report.append(
-        "docker: daemon up"
-        if docker["available"]
-        else "docker: daemon not reachable (start Docker Desktop manually)"
-    )
+    _docker_ok, docker_line = ensure_docker()
+    report.append(docker_line)
     time.sleep(3)
     for label, port, _cwd in checks:
         report.append(
