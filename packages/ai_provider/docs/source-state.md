@@ -21,6 +21,36 @@ routing configuration. The [model catalog](../../ai_orchestrator/examples/model_
 contains declared route capabilities; native readers report supported account
 observations. Neither establishes coding quality by itself.
 
+## Full L3 ladder (T0–T3) — 2026-11-02
+
+`scripts/l3_ladder.py` now resolves candidates through the orchestrator
+catalog with cost-tier gating (ADR-080); `ai_provider.route_eval` walks the
+ordered list (max 3, tier-blocked routes recorded, never attempted).
+First-row live-list auto-pick retired after the Nov 1–2 failures below.
+
+Last auto-pick run (`route-eval-T0-T3-20261102T082939Z.json`, all routes,
+PASS-gated): Meta `muse-spark-1.3` T0/T1/T2 PASS, T3 FAIL at exactly 4096
+output tokens (truncated, ~$0.031 total); Baseten
+`meta-models/muse-spark-open-1026` the same shape on hackathon credits;
+OpenRouter `recursive/flint-v1.0:free` HTTP 503; Requesty
+`novita/ling-3.1-flash` parked 403 (standing edge refusal);
+OpenCode `deepseek-v4.1-flash` full T0–T3 PASS (only full clear; the Oct 31
+429 limit had lifted). T3 cap raised to 16384 with a `--max-output-tokens`
+CLI override; see `docs/limits-register.md`. This establishes per-route
+reachability plus one micro-task ladder each, not general quality.
+
+Validation of the new path the same day (`--allow-tier free_only` T0, then
+full T0–T3 at default prepaid): tier gates record `tier-blocked` rows without
+spending; OpenRouter walked gemma-429 to dots-PASS; Requesty gemma full
+T0–T3 PASS $0; Meta full T0–T3 PASS (~$0.026, T3 in 3566 tokens — the 16384
+cap fixed the truncation); Baseten T3 fails at 4096/16384/32768 alike
+(unbounded verbosity, capability FAIL, no further raise); dots T1 PASS at
+4096 after hitting 2048 exactly (T1 default raised); OpenCode walked a
+reproducible kimi-k2.7-code HTTP 400 to deepseek full PASS — the kimi
+catalog entry is suspect (same route and credentials serve deepseek), needs
+investigation. Skip-list is keyed per (route, model) from the newest
+snapshots' transport errors.
+
 ## Live route sweep + micro-eval — 2026-10-31
 
 `ai_provider.route_probe` (free list-endpoint sweep, no inference): with
