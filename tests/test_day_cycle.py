@@ -1,6 +1,7 @@
 """Day-cycle verdict logic; service checks are never executed here."""
 
 import importlib.util
+import os
 import sys
 from pathlib import Path
 
@@ -17,6 +18,8 @@ without_warnings = _module.without_warnings
 docker_desktop_candidates = _module.docker_desktop_candidates
 ensure_docker = _module.ensure_docker
 parse_process_count = _module.parse_process_count
+service_env = _module.service_env
+start_detached = _module.start_detached
 
 
 def test_close_verdict_clean_trees() -> None:
@@ -128,3 +131,35 @@ def test_ensure_docker_times_out_when_daemon_never_arrives() -> None:
     )
     assert ok is False
     assert "still down" in line
+
+
+def test_service_env_returns_only_allowlisted_names(tmp_path, monkeypatch) -> None:
+    (tmp_path / ".env").write_text(
+        "OPERATOR_ACCESS_TOKEN=fake-token\nEXTRA_KEY=1\nEMPTY=\n", encoding="utf-8"
+    )
+    monkeypatch.delenv("OPERATOR_ACCESS_TOKEN", raising=False)
+    monkeypatch.delenv("EXTRA_KEY", raising=False)
+    try:
+        assert service_env("operator-serve", store=tmp_path / "missing") == {}
+        assert service_env("operator-serve", store=tmp_path) == {
+            "OPERATOR_ACCESS_TOKEN": "fake-token"
+        }
+        assert service_env("dashboard", store=tmp_path) == {}
+
+    finally:
+        os.environ.pop("OPERATOR_ACCESS_TOKEN", None)
+        os.environ.pop("EXTRA_KEY", None)
+
+
+def test_start_detached_passes_env_through(tmp_path, monkeypatch) -> None:
+    captured: dict = {}
+
+    class FakePopen:
+        def __init__(self, argv, **kwargs):
+            captured.update(kwargs)
+
+    monkeypatch.setattr(_module.subprocess, "Popen", FakePopen)
+    monkeypatch.setattr(_module, "SNAPSHOT_DIR", tmp_path)
+    assert start_detached("svc", ["echo", "hi"], tmp_path, env={"K": "V"}) is True
+    assert captured["env"]["K"] == "V"
+    assert "PATH" in captured["env"] or "Path" in captured["env"]
