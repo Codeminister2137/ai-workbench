@@ -21,3 +21,4 @@ body{overflow-x:hidden}button{max-width:100%}
 #judge-start ol{padding-left:24px;margin:10px 0}#judge-start li{padding:4px 0}
 @media (max-width:380px){main{padding:20px 12px 60px}section{padding:16px 14px}button{width:100%;margin:5px 0}}
 #viewNav{display:flex;flex-wrap:wrap;gap:4px;margin:16px 0 0}#viewNav button.active{background:#8ab5ff;color:#10203b}#verdict{font-weight:650;color:#ffd487}#planSettingsNote{color:#a3c8ff}#demoReviewStatus{color:#b5c3da}
+#approvalSubject{font-weight:650;color:#a3c8ff}#approvalChecklist{list-style:none;padding-left:0}#approvalChecklist li{padding:3px 0;color:#b5c3da}

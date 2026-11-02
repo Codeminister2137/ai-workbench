@@ -19,6 +19,7 @@ let selectionRevision = 0;
 let progressTimer = null;
 let pollBusy = false;
 let currentView = "demo";
+let reviewContext = null; // {run_id, thread_id, thread_topic} when opened from a run.
 function switchView(name) {
   currentView = name;
   for (const view of ["demo", "supervise", "review", "activity"]) {
@@ -357,6 +358,54 @@ async function openSupervisorThread(id) {
   }
   supervisorActions();
 }
+function threadTopic(thread_id) {
+  const options = element("supervisorThreads").options;
+  for (const option of options) {
+    if (option.value === thread_id) {
+      const sep = option.textContent.indexOf(" \u00b7 ");
+      return sep >= 0 ? option.textContent.slice(sep + 3) : option.textContent;
+    }
+  }
+  return "";
+}
+function renderApprovalSubject() {
+  const subject = element("approvalSubject");
+  const checklist = element("approvalChecklist");
+  if (!task) {
+    subject.textContent = "No task selected.";
+    checklist.replaceChildren();
+    return;
+  }
+  const short = (hex) => typeof hex === "string" ? hex.slice(0, 12) : "?";
+  const kind = reviewContext ?
+    "Supervised run " + reviewContext.run_id.slice(0, 12) + (reviewContext.thread_topic ? " \u00b7 thread '" + reviewContext.thread_topic + "'" : "") :
+    "Demo task";
+  const promptLine = typeof task.prompt === "string" ? task.prompt.split("\n")[0].slice(0, 90) : "";
+  const injected = task.injected ? " \u00b7 injected failure" : "";
+  const runner = task.evidence && task.evidence.runner ? task.evidence.runner : "not run yet";
+  subject.textContent = kind + " \u00b7 task " + task.id.slice(0, 12) + " \u00b7 attempt " + (task.calls || 0) + injected +
+    " \u00b7 actor " + runner + " \u00b7 candidate " + short(task.evidence && task.evidence.candidate_digest) +
+    " \u00b7 base " + short(task.base_digest) + (promptLine ? ' \u00b7 "' + promptLine + '"' : "");
+  const rows = [];
+  const push = (ok, text) => rows.push((ok ? "PASS " : "FAIL ") + text);
+  if (!task.evidence) {
+    push(false, "No candidate produced yet.");
+  } else {
+    push(true, "Candidate fingerprinted " + short(task.evidence.candidate_digest) + ".");
+    push(!!task.evidence.passed, task.evidence.passed ? "Validation passed (" + runner + ")." : "Validation FAILED \u2014 do not approve.");
+  }
+  if (task.status === "awaiting_approval" && task.approval && typeof task.approval.expires === "number") {
+    const fresh = Date.now() < task.approval.expires * 1000;
+    push(fresh, fresh ? "Approval window fresh." : "Approval EXPIRED \u2014 revalidate.");
+  } else if (task.status === "awaiting_approval") {
+    push(false, "No valid approval \u2014 run fresh validation first.");
+  }
+  checklist.replaceChildren(...rows.map((text) => {
+    const item = document.createElement("li");
+    item.textContent = text;
+    return item;
+  }));
+}
 async function loadSupervisorRuns() {
   const session = sessionRevision;
   const payload = await api("/api/supervisor/runs");
@@ -379,6 +428,8 @@ async function loadSupervisorRuns() {
       const detail = await api("/api/supervisor/runs/" + run.run_id);
       if (!detail.task_id) { supervisorNote("Run has no linked task yet; wait for the worker."); return; }
       await chooseTask(detail.task_id);
+      reviewContext = {run_id: run.run_id, thread_id: run.thread_id, thread_topic: threadTopic(run.thread_id)};
+      renderApprovalSubject();
       switchView("review");
     }));
     item.append(review);
@@ -446,12 +497,13 @@ function renderEvents() {
   element("eventHistory").textContent = showAllEvents ? "Show latest activity" : "Show all activity (" + taskEvents.length + ")";
 }
 function clearTaskView() {
-  task = null; taskEvents = []; showAllEvents = false;
+  task = null; taskEvents = []; showAllEvents = false; reviewContext = null;
   element("status").textContent = "No task selected";
   element("diff").textContent = "No candidate yet.";
   element("evidence").textContent = "Not validated.";
   element("validation-summary").textContent = "Not validated.";
   element("verdict").textContent = "No candidate yet.";
+  renderApprovalSubject();
   element("demoReviewStatus").textContent = "No task yet. Create and run one above; you will be brought to the Review view when it is ready.";
   element("demoReviewCta").disabled = true;
   element("issues").replaceChildren(); element("import-errors").replaceChildren();
@@ -471,6 +523,7 @@ element("newTask").onclick = newTask;
 element("eventHistory").onclick = () => { showAllEvents = !showAllEvents; renderEvents(); };
 async function chooseTask(id) {
   if (!/^[a-f0-9]{32}$/.test(id)) throw new Error("Choose a saved task or provide a valid task ID.");
+  reviewContext = null;
   stopPolling(); selectionRevision++; task = null;
   element("taskId").value = id;
   element("issues").replaceChildren(); element("import-errors").replaceChildren();
@@ -509,6 +562,7 @@ async function refresh() {
     "Status: " + task.status + ".";
   element("demoReviewStatus").textContent = "Task " + task.status + ": " + element("verdict").textContent;
   element("demoReviewCta").disabled = false;
+  renderApprovalSubject();
   actions();
   const events = await api("/api/tasks/" + encodeURIComponent(id) + "/events");
   if (!stillSelected(id, selection, session)) return;
