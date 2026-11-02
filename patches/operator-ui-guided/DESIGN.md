@@ -109,3 +109,22 @@ never yanks the user otherwise.
 - Run Review buttons pass `{run_id, thread_id, thread_topic}` as review
   context (thread topic resolved from the loaded chooser, no new API).
 - Split demo/supervised review screens: parked as a post-event follow-up.
+## V3 addendum (split diff, owner 2026-11-02)
+
+Owner: approvals "always looked like the same csv imports" — the unified
+diff blob does not show WHAT changes, only the subject header says WHICH
+thing. V3 adds a side-by-side split view in Review, no API changes:
+
+- `#diffModeBar` toggle (Split default / Unified); `#diff` stays populated
+  always so smoke couplings and Unified readers are unaffected.
+- `#diffSplit` renders one section per file (`base/X → candidate/Y` when
+  renamed): left column context+deletions ("old (base)"), right column
+  context+additions ("new (candidate)"), via pure `parseUnifiedDiff`.
+- Unknown/empty input never hides content: unparsed lines go to both
+  columns; empty diff shows the same empty text as Unified.
+- Responsive: 2 columns on desktop, stacked old-above-new under 720px
+  (phone portrait); per-column `::before` captions keep sides labeled.
+- 4 new IDs (`diffModeBar`, `diffModeSplit`, `diffModeUnified`, `diffSplit`);
+  all 91 sibling IDs preserved once; 101/101 JS ID refs resolve.
+- `tests/split-parser.test.mjs` unit-tests the parser via marker slice
+  (empty, single-file, multi-file, no-newline, rename/garbage).

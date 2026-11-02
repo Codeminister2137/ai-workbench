@@ -253,6 +253,9 @@ async function refreshExternalActions() {
   }));
 }
 element("refreshExternal").onclick = () => guarded(refreshExternalActions);
+element("diffModeSplit").onclick = () => { diffMode = "split"; applyDiffMode(); };
+element("diffModeUnified").onclick = () => { diffMode = "unified"; applyDiffMode(); };
+applyDiffMode();
 element("supervisionMode").onchange = () => guarded(async () => {
   const saved = await api("/api/settings", "PUT", {supervision: element("supervisionMode").value});
   element("settingsNote").textContent = saved.supervision === "unattended" ?
@@ -367,6 +370,85 @@ function threadTopic(thread_id) {
     }
   }
   return "";
+}
+// ==split-parser-start== (pure; unit-tested by tests/split-parser.test.mjs via marker slice)
+function parseUnifiedDiff(text) {
+  // Split concatenated unified diffs (difflib format, one section per file)
+  // into per-file old/new line columns. Left holds context + deletions,
+  // right holds context + additions. Unknown lines go to both sides so no
+  // content is ever hidden by the split view.
+  const files = [];
+  let cur = null;
+  let lastSide = "both"; // attaches "\ No newline" markers to the prior side
+  const pushLine = (side, line) => {
+    if (!cur) { cur = { file: "change", left: [], right: [] }; files.push(cur); }
+    if (side === "left" || side === "both") cur.left.push(line);
+    if (side === "right" || side === "both") cur.right.push(line);
+  };
+  for (const raw of String(text || "").split("\n")) {
+    if (raw.startsWith("--- ")) {
+      cur = { file: raw.slice(4).trim().replace(/^base\//, ""), left: [], right: [] };
+      files.push(cur); lastSide = "both";
+    } else if (raw.startsWith("+++ ")) {
+      if (cur) {
+        const name = raw.slice(4).trim().replace(/^candidate\//, "");
+        if (cur.file !== name) cur.file += " \u2192 " + name;
+      }
+      lastSide = "both";
+    } else if (raw.startsWith("@@")) {
+      pushLine("both", raw); lastSide = "both";
+    } else if (raw.startsWith("\\ ")) {
+      pushLine(lastSide, raw);
+    } else if (raw.startsWith("-")) {
+      pushLine("left", raw); lastSide = "left";
+    } else if (raw.startsWith("+")) {
+      pushLine("right", raw); lastSide = "right";
+    } else if (raw === "") {
+      continue; // trailing-newline artifact; difflib never emits bare mid-diff lines
+    } else {
+      pushLine("both", raw); lastSide = "both";
+    }
+  }
+  return files.filter((f) => f.left.length || f.right.length);
+}
+// ==split-parser-end==
+let diffMode = "split";
+function renderDiffViews(text, emptyText) {
+  element("diff").textContent = text || emptyText;
+  const box = element("diffSplit");
+  box.replaceChildren();
+  const files = parseUnifiedDiff(text || "");
+  if (!files.length) {
+    const empty = document.createElement("p");
+    empty.textContent = text ? "No line changes." : emptyText;
+    box.append(empty);
+  }
+  for (const f of files) {
+    const section = document.createElement("div");
+    section.className = "diff-split-file";
+    const head = document.createElement("div");
+    head.className = "diff-split-head";
+    head.textContent = f.file + " \u2014 old (base) vs new (candidate)";
+    const cols = document.createElement("div");
+    cols.className = "diff-cols";
+    const left = document.createElement("pre");
+    left.className = "diff-col diff-old";
+    left.textContent = f.left.join("\n");
+    const right = document.createElement("pre");
+    right.className = "diff-col diff-new";
+    right.textContent = f.right.join("\n");
+    cols.append(left, right);
+    section.append(head, cols);
+    box.append(section);
+  }
+  applyDiffMode();
+}
+function applyDiffMode() {
+  const split = diffMode === "split";
+  element("diff").hidden = split;
+  element("diffSplit").hidden = !split;
+  element("diffModeSplit").classList.toggle("active", split);
+  element("diffModeUnified").classList.toggle("active", !split);
 }
 function renderApprovalSubject() {
   const subject = element("approvalSubject");
@@ -499,7 +581,7 @@ function renderEvents() {
 function clearTaskView() {
   task = null; taskEvents = []; showAllEvents = false; reviewContext = null;
   element("status").textContent = "No task selected";
-  element("diff").textContent = "No candidate yet.";
+  renderDiffViews("", "No candidate yet.");
   element("evidence").textContent = "Not validated.";
   element("validation-summary").textContent = "Not validated.";
   element("verdict").textContent = "No candidate yet.";
@@ -542,7 +624,7 @@ async function refresh() {
   if (location.hash.slice(1) !== task.id) location.hash = task.id;
   element("recentTasks").value = task.id;
   element("status").textContent = task.status;
-  element("diff").textContent = review.diff || "No candidate change.";
+  renderDiffViews(review.diff, "No candidate change.");
   element("evidence").textContent = task.evidence ? JSON.stringify(task.evidence, null, 2) : "Not validated.";
   element("validation-summary").textContent = task.evidence ?
     (task.evidence.passed ? "Passed" : "Failed") + " · " + task.evidence.runner + " · source " + task.evidence.candidate_digest.slice(0,12) : "Not validated.";
