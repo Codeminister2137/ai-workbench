@@ -72,13 +72,21 @@ app until a later wired slice the owner approves.
 
 ## What needs owner approval
 
-1. **The amount.** Concrete `max_requests`, `approved_usd`, expiry and model
-   route for the pool. There is intentionally no suggested value in the
-   code; the tests use fixtures only.
-2. **Activation.** Wiring the pool into the hosted admission path (order
-   vs owner grant and judge self-grants), whose key funds pool requests,
-   and whose credits the spend bills. Until approved, the funded judge path
-   stays disabled exactly as today.
+1. **The amount.** Decided D1 (2026-11-02): **Medium band** (~25-50 requests
+   / $2-5). Exact numbers default to 40 requests / $4.00 USD, expiry event
+   end + 3 days, current Meta demo route -- owner can override with one
+   message. There is intentionally no value in the code; tests use fixtures.
+2. **Activation.** Decided D2 (2026-11-02): **judge BYOK first, pool as
+   fallback**; owner grant stays reserved for owner runs. Decided D3:
+   **owner key funds the pool**, consumption **judge-visible**. Until
+   wired, the funded judge path stays disabled exactly as today.
+
+## Resolved: BYOK-only (owner, 2026-11-02)
+
+Organizers confirmed judges may be REQUIRED to BYOK, so the pool stays
+unfunded and unwired. Revisit the public pool only when the X-sharing
+decision is made. The D1 amount band and D3 billing/visibility decisions
+stand as the fallback design if funding is ever approved.
 
 ## Open questions for the owner
 
