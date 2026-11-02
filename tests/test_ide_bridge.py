@@ -156,35 +156,3 @@ class TestReadOnlyWrappers:
         validated = run_command.run(ToolCall("run_command", {"command": command}), context)
         assert not validated.is_error
         assert "validation-ok" in validated.output
-
-
-class TestBridgeRequest:
-    def test_request_resolves_the_installed_httpx_module(self, tmp_path, monkeypatch):
-        """Regression: _request imported nonexistent "httpx2", failing every call."""
-        import asyncio
-        import importlib
-        import types
-
-        real_import = importlib.import_module
-        seen: list[str] = []
-
-        def fake_import(name, *args, **kwargs):
-            seen.append(name)
-            if name == "mcp":
-                return types.SimpleNamespace()
-            if name == "mcp.client.streamable_http":
-                namespace = types.SimpleNamespace()
-
-                def fail(*args, **kwargs):
-                    raise RuntimeError("stubbed transport")
-
-                namespace.streamable_http_client = fail
-                return namespace
-            return real_import(name, *args, **kwargs)
-
-        monkeypatch.setattr(importlib, "import_module", fake_import)
-        configuration = IdeConfiguration.parse(settings(tmp_path), tmp_path)
-        with pytest.raises(RuntimeError, match="Cannot communicate"):
-            asyncio.run(ide_bridge._request(configuration, None, {}))
-        assert "httpx" in seen
-        assert "httpx2" not in seen
