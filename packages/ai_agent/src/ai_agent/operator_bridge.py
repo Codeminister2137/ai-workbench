@@ -191,17 +191,18 @@ class OperatorApprovalBridge:
                     remaining()
                     return approved
                 except OperatorBridgeError:
-                    if time.perf_counter() >= deadline:
-                        # Cleanup cannot authorize the action. Preserve the existing
-                        # best-effort cancellation with a separate one-second cap.
-                        try:
-                            client.post(
-                                f"{self.base_url}/api/external-actions/{action_id}/cancel",
-                                headers=self.headers,
-                                timeout=min(1.0, self.timeout),
-                            )
-                        except httpx.HTTPError:
-                            pass
+                    # Abandoned for any reason (timeout, binding mismatch,
+                    # invalid response, changed state): cancel best-effort so
+                    # the phone never offers an approval nobody waits for.
+                    # Cleanup cannot authorize the action; one-second cap.
+                    try:
+                        client.post(
+                            f"{self.base_url}/api/external-actions/{action_id}/cancel",
+                            headers=self.headers,
+                            timeout=min(1.0, self.timeout),
+                        )
+                    except Exception:  # noqa: BLE001 - cleanup must never mask the original error
+                        pass
                     raise
         except httpx.HTTPError as exc:
             raise OperatorBridgeError(f"Failed to submit external action: {exc}") from exc

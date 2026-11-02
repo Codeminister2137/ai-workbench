@@ -307,7 +307,9 @@ def test_approved_response_must_match_submitted_digests(tmp_path, stage, field):
     )
     with pytest.raises(OperatorBridgeError, match="does not match"):
         bridge(_tool_call(), ToolCategory.WRITE)
-    assert methods == (["POST"] if stage == "submit" else ["POST", "GET"])
+    # Poll-stage abandon now best-effort cancels (trailing POST); a submit-ack
+    # mismatch never cancels: the id comes from the untrusted ack itself.
+    assert methods == (["POST"] if stage == "submit" else ["POST", "GET", "POST"])
 
 
 @pytest.mark.parametrize("identifier", ["../approve", "x" * 32, None])
@@ -778,7 +780,9 @@ def test_poll_http_status_error_fails_fast_without_retry(tmp_path, status_code):
     )
     with pytest.raises(OperatorBridgeError, match="Failed to poll"):
         bridge(_tool_call(), ToolCategory.WRITE)
-    assert methods == ["POST", "GET"]
+    # Still exactly one GET (fail fast, no retry); the trailing POST is the
+    # best-effort cancel of the abandoned action.
+    assert methods == ["POST", "GET", "POST"]
 
 
 @pytest.mark.parametrize(
@@ -837,3 +841,30 @@ def test_poll_retries_transient_5xx_until_approval(tmp_path, status_code):
     )
     assert bridge(_tool_call(), ToolCategory.WRITE) is True
     assert methods == ["POST", "GET", "GET", "GET"]
+
+
+def test_binding_mismatch_cancels_server_side_action(tmp_path):
+    methods = []
+    binding = {}
+
+    def handle(request):
+        methods.append((request.method, request.url.path))
+        if request.url.path.endswith("/cancel"):
+            return httpx.Response(200, json={**binding, "status": "cancelled"})
+        if request.method == "POST":
+            binding.update(id="a" * 32, **json.loads(request.content))
+            return httpx.Response(200, json={"id": binding["id"], "status": "submitted"})
+        tampered = dict(binding, status="approved", candidate_digest="b" * 64)
+        return httpx.Response(200, json=tampered)
+
+    bridge = OperatorApprovalBridge(
+        "http://synthetic.invalid",
+        "synthetic-token",
+        tmp_path,
+        client_factory=lambda **kwargs: httpx.Client(
+            transport=httpx.MockTransport(handle), **kwargs
+        ),
+    )
+    with pytest.raises(OperatorBridgeError, match="does not match"):
+        bridge(_tool_call(), ToolCategory.WRITE)
+    assert ("POST", "/api/external-actions/" + "a" * 32 + "/cancel") in methods
