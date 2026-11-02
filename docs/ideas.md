@@ -165,4 +165,5 @@ an idea inbox (candidate work).
 
 Cross-cutting chat requirement (same session): every chat surface stays
 interruptible — user turns get answers without breaking in-flight runs
-(steering queue, non-blocking turns). Owner-confirmed P4 behavior.
+(steering queue, non-blocking turns). Owner-confirmed P4 behavior.\
+- (2026-11-02, via operator Owner-replies thread) Company site chatbot: let users schedule online meetings with the owner (Google Calendar?), mainly after their product draft is finished; human contact earlier only if the client insists. Rationale: the entire human side rests on the owner.\
