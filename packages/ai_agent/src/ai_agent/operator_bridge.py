@@ -227,6 +227,15 @@ class OperatorApprovalBridge:
                     raise OperatorBridgeError("Invalid external action response")
                 self._verify_binding(action, binding)
                 status = action["status"]
+            except httpx.TransportError:
+                # Transient poll failure (reset connection, DNS blip, read
+                # timeout): the poll is an idempotent read, so retry on the
+                # normal poll cadence until the approval deadline instead of
+                # abandoning a pending phone approval. HTTP status errors
+                # still fail fast below.
+                remaining()
+                time.sleep(min(self.poll_interval, remaining()))
+                continue
             except httpx.HTTPError as exc:
                 raise OperatorBridgeError(f"Failed to poll external action: {exc}") from exc
 
