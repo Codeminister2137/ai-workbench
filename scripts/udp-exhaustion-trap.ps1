@@ -24,11 +24,35 @@ try {
     $lines += "Tcpip-4266 query failed: $($_.Exception.Message)"
 }
 
+function Get-UdpOwnerGroups {
+    # Primary: CIM-based endpoints. Filters nulls (CIM races emit them and
+    # broke the 2026-11-02 firing's owner snapshot).
+    try {
+        $udp = @(Get-NetUDPEndpoint -ErrorAction Stop | Where-Object { $_ -ne $null -and $_.OwningProcess })
+        $groups = @($udp | Group-Object OwningProcess | Sort-Object Count -Descending | Select-Object -First 15)
+        return @{ total = $udp.Count; groups = $groups; via = 'cim' }
+    } catch {
+        $cimErr = $_.Exception.Message
+    }
+    # Fallback: netstat parsing (no CIM dependency).
+    try {
+        $pids = @()
+        foreach ($line in (netstat -ano -p udp)) {
+            if ($line -match '^\s*UDP\s+\S+\s+\S+\s+(\d+)\s*$') { $pids += $Matches[1] }
+        }
+        $groups = @($pids | Group-Object | Sort-Object Count -Descending | Select-Object -First 15)
+        return @{ total = $pids.Count; groups = $groups; via = ("netstat (cim failed: $cimErr)") }
+    } catch {
+        throw "both cim and netstat snapshots failed: $cimErr / $($_.Exception.Message)"
+    }
+}
+
 try {
-    $udp = @(Get-NetUDPEndpoint -ErrorAction Stop)
-    $lines += "total UDP endpoints: $($udp.Count)"
-    $groups = $udp | Group-Object OwningProcess | Sort-Object Count -Descending | Select-Object -First 15
+    $snap = Get-UdpOwnerGroups
+    $lines += "total UDP endpoints: $($snap.total) via $($snap.via)"
+    $groups = $snap.groups
     foreach ($g in $groups) {
+        if (-not $g.Name) { $lines += ("pid=? udp={0} (no owner)" -f $g.Count); continue }
         try {
             $proc = Get-Process -Id $g.Name -ErrorAction Stop
             $started = '?'
