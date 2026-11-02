@@ -12,6 +12,8 @@ Research: `RESEARCH.md` in this directory. No code written; sibling untouched.
 - Q3: answered by verification -- phone route is Tailnet HTTPS (secure
   context satisfied).
 - Q5: NO auto-send, ever for v1. Dictation fills the textarea; the user
+- Meta STT key source (owner, 2026-11-02): the SAME Meta API key already
+  used for model runs (session key). No separate STT credential.
   reviews AND can edit before Send (STT is never trusted verbatim).
 
 1. **Browser-vendor cloud STT acceptable?** The recommended free path (Web Speech
