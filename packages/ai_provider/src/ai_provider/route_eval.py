@@ -8,6 +8,11 @@ nothing further. Prompts are synthetic and carry no repository content
 deterministic bare-namespace exec (temperature 0.0, one attempt per task, no
 retries), and usage plus a planning-only cost estimate are recorded when the
 provider reports usage.
+
+Model selection is caller-owned: ``main()`` walks explicit per-route
+candidates from a ``--candidates`` file, and ``scripts/l3_ladder.py``
+resolves those candidates through the orchestrator catalog with cost-tier
+gating (ADR-080). This module never substitutes its own picks.
 """
 
 from __future__ import annotations
@@ -20,10 +25,10 @@ import re
 import threading
 import time
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 from ai_provider import route_probe
-from ai_provider.adapters.baseten import BASETEN_HACKATHON_MODEL
 from ai_provider.adapters.openai_compatible import _zero_price_row
 from ai_provider.config import BackendConfig, ProviderKind
 from ai_provider.contracts import AIMessage, AIRequest, MessageRole, PrivacyClass
@@ -56,7 +61,10 @@ TASK_T1 = (
     "clamp(5, 0, 10) == 5; clamp(-3, 0, 10) == 0; "
     "retry_delay_ms(100, 2, 0) == 100; retry_delay_ms(100, 2, 3) == 800."
 )
-MAX_OUTPUT_TOKENS_T1 = 2048
+# Raised 2026-11-02 (was 2048): dots-studio T1 hit exactly 2048 output
+# tokens (truncated FAIL); per docs/limits-register.md the headroom is cheaper
+# than a rerun.
+MAX_OUTPUT_TOKENS_T1 = 4096
 
 TASK_T2 = (
     "This function has a bug: is_retryable(500) should be True but it returns "
@@ -86,7 +94,10 @@ TASK_T3 = (
     "For example, mean([2, 4]) is 3.0, and stragglers([0, 10], 1) returns both "
     "inputs in order. (Illustrative only; grading uses other values.)"
 )
-MAX_OUTPUT_TOKENS_T3 = 4096
+# 2026-11-02 live evidence: Meta muse-spark-1.3 and the Baseten open model both
+# hit exactly 4096 output tokens on T3 (truncated FAIL); 16384 matches the repo
+# convention for coding-sized outputs (see docs/limits-register.md).
+MAX_OUTPUT_TOKENS_T3 = 16384
 
 TASKS: tuple[str, ...] = ("T0", "T1", "T2", "T3")
 
@@ -399,7 +410,7 @@ def _short_error(error: Exception) -> str:
 
 
 _FREE_TIER_ROUTES = frozenset({"openrouter", "requesty"})
-"""Routes whose model selection enforces free-tier picks (see select_model)."""
+"""Routes whose model selection enforces free-tier picks (see list_free_candidates)."""
 
 _SPARK_STANDARD_PER_MTOK = (1.25, 4.25)
 """Planning-only Meta rate: $1.25 input / $4.25 output per M tokens."""
@@ -444,8 +455,18 @@ def _is_parked_refusal(error: Exception) -> bool:
     return bool(_PARKED_STATUS.search(str(error)))
 
 
-def run_eval(client: Any, route: str, model: str, *, task_id: str = "T0") -> EvalResult:
-    """Send one ladder task through one client and grade deterministically."""
+def run_eval(
+    client: Any,
+    route: str,
+    model: str,
+    *,
+    task_id: str = "T0",
+    max_output_tokens: int | None = None,
+) -> EvalResult:
+    """Send one ladder task through one client and grade deterministically.
+
+    ``max_output_tokens`` overrides the task spec cap for this attempt only.
+    """
     spec = TASK_SPECS.get(task_id)
     if spec is None:
         raise ValueError(f"unknown route-eval task: {task_id!r}")
@@ -453,7 +474,9 @@ def run_eval(client: Any, route: str, model: str, *, task_id: str = "T0") -> Eva
     request = AIRequest(
         messages=(AIMessage(MessageRole.USER, spec.prompt),),
         temperature=0.0,
-        max_output_tokens=spec.max_output_tokens,
+        max_output_tokens=(
+            max_output_tokens if max_output_tokens is not None else spec.max_output_tokens
+        ),
         privacy_class=PrivacyClass.PUBLIC_OR_LOW_RISK,
         # Fixed synthetic prompt: satisfies the ADR-063 public attestation
         # branch of the OpenRouter free-tier retention guard.
@@ -492,6 +515,7 @@ def run_ladder(
     *,
     tasks: tuple[str, ...] = TASKS,
     stop_on_fail: bool = True,
+    max_output_tokens: dict[str, int] | None = None,
 ) -> list[EvalResult]:
     """Attempt ladder tasks in order; PASS-gated by default.
 
@@ -499,11 +523,13 @@ def run_ladder(
     ladder so a failing route spends nothing further. Pass
     ``stop_on_fail=False`` to collect a full card on $0 free-tier routes.
     Results stay in task order, so evidence consumers read the last row per
-    route as the ladder verdict.
+    route as the ladder verdict. ``max_output_tokens`` maps task ids to
+    per-run cap overrides so a wrong cap never forces a code-change rerun.
     """
     results = []
     for task_id in tasks:
-        result = run_eval(client, route, model, task_id=task_id)
+        override = (max_output_tokens or {}).get(task_id)
+        result = run_eval(client, route, model, task_id=task_id, max_output_tokens=override)
         results.append(result)
         if stop_on_fail and not result.passed:
             break
@@ -577,29 +603,25 @@ def _list_model_ids(route: str, credentials: dict[str, str | None]) -> list[str]
     return [str(item) for item in ids if item]
 
 
-def select_model(route: str, credentials: dict[str, str | None]) -> str | None:
-    """Cheapest defensible model id per route, or None to skip the route."""
-    if route == "meta":
-        return "muse-spark-1.3"
-    if route == "baseten":
-        return BASETEN_HACKATHON_MODEL
+def list_free_candidates(route: str, credentials: dict[str, str | None]) -> list[str]:
+    """Live $0-verified model ids for free-tier routes; [] elsewhere or empty.
+
+    OpenRouter picks ``:free`` ids in list order; Requesty applies the same
+    zero-price rule the completion guard enforces live. Paid and allowance
+    routes resolve from the orchestrator catalog instead (see
+    ``scripts/l3_ladder.py``), never from live invention: unknown paid
+    models must not be auto-tried.
+    """
     if route == "requesty":
         # Same zero-price rule the completion guard enforces live.
         rows = _list_rows(route, credentials)
-        free = [
+        return [
             row["id"] for row in rows if isinstance(row.get("id"), str) and _zero_price_row(row)
         ]
-        return free[0] if free else None
-    ids = _list_model_ids(route, credentials)
     if route == "openrouter":
-        free = [item for item in ids if item.endswith(":free")]
-        return free[0] if free else None
-    if route == "opencode_go":
-        cheap = [
-            item for item in ids if any(tag in item.lower() for tag in ("flash", "mini", "haiku"))
-        ]
-        return (cheap or ids or [None])[0]
-    return None
+        ids = _list_model_ids(route, credentials)
+        return [item for item in ids if item.endswith(":free")]
+    return []
 
 
 _PROVIDERS: dict[str, tuple[ProviderKind, str, float, bool]] = {
@@ -631,39 +653,79 @@ def _clients(credentials: dict[str, str | None]) -> dict[str, Callable[[str], An
     return {route: make(route) for route in _PROVIDERS}
 
 
-def run_all(
-    credentials: dict[str, str | None], *, tasks: tuple[str, ...] = TASKS
+def run_candidate_ladder(
+    build: Callable[[str], Any],
+    route: str,
+    models: list[str],
+    *,
+    tasks: tuple[str, ...] = TASKS,
+    max_attempts: int = 3,
+    stop_on_fail: bool = True,
+    max_output_tokens: dict[str, int] | None = None,
 ) -> list[EvalResult]:
-    """Run the ladder on every route with a selectable model; skips recorded."""
+    """Attempt ordered candidates until one is reached; record every attempt.
+
+    The first candidate that returns a gradeable answer (no transport error)
+    runs the rest of its ladder; transport/refusal errors record one row and
+    move to the next candidate, up to ``max_attempts``. An empty list records
+    a ``no-model`` skip. Callers resolve and tier-gate the candidate order;
+    this walk never substitutes its own picks.
+    """
     gate = tasks[0] if tasks else "T0"
-    factories = _clients(credentials)
-    results = []
-    for route, build in factories.items():
-        try:
-            model = select_model(route, credentials)
-        except Exception as error:
-            results.append(
-                EvalResult(
+    overrides = max_output_tokens or {}
+    results: list[EvalResult] = []
+    for model in list(models)[: max(0, max_attempts)]:
+        client = build(model)
+        first = run_eval(client, route, model, task_id=gate, max_output_tokens=overrides.get(gate))
+        results.append(first)
+        if first.error is not None:
+            continue
+        if first.passed or not stop_on_fail:
+            results.extend(
+                run_ladder(
+                    client,
                     route,
-                    "?",
-                    _utc_now(),
-                    False,
-                    None,
-                    None,
-                    None,
-                    f"select:{type(error).__name__}",
-                    task_id=gate,
+                    model,
+                    tasks=tasks[1:],
+                    stop_on_fail=stop_on_fail,
+                    max_output_tokens=max_output_tokens,
                 )
             )
-            continue
-        if model is None:
-            results.append(
-                EvalResult(
-                    route, "?", _utc_now(), False, None, None, None, "no-model", task_id=gate
-                )
+        return results
+    if not results:
+        results.append(
+            EvalResult(route, "?", _utc_now(), False, None, None, None, "no-model", task_id=gate)
+        )
+    return results
+
+
+def run_all(
+    credentials: dict[str, str | None],
+    *,
+    tasks: tuple[str, ...] = TASKS,
+    models: dict[str, list[str]],
+    routes: list[str] | tuple[str, ...] | None = None,
+    max_attempts: int = 3,
+    stop_on_fail: bool = True,
+    max_output_tokens: dict[str, int] | None = None,
+) -> list[EvalResult]:
+    """Walk explicit per-route candidates; every skip recorded, never imputed."""
+    factories = _clients(credentials)
+    wanted = list(routes) if routes is not None else list(factories)
+    results: list[EvalResult] = []
+    for route in wanted:
+        build = factories[route]
+        results.extend(
+            run_candidate_ladder(
+                build,
+                route,
+                models.get(route, []),
+                tasks=tasks,
+                max_attempts=max_attempts,
+                stop_on_fail=stop_on_fail,
+                max_output_tokens=max_output_tokens,
             )
-            continue
-        results.extend(run_ladder(build(model), route, model, tasks=tasks))
+        )
     return results
 
 
@@ -680,14 +742,75 @@ def _snapshot_name(tasks: tuple[str, ...], stamp: str) -> str:
     return f"route-eval-{label}-{stamp}.json"
 
 
+def parse_output_overrides(entries: list[str] | None) -> dict[str, int]:
+    """Parse ``--max-output-tokens`` TASK:N entries into per-task caps."""
+    overrides: dict[str, int] = {}
+    for entry in entries or []:
+        task_id, sep, raw = entry.partition(":")
+        try:
+            value = int(raw) if sep else -1
+        except ValueError:
+            value = -1
+        if task_id not in TASK_SPECS or value <= 0:
+            raise ValueError(
+                f"bad --max-output-tokens entry {entry!r}: want TASK:N with a positive "
+                f"integer (choose from {' '.join(TASKS)})"
+            )
+        overrides[task_id] = value
+    return overrides
+
+
+def load_candidates(path: Path) -> dict[str, list[str]]:
+    """Read a ``{route: [models...]}`` candidates file; ValueError on any problem."""
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise ValueError(f"bad --candidates file {path}: {exc}") from exc
+    if not isinstance(raw, dict):
+        raise ValueError(f"bad --candidates file {path}: want a {{route: [models]}} object")
+    candidates: dict[str, list[str]] = {}
+    for route, models in raw.items():
+        if route not in _PROVIDERS:
+            raise ValueError(
+                f"bad --candidates file {path}: unknown route {route!r} "
+                f"(choose from {', '.join(_PROVIDERS)})"
+            )
+        if not isinstance(models, list) or any(
+            not isinstance(item, str) or not item.strip() for item in models
+        ):
+            raise ValueError(
+                f"bad --candidates file {path}: route {route!r} wants a list of model ids"
+            )
+        candidates[route] = [item.strip() for item in models]
+    return candidates
+
+
+def write_results_snapshot(
+    results: list[EvalResult], tasks: tuple[str, ...], snapshot_dir: Path
+) -> Path:
+    """Write one dated results snapshot; return its path."""
+    snapshot_dir.mkdir(parents=True, exist_ok=True)
+    stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+    snapshot = snapshot_dir / _snapshot_name(tasks, stamp)
+    snapshot.write_text(
+        json.dumps([item.to_dict() for item in results], indent=2), encoding="utf-8"
+    )
+    return snapshot
+
+
 def main(argv: list[str] | None = None) -> int:
-    """Live CLI: run the ladder on reachable routes, write a dated snapshot."""
+    """Live CLI: walk explicit per-route candidates, write a dated snapshot."""
     import os
-    from pathlib import Path
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--snapshot-dir", type=Path, default=Path("artifacts/route-evals"))
     parser.add_argument("--routes", nargs="*", default=None)
+    parser.add_argument(
+        "--candidates",
+        type=Path,
+        default=None,
+        help="JSON {route: [models...]} candidates file (required; see scripts/l3_ladder.py)",
+    )
     parser.add_argument(
         "--tasks",
         nargs="*",
@@ -699,12 +822,36 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="run every requested task even after a FAIL (default: PASS-gated)",
     )
+    parser.add_argument(
+        "--max-output-tokens",
+        nargs="*",
+        default=None,
+        metavar="TASK:N",
+        help="per-task output cap overrides, e.g. T3:16384 (default: task specs)",
+    )
+    parser.add_argument(
+        "--max-candidates",
+        type=int,
+        default=3,
+        help="walk attempts per route before moving on (default: 3)",
+    )
     args = parser.parse_args(argv)
     tasks = tuple(args.tasks) if args.tasks is not None else TASKS
     unknown = [task for task in tasks if task not in TASK_SPECS]
     if unknown:
         parser.error(f"unknown task id(s): {', '.join(unknown)} (choose from {' '.join(TASKS)})")
-    gate = tasks[0] if tasks else "T0"
+    try:
+        overrides = parse_output_overrides(args.max_output_tokens)
+    except ValueError as exc:
+        parser.error(str(exc))
+    if args.max_candidates < 1:
+        parser.error("--max-candidates must be at least 1")
+    if args.candidates is None:
+        parser.error("--candidates PATH is required (JSON {route: [models...]})")
+    try:
+        candidates = load_candidates(args.candidates)
+    except ValueError as exc:
+        parser.error(str(exc))
     load_dotenv()
     credentials = {
         name: os.getenv(name) or None
@@ -717,32 +864,26 @@ def main(argv: list[str] | None = None) -> int:
         )
     }
     factories = _clients(credentials)
-    wanted = args.routes or list(factories)
-    results = []
+    wanted = args.routes or list(candidates)
+    unknown_routes = [route for route in wanted if route not in factories]
+    if unknown_routes:
+        parser.error(
+            f"unknown route(s): {', '.join(unknown_routes)} (choose from {', '.join(factories)})"
+        )
+    results: list[EvalResult] = []
     for route in wanted:
-        model = select_model(route, credentials)
-        if model is None:
-            results.append(
-                EvalResult(
-                    route, "?", _utc_now(), False, None, None, None, "no-model", task_id=gate
-                )
-            )
-            continue
         results.extend(
-            run_ladder(
-                factories[route](model),
+            run_candidate_ladder(
+                factories[route],
                 route,
-                model,
+                candidates.get(route, []),
                 tasks=tasks,
+                max_attempts=args.max_candidates,
                 stop_on_fail=not args.continue_past_fail,
+                max_output_tokens=overrides,
             )
         )
-    args.snapshot_dir.mkdir(parents=True, exist_ok=True)
-    stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
-    snapshot = args.snapshot_dir / _snapshot_name(tasks, stamp)
-    snapshot.write_text(
-        json.dumps([item.to_dict() for item in results], indent=2), encoding="utf-8"
-    )
+    snapshot = write_results_snapshot(results, tasks, args.snapshot_dir)
     for item in results:
         print(item.summary())
     print(f"snapshot: {snapshot}")

@@ -1,5 +1,6 @@
 """Eval ladder grading and gating; clients mocked, no network and no inference."""
 
+import json
 import time
 from types import SimpleNamespace
 
@@ -14,9 +15,12 @@ from ai_provider.route_eval import (
     check_t2,
     check_t3,
     estimate_cost_usd,
+    list_free_candidates,
+    parse_output_overrides,
+    run_all,
+    run_candidate_ladder,
     run_eval,
     run_ladder,
-    select_model,
 )
 
 T1_GOOD = (
@@ -312,9 +316,9 @@ def test_run_eval_tolerates_missing_usage():
     ("task_id", "answer", "cap"),
     [
         ("T0", "```python\ndef add2(x):\n    return x + 2\n```", 1024),
-        ("T1", T1_GOOD, 2048),
+        ("T1", T1_GOOD, 4096),
         ("T2", T2_GOOD, 2048),
-        ("T3", T3_GOOD, 4096),
+        ("T3", T3_GOOD, 16384),
     ],
 )
 def test_run_eval_grades_each_task_with_its_cap(task_id, answer, cap):
@@ -496,34 +500,216 @@ def test_main_rejects_unknown_task_id(capsys):
     assert "unknown task id" in capsys.readouterr().err
 
 
-def test_select_model_pins_funded_routes(monkeypatch):
+def test_list_free_candidates_empty_without_rows(monkeypatch):
     monkeypatch.setattr(
         route_eval,
-        "_list_model_ids",
-        lambda route, creds: (_ for _ in ()).throw(AssertionError("no fetch")),
+        "_list_rows",
+        lambda route, creds: [],
     )
-    assert select_model("meta", {}) == "muse-spark-1.3"
-    assert select_model("baseten", {}) == route_eval.BASETEN_HACKATHON_MODEL
+    assert list_free_candidates("openrouter", {}) == []
+    assert list_free_candidates("requesty", {}) == []
 
 
-def test_select_model_prefers_free_and_cheap_ids(monkeypatch):
+def test_list_free_candidates_prefers_free_ids(monkeypatch):
     monkeypatch.setattr(
         route_eval, "_list_model_ids", lambda route, creds: ["a/big", "b/small:free", "c/flash"]
     )
-    assert select_model("openrouter", {}) == "b/small:free"
-    assert select_model("opencode_go", {}) == "c/flash"
+    assert list_free_candidates("openrouter", {}) == ["b/small:free"]
+    assert list_free_candidates("opencode_go", {}) == []
     monkeypatch.setattr(route_eval, "_list_model_ids", lambda route, creds: ["a/big"])
-    assert select_model("opencode_go", {}) == "a/big"
+    assert list_free_candidates("meta", {}) == []
     monkeypatch.setattr(route_eval, "_list_model_ids", lambda route, creds: [])
-    assert select_model("openrouter", {}) is None
+    assert list_free_candidates("openrouter", {}) == []
 
 
-def test_select_model_uses_zero_price_rows_for_requesty(monkeypatch):
+def test_list_free_candidates_uses_zero_price_rows(monkeypatch):
     rows = [
         {"id": "paid", "api": "chat", "pricing": [], "input_price": "1", "output_price": "2"},
         {"id": "freebie", "api": "chat", "pricing": [], "input_price": "0", "output_price": "0"},
     ]
     monkeypatch.setattr(route_eval, "_list_rows", lambda route, creds: rows)
-    assert select_model("requesty", {}) == "freebie"
+    assert list_free_candidates("requesty", {}) == ["freebie"]
     monkeypatch.setattr(route_eval, "_list_rows", lambda route, creds: rows[:1])
-    assert select_model("requesty", {}) is None
+    assert list_free_candidates("requesty", {}) == []
+
+
+def test_parse_output_overrides_reads_task_caps():
+    assert parse_output_overrides(None) == {}
+    assert parse_output_overrides([]) == {}
+    assert parse_output_overrides(["T3:16384"]) == {"T3": 16384}
+    assert parse_output_overrides(["T0:512", "T3:8192"]) == {"T0": 512, "T3": 8192}
+
+
+@pytest.mark.parametrize("entry", ["T9:100", "T3", "T3:abc", "T3:0", "T3:-5", ":100"])
+def test_parse_output_overrides_rejects_bad_entries(entry):
+    with pytest.raises(ValueError, match="max-output-tokens"):
+        parse_output_overrides([entry])
+
+
+def test_run_eval_applies_cap_override():
+    calls = []
+
+    class Client:
+        def complete(self, request):
+            calls.append(request)
+            return SimpleNamespace(
+                message=SimpleNamespace(content=T3_GOOD),
+                usage=SimpleNamespace(input_tokens=10, output_tokens=20),
+            )
+
+    result = run_eval(Client(), "r", "m", task_id="T3", max_output_tokens=777)
+    assert result.passed is True
+    assert calls[0].max_output_tokens == 777
+
+
+def test_run_ladder_passes_cap_overrides_through():
+    client = ScriptedClient(
+        [
+            ("def add2", "```python\ndef add2(x):\n    return x + 2\n```"),
+            ("retry_delay_ms", T1_GOOD),
+        ]
+    )
+    run_ladder(client, "r", "m", tasks=("T0", "T1"), max_output_tokens={"T1": 999})
+    assert [request.max_output_tokens for request in client.calls] == [1024, 999]
+
+
+def test_main_rejects_bad_cap_override(capsys):
+    with pytest.raises(SystemExit) as exc:
+        route_eval.main(["--max-output-tokens", "T9:100"])
+    assert exc.value.code == 2
+    assert "max-output-tokens" in capsys.readouterr().err
+
+
+def test_run_candidate_ladder_skips_erroring_models():
+    seen = []
+
+    def build(model):
+        seen.append(model)
+        if model == "dead":
+            return ScriptedClient([("def add2", ConnectionError("HTTP Error 503"))])
+        return ScriptedClient(_LADDER_MARKS)
+
+    results = run_candidate_ladder(build, "r", ["dead", "alive"], tasks=("T0", "T1"))
+    assert seen == ["dead", "alive"]
+    assert [(item.model, item.task_id) for item in results] == [
+        ("dead", "T0"),
+        ("alive", "T0"),
+        ("alive", "T1"),
+    ]
+    assert results[0].error is not None and "503" in results[0].error
+    assert results[1].passed and results[2].passed
+
+
+def test_run_candidate_ladder_stops_at_max_attempts():
+    def build(model):
+        return ScriptedClient([("def add2", ConnectionError("down"))])
+
+    results = run_candidate_ladder(build, "r", ["a", "b", "c", "d"], tasks=("T0",))
+    assert [item.model for item in results] == ["a", "b", "c"]
+    assert all(item.error for item in results)
+
+
+def test_run_candidate_ladder_empty_models_records_skip():
+    def build(model):
+        raise AssertionError("must not build without candidates")
+
+    results = run_candidate_ladder(build, "r", [], tasks=("T0",))
+    assert [(item.model, item.error, item.task_id) for item in results] == [("?", "no-model", "T0")]
+
+
+def test_run_candidate_ladder_graded_fail_ends_walk():
+    seen = []
+
+    def build(model):
+        seen.append(model)
+        return ScriptedClient([("def add2", "I cannot do that.")])
+
+    results = run_candidate_ladder(build, "r", ["m1", "m2"], tasks=("T0", "T1"))
+    assert seen == ["m1"]
+    assert len(results) == 1
+    assert (results[0].passed, results[0].error) == (False, None)
+
+
+def test_run_all_walks_explicit_models(monkeypatch):
+    monkeypatch.setattr(
+        route_eval, "_clients", lambda creds: {"r": lambda model: ScriptedClient(_LADDER_MARKS)}
+    )
+    results = run_all({}, models={"r": ["m1"]}, tasks=("T0",))
+    assert [(item.route, item.model, item.passed) for item in results] == [("r", "m1", True)]
+    skipped = run_all({}, models={}, tasks=("T0",))
+    assert [(item.model, item.error) for item in skipped] == [("?", "no-model")]
+
+
+def test_main_requires_candidates_file(capsys):
+    with pytest.raises(SystemExit) as exc:
+        route_eval.main(["--tasks", "T0"])
+    assert exc.value.code == 2
+    assert "--candidates" in capsys.readouterr().err
+
+
+def test_main_rejects_missing_candidates_file(capsys, tmp_path):
+    with pytest.raises(SystemExit) as exc:
+        route_eval.main(["--candidates", str(tmp_path / "nope.json")])
+    assert exc.value.code == 2
+    assert "--candidates" in capsys.readouterr().err
+
+
+def test_main_rejects_bad_candidates_file(capsys, tmp_path):
+    bad = tmp_path / "c.json"
+    bad.write_text("{not json", encoding="utf-8")
+    with pytest.raises(SystemExit) as exc:
+        route_eval.main(["--candidates", str(bad)])
+    assert exc.value.code == 2
+    bad.write_text(json.dumps({"nope": ["m"]}), encoding="utf-8")
+    with pytest.raises(SystemExit) as exc:
+        route_eval.main(["--candidates", str(bad)])
+    assert exc.value.code == 2
+
+
+def test_main_rejects_unknown_route(capsys, tmp_path):
+    cand = tmp_path / "c.json"
+    cand.write_text(json.dumps({"meta": ["m"]}), encoding="utf-8")
+    with pytest.raises(SystemExit) as exc:
+        route_eval.main(["--candidates", str(cand), "--routes", "nope"])
+    assert exc.value.code == 2
+    assert "unknown route" in capsys.readouterr().err
+
+
+def test_main_runs_explicit_candidates_offline(monkeypatch, tmp_path, capsys):
+    cand = tmp_path / "c.json"
+    cand.write_text(json.dumps({"meta": ["m1"]}), encoding="utf-8")
+    monkeypatch.setattr(
+        route_eval,
+        "_clients",
+        lambda creds: {"meta": lambda model: ScriptedClient(_LADDER_MARKS)},
+    )
+    code = route_eval.main(
+        ["--candidates", str(cand), "--snapshot-dir", str(tmp_path / "snap"), "--tasks", "T0"]
+    )
+    assert code == 0
+    out = capsys.readouterr().out
+    assert "meta/T0 (m1): PASS" in out
+    assert "snapshot:" in out
+    assert list((tmp_path / "snap").glob("route-eval-T0-*.json")) != []
+
+
+def test_write_results_snapshot_writes_dated_file(tmp_path):
+    results = [EvalResult("r", "m", "2026-11-02T00:00:00+00:00", True, 7, 1, 2, None, "T0", 0.0)]
+    snapshot = route_eval.write_results_snapshot(results, ("T0",), tmp_path)
+    assert snapshot.name.startswith("route-eval-T0-")
+    assert json.loads(snapshot.read_text(encoding="utf-8"))[0]["model"] == "m"
+
+
+def test_run_all_routes_filter_skips_unwanted(monkeypatch):
+    seen = []
+
+    def fake_clients(creds):
+        return {
+            name: (lambda model, _n=name: seen.append(_n) or ScriptedClient(_LADDER_MARKS))
+            for name in ("a", "b")
+        }
+
+    monkeypatch.setattr(route_eval, "_clients", fake_clients)
+    results = run_all({}, models={"a": ["m"], "b": ["m"]}, routes=["b"], tasks=("T0",))
+    assert seen == ["b"]
+    assert [(item.route, item.model) for item in results] == [("b", "m")]
