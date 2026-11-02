@@ -81,12 +81,12 @@ app until a later wired slice the owner approves.
    **owner key funds the pool**, consumption **judge-visible**. Until
    wired, the funded judge path stays disabled exactly as today.
 
-## Open re-evaluation (owner note, 2026-11-02)
+## Resolved: BYOK-only (owner, 2026-11-02)
 
-Organizers confirmed it is acceptable to REQUIRE judges to BYOK. Re-evaluate
-whether the pool needs funding at all -- possibly only if the submission is
-shared publicly (e.g. to X), where frictionless access matters. Until this
-is resolved: **no wiring, no funding**. BYOK-only remains the default.
+Organizers confirmed judges may be REQUIRED to BYOK, so the pool stays
+unfunded and unwired. Revisit the public pool only when the X-sharing
+decision is made. The D1 amount band and D3 billing/visibility decisions
+stand as the fallback design if funding is ever approved.
 
 ## Open questions for the owner
 
