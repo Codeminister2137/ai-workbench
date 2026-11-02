@@ -779,3 +779,34 @@ def test_poll_http_status_error_fails_fast_without_retry(tmp_path, status_code):
     with pytest.raises(OperatorBridgeError, match="Failed to poll"):
         bridge(_tool_call(), ToolCategory.WRITE)
     assert methods == ["POST", "GET"]
+
+
+@pytest.mark.parametrize(
+    ("timeout_seconds", "expected"),
+    [(300.0, (290, 300)), (10.0, (30, 30)), (7200.0, (3600, 3600))],
+)
+def test_submit_sends_expires_seconds_from_local_deadline(tmp_path, timeout_seconds, expected):
+    bodies = []
+    binding = {}
+
+    def handle(request):
+        if request.method == "POST":
+            body = json.loads(request.content)
+            bodies.append(body)
+            binding.update(id="a" * 32, **body)
+            return httpx.Response(200, json={"id": binding["id"], "status": "submitted"})
+        return httpx.Response(200, json={**binding, "status": "approved"})
+
+    bridge = OperatorApprovalBridge(
+        "http://synthetic.invalid",
+        "synthetic-token",
+        tmp_path,
+        timeout_seconds=timeout_seconds,
+        client_factory=lambda **kwargs: httpx.Client(
+            transport=httpx.MockTransport(handle), **kwargs
+        ),
+    )
+    assert bridge(_tool_call(), ToolCategory.WRITE) is True
+    assert len(bodies) == 1
+    low, high = expected
+    assert low <= bodies[0]["expires_seconds"] <= high

@@ -142,6 +142,10 @@ class OperatorApprovalBridge:
                     json={
                         "description": description,
                         **binding,
+                        # Align the server-side window with the local
+                        # deadline so the phone shows the window the bridge
+                        # actually waits; the server clamps to [30, 3600].
+                        "expires_seconds": max(30, min(3600, int(remaining()))),
                     },
                     timeout=remaining(),
                 )
