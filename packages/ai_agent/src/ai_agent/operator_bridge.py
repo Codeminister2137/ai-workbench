@@ -224,7 +224,17 @@ class OperatorApprovalBridge:
                     headers=self.headers,
                     timeout=remaining(),
                 )
-                response.raise_for_status()
+                try:
+                    response.raise_for_status()
+                except httpx.HTTPStatusError as exc:
+                    # A 502/503/504 mid-poll (e.g. operator redeploy) is as
+                    # transient as a transport blip: retry on the normal poll
+                    # cadence until the deadline. Other statuses fail fast.
+                    if exc.response.status_code not in (502, 503, 504):
+                        raise
+                    remaining()
+                    time.sleep(min(self.poll_interval, remaining()))
+                    continue
                 remaining()
                 action = response.json()
                 if not isinstance(action, dict):

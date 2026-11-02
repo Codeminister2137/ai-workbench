@@ -810,3 +810,30 @@ def test_submit_sends_expires_seconds_from_local_deadline(tmp_path, timeout_seco
     assert len(bodies) == 1
     low, high = expected
     assert low <= bodies[0]["expires_seconds"] <= high
+
+
+@pytest.mark.parametrize("status_code", [502, 503, 504])
+def test_poll_retries_transient_5xx_until_approval(tmp_path, status_code):
+    binding = {}
+    methods = []
+
+    def handle(request):
+        methods.append(request.method)
+        if request.method == "POST":
+            binding.update(id="a" * 32, **json.loads(request.content))
+            return httpx.Response(200, json={"id": binding["id"], "status": "submitted"})
+        if methods.count("GET") <= 2:
+            return httpx.Response(status_code, json={"detail": "simulated transient 5xx"})
+        return httpx.Response(200, json={**binding, "status": "approved"})
+
+    bridge = OperatorApprovalBridge(
+        "http://synthetic.invalid",
+        "synthetic-token",
+        tmp_path,
+        poll_interval_seconds=0.01,
+        client_factory=lambda **kwargs: httpx.Client(
+            transport=httpx.MockTransport(handle), **kwargs
+        ),
+    )
+    assert bridge(_tool_call(), ToolCategory.WRITE) is True
+    assert methods == ["POST", "GET", "GET", "GET"]
