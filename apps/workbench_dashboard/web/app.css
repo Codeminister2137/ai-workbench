@@ -23,3 +23,10 @@ button { font: inherit; cursor: pointer; }
 ul.plain { list-style: none; padding-left: 0; }
 ul.plain li { margin-bottom: 0.4rem; }
 @media (max-width: 700px) { .columns { grid-template-columns: 1fr; } }
+.pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: .85rem; }
+.st-new, .st-open { background: rgba(138, 181, 255, .15); color: #8ab5ff; }
+.st-reviewing, .st-answered { background: rgba(255, 212, 135, .15); color: #ffd487; }
+.st-adopted, .st-merged, .st-live, .st-complete { background: rgba(138, 223, 160, .15); color: #8adfa0; }
+.st-parked, .st-closed { background: rgba(181, 195, 218, .15); color: #b5c3da; }
+.st-declined { background: rgba(255, 138, 138, .15); color: #ff8a8a; }
+abbr[title] { text-decoration: underline dotted; cursor: help; }

@@ -163,6 +163,12 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             if path.startswith("/api/chat/sessions/") and path.endswith("/messages"):
                 session_id = path[len("/api/chat/sessions/") : -len("/messages")]
                 return self._post_chat_message(config, session_id, payload)
+            if path.startswith("/api/chat/sessions/") and path.endswith("/rename"):
+                session_id = path[len("/api/chat/sessions/") : -len("/rename")]
+                return self._rename_chat_session(config, session_id, payload)
+            if path.startswith("/api/chat/sessions/") and path.endswith("/delete"):
+                session_id = path[len("/api/chat/sessions/") : -len("/delete")]
+                return self._delete_chat_session(config, session_id)
             if path == "/api/inbox":
                 return self._create_inbox_task(payload)
             if path == "/api/ideas":
@@ -276,6 +282,23 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 "model": outcome.model,
             }
         )
+
+    def _rename_chat_session(self, config: DashboardConfig, session_id: str, payload: dict) -> None:
+        title = payload.get("title", "")
+        if not isinstance(title, str) or not title.strip():
+            return self._send_json({"ok": False, "error": "Title must not be empty"}, status=400)
+        try:
+            record = self._chat(config).rename_session(session_id, title=title)
+        except ValueError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=404)
+        self._send_json({"ok": True, "id": record.session_id, "title": record.title})
+
+    def _delete_chat_session(self, config: DashboardConfig, session_id: str) -> None:
+        try:
+            self._chat(config).delete_session(session_id)
+        except ValueError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=404)
+        self._send_json({"ok": True, "id": session_id})
 
     def _send_collection(self, collection, query: str) -> None:
         params = parse_qs(query)
