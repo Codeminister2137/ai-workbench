@@ -17,6 +17,29 @@ if TYPE_CHECKING:
 from ai_agent.contracts import ToolCall, ToolDefinition, ToolResult
 from ai_agent.tools.credential_paths import is_credential_path
 
+#: Host variables safe to expose to model-driven child processes. Everything else
+#: in the ambient environment (API keys, tokens, credentials) is withheld unless
+#: the top-level interactive owner loop explicitly opts in.
+HOST_ENV_ALLOWLIST = frozenset(
+    {
+        "PATH",
+        "PATHEXT",
+        "SYSTEMROOT",
+        "WINDIR",
+        "COMSPEC",
+        "TEMP",
+        "TMP",
+        "HOME",
+        "USERPROFILE",
+        "APPDATA",
+        "LOCALAPPDATA",
+        "PROGRAMFILES",
+        "PROGRAMFILES(X86)",
+        "LANG",
+        "LC_ALL",
+    }
+)
+
 
 @dataclass(frozen=True, slots=True)
 class ToolContext:
@@ -25,33 +48,51 @@ class ToolContext:
     workspace_root: Path
     env: dict[str, str] = field(default_factory=dict)
     delegation: DelegationScope | None = field(default=None, repr=False, compare=False)
-    inherit_environment: bool = True
+    # Explicit opt-in for the top-level interactive owner loop ONLY. Delegated
+    # child contexts (DelegationScope.depth >= 1) are always narrowed, even if
+    # True is passed; see __post_init__ and command_environment.
+    inherit_environment: bool = False
     credential_secrets: tuple[str, ...] = field(default=(), repr=False, compare=False)
 
-    def command_environment(self) -> dict[str, str]:
-        """Preserve ordinary parent behavior; delegated processes get a host allowlist."""
-        allowed = {
-            "PATH",
-            "PATHEXT",
-            "SYSTEMROOT",
-            "WINDIR",
-            "COMSPEC",
-            "TEMP",
-            "TMP",
-            "HOME",
-            "USERPROFILE",
-            "APPDATA",
-            "LOCALAPPDATA",
-            "PROGRAMFILES",
-            "PROGRAMFILES(X86)",
-            "LANG",
-            "LC_ALL",
-        }
-        environment = (
-            os.environ.copy()
-            if self.inherit_environment
-            else {name: value for name, value in os.environ.items() if name.upper() in allowed}
+    def __post_init__(self) -> None:
+        # DelegateTaskTool builds children via replace(context, delegation=child),
+        # which would otherwise carry a parent's opt-in into the child. Fail closed
+        # instead of breaking the delegation flow, so direct flag readers
+        # (ProcessTool) stay narrowed too. Depth is read structurally to avoid a
+        # base -> delegation_scope import cycle.
+        if getattr(self.delegation, "depth", 0) >= 1 and self.inherit_environment:
+            object.__setattr__(self, "inherit_environment", False)
+
+    @classmethod
+    def for_interactive_owner(
+        cls,
+        workspace_root: Path,
+        *,
+        delegation: DelegationScope | None = None,
+        env: dict[str, str] | None = None,
+    ) -> ToolContext:
+        """Build the top-level interactive owner context with ambient env.
+
+        This is the ONLY sanctioned ambient-environment opt-in. Delegated
+        children (DelegationScope.depth >= 1) are narrowed unconditionally.
+        """
+        return cls(
+            workspace_root=workspace_root,
+            env=dict(env) if env else {},
+            delegation=delegation,
+            inherit_environment=True,
         )
+
+    def command_environment(self) -> dict[str, str]:
+        """Host allowlist plus explicit context vars; ambient env is owner-only."""
+        if self.inherit_environment and getattr(self.delegation, "depth", 0) < 1:
+            environment = os.environ.copy()
+        else:
+            environment = {
+                name: value
+                for name, value in os.environ.items()
+                if name.upper() in HOST_ENV_ALLOWLIST
+            }
         environment.update(self.env)
         return environment
 

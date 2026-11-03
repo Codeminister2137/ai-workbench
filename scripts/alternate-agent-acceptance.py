@@ -11,6 +11,7 @@ import json
 import os
 import subprocess
 import sys
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -20,6 +21,38 @@ ROUTES = (
     "github/copilot-cli-auto",
     "kiro/auto",
 )
+
+#: Host variables safe to expose to acceptance children. Route credentials are
+#: added per-route; nothing else from the ambient environment is passed through.
+BASE_ENV_ALLOWLIST = frozenset(
+    {
+        "PATH",
+        "PATHEXT",
+        "SYSTEMROOT",
+        "WINDIR",
+        "COMSPEC",
+        "TEMP",
+        "TMP",
+        "HOME",
+        "USERPROFILE",
+        "APPDATA",
+        "LOCALAPPDATA",
+        "PROGRAMFILES",
+        "PROGRAMFILES(X86)",
+        "LANG",
+        "LC_ALL",
+    }
+)
+
+#: Credential/command keys each route needs. A route's agent child receives ONLY
+#: its own keys plus BASE_ENV_ALLOWLIST; other routes' secrets are withheld.
+ROUTE_ENV_KEYS = {
+    "requesty/free-google/gemma-4-31b-it": ("REQUESTY_API_KEY",),
+    "google/antigravity-gemini-3.1-pro-high": ("ANTIGRAVITY_COMMAND",),
+    "github/copilot-cli-auto": ("GITHUB_COPILOT_COMMAND",),
+    "kiro/auto": ("KIRO_COMMAND",),
+}
+
 SOURCE = "def add(a, b):\n    return a - b\n"
 TESTS = """import unittest
 from math_ops import add
@@ -39,21 +72,45 @@ if __name__ == "__main__":
 """
 
 
+def build_base_env(source: Mapping[str, str]) -> dict[str, str]:
+    """Minimal host environment for validation children (no route credentials)."""
+    return {name: value for name, value in source.items() if name.upper() in BASE_ENV_ALLOWLIST}
+
+
+def build_route_env(route: str, source: Mapping[str, str]) -> dict[str, str]:
+    """Minimal environment for one route's agent child: host allowlist plus its keys."""
+    try:
+        keys = ROUTE_ENV_KEYS[route]
+    except KeyError:
+        raise ValueError(f"Unknown acceptance route: {route!r}") from None
+    environment = build_base_env(source)
+    for key in keys:
+        if key in source:
+            environment[key] = source[key]
+    return environment
+
+
+def load_dotenv_secrets(repo: Path) -> dict[str, str]:
+    """Read route credentials from the repo .env without mutating os.environ."""
+    wanted = {key for keys in ROUTE_ENV_KEYS.values() for key in keys}
+    secrets: dict[str, str] = {}
+    for line in (repo / ".env").read_text(encoding="utf-8").splitlines():
+        name, separator, value = line.partition("=")
+        if separator and name.strip() in wanted:
+            secrets[name.strip()] = value.strip().strip("\"'")
+    return secrets
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--routes", nargs="+", choices=ROUTES, default=list(ROUTES))
     parser.add_argument("--timeout-seconds", type=float, default=180)
     args = parser.parse_args()
     repo = Path(__file__).resolve().parents[1]
-    for line in (repo / ".env").read_text(encoding="utf-8").splitlines():
-        name, separator, value = line.partition("=")
-        if separator and name.strip() in {
-            "REQUESTY_API_KEY",
-            "ANTIGRAVITY_COMMAND",
-            "GITHUB_COPILOT_COMMAND",
-            "KIRO_COMMAND",
-        }:
-            os.environ[name.strip()] = value.strip().strip("\"'")
+    # .env values override ambient ones, as before, but stay out of this process's
+    # own os.environ: every child below receives an explicit minimal env instead
+    # of inheriting the full parent environment.
+    ambient = {**os.environ, **load_dotenv_secrets(repo)}
     root = (
         repo
         / "artifacts"
@@ -73,7 +130,9 @@ def main() -> int:
             encoding="utf-8",
         )
         validation = [sys.executable, "-m", "unittest", "-q"]
-        baseline = subprocess.run(validation, cwd=fixture, capture_output=True, text=True)
+        baseline = subprocess.run(
+            validation, cwd=fixture, capture_output=True, text=True, env=build_base_env(ambient)
+        )
         assert baseline.returncode != 0, "Fixture must fail before the agent edit"
         prompt = (
             "Fix math_ops.add to perform addition. Read the file and use an actual file-edit "
@@ -118,13 +177,16 @@ def main() -> int:
                 encoding="utf-8",
                 errors="replace",
                 timeout=args.timeout_seconds,
+                env=build_route_env(route, ambient),
             )
             (fixture / "assistant.log").write_text(run.stdout + run.stderr, encoding="utf-8")
             exit_code = run.returncode
         except subprocess.TimeoutExpired:
             exit_code = None
             failure = "acceptance process timed out"
-        checked = subprocess.run(validation, cwd=fixture, capture_output=True, text=True)
+        checked = subprocess.run(
+            validation, cwd=fixture, capture_output=True, text=True, env=build_base_env(ambient)
+        )
         (fixture / "validation.log").write_text(checked.stdout + checked.stderr, encoding="utf-8")
         changed = (fixture / "math_ops.py").read_text(encoding="utf-8") != SOURCE
         tests_unchanged = test_file.read_text(encoding="utf-8") == TESTS
