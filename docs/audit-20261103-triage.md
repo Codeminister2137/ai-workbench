@@ -30,9 +30,9 @@ verification before action — several audit claims were already proven wrong
 
 ## ai-workbench/1
 
-- [HIGH] MCP stdio server crashes on tool exception — `packages/ai_agent/src/ai_agent/mcp_server.py` → **UNREVIEWED**
-- [HIGH] Delegated child uses permissive permissions — `packages/ai_agent/src/ai_agent/mcp_server.py` → **UNREVIEWED**
-- [HIGH] Delegated CLI scope also escalates to permissive — `packages/ai_agent/src/ai_agent/repo_coding_assistant.py` → **UNREVIEWED**
+- [HIGH] MCP stdio server crashes on tool exception — `packages/ai_agent/src/ai_agent/mcp_server.py` → **FALSE POSITIVE (BaseTool.run catches every Exception into an error ToolResult; only control-flow BaseExceptions propagate, correctly)**
+- [HIGH] Delegated child uses permissive permissions — `packages/ai_agent/src/ai_agent/mcp_server.py` → **FALSE POSITIVE (_GrantedTool.execute re-checks each child call against the LIVE parent permission manager; a permissive child profile cannot authorize what the parent denies)**
+- [HIGH] Delegated CLI scope also escalates to permissive — `packages/ai_agent/src/ai_agent/repo_coding_assistant.py` → **FALSE POSITIVE (same _GrantedTool parent re-check per call; see above)**
 - [MEDIUM] Fallback handoff writes files outside permission system — `packages/ai_agent/src/ai_agent/repo_coding_assistant.py` → **UNREVIEWED**
 - [MEDIUM] Process handle map accessed without lock — `packages/ai_agent/src/ai_agent/processes.py` → **UNREVIEWED**
 - [MEDIUM] Codex login subprocess can hang forever — `packages/ai_agent/src/ai_agent/repo_coding_assistant.py` → **UNREVIEWED**
@@ -95,13 +95,13 @@ verification before action — several audit claims were already proven wrong
 
 ## ai-workbench/2
 
-- [HIGH] Arbitrary shell execution via model-controlled command — `packages/ai_agent/src/ai_agent/tools/shell.py` → **UNREVIEWED**
-- [HIGH] Full parent environment inherited by model-chosen subprocess — `packages/ai_agent/src/ai_agent/tools/base.py` → **UNREVIEWED**
+- [HIGH] Arbitrary shell execution via model-controlled command — `packages/ai_agent/src/ai_agent/tools/shell.py` → **INTENDED (capability primitive behind the permission-manager + approval-callback architecture with cwd jailing; permissive only under an explicit user preset)**
+- [HIGH] Full parent environment inherited by model-chosen subprocess — `packages/ai_agent/src/ai_agent/tools/base.py` → **REAL — POST-HACKATHON (inherit_environment defaults True, so delegated children receive full ambient env incl. secrets with no gating; tool-output scrubbing is partial mitigation only; default-deny env for delegated contexts)**
 - [MEDIUM] Untrusted skill file becomes trusted model instructions — `packages/ai_agent/src/ai_agent/skills.py` → **UNREVIEWED**
 - [MEDIUM] Candidate-controlled text concatenated into reviewer prompts — `packages/ai_agent/src/ai_agent/scrutiny_workflow.py` → **UNREVIEWED**
 - [MEDIUM] Catalog base_url trusted without validation enables SSRF — `packages/ai_provider/examples/orchestrator_execution_target.py` → **UNREVIEWED**
 - [LOW] Credential-path blocklist misses common secret filenames — `packages/ai_agent/src/ai_agent/tools/credential_paths.py` → **UNREVIEWED**
-- [HIGH] Rename apply can half-succeed with no rollback — `packages/ai_agent/src/ai_agent/tools/refactor.py` → **UNREVIEWED**
+- [HIGH] Rename apply can half-succeed with no rollback — `packages/ai_agent/src/ai_agent/tools/refactor.py` → **DOWNGRADED (all hashes pre-validated before any write, per-file atomic replace, exact applied-list + shas on failure; only a crash-mid-apply leaves partial state, honestly reported)**
 - [MEDIUM] Model IDs lowercased in derived route_id — `packages/ai_orchestrator/src/ai_orchestrator/catalog.py` → **UNREVIEWED**
 - [MEDIUM] Unbounded last-message file read after Codex run — `packages/ai_orchestrator/examples/codex_cli_executor.py` → **UNREVIEWED**
 - [LOW] Git failure returned as data tuple masks errors — `packages/ai_agent/src/ai_agent/run_tracking.py` → **UNREVIEWED**
@@ -109,7 +109,7 @@ verification before action — several audit claims were already proven wrong
 
 ## ai-workbench/3
 
-- [HIGH] Unbounded provider response reads allow OOM — `packages/ai_provider/src/ai_provider/adapters/openai_compatible.py` → **UNREVIEWED**
+- [HIGH] Unbounded provider response reads allow OOM — `packages/ai_provider/src/ai_provider/adapters/openai_compatible.py` → **REAL — POST-HACKATHON (response.read() unbounded in every adapter via shared http_transport.urlopen; bound once in the transport)**
 - [MEDIUM] Codex MCP server_name TOML injection + unconstrained write — `packages/ai_provider/src/ai_provider/codex_mcp.py` → **UNREVIEWED**
 - [MEDIUM] netstat path from attacker-influenced environment — `packages/ai_provider/src/ai_provider/acceptance_processes.py` → **UNREVIEWED**
 - [MEDIUM] Closeout log injection via unsanitized route ids and CR — `packages/ai_provider/src/ai_provider/closeout.py` → **UNREVIEWED**
@@ -125,7 +125,7 @@ verification before action — several audit claims were already proven wrong
 
 - [CRITICAL] Unsafe exec of model output with escapable bare namespace — `packages/ai_provider/src/ai_provider/route_eval.py` → **REAL — POST-HACKATHON** (in-process exec of model text; builtins-stripped but dunder-escape possible; grade in subprocess sandbox)
 - [HIGH] Model-proposed shell execution via /bin/sh -c — `packages/ai_provider/src/ai_provider/repo_actions.py` → **DOWNGRADED** (only caller passes interactive authorizer; library default None is a footgun — consider required authorizer)
-- [HIGH] Full parent env (secrets) inherited by external agent child — `packages/ai_provider/src/ai_provider/foreground_tools.py` → **UNREVIEWED**
+- [HIGH] Full parent env (secrets) inherited by external agent child — `packages/ai_provider/src/ai_provider/foreground_tools.py` → **REAL — POST-HACKATHON (shared_child_env copies full os.environ to the MCP child; same delegated-env issue as the ToolContext default)**
 - [MEDIUM] Arbitrary base_url fetched without loopback/redirect guard — `packages/ai_provider/src/ai_provider/ollama_models.py` → **UNREVIEWED**
 - [MEDIUM] User prompt preview persisted to SQLite without redaction — `packages/ai_provider/src/ai_provider/orchestrated_runs.py` → **UNREVIEWED**
 - [MEDIUM] Env-controlled executable used as subprocess without validation — `packages/ai_provider/src/ai_provider/external_agents.py` → **UNREVIEWED**
@@ -278,13 +278,13 @@ verification before action — several audit claims were already proven wrong
 ## Verdict counts
 
 - BACKLOG: 3
-- DOWNGRADED: 6
-- FALSE POSITIVE: 9
+- DOWNGRADED: 7
+- FALSE POSITIVE: 12
 - FIXED: 6
-- INTENDED: 2
-- REAL — POST-HACKATHON: 3
+- INTENDED: 3
+- REAL — POST-HACKATHON: 6
 - TEST GAP CLOSED: 1
-- UNREVIEWED: 185
+- UNREVIEWED: 177
 
 ## Appendix: frontend-audit leftovers verified 2026-11-03 evening
 
