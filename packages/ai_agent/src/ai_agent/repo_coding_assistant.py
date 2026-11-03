@@ -4100,7 +4100,7 @@ def _run_native_agent(
     agent = AgentLoop(
         client,
         registry,
-        ToolContext(workspace_root=repo_root, delegation=granted),
+        ToolContext.for_interactive_owner(repo_root, delegation=granted),
         permissions=manager,
         max_iterations=args.max_action_rounds,
         deadline=getattr(getattr(args, "fallback_session", None), "deadline", None),
