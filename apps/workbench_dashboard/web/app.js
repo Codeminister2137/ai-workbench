@@ -347,21 +347,32 @@ async function renderInbox(id) {
     const options = (item.options || []).map((opt, i) =>
       `<label><input type="radio" name="opt" value="${i}"> ${esc(opt)}</label><br>`).join("");
     const refs = (item.context_refs || []).map((r) => `<li>${esc(r)}</li>`).join("");
+    const stamp = (v) => v ? esc(v.slice(0, 16).replace("T", " ")) : "";
+    const record = (item.options || []).length && item.status === "closed"
+      ? `<h3>Choices offered</h3><ol>${item.options.map((o) => `<li>${esc(o)}</li>`).join("")}</ol>` : "";
+    const decision = item.answer || item.note
+      ? `${item.answer ? `<p><strong>Answer:</strong> ${esc(item.answer)}</p>` : ""}
+         ${item.note ? `<p><strong>Note:</strong> ${esc(item.note)}</p>` : ""}
+         ${item.answered_at ? `<p class="muted">Answered ${stamp(item.answered_at)}</p>` : ""}`
+      : '<p class="muted">No answer recorded yet.</p>';
     view.innerHTML = `<h1>Inbox task</h1><p><a href="#/inbox">All tasks</a></p>
       <div class="card"><h2>${gtext(item.title)}</h2>
-      <p class="muted">${esc(item.type)} · ${esc(item.status)} · from ${esc(item.created_by || "")}</p>
+      <p class="muted">${esc(item.type)} · ${esc(item.status)} · from ${esc(item.created_by || "")} · opened ${stamp(item.created_at)}</p>
+      <h3>Request</h3>
       <p>${gtext(item.body || "")}</p>
       ${refs ? `<ul class="plain">${refs}</ul>` : ""}
-      ${(item.options || []).length ? `<p><strong>Options offered:</strong></p><ol>${item.options.map((o) => `<li>${esc(o)}</li>`).join("")}</ol>` : ""}
-      ${item.answer ? `<p><strong>Answer:</strong> ${esc(item.answer)}</p>` : ""}
-      ${item.note ? `<p><strong>Note:</strong> ${esc(item.note)}</p>` : ""}
+      ${record}
+      <h3>Decision record</h3>
+      ${decision}
       ${item.status === "closed" ? '<p class="muted">Closed; answers are immutable.</p>' : `
+      <h3>Your choices</h3>
       <form id="answer-form">
         ${options}
         ${options ? '<p class="muted">Pick one, add a note, or both — the note expands your choice.</p>' : ""}
         <div><input type="text" name="answer" placeholder="${options ? "Add a note (optional)..." : "Your answer..."}" title="${options ? "Optional note expanding your choice" : "Type your answer"}"></div>
         <p><button type="submit" title="Record your choice and note">Submit answer</button></p>
       </form>
+      <h3>Actions</h3>
       <p><button id="close-btn" title="Close this task (answers become immutable)">Close task</button></p>`}</div>`;
     const form = document.getElementById("answer-form");
     if (form) form.addEventListener("submit", async (ev) => {

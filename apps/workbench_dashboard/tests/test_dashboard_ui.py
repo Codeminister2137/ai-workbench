@@ -131,9 +131,13 @@ def test_create_form_marks_required_and_optional() -> None:
 
 
 def test_inbox_detail_keeps_full_record() -> None:
-    """Answered tasks still show body, options, answer, and note."""
+    """Detail has fixed sections; the options recap only shows once closed."""
     js = _read("app.js")
-    assert "Options offered:" in js
+    assert "<h3>Request</h3>" in js
+    assert "<h3>Decision record</h3>" in js
+    assert "<h3>Your choices</h3>" in js
+    assert "No answer recorded yet." in js
+    assert '(item.options || []).length && item.status === "closed"' in js
     assert "<strong>Note:</strong>" in js
     assert "Archive" in js
 
