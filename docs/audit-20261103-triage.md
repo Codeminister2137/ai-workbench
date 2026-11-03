@@ -164,7 +164,7 @@ verification before action — several audit claims were already proven wrong
 
 - [CRITICAL] Arbitrary local file read exfiltrated to Baseten — `scripts/plan-with-supervisor.py` → **FALSE POSITIVE** (operator CLI reading operator-named files is the tool function; no boundary crossed)
 - [HIGH] Snapshot command-line replay gives local RCE — `scripts/day_cycle.py` → **REAL — POST-HACKATHON** (artifacts file-write replays on open (Windows Popen-str); store argv + allowlist, echo cmdline; POSIX path broken anyway)
-- [HIGH] All provider keys exposed to every agent subprocess — `scripts/alternate-agent-acceptance.py` → **UNREVIEWED**
+- [HIGH] All provider keys exposed to every agent subprocess — `scripts/alternate-agent-acceptance.py` → **REAL — POST-HACKATHON** (agent children inherit full parent os.environ; only 4 names are loaded explicitly but the rest ride along; pass a per-route minimal env post-hackathon)
 - [HIGH] Private Gmail content sent to external Meta model — `scripts/mail_digest.py` → **INTENDED** (owner tool, owner key, documented no-training route; subject+snippet only)
 - [MEDIUM] Unencoded server-controlled IDs in fetch paths — `patches/operator-ui-guided/app.js` → **UNREVIEWED**
 - [MEDIUM] Owner ping leaks host IP to external service by default — `scripts/loop_notify.py` → **UNREVIEWED**
@@ -282,9 +282,9 @@ verification before action — several audit claims were already proven wrong
 - FALSE POSITIVE: 12
 - FIXED: 6
 - INTENDED: 3
-- REAL — POST-HACKATHON: 6
+- REAL — POST-HACKATHON: 7
 - TEST GAP CLOSED: 1
-- UNREVIEWED: 177
+- UNREVIEWED: 176
 
 ## Appendix: frontend-audit leftovers verified 2026-11-03 evening
 
