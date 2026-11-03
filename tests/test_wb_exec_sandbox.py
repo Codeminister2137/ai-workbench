@@ -117,3 +117,38 @@ def test_dunder_escape_cannot_touch_parent_state(check, payload, monkeypatch) ->
         assert "WB_SANDBOX_PWNED" not in vars(route_eval)
     finally:
         vars(route_eval).pop("WB_SANDBOX_PWNED", None)
+
+
+def test_replay_allows_known_module_script_and_ollama() -> None:
+    """Allowlisted service commands replay; nothing launches here."""
+    cwd = day_cycle.REPO_ROOT
+    assert day_cycle.is_replay_allowed(
+        "operator", ["python", "-m", "remote_operator.cli", "serve"], cwd
+    )
+    assert day_cycle.is_replay_allowed("dashboard", ["python", "scripts/day_cycle.py", "open"], cwd)
+    assert day_cycle.is_replay_allowed("ollama", ["ollama", "serve"], cwd)
+
+
+def test_replay_refuses_dangerous_commands(tmp_path: Path) -> None:
+    """-c, bare -, foreign modules, planted interpreters, and escapes refuse."""
+    cwd = day_cycle.REPO_ROOT
+    planted = str(tmp_path / "python.exe")
+    outside = str(tmp_path / "evil.py")
+    assert not day_cycle.is_replay_allowed("operator", ["python", "-c", "print(1)"], cwd)
+    assert not day_cycle.is_replay_allowed("operator", ["python", "-"], cwd)
+    assert not day_cycle.is_replay_allowed("operator", ["python", "-m", "os", "serve"], cwd)
+    assert not day_cycle.is_replay_allowed("operator", [planted, "-m", "remote_operator.cli"], cwd)
+    assert not day_cycle.is_replay_allowed("operator", ["python", outside], cwd)
+    assert not day_cycle.is_replay_allowed("ollama", ["ollama", "run", "x"], cwd)
+    assert not day_cycle.is_replay_allowed("operator", [], cwd)
+
+
+def test_replay_argv_for_refuses_legacy_and_tampered() -> None:
+    """Legacy strings and non-allowlisted snapshots refuse with a reason."""
+    cwd = day_cycle.REPO_ROOT
+    argv, reason = day_cycle.replay_argv_for("operator", 8765, {"8765": ["python", "-c", "x"]}, cwd)
+    assert argv is None and "allowlist" in reason
+    argv, reason = day_cycle.replay_argv_for("operator", 8765, {"8765": "python -m x"}, cwd)
+    assert argv is None and "argv list" in reason
+    argv, reason = day_cycle.replay_argv_for("operator", 8765, {}, cwd)
+    assert argv is None and reason == "missing"
