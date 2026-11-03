@@ -104,7 +104,7 @@ Path("executed").touch()
 print("stdout progress", flush=True)
 print("stderr progress", file=sys.stderr, flush=True)
 print(os.environ["SHELL_TEST_OVERRIDE"], flush=True)
-print(os.environ["SHELL_TEST_INHERITED"], flush=True)
+print(os.environ.get("SHELL_TEST_INHERITED", "not-inherited"), flush=True)
 if mode in {
     "timeout", "large_timeout", "interrupt", "interrupt_cleanup", "root_exit", "root_failure"
 }:
@@ -137,6 +137,7 @@ if mode == "root_failure":
 def test_shell_owned_worker_has_outer_deadline_and_cleanup(tmp_path: Path, mode: str) -> None:
     (tmp_path / "worker.py").write_text(textwrap.dedent(WORKER))
     (tmp_path / "fixture.py").write_text(textwrap.dedent(FIXTURE))
+    # Delegated shell children must not inherit ambient env; the marker below proves the cut.
     env = dict(os.environ, SHELL_TEST_INHERITED="inherited-value", SHELL_TEST_OVERRIDE="old-value")
     # The worker cannot launch workspace code until this independent job owns it.
     process = subprocess.Popen(
@@ -178,7 +179,8 @@ def test_shell_owned_worker_has_outer_deadline_and_cleanup(tmp_path: Path, mode:
             assert "[STDERR]\nstderr progress" in data["output"]
             if mode != "large_timeout":
                 assert "context-value" in data["output"]
-                assert "inherited-value" in data["output"]
+                assert "inherited-value" not in data["output"]
+                assert "not-inherited" in data["output"]
             assert "old-value" not in data["output"]
             assert data["error"] == (mode != "root_exit")
             if mode in {"timeout", "large_timeout"}:

@@ -278,7 +278,8 @@ def test_shell_preserves_output_and_empty_success(tmp_path, monkeypatch):
     monkeypatch.setenv("SHELL_INHERITED", "parent")
     monkeypatch.setattr(shell, "run_validation_process", runner)
     result = RunCommandTool().execute(
-        {"command": "synthetic"}, ToolContext(tmp_path, env={"SHELL_OVERRIDE": "context"})
+        {"command": "synthetic"},
+        ToolContext.for_interactive_owner(tmp_path, env={"SHELL_OVERRIDE": "context"}),
     )
     assert result.is_error
     assert result.output == "out\nnext\n\n[STDERR]\nerr\n\n[Process exited with code 9]"

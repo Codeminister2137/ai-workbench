@@ -134,7 +134,7 @@ def test_real_command_output_is_withheld_and_mcp_metadata_is_safe(tmp_path, monk
     argv = [sys.executable, "-c", "import os; print(os.environ['SYNTHETIC_API_KEY'])"]
     command = subprocess.list2cmdline(argv) if os.name == "nt" else shlex.join(argv)
     result = RunCommandTool().run(
-        ToolCall("run_command", {"command": command}), ToolContext(tmp_path)
+        ToolCall("run_command", {"command": command}), ToolContext.for_interactive_owner(tmp_path)
     )
     assert result.is_error and result.metadata == {"credential_output_refused": True}
     assert SECRET not in result.output
