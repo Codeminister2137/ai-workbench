@@ -1,12 +1,14 @@
 """Day-cycle helper: safe end-of-day closeout and next-day startup.
 
-``close`` snapshots git state plus the exact command lines of running
-services, and reports whether the tree is safe to power off. ``open``
-replays the snapshot: it checks every expected service and starts the
-missing ones, then reports what runs and what still needs a human.
+``close`` snapshots git state plus the argv lists of running services,
+and reports whether the tree is safe to power off. ``open`` replays the
+snapshot: it checks every expected service and starts the missing ones
+from allowlisted argv only (anything else is refused, never executed),
+then reports what runs and what still needs a human.
 
-Snapshots live under ``artifacts/day-cycle/`` (gitignored, local only).
-Service command lines may contain hostnames; they never leave the disk.
+Snapshots are untrusted input: they live under ``artifacts/day-cycle/``
+(gitignored, local only), service command lines may contain hostnames,
+and they never leave the disk.
 """
 
 from __future__ import annotations
@@ -16,6 +18,8 @@ import dataclasses
 import datetime
 import json
 import os
+import re
+import shlex
 import socket
 import subprocess
 import sys
@@ -119,8 +123,38 @@ def close_verdict(states: list[GitState]) -> tuple[bool, list[str]]:
     return (not blockers, blockers)
 
 
-def service_command_lines() -> dict[str, str]:
-    """Map listener ports to owning python command lines (Windows)."""
+def _windows_argv(cmdline: str) -> list[str]:
+    """Split one command line exactly like the Windows C runtime does."""
+    import ctypes
+
+    shell32 = ctypes.windll.shell32
+    shell32.CommandLineToArgvW.argtypes = [ctypes.c_wchar_p, ctypes.POINTER(ctypes.c_int)]
+    shell32.CommandLineToArgvW.restype = ctypes.POINTER(ctypes.c_wchar_p)
+    argc = ctypes.c_int()
+    argv = shell32.CommandLineToArgvW(cmdline, ctypes.byref(argc))
+    if not argv:
+        raise OSError("CommandLineToArgvW failed")
+    try:
+        return [argv[index] or "" for index in range(argc.value)]
+    finally:
+        ctypes.windll.kernel32.LocalFree(argv)
+
+
+def split_command_line(cmdline: str) -> list[str]:
+    """Split a snapshotted command line into argv (never executed as text)."""
+    text = " ".join(cmdline.split())
+    if not text:
+        return []
+    if os.name == "nt":
+        try:
+            return _windows_argv(text)
+        except Exception:
+            return shlex.split(text, posix=False)
+    return shlex.split(text)
+
+
+def service_command_lines() -> dict[str, list[str]]:
+    """Map listener ports to owning process argv lists (Windows)."""
     code, conns = run_command(
         [
             "powershell",
@@ -137,7 +171,7 @@ def service_command_lines() -> dict[str, str]:
         parts = line.split()
         if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
             port_pids[parts[0]] = parts[1]
-    found: dict[str, str] = {}
+    found: dict[str, list[str]] = {}
     for port in (str(OPERATOR_PORT), str(DASHBOARD_PORT), str(OLLAMA_PORT)):
         pid = port_pids.get(port)
         if not pid:
@@ -151,8 +185,14 @@ def service_command_lines() -> dict[str, str]:
             ],
             timeout=30,
         )
-        if not code_p and info.strip():
-            found[port] = " ".join(info.split())
+        if code_p or not info.strip():
+            continue
+        try:
+            argv = split_command_line(info)
+        except ValueError:
+            continue
+        if argv:
+            found[port] = argv
     return found
 
 
@@ -323,10 +363,137 @@ def service_env(label: str, *, store: Path | None = None) -> dict[str, str]:
     }
 
 
+OLLAMA_PROGRAMS = frozenset({"ollama", "ollama.exe"})
+PYTHON_PROGRAMS = frozenset({"python", "python.exe", "pythonw.exe", "python3"})
+"""Executable basenames the replay allowlist recognises per service slot."""
+
+REPLAY_ALLOWED_MODULES = frozenset({"remote_operator"})
+"""Top-level ``-m`` modules replay may start; extend only with reviewed entries."""
+
+_SAFE_INTERPRETER_FLAGS = frozenset({"-u", "-B", "-E", "-P", "-s", "-S", "-O", "-OO", "-I"})
+_SAFE_INTERPRETER_PREFIXES = ("-X", "-W")
+_MODULE_PATTERN = re.compile(r"[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*")
+
+
+def format_command_line(argv: list[str]) -> str:
+    """Render argv exactly as the OS will receive it (echo only, never eval)."""
+    if os.name == "nt":
+        return subprocess.list2cmdline(argv)
+    return shlex.join(argv)
+
+
+def _under_known_roots(path: Path) -> bool:
+    """True when a resolved path stays inside the workbench or operator trees."""
+    for root in (REPO_ROOT, OPERATOR_ROOT):
+        try:
+            if path.is_relative_to(root.resolve()):
+                return True
+        except OSError:
+            continue
+    return False
+
+
+def _resolve_under_roots(candidate: str, cwd: Path) -> Path | None:
+    """Resolve a snapshot path against cwd; None when unreadable or escaped."""
+    try:
+        path = Path(candidate)
+        resolved = path.resolve() if path.is_absolute() else (cwd / path).resolve()
+    except OSError:
+        return None
+    return resolved if _under_known_roots(resolved) else None
+
+
+def _argv0_permitted(argv0: str, cwd: Path) -> bool:
+    """Bare interpreter names use PATH; any path must stay under known roots.
+
+    A planted absolute interpreter (``C:\\evil\\python.exe``) is refused even
+    when its basename looks right.
+    """
+    if Path(argv0).name == argv0:
+        return True
+    return _resolve_under_roots(argv0, cwd) is not None
+
+
+def _script_permitted(script: str, cwd: Path) -> bool:
+    """Replayed scripts must be existing .py files under the known checkouts."""
+    if not script.lower().endswith(".py"):
+        return False
+    resolved = _resolve_under_roots(script, cwd)
+    return resolved is not None and resolved.is_file()
+
+
+def is_replay_allowed(label: str, argv: list[str], cwd: Path) -> bool:
+    """Allowlist gate for replayed service commands (snapshot is untrusted).
+
+    Ollama replays only ``ollama serve``. Python services replay only a
+    known interpreter running an existing under-roots ``.py`` script or an
+    allowlisted ``-m`` module, after safe interpreter flags. ``-c``, bare
+    ``-``, unknown programs, planted interpreter paths, and scripts outside
+    the checkouts are all refused.
+    """
+    if not argv or any(not isinstance(part, str) or not part for part in argv):
+        return False
+    program = Path(argv[0]).name.lower()
+    if label == "ollama":
+        return program in OLLAMA_PROGRAMS and argv[1:] == ["serve"]
+    if program in OLLAMA_PROGRAMS or program not in PYTHON_PROGRAMS:
+        return False
+    if not _argv0_permitted(argv[0], cwd):
+        return False
+    rest = list(argv[1:])
+    while rest and (
+        rest[0] in _SAFE_INTERPRETER_FLAGS or rest[0].startswith(_SAFE_INTERPRETER_PREFIXES)
+    ):
+        rest.pop(0)
+    if not rest:
+        return False
+    first = rest[0]
+    if first == "-m":
+        if len(rest) < 2 or not _MODULE_PATTERN.fullmatch(rest[1]):
+            return False
+        return rest[1].split(".")[0] in REPLAY_ALLOWED_MODULES
+    if first.startswith("-"):
+        return False
+    return _script_permitted(first, cwd)
+
+
+def replay_argv_for(label: str, port: int, stored: dict, cwd: Path) -> tuple[list[str] | None, str]:
+    """Validate one snapshotted command; (argv, "ok") or (None, reason).
+
+    ``stored`` is the untrusted snapshot mapping. Anything that is not an
+    allowlisted argv list — legacy strings, tampered entries, unknown shapes —
+    is refused and must never be executed.
+    """
+    raw = stored.get(str(port))
+    if raw is None or raw == "" or raw == []:
+        return None, "missing"
+    if (
+        not isinstance(raw, list)
+        or not raw
+        or any(not isinstance(part, str) or not part for part in raw)
+    ):
+        return None, "snapshot command is not an argv list (re-run close)"
+    if not is_replay_allowed(label, raw, cwd):
+        return None, f"not on the replay allowlist: {format_command_line(raw)}"
+    return list(raw), "ok"
+
+
 def start_detached(
-    label: str, argv: list[str] | str, cwd: Path, env: dict[str, str] | None = None
+    label: str, argv: list[str], cwd: Path, env: dict[str, str] | None = None
 ) -> bool:
-    """Start one service detached with logs; never raises."""
+    """Start one service detached with logs; never raises.
+
+    ``argv`` must be a list: string command lines are refused outright (no
+    shell parsing, ever), and the exact command line is echoed before
+    anything runs.
+    """
+    if isinstance(argv, str) or not isinstance(argv, list):
+        print(f"{label}: REFUSED string command (argv list required)")
+        return False
+    if not argv or any(not isinstance(part, str) or not part for part in argv):
+        print(f"{label}: REFUSED empty or malformed argv")
+        return False
+    print(f"{label}: exec: {format_command_line(argv)}", flush=True)
     logs = SNAPSHOT_DIR / "service-logs"
     try:
         logs.mkdir(parents=True, exist_ok=True)
@@ -342,6 +509,7 @@ def start_detached(
             stdout=out,
             stderr=err,
             stdin=subprocess.DEVNULL,
+            shell=False,
             env={**os.environ, **(env or {})},
             creationflags=creation,
             start_new_session=True,
@@ -371,15 +539,20 @@ def command_open() -> int:
             continue
         env: dict[str, str] = {}
         if label == "ollama":
-            ok = start_detached(label, ["ollama", "serve"], REPO_ROOT)
+            argv: list[str] | None = ["ollama", "serve"]
+            reason = "ok"
         else:
-            cmdline = stored.get(str(port), "")
-            if not cmdline:
+            argv, reason = replay_argv_for(label, port, stored, cwd)
+        if argv is None:
+            if reason == "missing":
                 report.append(f"{label}: missing and no snapshot command to replay")
-                failed = True
-                continue
+            else:
+                report.append(f"{label}: missing and snapshot command REFUSED ({reason})")
+            failed = True
+            continue
+        if label != "ollama":
             env = service_env(label)
-            ok = start_detached(label, cmdline, cwd, env=env)
+        ok = start_detached(label, argv, cwd, env=env)
         secret = ""
         if label in SERVICE_ENV_ALLOWLIST:
             secret = " (token from secret store)" if env else " (NO TOKEN in secret store)"
