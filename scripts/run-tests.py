@@ -63,6 +63,7 @@ GROUPS = {
         "tests/test_opencode_go_adapter.py",
         "tests/test_opencode_go_protocol_adapters.py",
         "tests/test_opencode_go_route.py",
+        "tests/test_wb_exec_sandbox.py",
     ),
     "orchestrator": (
         "tests/test_orchestrator_*.py",
