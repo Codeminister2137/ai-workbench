@@ -91,6 +91,7 @@ GROUPS = {
         "tests/test_native_admission.py",
         "tests/test_measured_prefix_admission.py",
         "tests/test_operator_bridge.py",
+        "tests/test_wb_env_narrow.py",
     ),
     "cli": (
         "tests/repo_assistant/test_*.py",
