@@ -176,6 +176,9 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             if path.startswith("/api/ideas/") and path.endswith("/review"):
                 item_id = path[len("/api/ideas/") : -len("/review")]
                 return self._review_idea(item_id, payload)
+            if path.startswith("/api/runs/") and path.endswith("/report-request"):
+                run_id = path[len("/api/runs/") : -len("/report-request")]
+                return self._request_run_report(run_id)
         except (StoreError, ValueError) as exc:
             return self._send_json({"ok": False, "error": str(exc)}, status=400)
         return self._send_json({"ok": False, "error": "Unknown endpoint"}, status=404)
@@ -393,6 +396,37 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             code = 404 if "not found" in str(exc).lower() else 400
             return self._send_json({"ok": False, "error": str(exc)}, status=code)
         self._send_json({"ok": True, "id": record["id"], "status": record["status"]})
+
+    def _request_run_report(self, run_id: str) -> None:
+        try:
+            run = self._stores().runs.get(run_id)
+        except StoreError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        if run is None:
+            return self._send_json({"ok": False, "error": "Not found"}, status=404)
+        if run.get("report"):
+            return self._send_json({"ok": True, "id": run_id, "report": True})
+        if run.get("report_request_id"):
+            return self._send_json(
+                {"ok": True, "id": run.get("report_request_id"), "deduped": True}
+            )
+        try:
+            record = self._stores().create_inbox_task(
+                title=f"Generate report for {run.get('title') or run_id}",
+                body=(
+                    "Owner requested a completion report. Write it, attach it "
+                    "as the run's `report` field, then close this task."
+                ),
+                task_type="order",
+                task_id=run_id,
+                context_refs=[f"run:{run_id}"],
+            )
+        except StoreError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        run["report_requested"] = True
+        run["report_request_id"] = record["id"]
+        self._stores().runs.put(run_id, run)
+        self._send_json({"ok": True, "id": record["id"]})
 
     def _send_json(self, payload: dict | list, status: int = 200) -> None:
         body = json.dumps(payload).encode("utf-8")

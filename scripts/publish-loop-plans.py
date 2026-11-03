@@ -43,6 +43,7 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--branch", default=None)
     run.add_argument("--commit", default=None)
     run.add_argument("--validation", default=None)
+    run.add_argument("--report", default=None)
 
     decision = sub.add_parser("decision", help="Create one owner decision task")
     decision.add_argument("--title", required=True)
@@ -78,6 +79,7 @@ def main(argv: list[str] | None = None) -> int:
             branch=args.branch,
             commit=args.commit,
             validation=args.validation,
+            report=args.report,
         )
     else:
         body = args.body if args.body is not None else args.body_file.read_text(encoding="utf-8")

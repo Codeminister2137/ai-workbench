@@ -84,3 +84,26 @@ def test_idea_create_validates_source_and_title(stores) -> None:
         stores.create_idea(title="t", body="b", source="stranger")
     with pytest.raises(StoreError, match="not found"):
         stores.set_idea_status("missing", status="adopted")
+
+
+def test_answer_and_note_are_independent(stores) -> None:
+    record = stores.create_inbox_task(
+        title="Pick one",
+        body="A or B?",
+        task_type="decision",
+        options=["Alpha", "Beta"],
+    )
+    answered = stores.answer_inbox_task(record["id"], answer=" leaning Beta ", option_index=1)
+    assert answered["answer"] == "Beta"
+    assert answered["option_index"] == 1
+    assert answered["note"] == "leaning Beta"
+    assert answered["status"] == "answered"
+
+    typed = stores.create_inbox_task(
+        title="Explain",
+        body="Why?",
+        task_type="clarification",
+    )
+    only = stores.answer_inbox_task(typed["id"], answer="Because.")
+    assert only["answer"] == "Because."
+    assert only["note"] is None

@@ -86,7 +86,7 @@ async function renderHome() {
         <div class="card"><h2>Inbox</h2>
           <p>${status.open_inbox} open task(s). <a href="#/inbox">Open inbox</a></p></div>
         <div class="card"><h2>Ideas</h2>
-          <p>${status.new_ideas} untriaged. <a href="#/ideas">Open ideas</a></p></div>
+          <p>${status.new_ideas} new — triage each in Ideas (adopt, park, or decline). <a href="#/ideas">Open ideas</a></p></div>
         <div class="card"><h2>Chat</h2>
           <form class="inline" id="quick-chat"><input type="text" name="text" placeholder="Ask the supervisor..." title="Ask the supervisor (starts a new chat)" required>
           <button type="submit" title="Start a chat with this question">Send</button></form></div>
@@ -165,8 +165,12 @@ async function renderChatThread(id, initial) {
 async function renderPlans(id) {
   if (id) {
     const payload = await api("/api/plans/" + encodeURIComponent(id));
+    const plan = payload.item;
     view.innerHTML = `<h1>Plan</h1><p><a href="#/plans">All plans</a></p>
-      <pre>${esc(JSON.stringify(payload.item, null, 2))}</pre>`;
+      <div class="card"><h2>${esc(plan.title || plan.id)}</h2>
+      <p class="muted">${esc(plan.status || "")}${plan.updated_at_utc ? " · updated " + esc(plan.updated_at_utc) : ""}</p>
+      ${plan.source ? `<p class="muted">Source: ${esc(plan.source)}</p>` : ""}
+      <pre>${esc(plan.body || "(empty plan)")}</pre></div>`;
     return;
   }
   const payload = await api("/api/plans");
@@ -181,8 +185,33 @@ async function renderPlans(id) {
 async function renderRuns(id) {
   if (id) {
     const payload = await api("/api/runs/" + encodeURIComponent(id));
+    const run = payload.item;
+    const meta = [run.status, run.branch, run.commit].filter(Boolean).map(esc).join(" · ");
+    const report = run.report
+      ? `<h3>Report</h3><pre>${esc(run.report)}</pre>`
+      : run.report_request_id
+        ? `<p class="muted">Report requested — see the inbox task.</p>`
+        : `<p><button id="report-btn" title="Ask for a completion report for this run">Generate report</button></p>`;
     view.innerHTML = `<h1>Run</h1><p><a href="#/runs">All runs</a></p>
-      <pre>${esc(JSON.stringify(payload.item, null, 2))}</pre>`;
+      <div class="card"><h2>${esc(run.title || run.id)}</h2>
+      <p class="muted">${meta}</p>
+      ${run.validation ? `<p><strong>Validation:</strong> ${esc(run.validation)}</p>` : ""}
+      ${run.body ? `<pre>${esc(run.body)}</pre>` : ""}
+      ${report}</div>`;
+    const reportBtn = document.getElementById("report-btn");
+    if (reportBtn) reportBtn.addEventListener("click", async () => {
+      try {
+        await api("/api/runs/" + encodeURIComponent(id) + "/report-request", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: "{}",
+        });
+        toast("Report requested — see inbox", true);
+        render();
+      } catch (err) {
+        toast(err.message, false);
+      }
+    });
     return;
   }
   const payload = await api("/api/runs");
@@ -219,11 +248,13 @@ async function renderInbox(id) {
       <p>${esc(item.body || "")}</p>
       ${refs ? `<ul class="plain">${refs}</ul>` : ""}
       ${item.answer ? `<p><strong>Answer:</strong> ${esc(item.answer)}</p>` : ""}
+      ${item.note ? `<p><strong>Note:</strong> ${esc(item.note)}</p>` : ""}
       ${item.status === "closed" ? '<p class="muted">Closed; answers are immutable.</p>' : `
       <form id="answer-form">
         ${options}
-        <div class="inline"><input type="text" name="answer" placeholder="Your answer..." title="Type your answer">
-        <button type="submit" title="Record answer">Answer</button></div>
+        ${options ? '<p class="muted">Pick one, add a note, or both — the note expands your choice.</p>' : ""}
+        <div><input type="text" name="answer" placeholder="${options ? "Add a note (optional)..." : "Your answer..."}" title="${options ? "Optional note expanding your choice" : "Type your answer"}"></div>
+        <p><button type="submit" title="Record your choice and note">Submit answer</button></p>
       </form>
       <p><button id="close-btn" title="Close this task (answers become immutable)">Close task</button></p>`}</div>`;
     const form = document.getElementById("answer-form");

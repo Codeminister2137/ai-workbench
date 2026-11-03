@@ -66,7 +66,7 @@ def test_dynamic_buttons_have_titles() -> None:
     """Every button rendered by app.js templates carries a tooltip title."""
     js = _read("app.js")
     buttons = re.findall(r"<button\b[^>]*>", js)
-    assert len(buttons) == 6
+    assert len(buttons) == 7  # +report-btn (run detail)
     for tag in buttons:
         assert "title=" in tag, f"button without title: {tag}"
 
@@ -82,3 +82,36 @@ def test_dynamic_inputs_and_selects_have_titles() -> None:
     assert len(selects) == 1
     for tag in selects:
         assert "title=" in tag, f"select without title: {tag}"
+
+
+def test_plan_detail_renders_fields_not_json() -> None:
+    """Plan detail shows title/status/source/body instead of a JSON dump."""
+    js = _read("app.js")
+    assert "JSON.stringify(payload.item" not in js
+    assert "Source: ${esc(plan.source)}" in js
+    assert "<pre>${esc(plan.body" in js
+
+
+def test_run_detail_has_report_section_and_button() -> None:
+    """Run detail shows a report or a titled Generate-report button."""
+    js = _read("app.js")
+    assert 'id="report-btn"' in js
+    assert 'title="Ask for a completion report for this run"' in js
+    assert "/report-request" in js
+
+
+def test_ideas_label_explains_triage() -> None:
+    """The status card tells the owner what triage means."""
+    js = _read("app.js")
+    assert "untriaged." not in js
+    assert "adopt, park, or decline" in js
+
+
+def test_inbox_form_keeps_note_and_submit_below_choices() -> None:
+    """Choice + note are independent; one submit covers the whole form."""
+    js = _read("app.js")
+    assert "Add a note (optional)..." in js
+    assert "the note expands your choice" in js
+    assert ">Submit answer</button>" in js
+    assert 'title="Record your choice and note"' in js
+    assert "<strong>Note:</strong>" in js
