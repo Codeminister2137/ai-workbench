@@ -116,7 +116,7 @@ def test_dunder_escape_cannot_touch_parent_state(check, payload, monkeypatch) ->
         assert os.environ.get("WB_SANDBOX_PWNED") is None
         assert "WB_SANDBOX_PWNED" not in vars(route_eval)
     finally:
-        vars(route_eval).pop("WB_SANDBOX_PWNED", None)
+        route_eval.__dict__.pop("WB_SANDBOX_PWNED", None)
 
 
 def test_replay_allows_known_module_script_and_ollama() -> None:
