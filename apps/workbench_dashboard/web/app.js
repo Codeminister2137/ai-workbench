@@ -91,6 +91,29 @@ function gtext(s) {
     (m) => `<abbr title="${gloss(m)}">${m}</abbr>`);
 }
 
+/* Client-side list filter over already-fetched items (no backend change). */
+function filterList(listId, query) {
+  const q = String(query || "").trim().toLowerCase();
+  document.querySelectorAll("#" + listId + " li").forEach((li) => {
+    li.hidden = q !== "" && !li.textContent.toLowerCase().includes(q);
+  });
+}
+
+/* Runs list auto-refresh: poll /api/runs every ~10s while the view is visible. */
+let runsPollTimer = null;
+function stopRunsPoll() {
+  if (runsPollTimer) { clearInterval(runsPollTimer); runsPollTimer = null; }
+}
+function startRunsPoll() {
+  if (runsPollTimer) return;
+  runsPollTimer = setInterval(async () => {
+    if (document.hidden) return;
+    const hash = location.hash || "";
+    if (hash !== "#/runs" && !hash.startsWith("#/runs?")) return;
+    try { await renderRuns(); } catch (err) { /* next tick retries */ }
+  }, 10000);
+}
+
 async function renderHome() {
   const status = await api("/api/status");
   const plan = status.current_plan
@@ -250,11 +273,15 @@ async function renderPlans(id) {
         `<li><a href="#/plans/${esc(p.id)}">${gtext(p.title || p.id)}</a>
          <span class="pill st-${esc((p.status || "none").replace(/\s+/g, "-"))}">${esc(p.status || "")}</span></li>`).join("")
     : '<li class="muted">No plans on file. Plans are created by Workbench flows.</li>';
-  view.innerHTML = `<h1>Plans</h1><ul class="plain">${items}</ul><p class="muted">${payload.total} total.</p>`;
+  view.innerHTML = `<h1>Plans</h1>
+    <p><input type="text" id="filter-plans" placeholder="Filter plans..." title="Filter plans by text"></p>
+    <ul class="plain" id="plans-list">${items}</ul><p class="muted">${payload.total} total.</p>`;
+  document.getElementById("filter-plans").addEventListener("input", (ev) => filterList("plans-list", ev.target.value));
 }
 
 async function renderRuns(id) {
   if (id) {
+    stopRunsPoll();
     const payload = await api("/api/runs/" + encodeURIComponent(id));
     const run = payload.item;
     const meta = [run.status, run.branch, run.commit].filter(Boolean).map(esc).join(" · ");
@@ -285,6 +312,7 @@ async function renderRuns(id) {
     });
     return;
   }
+  const prevFilter = (document.getElementById("filter-runs") || {}).value || "";
   const payload = await api("/api/runs");
   const items = payload.items.length
     ? payload.items.map((r) =>
@@ -303,7 +331,13 @@ async function renderRuns(id) {
   } catch (err) {
     evidence = '<p class="muted">Evidence unavailable: ' + esc(err.message) + "</p>";
   }
-  view.innerHTML = `<h1>Runs</h1><ul class="plain">${items}</ul>${evidence}`;
+  view.innerHTML = `<h1>Runs</h1>
+    <p><input type="text" id="filter-runs" placeholder="Filter runs..." title="Filter runs by text"></p>
+    <ul class="plain" id="runs-list">${items}</ul>${evidence}`;
+  const filterInput = document.getElementById("filter-runs");
+  filterInput.addEventListener("input", (ev) => filterList("runs-list", ev.target.value));
+  if (prevFilter) { filterInput.value = prevFilter; filterList("runs-list", prevFilter); }
+  startRunsPoll();
 }
 
 async function renderInbox(id) {
@@ -374,7 +408,9 @@ async function renderInbox(id) {
     : '<li class="muted">Nothing here. The supervisor assigns decisions to the inbox.</li>';
   view.innerHTML = `<h1>Inbox</h1>
     <p><a href="#/inbox">Active</a> · <a href="#/inbox?status=archive">Archive</a></p>
-    <ul class="plain">${items}</ul>`;
+    <p><input type="text" id="filter-inbox" placeholder="Filter tasks..." title="Filter inbox by text"></p>
+    <ul class="plain" id="inbox-list">${items}</ul>`;
+  document.getElementById("filter-inbox").addEventListener("input", (ev) => filterList("inbox-list", ev.target.value));
 }
 
 async function markIdeaSeen(id, item) {
@@ -438,7 +474,9 @@ async function renderIdeas(id) {
     : '<li class="muted">No ideas captured yet — use + New.</li>';
   view.innerHTML = `<h1>Ideas</h1>
     <p class="muted">Capture inbox for brain-dumps and third-party wishes. Triage in planning sessions.</p>
-    <ul class="plain">${items}</ul>`;
+    <p><input type="text" id="filter-ideas" placeholder="Filter ideas..." title="Filter ideas by text"></p>
+    <ul class="plain" id="ideas-list">${items}</ul>`;
+  document.getElementById("filter-ideas").addEventListener("input", (ev) => filterList("ideas-list", ev.target.value));
 }
 
 function fieldRow(label, inner, hint) {
@@ -515,6 +553,7 @@ function renderSchedule() {
 }
 
 async function render() {
+  stopRunsPoll();
   document.querySelectorAll("nav a").forEach((a) => a.classList.remove("active"));
   const raw = (location.hash || "#/home").slice(2);
   const [path, query] = raw.split("?");

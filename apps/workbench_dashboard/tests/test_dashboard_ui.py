@@ -71,7 +71,7 @@ def test_dynamic_inputs_and_selects_have_titles() -> None:
     """Text inputs/selects in templates have titles (radios use labels)."""
     js = _read("app.js")
     inputs = [tag for tag in re.findall(r"<input\b[^>]*>", js) if 'type="radio"' not in tag]
-    assert len(inputs) == 9  # +rename/create-form inputs
+    assert len(inputs) == 13  # +rename/create-form inputs, +4 list filters
     for tag in inputs:
         assert "title=" in tag, f"input without title: {tag}"
     selects = re.findall(r"<select\b[^>]*>", js)
@@ -164,3 +164,33 @@ def test_chat_thread_has_rename_and_two_click_delete() -> None:
 def test_ideas_list_shows_date() -> None:
     js = _read("app.js")
     assert "created_at" in js
+
+
+def test_list_views_have_filter_boxes() -> None:
+    """Plans/Runs/Inbox/Ideas lists filter client-side over fetched items."""
+    js = _read("app.js")
+    assert "function filterList(listId, query)" in js
+    assert 'id="filter-plans"' in js
+    assert 'title="Filter plans by text"' in js
+    assert 'id="filter-runs"' in js
+    assert 'title="Filter runs by text"' in js
+    assert 'id="filter-inbox"' in js
+    assert 'title="Filter inbox by text"' in js
+    assert 'id="filter-ideas"' in js
+    assert 'title="Filter ideas by text"' in js
+    assert 'id="plans-list"' in js
+    assert 'id="runs-list"' in js
+    assert 'id="inbox-list"' in js
+    assert 'id="ideas-list"' in js
+
+
+def test_runs_list_auto_refresh_polls_while_visible() -> None:
+    """Runs list re-polls /api/runs every ~10s; paused when hidden."""
+    js = _read("app.js")
+    assert "runsPollTimer" in js
+    assert "stopRunsPoll" in js
+    assert "startRunsPoll" in js
+    assert "setInterval" in js
+    assert "10000" in js
+    assert "document.hidden" in js
+    assert "prevFilter" in js
