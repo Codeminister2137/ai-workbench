@@ -27,6 +27,7 @@ from ai_provider import (
 )
 from ai_provider.adapters.openai_compatible import OpenAICompatibleChatClient
 from ai_provider.config import BackendConfig
+from ai_provider.http_transport import read_bounded
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -289,3 +290,21 @@ def test_stream_accepts_body_within_bound(monkeypatch: pytest.MonkeyPatch) -> No
     assert isinstance(events[0], AIStreamDelta)
     assert isinstance(events[-1], AIStreamFinal)
     assert events[-1].response.message.content == "Hello world"
+
+
+class _NoArgReadResponse:
+    """Legacy stub whose read() takes no size argument."""
+
+    def __init__(self, body: bytes) -> None:
+        self._body = body
+
+    def read(self) -> bytes:
+        return self._body
+
+
+def test_read_bounded_supports_legacy_no_arg_read(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("ai_provider.http_transport.MAX_RESPONSE_BYTES", 16)
+    assert read_bounded(_NoArgReadResponse(b"small")) == b"small"
+    with pytest.raises(ProviderError) as error:
+        read_bounded(_NoArgReadResponse(b"x" * 17))
+    assert error.value.category is ProviderErrorCategory.NON_RETRYABLE
