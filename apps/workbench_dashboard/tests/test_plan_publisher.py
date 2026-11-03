@@ -94,5 +94,5 @@ def test_sync_run_carries_report(tmp_path) -> None:
     stores = DashboardStores(tmp_path / "data")
     record = sync_run(stores, run_id="w4", title="W4 fix", status="merged", report="Done.")
     assert record["report"] == "Done."
-    assert stores.runs.get("w4") is not None
-    assert stores.runs.get("w4")["report"] == "Done."
+    got = stores.runs.get("w4")
+    assert got is not None and got["report"] == "Done."
