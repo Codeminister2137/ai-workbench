@@ -72,3 +72,27 @@ def test_send_unknown_provider_fails_in_transcript(tmp_path) -> None:
 def test_missing_session_refused(chat) -> None:
     with pytest.raises(ValueError, match="not found"):
         chat.send("missing", "Hi")
+
+
+def test_rename_and_delete_session(chat, tmp_path) -> None:
+    store = SQLiteChatTranscriptStore(tmp_path / "chats.sqlite3")
+    record = chat.create_session(title="Typo name")
+    renamed = chat.rename_session(record.session_id, title="Fixed name")
+    assert renamed.title == "Fixed name"
+    assert store.get_session(record.session_id) is not None
+    assert store.get_session(record.session_id).title == "Fixed name"
+    chat.delete_session(record.session_id)
+    assert store.get_session(record.session_id) is None
+    with pytest.raises(ValueError, match="not found"):
+        chat.delete_session(record.session_id)
+    with pytest.raises(ValueError, match="not be empty"):
+        chat.rename_session(record.session_id, title="   ")
+
+
+def test_delete_removes_messages(chat) -> None:
+    record = chat.create_session(title="Gone")
+    chat.send(record.session_id, "hello")
+    assert len(chat.list_messages(record.session_id)) == 2
+    chat.delete_session(record.session_id)
+    with pytest.raises(ValueError, match="not found"):
+        chat.list_messages(record.session_id)

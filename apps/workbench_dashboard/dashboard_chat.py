@@ -82,6 +82,23 @@ class DashboardChat:
             raise ValueError("Chat session not found")
         return tuple(self.store.list_messages(session_id))
 
+    def rename_session(self, session_id: str, *, title: str) -> ChatSessionRecord:
+        """Rename one chat session; rejects empty titles and unknown ids."""
+
+        title = title.strip()
+        if not title:
+            raise ValueError("Title must not be empty")
+        record = self.store.rename_session(session_id, title=title)
+        if record is None:
+            raise ValueError("Chat session not found")
+        return record
+
+    def delete_session(self, session_id: str) -> None:
+        """Delete one chat session with its transcript; unknown ids fail."""
+
+        if not self.store.delete_session(session_id):
+            raise ValueError("Chat session not found")
+
     def _controller(self, session_id: str, privacy_class: str) -> CodingChatController:
         try:
             return CodingChatController(

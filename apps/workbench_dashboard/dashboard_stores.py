@@ -15,7 +15,7 @@ from pathlib import Path
 
 MAX_RESPONSE_BYTES = 100_000
 MAX_OPEN_TASKS = 50
-INBOX_TYPES = ("decision", "clarification")
+INBOX_TYPES = ("decision", "clarification", "order")
 INBOX_STATUSES = ("open", "answered", "closed")
 IDEA_SOURCES = ("owner", "third-party")
 IDEA_STATUSES = ("new", "reviewing", "adopted", "parked", "declined")
@@ -161,7 +161,12 @@ class DashboardStores:
     def answer_inbox_task(
         self, item_id: str, *, answer: str, option_index: int | None = None
     ) -> dict:
-        """Record the owner's answer; closed tasks are immutable."""
+        """Record the owner's answer; closed tasks are immutable.
+
+        A choice and free text are independent: when both are given, the
+        choice is the answer and the text is kept as a note expanding it.
+        Typed-only replies keep working as before.
+        """
         record = self.inbox.get(item_id)
         if record is None:
             raise StoreError("Inbox task not found")
@@ -173,8 +178,14 @@ class DashboardStores:
         options = record.get("options") or []
         if option_index is not None and not 0 <= option_index < len(options):
             raise StoreError("Option choice is out of range")
-        record["answer"] = answer or options[option_index or 0]
-        record["option_index"] = option_index
+        if option_index is not None:
+            record["answer"] = options[option_index]
+            record["option_index"] = option_index
+            record["note"] = answer or None
+        else:
+            record["answer"] = answer
+            record["option_index"] = None
+            record["note"] = None
         record["status"] = "answered"
         record["answered_at"] = _utc_now()
         self.inbox.put(item_id, record)

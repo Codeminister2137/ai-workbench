@@ -53,6 +53,7 @@ def sync_run(
     branch: str | None = None,
     commit: str | None = None,
     validation: str | None = None,
+    report: str | None = None,
 ) -> dict:
     """Store one work-slice run record (upsert by id)."""
     record = {
@@ -63,6 +64,7 @@ def sync_run(
         "branch": branch,
         "commit": commit,
         "validation": validation,
+        "report": report,
         "updated_at_utc": _utc_now(),
     }
     stores.runs.put(run_id, record)

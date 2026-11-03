@@ -163,6 +163,12 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             if path.startswith("/api/chat/sessions/") and path.endswith("/messages"):
                 session_id = path[len("/api/chat/sessions/") : -len("/messages")]
                 return self._post_chat_message(config, session_id, payload)
+            if path.startswith("/api/chat/sessions/") and path.endswith("/rename"):
+                session_id = path[len("/api/chat/sessions/") : -len("/rename")]
+                return self._rename_chat_session(config, session_id, payload)
+            if path.startswith("/api/chat/sessions/") and path.endswith("/delete"):
+                session_id = path[len("/api/chat/sessions/") : -len("/delete")]
+                return self._delete_chat_session(config, session_id)
             if path == "/api/inbox":
                 return self._create_inbox_task(payload)
             if path == "/api/ideas":
@@ -176,6 +182,9 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             if path.startswith("/api/ideas/") and path.endswith("/review"):
                 item_id = path[len("/api/ideas/") : -len("/review")]
                 return self._review_idea(item_id, payload)
+            if path.startswith("/api/runs/") and path.endswith("/report-request"):
+                run_id = path[len("/api/runs/") : -len("/report-request")]
+                return self._request_run_report(run_id)
         except (StoreError, ValueError) as exc:
             return self._send_json({"ok": False, "error": str(exc)}, status=400)
         return self._send_json({"ok": False, "error": "Unknown endpoint"}, status=404)
@@ -273,6 +282,23 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 "model": outcome.model,
             }
         )
+
+    def _rename_chat_session(self, config: DashboardConfig, session_id: str, payload: dict) -> None:
+        title = payload.get("title", "")
+        if not isinstance(title, str) or not title.strip():
+            return self._send_json({"ok": False, "error": "Title must not be empty"}, status=400)
+        try:
+            record = self._chat(config).rename_session(session_id, title=title)
+        except ValueError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=404)
+        self._send_json({"ok": True, "id": record.session_id, "title": record.title})
+
+    def _delete_chat_session(self, config: DashboardConfig, session_id: str) -> None:
+        try:
+            self._chat(config).delete_session(session_id)
+        except ValueError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=404)
+        self._send_json({"ok": True, "id": session_id})
 
     def _send_collection(self, collection, query: str) -> None:
         params = parse_qs(query)
@@ -393,6 +419,37 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             code = 404 if "not found" in str(exc).lower() else 400
             return self._send_json({"ok": False, "error": str(exc)}, status=code)
         self._send_json({"ok": True, "id": record["id"], "status": record["status"]})
+
+    def _request_run_report(self, run_id: str) -> None:
+        try:
+            run = self._stores().runs.get(run_id)
+        except StoreError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        if run is None:
+            return self._send_json({"ok": False, "error": "Not found"}, status=404)
+        if run.get("report"):
+            return self._send_json({"ok": True, "id": run_id, "report": True})
+        if run.get("report_request_id"):
+            return self._send_json(
+                {"ok": True, "id": run.get("report_request_id"), "deduped": True}
+            )
+        try:
+            record = self._stores().create_inbox_task(
+                title=f"Generate report for {run.get('title') or run_id}",
+                body=(
+                    "Owner requested a completion report. Write it, attach it "
+                    "as the run's `report` field, then close this task."
+                ),
+                task_type="order",
+                task_id=run_id,
+                context_refs=[f"run:{run_id}"],
+            )
+        except StoreError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        run["report_requested"] = True
+        run["report_request_id"] = record["id"]
+        self._stores().runs.put(run_id, run)
+        self._send_json({"ok": True, "id": record["id"]})
 
     def _send_json(self, payload: dict | list, status: int = 200) -> None:
         body = json.dumps(payload).encode("utf-8")

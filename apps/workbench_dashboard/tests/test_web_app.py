@@ -214,3 +214,63 @@ def test_filtered_totals_count_matches(dashboard_server) -> None:
     assert len(answered["items"]) == 1
     still_open = get_json(dashboard_server, "/api/inbox?status=open")
     assert still_open["total"] == 1
+
+
+def test_run_report_request_creates_order_task(dashboard_server, tmp_path) -> None:
+    runs_dir = tmp_path / "data" / "runs"
+    runs_dir.mkdir(parents=True)
+    (runs_dir / "w4.json").write_text(
+        json.dumps({"id": "w4", "title": "W4 fix", "status": "merged"}), encoding="utf-8"
+    )
+    first = post_json(dashboard_server, "/api/runs/w4/report-request", {})
+    assert first["ok"] is True
+    task = get_json(dashboard_server, f"/api/inbox/{first['id']}")
+    assert task["item"]["type"] == "order"
+    assert task["item"]["task_id"] == "w4"
+    assert "W4 fix" in task["item"]["title"]
+    run = get_json(dashboard_server, "/api/runs/w4")
+    assert run["item"]["report_request_id"] == first["id"]
+    second = post_json(dashboard_server, "/api/runs/w4/report-request", {})
+    assert second.get("deduped") is True
+    assert second["id"] == first["id"]
+
+
+def test_run_report_request_unknown_run_is_404(dashboard_server) -> None:
+    with pytest.raises(HTTPError) as raised:
+        post_json(dashboard_server, "/api/runs/nope/report-request", {})
+    assert raised.value.code == 404
+    raised.value.close()
+
+
+def test_chat_rename_and_delete_endpoints(dashboard_server) -> None:
+    created = post_json(dashboard_server, "/api/chat/sessions", {"title": "Typo"})
+    session_id = created["id"]
+    renamed = post_json(
+        dashboard_server,
+        f"/api/chat/sessions/{session_id}/rename",
+        {"title": "Fixed"},
+    )
+    assert renamed["ok"] is True
+    assert renamed["title"] == "Fixed"
+    sessions = get_json(dashboard_server, "/api/chat/sessions")
+    assert [s["title"] for s in sessions["sessions"]] == ["Fixed"]
+    deleted = post_json(dashboard_server, f"/api/chat/sessions/{session_id}/delete", {})
+    assert deleted["ok"] is True
+    sessions = get_json(dashboard_server, "/api/chat/sessions")
+    assert sessions["sessions"] == []
+    with pytest.raises(HTTPError) as raised:
+        post_json(dashboard_server, f"/api/chat/sessions/{session_id}/delete", {})
+    assert raised.value.code == 404
+    raised.value.close()
+
+
+def test_chat_rename_rejects_empty_title(dashboard_server) -> None:
+    created = post_json(dashboard_server, "/api/chat/sessions", {"title": "Keep"})
+    with pytest.raises(HTTPError) as raised:
+        post_json(
+            dashboard_server,
+            f"/api/chat/sessions/{created['id']}/rename",
+            {"title": "  "},
+        )
+    assert raised.value.code == 400
+    raised.value.close()

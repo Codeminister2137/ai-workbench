@@ -60,6 +60,37 @@ async function refreshBadge() {
   }
 }
 
+const GLOSSARY = {
+  D4: "Dashboard batch: +New menu, Mark-seen badge, chat cancel, tooltips",
+  W1: "Edge finding: ide_bridge httpx import (false positive, reverted)",
+  W2: "Edge finding: external agent without try/finally orphans live agents",
+  W3: "Edge finding: agent timeout_seconds is inactivity-only",
+  W4: "Edge finding: malformed poll JSON bypassed cancel-on-abandon (fixed)",
+  H1: "Edge finding: hosted runs queued but never drained",
+  M1: "Edge finding: failed live inference dropped the chat message",
+  STT: "Speech-to-text dictation (Web Speech v1 live, Meta server planned)",
+  R1: "Backlog: company offering drafts",
+  R2: "Backlog: Codeministry name + legality research",
+  R3: "Backlog: marketing + social bots research",
+  T0: "L3 ladder tier 0 (smoke)",
+  T1: "L3 ladder tier 1",
+  T2: "L3 ladder tier 2",
+  T3: "L3 ladder tier 3 (full)",
+  L3: "Live L3 capability ladder",
+  BYOK: "Bring your own key: provider API key on top of OpenRouter",
+};
+function gloss(term) {
+  if (Object.hasOwn(GLOSSARY, term)) return GLOSSARY[term];
+  if (/^W\d+$/.test(term)) return "Edge finding — see the edge-round1-workbench plan";
+  if (/^[HM]\d+$/.test(term)) return "Edge finding — see the edge-round1-operator plan";
+  return term;
+}
+function gtext(s) {
+  return esc(s).replace(
+    /\b(D4|W\d+|H\d+|M\d+|STT|R[1-3]|T[0-3]|L3|BYOK)\b/g,
+    (m) => `<abbr title="${gloss(m)}">${m}</abbr>`);
+}
+
 async function renderHome() {
   const status = await api("/api/status");
   const plan = status.current_plan
@@ -86,7 +117,7 @@ async function renderHome() {
         <div class="card"><h2>Inbox</h2>
           <p>${status.open_inbox} open task(s). <a href="#/inbox">Open inbox</a></p></div>
         <div class="card"><h2>Ideas</h2>
-          <p>${status.new_ideas} untriaged. <a href="#/ideas">Open ideas</a></p></div>
+          <p>${status.new_ideas} new — triage each in Ideas (adopt, park, or decline). <a href="#/ideas">Open ideas</a></p></div>
         <div class="card"><h2>Chat</h2>
           <form class="inline" id="quick-chat"><input type="text" name="text" placeholder="Ask the supervisor..." title="Ask the supervisor (starts a new chat)" required>
           <button type="submit" title="Start a chat with this question">Send</button></form></div>
@@ -130,10 +161,50 @@ async function renderChatThread(id, initial) {
     `<div class="msg"><span class="role">${esc(m.role)}</span>
      <span class="muted">${m.provider ? esc(m.provider + "/" + (m.model || "")) : ""}</span>
      <div>${esc(m.content)}</div></div>`).join("");
-  view.innerHTML = `<h1>Chat</h1><p><a href="#/chat">All chats</a></p>
+  const sessions = await api("/api/chat/sessions");
+  const found = (sessions.sessions || []).find((s) => s.id === id) || {};
+  view.innerHTML = `<h1>Chat: ${esc(found.title || id)}</h1><p><a href="#/chat">All chats</a></p>
+    <form id="rename-form" class="inline"><input type="text" name="title" value="${esc(found.title || "")}" title="Chat title">
+    <button type="submit" title="Rename this chat">Rename</button></form>
+    <p><button id="delete-btn" title="Delete this chat and its transcript">Delete chat</button></p>
     <div id="thread">${msgs || '<p class="muted">No messages yet.</p>'}</div>
     <form class="inline" id="chat-form"><input type="text" name="text" placeholder="Message..." title="Message the supervisor" required>
     <button type="submit" title="Send message">Send</button></form>`;
+  document.getElementById("rename-form").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const title = ev.target.title.value.trim();
+    if (!title) { toast("Title must not be empty", false); return; }
+    try {
+      await api("/api/chat/sessions/" + encodeURIComponent(id) + "/rename", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({title}),
+      });
+      toast("Chat renamed", true);
+      render();
+    } catch (err) {
+      toast(err.message, false);
+    }
+  });
+  const deleteBtn = document.getElementById("delete-btn");
+  deleteBtn.addEventListener("click", async () => {
+    if (deleteBtn.dataset.armed !== "1") {
+      deleteBtn.dataset.armed = "1";
+      deleteBtn.textContent = "Confirm delete?";
+      return;
+    }
+    try {
+      await api("/api/chat/sessions/" + encodeURIComponent(id) + "/delete", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: "{}",
+      });
+      toast("Chat deleted", true);
+      location.hash = "#/chat";
+    } catch (err) {
+      toast(err.message, false);
+    }
+  });
   const form = document.getElementById("chat-form");
   async function send(text) {
     const btn = form.querySelector("button");
@@ -165,15 +236,19 @@ async function renderChatThread(id, initial) {
 async function renderPlans(id) {
   if (id) {
     const payload = await api("/api/plans/" + encodeURIComponent(id));
+    const plan = payload.item;
     view.innerHTML = `<h1>Plan</h1><p><a href="#/plans">All plans</a></p>
-      <pre>${esc(JSON.stringify(payload.item, null, 2))}</pre>`;
+      <div class="card"><h2>${gtext(plan.title || plan.id)}</h2>
+      <p class="muted">${esc(plan.status || "")}${plan.updated_at_utc ? " · updated " + esc(plan.updated_at_utc) : ""}</p>
+      ${plan.source ? `<p class="muted">Source: ${esc(plan.source)}</p>` : ""}
+      <pre>${gtext(plan.body || "(empty plan)")}</pre></div>`;
     return;
   }
   const payload = await api("/api/plans");
   const items = payload.items.length
     ? payload.items.map((p) =>
-        `<li><a href="#/plans/${esc(p.id)}">${esc(p.title || p.id)}</a>
-         <span class="muted">${esc(p.status || "")}</span></li>`).join("")
+        `<li><a href="#/plans/${esc(p.id)}">${gtext(p.title || p.id)}</a>
+         <span class="pill st-${esc((p.status || "none").replace(/\s+/g, "-"))}">${esc(p.status || "")}</span></li>`).join("")
     : '<li class="muted">No plans on file. Plans are created by Workbench flows.</li>';
   view.innerHTML = `<h1>Plans</h1><ul class="plain">${items}</ul><p class="muted">${payload.total} total.</p>`;
 }
@@ -181,15 +256,40 @@ async function renderPlans(id) {
 async function renderRuns(id) {
   if (id) {
     const payload = await api("/api/runs/" + encodeURIComponent(id));
+    const run = payload.item;
+    const meta = [run.status, run.branch, run.commit].filter(Boolean).map(esc).join(" · ");
+    const report = run.report
+      ? `<h3>Report</h3><pre>${gtext(run.report)}</pre>`
+      : run.report_request_id
+        ? `<p class="muted">Report requested — see the inbox task.</p>`
+        : `<p><button id="report-btn" title="Ask for a completion report for this run">Generate report</button></p>`;
     view.innerHTML = `<h1>Run</h1><p><a href="#/runs">All runs</a></p>
-      <pre>${esc(JSON.stringify(payload.item, null, 2))}</pre>`;
+      <div class="card"><h2>${gtext(run.title || run.id)}</h2>
+      <p class="muted">${meta}</p>
+      ${run.validation ? `<p><strong>Validation:</strong> ${esc(run.validation)}</p>` : ""}
+      ${run.body ? `<pre>${gtext(run.body)}</pre>` : ""}
+      ${report}</div>`;
+    const reportBtn = document.getElementById("report-btn");
+    if (reportBtn) reportBtn.addEventListener("click", async () => {
+      try {
+        await api("/api/runs/" + encodeURIComponent(id) + "/report-request", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: "{}",
+        });
+        toast("Report requested — see inbox", true);
+        render();
+      } catch (err) {
+        toast(err.message, false);
+      }
+    });
     return;
   }
   const payload = await api("/api/runs");
   const items = payload.items.length
     ? payload.items.map((r) =>
-        `<li><a href="#/runs/${esc(r.id)}">${esc(r.title || r.id)}</a>
-         <span class="muted">${esc(r.status || "")}</span></li>`).join("")
+        `<li><a href="#/runs/${esc(r.id)}">${gtext(r.title || r.id)}</a>
+         <span class="pill st-${esc((r.status || "none").replace(/\s+/g, "-"))}">${esc(r.status || "")}</span></li>`).join("")
     : '<li class="muted">No runs recorded.</li>';
   let evidence = "";
   try {
@@ -214,16 +314,19 @@ async function renderInbox(id) {
       `<label><input type="radio" name="opt" value="${i}"> ${esc(opt)}</label><br>`).join("");
     const refs = (item.context_refs || []).map((r) => `<li>${esc(r)}</li>`).join("");
     view.innerHTML = `<h1>Inbox task</h1><p><a href="#/inbox">All tasks</a></p>
-      <div class="card"><h2>${esc(item.title)}</h2>
+      <div class="card"><h2>${gtext(item.title)}</h2>
       <p class="muted">${esc(item.type)} · ${esc(item.status)} · from ${esc(item.created_by || "")}</p>
-      <p>${esc(item.body || "")}</p>
+      <p>${gtext(item.body || "")}</p>
       ${refs ? `<ul class="plain">${refs}</ul>` : ""}
+      ${(item.options || []).length ? `<p><strong>Options offered:</strong></p><ol>${item.options.map((o) => `<li>${esc(o)}</li>`).join("")}</ol>` : ""}
       ${item.answer ? `<p><strong>Answer:</strong> ${esc(item.answer)}</p>` : ""}
+      ${item.note ? `<p><strong>Note:</strong> ${esc(item.note)}</p>` : ""}
       ${item.status === "closed" ? '<p class="muted">Closed; answers are immutable.</p>' : `
       <form id="answer-form">
         ${options}
-        <div class="inline"><input type="text" name="answer" placeholder="Your answer..." title="Type your answer">
-        <button type="submit" title="Record answer">Answer</button></div>
+        ${options ? '<p class="muted">Pick one, add a note, or both — the note expands your choice.</p>' : ""}
+        <div><input type="text" name="answer" placeholder="${options ? "Add a note (optional)..." : "Your answer..."}" title="${options ? "Optional note expanding your choice" : "Type your answer"}"></div>
+        <p><button type="submit" title="Record your choice and note">Submit answer</button></p>
       </form>
       <p><button id="close-btn" title="Close this task (answers become immutable)">Close task</button></p>`}</div>`;
     const form = document.getElementById("answer-form");
@@ -261,13 +364,17 @@ async function renderInbox(id) {
     });
     return;
   }
+  const tab = new URLSearchParams((location.hash.split("?")[1] || "")).get("status") || "active";
   const payload = await api("/api/inbox");
-  const items = payload.items.length
-    ? payload.items.map((t) =>
-        `<li><a href="#/inbox/${esc(t.id)}">${esc(t.title)}</a>
-         <span class="muted">${esc(t.type)} · ${esc(t.status)}</span></li>`).join("")
-    : '<li class="muted">Inbox zero. The supervisor assigns decisions here.</li>';
-  view.innerHTML = `<h1>Inbox</h1><ul class="plain">${items}</ul>`;
+  const shown = payload.items.filter((t) => tab === "archive" ? t.status === "closed" : t.status !== "closed");
+  const items = shown.length
+    ? shown.map((t) =>
+        `<li><a href="#/inbox/${esc(t.id)}">${gtext(t.title)}</a>
+         <span class="pill st-${esc((t.status || "none").replace(/\s+/g, "-"))}">${esc(t.type)} · ${esc(t.status)}</span></li>`).join("")
+    : '<li class="muted">Nothing here. The supervisor assigns decisions to the inbox.</li>';
+  view.innerHTML = `<h1>Inbox</h1>
+    <p><a href="#/inbox">Active</a> · <a href="#/inbox?status=archive">Archive</a></p>
+    <ul class="plain">${items}</ul>`;
 }
 
 async function markIdeaSeen(id, item) {
@@ -291,9 +398,9 @@ async function renderIdeas(id) {
     const opts = ["new", "reviewing", "adopted", "parked", "declined"].map((s) =>
       `<option value="${s}"${item.status === s ? " selected" : ""}>${s}</option>`).join("");
     view.innerHTML = `<h1>Idea</h1><p><a href="#/ideas">All ideas</a></p>
-      <div class="card"><h2>${esc(item.title)}</h2>
+      <div class="card"><h2>${gtext(item.title)}</h2>
       <p class="muted">${esc(item.source)}${item.contact ? " · " + esc(item.contact) : ""} · ${esc(item.status)}</p>
-      <p>${esc(item.body || "")}</p>
+      <p>${gtext(item.body || "")}</p>
       ${item.decision ? `<p><strong>Decision:</strong> ${esc(item.decision)}</p>` : ""}
       ${item.status === "new" ? `<p><button id="mark-seen-btn" title="Mark this idea seen (moves it out of new)">Mark seen</button></p>` : ""}
       <form id="review-form" class="inline">
@@ -325,12 +432,81 @@ async function renderIdeas(id) {
   const payload = await api("/api/ideas");
   const items = payload.items.length
     ? payload.items.map((t) =>
-        `<li><a href="#/ideas/${esc(t.id)}">${esc(t.title)}</a>
-         <span class="muted">${esc(t.source)} · ${esc(t.status)}</span></li>`).join("")
+        `<li><a href="#/ideas/${esc(t.id)}">${gtext(t.title)}</a>
+         <span class="muted">${esc(t.source)} · ${esc((t.created_at || "").slice(0, 10))}</span>
+         <span class="pill st-${esc((t.status || "none").replace(/\s+/g, "-"))}">${esc(t.status)}</span></li>`).join("")
     : '<li class="muted">No ideas captured yet — use + New.</li>';
   view.innerHTML = `<h1>Ideas</h1>
     <p class="muted">Capture inbox for brain-dumps and third-party wishes. Triage in planning sessions.</p>
     <ul class="plain">${items}</ul>`;
+}
+
+function fieldRow(label, inner, hint) {
+  return `<p><label><strong>${label}</strong><br>${inner}</label><br><span class="muted">${hint}</span></p>`;
+}
+function renderCreate(kind) {
+  const defs = {
+    chat: {heading: "New chat", fields: `
+      ${fieldRow("Title *", '<input type="text" id="f-title" value="Dashboard chat" title="Chat title (required)">', "required")}`},
+    inbox: {heading: "New inbox item", fields: `
+      ${fieldRow("Title *", '<input type="text" id="f-title" title="Inbox item title (required)">', "required")}
+      ${fieldRow("Details", '<textarea id="f-body" rows="3" title="Details (optional)"></textarea>', "optional")}
+      ${fieldRow("Type *", `<select id="f-type" title="Item type (required)"><option value="clarification">clarification</option><option value="decision">decision</option></select>`, "required")}`},
+    idea: {heading: "New idea", fields: `
+      ${fieldRow("Title *", '<input type="text" id="f-title" title="Idea title (required)">', "required")}
+      ${fieldRow("Description", '<textarea id="f-body" rows="3" title="Description (optional)"></textarea>', "optional")}
+      ${fieldRow("Origin *", `<select id="f-source" title="Whose idea (required)"><option value="owner">mine</option><option value="third-party">someone else's</option></select>`, "required")}
+      ${fieldRow("Contact", '<input type="text" id="f-contact" title="Name or contact (only for third-party ideas)">', "only for third-party ideas")}`},
+  };
+  const def = defs[kind];
+  if (!def) { view.innerHTML = "<h1>Not found</h1>"; return; }
+  view.innerHTML = `<h1>${def.heading}</h1><form id="create-form">${def.fields}
+    <p><button type="submit" title="Create this item">Create</button>
+    <button type="button" id="create-cancel" title="Cancel without creating anything">Cancel</button></p></form>`;
+  document.getElementById("create-cancel").addEventListener("click", () => history.back());
+  document.getElementById("create-form").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const title = document.getElementById("f-title").value.trim();
+    if (!title) { toast("Title is required", false); return; }
+    try {
+      if (kind === "chat") {
+        const session = await api("/api/chat/sessions", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({title}),
+        });
+        toast("Chat created", true);
+        location.hash = "#/chat/" + session.id;
+      } else if (kind === "inbox") {
+        const out = await api("/api/inbox", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({
+            title,
+            body: document.getElementById("f-body").value,
+            type: document.getElementById("f-type").value,
+          }),
+        });
+        toast("Inbox item created", true);
+        location.hash = "#/inbox/" + out.id;
+      } else if (kind === "idea") {
+        const out = await api("/api/ideas", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({
+            title,
+            body: document.getElementById("f-body").value,
+            source: document.getElementById("f-source").value,
+            contact: document.getElementById("f-contact").value,
+          }),
+        });
+        toast("Idea captured", true);
+        location.hash = "#/ideas/" + out.id;
+      }
+    } catch (err) {
+      toast(err.message, false);
+    }
+  });
 }
 
 function renderSchedule() {
@@ -358,6 +534,7 @@ async function render() {
     else if (name === "inbox") await renderInbox(id);
     else if (name === "ideas") await renderIdeas(id);
     else if (name === "schedule") renderSchedule();
+    else if (name === "create" && id) renderCreate(id);
     else view.innerHTML = "<h1>Not found</h1>";
   } catch (err) {
     view.innerHTML = `<h1>Something failed</h1><p>${esc(err.message)}</p>`;
@@ -371,49 +548,9 @@ document.getElementById("create-btn").addEventListener("click", () => {
     !document.getElementById("create-menu").hidden;
 });
 document.querySelectorAll("[data-create]").forEach((btn) => {
-  btn.addEventListener("click", async () => {
+  btn.addEventListener("click", () => {
     document.getElementById("create-menu").hidden = true;
-    const kind = btn.dataset.create;
-    try {
-      if (kind === "chat") {
-        const picked = prompt("Chat title:", "Dashboard chat");
-        if (picked === null) return;
-        const title = picked || "Dashboard chat";
-        const session = await api("/api/chat/sessions", {
-          method: "POST",
-          headers: {"Content-Type": "application/json"},
-          body: JSON.stringify({title}),
-        });
-        toast("Chat created", true);
-        location.hash = "#/chat/" + session.id;
-      } else if (kind === "inbox") {
-        const title = prompt("Inbox item title:");
-        if (!title) return;
-        const body = prompt("Details:", "") || "";
-        const out = await api("/api/inbox", {
-          method: "POST",
-          headers: {"Content-Type": "application/json"},
-          body: JSON.stringify({title, body, type: "clarification"}),
-        });
-        toast("Inbox item created", true);
-        location.hash = "#/inbox/" + out.id;
-      } else if (kind === "idea") {
-        const title = prompt("Idea title:");
-        if (!title) return;
-        const body = prompt("Describe the idea:", "") || "";
-        const third = confirm("Third-party idea? OK = someone else's, Cancel = mine.");
-        const contact = third ? (prompt("Whose idea (name/contact, optional):", "") || "") : "";
-        const out = await api("/api/ideas", {
-          method: "POST",
-          headers: {"Content-Type": "application/json"},
-          body: JSON.stringify({title, body, source: third ? "third-party" : "owner", contact}),
-        });
-        toast("Idea captured", true);
-        location.hash = "#/ideas/" + out.id;
-      }
-    } catch (err) {
-      toast(err.message, false);
-    }
+    location.hash = "#/create/" + btn.dataset.create;
   });
 });
 
