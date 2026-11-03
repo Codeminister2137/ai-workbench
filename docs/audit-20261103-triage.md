@@ -14,7 +14,7 @@ verification before action — several audit claims were already proven wrong
 
 ## ai-workbench/0
 
-- [HIGH] Public Modal endpoint depends solely on in-container API key — `deploy/modal/qwen25-coder-7b/modal_app.py` → **UNREVIEWED**
+- [HIGH] Public Modal endpoint depends solely on in-container API key — `deploy/modal/qwen25-coder-7b/modal_app.py` → **INTENDED (single-token vLLM auth is the documented design for this private dev endpoint; app is not currently deployed — zero exposure)**
 - [MEDIUM] Supervisor token absent means allow-all — `apps/workbench_dashboard/dashboard_stores.py` → **UNREVIEWED**
 - [MEDIUM] Transcript list crashes on concurrent delete/unreadable file — `apps/workbench_dashboard/dashboard_stores.py` → **UNREVIEWED**
 - [MEDIUM] Chat factory exception bypasses failure envelope — `apps/workbench_dashboard/dashboard_chat.py` → **UNREVIEWED**
@@ -50,7 +50,7 @@ verification before action — several audit claims were already proven wrong
 - [MEDIUM] Loopback handler enforces auth with `assert` — `tests/test_hosted_delegation_acceptance.py` → **UNREVIEWED**
 - [LOW] Global `sys.path` mutation without restore — `tests/test_mail_digest.py` → **UNREVIEWED**
 - [LOW] Global `sys.modules` pollution by script loader — `tests/test_l3_ladder.py` → **UNREVIEWED**
-- [HIGH] Bounded join then hard liveness assert is flaky — `tests/test_hosted_delegation_acceptance.py` → **UNREVIEWED**
+- [HIGH] Bounded join then hard liveness assert is flaky — `tests/test_hosted_delegation_acceptance.py` → **FALSE POSITIVE (no liveness assert exists; daemon thread, join result ignored in the finalizer)**
 - [MEDIUM] Incorrect POSIX shell quoting of interpreter path — `tests/test_hosted_delegation_acceptance.py` → **UNREVIEWED**
 - [MEDIUM] Cross-test module import creates order dependency — `tests/test_measured_prefix_admission.py` → **UNREVIEWED**
 - [MEDIUM] Whole `time` module replaced by sleep-only stub — `tests/test_loop_notify.py` → **UNREVIEWED**
@@ -67,7 +67,7 @@ verification before action — several audit claims were already proven wrong
 - [MEDIUM] Predictable PID tmp file allows symlink hijack — `tests/test_pid_publication.py` → **UNREVIEWED**
 - [LOW] Unbounded PID file read — `tests/test_pid_publication.py` → **UNREVIEWED**
 - [LOW] Dynamic PowerShell code execution via Invoke-Expression — `tests/test_research_runner.py` → **UNREVIEWED**
-- [HIGH] cp1252 stdout test crashes on emoji print — `tests/test_requesty_free_models.py` → **UNREVIEWED**
+- [HIGH] cp1252 stdout test crashes on emoji print — `tests/test_requesty_free_models.py` → **FALSE POSITIVE (the CLI reconfigures stdout to UTF-8/replace; the test passes and the suite is green — the crash was imagined)**
 - [MEDIUM] Hardlink test lacks Windows/privilege guard — `tests/test_research_tools.py` → **UNREVIEWED**
 - [MEDIUM] Descendant-kill assertion is timing-flaky — `tests/test_research_runner.py` → **UNREVIEWED**
 - [MEDIUM] Relative catalog path depends on CWD — `tests/test_repair_progress.py` → **UNREVIEWED**
@@ -129,7 +129,7 @@ verification before action — several audit claims were already proven wrong
 - [MEDIUM] Arbitrary base_url fetched without loopback/redirect guard — `packages/ai_provider/src/ai_provider/ollama_models.py` → **UNREVIEWED**
 - [MEDIUM] User prompt preview persisted to SQLite without redaction — `packages/ai_provider/src/ai_provider/orchestrated_runs.py` → **UNREVIEWED**
 - [MEDIUM] Env-controlled executable used as subprocess without validation — `packages/ai_provider/src/ai_provider/external_agents.py` → **UNREVIEWED**
-- [HIGH] Asserts used for runtime control flow — `packages/ai_provider/src/ai_provider/fallback_diagnostics.py` → **UNREVIEWED**
+- [HIGH] Asserts used for runtime control flow — `packages/ai_provider/src/ai_provider/fallback_diagnostics.py` → **FALSE POSITIVE (both asserts guard values dereferenced on the next line; under -O the crash changes type but stays loud — invariants, not control flow)**
 - [MEDIUM] Unbounded workspace file hashing enables DoS/OOM — `packages/ai_provider/src/ai_provider/repair_state.py` → **UNREVIEWED**
 - [MEDIUM] Pinned Gemini chunk filename makes verification brittle — `packages/ai_provider/src/ai_provider/gemini_cli.py` → **UNREVIEWED**
 - [MEDIUM] Exclusive settings create has no exists-handling — `packages/ai_provider/src/ai_provider/gemini_cli.py` → **UNREVIEWED**
@@ -168,7 +168,7 @@ verification before action — several audit claims were already proven wrong
 - [HIGH] Private Gmail content sent to external Meta model — `scripts/mail_digest.py` → **INTENDED** (owner tool, owner key, documented no-training route; subject+snippet only)
 - [MEDIUM] Unencoded server-controlled IDs in fetch paths — `patches/operator-ui-guided/app.js` → **UNREVIEWED**
 - [MEDIUM] Owner ping leaks host IP to external service by default — `scripts/loop_notify.py` → **UNREVIEWED**
-- [HIGH] Validator allowance keys accessed without validation — `scripts/meta-supervised-develop.py` → **UNREVIEWED**
+- [HIGH] Validator allowance keys accessed without validation — `scripts/meta-supervised-develop.py` → **DOWNGRADED (malformed host-authored file raises fail-closed before any model call; tampering after prepare is caught by the AUTHORIZED job-digest check)**
 - [MEDIUM] Security gates use `assert`, stripped under `python -O` — `scripts/fallback-acceptance.py` → **UNREVIEWED**
 - [MEDIUM] Unbounded mailbox/body reads allow DoS/OOM — `scripts/mail_digest.py` → **UNREVIEWED**
 - [MEDIUM] `.env` read crashes when file missing — `scripts/alternate-agent-acceptance.py` → **UNREVIEWED**
@@ -179,14 +179,14 @@ verification before action — several audit claims were already proven wrong
 
 ## ai-workbench/7
 
-- [HIGH] Worktree-joined model file write without traversal check — `scripts/unattended-development-loop.py` → **UNREVIEWED**
-- [HIGH] External exfiltration via unvalidated `worktree/files` join — `scripts/unattended-development-loop.py` → **UNREVIEWED**
-- [HIGH] Objective-id used as filesystem path without sanitization — `scripts/unattended-development-loop.py` → **UNREVIEWED**
-- [HIGH] Destructive git wipe on unvalidated queue path — `scripts/unattended-development-loop.py` → **UNREVIEWED**
+- [HIGH] Worktree-joined model file write without traversal check — `scripts/unattended-development-loop.py` → **REAL — POST-HACKATHON (proposal['changes'] keys are model-controlled, written via worktree/rel_path with mkdir parents and no guard (L552); script not in tonight's path; add traversal check post-hackathon)**
+- [HIGH] External exfiltration via unvalidated `worktree/files` join — `scripts/unattended-development-loop.py` → **FALSE POSITIVE on location (no worktree/files route exists in the cited file; closest match is the L552 model-write join, filed separately)**
+- [HIGH] Objective-id used as filesystem path without sanitization — `scripts/unattended-development-loop.py` → **DOWNGRADED (queue is host-owned per the file header contract; owner-typo robustness only, not a trust-boundary issue)**
+- [HIGH] Destructive git wipe on unvalidated queue path — `scripts/unattended-development-loop.py` → **DOWNGRADED (worktree comes from the host-owned queue; checkout+clean is the documented validation-failure recovery inside that dir)**
 - [MEDIUM] PATH fallback for linter binary — `scripts/unattended-development-loop.py` → **UNREVIEWED**
 - [MEDIUM] Unbounded WOL flooder to arbitrary target — `scripts/wake_on_lan.py` → **UNREVIEWED**
-- [HIGH] `except BaseException` swallows cancel/exit — `scripts/unattended-development-loop.py` → **UNREVIEWED**
-- [HIGH] Malformed queue crashes error handler — `scripts/unattended-development-loop.py` → **UNREVIEWED**
+- [HIGH] `except BaseException` swallows cancel/exit — `scripts/unattended-development-loop.py` → **DOWNGRADED (per-objective isolation; deadline/stop re-checked at the next iteration boundary, so shutdown is delayed, not swallowed)**
+- [HIGH] Malformed queue crashes error handler — `scripts/unattended-development-loop.py` → **DOWNGRADED (handler itself is defensive — item.get('kind'); a missing id aborts loudly at the outer level; host-owned input)**
 - [MEDIUM] Missing size/symlink guard on workbench file ingest — `scripts/unattended-development-loop.py` → **UNREVIEWED**
 - [MEDIUM] Hardcoded Windows interpreters + username leak — `scripts/unattended-development-loop.py` → **UNREVIEWED**
 - [MEDIUM] Missing CLI bounds in WOL and report validator — `scripts/wake_on_lan.py` → **UNREVIEWED**
@@ -197,8 +197,8 @@ verification before action — several audit claims were already proven wrong
 
 ## ai-workbench/8
 
-- [HIGH] Malicious validator escape only verified on Windows — `tests/test_acceptance_jobs.py` → **UNREVIEWED**
-- [HIGH] Owned-child cleanup has no Linux coverage — `tests/test_acceptance_jobs.py` → **UNREVIEWED**
+- [HIGH] Malicious validator escape only verified on Windows — `tests/test_acceptance_jobs.py` → **BACKLOG (documented Windows v1 scope via explicit skipif; Linux coverage is future work, not a defect)**
+- [HIGH] Owned-child cleanup has no Linux coverage — `tests/test_acceptance_jobs.py` → **BACKLOG (documented Windows v1 scope via explicit skipif; Linux coverage is future work, not a defect)**
 - [MEDIUM] Test SSRF/size guards use `assert` (stripped under `-O`) — `tests/repo_assistant/test_protocol_continuity.py` → **UNREVIEWED**
 - [MEDIUM] Git helpers run without timeout — `tests/test_ai_agent_git_tools.py` → **UNREVIEWED**
 - [MEDIUM] Junction creation via PowerShell has no timeout — `tests/test_ai_agent_boundaries.py` → **UNREVIEWED**
@@ -209,7 +209,7 @@ verification before action — several audit claims were already proven wrong
 
 ## ai-workbench/9
 
-- [HIGH] Test helper executes workspace-controlled file via `exec` — `tests/test_execution_fallback.py` → **UNREVIEWED**
+- [HIGH] Test helper executes workspace-controlled file via `exec` — `tests/test_execution_fallback.py` → **FALSE POSITIVE (no exec() call in the file; the audit matched the module name execution_fallback)**
 - [MEDIUM] Full host environ forwarded to stdio proxy child — `tests/test_foreground_http.py` → **UNREVIEWED**
 - [MEDIUM] Eval harness suggests in-process `exec` of model output — `tests/test_ai_provider_route_eval.py` → **UNREVIEWED**
 - [LOW] Redirect test proves credential-bearing retry would leak prompt — `tests/test_ai_provider_transport.py` → **UNREVIEWED**
@@ -277,14 +277,14 @@ verification before action — several audit claims were already proven wrong
 
 ## Verdict counts
 
-- BACKLOG: 1
-- DOWNGRADED: 1
-- FALSE POSITIVE: 4
+- BACKLOG: 3
+- DOWNGRADED: 6
+- FALSE POSITIVE: 9
 - FIXED: 6
-- INTENDED: 1
-- REAL — POST-HACKATHON: 2
+- INTENDED: 2
+- REAL — POST-HACKATHON: 3
 - TEST GAP CLOSED: 1
-- UNREVIEWED: 199
+- UNREVIEWED: 185
 
 ## Appendix: frontend-audit leftovers verified 2026-11-03 evening
 
