@@ -5,7 +5,7 @@ module; T2 repairs a buggy function; T3 builds a module from a short spec.
 Each route attempts T(n+1) only after Tn passes, so a failing route spends
 nothing further. Prompts are synthetic and carry no repository content
 (PUBLIC_OR_LOW_RISK with the ADR-063 public attestation), grading is
-deterministic bare-namespace exec (temperature 0.0, one attempt per task, no
+deterministic subprocess-sandbox exec (temperature 0.0, one attempt per task, no
 retries), and usage plus a planning-only cost estimate are recorded when the
 provider reports usage.
 
@@ -18,12 +18,17 @@ gating (ADR-080). This module never substitutes its own picks.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import dataclasses
 import json
 import math
+import os
 import re
+import subprocess
+import sys
 import threading
 import time
+import weakref
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -138,33 +143,134 @@ class EvalResult:
 
 
 def check_completion(text: str) -> bool:
-    """Run the returned function in a bare namespace and assert add2(2) == 4."""
-    block = text
-    if "```" in text:
-        parts = text.split("```")
-        candidates = [part for part in parts if "def add2" in part]
-        if not candidates:
+    """Grade the T0 completion: add2(2) == 4, executed in the grading child."""
+
+    def check(namespace: dict[str, Any]) -> bool:
+        candidate = namespace.get("add2")
+        if not callable(candidate):
             return False
-        block = candidates[0]
-        if block.lstrip().startswith("python"):
-            block = block.lstrip()[len("python") :]
-    namespace: dict[str, Any] = {"__builtins__": {}}
-    try:
-        # Bare namespace without builtins: the snippet can only define add2.
-        exec(compile(block, "<eval>", "exec"), namespace)
-    except Exception:
-        return False
-    candidate = namespace.get("add2")
-    if not callable(candidate):
-        return False
-    try:
-        return bool(candidate(2) == 4)
-    except Exception:
-        return False
+        try:
+            return bool(candidate(2) == 4)
+        except Exception:
+            return False
+
+    return _grade(text, symbols=("def add2",), check=check)
 
 
-_SAFE_MODULES: dict[str, Any] = {"math": math, "re": re, "json": json}
-"""Named-safe modules a task spec may allow; everything else stays banned."""
+_SANDBOX_SCRIPT = r'''
+"""Grading child: exec one candidate answer, then serve calls over stdio JSON."""
+import json
+import math
+import re
+import sys
+
+_SAFE = {"math": math, "re": re, "json": json}
+_ALLOWED = frozenset(filter(None, (sys.argv[1] if len(sys.argv) > 1 else "").split(",")))
+
+
+def _restricted_import(name, *args, **kwargs):
+    if name in _ALLOWED:
+        return _SAFE[name]
+    raise ImportError("import of %r is not allowed in eval answers" % (name,))
+
+
+_NAMESPACE = {"__builtins__": {"__import__": _restricted_import}}
+for _name in _ALLOWED:
+    if _name in _SAFE:
+        _NAMESPACE[_name] = _SAFE[_name]
+
+
+def _send(obj):
+    sys.stdout.write(json.dumps(obj) + "\n")
+    sys.stdout.flush()
+
+
+try:
+    _request = json.loads(sys.stdin.readline() or "{}")
+    _block = _request.get("block", "")
+    if not isinstance(_block, str):
+        raise ValueError("candidate block must be text")
+    exec(compile(_block, "<eval>", "exec"), _NAMESPACE)
+except Exception as _exc:
+    try:
+        _send({"ok": False, "error": type(_exc).__name__})
+    except Exception:
+        pass
+    sys.exit(0)
+
+_callables = sorted(
+    _key for _key, _value in _NAMESPACE.items()
+    if callable(_value) and not _key.startswith("__")
+)
+_values = {}
+for _key, _value in _NAMESPACE.items():
+    if _key.startswith("__") or callable(_value):
+        continue
+    try:
+        json.dumps(_value)
+    except (TypeError, ValueError):
+        continue
+    _values[_key] = _value
+_send({"ok": True, "callables": _callables, "values": _values})
+
+for _line in sys.stdin:
+    try:
+        _message = json.loads(_line)
+    except ValueError:
+        continue
+    if not isinstance(_message, dict) or "done" in _message:
+        break
+    _arguments = _message.get("args", [])
+    _keywords = _message.get("kwargs", {})
+    if not isinstance(_arguments, list) or not isinstance(_keywords, dict):
+        _send({"ok": False, "error": "bad-call"})
+        continue
+    _function = _NAMESPACE.get(_message.get("call"))
+    if not callable(_function):
+        _send({"ok": False, "error": "not-callable"})
+        continue
+    try:
+        _result = _function(*_arguments, **_keywords)
+    except Exception as _exc:
+        _send({"ok": False, "error": type(_exc).__name__})
+        continue
+    try:
+        _send({"ok": True, "result": _result})
+    except (TypeError, ValueError):
+        _send({"ok": False, "error": "unserializable"})
+'''
+"""Source of the grading child: model text is exec'd only in that process."""
+
+
+def _sandbox_env() -> dict[str, str]:
+    """Minimal child environment: OS needs ride along, secrets do not."""
+    env = {
+        "PYTHONSAFEPATH": "1",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONNOUSERSITE": "1",
+        "PYTHONIOENCODING": "utf-8",
+    }
+    for name in (
+        "SystemRoot",
+        "windir",
+        "PATH",
+        "Path",
+        "PATHEXT",
+        "TEMP",
+        "TMP",
+        "HOME",
+        "LANG",
+        "LC_ALL",
+        "LC_CTYPE",
+    ):
+        value = os.environ.get(name)
+        if value:
+            env[name] = value
+    return env
+
+
+class _SandboxError(RuntimeError):
+    """The grading child died or spoke non-JSON; the grade is FAIL."""
 
 
 def _extract_block(text: str, symbols: tuple[str, ...]) -> str | None:
@@ -182,33 +288,163 @@ def _extract_block(text: str, symbols: tuple[str, ...]) -> str | None:
     return block
 
 
-def _candidate_namespace(safe_modules: tuple[str, ...]) -> dict[str, Any]:
-    """Bare namespace: no builtins, only the task's named-safe modules.
+class _CandidateSandbox:
+    """One short-lived child grading one candidate answer.
 
-    Allowed modules are pre-bound AND importable through a restricted
-    ``__import__``, so both bare ``math.sqrt`` and ``import math`` styles
-    work. Any other import raises ImportError; any builtin raises NameError.
+    Model text is exec'd ONLY in the child, in a bare namespace (no
+    builtins, only the task's named-safe modules, pre-bound AND importable
+    through a restricted ``__import__``). The parent process sees JSON
+    values plus proxy callables, so a dunder escape in model output cannot
+    reach parent-process state: no parent modules, globals, or handles.
     """
-    allowed = frozenset(safe_modules)
 
-    def _restricted_import(name: str, *args: Any, **kwargs: Any) -> Any:
-        if name in allowed:
-            return _SAFE_MODULES[name]
-        raise ImportError(f"import of {name!r} is not allowed in eval answers")
+    def __init__(self, safe_modules: tuple[str, ...]) -> None:
+        self._lock = threading.Lock()
+        self._closed = False
+        self._proc = subprocess.Popen(
+            [sys.executable, "-I", "-c", _SANDBOX_SCRIPT, ",".join(safe_modules)],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            env=_sandbox_env(),
+        )
 
-    namespace: dict[str, Any] = {"__builtins__": {"__import__": _restricted_import}}
-    for name in allowed:
-        namespace[name] = _SAFE_MODULES[name]
+    def _send(self, obj: dict[str, Any]) -> None:
+        stdin = self._proc.stdin
+        if stdin is None:
+            raise _SandboxError("grading child has no stdin")
+        stdin.write(json.dumps(obj) + "\n")
+        stdin.flush()
+
+    def _recv(self) -> dict[str, Any]:
+        stdout = self._proc.stdout
+        if stdout is None:
+            raise _SandboxError("grading child has no stdout")
+        line = stdout.readline()
+        if not line:
+            raise _SandboxError("grading child exited")
+        try:
+            message = json.loads(line)
+        except ValueError as exc:
+            raise _SandboxError("grading child spoke non-JSON") from exc
+        if not isinstance(message, dict):
+            raise _SandboxError("grading child spoke non-JSON")
+        return message
+
+    def define(self, block: str) -> tuple[list[str], dict[str, Any]] | None:
+        """Exec the candidate in the child; None when it fails to define."""
+        with self._lock:
+            try:
+                self._send({"block": block})
+                reply = self._recv()
+            except (OSError, _SandboxError):
+                return None
+        if not reply.get("ok"):
+            return None
+        callables = reply.get("callables", [])
+        values = reply.get("values", {})
+        if not isinstance(callables, list) or not isinstance(values, dict):
+            return None
+        return [str(name) for name in callables], dict(values)
+
+    def call(self, name: str, args: tuple[Any, ...]) -> tuple[bool, Any]:
+        """Call one candidate function in the child; (ok, result-or-error)."""
+        with self._lock:
+            try:
+                self._send({"call": name, "args": list(args), "kwargs": {}})
+                reply = self._recv()
+            except (OSError, _SandboxError) as exc:
+                return False, f"sandbox: {exc}"
+        if not reply.get("ok"):
+            return False, reply.get("error", "call-failed")
+        return True, reply.get("result")
+
+    def close(self) -> None:
+        """Shut the child down; never raises, safe to call twice or late."""
+        with self._lock:
+            if self._closed:
+                return
+            self._closed = True
+        proc = self._proc
+        if proc.stdin is not None:
+            with contextlib.suppress(OSError):
+                proc.stdin.close()
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            with contextlib.suppress(OSError):
+                proc.kill()
+            with contextlib.suppress(subprocess.TimeoutExpired):
+                proc.wait(timeout=5)
+        if proc.stdout is not None:
+            with contextlib.suppress(OSError):
+                proc.stdout.close()
+
+    def abort(self) -> None:
+        """Kill the child immediately (timeout path); never raises."""
+        with self._lock:
+            if self._closed:
+                return
+            self._closed = True
+        proc = self._proc
+        with contextlib.suppress(OSError):
+            proc.kill()
+        with contextlib.suppress(subprocess.TimeoutExpired):
+            proc.wait(timeout=5)
+        for pipe in (proc.stdin, proc.stdout):
+            if pipe is not None:
+                with contextlib.suppress(OSError):
+                    pipe.close()
+
+
+class _SandboxNamespace(dict):
+    """A candidate namespace whose callables run in the grading child."""
+
+
+def _proxy_call(sandbox: _CandidateSandbox, name: str, args: tuple[Any, ...]) -> Any:
+    ok, result = sandbox.call(name, args)
+    if not ok:
+        raise RuntimeError(f"candidate call {name} failed: {result}")
+    return result
+
+
+def _proxy_namespace(
+    sandbox: _CandidateSandbox, callables: list[str], values: dict[str, Any]
+) -> _SandboxNamespace:
+    namespace = _SandboxNamespace(values)
+    for name in callables:
+
+        def _proxy(*args: Any, _name: str = name) -> Any:
+            return _proxy_call(sandbox, _name, args)
+
+        namespace[name] = _proxy
     return namespace
 
 
 def _exec_candidate(block: str, safe_modules: tuple[str, ...]) -> dict[str, Any] | None:
-    """Exec one answer in a bare namespace; None when it fails to define."""
+    """Exec one answer in the grading child; None when it fails to define.
+
+    The returned namespace holds plain JSON values plus proxy callables
+    that run in the child; the child exits when the namespace is collected.
+    """
     try:
-        namespace = _candidate_namespace(safe_modules)
-        exec(compile(block, "<eval>", "exec"), namespace)
-    except Exception:
+        sandbox = _CandidateSandbox(safe_modules)
+    except OSError:
         return None
+    try:
+        defined = sandbox.define(block)
+    except Exception:
+        sandbox.close()
+        return None
+    if defined is None:
+        sandbox.close()
+        return None
+    callables, values = defined
+    namespace = _proxy_namespace(sandbox, callables, values)
+    weakref.finalize(namespace, sandbox.close)
     return namespace
 
 
@@ -218,23 +454,41 @@ def _run_guarded(
     safe_modules: tuple[str, ...],
     timeout_seconds: float = CANDIDATE_TIMEOUT_SECONDS,
 ) -> bool:
-    """Exec plus assertions with a wall-clock bound (2 s per the design).
+    """Grade one answer in the child with a wall-clock bound (2 s per design).
 
-    A candidate that never returns keeps its daemon worker until process
-    exit; the grade itself always resolves at the timeout.
+    Model text never executes in this process: the child execs the block
+    and runs each candidate call while the parent only checks JSON results.
+    A candidate that never returns is killed at the timeout; the grade
+    itself always resolves, and the daemon worker exits with the pipes.
     """
     outcome: list[bool] = []
+    sandboxes: list[_CandidateSandbox] = []
 
     def attempt() -> None:
         try:
-            namespace = _exec_candidate(block, safe_modules)
-            outcome.append(namespace is not None and check(namespace))
+            sandbox = _CandidateSandbox(safe_modules)
+        except OSError:
+            outcome.append(False)
+            return
+        sandboxes.append(sandbox)
+        try:
+            defined = sandbox.define(block)
+            if defined is None:
+                outcome.append(False)
+                return
+            callables, values = defined
+            outcome.append(bool(check(_proxy_namespace(sandbox, callables, values))))
         except Exception:
             outcome.append(False)
+        finally:
+            sandbox.close()
 
     worker = threading.Thread(target=attempt, daemon=True)
     worker.start()
     worker.join(timeout_seconds)
+    if worker.is_alive():
+        for sandbox in sandboxes:
+            sandbox.abort()
     return len(outcome) == 1 and outcome[0]
 
 
@@ -246,7 +500,7 @@ def _grade(
     safe_modules: tuple[str, ...] = (),
     timeout_seconds: float = CANDIDATE_TIMEOUT_SECONDS,
 ) -> bool:
-    """Grade one answer: extract the code block, exec bare, run assertions."""
+    """Grade one answer: extract the code block, exec in the child, run assertions."""
     block = _extract_block(text, symbols)
     if block is None:
         return False
