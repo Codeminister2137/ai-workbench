@@ -522,6 +522,25 @@ def propose(
     return receipt
 
 
+def resolve_worktree_target(worktree: Path, rel_path: str) -> Path:
+    """Resolve a model-proposed path strictly inside *worktree*.
+
+    Rejects absolute paths, drive-qualified paths, and anything resolving
+    to the worktree root itself or outside it (``..`` escapes, symlinks).
+    Raises ValueError on rejection so the proposal fails closed.
+    """
+    if not isinstance(rel_path, str) or not rel_path.strip():
+        raise ValueError(f"Path rejected (not a relative file path): {rel_path!r}")
+    candidate = Path(rel_path)
+    if candidate.is_absolute() or candidate.drive:
+        raise ValueError(f"Absolute path rejected: {rel_path!r}")
+    root = worktree.resolve()
+    target = (root / candidate).resolve()
+    if target == root or root not in target.parents:
+        raise ValueError(f"Path escapes worktree: {rel_path!r}")
+    return target
+
+
 def workbench_implement(
     task: str,
     files: dict[str, str],
@@ -548,9 +567,20 @@ def workbench_implement(
         receipt["applied"] = False
         (out / "receipt.json").write_text(json.dumps(receipt, indent=2), encoding="utf-8")
         return receipt
+    # Validate every proposed path before writing anything: one escape
+    # rejects the whole proposal so there are never partial writes.
+    resolved: dict[str, Path] = {}
+    try:
+        for rel_path in proposal["changes"]:
+            resolved[rel_path] = resolve_worktree_target(worktree, rel_path)
+    except ValueError as exc:
+        receipt["applied"] = False
+        receipt["rejected_path"] = str(exc)
+        (out / "receipt.json").write_text(json.dumps(receipt, indent=2), encoding="utf-8")
+        return receipt
     # Apply changes under the Workbench worktree.
     for rel_path, content in proposal["changes"].items():
-        target = worktree / rel_path
+        target = resolved[rel_path]
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(content, encoding="utf-8")
     # Validate changed Python files.
@@ -559,7 +589,7 @@ def workbench_implement(
     validation_errors: list[str] = []
     for rel_path in changed:
         if rel_path.endswith(".py"):
-            target = worktree / rel_path
+            target = resolved[rel_path]
             result = run(
                 [sys.executable, "-m", "py_compile", str(target)],
                 timeout=60,
@@ -576,8 +606,8 @@ def workbench_implement(
         ruff_bin = str(ruff) if ruff.exists() else "ruff"
         for rel_path in changed:
             if rel_path.endswith(".py"):
-                run([ruff_bin, "check", "--fix", str(worktree / rel_path)], timeout=120)
-                run([ruff_bin, "format", str(worktree / rel_path)], timeout=120)
+                run([ruff_bin, "check", "--fix", str(resolved[rel_path])], timeout=120)
+                run([ruff_bin, "format", str(resolved[rel_path])], timeout=120)
         run(["git", "-C", str(worktree), "add", "-A"], timeout=120)
         commit = run(
             ["git", "-C", str(worktree), "commit", "-m", f"{out.name}: supervised Workbench slice"],
