@@ -268,3 +268,51 @@ Suggested owner questions: (1) confirm B-local-first vs any remote
 need that forces A sooner; (2) pick the first ChatGPT-replacement
 task class to evaluate for B; (3) answer P7 Q1–Q3 or explicitly park
 C; (4) confirm D-as-mode vs standalone council UI.
+
+## Owner directions (2026-11-01, chat)
+
+Decided this session: B1 (coding help) is the first B slice; B2/B3
+(research/planning, daily misc) follow later — they fit owner use more
+but B1 is the measurable first slice. P6 phased v1/v2/v3 confirmed.
+
+Security requirements for the company-site bot (C), recorded for its
+future workstream (P7/plan-04 gates still apply):
+
+- Purpose confinement: users can only use the bot for its intended
+  intake purpose, not as a general assistant.
+- Jailbreak resistance including social-engineering and
+  emotional-manipulation attempts ("stupid attacks" that work count).
+- No protected-data or cross-user-data leakage under any prompt story.
+- Design implication: system-prompt hardening alone is insufficient;
+  C needs capability sandboxing (narrow tools, no raw data access),
+  session isolation between visitors, and a red-team eval slice before
+  any public exposure.
+
+Operator chatbot direction: a UI copilot that explains which UI action
+achieves the owner's goal ("which button for X"), complementing
+tooltips; ideally also able to act for the user as a less-manual
+interaction mode. OPEN: acting for the user must not bypass the
+operator's exact-change approval boundary. Recommendation recorded:
+guidance-only v1; any bot-proposed action flows through the normal
+approval UI with the bot as proposer, never approver. Awaiting owner
+confirmation or an alternative line.
+
+Hosted-model tiering research (both hosted bots): public models need a
+quality floor but simple tasks must not burn frontier models. This is
+P2/L3 program work: per-task-class quality/cost frontiers measured by
+the L3 ladder, producing a tiering policy. Approved inside eval scope.
+
+Workbench bot: complex management of various code is the priority.
+It runs LOCAL - no hosting needed (models may still be remote, under
+privacy classes). A local supervisor is likely beneficial (reliable,
+cheap) but needs research: the L3 ladder plus local-vs-hosted
+task-class comparison answers whether local models clear the bar.
+Owner designation: the workbench bot is the "most unsafe" bot - the
+dashboard is built around it, a growing ecosystem runs through it, and
+mostly-unrestricted access is both powerful and dangerous. Recorded
+rule: the local bot gets the strongest internal guardrails
+(permissions, approvals, audit), not the weakest; local does not mean
+trusted. Each new chat capability (edits, run control, delegation)
+needs its approval story before it ships; v1 answering without tools
+is a safety feature, not just a scope limit. Remote use goes through
+the P3 thin client, keeping this bot off the public internet.

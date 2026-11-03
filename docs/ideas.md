@@ -150,3 +150,21 @@ Open product questions:
 - What model-quality threshold is good enough to replace ChatGPT/Codex for a
   given task class, and when should the dashboard deliberately route to hosted
   models instead of local ones?
+
+## Dashboard ideas tab (owner direction 2026-11-01)
+
+Fast capture inbox on the dashboard for owner brain-dumps, triaged in
+planning sessions into project directions (new project, extension,
+modification). Third-party mode: a guest (e.g. friend on the owner's
+phone) files an idea tagged "third-party idea" about software they need;
+the system evaluates it, plans, and reports to the owner, who judges the
+outcome (prototype, integrate into an existing app, commercial product).
+This rehearses future client intake. V1: capture list with source tags;
+triage agent later. Complements the owner-task inbox (assigned work) with
+an idea inbox (candidate work).
+
+Cross-cutting chat requirement (same session): every chat surface stays
+interruptible — user turns get answers without breaking in-flight runs
+(steering queue, non-blocking turns). Owner-confirmed P4 behavior.\
+- (2026-11-02, via operator Owner-replies thread) Company site chatbot: let users schedule online meetings with the owner (Google Calendar?), mainly after their product draft is finished; human contact earlier only if the client insists. Rationale: the entire human side rests on the owner.\
+- (2026-11-02, via operator Owner-replies thread) Workbench dashboard needs a workers view: running workers, their status etc. \u2014 development must be visualized clearly for the user.

@@ -227,7 +227,7 @@ Scale definitions, validation and the recompute command live in
 
 ### Per-route bands
 
-The 19 routes declared in `model_catalog.toml`, graded from the primary matched
+The 25 routes declared in `model_catalog.toml`, graded from the primary matched
 row in [route-upstream-family-mapping.md](route-upstream-family-mapping.md) —
 the row with the closest identity; alternate rows recorded there are not used.
 `—` means that source published no row for this route's family, so the route
@@ -254,10 +254,16 @@ stays ungraded in that column.
 | `requesty/openai/gpt-5-mini` | Frontier (88) | — | `family` |
 | `opencode-go/go-kimi-k2.7-code` | Strong (59.1) | Very strong (70.8) | `family` |
 | `openrouter/free-google/gemma-4-31b-it:free` | — | — | `unmatched` |
+| `meta/muse-spark-1.3` | — | — | `unmatched` |
+| `modal/qwen/qwen2.5-coder-7b-instruct` | Very weak (8) | Very weak (9) | `family` |
+| `baseten/baseten-hackathon-meta-models/muse-spark-open-1026` | — | — | `unmatched` |
+| `opencode-go/go-deepseek-v4.1-flash` | — | — | `unmatched` |
+| `requesty/free-nvidia/nemotron-3.5-lightning-30b-a3b` | — | — | `unmatched` |
+| `openrouter/free-dots-studio/dots-3-note-preview:free` | — | — | `unmatched` |
 
-14 routes are graded at `family` confidence and 5 stay ungraded; 10 carry an
-Aider band, 6 a SWE-bench band, and only `opencode-go/go-kimi-k2.7-code` and
-`ollama/qwen2.5-coder:14b` carry both.
+15 routes are graded at `family` confidence and 10 stay ungraded; 11 carry an
+Aider band, 7 a SWE-bench band, and only `opencode-go/go-kimi-k2.7-code`,
+`ollama/qwen2.5-coder:14b`, and `modal/qwen/qwen2.5-coder-7b-instruct` carry both.
 
 **How to read this table.**
 

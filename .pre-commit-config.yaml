@@ -7,6 +7,11 @@ repos:
         language: system
         stages: [pre-commit]
         types_or: [python, pyi]
+        # Sibling-tree mirrors live under the sibling repo's own ruff config
+        # (verified via overlay lint/test before commit); workbench rules
+        # misfire on them (e.g. pre-existing E731) and reformat whole files.
+        # Scoped to src|tests so workbench-native bundle scripts stay linted.
+        exclude: ^patches/operator-[^/]+/(src|tests)/
 
       - id: ruff-format
         name: ruff format
@@ -14,6 +19,8 @@ repos:
         language: system
         stages: [pre-commit]
         types_or: [python, pyi]
+        # Same as above: never reformat sibling mirrors with workbench style.
+        exclude: ^patches/operator-[^/]+/(src|tests)/
 
       - id: pyright
         name: pyright

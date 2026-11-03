@@ -207,6 +207,7 @@ def test_allowance_report_keeps_account_percentages_and_published_caps_separate(
 
 def test_allowance_report_without_observation_has_no_binding_window(monkeypatch):
     monkeypatch.setattr(go, "urlopen", lambda *a, **k: pytest.fail("Network attempted"))
+    monkeypatch.delenv("OPENCODE_API_KEY", raising=False)
     report = go.read_opencode_go_allowance(api_key=None, timeout_seconds=4)
     assert report["status"] == "unavailable"
     assert report["binding_window"] is None

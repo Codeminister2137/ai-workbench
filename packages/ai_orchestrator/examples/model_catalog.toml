@@ -516,7 +516,7 @@ cost_policy_tier = "allowances_allowed"
 quality = "high"
 latency = "interactive"
 base_url = "https://opencode.ai/inference/go/openai/v1"
-notes = "OpenCode Go Kimi K2.7 Code route. Requires OPENCODE_API_KEY. Provisional catalog entry; route-id naming may be normalized later."
+notes = "OpenCode Go Kimi K2.7 Code route. Requires OPENCODE_API_KEY. Provisional catalog entry; route-id naming may be normalized later. L3 2026-11-02: reproducible HTTP 400 on the T0 shape while deepseek-v4.1-flash on the same route passes — entry suspect, needs investigation."
 
 [models.capabilities]
 chat = true
@@ -559,6 +559,119 @@ input_cost_per_million_tokens = 1.25
 output_cost_per_million_tokens = 4.25
 source = "Meta Model API pricing page, checked 2026-10-27"
 source_url = "https://dev.meta.ai/docs/pricing-rate-limits"
+
+[models.metadata]
+provisional = true
+
+[[models]]
+route_id = "baseten/baseten-hackathon-meta-models/muse-spark-open-1026"
+provider = "baseten"
+product = "baseten_hackathon"
+model = "meta-models/muse-spark-open-1026"
+location = "external"
+access_method = "provider_api"
+auth_method = "api_key"
+billing_source = "baseten_api_billing"
+cost_policy_tier = "prepaid_credits_allowed"
+quality = "standard"
+latency = "interactive"
+notes = "Baseten hackathon grant route; finite grant pool treated as prepaid (no open billing). Requires BASETEN_HACKATHON_API_KEY. L3 ladder 2026-11-02: T0/T1/T2 PASS, T3 truncated at the 4096 output cap (same shape as Meta direct). Quality provisional; no grant-balance endpoint exists, owner confirms credits from the dashboard."
+
+[models.capabilities]
+chat = true
+streaming = false
+tools = false
+structured_output = false
+multimodal_input = false
+embeddings = false
+
+[models.metadata]
+provisional = true
+
+[[models]]
+route_id = "opencode-go/go-deepseek-v4.1-flash"
+provider = "opencode_go"
+product = "go"
+model = "deepseek-v4.1-flash"
+location = "external"
+access_method = "provider_api"
+auth_method = "api_key"
+billing_source = "opencode_go_subscription_allowance"
+cost_policy_tier = "allowances_allowed"
+quality = "standard"
+latency = "interactive"
+base_url = "https://opencode.ai/inference/go/openai/v1"
+notes = "OpenCode Go subscription-allowance route. Requires OPENCODE_API_KEY. L3 ladder 2026-11-02: full T0-T3 PASS (T3 in 1101 tokens), the only full clear that day; the Oct 31 429 account limit had lifted. Quality provisional."
+
+[models.capabilities]
+chat = true
+streaming = false
+tools = false
+structured_output = false
+multimodal_input = false
+embeddings = false
+
+[models.metadata]
+provisional = true
+
+[[models]]
+route_id = "requesty/free-nvidia/nemotron-3.5-lightning-30b-a3b"
+provider = "requesty"
+product = "requesty_free"
+model = "nvidia/nemotron-3.5-lightning-30b-a3b"
+location = "external"
+access_method = "provider_api"
+auth_method = "api_key"
+billing_source = "requesty_billing"
+cost_policy_tier = "free_only"
+quality = "standard"
+latency = "interactive"
+notes = "Requesty free-plan route. Live $0 price verification before every request. T0 PASS 2026-10-31 (~57/302t, $0) after the first zero-price pick (novita/ling-3.1-flash) returned a provider-edge 403; model choice matters on this route. Quality provisional, not evaluated."
+
+[models.capabilities]
+chat = true
+streaming = false
+tools = false
+structured_output = false
+multimodal_input = false
+embeddings = false
+
+[models.estimate]
+input_cost_per_million_tokens = 0
+output_cost_per_million_tokens = 0
+source = "Requesty live models API; $0 verified per request at runtime"
+source_url = "https://router.requesty.ai/v1/models"
+
+[models.metadata]
+provisional = true
+
+[[models]]
+route_id = "openrouter/free-dots-studio/dots-3-note-preview:free"
+provider = "openrouter"
+product = "openrouter_free"
+model = "dots-studio/dots-3-note-preview:free"
+location = "external"
+access_method = "provider_api"
+auth_method = "api_key"
+billing_source = "openrouter_free"
+cost_policy_tier = "free_only"
+quality = "standard"
+latency = "interactive"
+notes = "OpenRouter free variant. T0 PASS 2026-10-31 (~54/314t, $0) while sibling :free picks 503/429/404 the same day; free-tier capacity is flaky per model. Quality provisional, carries no leaderboard prior."
+
+[models.capabilities]
+chat = true
+streaming = false
+tools = false
+structured_output = false
+multimodal_input = false
+embeddings = false
+
+[models.estimate]
+input_cost_per_million_tokens = 0
+output_cost_per_million_tokens = 0
+source = "OpenRouter public models API; $0 verified per request at runtime"
+source_url = "https://openrouter.ai/api/v1/models"
 
 [models.metadata]
 provisional = true

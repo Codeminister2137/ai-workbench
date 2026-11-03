@@ -63,6 +63,8 @@ GROUPS = {
         "tests/test_opencode_go_adapter.py",
         "tests/test_opencode_go_protocol_adapters.py",
         "tests/test_opencode_go_route.py",
+        "tests/test_wb_bounds_guard.py",
+        "tests/test_wb_exec_sandbox.py",
     ),
     "orchestrator": (
         "tests/test_orchestrator_*.py",
@@ -91,6 +93,7 @@ GROUPS = {
         "tests/test_native_admission.py",
         "tests/test_measured_prefix_admission.py",
         "tests/test_operator_bridge.py",
+        "tests/test_wb_env_narrow.py",
     ),
     "cli": (
         "tests/repo_assistant/test_*.py",
@@ -121,6 +124,8 @@ GROUPS = {
         "tests/test_loop_resume.py",
         "tests/test_baseten_receipts.py",
         "tests/test_wake_on_lan.py",
+        "tests/test_day_cycle.py",
+        "tests/test_l3_ladder.py",
     ),
     "research": (
         "tests/test_research_*.py",
@@ -128,6 +133,7 @@ GROUPS = {
         "tests/test_acceptance_usage.py",
     ),
     "council": ("apps/ai_council/tests/test_*.py",),
+    "dashboard": ("apps/workbench_dashboard/tests/test_*.py",),
     "job-search": ("apps/job_search/job-email/test_*.py",),
     "live": ("tests/integration/test_*.py",),
 }

@@ -192,6 +192,49 @@ class SQLiteChatTranscriptStore:
             ).fetchone()
         return None if row is None else _session_from_row(row)
 
+    def rename_session(self, session_id: str, *, title: str) -> ChatSessionRecord | None:
+        """Rename one chat session; returns None when absent."""
+
+        self.initialize()
+        now = _utc_now()
+        with self._connect() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE chat_sessions
+                SET title = ?, updated_at_utc = ?
+                WHERE session_id = ?
+                """,
+                (_title_preview(title), now, session_id),
+            )
+            if cursor.rowcount == 0:
+                return None
+            row = connection.execute(
+                """
+                SELECT session_id, created_at_utc, updated_at_utc, repo_root,
+                       title, privacy_class, status
+                FROM chat_sessions
+                WHERE session_id = ?
+                """,
+                (session_id,),
+            ).fetchone()
+        return None if row is None else _session_from_row(row)
+
+    def delete_session(self, session_id: str) -> bool:
+        """Delete a session with its messages and summaries; False when absent."""
+
+        self.initialize()
+        with self._connect() as connection:
+            cursor = connection.execute(
+                "DELETE FROM chat_sessions WHERE session_id = ?", (session_id,)
+            )
+            if cursor.rowcount == 0:
+                return False
+            connection.execute("DELETE FROM chat_messages WHERE session_id = ?", (session_id,))
+            connection.execute(
+                "DELETE FROM chat_rolling_summaries WHERE session_id = ?", (session_id,)
+            )
+        return True
+
     def latest_session(self, *, repo_root: Path | None = None) -> ChatSessionRecord | None:
         """Return the most recently updated session, optionally scoped to a repo."""
 

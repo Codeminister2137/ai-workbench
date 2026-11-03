@@ -173,13 +173,18 @@ def main(argv=None) -> int:
     parser.add_argument("--run-dir", type=Path, required=True)
     parser.add_argument("--event", required=True)
     parser.add_argument("--subject", required=True)
-    parser.add_argument("--body", required=True)
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("--body", default=None)
+    group.add_argument("--body-file", type=Path, default=None)
     parser.add_argument("--to", default=None)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
+    body = args.body
+    if args.body_file is not None:
+        body = args.body_file.read_text(encoding="utf-8-sig")
     receipt = send_ping(
         subject=args.subject,
-        body=args.body,
+        body=body,
         run_dir=args.run_dir.resolve(),
         event=args.event,
         recipient=args.to,

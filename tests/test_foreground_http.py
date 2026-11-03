@@ -483,7 +483,25 @@ class TestIncompleteHttpRequests:
             assert not host.scopes
             assert not host.thread.is_alive()
             client.settimeout(1)
-            assert client.recv(1) == b""
+            first = client.recv(1)
+            if first == b"H":
+                # The handler's fail-closed error reply raced connection
+                # shutdown (dispatch answers 401 once close clears scopes).
+                # Read the status line and require a refusal, never a grant.
+                line = first
+                deadline = time.monotonic() + 2
+                while b"\r\n" not in line and time.monotonic() < deadline:
+                    try:
+                        chunk = client.recv(1)
+                    except TimeoutError:
+                        break
+                    if chunk == b"":
+                        break
+                    line += chunk
+                assert line.startswith(b"HTTP/"), line
+                assert b" 200 " not in line, line
+            else:
+                assert first == b"", first
         finally:
             client.close()
             if closer.ident is not None:

@@ -1,3 +1,14 @@
+## ADR-080 - Cost-tier fallback walks within the authorized tier
+
+**Status:** Accepted by the owner, 2026-11-02.
+
+On model failure, try the next candidate within the authorized tier (up to 3
+per route); never escalate tiers without approval. Mechanism in
+`ai_provider.route_eval` (ordered walk, all attempts recorded), policy in
+`scripts/l3_ladder.py` (orchestrator catalog resolution, tier gates, live $0
+refresh for free routes). First-row auto-pick retired. See
+[ADR-080](decisions/ADR-080-cost-tier-fallback-within-authorized-tier.md).
+
 ## ADR-079 - Submission runtime calls only Meta models
 
 **Status:** Owner-accepted constraint, recorded 2026-10-29; ai-workbench showcase

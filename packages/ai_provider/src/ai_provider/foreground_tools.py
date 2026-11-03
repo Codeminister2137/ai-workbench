@@ -25,6 +25,37 @@ if TYPE_CHECKING:
 
 ACTIVE_FOREGROUND: ContextVar[ForegroundTools | None] = ContextVar("foreground_tools", default=None)
 
+#: Host variables safe to expose to the MCP child process. Session auth travels
+#: via the single-use token variable; every other ambient secret stays with the CLI.
+CHILD_ENV_ALLOWLIST = frozenset(
+    {
+        "PATH",
+        "PATHEXT",
+        "SYSTEMROOT",
+        "WINDIR",
+        "COMSPEC",
+        "TEMP",
+        "TMP",
+        "HOME",
+        "USERPROFILE",
+        "APPDATA",
+        "LOCALAPPDATA",
+        "PROGRAMFILES",
+        "PROGRAMFILES(X86)",
+        "LANG",
+        "LC_ALL",
+    }
+)
+
+
+def _child_env(token_env_name: str, token: str) -> dict[str, str]:
+    """Build the MCP child's explicit environment: host allowlist plus session token."""
+    environment = {
+        name: value for name, value in os.environ.items() if name.upper() in CHILD_ENV_ALLOWLIST
+    }
+    environment[token_env_name] = token
+    return environment
+
 
 class ForegroundTools:
     """Runtime ownership survives routes, but never the CLI's lifetime."""
@@ -112,7 +143,7 @@ class ForegroundTools:
                 config,
                 shared_host_url=host.url,
                 shared_token_env=environment_name,
-                shared_child_env={**os.environ, environment_name: token},
+                shared_child_env=_child_env(environment_name, token),
                 shared_available_tools=tuple(d.name for d in registry.list_definitions()),
             )
         finally:

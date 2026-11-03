@@ -1,28 +1,45 @@
-"""One-shot micro-evaluation across reachable chat routes (L3 evidence).
+"""PASS-gated micro-evaluation ladder across reachable chat routes (L3 evidence).
 
-Sends one fixed tiny task per route — complete a three-line function — and
-checks the answer deterministically. The prompt is synthetic and carries no
-repository content (PUBLIC_OR_LOW_RISK), outputs are capped at 256 tokens,
-and usage is recorded when the provider reports it. Typical cost is a few
-cents of grant credit across all routes.
+T0 completes a three-line function; T1 implements a small two-function
+module; T2 repairs a buggy function; T3 builds a module from a short spec.
+Each route attempts T(n+1) only after Tn passes, so a failing route spends
+nothing further. Prompts are synthetic and carry no repository content
+(PUBLIC_OR_LOW_RISK with the ADR-063 public attestation), grading is
+deterministic subprocess-sandbox exec (temperature 0.0, one attempt per task, no
+retries), and usage plus a planning-only cost estimate are recorded when the
+provider reports usage.
+
+Model selection is caller-owned: ``main()`` walks explicit per-route
+candidates from a ``--candidates`` file, and ``scripts/l3_ladder.py``
+resolves those candidates through the orchestrator catalog with cost-tier
+gating (ADR-080). This module never substitutes its own picks.
 """
 
 from __future__ import annotations
 
 import argparse
+import contextlib
 import dataclasses
 import json
+import math
+import os
 import re
+import subprocess
+import sys
+import threading
 import time
+import weakref
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 from ai_provider import route_probe
-from ai_provider.adapters.baseten import BASETEN_HACKATHON_MODEL
 from ai_provider.adapters.openai_compatible import _zero_price_row
 from ai_provider.config import BackendConfig, ProviderKind
 from ai_provider.contracts import AIMessage, AIRequest, MessageRole, PrivacyClass
+from ai_provider.errors import ProviderError, ProviderErrorCategory
 from ai_provider.factory import create_chat_client
+from ai_provider.secrets import load_dotenv
 from ai_provider.source_info import _utc_now
 
 TASK = (
@@ -32,10 +49,70 @@ TASK = (
 )
 MAX_OUTPUT_TOKENS = 1024
 
+TASK_T1 = (
+    "Implement two pure functions so the examples hold. "
+    "Reply with ONLY the functions in a ```python block, no explanation. "
+    "Use only plain arithmetic, comparisons, if/else, and for/while loops: "
+    "no builtin functions (no len/range/sum), no imports, no printing:\n"
+    "```python\n"
+    "def clamp(value, lo, hi):\n"
+    "    return\n"
+    "\n"
+    "def retry_delay_ms(base_ms, factor, attempt):\n"
+    "    return\n"
+    "```\n"
+    "clamp returns value limited to [lo, hi]. retry_delay_ms returns "
+    "base_ms * factor**attempt with attempt counting from 0. Examples: "
+    "clamp(5, 0, 10) == 5; clamp(-3, 0, 10) == 0; "
+    "retry_delay_ms(100, 2, 0) == 100; retry_delay_ms(100, 2, 3) == 800."
+)
+# Raised 2026-11-02 (was 2048): dots-studio T1 hit exactly 2048 output
+# tokens (truncated FAIL); per docs/limits-register.md the headroom is cheaper
+# than a rerun.
+MAX_OUTPUT_TOKENS_T1 = 4096
+
+TASK_T2 = (
+    "This function has a bug: is_retryable(500) should be True but it returns "
+    "False. Reply with ONLY the fixed function in a ```python block, no "
+    "explanation. Use only plain comparisons and if/else: no builtin "
+    "functions, no imports:\n"
+    "```python\n"
+    "def is_retryable(status):\n"
+    "    return status == 429\n"
+    "```\n"
+    "It must return True for status 429 and for any 5xx status (500-599 "
+    "inclusive), and False otherwise. Failing test: is_retryable(500) == True."
+)
+MAX_OUTPUT_TOKENS_T2 = 2048
+
+TASK_T3 = (
+    "Implement a small statistics module with these three functions. Reply "
+    "with ONLY the functions in a ```python block, no explanation. Use only "
+    "plain arithmetic, comparisons, if/else, and for/while loops over the "
+    "input lists: no builtin functions (no len/sum/min/max), no printing. "
+    "You may `import math`; any other import fails.\n"
+    "- mean(values): arithmetic mean of a non-empty list of numbers.\n"
+    "- stragglers(values, band): the values strictly outside "
+    "[mean(values) - band, mean(values) + band], in input order. band >= 0.\n"
+    "- rmse(values, target): square root of the mean squared deviation from "
+    "target (math.sqrt is allowed).\n"
+    "For example, mean([2, 4]) is 3.0, and stragglers([0, 10], 1) returns both "
+    "inputs in order. (Illustrative only; grading uses other values.)"
+)
+# 2026-11-02 live evidence: Meta muse-spark-1.3 and the Baseten open model both
+# hit exactly 4096 output tokens on T3 (truncated FAIL); 16384 matches the repo
+# convention for coding-sized outputs (see docs/limits-register.md).
+MAX_OUTPUT_TOKENS_T3 = 16384
+
+TASKS: tuple[str, ...] = ("T0", "T1", "T2", "T3")
+
+CANDIDATE_TIMEOUT_SECONDS = 2.0
+"""Wall-clock bound for grading one candidate answer (exec + assertions)."""
+
 
 @dataclasses.dataclass(frozen=True)
 class EvalResult:
-    """Deterministic outcome of one route's micro-evaluation."""
+    """Deterministic outcome of one route's evaluation on one ladder task."""
 
     route: str
     model: str
@@ -45,46 +122,539 @@ class EvalResult:
     input_tokens: int | None
     output_tokens: int | None
     error: str | None
+    task_id: str = "T0"
+    cost_usd_est: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return dataclasses.asdict(self)
 
     def summary(self) -> str:
+        where = f"{self.route}/{self.task_id} ({self.model})"
         if self.error:
-            return f"{self.route} ({self.model}): ERROR {self.error}"
+            return f"{where}: ERROR {self.error}"
         verdict = "PASS" if self.passed else "FAIL"
         usage = (
             f"{self.input_tokens}/{self.output_tokens}t"
             if self.input_tokens is not None
             else "usage-unknown"
         )
-        return f"{self.route} ({self.model}): {verdict} {self.latency_ms}ms {usage}"
+        cost = f" ~${self.cost_usd_est:.4f}" if self.cost_usd_est is not None else ""
+        return f"{where}: {verdict} {self.latency_ms}ms {usage}{cost}"
 
 
 def check_completion(text: str) -> bool:
-    """Run the returned function in a bare namespace and assert add2(2) == 4."""
+    """Grade the T0 completion: add2(2) == 4, executed in the grading child."""
+
+    def check(namespace: dict[str, Any]) -> bool:
+        candidate = namespace.get("add2")
+        if not callable(candidate):
+            return False
+        try:
+            return bool(candidate(2) == 4)
+        except Exception:
+            return False
+
+    return _grade(text, symbols=("def add2",), check=check)
+
+
+_SANDBOX_SCRIPT = r'''
+"""Grading child: exec one candidate answer, then serve calls over stdio JSON."""
+import json
+import math
+import re
+import sys
+
+_SAFE = {"math": math, "re": re, "json": json}
+_ALLOWED = frozenset(filter(None, (sys.argv[1] if len(sys.argv) > 1 else "").split(",")))
+
+
+def _restricted_import(name, *args, **kwargs):
+    if name in _ALLOWED:
+        return _SAFE[name]
+    raise ImportError("import of %r is not allowed in eval answers" % (name,))
+
+
+_NAMESPACE = {"__builtins__": {"__import__": _restricted_import}}
+for _name in _ALLOWED:
+    if _name in _SAFE:
+        _NAMESPACE[_name] = _SAFE[_name]
+
+
+def _send(obj):
+    sys.stdout.write(json.dumps(obj) + "\n")
+    sys.stdout.flush()
+
+
+try:
+    _request = json.loads(sys.stdin.readline() or "{}")
+    _block = _request.get("block", "")
+    if not isinstance(_block, str):
+        raise ValueError("candidate block must be text")
+    exec(compile(_block, "<eval>", "exec"), _NAMESPACE)
+except Exception as _exc:
+    try:
+        _send({"ok": False, "error": type(_exc).__name__})
+    except Exception:
+        pass
+    sys.exit(0)
+
+_callables = sorted(
+    _key for _key, _value in _NAMESPACE.items()
+    if callable(_value) and not _key.startswith("__")
+)
+_values = {}
+for _key, _value in _NAMESPACE.items():
+    if _key.startswith("__") or callable(_value):
+        continue
+    try:
+        json.dumps(_value)
+    except (TypeError, ValueError):
+        continue
+    _values[_key] = _value
+_send({"ok": True, "callables": _callables, "values": _values})
+
+for _line in sys.stdin:
+    try:
+        _message = json.loads(_line)
+    except ValueError:
+        continue
+    if not isinstance(_message, dict) or "done" in _message:
+        break
+    _arguments = _message.get("args", [])
+    _keywords = _message.get("kwargs", {})
+    if not isinstance(_arguments, list) or not isinstance(_keywords, dict):
+        _send({"ok": False, "error": "bad-call"})
+        continue
+    _function = _NAMESPACE.get(_message.get("call"))
+    if not callable(_function):
+        _send({"ok": False, "error": "not-callable"})
+        continue
+    try:
+        _result = _function(*_arguments, **_keywords)
+    except Exception as _exc:
+        _send({"ok": False, "error": type(_exc).__name__})
+        continue
+    try:
+        _send({"ok": True, "result": _result})
+    except (TypeError, ValueError):
+        _send({"ok": False, "error": "unserializable"})
+'''
+"""Source of the grading child: model text is exec'd only in that process."""
+
+
+def _sandbox_env() -> dict[str, str]:
+    """Minimal child environment: OS needs ride along, secrets do not."""
+    env = {
+        "PYTHONSAFEPATH": "1",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONNOUSERSITE": "1",
+        "PYTHONIOENCODING": "utf-8",
+    }
+    for name in (
+        "SystemRoot",
+        "windir",
+        "PATH",
+        "Path",
+        "PATHEXT",
+        "TEMP",
+        "TMP",
+        "HOME",
+        "LANG",
+        "LC_ALL",
+        "LC_CTYPE",
+    ):
+        value = os.environ.get(name)
+        if value:
+            env[name] = value
+    return env
+
+
+class _SandboxError(RuntimeError):
+    """The grading child died or spoke non-JSON; the grade is FAIL."""
+
+
+def _extract_block(text: str, symbols: tuple[str, ...]) -> str | None:
+    """First fenced block defining a wanted symbol, or the raw text unfenced."""
     block = text
     if "```" in text:
         parts = text.split("```")
-        candidates = [part for part in parts if "def add2" in part]
+        candidates = [part for part in parts if any(marker in part for marker in symbols)]
         if not candidates:
-            return False
+            return None
         block = candidates[0]
-        if block.lstrip().startswith("python"):
-            block = block.lstrip()[len("python") :]
-    namespace: dict[str, Any] = {"__builtins__": {}}
+        stripped = block.lstrip()
+        if stripped.startswith("python"):
+            block = stripped[len("python") :]
+    return block
+
+
+class _CandidateSandbox:
+    """One short-lived child grading one candidate answer.
+
+    Model text is exec'd ONLY in the child, in a bare namespace (no
+    builtins, only the task's named-safe modules, pre-bound AND importable
+    through a restricted ``__import__``). The parent process sees JSON
+    values plus proxy callables, so a dunder escape in model output cannot
+    reach parent-process state: no parent modules, globals, or handles.
+    """
+
+    def __init__(self, safe_modules: tuple[str, ...]) -> None:
+        self._lock = threading.Lock()
+        self._closed = False
+        self._proc = subprocess.Popen(
+            [sys.executable, "-I", "-c", _SANDBOX_SCRIPT, ",".join(safe_modules)],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            env=_sandbox_env(),
+        )
+
+    def _send(self, obj: dict[str, Any]) -> None:
+        stdin = self._proc.stdin
+        if stdin is None:
+            raise _SandboxError("grading child has no stdin")
+        stdin.write(json.dumps(obj) + "\n")
+        stdin.flush()
+
+    def _recv(self) -> dict[str, Any]:
+        stdout = self._proc.stdout
+        if stdout is None:
+            raise _SandboxError("grading child has no stdout")
+        line = stdout.readline()
+        if not line:
+            raise _SandboxError("grading child exited")
+        try:
+            message = json.loads(line)
+        except ValueError as exc:
+            raise _SandboxError("grading child spoke non-JSON") from exc
+        if not isinstance(message, dict):
+            raise _SandboxError("grading child spoke non-JSON")
+        return message
+
+    def define(self, block: str) -> tuple[list[str], dict[str, Any]] | None:
+        """Exec the candidate in the child; None when it fails to define."""
+        with self._lock:
+            try:
+                self._send({"block": block})
+                reply = self._recv()
+            except (OSError, _SandboxError):
+                return None
+        if not reply.get("ok"):
+            return None
+        callables = reply.get("callables", [])
+        values = reply.get("values", {})
+        if not isinstance(callables, list) or not isinstance(values, dict):
+            return None
+        return [str(name) for name in callables], dict(values)
+
+    def call(self, name: str, args: tuple[Any, ...]) -> tuple[bool, Any]:
+        """Call one candidate function in the child; (ok, result-or-error)."""
+        with self._lock:
+            try:
+                self._send({"call": name, "args": list(args), "kwargs": {}})
+                reply = self._recv()
+            except (OSError, _SandboxError) as exc:
+                return False, f"sandbox: {exc}"
+        if not reply.get("ok"):
+            return False, reply.get("error", "call-failed")
+        return True, reply.get("result")
+
+    def close(self) -> None:
+        """Shut the child down; never raises, safe to call twice or late."""
+        with self._lock:
+            if self._closed:
+                return
+            self._closed = True
+        proc = self._proc
+        if proc.stdin is not None:
+            with contextlib.suppress(OSError):
+                proc.stdin.close()
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            with contextlib.suppress(OSError):
+                proc.kill()
+            with contextlib.suppress(subprocess.TimeoutExpired):
+                proc.wait(timeout=5)
+        if proc.stdout is not None:
+            with contextlib.suppress(OSError):
+                proc.stdout.close()
+
+    def abort(self) -> None:
+        """Kill the child immediately (timeout path); never raises."""
+        with self._lock:
+            if self._closed:
+                return
+            self._closed = True
+        proc = self._proc
+        with contextlib.suppress(OSError):
+            proc.kill()
+        with contextlib.suppress(subprocess.TimeoutExpired):
+            proc.wait(timeout=5)
+        for pipe in (proc.stdin, proc.stdout):
+            if pipe is not None:
+                with contextlib.suppress(OSError):
+                    pipe.close()
+
+
+class _SandboxNamespace(dict):
+    """A candidate namespace whose callables run in the grading child."""
+
+
+def _proxy_call(sandbox: _CandidateSandbox, name: str, args: tuple[Any, ...]) -> Any:
+    ok, result = sandbox.call(name, args)
+    if not ok:
+        raise RuntimeError(f"candidate call {name} failed: {result}")
+    return result
+
+
+def _proxy_namespace(
+    sandbox: _CandidateSandbox, callables: list[str], values: dict[str, Any]
+) -> _SandboxNamespace:
+    namespace = _SandboxNamespace(values)
+    for name in callables:
+
+        def _proxy(*args: Any, _name: str = name) -> Any:
+            return _proxy_call(sandbox, _name, args)
+
+        namespace[name] = _proxy
+    return namespace
+
+
+def _exec_candidate(block: str, safe_modules: tuple[str, ...]) -> dict[str, Any] | None:
+    """Exec one answer in the grading child; None when it fails to define.
+
+    The returned namespace holds plain JSON values plus proxy callables
+    that run in the child; the child exits when the namespace is collected.
+    """
     try:
-        # Bare namespace without builtins: the snippet can only define add2.
-        exec(compile(block, "<eval>", "exec"), namespace)
-    except Exception:
-        return False
-    candidate = namespace.get("add2")
-    if not callable(candidate):
-        return False
+        sandbox = _CandidateSandbox(safe_modules)
+    except OSError:
+        return None
     try:
-        return bool(candidate(2) == 4)
+        defined = sandbox.define(block)
     except Exception:
+        sandbox.close()
+        return None
+    if defined is None:
+        sandbox.close()
+        return None
+    callables, values = defined
+    namespace = _proxy_namespace(sandbox, callables, values)
+    weakref.finalize(namespace, sandbox.close)
+    return namespace
+
+
+def _run_guarded(
+    block: str,
+    check: Callable[[dict[str, Any]], bool],
+    safe_modules: tuple[str, ...],
+    timeout_seconds: float = CANDIDATE_TIMEOUT_SECONDS,
+) -> bool:
+    """Grade one answer in the child with a wall-clock bound (2 s per design).
+
+    Model text never executes in this process: the child execs the block
+    and runs each candidate call while the parent only checks JSON results.
+    A candidate that never returns is killed at the timeout; the grade
+    itself always resolves, and the daemon worker exits with the pipes.
+    """
+    outcome: list[bool] = []
+    sandboxes: list[_CandidateSandbox] = []
+
+    def attempt() -> None:
+        try:
+            sandbox = _CandidateSandbox(safe_modules)
+        except OSError:
+            outcome.append(False)
+            return
+        sandboxes.append(sandbox)
+        try:
+            defined = sandbox.define(block)
+            if defined is None:
+                outcome.append(False)
+                return
+            callables, values = defined
+            outcome.append(bool(check(_proxy_namespace(sandbox, callables, values))))
+        except Exception:
+            outcome.append(False)
+        finally:
+            sandbox.close()
+
+    worker = threading.Thread(target=attempt, daemon=True)
+    worker.start()
+    worker.join(timeout_seconds)
+    if worker.is_alive():
+        for sandbox in sandboxes:
+            sandbox.abort()
+    return len(outcome) == 1 and outcome[0]
+
+
+def _grade(
+    text: str,
+    *,
+    symbols: tuple[str, ...],
+    check: Callable[[dict[str, Any]], bool],
+    safe_modules: tuple[str, ...] = (),
+    timeout_seconds: float = CANDIDATE_TIMEOUT_SECONDS,
+) -> bool:
+    """Grade one answer: extract the code block, exec in the child, run assertions."""
+    block = _extract_block(text, symbols)
+    if block is None:
         return False
+    return _run_guarded(block, check, safe_modules, timeout_seconds)
+
+
+_T1_CLAMP_CASES = (
+    # First two rows are the prompt's visible examples; the rest are held.
+    (5, 0, 10, 5),
+    (-3, 0, 10, 0),
+    (99, 0, 10, 10),
+    (0, 0, 10, 0),
+    (10, 0, 10, 10),
+    (7, 7, 7, 7),
+    (2.5, 0, 1, 1),
+    (-5, -10, -1, -5),
+)
+_T1_DELAY_CASES = (
+    (100, 2, 0, 100),
+    (100, 2, 3, 800),
+    (50, 1, 5, 50),
+    (10, 3, 2, 90),
+    (100, 0.5, 2, 25.0),
+    (200, 2, 10, 204800),
+)
+
+
+def check_t1(text: str) -> bool:
+    """Grade the T1 small module: clamp plus retry_delay_ms over held edges."""
+
+    def check(namespace: dict[str, Any]) -> bool:
+        clamp = namespace.get("clamp")
+        delay = namespace.get("retry_delay_ms")
+        if not callable(clamp) or not callable(delay):
+            return False
+        try:
+            for value, lo, hi, want in _T1_CLAMP_CASES:
+                if clamp(value, lo, hi) != want:
+                    return False
+            for base, factor, attempt, want in _T1_DELAY_CASES:
+                if delay(base, factor, attempt) != want:
+                    return False
+        except Exception:
+            return False
+        return True
+
+    return _grade(text, symbols=("def clamp", "def retry_delay_ms"), check=check)
+
+
+_T2_CASES = (
+    # (status, retryable): the 500 row is the prompt's failing test.
+    (429, True),
+    (500, True),
+    (502, True),
+    (503, True),
+    (504, True),
+    (598, True),
+    (599, True),
+    (200, False),
+    (400, False),
+    (404, False),
+    (499, False),
+    (600, False),
+)
+
+
+def check_t2(text: str) -> bool:
+    """Grade the T2 repair: the failing test plus the regression set."""
+
+    def check(namespace: dict[str, Any]) -> bool:
+        candidate = namespace.get("is_retryable")
+        if not callable(candidate):
+            return False
+        try:
+            for status, want in _T2_CASES:
+                if candidate(status) is not want:
+                    return False
+        except Exception:
+            return False
+        return True
+
+    return _grade(text, symbols=("def is_retryable",), check=check)
+
+
+_T3_MEAN_CASES = (
+    ((1, 2, 3), 2.0),
+    ((5,), 5.0),
+    ((0, 0, 0, 10), 2.5),
+    ((-4, 4), 0.0),
+    ((1.5, 2.5), 2.0),
+    ((10, 20, 30, 40), 25.0),
+)
+_T3_STRAGGLER_CASES = (
+    ((2, 4, 4, 4, 5, 9), 2, [2, 9]),
+    ((1, 2, 3, 4, 100), 10, [1, 2, 3, 4, 100]),
+    ((10, 10, 10), 0, []),
+    ((50, 1, 2, 3), 5, [50, 1, 2, 3]),
+    ((7,), 1, []),
+)
+_T3_RMSE_CASES = (
+    ((4, 6), 5, 1.0),
+    ((2, 8), 5, 3.0),
+    ((5, 5), 5, 0.0),
+    ((5, 5, 5, 9), 5, 2.0),
+)
+
+
+def check_t3(text: str) -> bool:
+    """Grade the T3 spec build: mean, stragglers, rmse, all hidden tests."""
+
+    def check(namespace: dict[str, Any]) -> bool:
+        mean: Callable[..., Any] | None = namespace.get("mean")
+        stragglers: Callable[..., Any] | None = namespace.get("stragglers")
+        rmse: Callable[..., Any] | None = namespace.get("rmse")
+        if not callable(mean) or not callable(stragglers) or not callable(rmse):
+            return False
+        try:
+            for values, want in _T3_MEAN_CASES:
+                if mean(list(values)) != want:
+                    return False
+            for values, band, want in _T3_STRAGGLER_CASES:
+                if stragglers(list(values), band) != want:
+                    return False
+            for values, target, want in _T3_RMSE_CASES:
+                if not math.isclose(rmse(list(values), target), want, rel_tol=1e-9):
+                    return False
+        except Exception:
+            return False
+        return True
+
+    return _grade(
+        text,
+        symbols=("def mean", "def stragglers", "def rmse"),
+        check=check,
+        safe_modules=("math",),
+    )
+
+
+@dataclasses.dataclass(frozen=True)
+class TaskSpec:
+    """One ladder task: synthetic prompt, output cap, and grader."""
+
+    task_id: str
+    prompt: str
+    max_output_tokens: int
+    check: Callable[[str], bool]
+
+
+TASK_SPECS: dict[str, TaskSpec] = {
+    "T0": TaskSpec("T0", TASK, MAX_OUTPUT_TOKENS, check_completion),
+    "T1": TaskSpec("T1", TASK_T1, MAX_OUTPUT_TOKENS_T1, check_t1),
+    "T2": TaskSpec("T2", TASK_T2, MAX_OUTPUT_TOKENS_T2, check_t2),
+    "T3": TaskSpec("T3", TASK_T3, MAX_OUTPUT_TOKENS_T3, check_t3),
+}
 
 
 def _short_error(error: Exception) -> str:
@@ -93,13 +663,77 @@ def _short_error(error: Exception) -> str:
     return f"{type(error).__name__}: {scrubbed[:150]}"
 
 
-def run_eval(client: Any, route: str, model: str) -> EvalResult:
-    """Send the fixed task through one client and grade deterministically."""
+_FREE_TIER_ROUTES = frozenset({"openrouter", "requesty"})
+"""Routes whose model selection enforces free-tier picks (see list_free_candidates)."""
+
+_SPARK_STANDARD_PER_MTOK = (1.25, 4.25)
+"""Planning-only Meta rate: $1.25 input / $4.25 output per M tokens."""
+
+
+def estimate_cost_usd(
+    route: str, input_tokens: int | None, output_tokens: int | None
+) -> float | None:
+    """Planning-only cost estimate: price table times usage.
+
+    Provider billing is truth. Free-tier routes estimate $0; routes without
+    a planning rate return None rather than an imputed guess.
+    """
+    if input_tokens is None or output_tokens is None:
+        return None
+    if route in _FREE_TIER_ROUTES:
+        return 0.0
+    if route == "meta":
+        per_input, per_output = _SPARK_STANDARD_PER_MTOK
+        return (input_tokens * per_input + output_tokens * per_output) / 1_000_000
+    return None
+
+
+_PARKED_CATEGORIES = frozenset(
+    {
+        ProviderErrorCategory.AUTHENTICATION,
+        ProviderErrorCategory.RATE_LIMIT,
+        ProviderErrorCategory.USAGE_LIMIT,
+    }
+)
+_PARKED_STATUS = re.compile(r"\b(401|403|429)\b")
+
+PARKED_STREAK_LIMIT = 2
+"""Consecutive parked errors that stop a candidate walk (account-level wall)."""
+
+
+def _is_parked_refusal(error: Exception) -> bool:
+    """Account-level refusals (auth/rate-limit, incl. raw 401/403/429 markers).
+
+    Observed shapes: Requesty-Novita HTTP 403 edge refusals, OpenCode HTTP
+    429 account limits. A parked route stops the ladder with no retry-spend.
+    """
+    if isinstance(error, ProviderError) and error.category in _PARKED_CATEGORIES:
+        return True
+    return bool(_PARKED_STATUS.search(str(error)))
+
+
+def run_eval(
+    client: Any,
+    route: str,
+    model: str,
+    *,
+    task_id: str = "T0",
+    max_output_tokens: int | None = None,
+) -> EvalResult:
+    """Send one ladder task through one client and grade deterministically.
+
+    ``max_output_tokens`` overrides the task spec cap for this attempt only.
+    """
+    spec = TASK_SPECS.get(task_id)
+    if spec is None:
+        raise ValueError(f"unknown route-eval task: {task_id!r}")
     checked = _utc_now()
     request = AIRequest(
-        messages=(AIMessage(MessageRole.USER, TASK),),
+        messages=(AIMessage(MessageRole.USER, spec.prompt),),
         temperature=0.0,
-        max_output_tokens=MAX_OUTPUT_TOKENS,
+        max_output_tokens=(
+            max_output_tokens if max_output_tokens is not None else spec.max_output_tokens
+        ),
         privacy_class=PrivacyClass.PUBLIC_OR_LOW_RISK,
         # Fixed synthetic prompt: satisfies the ADR-063 public attestation
         # branch of the OpenRouter free-tier retention guard.
@@ -109,19 +743,88 @@ def run_eval(client: Any, route: str, model: str) -> EvalResult:
     try:
         response = client.complete(request)
     except Exception as error:
-        return EvalResult(route, model, checked, False, None, None, None, _short_error(error))
+        short = _short_error(error)
+        if _is_parked_refusal(error):
+            short = f"parked:{short}"
+        return EvalResult(route, model, checked, False, None, None, None, short, task_id=task_id)
     latency_ms = int((time.monotonic() - started) * 1000)
     usage = response.usage
+    input_tokens = getattr(usage, "input_tokens", None)
+    output_tokens = getattr(usage, "output_tokens", None)
     return EvalResult(
         route,
         model,
         checked,
-        check_completion(response.message.content or ""),
+        spec.check(response.message.content or ""),
         latency_ms,
-        getattr(usage, "input_tokens", None),
-        getattr(usage, "output_tokens", None),
+        input_tokens,
+        output_tokens,
         None,
+        task_id=task_id,
+        cost_usd_est=estimate_cost_usd(route, input_tokens, output_tokens),
     )
+
+
+def run_ladder(
+    client: Any,
+    route: str,
+    model: str,
+    *,
+    tasks: tuple[str, ...] = TASKS,
+    stop_on_fail: bool = True,
+    max_output_tokens: dict[str, int] | None = None,
+) -> list[EvalResult]:
+    """Attempt ladder tasks in order; PASS-gated by default.
+
+    With gating (the default), the first FAIL or transport error ends the
+    ladder so a failing route spends nothing further. Pass
+    ``stop_on_fail=False`` to collect a full card on $0 free-tier routes.
+    Results stay in task order, so evidence consumers read the last row per
+    route as the ladder verdict. ``max_output_tokens`` maps task ids to
+    per-run cap overrides so a wrong cap never forces a code-change rerun.
+    """
+    results = []
+    for task_id in tasks:
+        override = (max_output_tokens or {}).get(task_id)
+        result = run_eval(client, route, model, task_id=task_id, max_output_tokens=override)
+        results.append(result)
+        if stop_on_fail and not result.passed:
+            break
+    return results
+
+
+def capability_cards(results: list[EvalResult]) -> list[dict[str, Any]]:
+    """Group per-task results into one capability card per (route, model).
+
+    Each card carries pass/fail per task, latency, tokens, the planning
+    cost estimate, and the error class on failure; ``parked`` marks routes
+    stopped by an account-level refusal (ungraded, never imputed).
+    """
+    cards: dict[tuple[str, str], dict[str, Any]] = {}
+    for result in results:
+        key = (result.route, result.model)
+        card = cards.get(key)
+        if card is None:
+            card = {
+                "route": result.route,
+                "model": result.model,
+                "checked_utc": result.checked_utc,
+                "tasks": {},
+                "parked": False,
+            }
+            cards[key] = card
+        card["checked_utc"] = max(card["checked_utc"], result.checked_utc)
+        card["tasks"][result.task_id] = {
+            "passed": result.passed,
+            "latency_ms": result.latency_ms,
+            "input_tokens": result.input_tokens,
+            "output_tokens": result.output_tokens,
+            "cost_usd_est": result.cost_usd_est,
+            "error": result.error,
+        }
+        if result.error is not None and result.error.startswith("parked:"):
+            card["parked"] = True
+    return list(cards.values())
 
 
 def _list_rows(route: str, credentials: dict[str, str | None]) -> list[dict]:
@@ -157,29 +860,25 @@ def _list_model_ids(route: str, credentials: dict[str, str | None]) -> list[str]
     return [str(item) for item in ids if item]
 
 
-def select_model(route: str, credentials: dict[str, str | None]) -> str | None:
-    """Cheapest defensible model id per route, or None to skip the route."""
-    if route == "meta":
-        return "muse-spark-1.3"
-    if route == "baseten":
-        return BASETEN_HACKATHON_MODEL
+def list_free_candidates(route: str, credentials: dict[str, str | None]) -> list[str]:
+    """Live $0-verified model ids for free-tier routes; [] elsewhere or empty.
+
+    OpenRouter picks ``:free`` ids in list order; Requesty applies the same
+    zero-price rule the completion guard enforces live. Paid and allowance
+    routes resolve from the orchestrator catalog instead (see
+    ``scripts/l3_ladder.py``), never from live invention: unknown paid
+    models must not be auto-tried.
+    """
     if route == "requesty":
         # Same zero-price rule the completion guard enforces live.
         rows = _list_rows(route, credentials)
-        free = [
+        return [
             row["id"] for row in rows if isinstance(row.get("id"), str) and _zero_price_row(row)
         ]
-        return free[0] if free else None
-    ids = _list_model_ids(route, credentials)
     if route == "openrouter":
-        free = [item for item in ids if item.endswith(":free")]
-        return free[0] if free else None
-    if route == "opencode_go":
-        cheap = [
-            item for item in ids if any(tag in item.lower() for tag in ("flash", "mini", "haiku"))
-        ]
-        return (cheap or ids or [None])[0]
-    return None
+        ids = _list_model_ids(route, credentials)
+        return [item for item in ids if item.endswith(":free")]
+    return []
 
 
 _PROVIDERS: dict[str, tuple[ProviderKind, str, float, bool]] = {
@@ -211,43 +910,214 @@ def _clients(credentials: dict[str, str | None]) -> dict[str, Callable[[str], An
     return {route: make(route) for route in _PROVIDERS}
 
 
-def run_all(credentials: dict[str, str | None]) -> list[EvalResult]:
-    """Evaluate every route with a selectable model; skips are recorded."""
-    factories = _clients(credentials)
-    results = []
-    for route, build in factories.items():
-        try:
-            model = select_model(route, credentials)
-        except Exception as error:
-            results.append(
-                EvalResult(
+def run_candidate_ladder(
+    build: Callable[[str], Any],
+    route: str,
+    models: list[str],
+    *,
+    tasks: tuple[str, ...] = TASKS,
+    max_attempts: int = 3,
+    stop_on_fail: bool = True,
+    max_output_tokens: dict[str, int] | None = None,
+) -> list[EvalResult]:
+    """Attempt ordered candidates until one is reached; record every attempt.
+
+    The first candidate that returns a gradeable answer (no transport error)
+    runs the rest of its ladder; transport/refusal errors record one row and
+    move to the next candidate, up to ``max_attempts`` (``<= 0`` walks the
+    whole list). Two consecutive parked errors stop the walk: an
+    account-level wall will not clear for the next model. An empty list records
+    a ``no-model`` skip. Callers resolve and tier-gate the candidate order;
+    this walk never substitutes its own picks.
+    """
+    gate = tasks[0] if tasks else "T0"
+    overrides = max_output_tokens or {}
+    results: list[EvalResult] = []
+    attempts = list(models) if max_attempts <= 0 else list(models)[:max_attempts]
+    parked_streak = 0
+    for model in attempts:
+        client = build(model)
+        first = run_eval(client, route, model, task_id=gate, max_output_tokens=overrides.get(gate))
+        results.append(first)
+        if first.error is not None:
+            parked = first.error.startswith("parked:")
+            parked_streak = parked_streak + 1 if parked else 0
+            if parked_streak >= PARKED_STREAK_LIMIT:
+                return results
+            continue
+        if first.passed or not stop_on_fail:
+            results.extend(
+                run_ladder(
+                    client,
                     route,
-                    "?",
-                    _utc_now(),
-                    False,
-                    None,
-                    None,
-                    None,
-                    f"select:{type(error).__name__}",
+                    model,
+                    tasks=tasks[1:],
+                    stop_on_fail=stop_on_fail,
+                    max_output_tokens=max_output_tokens,
                 )
             )
-            continue
-        if model is None:
-            results.append(EvalResult(route, "?", _utc_now(), False, None, None, None, "no-model"))
-            continue
-        results.append(run_eval(build(model), route, model))
+        return results
+    if not results:
+        results.append(
+            EvalResult(route, "?", _utc_now(), False, None, None, None, "no-model", task_id=gate)
+        )
     return results
 
 
+def run_all(
+    credentials: dict[str, str | None],
+    *,
+    tasks: tuple[str, ...] = TASKS,
+    models: dict[str, list[str]],
+    routes: list[str] | tuple[str, ...] | None = None,
+    max_attempts: int = 3,
+    stop_on_fail: bool = True,
+    max_output_tokens: dict[str, int] | None = None,
+) -> list[EvalResult]:
+    """Walk explicit per-route candidates; every skip recorded, never imputed."""
+    factories = _clients(credentials)
+    wanted = list(routes) if routes is not None else list(factories)
+    results: list[EvalResult] = []
+    for route in wanted:
+        build = factories[route]
+        results.extend(
+            run_candidate_ladder(
+                build,
+                route,
+                models.get(route, []),
+                tasks=tasks,
+                max_attempts=max_attempts,
+                stop_on_fail=stop_on_fail,
+                max_output_tokens=max_output_tokens,
+            )
+        )
+    return results
+
+
+def _snapshot_name(tasks: tuple[str, ...], stamp: str) -> str:
+    """Snapshot filename carrying the attempted task ids (1 file per run)."""
+    if tasks == TASKS:
+        label = "T0-T3"
+    elif len(tasks) == 1:
+        label = tasks[0]
+    elif tasks:
+        label = "-".join(tasks)
+    else:
+        label = "empty"
+    return f"route-eval-{label}-{stamp}.json"
+
+
+def parse_output_overrides(entries: list[str] | None) -> dict[str, int]:
+    """Parse ``--max-output-tokens`` TASK:N entries into per-task caps."""
+    overrides: dict[str, int] = {}
+    for entry in entries or []:
+        task_id, sep, raw = entry.partition(":")
+        try:
+            value = int(raw) if sep else -1
+        except ValueError:
+            value = -1
+        if task_id not in TASK_SPECS or value <= 0:
+            raise ValueError(
+                f"bad --max-output-tokens entry {entry!r}: want TASK:N with a positive "
+                f"integer (choose from {' '.join(TASKS)})"
+            )
+        overrides[task_id] = value
+    return overrides
+
+
+def load_candidates(path: Path) -> dict[str, list[str]]:
+    """Read a ``{route: [models...]}`` candidates file; ValueError on any problem."""
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise ValueError(f"bad --candidates file {path}: {exc}") from exc
+    if not isinstance(raw, dict):
+        raise ValueError(f"bad --candidates file {path}: want a {{route: [models]}} object")
+    candidates: dict[str, list[str]] = {}
+    for route, models in raw.items():
+        if route not in _PROVIDERS:
+            raise ValueError(
+                f"bad --candidates file {path}: unknown route {route!r} "
+                f"(choose from {', '.join(_PROVIDERS)})"
+            )
+        if not isinstance(models, list) or any(
+            not isinstance(item, str) or not item.strip() for item in models
+        ):
+            raise ValueError(
+                f"bad --candidates file {path}: route {route!r} wants a list of model ids"
+            )
+        candidates[route] = [item.strip() for item in models]
+    return candidates
+
+
+def write_results_snapshot(
+    results: list[EvalResult], tasks: tuple[str, ...], snapshot_dir: Path
+) -> Path:
+    """Write one dated results snapshot; return its path."""
+    snapshot_dir.mkdir(parents=True, exist_ok=True)
+    stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+    snapshot = snapshot_dir / _snapshot_name(tasks, stamp)
+    snapshot.write_text(
+        json.dumps([item.to_dict() for item in results], indent=2), encoding="utf-8"
+    )
+    return snapshot
+
+
 def main(argv: list[str] | None = None) -> int:
-    """Live CLI: evaluate reachable routes, write a dated snapshot."""
+    """Live CLI: walk explicit per-route candidates, write a dated snapshot."""
     import os
-    from pathlib import Path
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--snapshot-dir", type=Path, default=Path("artifacts/route-evals"))
     parser.add_argument("--routes", nargs="*", default=None)
+    parser.add_argument(
+        "--candidates",
+        type=Path,
+        default=None,
+        help="JSON {route: [models...]} candidates file (required; see scripts/l3_ladder.py)",
+    )
+    parser.add_argument(
+        "--tasks",
+        nargs="*",
+        default=None,
+        help=f"task ids in ladder order (default: {' '.join(TASKS)})",
+    )
+    parser.add_argument(
+        "--continue-past-fail",
+        action="store_true",
+        help="run every requested task even after a FAIL (default: PASS-gated)",
+    )
+    parser.add_argument(
+        "--max-output-tokens",
+        nargs="*",
+        default=None,
+        metavar="TASK:N",
+        help="per-task output cap overrides, e.g. T3:16384 (default: task specs)",
+    )
+    parser.add_argument(
+        "--max-candidates",
+        type=int,
+        default=3,
+        help="walk attempts per route; 0 walks all resolved (default: 3)",
+    )
     args = parser.parse_args(argv)
+    tasks = tuple(args.tasks) if args.tasks is not None else TASKS
+    unknown = [task for task in tasks if task not in TASK_SPECS]
+    if unknown:
+        parser.error(f"unknown task id(s): {', '.join(unknown)} (choose from {' '.join(TASKS)})")
+    try:
+        overrides = parse_output_overrides(args.max_output_tokens)
+    except ValueError as exc:
+        parser.error(str(exc))
+    if args.max_candidates < 0:
+        parser.error("--max-candidates must be 0 or more (0 walks all)")
+    if args.candidates is None:
+        parser.error("--candidates PATH is required (JSON {route: [models...]})")
+    try:
+        candidates = load_candidates(args.candidates)
+    except ValueError as exc:
+        parser.error(str(exc))
+    load_dotenv()
     credentials = {
         name: os.getenv(name) or None
         for name in (
@@ -259,20 +1129,26 @@ def main(argv: list[str] | None = None) -> int:
         )
     }
     factories = _clients(credentials)
-    wanted = args.routes or list(factories)
-    results = []
+    wanted = args.routes or list(candidates)
+    unknown_routes = [route for route in wanted if route not in factories]
+    if unknown_routes:
+        parser.error(
+            f"unknown route(s): {', '.join(unknown_routes)} (choose from {', '.join(factories)})"
+        )
+    results: list[EvalResult] = []
     for route in wanted:
-        model = select_model(route, credentials)
-        if model is None:
-            results.append(EvalResult(route, "?", _utc_now(), False, None, None, None, "no-model"))
-            continue
-        results.append(run_eval(factories[route](model), route, model))
-    args.snapshot_dir.mkdir(parents=True, exist_ok=True)
-    stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
-    snapshot = args.snapshot_dir / f"route-eval-{stamp}.json"
-    snapshot.write_text(
-        json.dumps([item.to_dict() for item in results], indent=2), encoding="utf-8"
-    )
+        results.extend(
+            run_candidate_ladder(
+                factories[route],
+                route,
+                candidates.get(route, []),
+                tasks=tasks,
+                max_attempts=args.max_candidates,
+                stop_on_fail=not args.continue_past_fail,
+                max_output_tokens=overrides,
+            )
+        )
+    snapshot = write_results_snapshot(results, tasks, args.snapshot_dir)
     for item in results:
         print(item.summary())
     print(f"snapshot: {snapshot}")
