@@ -184,6 +184,17 @@ by default; enforced budgets reject Model API requests, not dedicated/training
 workloads. General credit documentation is not proof of an event hard cap. Verify
 the actual credit pool, expiry and charge prevention before inference.
 
+2026-11-03 billing-visibility note: the [billing page](https://docs.baseten.co/organization/billing)
+confirms the credit balance lives on the dashboard (`app.baseten.co/settings/billing`)
+while `GET https://api.baseten.co/v1/billing/usage_summary` (required UTC
+`start_date`/`end_date`, <=31 days) and the Model API costs endpoint expose usage
+to full-scope keys -- third-party tooling (e.g. pi-usage-bars) tracks spend this
+way and reads balance from the dashboard. Our event key (`BASETEN_HACKATHON_API_KEY`)
+returned HTTP 403 on `usage_summary` on 2026-11-03: it is inference-scoped and
+cannot read usage or balance, so Baseten funding stays owner-reported ($100 event
+credits per owner 2026-11-03) plus a local spend ledger. Credential
+existence/location/balance-source map: [credential-registry.md](credential-registry.md).
+
 Baseten's [Security Practices](https://www.baseten.co/security-practices/)
 (updated September 15) state no training on customer content and zero retention of
 Model API inputs/outputs, subject to customer-controlled logging/configurations
