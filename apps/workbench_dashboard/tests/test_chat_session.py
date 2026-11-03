@@ -79,8 +79,8 @@ def test_rename_and_delete_session(chat, tmp_path) -> None:
     record = chat.create_session(title="Typo name")
     renamed = chat.rename_session(record.session_id, title="Fixed name")
     assert renamed.title == "Fixed name"
-    assert store.get_session(record.session_id) is not None
-    assert store.get_session(record.session_id).title == "Fixed name"
+    got = store.get_session(record.session_id)
+    assert got is not None and got.title == "Fixed name"
     chat.delete_session(record.session_id)
     assert store.get_session(record.session_id) is None
     with pytest.raises(ValueError, match="not found"):
