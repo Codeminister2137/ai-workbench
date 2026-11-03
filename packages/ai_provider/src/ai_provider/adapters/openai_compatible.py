@@ -38,7 +38,7 @@ from ai_provider.contracts import (
     UsageSource,
 )
 from ai_provider.errors import ProviderError, ProviderErrorCategory
-from ai_provider.http_transport import urlopen
+from ai_provider.http_transport import iter_response_lines, read_bounded, urlopen
 from ai_provider.privacy import enforce_privacy_policy
 from ai_provider.turn_usage import observe_completion, observe_stream, observe_usage
 
@@ -245,7 +245,9 @@ class OpenAICompatibleChatClient:
         request = Request(f"{self.base_url}/models", headers=self._headers(), method="GET")
         try:
             with urlopen(request, timeout=self.config.timeout_seconds) as response:
-                catalog = json.loads(response.read().decode("utf-8"))
+                catalog = json.loads(
+                    read_bounded(response, provider=self.config.provider.value).decode("utf-8")
+                )
         except HTTPError as exc:
             raise self._http_error(exc) from exc
         except (URLError, TimeoutError, UnicodeDecodeError, json.JSONDecodeError) as exc:
@@ -323,7 +325,9 @@ class OpenAICompatibleChatClient:
 
         try:
             with urlopen(request, timeout=self.config.timeout_seconds) as response:
-                return json.loads(response.read().decode("utf-8"))
+                return json.loads(
+                    read_bounded(response, provider=self.config.provider.value).decode("utf-8")
+                )
         except (json.JSONDecodeError, UnicodeDecodeError) as exc:
             raise ProviderError(
                 "Chat Completions response returned invalid JSON.",
@@ -369,7 +373,7 @@ class OpenAICompatibleChatClient:
 
         try:
             with urlopen(request, timeout=self.config.timeout_seconds) as response:
-                for line in response:
+                for line in iter_response_lines(response, provider=self.config.provider.value):
                     raw_line = line.strip()
                     if not raw_line or raw_line.startswith((b":", b"event:", b"id:", b"retry:")):
                         continue
