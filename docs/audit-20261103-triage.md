@@ -285,3 +285,51 @@ verification before action — several audit claims were already proven wrong
 - REAL — POST-HACKATHON: 2
 - TEST GAP CLOSED: 1
 - UNREVIEWED: 200
+
+## Appendix: frontend-audit leftovers verified 2026-11-03 evening
+
+The focused frontend audit (24 findings, `muse-spark-1.3`, $0.08) had 20
+fixes merged to sibling main as `5c822ce`. The remaining findings were
+re-verified against current sibling code this evening; two were fixed on
+sibling branch `fix/frontend-copy-20261103` (`bc43bdc`, full suite 576
+passed / 9 skipped / 265 subtests, harness prefix-checked against pre-fix
+sources, merge queued for the 20:00 owner review under the UI freeze).
+
+FIXED tonight (`bc43bdc`, queued for merge):
+
+- [HIGH] Meta vs Baseten vs key language — REAL. `keyNote()` said
+  "charged to your own Meta account" even in Baseten mode, where the
+  server-side event key funds inference. Now mode-aware (Baseten /
+  Meta / no-route wordings), covered by `tests/js_actions.cjs`.
+- [HIGH] Run-mode scope vs supervision scope — REAL. Scopes lived only
+  in toggletips, and the run tip ("next task you create") was imprecise:
+  `runMode` is read only at plan approval. Labels now read "Run mode
+  (next plan)" / "Supervision (all runs)"; tip corrected to "next plan
+  you approve". Covered by `tests/js_actions.cjs`.
+
+Already fixed in current code (audit staleness; no action):
+
+- [HIGH] Approval-window wordings — term unified ("Review windows",
+  "Review window: ~N min left", "approve within ~N min").
+- [MEDIUM] Inject checkbox vs Resume — Resume title already scopes the
+  checkbox to Create-and-run; Resume sends `inject_failure: false`.
+- [LOW] Build chip ellipsis — shows "build ?" with an explanatory title.
+- [MEDIUM] powerArm confirm survives disconnect — token handler resets
+  `powerArmed` and the label (part of the 20-fix batch).
+- [MEDIUM] Sticky nav + 100% buttons — media query already excludes
+  `#viewNav button` (`width:auto`).
+- [LOW] Sticky nav hides anchors — sections carry `scroll-margin-top`.
+- [MEDIUM] Inbox tooltip jargon — plain text now ("Updates with each
+  refresh; ...").
+- [LOW] Unread badge SR announcement — badge span has `role="status"`
+  + `aria-live="polite"`.
+
+Deferred / no change:
+
+- [HIGH] Touch targets 24px — REAL but visual: `button{min-height:24px}`
+  is below the 44px guidance; raising it globally risks the tuned
+  phone layout the night before submit. Needs owner eyes; queued.
+- [MEDIUM] Pill/status contrast — FALSE POSITIVE by measurement: WCAG
+  ratios 5.46-12.82 on both page and section backgrounds (AA needs 4.5).
+- [MEDIUM] 3-step vs 4-step counts — acceptable as-is: the quick start
+  and the setup wizard are different components. Noted for 20:00.
