@@ -249,7 +249,7 @@ verification before action — several audit claims were already proven wrong
 - [MEDIUM] Sandbox file materialization follows symlinks as root — `src/remote_operator/sandbox_bootstrap.py` → **UNREVIEWED**
 - [MEDIUM] Allowance ledger allows non-finite USD to bypass cap — `src/remote_operator/store.py` → **UNREVIEWED**
 - [HIGH] Sandbox request assumes string payload without validation — `src/remote_operator/sandbox_bootstrap.py` → **FIXED** (payload validated before writes + test (batch1))
-- [HIGH] Run-job files lack durability hook used by task store — `src/remote_operator/supervisor_runner.py` → **UNREVIEWED**
+- [HIGH] Run-job files lack durability hook used by task store — `src/remote_operator/supervisor_runner.py` → **FIXED** (_write_job now fires store._durable() after every job mutation; 12 runner call sites covered incl. _finish_job; queue path was already durable via store.save; test_job_write_fires_durable_hook added + prefix-verified; sibling branch fix/runjob-durable-20261103 a06ead7, 577 green, merge queued for 20:00 review)
 - [MEDIUM] Owner-replies lookup capped at 50 threads creates duplicates — `src/remote_operator/supervisor.py` → **UNREVIEWED**
 - [MEDIUM] SQLite busy errors escape allowance/cancel transactions — `src/remote_operator/store.py` → **UNREVIEWED**
 - [MEDIUM] Inbox terminal-run mapping trusts mutable job file over event — `src/remote_operator/supervisor_inbox.py` → **UNREVIEWED**
@@ -280,11 +280,11 @@ verification before action — several audit claims were already proven wrong
 - BACKLOG: 1
 - DOWNGRADED: 1
 - FALSE POSITIVE: 4
-- FIXED: 5
+- FIXED: 6
 - INTENDED: 1
 - REAL — POST-HACKATHON: 2
 - TEST GAP CLOSED: 1
-- UNREVIEWED: 200
+- UNREVIEWED: 199
 
 ## Appendix: frontend-audit leftovers verified 2026-11-03 evening
 
