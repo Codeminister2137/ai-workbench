@@ -77,7 +77,15 @@ batch. Attachment changes during review require a new preview.
 python apps/job_search/job-email/main.py recruiter@example.com
 # Request per-package review and delivery
 python apps/job_search/job-email/main.py --send recruiter@example.com
+# Preview with an explicitly registered message variant
+python apps/job_search/job-email/main.py --message-variant concise recruiter@example.com
 ```
+
+Pass `--message-variant <id>` to render an explicitly registered message
+variant instead of the built-in default message. Unknown ids fail the
+recipient without fallback, prompting, delivery, or history changes. The
+preview always shows the selected CV and message variant ids alongside the
+recipient, subject, attachment path, and materials digest.
 
 SMTP setup occurs only after approval. Successful delivery appends the recipient
 to the existing sent-file history; failed delivery does not. Contacts already
