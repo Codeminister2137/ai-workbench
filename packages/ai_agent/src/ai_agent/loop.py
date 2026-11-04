@@ -7,7 +7,7 @@ import time
 from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ai_provider import (
     AIMessage,
@@ -30,6 +30,9 @@ from ai_agent.contracts import ToolCall, ToolResult
 from ai_agent.model_output_recovery import ModelOutputRecovery
 from ai_agent.permissions import PermissionManager
 from ai_agent.tools.base import ToolContext, ToolRegistry
+
+if TYPE_CHECKING:
+    from ai_agent.fanout import FanoutPolicy
 
 
 class AgentIterationLimitExceeded(RuntimeError):
@@ -65,6 +68,7 @@ class AgentLoop:
         top_p: float | None = None,
         diagnostic: Callable[[str], None] | None = None,
         completion_requirements: tuple[CompletionRequirement, ...] = (),
+        fanout_policy: FanoutPolicy | str = "allowed",
     ) -> None:
         if max_iterations < 1:
             raise ValueError("max_iterations must be at least 1")
@@ -90,6 +94,9 @@ class AgentLoop:
         if len(set(identifiers)) != len(identifiers):
             raise ValueError("Completion requirement identifiers must be unique")
         self.completion_requirements = completion_requirements
+        from ai_agent.fanout import FanoutPolicy as _FanoutPolicy
+
+        self.fanout_policy = _FanoutPolicy.coerce(fanout_policy)
 
     def _check_deadline(self, messages: list[AIMessage]) -> None:
         if self.deadline is not None and time.perf_counter() >= self.deadline:
@@ -133,6 +140,7 @@ class AgentLoop:
                     self.permissions,
                     self.context.workspace_root.resolve(),
                     DelegationBudget(self.max_iterations, self.deadline),
+                    fanout=self.fanout_policy,
                     instructions=system_prompt or "",
                     objective=prompt,
                     backends=frozenset(

@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from ai_agent.contracts import ToolCall, ToolCategory, ToolDefinition, ToolResult
-from ai_agent.delegation_scope import DelegationBudget, DelegationScope
+from ai_agent.delegation_scope import DelegationBudget, DelegationScope, FanoutPolicy
 from ai_agent.permissions import PermissionManager
 from ai_agent.tools.base import BaseTool, ToolContext, ToolRegistry
 
@@ -208,6 +208,7 @@ def scoped_registry(
     *,
     delegation_budget: DelegationBudget | None = None,
     delegation_deadline: float | None = None,
+    fanout: FanoutPolicy | str = FanoutPolicy.ALLOWED,
 ) -> ToolRegistry:
     if not task_id or not run_id:
         raise ValueError("Shared coding requires task and run identity")
@@ -219,6 +220,7 @@ def scoped_registry(
         workspace.resolve(),
         delegation_budget or DelegationBudget(8, delegation_deadline),
         is_active or (lambda: True),
+        fanout=FanoutPolicy.coerce(fanout),
     )
     return ToolRegistry(
         tuple(

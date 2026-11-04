@@ -3800,6 +3800,9 @@ def _run_native_agent(
     if client is None:
         client = create_chat_client(config)
     child_depth = int(getattr(args, "_delegation_depth", 0))
+    from ai_agent.fanout import resolve_fanout_policy as _resolve_fanout_policy
+
+    fanout_policy = _resolve_fanout_policy(getattr(args, "fanout_policy", "allowed"))
 
     def run_delegated_task(task: str, context: ToolContext) -> ToolResult:
         grant = context.delegation
@@ -3952,7 +3955,7 @@ def _run_native_agent(
     registry = (
         default_coding_tools()
         if child_depth >= 1
-        else coding_tools_with_delegation(run_delegated_task)
+        else coding_tools_with_delegation(run_delegated_task, fanout=fanout_policy)
     )
     if getattr(args, "shared_tools", None):
         from ai_agent.tool_profiles import shared_tool_registry
@@ -4050,7 +4053,9 @@ def _run_native_agent(
             and granted.registry.get("delegate_task") is not None
             and (granted.tools is None or "delegate_task" in granted.tools)
         ):
-            registry.register(granted.wrap(DelegateTaskTool(run_delegated_task)))
+            registry.register(
+                granted.wrap(DelegateTaskTool(run_delegated_task, fanout=granted.fanout))
+            )
         manager = PermissionManager(PermissionPolicy.permissive())
         system_prompt = granted.instructions
     else:
@@ -4096,6 +4101,7 @@ def _run_native_agent(
             backends=frozenset(permitted_backends),
             approved_client=client,
             request_timeout_seconds=config.timeout_seconds,
+            fanout=fanout_policy,
         )
     agent = AgentLoop(
         client,

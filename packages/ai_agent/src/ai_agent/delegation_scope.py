@@ -13,6 +13,7 @@ from pathlib import Path
 from ai_provider import ChatClient, ProviderError, ProviderErrorCategory
 
 from ai_agent.contracts import PermissionAction, ToolCall, ToolCategory, ToolResult
+from ai_agent.fanout import FanoutPolicy
 from ai_agent.permissions import PermissionManager, PermissionPolicy
 from ai_agent.tools.base import BaseTool, ToolContext, ToolRegistry
 
@@ -90,6 +91,7 @@ class DelegationScope:
     is_active: Callable[[], bool] = lambda: True
     depth: int = 0
     max_depth: int = 2
+    fanout: FanoutPolicy = FanoutPolicy.ALLOWED
     profile: str = "inherit"
     tools: frozenset[str] | None = None
     paths: tuple[Path, ...] | None = None
@@ -101,6 +103,11 @@ class DelegationScope:
     environment: tuple[tuple[str, str], ...] = ()
     approved_client: ChatClient | None = field(default=None, repr=False, compare=False)
     request_timeout_seconds: float | None = None
+
+    def __post_init__(self) -> None:
+        # Coerce host-supplied strings once so every enforcement point can
+        # compare enum members without re-validating.
+        object.__setattr__(self, "fanout", FanoutPolicy.coerce(self.fanout))
 
     def active(self) -> bool:
         return self.is_active() and (
@@ -115,6 +122,10 @@ class DelegationScope:
         paths: tuple[str, ...] | None = None,
         commands: tuple[str, ...] | None = None,
     ) -> DelegationScope:
+        if not self.fanout.allows_spawn:
+            raise ValueError(
+                f"Delegation fan-out policy is {self.fanout.value}: child spawn refused"
+            )
         if not self.active() or self.depth >= self.max_depth:
             raise ValueError("Delegation scope expired or maximum depth reached")
         if profile != "inherit":
