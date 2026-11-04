@@ -119,27 +119,29 @@ Those plan files are gitignored and absent here; citations below marked
 - **User job blocked:** trusting continued work after a route failure —
   what failed, what replaced it, did quality drop, what did it cost.
 - **Evidence:** Track B W1 mapped 16 fallback triggers; the trigger
-  truth-table, escalation pins, preservation-payload pins and the C1
+  truth-table, escalation pins (incl. session-scope
+  `allow_cost_escalation`), preservation-payload pins and the C1
   doc fix all landed 2026-11-04, leaving G3 (owner call on notice
-  semantics), the G6 session-level cost-escalation test (highest
-  spend risk), and a G1 residual check
-  `[plans:track-b-20261104.md:6-36]`; dashboard
+  semantics), G7 (owner call on default unification; current
+  divergence pinned as-is), and a G1 residual check
+  `[plans:track-b-20261104.md:6-45]`; dashboard
   run view shows only the fan-out indicator
   ([dashboard_web_app.py](apps/workbench_dashboard/dashboard_web_app.py:53-60)),
   no fallback/quality-downgrade events; ADR-060 receipt fields exist
   but are CLI-rendered, not dashboard-rendered
   ([architecture.md](docs/architecture.md:152-157)).
-- **Bounded slice:** (a) remaining W1 pins: G6 session-level
-  cost-escalation test, G1 residual check, G3 pin after the owner
-  call (`[plans:track-b-20261104.md:32-36]`; the other W1 fixes
-  landed 2026-11-04); (b) fallback-event feed on the run page from
+- **Bounded slice:** (a) remaining W1 pins: G3 pin and G7
+  unification pin after the two mailed owner calls, G1 residual
+  check ([plans:track-b-20261104.md:32-45]; trigger,
+  escalation, preservation and C1 fixes landed 2026-11-04);
+  (b) fallback-event feed on the run page from
   existing receipts. Files:
-  `packages/ai_orchestrator/src/ai_orchestrator/fallback.py` tests,
-  `packages/ai_provider/src/ai_provider/execution_fallback.py` tests,
-  dashboard run view. Estimate: 4–6h.
-- **Owner decision first?** Yes for one item — G3 `task_minimum`
-  downgrade-notice semantics ("needs owner call")
-  `[plans:track-b-20261104.md:34-36]`; the rest needs none.
+  `tests/test_fallback_*.py` (G1/G3/G7 pins),
+  dashboard run view. Estimate: 3–5h.
+- **Owner decision first?** Yes for two items — G3 `task_minimum`
+  downgrade-notice semantics and G7 fallback-default unification
+  (both mailed 2026-11-04, unanswered)
+  `[plans:track-b-20261104.md:32-45]`; the rest needs none.
 
 ### G6. Single-project dashboard (multi-project/company)
 
@@ -293,7 +295,7 @@ Those plan files are gitignored and absent here; citations below marked
 
 ## Cross-cutting notes
 
-- **Total bounded-slice load:** ~55–85h across G1–G12 (all slices
+- **Total bounded-slice load:** ~55–84h across G1–G12 (all slices
   independently shippable; stop after any one and keep the value).
 - **Recurring owner-decision themes** (answer once, unblock many):
   P4 approval/steering granularity, P5 allowance + prepaid UX, P7
