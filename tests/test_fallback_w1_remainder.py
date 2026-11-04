@@ -208,6 +208,7 @@ def test_production_preservation_payload_envelope_is_exact(monkeypatch):
     observed = cli._fallback_observed(sensitive)
     run, payloads, _saved = _run_preservation(monkeypatch, cli._fallback_observed, "report")
     expected_history = [f"Route codex:\n{observed}"]
+    assert run.handoff is not None
     assert run.handoff["observed"] == expected_history
     assert payloads[0] == PRESERVATION_PREFIX + json.dumps(expected_history)[-TRUNCATION_BOUND:]
 
@@ -215,6 +216,7 @@ def test_production_preservation_payload_envelope_is_exact(monkeypatch):
 def test_preservation_handoff_record_resaves_report(monkeypatch):
     """First receipt stops continuation; the re-save adds the report facts."""
     run, _payloads, saved = _run_preservation(monkeypatch, cli._fallback_observed, "REPORT")
+    assert run.handoff is not None
     assert run.handoff["status"] == "continuation_stopped"
     assert run.handoff["failure_kind"] == "usage_limit"
     assert run.handoff["preservation_route_id"] == "copilot"
@@ -329,6 +331,7 @@ def test_preservation_payload_keeps_last_24k_of_observed_json(monkeypatch):
     """The preservation payload carries the tail of the observed JSON only."""
     run, payloads, _saved = _run_preservation(monkeypatch, lambda value: "P" * 30000, "ok")
     expected_history = ["Route codex:\n" + "P" * 30000]
+    assert run.handoff is not None
     assert run.handoff["observed"] == expected_history
     tail = json.dumps(expected_history)[-TRUNCATION_BOUND:]
     assert len(tail) == TRUNCATION_BOUND
@@ -338,6 +341,7 @@ def test_preservation_payload_keeps_last_24k_of_observed_json(monkeypatch):
 def test_preservation_report_keeps_first_24k(monkeypatch):
     """Long preservation reports truncate at the tail in the saved handoff."""
     run, _payloads, saved = _run_preservation(monkeypatch, cli._fallback_observed, "R" * 30000)
+    assert run.handoff is not None
     assert run.handoff["preservation_report"] == "R" * TRUNCATION_BOUND
     assert saved[-1]["preservation_report"] == "R" * TRUNCATION_BOUND
 
