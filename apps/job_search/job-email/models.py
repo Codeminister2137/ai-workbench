@@ -76,6 +76,20 @@ class CVVariant:
 
 
 @dataclass(frozen=True, slots=True)
+class MessageVariant:
+    """A named message template variant for outreach subject/body rendering.
+
+    Templates use ``{placeholder}`` fields from the fixed set documented on
+    ``preparation.MESSAGE_TEMPLATE_FIELDS``. Literal braces must be doubled.
+    """
+
+    variant_id: str
+    subject_template: str
+    body_template: str
+    description: str = ""
+
+
+@dataclass(frozen=True, slots=True)
 class CandidateProfile:
     """Structured candidate profile acting as the source of truth for applications."""
 
@@ -86,6 +100,7 @@ class CandidateProfile:
     linkedin_url: str
     skills: dict[str, SkillEvidence] = field(default_factory=dict)
     cv_variants: dict[str, CVVariant] = field(default_factory=dict)
+    message_variants: dict[str, MessageVariant] = field(default_factory=dict)
 
     def get_skill_status(self, skill_name: str) -> EvidenceStatus:
         """Use vacancy matching's caseless skill lookup; unrecorded skills are ABSENT."""
@@ -142,6 +157,7 @@ class ApplicationPackage:
     subject: str
     body: str
     cv_variant_id: str = "default"
+    message_variant_id: str = "default"
     status: ApplicationStatus = ApplicationStatus.PREPARED
     created_at_utc: str = field(default_factory=utc_now_iso)
     approved_at_utc: str | None = None
@@ -161,6 +177,7 @@ class ApplicationPackage:
                 self.body,
                 self.cv_attachment_path,
                 self.cv_variant_id,
+                self.message_variant_id,
                 hashlib.sha256(attachment).hexdigest(),
             ],
             ensure_ascii=True,

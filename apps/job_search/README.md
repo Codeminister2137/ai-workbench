@@ -21,6 +21,12 @@ domain model layer and a delivery scaffold.
 Preparation rejects an explicitly requested unknown CV variant instead of
 silently choosing another attachment. Omitting the variant retains the existing
 default selection; every prepared package still needs review before sending.
+Message variants follow the same rule: an explicitly requested unknown message
+variant raises `ValueError`, while an omitted selection renders the first
+registered variant or the built-in default message. Templates may only use the
+fixed placeholders in `preparation.MESSAGE_TEMPLATE_FIELDS`, and the selected
+`message_variant_id` is recorded on the package and bound into the approval
+digest alongside the CV variant.
 
 `openings_import.import_openings_export` converts already-loaded Openings JSON
 export rows to the existing `JobVacancy` model. It performs no file/network access
@@ -50,7 +56,7 @@ Openings instance has been started or contacted.
 
 | Module | Purpose |
 | --- | --- |
-| `models.py` | Normalized `JobVacancy`, `CandidateProfile`, `SkillEvidence`, `CVVariant`, `ApplicationPackage`, and `SendReceipt` data classes |
+| `models.py` | Normalized `JobVacancy`, `CandidateProfile`, `SkillEvidence`, `CVVariant`, `MessageVariant`, `ApplicationPackage`, and `SendReceipt` data classes |
 | `evidence.py` | Evidence verification — applications never invent or upgrade qualifications; unbacked claims raise `ProhibitedClaimError` |
 | `deduplication.py` | Deterministic entity name/title normalization and duplicate key generation to prevent duplicate applications |
 | `preparation.py` | Assembles verified application packages, tailors messages, and selects appropriate CV variants |
