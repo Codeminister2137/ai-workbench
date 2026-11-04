@@ -18,7 +18,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "apps" / "workbench_dashboard"))
 
-from dashboard_stores import DashboardStores  # noqa: E402
+from dashboard_stores import DashboardStores, effective_fanout_policy  # noqa: E402
 from plan_publisher import sync_decision, sync_plan, sync_run  # noqa: E402
 
 DEFAULT_DATA_DIR = ROOT / "apps" / "workbench_dashboard" / "data"
@@ -94,6 +94,8 @@ def main(argv: list[str] | None = None) -> int:
             dedupe_open=not args.no_dedupe,
         )
     print(("deduped " if record.get("deduped") else "wrote ") + record["id"])
+    if args.command == "run":
+        print(f"fanout: {effective_fanout_policy(record)}")
     return 0
 
 

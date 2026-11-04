@@ -6,6 +6,7 @@ import argparse
 import json
 import socket
 import threading
+from collections.abc import Callable
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -16,7 +17,7 @@ from ai_orchestrator.evidence import merge_probe_eval
 from ai_provider.chat_transcripts import SQLiteChatTranscriptStore
 from dashboard_chat import DashboardChat
 from dashboard_config import DEFAULT_CONFIG_PATH, DEFAULT_DATA_DIR, DashboardConfig, load_config
-from dashboard_stores import DashboardStores, StoreError
+from dashboard_stores import DashboardStores, StoreError, effective_fanout_policy
 
 ROOT = Path(__file__).parent
 STATIC_ROOT = ROOT / "web"
@@ -47,6 +48,15 @@ def latest_snapshot(directory: Path, prefix: str) -> tuple[Path | None, list[dic
         return latest, []
     rows = payload if isinstance(payload, list) else []
     return latest, [row for row in rows if isinstance(row, dict)]
+
+
+def with_fanout_policy(run: dict) -> dict:
+    """Copy one run record with its effective fan-out policy resolved.
+
+    Response-only enrichment: the stored file is never rewritten, so records
+    that predate the field simply read as ``unknown``.
+    """
+    return {**run, "fanout_effective": effective_fanout_policy(run)}
 
 
 def evidence_snapshot(repo_root: Path = REPO_ROOT) -> dict[str, Any]:
@@ -127,9 +137,15 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             if path.startswith("/api/plans/"):
                 return self._send_item(self._stores().plans, path[len("/api/plans/") :])
             if path == "/api/runs":
-                return self._send_collection(self._stores().runs, parsed.query)
+                return self._send_collection(
+                    self._stores().runs, parsed.query, enrich=with_fanout_policy
+                )
             if path.startswith("/api/runs/"):
-                return self._send_item(self._stores().runs, path[len("/api/runs/") :])
+                return self._send_item(
+                    self._stores().runs,
+                    path[len("/api/runs/") :],
+                    enrich=with_fanout_policy,
+                )
             if path == "/api/inbox":
                 return self._send_inbox(parsed.query)
             if path == "/api/ideas":
@@ -300,7 +316,9 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             return self._send_json({"ok": False, "error": str(exc)}, status=404)
         self._send_json({"ok": True, "id": session_id})
 
-    def _send_collection(self, collection, query: str) -> None:
+    def _send_collection(
+        self, collection, query: str, *, enrich: Callable[[dict], dict] | None = None
+    ) -> None:
         params = parse_qs(query)
         try:
             limit = min(max(int(params.get("limit", ["20"])[0]), 1), 100)
@@ -308,12 +326,18 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         except ValueError:
             return self._send_json({"ok": False, "error": "Invalid limit or offset"}, status=400)
         items, total = collection.list(limit=limit, offset=offset)
+        if enrich is not None:
+            items = [enrich(item) for item in items]
         self._send_json({"ok": True, "items": items, "total": total})
 
-    def _send_item(self, collection, item_id: str) -> None:
+    def _send_item(
+        self, collection, item_id: str, *, enrich: Callable[[dict], dict] | None = None
+    ) -> None:
         item = collection.get(item_id)
         if item is None:
             return self._send_json({"ok": False, "error": "Not found"}, status=404)
+        if enrich is not None:
+            item = enrich(item)
         self._send_json({"ok": True, "item": item})
 
     def _send_inbox(self, query: str) -> None:
