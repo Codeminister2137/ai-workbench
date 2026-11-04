@@ -34,11 +34,24 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--send", action="store_true", help="Ask for approval and send each package"
     )
+    parser.add_argument(
+        "--message-variant",
+        default=None,
+        help="Explicit message variant id; unknown ids fail without fallback",
+    )
     args = parser.parse_args(argv)
-    return run_outreach(_load_config(), args.recipients, send=args.send)
+    return run_outreach(
+        _load_config(), args.recipients, send=args.send, message_variant_id=args.message_variant
+    )
 
 
-def run_outreach(config: Config, recipients: Sequence[str], *, send: bool = False) -> int:
+def run_outreach(
+    config: Config,
+    recipients: Sequence[str],
+    *,
+    send: bool = False,
+    message_variant_id: str | None = None,
+) -> int:
     """Review explicit contacts and record only successful guarded deliveries."""
     sent_emails = _load_sent_emails(config.SENT_FILE)
     seen = set(sent_emails)
@@ -53,17 +66,23 @@ def run_outreach(config: Config, recipients: Sequence[str], *, send: bool = Fals
             print(f"Skipped {email}")
             continue
         seen.add(email)
-        package = prepare_application(
-            profile,
-            JobVacancy(
-                id=f"outreach:{email}",
-                company="",
-                title="Python Developer",
-                location="",
-                contact_email=email,
-                source="manual-outreach",
-            ),
-        )
+        try:
+            package = prepare_application(
+                profile,
+                JobVacancy(
+                    id=f"outreach:{email}",
+                    company="",
+                    title="Python Developer",
+                    location="",
+                    contact_email=email,
+                    source="manual-outreach",
+                ),
+                message_variant_id=message_variant_id,
+            )
+        except ValueError as exc:
+            print(f"Cannot prepare application for {email}: {exc}; no delivery attempted.")
+            failed = True
+            continue
         try:
             reviewed_digest = package.materials_digest(
                 Path(package.cv_attachment_path).read_bytes()
@@ -149,6 +168,7 @@ def _candidate_profile(config: Config) -> CandidateProfile:
 
 def _print_preview(package: ApplicationPackage, digest: str) -> None:
     print(f"To: {package.contact_email}\nSubject: {package.subject}")
+    print(f"CV variant: {package.cv_variant_id}\nMessage variant: {package.message_variant_id}")
     print(f"Attachment: {package.cv_attachment_path}\nMaterials SHA-256: {digest}")
     print(package.body)
 

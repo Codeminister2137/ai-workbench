@@ -62,6 +62,7 @@ Openings instance has been started or contacted.
 | `preparation.py` | Assembles verified application packages, tailors messages, and selects appropriate CV variants |
 | `approval.py` | Enforces explicit human approval workflow; mutating an approved package revokes approval, requiring fresh review |
 | `sender.py` | Delivery abstractions: `DryRunEmailTransport` and `YagmailEmailTransport`; raises `UnapprovedApplicationError` if an unapproved package is delivered |
+| `records.py` | Append-only local JSONL ledger for application records; the strict reader rejects malformed lines with line numbers |
 | `outreach_cli.py` | Terminal preview/review and reusable `run_outreach`; sends explicit recipients through guarded delivery |
 | `main.py` | Thin compatibility entry point for the guarded outreach workflow |
 
@@ -77,13 +78,27 @@ batch. Attachment changes during review require a new preview.
 python apps/job_search/job-email/main.py recruiter@example.com
 # Request per-package review and delivery
 python apps/job_search/job-email/main.py --send recruiter@example.com
+# Preview with an explicitly registered message variant
+python apps/job_search/job-email/main.py --message-variant concise recruiter@example.com
 ```
+
+Pass `--message-variant <id>` to render an explicitly registered message
+variant instead of the built-in default message. Unknown ids fail the
+recipient without fallback, prompting, delivery, or history changes. The
+preview always shows the selected CV and message variant ids alongside the
+recipient, subject, attachment path, and materials digest.
 
 SMTP setup occurs only after approval. Successful delivery appends the recipient
 to the existing sent-file history; failed delivery does not. Contacts already
 in history and repeated command-line recipients are skipped. If SMTP succeeds
 but history recording fails, the batch stops and asks for manual reconciliation;
 the sent-file is not a transactional or concurrent delivery ledger.
+
+`records.py` persists full application packages (vacancy/contact identifiers,
+selected CV/message variant ids, timestamps, approval snapshot, and send
+receipt) as one JSON object per line in a local ledger
+(`application_records.jsonl` by default, also ignored). The CLI send path does
+not write this ledger yet.
 
 Credentials come from `GMAIL_EMAIL` and `GMAIL_PASSWORD` in the process
 environment. Applicant details, portfolio/profile links, attachment path and
