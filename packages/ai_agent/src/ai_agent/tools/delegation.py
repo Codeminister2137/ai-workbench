@@ -7,6 +7,7 @@ from dataclasses import dataclass, replace
 from typing import Any
 
 from ai_agent.contracts import ToolCategory, ToolDefinition, ToolParameter, ToolResult
+from ai_agent.fanout import FanoutPolicy
 from ai_agent.tools.base import BaseTool, ToolContext, ToolRegistry
 
 DelegatedTaskRunner = Callable[[str, ToolContext], ToolResult]
@@ -26,6 +27,10 @@ class DelegateTaskTool(BaseTool):
     """Tool that lets a primary agent delegate bounded coding subtasks."""
 
     runner: DelegatedTaskRunner
+    fanout: FanoutPolicy = FanoutPolicy.ALLOWED
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "fanout", FanoutPolicy.coerce(self.fanout))
 
     @property
     def definition(self) -> ToolDefinition:
@@ -101,6 +106,14 @@ class DelegateTaskTool(BaseTool):
                 output="Error: 'task' parameter is required.",
                 is_error=True,
             )
+        if not self.fanout.allows_spawn:
+            # Host-level gate for the unscoped path below; the scoped path is
+            # additionally refused by DelegationScope.narrow().
+            return ToolResult(
+                name=self.definition.name,
+                output=(f"Error: run fan-out policy is {self.fanout.value}: child spawn refused."),
+                is_error=True,
+            )
         scope = context.delegation
         overrides = {
             name: arguments.get(name)
@@ -134,10 +147,14 @@ class DelegateTaskTool(BaseTool):
             return ToolResult(self.definition.name, "Error: " + str(error), is_error=True)
 
 
-def coding_tools_with_delegation(runner: DelegatedTaskRunner) -> ToolRegistry:
+def coding_tools_with_delegation(
+    runner: DelegatedTaskRunner,
+    *,
+    fanout: FanoutPolicy | str = FanoutPolicy.ALLOWED,
+) -> ToolRegistry:
     """Return the default coding registry plus the bounded delegation tool."""
     from ai_agent.tools import default_coding_tools
 
     registry = default_coding_tools()
-    registry.register(DelegateTaskTool(runner=runner))
+    registry.register(DelegateTaskTool(runner=runner, fanout=FanoutPolicy.coerce(fanout)))
     return registry

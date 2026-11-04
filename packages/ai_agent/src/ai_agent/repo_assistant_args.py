@@ -18,6 +18,7 @@ from ai_provider.repo_context import (
 )
 
 from ai_agent.coding_chat import DEFAULT_CODING_CHAT_HISTORY_BUDGET_CHARS
+from ai_agent.fanout import FanoutPolicy
 from ai_agent.permissions import ApprovalPolicyPreset
 
 DEFAULT_DELEGATION_CONTEXT_BUDGET_CHARS = 6_000
@@ -361,6 +362,16 @@ def build_argument_parser() -> argparse.ArgumentParser:
             "Model-neutral action approval preset. read_only denies writes/shell, "
             "interactive asks for writes/shell, workspace_write allows file writes "
             "but denies legacy shell actions, and trusted_local allows local writes/shell."
+        ),
+    )
+    parser.add_argument(
+        "--fanout-policy",
+        action=UserDefaultAction,
+        choices=[item.value for item in FanoutPolicy],
+        default=FanoutPolicy.ALLOWED.value,
+        help=(
+            "Run-level subagent fan-out policy. restricted and denied both refuse "
+            "child spawns; denied records an explicit owner prohibition."
         ),
     )
     parser.add_argument(

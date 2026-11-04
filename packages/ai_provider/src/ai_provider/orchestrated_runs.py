@@ -31,6 +31,8 @@ class OrchestratedRunRecord:
     primary_route_id: str | None
     primary_provider: str | None
     primary_model: str | None
+    fanout_policy: str = "allowed"
+    fanout_effective: str = "allowed"
 
 
 @dataclass(frozen=True)
@@ -84,6 +86,8 @@ class SQLiteOrchestratedRunStore:
                     primary_route_id TEXT,
                     primary_provider TEXT,
                     primary_model TEXT,
+                    fanout_policy TEXT NOT NULL DEFAULT 'allowed',
+                    fanout_effective TEXT NOT NULL DEFAULT 'allowed',
                     schema_version INTEGER NOT NULL
                 )
                 """
@@ -132,6 +136,21 @@ class SQLiteOrchestratedRunStore:
                 """
             )
 
+            existing_columns = {
+                row[1]
+                for row in connection.execute("PRAGMA table_info(orchestrated_runs)").fetchall()
+            }
+            if "fanout_policy" not in existing_columns:
+                connection.execute(
+                    "ALTER TABLE orchestrated_runs ADD COLUMN "
+                    "fanout_policy TEXT NOT NULL DEFAULT 'allowed'"
+                )
+            if "fanout_effective" not in existing_columns:
+                connection.execute(
+                    "ALTER TABLE orchestrated_runs ADD COLUMN "
+                    "fanout_effective TEXT NOT NULL DEFAULT 'allowed'"
+                )
+
     def create_run(
         self,
         *,
@@ -143,6 +162,8 @@ class SQLiteOrchestratedRunStore:
         primary_route_id: str | None,
         primary_provider: str | None,
         primary_model: str | None,
+        fanout_policy: str = "allowed",
+        fanout_effective: str = "allowed",
         status: str = "planned",
         execution_status: str | None = None,
     ) -> OrchestratedRunRecord:
@@ -164,6 +185,8 @@ class SQLiteOrchestratedRunStore:
             primary_route_id=primary_route_id,
             primary_provider=primary_provider,
             primary_model=primary_model,
+            fanout_policy=fanout_policy,
+            fanout_effective=fanout_effective,
         )
         with self._connect() as connection:
             connection.execute(
@@ -182,9 +205,11 @@ class SQLiteOrchestratedRunStore:
                     primary_route_id,
                     primary_provider,
                     primary_model,
-                    schema_version
+                    schema_version,
+                    fanout_policy,
+                    fanout_effective
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     record.run_id,
@@ -201,6 +226,8 @@ class SQLiteOrchestratedRunStore:
                     record.primary_provider,
                     record.primary_model,
                     SCHEMA_VERSION,
+                    record.fanout_policy,
+                    record.fanout_effective,
                 ),
             )
         return record
@@ -279,7 +306,9 @@ class SQLiteOrchestratedRunStore:
                     execution_status,
                     primary_route_id,
                     primary_provider,
-                    primary_model
+                    primary_model,
+                    fanout_policy,
+                    fanout_effective
                 FROM orchestrated_runs
                 WHERE run_id = ?
                 """,
@@ -485,6 +514,8 @@ def _run_record_from_row(row: sqlite3.Row | tuple[object, ...]) -> OrchestratedR
         primary_route_id=str(row[10]) if row[10] is not None else None,
         primary_provider=str(row[11]) if row[11] is not None else None,
         primary_model=str(row[12]) if row[12] is not None else None,
+        fanout_policy=str(row[13]),
+        fanout_effective=str(row[14]),
     )
 
 

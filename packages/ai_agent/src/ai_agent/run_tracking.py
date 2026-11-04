@@ -21,6 +21,7 @@ from ai_provider.orchestrated_runs import (
 )
 from ai_provider.repair_state import changed_paths, workspace_fingerprints
 
+from ai_agent.fanout import resolve_fanout_policy
 from ai_agent.validation import (
     ValidationCommandResult,
     default_validation_python,
@@ -158,6 +159,8 @@ def persist_orchestrated_run_plan(
     target = (
         orchestration.execution_plan.target if orchestration.execution_plan is not None else None
     )
+    # Top-level run: no parent floor, so configured and effective coincide.
+    fanout_effective = resolve_fanout_policy(getattr(args, "fanout_policy", "allowed"))
     run_record = store.create_run(
         repo_root=repo_root,
         mode=args.mode,
@@ -167,6 +170,8 @@ def persist_orchestrated_run_plan(
         primary_route_id=target.route_id if target is not None else None,
         primary_provider=target.provider if target is not None else None,
         primary_model=target.model if target is not None else None,
+        fanout_policy=fanout_effective.value,
+        fanout_effective=fanout_effective.value,
     )
     stage_records = store.replace_stage_plan(
         run_record.run_id,
