@@ -6,7 +6,7 @@ Separates message/materials preparation from human approval and final sending.
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 from evidence import ProhibitedClaimError, analyze_vacancy_fit, verify_application_claims
 from models import (
@@ -14,8 +14,58 @@ from models import (
     ApplicationStatus,
     CandidateProfile,
     JobVacancy,
+    MessageVariant,
     utc_now_iso,
 )
+
+MESSAGE_TEMPLATE_FIELDS = (
+    "applicant_name",
+    "applicant_location",
+    "applicant_summary",
+    "portfolio_url",
+    "linkedin_url",
+    "company",
+    "role",
+    "location",
+    "skills",
+)
+"""Fixed placeholder set accepted in ``MessageVariant`` templates."""
+
+
+def render_message_template(
+    template: str, values: Mapping[str, str], *, variant_id: str, field_name: str
+) -> str:
+    """Render one message template against the fixed placeholder mapping.
+
+    Raises ValueError naming the variant and field when the template uses an
+    unknown placeholder or malformed format syntax.
+    """
+    try:
+        return template.format_map(values)
+    except (KeyError, IndexError, ValueError) as exc:
+        raise ValueError(
+            f"Message variant {variant_id!r} field {field_name!r} is invalid: {exc}. "
+            f"Available placeholders: {', '.join(MESSAGE_TEMPLATE_FIELDS)}."
+        ) from exc
+
+
+def _template_values(
+    profile: CandidateProfile,
+    vacancy: JobVacancy | None,
+    highlighted_skills: Sequence[str],
+) -> dict[str, str]:
+    """Build the fixed placeholder mapping for message template rendering."""
+    return {
+        "applicant_name": profile.applicant_name,
+        "applicant_location": profile.applicant_location,
+        "applicant_summary": profile.applicant_summary,
+        "portfolio_url": profile.portfolio_url,
+        "linkedin_url": profile.linkedin_url,
+        "company": vacancy.company if vacancy else "",
+        "role": vacancy.title if vacancy and vacancy.title else "Python Developer",
+        "location": vacancy.location if vacancy else "",
+        "skills": ", ".join(highlighted_skills),
+    }
 
 
 def build_default_message(
@@ -65,6 +115,7 @@ def prepare_application(
     vacancy: JobVacancy,
     *,
     cv_variant_id: str | None = None,
+    message_variant_id: str | None = None,
     explicit_claims: Sequence[str] = (),
     strict_evidence: bool = True,
 ) -> ApplicationPackage:
@@ -73,7 +124,10 @@ def prepare_application(
     Validates that any explicitly claimed skills exist in the candidate's
     evidence profile. Fails fast with ProhibitedClaimError if an ungrounded
     claim is detected under strict mode. An explicitly requested unknown CV
-    variant raises ValueError rather than selecting another document.
+    variant raises ValueError rather than selecting another document. Message
+    variants follow the same rule: an explicitly requested unknown message
+    variant raises ValueError, while an omitted selection renders the first
+    registered variant or the built-in default message.
     """
     if explicit_claims:
         verification = verify_application_claims(explicit_claims, profile, strict=strict_evidence)
@@ -101,11 +155,41 @@ def prepare_application(
     fit = analyze_vacancy_fit(vacancy, profile)
     highlighted = fit.matched_skills[:3] if fit.matched_skills else ()
 
-    subject = build_default_subject(profile, vacancy)
-    body = build_default_message(profile, vacancy, highlighted_skills=highlighted)
+    message_variant: MessageVariant | None
+    message_key = "default"
+    if message_variant_id is not None:
+        if message_variant_id not in profile.message_variants:
+            raise ValueError(f"Unknown message variant: {message_variant_id!r}")
+        message_variant = profile.message_variants[message_variant_id]
+        message_key = message_variant_id
+    elif profile.message_variants:
+        message_variant = next(iter(profile.message_variants.values()))
+        message_key = message_variant.variant_id
+    else:
+        message_variant = None
+
+    if message_variant is None:
+        subject = build_default_subject(profile, vacancy)
+        body = build_default_message(profile, vacancy, highlighted_skills=highlighted)
+    else:
+        values = _template_values(profile, vacancy, highlighted)
+        subject = render_message_template(
+            message_variant.subject_template,
+            values,
+            variant_id=message_key,
+            field_name="subject_template",
+        )
+        body = render_message_template(
+            message_variant.body_template,
+            values,
+            variant_id=message_key,
+            field_name="body_template",
+        )
 
     # Generate a deterministic unique ID for the application package
-    app_seed = f"{vacancy.id}:{vacancy.contact_email}:{variant_key}:{subject}".encode()
+    app_seed = (
+        f"{vacancy.id}:{vacancy.contact_email}:{variant_key}:{message_key}:{subject}".encode()
+    )
     app_id = hashlib.sha256(app_seed).hexdigest()[:12]
 
     recipient = vacancy.contact_email or ""
@@ -118,6 +202,7 @@ def prepare_application(
         subject=subject,
         body=body,
         cv_variant_id=variant_key,
+        message_variant_id=message_key,
         status=ApplicationStatus.PREPARED,
         created_at_utc=utc_now_iso(),
     )
