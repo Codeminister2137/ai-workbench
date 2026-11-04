@@ -3,6 +3,13 @@
 **Status:** Accepted
 **Date:** 2026-10-01
 
+**Partially superseded on 2026-11-04:**
+[ADR-021](ADR-021-access-routes-and-cost-policy.md) ("higher tiers permit the
+routes in lower tiers") and [ADR-068](ADR-068-free-routes-are-the-default-preference.md)
+(free-first preference) authorize lower-tier admission, so the same-billing-tier
+sentence in the Decision below no longer holds as written. The historical decision
+and rationale below are retained.
+
 **Partially superseded on 2026-10-15:**
 [ADR-059](ADR-059-context-aware-observable-fallback-history.md) permits transient
 full observable history for eligible native coding fallback when the destination
