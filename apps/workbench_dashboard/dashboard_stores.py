@@ -17,12 +17,28 @@ MAX_RESPONSE_BYTES = 100_000
 MAX_OPEN_TASKS = 50
 INBOX_TYPES = ("decision", "clarification", "order")
 INBOX_STATUSES = ("open", "answered", "closed")
+FANOUT_POLICIES = ("allowed", "restricted", "denied")
+FANOUT_UNKNOWN = "unknown"
 IDEA_SOURCES = ("owner", "third-party")
 IDEA_STATUSES = ("new", "reviewing", "adopted", "parked", "declined")
 
 
 class StoreError(ValueError):
     """A store refusal safe to report to the dashboard caller."""
+
+
+def effective_fanout_policy(record: dict) -> str:
+    """Read one run record's effective fan-out policy for display.
+
+    Prefers the resolved ``fanout_effective`` field, falls back to the raw
+    ``fanout_policy`` request, and reports ``unknown`` when the record predates
+    both fields or holds only blank/non-string values.
+    """
+    for key in ("fanout_effective", "fanout_policy"):
+        value = record.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return FANOUT_UNKNOWN
 
 
 def _utc_now() -> str:

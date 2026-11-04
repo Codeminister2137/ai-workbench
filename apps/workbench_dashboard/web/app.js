@@ -285,6 +285,7 @@ async function renderRuns(id) {
     const payload = await api("/api/runs/" + encodeURIComponent(id));
     const run = payload.item;
     const meta = [run.status, run.branch, run.commit].filter(Boolean).map(esc).join(" · ");
+    const fanout = run.fanout_effective || run.fanout_policy || "unknown";
     const report = run.report
       ? `<h3>Report</h3><pre>${gtext(run.report)}</pre>`
       : run.report_request_id
@@ -293,6 +294,7 @@ async function renderRuns(id) {
     view.innerHTML = `<h1>Run</h1><p><a href="#/runs">All runs</a></p>
       <div class="card"><h2>${gtext(run.title || run.id)}</h2>
       <p class="muted">${meta}</p>
+      <p title="Whether this run may spawn subagent children"><strong>Fan-out:</strong> <span class="pill">${esc(fanout)}</span></p>
       ${run.validation ? `<p><strong>Validation:</strong> ${esc(run.validation)}</p>` : ""}
       ${run.body ? `<pre>${gtext(run.body)}</pre>` : ""}
       ${report}</div>`;
@@ -317,7 +319,8 @@ async function renderRuns(id) {
   const items = payload.items.length
     ? payload.items.map((r) =>
         `<li><a href="#/runs/${esc(r.id)}">${gtext(r.title || r.id)}</a>
-         <span class="pill st-${esc((r.status || "none").replace(/\s+/g, "-"))}">${esc(r.status || "")}</span></li>`).join("")
+         <span class="pill st-${esc((r.status || "none").replace(/\s+/g, "-"))}">${esc(r.status || "")}</span>
+         <span class="pill" title="Fan-out policy: whether this run may spawn subagent children">fan-out: ${esc(r.fanout_effective || r.fanout_policy || "unknown")}</span></li>`).join("")
     : '<li class="muted">No runs recorded.</li>';
   let evidence = "";
   try {

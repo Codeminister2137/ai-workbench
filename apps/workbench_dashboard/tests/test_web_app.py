@@ -274,3 +274,47 @@ def test_chat_rename_rejects_empty_title(dashboard_server) -> None:
         )
     assert raised.value.code == 400
     raised.value.close()
+
+
+def _write_run(tmp_path, run_id: str, record: dict) -> None:
+    runs_dir = tmp_path / "data" / "runs"
+    runs_dir.mkdir(parents=True, exist_ok=True)
+    (runs_dir / f"{run_id}.json").write_text(json.dumps(record), encoding="utf-8")
+
+
+def test_runs_detail_reports_effective_fanout(dashboard_server, tmp_path) -> None:
+    _write_run(
+        tmp_path,
+        "w4",
+        {
+            "id": "w4",
+            "title": "W4 fix",
+            "status": "merged",
+            "fanout_effective": "restricted",
+            "fanout_policy": "allowed",
+        },
+    )
+    run = get_json(dashboard_server, "/api/runs/w4")
+    assert run["item"]["fanout_effective"] == "restricted"
+
+
+def test_runs_detail_falls_back_to_fanout_policy(dashboard_server, tmp_path) -> None:
+    _write_run(tmp_path, "w4", {"id": "w4", "fanout_policy": "denied"})
+    run = get_json(dashboard_server, "/api/runs/w4")
+    assert run["item"]["fanout_effective"] == "denied"
+
+
+def test_runs_detail_unknown_for_legacy_record(dashboard_server, tmp_path) -> None:
+    _write_run(tmp_path, "w4", {"id": "w4", "title": "W4 fix", "status": "merged"})
+    run = get_json(dashboard_server, "/api/runs/w4")
+    assert run["item"]["fanout_effective"] == "unknown"
+    stored = json.loads((tmp_path / "data" / "runs" / "w4.json").read_text(encoding="utf-8"))
+    assert "fanout_effective" not in stored
+
+
+def test_runs_list_resolves_fanout_per_item(dashboard_server, tmp_path) -> None:
+    _write_run(tmp_path, "new", {"id": "new", "fanout_effective": "allowed"})
+    _write_run(tmp_path, "old", {"id": "old", "status": "merged"})
+    payload = get_json(dashboard_server, "/api/runs")
+    by_id = {item["id"]: item["fanout_effective"] for item in payload["items"]}
+    assert by_id == {"new": "allowed", "old": "unknown"}

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pytest
-from dashboard_stores import DashboardStores, StoreError
+from dashboard_stores import DashboardStores, StoreError, effective_fanout_policy
 
 
 @pytest.fixture
@@ -107,3 +107,17 @@ def test_answer_and_note_are_independent(stores) -> None:
     only = stores.answer_inbox_task(typed["id"], answer="Because.")
     assert only["answer"] == "Because."
     assert only["note"] is None
+
+
+def test_effective_fanout_policy_prefers_effective() -> None:
+    record = {"fanout_effective": "restricted", "fanout_policy": "allowed"}
+    assert effective_fanout_policy(record) == "restricted"
+
+
+def test_effective_fanout_policy_falls_back_to_policy() -> None:
+    assert effective_fanout_policy({"fanout_policy": "denied"}) == "denied"
+
+
+def test_effective_fanout_policy_unknown_for_legacy_record() -> None:
+    assert effective_fanout_policy({"id": "w4", "status": "merged"}) == "unknown"
+    assert effective_fanout_policy({"fanout_effective": "  ", "fanout_policy": None}) == "unknown"

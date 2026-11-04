@@ -198,3 +198,16 @@ def test_runs_list_auto_refresh_polls_while_visible() -> None:
     assert "10000" in js
     assert "document.hidden" in js
     assert "prevFilter" in js
+
+
+def test_run_detail_shows_fanout_indicator() -> None:
+    """Run detail shows one Fan-out indicator with a graceful fallback."""
+    js = _read("app.js")
+    assert "<strong>Fan-out:</strong>" in js
+    assert 'run.fanout_effective || run.fanout_policy || "unknown"' in js
+
+
+def test_runs_list_shows_fanout_pill() -> None:
+    """Runs list rows carry the same fan-out indicator as the detail."""
+    js = _read("app.js")
+    assert 'fan-out: ${esc(r.fanout_effective || r.fanout_policy || "unknown")}' in js

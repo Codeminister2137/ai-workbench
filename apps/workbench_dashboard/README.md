@@ -27,7 +27,9 @@ inspect the owned process only.
   (`data/chats.sqlite3`). Turns cannot run tools yet — the assistant
   says what it would do instead of claiming effects.
 - Plans/Runs: read-only views of file-backed `data/plans/` and
-  `data/runs/` records created by existing Workbench flows.
+  `data/runs/` records created by existing Workbench flows. Each run
+  shows one fan-out indicator (allowed/restricted/denied, or unknown
+  for records that predate the field).
 - Inbox: decisions/clarifications assigned to the owner; answers flow
   back as record updates. Creation requires the supervisor token when
   `data/supervisor.token` exists.
