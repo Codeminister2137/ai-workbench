@@ -33,8 +33,11 @@ Those plan files are gitignored and absent here; citations below marked
   preflight command (verified: no `doctor` entry in
   [ai_agent CLI](packages/ai_agent/src/ai_agent/cli.py) or
   [repo_assistant_args](packages/ai_agent/src/ai_agent/repo_assistant_args.py)).
-  In this very worktree, `ai-assistant --help` failed on a fresh sync
-  (`program not found`) — a newcomer hits that wall first.
+  There is no single preflight that tells a newcomer which of these
+  gates failed and how to fix it — each gate's error must be decoded
+  separately. (Reviewer note 2026-11-04: an earlier draft cited a
+  worktree-local `program not found` anecdote; struck as a checkout
+  artifact, not a product defect.)
 - **Bounded slice:** add `ai-assistant doctor` — offline probes for
   Python/uv/venv, Ollama reachability + installed models, native-client
   binaries, `.env`/catalog presence — printing one fix-it list.
@@ -115,22 +118,25 @@ Those plan files are gitignored and absent here; citations below marked
 
 - **User job blocked:** trusting continued work after a route failure —
   what failed, what replaced it, did quality drop, what did it cost.
-- **Evidence:** Track B W1 mapped 16 fallback triggers with 7 untested
-  gaps (G1–G7) and live doc/code conflict C1
-  `[plans:track-b-20261104.md:6-36]`; highest spend risk is G6
-  (`allow_cost_escalation` never tested at session level); dashboard
+- **Evidence:** Track B W1 mapped 16 fallback triggers; the trigger
+  truth-table, escalation pins, preservation-payload pins and the C1
+  doc fix all landed 2026-11-04, leaving G3 (owner call on notice
+  semantics), the G6 session-level cost-escalation test (highest
+  spend risk), and a G1 residual check
+  `[plans:track-b-20261104.md:6-36]`; dashboard
   run view shows only the fan-out indicator
   ([dashboard_web_app.py](apps/workbench_dashboard/dashboard_web_app.py:53-60)),
   no fallback/quality-downgrade events; ADR-060 receipt fields exist
   but are CLI-rendered, not dashboard-rendered
   ([architecture.md](docs/architecture.md:152-157)).
-- **Bounded slice:** (a) W1 fix candidates 1–4 (escalation test,
-  trigger truth-table, preservation-payload pin, C1 doc fix —
-  `[plans:track-b-20261104.md:32-36]`); (b) fallback-event feed on the
-  run page from existing receipts. Files:
+- **Bounded slice:** (a) remaining W1 pins: G6 session-level
+  cost-escalation test, G1 residual check, G3 pin after the owner
+  call (`[plans:track-b-20261104.md:32-36]`; the other W1 fixes
+  landed 2026-11-04); (b) fallback-event feed on the run page from
+  existing receipts. Files:
   `packages/ai_orchestrator/src/ai_orchestrator/fallback.py` tests,
   `packages/ai_provider/src/ai_provider/execution_fallback.py` tests,
-  `docs/decisions.md` (C1, 3 lines), dashboard run view. Estimate: 4–6h.
+  dashboard run view. Estimate: 4–6h.
 - **Owner decision first?** Yes for one item — G3 `task_minimum`
   downgrade-notice semantics ("needs owner call")
   `[plans:track-b-20261104.md:34-36]`; the rest needs none.
