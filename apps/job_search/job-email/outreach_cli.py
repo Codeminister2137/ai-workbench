@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from email.utils import parseaddr
 from pathlib import Path
 
+import records
 from approval import approve_package
 from models import ApplicationPackage, ApplicationStatus, CandidateProfile, CVVariant, JobVacancy
 from preparation import prepare_application
@@ -26,6 +27,7 @@ class Config:
     LINKEDIN_URL: str = "https://www.linkedin.com/in/your-profile"
     CV_ATTACHMENT: str = "cv.pdf"
     SENT_FILE: str = "sent_emails.txt"
+    RECORDS_FILE: str = "application_records.jsonl"
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -39,9 +41,18 @@ def main(argv: Sequence[str] | None = None) -> int:
         default=None,
         help="Explicit message variant id; unknown ids fail without fallback",
     )
+    parser.add_argument(
+        "--cv-variant",
+        default=None,
+        help="Explicit CV variant id; unknown ids fail without fallback",
+    )
     args = parser.parse_args(argv)
     return run_outreach(
-        _load_config(), args.recipients, send=args.send, message_variant_id=args.message_variant
+        _load_config(),
+        args.recipients,
+        send=args.send,
+        message_variant_id=args.message_variant,
+        cv_variant_id=args.cv_variant,
     )
 
 
@@ -51,6 +62,7 @@ def run_outreach(
     *,
     send: bool = False,
     message_variant_id: str | None = None,
+    cv_variant_id: str | None = None,
 ) -> int:
     """Review explicit contacts and record only successful guarded deliveries."""
     sent_emails = _load_sent_emails(config.SENT_FILE)
@@ -78,6 +90,7 @@ def run_outreach(
                     source="manual-outreach",
                 ),
                 message_variant_id=message_variant_id,
+                cv_variant_id=cv_variant_id,
             )
         except ValueError as exc:
             print(f"Cannot prepare application for {email}: {exc}; no delivery attempted.")
@@ -130,6 +143,14 @@ def run_outreach(
         except OSError:
             print(f"Sent to {email}, but recording failed. Stop and reconcile sent history.")
             return 1
+        try:
+            records.append_application_record(config.RECORDS_FILE, delivered)
+        except OSError:
+            print(
+                f"Sent to {email} and recorded in sent history, "
+                f"but the application record was not saved. Stop and reconcile {config.RECORDS_FILE}."
+            )
+            return 1
         print(f"Sent to {email}")
     return int(failed)
 
@@ -145,6 +166,7 @@ def _load_config() -> Config:
         LINKEDIN_URL=os.getenv("LINKEDIN_URL", Config.LINKEDIN_URL),
         CV_ATTACHMENT=os.getenv("CV_ATTACHMENT", Config.CV_ATTACHMENT),
         SENT_FILE=os.getenv("SENT_FILE", Config.SENT_FILE),
+        RECORDS_FILE=os.getenv("RECORDS_FILE", Config.RECORDS_FILE),
     )
 
 

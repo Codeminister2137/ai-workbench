@@ -80,13 +80,16 @@ python apps/job_search/job-email/main.py recruiter@example.com
 python apps/job_search/job-email/main.py --send recruiter@example.com
 # Preview with an explicitly registered message variant
 python apps/job_search/job-email/main.py --message-variant concise recruiter@example.com
+# Preview with an explicitly registered CV variant
+python apps/job_search/job-email/main.py --cv-variant alternate recruiter@example.com
 ```
 
 Pass `--message-variant <id>` to render an explicitly registered message
-variant instead of the built-in default message. Unknown ids fail the
-recipient without fallback, prompting, delivery, or history changes. The
-preview always shows the selected CV and message variant ids alongside the
-recipient, subject, attachment path, and materials digest.
+variant instead of the built-in default message, and `--cv-variant <id>`
+to select a registered CV attachment instead of the default. Unknown ids
+fail the recipient without fallback, prompting, delivery, or history
+changes. The preview always shows the selected CV and message variant
+ids alongside the recipient, subject, attachment path, and materials digest.
 
 SMTP setup occurs only after approval. Successful delivery appends the recipient
 to the existing sent-file history; failed delivery does not. Contacts already
@@ -97,8 +100,11 @@ the sent-file is not a transactional or concurrent delivery ledger.
 `records.py` persists full application packages (vacancy/contact identifiers,
 selected CV/message variant ids, timestamps, approval snapshot, and send
 receipt) as one JSON object per line in a local ledger
-(`application_records.jsonl` by default, also ignored). The CLI send path does
-not write this ledger yet.
+(`application_records.jsonl` by default, also ignored; override with the
+`RECORDS_FILE` environment variable). Each successful guarded delivery
+appends its sent package after the sent-file write; previews and failed
+deliveries write nothing. If the ledger append fails after SMTP success,
+the batch stops for manual reconciliation, like the sent-file rule above.
 
 Credentials come from `GMAIL_EMAIL` and `GMAIL_PASSWORD` in the process
 environment. Applicant details, portfolio/profile links, attachment path and

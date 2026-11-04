@@ -14,6 +14,7 @@ def outreach(monkeypatch, tmp_path):
     history = tmp_path / "sent.txt"
     monkeypatch.setenv("CV_ATTACHMENT", str(attachment))
     monkeypatch.setenv("SENT_FILE", str(history))
+    monkeypatch.setenv("RECORDS_FILE", str(tmp_path / "records.jsonl"))
     monkeypatch.setenv("GMAIL_EMAIL", "sender@example.invalid")
     monkeypatch.setenv("GMAIL_PASSWORD", "synthetic-secret")
     calls = []
