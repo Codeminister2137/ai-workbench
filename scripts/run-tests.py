@@ -87,6 +87,7 @@ GROUPS = {
         "tests/test_hosted_delegation_acceptance.py",
         "tests/test_hosted_delegation_controller.py",
         "tests/test_delegation_scope.py",
+        "tests/test_fanout_policy.py",
         "tests/test_semantic_refactor.py",
         "tests/test_coding_sessions.py",
         "tests/test_codex_mcp_config.py",
