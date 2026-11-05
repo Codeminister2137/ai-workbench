@@ -24,6 +24,7 @@ class DashboardConfig:
     chat_fanout_policy: str = "restricted"
     work_roots: tuple[str, ...] = ()
     supervision: str = "attended"
+    trusted_hosts: tuple[str, ...] = ()
 
 
 def load_config(path: Path = DEFAULT_CONFIG_PATH) -> DashboardConfig:
@@ -45,6 +46,7 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> DashboardConfig:
         "chat_fanout_policy": str,
         "work_roots": list,
         "supervision": str,
+        "trusted_hosts": list,
     }
     values: dict[str, object] = {}
     for key, types in known.items():
@@ -66,6 +68,15 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> DashboardConfig:
             raise ValueError("Dashboard config key 'work_roots' must hold strings")
         # Dumb carrier: existence/overlap checks happen per request, not here.
         values["work_roots"] = tuple(entries)
+    hosts = values.get("trusted_hosts")
+    if hosts is not None:
+        entries = cast("list[object]", hosts)
+        if any(
+            not isinstance(entry, str) or not entry or any(char.isspace() for char in entry)
+            for entry in entries
+        ):
+            raise ValueError("Dashboard config key 'trusted_hosts' must hold exact Host values")
+        values["trusted_hosts"] = tuple(entries)
     supervision = values.get("supervision", "attended")
     if supervision not in ("attended", "unattended"):
         raise ValueError("Dashboard config key 'supervision' must be attended or unattended")

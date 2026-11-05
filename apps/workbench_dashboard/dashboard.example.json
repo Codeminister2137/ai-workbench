@@ -3,5 +3,6 @@
   "model": "gpt-oss:20b",
   "base_url": null,
   "title": "Workbench Dashboard",
-  "history_budget_chars": 20000
+  "history_budget_chars": 20000,
+  "trusted_hosts": []
 }
