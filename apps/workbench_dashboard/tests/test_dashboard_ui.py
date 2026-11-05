@@ -365,3 +365,13 @@ def test_chat_thread_has_dictate_button() -> None:
     assert "Stop (recording...)" in js
     assert "Dictation failed: " in js
     assert "type instead" in js
+
+
+def test_inbox_supports_owner_tasks() -> None:
+    """Task items are creatable and carry do-the-steps guidance, no new controls."""
+    js = _read("app.js")
+    assert '<option value="task">task</option>' in js
+    assert 'item.type === "task"' in js
+    assert "answer Done with a note" in js
+    assert "Never paste secrets here" in js
+    assert "assigns decisions and tasks to the inbox" in js
