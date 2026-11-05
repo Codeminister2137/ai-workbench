@@ -211,3 +211,95 @@ def test_runs_list_shows_fanout_pill() -> None:
     """Runs list rows carry the same fan-out indicator as the detail."""
     js = _read("app.js")
     assert 'fan-out: ${esc(r.fanout_effective || r.fanout_policy || "unknown")}' in js
+
+
+def test_inbox_badge_polls_live_open_count() -> None:
+    """The nav badge refreshes from /api/inbox on the ~10s cadence."""
+    js = _read("app.js")
+    assert "inboxPollTimer" in js
+    assert "stopInboxPoll" in js
+    assert "startInboxPoll" in js
+    assert "pollInboxBadge" in js
+    assert 'api("/api/inbox")' in js
+    assert 't.status === "open"' in js
+    assert "document.hidden" in js
+    assert "10000" in js
+    assert "startInboxPoll();" in js
+
+
+def test_inbox_badge_never_auto_answers() -> None:
+    """Badge refresh is a read-only GET; opening the inbox just re-renders."""
+    js = _read("app.js")
+    assert "inboxAckSeq" not in js
+    assert "AckSeq" not in js
+    # The poll path only reads; answers happen solely through the answer form.
+    assert js.count("/answer") == 1  # the inbox answer-form POST only
+
+
+def test_run_detail_polls_receipts_contract() -> None:
+    """Run detail fetches GET /api/runs/{id}/receipts and degrades gracefully."""
+    js = _read("app.js")
+    assert '"/receipts"' in js
+    assert "data.receipts" in js
+    assert 'id="receipts-list"' in js
+    assert "renderReceiptsInto" in js
+    assert "No receipts yet." in js
+    assert "Loading receipts..." in js
+    assert "<h3>Events and receipts</h3>" in js
+
+
+def test_receipts_render_collapsed_turn_groups() -> None:
+    """Receipts render as collapsed per-turn disclosures, never a raw dump."""
+    js = _read("app.js")
+    assert "receiptHtml" in js
+    assert '<details class="turn">' in js
+    assert '"Turn " + rec.turn' in js
+    css = _read("app.css")
+    assert "details.turn" in css
+
+
+def test_run_detail_auto_refreshes_while_visible() -> None:
+    """Run detail re-reads status + receipts every ~10s; stops on navigate."""
+    js = _read("app.js")
+    assert "runDetailPollTimer" in js
+    assert "stopRunDetailPoll" in js
+    assert "startRunDetailPoll" in js
+    assert "refreshRunDetail" in js
+    assert 'id="run-status"' in js
+    assert '"#/runs/" + id' in js
+    assert "stopRunDetailPoll();" in js  # render() stops it on navigation
+
+
+def test_plan_detail_renders_phase_checklist() -> None:
+    """Plan detail shows a phase header + checklist with a graceful fallback."""
+    js = _read("app.js")
+    assert "phaseChecklistHtml" in js
+    assert "plan.phases" in js
+    assert 'id="phase-checklist"' in js
+    assert "<strong>Phase:</strong>" in js
+    assert "<h3>Phase checklist</h3>" in js
+    assert "No phases recorded yet." in js
+    css = _read("app.css")
+    assert ".checklist" in css
+
+
+def test_run_detail_renders_synthesis_and_diff() -> None:
+    """Run detail shows Did/Found/Next synthesis and the diff when present."""
+    js = _read("app.js")
+    assert "synthesisHtml" in js
+    assert 'id="run-synthesis"' in js
+    assert '"Did"' in js and '"Found"' in js and '"Next"' in js
+    assert "<h3>Diff</h3>" in js
+    assert 'id="run-diff"' in js
+    assert "run.diff" in js
+
+
+def test_run_approval_links_to_inbox_only() -> None:
+    """Approve/Reject affordance is a link to the inbox answer flow, nothing else."""
+    js = _read("app.js")
+    assert "run.inbox_id" in js
+    assert '"#/inbox/${esc(run.inbox_id)}"' in js
+    assert "Review approval in inbox" in js
+    assert 'title="Approve or reject via the linked inbox task"' in js
+    assert "/approve" not in js
+    assert "/reject" not in js
