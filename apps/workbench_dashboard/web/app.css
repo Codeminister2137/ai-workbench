@@ -38,3 +38,13 @@ details.turn div { white-space: pre-wrap; }
 .staged-file { border-top: 1px solid #8884; padding: 0.4rem 0; }
 .staged-file h4 { margin: 0.2rem 0; font-size: 0.95rem; }
 .staged-file pre { white-space: pre-wrap; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+.doc-body { overflow-wrap: anywhere; line-height: 1.55; }
+.doc-body h1, .doc-body h2, .doc-body h3 { margin: 1rem 0 0.5rem; line-height: 1.25; }
+.doc-body h1 { font-size: 1.35rem; }
+.doc-body h2 { font-size: 1.15rem; }
+.doc-body h3 { font-size: 1rem; }
+.doc-body pre { background: #8881; padding: 0.5rem; border-radius: 0.25rem; overflow-x: auto; }
+.doc-body blockquote { margin: 0.5rem 0; padding-left: 0.75rem; border-left: 2px solid #8884; }
+.doc-body table { border-collapse: collapse; }
+.doc-body th, .doc-body td { border: 1px solid #8884; padding: 0.25rem 0.5rem; }

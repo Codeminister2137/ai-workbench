@@ -848,7 +848,7 @@ async function renderDocuments(id) {
     if (item.renderable) {
       try {
         const full = await api("/api/documents/" + id.split("/").map(encodeURIComponent).join("/") + "?content=1");
-        body += `<pre>${esc(full.content)}</pre>`
+        body += `<div class="doc-body">${mdToHtml(full.content)}</div>`
           + (full.truncated ? '<p class="muted">Preview truncated at 100 KB — open the file for the rest.</p>' : "");
       } catch (err) {
         body += `<p class="muted">Preview unavailable: ${esc(err.message)} — open the file instead.</p>`;
