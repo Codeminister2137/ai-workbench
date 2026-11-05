@@ -42,6 +42,7 @@ from dashboard_config import (
     load_config,
     save_supervision,
 )
+from dashboard_projects import create_project, get_project, list_projects
 from dashboard_stores import DashboardStores, StoreError, effective_fanout_policy
 from document_library import DocumentLibrary
 from owner_mail import mail_configured
@@ -223,6 +224,14 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 return self._send_inbox(parsed.query)
             if path == "/api/ideas":
                 return self._send_ideas(parsed.query)
+            if path == "/api/projects":
+                try:
+                    projects = list_projects(self.data_dir)
+                except StagedEditError as exc:
+                    return self._send_json({"ok": False, "error": str(exc)}, status=500)
+                return self._send_json({"ok": True, "projects": projects})
+            if path.startswith("/api/projects/"):
+                return self._send_project(path[len("/api/projects/") :])
             if path.startswith("/api/inbox/"):
                 return self._send_item(self._stores().inbox, path[len("/api/inbox/") :])
             if path.startswith("/api/ideas/"):
@@ -267,6 +276,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 return self._create_inbox_task(payload)
             if path == "/api/ideas":
                 return self._create_idea(payload)
+            if path == "/api/projects":
+                return self._create_project(payload)
             if path == "/api/settings":
                 return self._save_settings(payload)
             if path.startswith("/api/inbox/") and path.endswith("/answer"):
@@ -670,6 +681,33 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             code = 404 if "not found" in str(exc).lower() else 400
             return self._send_json({"ok": False, "error": str(exc)}, status=code)
         self._send_json({"ok": True, "id": record["id"], "status": record["status"]})
+
+    def _send_project(self, project_id: str) -> None:
+        try:
+            project = get_project(self.data_dir, project_id)
+        except StagedEditError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=500)
+        if project is None:
+            return self._send_json({"ok": False, "error": "Not found"}, status=404)
+        self._send_json({"ok": True, "project": project})
+
+    def _create_project(self, payload: dict) -> None:
+        name = payload.get("name")
+        root = payload.get("root")
+        description = payload.get("description", "")
+        if not isinstance(name, str) or not isinstance(root, str):
+            return self._send_json(
+                {"ok": False, "error": "name and root must be strings"}, status=400
+            )
+        if not isinstance(description, str):
+            return self._send_json(
+                {"ok": False, "error": "description must be a string"}, status=400
+            )
+        try:
+            project = create_project(self.data_dir, name=name, root=root, description=description)
+        except StagedEditError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        self._send_json({"ok": True, "project": project})
 
     def _cancel_run(self, run_id: str) -> None:
         try:
