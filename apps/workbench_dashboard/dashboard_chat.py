@@ -26,6 +26,7 @@ from ai_provider.config import BackendConfig, ProviderKind
 from ai_provider.contracts import ChatClient, PrivacyClass
 from ai_provider.errors import ProviderError
 from ai_provider.factory import create_chat_client
+from ai_provider.translation import Translator, normalize_input
 from dashboard_config import DashboardConfig
 from dashboard_stores import DashboardStores
 
@@ -174,13 +175,35 @@ class DashboardChat:
             },
         )
 
-    def send(self, session_id: str, text: str) -> DashboardTurnOutcome:
-        """Append one user turn and its provider answer to the transcript."""
+    def send(
+        self,
+        session_id: str,
+        text: str,
+        *,
+        language: str = "en",
+        translator: Translator | None = None,
+    ) -> DashboardTurnOutcome:
+        """Translate at ingestion, then append one turn plus its answer.
+
+        Non-English input without a translator fails closed (nothing stored);
+        translated turns keep the verbatim source in message metadata.
+        """
         session = self.store.get_session(session_id)
         if session is None:
             raise ValueError("Chat session not found")
+        normalized, _receipt = normalize_input(translator, text, language)
+        metadata = (
+            {
+                "source_text": normalized.source,
+                "source_lang": normalized.lang,
+                "translated": True,
+                "translator": normalized.translator_id,
+            }
+            if normalized.translated
+            else None
+        )
         controller = self._controller(session_id, session.privacy_class)
-        result = controller.turn(text, self._execute)
+        result = controller.turn(normalized.working, self._execute, user_metadata=metadata)
         return DashboardTurnOutcome(
             response_text=result.response_text,
             execution_status=result.execution_status,

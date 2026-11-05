@@ -379,7 +379,8 @@ async function renderChatThread(id, initial) {
     <div id="thread">${msgs || '<p class="muted">No messages yet.</p>'}</div>
     <form class="inline" id="chat-form"><input type="text" name="text" placeholder="Message..." title="Message the supervisor" required>
     <button type="submit" title="Send message">Send</button>
-    <button type="button" id="run-request-btn" title="Queue this message as an agent run (needs inbox approval)">Request run</button></form>
+    <button type="button" id="run-request-btn" title="Queue this message as an agent run (needs inbox approval)">Request run</button>
+    <button type="button" id="dictate-btn" title="Dictate with the microphone (server transcription)">Dictate</button></form>
     <p><select id="project-picker" title="Project for the next run request (optional)"></select>
     <span id="project-note" class="muted"></span></p>`;
   document.getElementById("rename-form").addEventListener("submit", async (ev) => {
@@ -460,6 +461,46 @@ async function renderChatThread(id, initial) {
     }
   });
   loadProjectPicker();
+  let dictationRecorder = null;
+  const dictateBtn = document.getElementById("dictate-btn");
+  dictateBtn.addEventListener("click", async () => {
+    if (dictationRecorder) { dictationRecorder.stop(); return; }
+    if (!navigator.mediaDevices || !window.MediaRecorder) {
+      toast("Dictation needs microphone + MediaRecorder support", false);
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({audio: true});
+      const chunks = [];
+      const recorder = new MediaRecorder(stream);
+      dictationRecorder = recorder;
+      dictateBtn.dataset.live = "1";
+      dictateBtn.textContent = "Stop (recording...)";
+      recorder.ondataavailable = (ev) => { if (ev.data.size) chunks.push(ev.data); };
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        dictationRecorder = null;
+        dictateBtn.dataset.live = "";
+        dictateBtn.textContent = "Dictate";
+        const lang = (navigator.language || "en").toLowerCase().startsWith("pl") ? "pl" : "en";
+        try {
+          const data = new FormData();
+          data.append("audio", new Blob(chunks, {type: recorder.mimeType || "audio/webm"}), "clip.webm");
+          data.append("language", lang);
+          const res = await fetch("/api/stt/transcribe", {method: "POST", body: data});
+          const out = await res.json();
+          if (!res.ok || !out.ok) throw new Error(out.error || ("Transcription failed (" + res.status + ")"));
+          form.text.value = out.text;
+          toast("Dictated (" + out.language + ", " + out.billed_seconds + "s billed)", true);
+        } catch (err) {
+          toast("Dictation failed: " + err.message + " — type instead", false);
+        }
+      };
+      recorder.start();
+    } catch (err) {
+      toast("Microphone unavailable: " + err.message, false);
+    }
+  });
   if (initial) send(initial);
 }
 

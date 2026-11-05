@@ -24,6 +24,15 @@ from ai_agent.staged_edits import (
 )
 from ai_orchestrator.evidence import merge_probe_eval
 from ai_provider.chat_transcripts import SQLiteChatTranscriptStore
+from ai_provider.stt import (
+    STT_BODY_MAX_BYTES,
+    MeteringHook,
+    SttFailure,
+    TranscribeEngine,
+    parse_transcribe_form,
+    transcribe_audio,
+)
+from ai_provider.translation import TranslationError, Translator
 from dashboard_chat import DashboardChat
 from dashboard_config import DEFAULT_CONFIG_PATH, DEFAULT_DATA_DIR, DashboardConfig, load_config
 from dashboard_stores import DashboardStores, StoreError, effective_fanout_policy
@@ -88,6 +97,12 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
     config_path = DEFAULT_CONFIG_PATH
     data_dir = DEFAULT_DATA_DIR
     repo_root = REPO_ROOT
+    # Speech/translation seams. None means unconfigured: transcription and
+    # non-English ingestion fail closed (409) until the owner wires a keyed
+    # engine, metering, and translator. Tests inject fakes here.
+    stt_engine_factory: Callable[[], TranscribeEngine] | None = None
+    stt_metering: MeteringHook | None = None
+    chat_translator: Translator | None = None
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(STATIC_ROOT), **kwargs)
@@ -198,6 +213,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         if not path.startswith("/api/"):
             self.send_error(HTTPStatus.NOT_FOUND, "Unknown endpoint")
             return
+        if path == "/api/stt/transcribe":
+            return self._transcribe_audio()
         try:
             payload = self._read_json_body()
             config = load_config(self.config_path)
@@ -309,6 +326,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                         "content": message.content,
                         "provider": message.provider,
                         "model": message.model,
+                        "metadata": message.metadata or {},
                     }
                     for message in messages
                 ],
@@ -326,10 +344,19 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         text = payload.get("text", "")
         if not isinstance(text, str) or not text.strip():
             return self._send_json({"ok": False, "error": "Message text is required"}, status=400)
+        language = payload.get("language", "en")
+        if not isinstance(language, str):
+            return self._send_json({"ok": False, "error": "Language must be a string"}, status=400)
         try:
-            outcome = self._chat(config).send(session_id, text)
+            outcome = self._chat(config).send(
+                session_id, text, language=language, translator=self.chat_translator
+            )
+        except TranslationError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=exc.status)
         except ValueError as exc:
-            return self._send_json({"ok": False, "error": str(exc)}, status=404)
+            message = str(exc).lower()
+            code = 404 if ("not found" in message or "unavailable" in message) else 400
+            return self._send_json({"ok": False, "error": str(exc)}, status=code)
         self._send_json(
             {
                 "ok": outcome.execution_status == "completed",
@@ -674,6 +701,42 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             return self._send_json({"ok": False, "error": str(exc)}, status=400)
         self._send_json({"ok": True, "id": run_id, "applied": applied})
 
+    def _transcribe_audio(self) -> None:
+        try:
+            body = self._read_body_bytes(STT_BODY_MAX_BYTES)
+        except InvalidRequest as exc:
+            self.close_connection = True
+            return self._send_json({"ok": False, "error": str(exc)}, status=exc.status)
+        content_type = self.headers.get("Content-Type", "")
+        try:
+            audio, audio_type, language = parse_transcribe_form(content_type, body)
+        except SttFailure as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=exc.http_status)
+        if self.stt_engine_factory is None or self.stt_metering is None:
+            return self._send_json(
+                {
+                    "ok": False,
+                    "error": "Transcription unavailable: no speech engine configured.",
+                },
+                status=409,
+            )
+        try:
+            result = transcribe_audio(
+                engine=self.stt_engine_factory(),
+                metering=self.stt_metering,
+                audio_bytes=audio,
+                content_type=audio_type,
+                language=language,
+            )
+        except SttFailure as exc:
+            payload: dict = {"ok": False, "error": str(exc)}
+            if exc.retry_after:
+                payload["retry_after"] = exc.retry_after
+            return self._send_json(payload, status=exc.http_status)
+        except ValueError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=409)
+        self._send_json({"ok": True, **result})
+
     def _send_json(self, payload: dict | list, status: int = 200) -> None:
         body = json.dumps(payload).encode("utf-8")
         self.send_response(status)
@@ -683,10 +746,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def _read_json_body(self) -> dict:
-        media_type = self.headers.get("Content-Type", "").split(";", 1)[0].strip().lower()
-        if media_type != "application/json":
-            raise InvalidRequest(415, "Content-Type must be application/json")
+    def _read_body_bytes(self, max_bytes: int) -> bytes:
         lengths = self.headers.get_all("Content-Length", [])
         if self.headers.get("Transfer-Encoding") or len(lengths) != 1:
             raise InvalidRequest(400, "One Content-Length is required")
@@ -694,7 +754,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             length = int(lengths[0])
         except ValueError:
             raise InvalidRequest(400, "Invalid Content-Length") from None
-        if not 0 < length <= MAX_REQUEST_BYTES:
+        if not 0 < length <= max_bytes:
             raise InvalidRequest(413, "Request body exceeds allowed size")
         expired = threading.Event()
 
@@ -712,19 +772,26 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             raw = self.rfile.read(length)
             if expired.is_set() or len(raw) != length:
                 raise InvalidRequest(408, "Incomplete request body")
-            payload = json.loads(raw)
-            if not isinstance(payload, dict):
-                raise InvalidRequest(400, "JSON body must be an object")
-            return payload
-        except (ValueError, UnicodeError) as exc:
-            if isinstance(exc, InvalidRequest):
-                raise
-            raise InvalidRequest(400, "Invalid JSON body") from None
+            return raw
         except OSError:
             raise InvalidRequest(408, "Request body timed out") from None
         finally:
             timer.cancel()
             timer.join(timeout=1)
+
+    def _read_json_body(self) -> dict:
+        media_type = self.headers.get("Content-Type", "").split(";", 1)[0].strip().lower()
+        if media_type != "application/json":
+            raise InvalidRequest(415, "Content-Type must be application/json")
+        try:
+            payload = json.loads(self._read_body_bytes(MAX_REQUEST_BYTES))
+        except (ValueError, UnicodeError) as exc:
+            if isinstance(exc, InvalidRequest):
+                raise
+            raise InvalidRequest(400, "Invalid JSON body") from None
+        if not isinstance(payload, dict):
+            raise InvalidRequest(400, "JSON body must be an object")
+        return payload
 
 
 def build_parser() -> argparse.ArgumentParser:

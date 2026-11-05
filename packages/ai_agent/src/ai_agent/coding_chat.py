@@ -253,6 +253,8 @@ class CodingChatController:
         self,
         text: str | StagedCodingInput,
         execute: Callable[[CodingTurnRequest], CodingTurnResult],
+        *,
+        user_metadata: dict[str, object] | None = None,
     ) -> CodingTurnResult:
         staged = text if isinstance(text, StagedCodingInput) else None
         if staged:
@@ -285,7 +287,7 @@ class CodingChatController:
             else self._append(
                 role="user",
                 content=text,
-                metadata={"source": "coding_chat"},
+                metadata={"source": "coding_chat", **(user_metadata or {})},
             ).message_id
         )
         try:

@@ -63,8 +63,8 @@ def test_dynamic_buttons_have_titles() -> None:
     js = _read("app.js")
     buttons = re.findall(r"<button\b[^>]*>", js)
     assert (
-        len(buttons) == 14
-    )  # +report/rename/delete/submit/create/cancel/run-request/staged-approve/staged-reject
+        len(buttons) == 15
+    )  # +report/rename/delete/submit/create/cancel/run-request/staged-approve/staged-reject/dictate
     for tag in buttons:
         assert "title=" in tag, f"button without title: {tag}"
 
@@ -353,3 +353,15 @@ def test_run_detail_renders_staged_review() -> None:
     assert "data-applied" in js
     css = _read("app.css")
     assert ".staged-file" in css
+
+
+def test_chat_thread_has_dictate_button() -> None:
+    """Chat threads dictate via the transcribe endpoint with honest failure copy."""
+    js = _read("app.js")
+    assert 'id="dictate-btn"' in js
+    assert 'title="Dictate with the microphone (server transcription)"' in js
+    assert "/api/stt/transcribe" in js
+    assert "MediaRecorder" in js
+    assert "Stop (recording...)" in js
+    assert "Dictation failed: " in js
+    assert "type instead" in js
