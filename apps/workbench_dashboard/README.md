@@ -62,12 +62,19 @@ inspect the owned process only.
 - Agent status: `GET /api/agent-status` reports what the agent is
   working on from the gitignored `window-status.json` heartbeat at
   the checkout root; a missing file reads as idle.
+- Agent executor: drained runs execute through `AgentLoop` with the
+  full coding toolset (read/search/git/shell/python/navigate plus
+  staged writes). Project file changes stage into the run record for
+  owner review/apply; shell and Python run unconfined under the
+  per-run approval (owner decision). Delegation is excluded until a
+  child runner exists; fan-out still flows from the run record.
 
 ## Limits (honest)
 
-- Chat answers are single-shot completions; agent runs execute through
-  the drain with an injected executor (AgentLoop wiring is pending),
-  so runs complete with fixture receipts until that lands.
+- Chat answers are single-shot completions; drained runs execute
+  through the AgentLoop-backed executor, but no production drain
+  driver exists yet (owner-deferred), so the drain only runs when
+  invoked directly (tests, scripts).
 - Transcription/translation need owner-wired keys and metering; the
   endpoints answer 409 until then. No per-project data isolation yet:
   runs/inbox stay global with per-run project refs (G6 owner question).
