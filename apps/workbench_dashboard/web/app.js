@@ -483,10 +483,10 @@ async function renderChatThread(id, initial) {
         body: JSON.stringify({text}),
       });
       toast("Answer received (" + out.execution_status + ")", true);
-      render();
     } catch (err) {
       toast(err.message, false);
     } finally {
+      render();
       btn.disabled = false;
       btn.textContent = "Send";
     }
@@ -933,8 +933,10 @@ function renderCreate(kind) {
   document.getElementById("create-cancel").addEventListener("click", () => history.back());
   document.getElementById("create-form").addEventListener("submit", async (ev) => {
     ev.preventDefault();
+    const createBtn = ev.target.querySelector("button[type=submit]");
     const title = document.getElementById("f-title").value.trim();
     if (!title) { toast("Title is required", false); return; }
+    createBtn.disabled = true;
     try {
       if (kind === "chat") {
         const session = await api("/api/chat/sessions", {
@@ -971,6 +973,7 @@ function renderCreate(kind) {
         location.hash = "#/ideas/" + out.id;
       }
     } catch (err) {
+      createBtn.disabled = false;
       toast(err.message, false);
     }
   });

@@ -455,3 +455,17 @@ def test_inbox_supports_owner_tasks() -> None:
     assert "answer Done with a note" in js
     assert "Never paste secrets here" in js
     assert "assigns decisions and tasks to the inbox" in js
+
+
+def test_chat_send_refreshes_thread_on_failure() -> None:
+    """Failed turns still re-render the thread (messages are saved anyway)."""
+    js = _read("app.js").replace("\r\n", "\n")
+    assert "} finally {\n      render();\n      btn.disabled = false;" in js
+
+
+def test_create_form_disables_submit_while_creating() -> None:
+    """Double-clicking Create cannot create duplicate items."""
+    js = _read("app.js")
+    assert 'ev.target.querySelector("button[type=submit]")' in js
+    assert "createBtn.disabled = true;" in js
+    assert "createBtn.disabled = false;" in js
