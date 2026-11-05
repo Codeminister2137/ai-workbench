@@ -7,9 +7,13 @@ and execution is an injected callable. The real ``AgentLoop`` wiring is a
 later integration; this module never imports or calls loop execution.
 
 Approval rule (fail-closed): a queued run executes only when its linked
-inbox record has status ``answered`` with answer ``Approve``. Open,
-rejected, closed, missing, or unreadable approvals leave the run parked:
-never executed, never deleted. Paused runs resume without re-approval.
+inbox record carries a recorded ``Approve`` answer with status ``answered``
+or ``closed`` (close is archival and answers are immutable after close, so a
+close preceding the drain pass must not strand an approval). Open, rejected,
+closed-without-answer, missing, or unreadable approvals leave the run parked:
+never executed, never deleted. Paused runs resume without re-approval. The
+refusal path is an explicit ``Reject`` answer (or run cancellation), never a
+bare close.
 
 The drain assumes a single worker. Concurrent drains race benignly on the
 atomic claim rename (the loser skips), but cancellation and approval
@@ -116,7 +120,7 @@ class RunDrain:
             return False, "linked approval not found"
         status = record.get("status")
         answer = record.get("answer")
-        if status == "answered" and answer == APPROVAL_ANSWER:
+        if answer == APPROVAL_ANSWER and status in ("answered", "closed"):
             return True, "approved"
         if status == "open":
             return False, "awaiting owner approval"

@@ -24,8 +24,11 @@ from ai_agent.contracts import (
     ToolParameter,
     ToolResult,
 )
-from ai_agent.loop import AgentLoop, AgentResult
+from ai_agent.loop import AgentLoop, AgentResult, ToolExecutionEvent
 from ai_agent.permissions import ApprovalPolicyPreset, PermissionManager, PermissionPolicy
+from ai_agent.recovery import RecoveryState
+from ai_agent.supervisor_drain import RunDrain
+from ai_agent.supervisor_threads import SupervisorThreads
 from ai_agent.tools import (
     BaseTool,
     CreateFileTool,
@@ -68,12 +71,16 @@ __all__ = [
     "PermissionManager",
     "PermissionPolicy",
     "ReadFileTool",
+    "RecoveryState",
     "RunCommandTool",
+    "RunDrain",
     "ServiceAuthorization",
+    "SupervisorThreads",
     "ToolCall",
     "ToolCategory",
     "ToolContext",
     "ToolDefinition",
+    "ToolExecutionEvent",
     "ToolParameter",
     "ToolRegistry",
     "coding_tools_with_delegation",

@@ -132,14 +132,14 @@ def test_closed_without_approval_parks(drain, stores, calls) -> None:
     assert calls == []
 
 
-def test_closed_after_approve_stays_parked(drain, stores, calls) -> None:
-    """Strict rule: only answered+Approve executes, even with a past approval."""
+def test_closed_after_approve_executes(drain, stores, calls) -> None:
+    """Close is archival: a recorded Approve survives close-before-drain."""
     run_id, inbox_id = _queue_chat_run(stores, answer="Approve")
     stores.close_inbox_task(inbox_id)
     assert stores.inbox.get(inbox_id)["answer"] == "Approve"
     outcomes = drain.drain()
-    assert outcomes[0]["action"] == "parked"
-    assert calls == []
+    assert outcomes == [{"run_id": run_id, "status": "completed"}]
+    assert [call["id"] for call in calls] == [run_id]
 
 
 def test_broken_approval_link_parks_fail_closed(drain, stores, calls) -> None:
