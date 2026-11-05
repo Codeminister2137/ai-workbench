@@ -187,6 +187,49 @@ def test_ideas_capture_filter_and_triage(dashboard_server) -> None:
     assert [item["id"] for item in remaining["items"]] == [mine["id"]]
 
 
+def test_trusted_host_allowlist_accepts_tailnet_origin(dashboard_server, tmp_path) -> None:
+    config_path = tmp_path / "dashboard.json"
+    payload = json.loads(config_path.read_text(encoding="utf-8"))
+    payload["trusted_hosts"] = ["example.tailc59785.ts.net"]
+    config_path.write_text(json.dumps(payload), encoding="utf-8")
+    host = "example.tailc59785.ts.net"
+    allowed = Request(
+        f"{dashboard_server}/api/status",
+        headers={"Host": host, "Origin": f"https://{host}"},
+        method="GET",
+    )
+    with urlopen(allowed, timeout=5) as response:
+        assert json.loads(response.read().decode("utf-8"))["ok"] is True
+    downgraded = Request(
+        f"{dashboard_server}/api/status",
+        headers={"Host": host, "Origin": f"http://{host}"},
+        method="GET",
+    )
+    with pytest.raises(HTTPError) as raised:
+        urlopen(downgraded, timeout=5)
+    assert raised.value.code == 403
+    raised.value.close()
+    stranger = Request(
+        f"{dashboard_server}/api/status", headers={"Host": "evil.invalid"}, method="GET"
+    )
+    with pytest.raises(HTTPError) as raised:
+        urlopen(stranger, timeout=5)
+    assert raised.value.code == 403
+    raised.value.close()
+
+
+def test_trusted_hosts_config_validation(tmp_path) -> None:
+    from dashboard_config import load_config
+
+    config_path = tmp_path / "dashboard.json"
+    config_path.write_text(json.dumps({"trusted_hosts": ["a.ts.net"]}), encoding="utf-8")
+    assert load_config(config_path).trusted_hosts == ("a.ts.net",)
+    for bad in ([""], ["a b"], [1], "a.ts.net"):
+        config_path.write_text(json.dumps({"trusted_hosts": bad}), encoding="utf-8")
+        with pytest.raises(ValueError):
+            load_config(config_path)
+
+
 def test_untrusted_origin_refused(dashboard_server) -> None:
     request = Request(
         f"{dashboard_server}/api/status", headers={"Origin": "https://evil.invalid"}, method="GET"

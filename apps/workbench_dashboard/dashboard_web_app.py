@@ -125,14 +125,18 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
 
     def _trusted_request(self) -> bool:
         port = cast(tuple[str, int], self.server.server_address)[1]
-        hosts = {f"127.0.0.1:{port}", f"localhost:{port}"}
+        local_hosts = {f"127.0.0.1:{port}", f"localhost:{port}"}
+        try:
+            extra_hosts = set(load_config(self.config_path).trusted_hosts)
+        except ValueError:
+            extra_hosts = set()
         host = self.headers.get("Host")
         origin = self.headers.get("Origin")
-        if (
-            len(self.headers.get_all("Host", [])) != 1
-            or host not in hosts
-            or (origin is not None and origin != f"http://{host}")
-        ):
+        if len(self.headers.get_all("Host", [])) != 1 or host not in local_hosts | extra_hosts:
+            self.send_error(HTTPStatus.FORBIDDEN, "Untrusted request origin")
+            return False
+        expected_origin = f"https://{host}" if host in extra_hosts else f"http://{host}"
+        if origin is not None and origin != expected_origin:
             self.send_error(HTTPStatus.FORBIDDEN, "Untrusted request origin")
             return False
         return True
