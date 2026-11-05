@@ -42,6 +42,10 @@ inspect the owned process only.
   `POST /api/stt/transcribe`; messages accept a `language` tag and
   translate at ingestion with source provenance. Both fail closed
   (409) until a keyed engine, metering, and translator are wired.
+- Documents: company library over `docs/library/` (tracked, public),
+  `docs/plans/` (private, read-only), and `docs/library-private/`
+  (private, gitignored default for new research). Markdown previews
+  in-tab; every file opens with one click (browser or download).
 - Ideas: fast capture inbox for brain-dumps, tagged `owner` or
   `third-party` (with optional contact); triage to
   reviewing/adopted/parked/declined with a decision note.

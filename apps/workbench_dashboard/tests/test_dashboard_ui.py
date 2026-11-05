@@ -53,7 +53,7 @@ def test_static_controls_have_titles() -> None:
     for tag in re.findall(r"<button\b[^>]*>", html):
         assert "title=" in tag, f"button without title: {tag}"
     nav_links = re.findall(r"<a\b[^>]*data-view[^>]*>", html)
-    assert len(nav_links) == 7
+    assert len(nav_links) == 8
     for tag in nav_links:
         assert "title=" in tag, f"nav link without title: {tag}"
 
@@ -73,7 +73,7 @@ def test_dynamic_inputs_and_selects_have_titles() -> None:
     """Text inputs/selects in templates have titles (radios use labels)."""
     js = _read("app.js")
     inputs = [tag for tag in re.findall(r"<input\b[^>]*>", js) if 'type="radio"' not in tag]
-    assert len(inputs) == 13  # +rename/create-form inputs, +4 list filters
+    assert len(inputs) == 14  # +rename/create-form inputs, +5 list filters
     for tag in inputs:
         assert "title=" in tag, f"input without title: {tag}"
     selects = re.findall(r"<select\b[^>]*>", js)
@@ -365,3 +365,17 @@ def test_chat_thread_has_dictate_button() -> None:
     assert "Stop (recording...)" in js
     assert "Dictation failed: " in js
     assert "type instead" in js
+
+
+def test_documents_view_lists_and_previews() -> None:
+    """Documents tab lists all roots with badges, previews markdown, opens files."""
+    html = _read("index.html")
+    assert 'data-view="documents"' in html
+    js = _read("app.js")
+    assert "renderDocuments" in js
+    assert 'id="filter-documents"' in js
+    assert 'id="documents-list"' in js
+    assert '"/api/documents"' in js
+    assert "/file" in js
+    assert "Open file" in js
+    assert "Private files never leave this PC" in js
