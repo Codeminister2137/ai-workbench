@@ -80,6 +80,8 @@ def test_registry_has_full_staged_toolset() -> None:
         "python_navigate",
         "rename_preview",
         "stage_file",
+        "request_owner_task",
+        "delegate_task",
     }
 
 
@@ -208,3 +210,111 @@ def test_permissions_are_trusted_local(harness) -> None:
     assert permissions.policy == PermissionPolicy.from_approval_preset(
         ApprovalPolicyPreset.TRUSTED_LOCAL
     )
+
+
+def test_owner_tasks_filed_to_inbox(tmp_path) -> None:
+    FakeLoop.instances = []
+    filed: list[dict] = []
+
+    def inbox_create(**kwargs):
+        record = {"id": f"task-{len(filed) + 1}", **kwargs}
+        filed.append(record)
+        return record
+
+    def factory_loop(client, registry, context, **kwargs):
+        loop = FakeLoop(client, registry, context, **kwargs)
+        loop.result = AgentResult(
+            response=_response("needs a human"),
+            tool_results=(
+                ToolResult(
+                    name="request_owner_task",
+                    output="filed",
+                    metadata={"owner_task": {"title": "Probe mic", "body": "steps"}},
+                ),
+            ),
+        )
+        return loop
+
+    config = DashboardConfig(provider="ollama", model="fake")
+    execute = build_executor(
+        config,
+        ProjectRoots(()),
+        tmp_path,
+        client_factory=lambda backend: object(),
+        loop_factory=factory_loop,
+        inbox_create=inbox_create,
+    )
+    receipt = execute({"id": "r1", "title": "t", "body": "b"})
+    assert receipt["status"] == "completed"
+    assert receipt["owner_tasks"] == ["task-1"]
+    assert filed[0]["task_type"] == "task"
+    assert filed[0]["task_id"] == "r1"
+    assert filed[0]["context_refs"] == ["run:r1"]
+
+
+def test_owner_tasks_without_inbox_fail_closed(tmp_path) -> None:
+    FakeLoop.instances = []
+
+    def factory_loop(client, registry, context, **kwargs):
+        loop = FakeLoop(client, registry, context, **kwargs)
+        loop.result = AgentResult(
+            response=_response("needs a human"),
+            tool_results=(
+                ToolResult(
+                    name="request_owner_task",
+                    output="filed",
+                    metadata={"owner_task": {"title": "Probe mic", "body": "steps"}},
+                ),
+            ),
+        )
+        return loop
+
+    config = DashboardConfig(provider="ollama", model="fake")
+    execute = build_executor(
+        config,
+        ProjectRoots(()),
+        tmp_path,
+        client_factory=lambda backend: object(),
+        loop_factory=factory_loop,
+    )
+    receipt = execute({"id": "r1", "title": "t", "body": "b"})
+    assert receipt["status"] == "failed"
+    assert "no inbox is wired" in receipt["error"]
+
+
+def test_child_staged_merges_into_receipt(tmp_path) -> None:
+    FakeLoop.instances = []
+
+    def factory_loop(client, registry, context, **kwargs):
+        loop = FakeLoop(client, registry, context, **kwargs)
+        loop.result = AgentResult(
+            response=_response("delegated"),
+            tool_results=(
+                ToolResult(
+                    name="delegate_task",
+                    output="child done",
+                    metadata={"child_staged": [{"relpath": "kid.py", "content": "x"}]},
+                ),
+            ),
+        )
+        return loop
+
+    config = DashboardConfig(provider="ollama", model="fake")
+    execute = build_executor(
+        config,
+        ProjectRoots(()),
+        tmp_path,
+        client_factory=lambda backend: object(),
+        loop_factory=factory_loop,
+    )
+    receipt = execute({"id": "r1", "title": "t", "body": "b"})
+    assert receipt["staged"] == [{"relpath": "kid.py", "content": "x"}]
+
+
+def test_delegate_tool_carries_run_fanout(harness) -> None:
+    execute, _factory, _project = harness
+    execute({"id": "r1", "title": "t", "body": "b", "fanout_policy": "allowed"})
+    registry = FakeLoop.instances[-1].registry
+    assert registry.get("delegate_task").fanout.value == "allowed"
+    execute({"id": "r2", "title": "t", "body": "b"})
+    assert FakeLoop.instances[-1].registry.get("delegate_task").fanout.value == "restricted"
