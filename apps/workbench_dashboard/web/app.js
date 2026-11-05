@@ -114,6 +114,111 @@ function startRunsPoll() {
   }, 10000);
 }
 
+/* Inbox badge: honest live open count from /api/inbox every ~10s.
+   Best-effort read-only refresh; opening the inbox just re-renders,
+   it never answers or acknowledges anything. */
+let inboxPollTimer = null;
+function stopInboxPoll() {
+  if (inboxPollTimer) { clearInterval(inboxPollTimer); inboxPollTimer = null; }
+}
+async function pollInboxBadge() {
+  try {
+    const payload = await api("/api/inbox");
+    const open = (payload.items || []).filter((t) => t.status === "open").length;
+    if (open > 0) {
+      badge.textContent = open;
+      badge.hidden = false;
+    } else {
+      badge.hidden = true;
+    }
+  } catch (err) { /* keep the last badge; next tick retries */ }
+}
+function startInboxPoll() {
+  if (inboxPollTimer) return;
+  pollInboxBadge();
+  inboxPollTimer = setInterval(async () => {
+    if (document.hidden) return;
+    await pollInboxBadge();
+  }, 10000);
+}
+
+/* Run detail auto-refresh: re-read status + receipts every ~10s while
+   the detail view is visible. Stopped on navigation (see render()). */
+let runDetailPollTimer = null;
+function stopRunDetailPoll() {
+  if (runDetailPollTimer) { clearInterval(runDetailPollTimer); runDetailPollTimer = null; }
+}
+async function refreshRunDetail(id) {
+  try {
+    const payload = await api("/api/runs/" + encodeURIComponent(id));
+    const run = payload.item;
+    const statusEl = document.getElementById("run-status");
+    if (statusEl) statusEl.textContent = [run.status, run.branch, run.commit].filter(Boolean).join(" · ");
+    await renderReceiptsInto(id);
+  } catch (err) { /* next tick retries; never break the page */ }
+}
+function startRunDetailPoll(id) {
+  if (runDetailPollTimer) return;
+  runDetailPollTimer = setInterval(async () => {
+    if (document.hidden) return;
+    const here = (location.hash || "").split("?")[0];
+    if (here !== "#/runs/" + id) return;
+    await refreshRunDetail(id);
+  }, 10000);
+}
+
+/* Events/receipts section: GET /api/runs/{id}/receipts -> {ok, receipts:[...]}.
+   Missing endpoint (404) or empty list renders a graceful placeholder. */
+function receiptHtml(r) {
+  const rec = r && typeof r === "object" ? r : {};
+  const title = rec.title || rec.kind || rec.type || "receipt";
+  const turn = rec.turn != null ? "Turn " + rec.turn + " — " : "";
+  const when = rec.created_at_utc || rec.created_at || rec.at || rec.ts || "";
+  const body = rec.body || rec.message || rec.detail || rec.text || "";
+  return `<details class="turn"><summary>${esc(turn + title)}`
+    + `${when ? ` <span class="muted">${esc(when)}</span>` : ""}</summary>`
+    + `<div>${body ? esc(body) : esc(JSON.stringify(rec))}</div></details>`;
+}
+async function renderReceiptsInto(id) {
+  const list = document.getElementById("receipts-list");
+  if (!list) return;
+  let receipts = null;
+  try {
+    const data = await api("/api/runs/" + encodeURIComponent(id) + "/receipts");
+    receipts = Array.isArray(data.receipts) ? data.receipts : [];
+  } catch (err) { receipts = null; }
+  if (!receipts || !receipts.length) {
+    list.innerHTML = '<p class="muted">No receipts yet.</p>';
+    return;
+  }
+  list.innerHTML = receipts.map(receiptHtml).join("");
+}
+
+/* P4 turn synthesis: Did/Found/Next line when the record carries it. */
+function synthesisHtml(run) {
+  if (typeof run.synthesis === "string" && run.synthesis.trim()) {
+    return `<p id="run-synthesis">${gtext(run.synthesis.trim())}</p>`;
+  }
+  const parts = [["Did", run.did], ["Found", run.found], ["Next", run.next]]
+    .filter(([, v]) => typeof v === "string" && v.trim());
+  if (!parts.length) return "";
+  return `<p id="run-synthesis">${parts.map(([k, v]) =>
+    `<strong>${k}:</strong> ${gtext(v.trim())}`).join(" · ")}</p>`;
+}
+
+/* P4 phase header + checklist from the plan record; graceful when absent. */
+function phaseChecklistHtml(plan) {
+  const phases = Array.isArray(plan.phases) ? plan.phases : [];
+  if (!phases.length) return '<p class="muted">No phases recorded yet.</p>';
+  const rows = phases.map((p) => {
+    const ph = p && typeof p === "object" ? p : {};
+    const name = ph.title || ph.name || "phase";
+    const st = ph.status || "pending";
+    return `<li>${gtext(name)} <span class="pill st-${esc(st.replace(/\s+/g, "-"))}">${esc(st)}</span></li>`;
+  }).join("");
+  return `<ul class="plain checklist" id="phase-checklist">${rows}</ul>`;
+}
+
 async function renderHome() {
   const status = await api("/api/status");
   const plan = status.current_plan
@@ -279,7 +384,10 @@ async function renderPlans(id) {
     view.innerHTML = `<h1>Plan</h1><p><a href="#/plans">All plans</a></p>
       <div class="card"><h2>${gtext(plan.title || plan.id)}</h2>
       <p class="muted">${esc(plan.status || "")}${plan.updated_at_utc ? " · updated " + esc(plan.updated_at_utc) : ""}</p>
+      <p><strong>Phase:</strong> <span class="pill">${esc(plan.phase || plan.status || "unknown")}</span></p>
       ${plan.source ? `<p class="muted">Source: ${esc(plan.source)}</p>` : ""}
+      <h3>Phase checklist</h3>
+      ${phaseChecklistHtml(plan)}
       <pre>${gtext(plan.body || "(empty plan)")}</pre></div>`;
     return;
   }
@@ -298,6 +406,7 @@ async function renderPlans(id) {
 async function renderRuns(id) {
   if (id) {
     stopRunsPoll();
+    stopRunDetailPoll();
     const payload = await api("/api/runs/" + encodeURIComponent(id));
     const run = payload.item;
     const meta = [run.status, run.branch, run.commit].filter(Boolean).map(esc).join(" · ");
@@ -307,13 +416,26 @@ async function renderRuns(id) {
       : run.report_request_id
         ? `<p class="muted">Report requested — see the inbox task.</p>`
         : `<p><button id="report-btn" title="Ask for a completion report for this run">Generate report</button></p>`;
+    const diff = run.diff
+      ? `<h3>Diff</h3><pre id="run-diff">${gtext(run.diff)}</pre>`
+      : "";
+    const inboxLink = run.inbox_id
+      ? `<p><a href="#/inbox/${esc(run.inbox_id)}" title="Approve or reject via the linked inbox task">Review approval in inbox</a></p>`
+      : "";
     view.innerHTML = `<h1>Run</h1><p><a href="#/runs">All runs</a></p>
       <div class="card"><h2>${gtext(run.title || run.id)}</h2>
-      <p class="muted">${meta}</p>
+      <p class="muted" id="run-status">${meta}</p>
       <p title="Whether this run may spawn subagent children"><strong>Fan-out:</strong> <span class="pill">${esc(fanout)}</span></p>
+      ${synthesisHtml(run)}
       ${run.validation ? `<p><strong>Validation:</strong> ${esc(run.validation)}</p>` : ""}
       ${run.body ? `<pre>${gtext(run.body)}</pre>` : ""}
+      ${diff}
+      <h3>Events and receipts</h3>
+      <div id="receipts-list"><p class="muted">Loading receipts...</p></div>
+      ${inboxLink}
       ${report}</div>`;
+    renderReceiptsInto(id);
+    startRunDetailPoll(id);
     const reportBtn = document.getElementById("report-btn");
     if (reportBtn) reportBtn.addEventListener("click", async () => {
       try {
@@ -584,6 +706,7 @@ function renderSchedule() {
 
 async function render() {
   stopRunsPoll();
+  stopRunDetailPoll();
   document.querySelectorAll("nav a").forEach((a) => a.classList.remove("active"));
   const raw = (location.hash || "#/home").slice(2);
   const [path, query] = raw.split("?");
@@ -625,3 +748,4 @@ document.querySelectorAll("[data-create]").forEach((btn) => {
 
 window.addEventListener("hashchange", render);
 render();
+startInboxPoll();
