@@ -22,6 +22,7 @@ RESEARCH_*.md
 sent_emails.txt
 application_records.jsonl
 docs/plans/
+docs/library-private/
 docs/api-reference/
 docs/pycharm-ai-prompt-library.md
 
