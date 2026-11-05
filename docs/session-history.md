@@ -3433,3 +3433,687 @@ Candidate statuses: READY, NEEDS_INVESTIGATION, IN_PROGRESS, COMPLETE, BLOCKED.
 | 17:33 | Attested probe passed guards, upstream 429 from the shared free pool; cause established from the response body | 147 min / 15 | `openrouter_attested_probe.py`, `openrouter_429_diagnosis.py` | Record findings, keep the route out of the local priority, queue the owner decision |
 | 17:38 | Full suite 2846 passed; Ruff/Pyright clean; 40848ee + a635bd0 pushed | 142 min / 15 | `HEAD == origin/develop == a635bd0` | Fix the aborted-route recording gap |
 | 17:45 | Rolling lease renewed and acknowledged to 19:50:00Z | 135 min / 15 | receipt `planned_sleep_utc 19:50:00Z` | Handoff, push 607ca72, then independent work |
+
+
+---
+
+# Archived handoff 2026-11-04 (moved 2026-11-05)
+
+# Current context — 2026-11-04 16:21 Warsaw: UNATTENDED window ACTIVE till 20:00
+
+Plan: docs/plans/unattended-work-plan.md. Sleep fallback armed (PID 33760,
+due 15:52Z rolling, receipt artifacts/unattended-20261104-1621/). Owner back
+20:00 Warsaw for FINAL E2E + video. Early-done → report + video script + sleep.
+Chat bug (owner replies not real) is IN_PROGRESS by main agent; 4 subagents
+(RO-E2E, RO-SEC, WB-TESTS, WB-EVALS) spawning next on manual worktrees.
+
+4/4 subagent slices VERIFIED + MERGED + PUSHED: develop @ 34b8d45
+(w4-trigger 65t, w4-escalation 5t, visibility 65t, policy 26t + 642
+neighbors; ruff clean; GROUPS fixed for fanout tests). Slice branches +
+worktrees removed; local branches: develop/master + 2 pre-existing
+worktree branches. First push attempt hit SSH drop post-gate; retry
+green. Sibling installer uv-offer merged to main (f690897) for laptop
+E2E. Owner continues remote-operator manual tests + video.
+Laptop E2E finding: serve didn't autostart (silent). Fixed on sibling
+main (9d0a4c7, pushed+verified): installer probes the port 30s after
+task start + always prints the manual start command. Note: serve boot
+needs no Docker (only task checks do), so laptop cause is elsewhere —
+serve.log will tell.
+E2E batch2 on sibling fix/ro-e2e-batch2 @ 847f551 (pushed, UNMERGED):
+key-note reassurance, Step-1 + judge-card sample-scope labels, Meta
+dictate mic-live indicator + honest Stop-flush copy. Local testable now
+via hard refresh (static files, no restart). Dictate root cause: Meta
+transcribes per 55s slice → short speech appears only at Stop.
+Batch2 extended (17fb33a, pushed): Work-on moved above Step 1 with own
+heading; dictate appends per-slice audio-KB/transcript-char receipts.
+Post-Stop capture EXPLAINED: Meta transcribe 502'd (no ffmpeg) →
+silent browser fallback captured post-Stop speech. FIXED: ffmpeg
+installed (Gyan 9.0.2), serve restarted (PID 38588), probe tone → HTTP
+200 via muse-voice-transcribe-1.0 ($0.00005). Installer ffmpeg offer
+merged to sibling main (d33bc89). Batch2 @ e10a085: fallback keeps
+Meta failure note; Work-on add-folder hint in UI+README.
+Batch3 fix/ro-e2e-batch3 @ 14f460e (pushed, UNMERGED): chat words via
+model summary prepend (+2 supervisor tests), red access errors, manual
+dictate fallback (press Dictate again), creation feedback, review-pane
+"Sample/Repository task" banner. Respects no-localStorage + list-shape
+test contracts (localStorage/list-mode ideas dropped, not tests edited).
+Rebase done (owner closed editor, no harm). Serve PID 38588 live.
+Batch2+batch3 ALL MERGED + PUSHED to sibling origin/main @ d5f70ae
+(verified via ls-remote): chat words, red access errors, manual dictate
+fallback, creation feedback, review mode banner, stale docstring fixed.
+Laptop: git pull origin main.
+Serve-no-start ROOT CAUSE: wrapper EAP=Stop + *>> turned the no-SMTP
+stderr notice into fatal NativeCommandError (proven live). Fixed on
+sibling origin/main @ ee9c819 (EAP Continue before serve + regression
+test). Laptop needs EITHER hand-patch of generated wrapper (one line)
+OR installer re-run after pull.
+Laptop: serve+dictation live. "No repository targets" = re-run with
+bad folder name wiped OPERATOR_WORK_ROOTS (installer overwrote with
+empty). Hardened on sibling origin/main @ 537b293: unmatched typed
+answer now keeps previous roots + warns loudly (+regression test).
+Laptop remedy: re-run installer, type an EXISTING folder (demo-repo),
+restart serve. Discord mangles backslash-dot sequences: use fenced
+blocks + forward slashes (proven: -File .tmp/parse_check.ps1 works).
+Installer round3 on sibling origin/main @ 9dab9bf: existing-folder
+prompt line, CODE FOLDER recap in summary (+kept-previous note),
+Find-FfmpegCommand with registry PATH refresh (mirrors uv) +
+already-installed tolerance. 5 wrapper tests green, live probes for
+3b scenarios + stale-PATH recovery pass.
+Installer model-key prompt on sibling origin/main @ 3a00786: 3c step
+(keep/skip/save/rotate, never prints value) + MODEL KEY summary line.
+6 wrapper tests green, live key probe exact, 0 key-material lines.
+PC serve 38588/35884 (started 14:42) PREDATES batch3 py fix, NO reload,
+NO .env, secrets only in process env (parent dead) -> restart UNSAFE
+without owner re-entry. Static JS/CSS fresh from disk. DECISION TAKEN (B): secrets copied ai-workbench/.env -> User env
+(names/flags only, values never shown). Serve restarted PID 19928
+(same cmdline): /api/work-roots 2 roots, 35 tasks preserved,
+allowance 28/50 $7.53 left. ALL fixes live. Old PIDs 38588/35884 gone.
+Project-task crash FIXED on sibling origin/main @ 5390791: Meta/Baseten
+sent sample-only instructions (issue_import.py) for project tasks ->
+first read_file raised -> execution_stopped. Now run() passes
+project_root (presence-gated, path never sent), live models switch to
+PROJECT_INSTRUCTIONS/TOOLS, scripted refuses clearly, stop events
+carry detail + UI renders it. Serve restarted PID 29640, 36 tasks kept,
+allowance 32/50 $7.48. Owner retests with FRESH project task.
+Retest 082f81 failed LEGITIMATELY: model correctly read notes.txt,
+missing under remote-ai-operator root. Tool-recovery fix on sibling
+origin/main @ 4a57987: project read/write/validate ValueErrors return
+as {"error"} history results (model adapts/creates); protocol
+violations still raise; adapt sentence in both project prompts.
+Serve restarted PID 24132, 37 tasks kept, allowance 33/50 $7.44.
+147 tests green. Owner retests same prompt (either root works now).
+Project run SUCCEEDED (493caa4, notes.txt staged) but Approve greyed:
+gating required sample evidence.passed, null by design for projects.
+Fixed on sibling origin/main @ efdd16e: project approve gates on
+staged approval; revalidate disabled for projects (+sim cases).
+No restart needed (static JS). Owner hard-refreshes + approves.
+Chat REAL fix on sibling origin/main @ f5ff550: _live_reply called
+tool-loop next_operation (bare tool call, no text) -> template always.
+Added metered chat_text to Meta+Baseten (tool-less, capped, redacted)
+preferred by _live_reply with humanize fallback. 197 tests green;
+2 translate tests updated to select translation call by content
+(intent preserved). Serve PID 35092. LIVE probe: marker words back.
+Allowance 40/50 $7.14 left. 4 subagents fanned; WB-EVALS + WB-TESTS
+reported (pending read).
+FLAG for 20:00: grant at 41/50 REQUESTS (hard local stop at 50 via
+reserve_allowance; USD fine at $7.13/$8). Evening needs budgeting:
+FINAL E2E + video takes + chat/dictate share ~9 calls. Owner may
+mint a bigger grant file (their financial authority only) or run
+lean (rehearse scripted, minimal takes). Do NOT mint/extend grants.
+Loop4 integrated: sibling main 12713bc (chat+sec+e2e+script),
+workbench develop 92f9954 (W1 remainder + jobsearch variants).
+G3/G7 mailed, awaiting owner. Hosted REDEPLOYED on owner Option A
+(owner_replies): 12713bc verified live, $0 spent. Cron 6f2e1347 on.
+All agents landed; window in monitor-till-20:00 phase.
+18:12Z FINAL SWEEP GREEN: serve 2 roots/39 tasks/allowance 42/50
+$7.12; sibling main 12713bc clean; workbench develop 92f9954 clean;
+hosted 12713bc live; no loop4 residue. G3/G7 still unanswered.
+On owner return: run .\cancel-sleep.cmd, verify sleep_cancelled,
+delete cron 6f2e1347, attended handoff (FINAL E2E + video + grant
+budget flag). No early sleep (owner imminent).
+Loop5 (all 3 landed): RO-DOCS sibling main e89c548 (pushed+verified;
+16 stale judge-doc claims fixed vs code + my runbook open-entry line;
+docs-only, no redeploy). WB-PRODUCT gap doc reviewed w/ 3 corrections
+(current W1 state, struck worktree anecdote) — FOLLOW-UPS QUEUED: (a)
+gap-2 bounded-slice requirement wording still slightly stale vs
+landed W1 pins (doc points at track-b which is current); (b) planned
+UX-proof pass not re-run after my corrections (formatting risk only);
+(c) slice-7 (log-triage fallbacks) + slice-8 (doctor) unclaimed, need
+owner track pick. WB-BUILD develop e184af8 (merged, push retry in
+flight after SSH flap): --message-variant CLI (fail-closed), JSONL
+ledger records.py (unwired), evidence-schema pins; 139 job-email
+green. Follow-ups: add --cv-variant symmetric flag; wire ledger into
+send path + decide runtime-dir default/reconcile rule.
+Owner 2026-11-04: (1) chat wake-path is post-submit merge work —
+recorded in docs/plans/backlog.md for next planning session (RO repo
+becomes hackathon-only; merge starts after submit). (3) video-plan
+narration is a DRAFT, rework soon (incl. "New task" vs real "Start
+new demo draft" label). (4) implement queued follow-ups unless they
+need a decision → DONE + PUSHED (develop b0cfde7, verified):
+--cv-variant flag (fail-closed, mirrors
+--message-variant), ledger wired into send path (RECORDS_FILE config
++ env, SENT-only, stop-and-reconcile on append failure), 10 new
+tests (149 job-email green, ruff+pyright clean), README updated,
+fixtures isolated to tmp. G5 corrected (G6 landed — session-scope
+escalation test exists; remaining = G3/G7 owner calls + G1
+residual), track-b landed-status block added (local, gitignored),
+proof nits fixed. Slice-7/8 track pick stays queued (needs owner).
+Hosted fix 2026-11-04: sample request locked to fixed text (sibling
+main 548534e, pushed+verified, hosted redeployed+verified live):
+custom prompts in sample mode could only confuse/break CSV-fixed
+validation. Field+dictate disabled on sample target, submit sends
+the fixed request, unlocked for repo targets. Owner hard-refresh +
+retest hosted.
+Judge pass 2026-11-04 (~00:30): decision A (keep hosted full +
+reframe). Sibling main 514b87e, pushed+verified, hosted
+redeployed+verified live: key-value reframe (quick-start + key
+note), STT hint fix ('Your model key'), README judges top
+(link+code first, hosted-vs-local table, origin story, honest
+limits), full video script w/ origin+dogfood + locked-request
+direction. Meta-dictation root cause: no ffmpeg in Modal image
+(webm needs conversion → 502 → fallback); added apt_install
+ffmpeg. Needs owner key-funded retest to prove STT end-to-end.
+Field audit: prompt was the only misleading editable (locked);
+power/supervision already hidden on hosted; rest functional.
+Dictate-row fix: chat dictate row now follows its field (sibling
+main 5c9a4f0, pushed+verified, hosted redeployed+verified live).
+On hosted, dictation lives in Supervise chat (open thread first)
+and parked-answer fields; Build prompt stays locked by design.
+Local/hosted text split: judge quick-start was rendering on local
+(only leak; wizard/key/grant sections properly hidden) — now
+hidden unless hosted (sibling main 53c467d, pushed+verified,
+hosted redeployed+verified live). Swept all hosted-worded static
+text; rest is correctly gated.
+Grant refresh 2026-11-04 (owner-approved): spent 50/50 grant backed
+up to grant-loop-20261103-spent.json; new grant.json
+(meta-video-20261104-owner, 100 req cap, $6.66 remaining
+envelope). Serve restarted PID 34108 (same cmdline; secrets
+bridged User→process env for the child): 2 roots, 42 tasks kept,
+allowance 0/100 $6.66. Old PIDs 37884/27936 stopped.
+Serve-restart lesson: child inherits the STARTER's stale PATH —
+Gyan ffmpeg was in User PATH but invisible to the restarted
+serve → Meta dictate 502'd. Restarted again with registry-fresh
+env; probe webm → HTTP 200 via muse-voice-transcribe-1.0
+($0.00 billed, empty text correct for a tone). Allowance now
+21/100, $5.61 left. Always refresh Machine+User env in the same
+command that starts the serve.
+VIDEO EMERGENCY: repeated Meta transport timeouts (submission-hour
+congestion) → serve switched to SCRIPTED (owner-ordered, will
+disclose on camera): same cmdline minus --model-mode/--grant.
+2 roots, 50 tasks kept, no allowance. Live Meta proof now rests
+on hosted judge runs + earlier verified runs, not this take.
+SUBMITTED. Post-submit doc pass: sibling main bd3d074
+(pushed+verified, docs-only, no redeploy) — draft (video done,
+published, repo scope), DEMO.md (locked request, open entry,
+complete), video-plan shot cell. No doc qualified for deletion
+(all referenced or historical); decisions/release-checklist
+stale-looking lines are dated records, left intact.
+Process-doc purge (owner-ordered): sibling main a33e505
+(pushed+verified, hosted redeployed+verified live) — deleted
+DEMO.md, video-plan/script/obs, submit-runbook,
+x-sharing-analysis, release-checklist (-569 lines); fixed 3
+dangling refs. README + hosted judge-start now stress local >>
+hosted. Tooling lesson: output pipeline redacts
+secrets-adjacent words in displays (chased a phantom mismatch —
+verify via hex/counts, never displayed text).
+
+Workbench branches: 117 local merged-pruned (2 worktree-backed kept:
+baseten-workbench-loop, release/workbench-20261025); develop @ 4c62473
+pushed+verified (C1 + restricted-reviewed-input history union; payload
+was already on develop via duplicate branches). Remote: 11 stale
+deleted, only develop+master remain. Remote switched to SSH per owner.
+Push-gate lesson: pre-push runs pyright + FULL suite (~10 min); my
+earlier kills orphaned pytest (finished, nothing stuck). GCM is fine.
+4 subagents fanned (manual git worktrees under artifacts/dev-*/worktree,
+no-push rule, I integrate): w4-trigger-table + w4-escalation-pins VERIFIED
+(70 tests, ruff, GROUPS) and MERGED to develop (9f3a77f, 8b39c2b).
+fanout-visibility VERIFIED (65 tests, ruff, GROUPS, diff-reviewed) and
+MERGED (d7b4a05; nit: unused FANOUT_POLICIES constant kept as vocabulary).
+All unpushed — batching with fanout-policy slice, still running. Owner
+runs remote-operator manual tests meanwhile.
+Sibling: installer uv-offer + folder-hint merged to main (f690897,
+pushed+verified) for laptop E2E. Workbench develop push retry running.
+
+# Previous — 2026-11-04 MIDDAY: project-dev built, owner away ~30 min
+
+remote-operator PROJECT TASKS built on sibling feature/project-dev-20261104
+@ 147ee1c, pushed+verified: --work-root allowlist, staged approvals with
+checks:none, Work-on picker, 20 new tests, full suite 600 green, ruff clean,
+ACTIONS-OK + DICTATE-OK. NOT merged (needs owner approval). Live :8765
+untouched (no --work-root until owner restarts serve). C1 doc fix committed
+on workbench docs/adr032-c1-supersession @ 0cd41db (push QUEUED: HTTPS
+push hangs, likely GCM GUI prompt needing owner; reads fine). G3
+task_minimum reporting still needs owner call. Symlink-guard subtest skips
+here (no OS privilege). SSH flapping persists; HTTPS verify fallback works.
+NEXT: owner manual tests (checklist in chat), laptop installer E2E, records video.
+DONE 12:3x: project-dev MERGED to sibling main (9db3185, pushed+verified);
+serve restarted WITH --work-root both repos (PID 35216->25880, meta live,
+34 tasks, /api/work-roots green). Serve parent+child pair is normal
+(uvicorn supervisor). C1 push still queued (GCM popup needs owner).
+Ship follow-ups MERGED to sibling main (1c53b26, pushed+verified).
+C1 push: owner action needed — cached git:https://github.com cred fills
+OK but push hangs reproducibly (60s+90s, 0 bytes); GCM wants GUI re-auth
+(possibly post-rename grant). Owner runs one push in own terminal.
+
+# Previous — 2026-11-04 MORNING: execute docs/plans/morning-20261104.md
+
+Owner answers: installer merge DONE (sibling main 2cb7e63 pushed, js
+harness green), visitor-note merge DONE, Modal rename GO (sequenced to
+morning step 1, owner present), PC recording decided, MSI ignored.
+Morning: say `go` (+ D2 2nd-PC answer) to execute the plan. Plan file:
+[docs/plans/morning-20261104.md](docs/plans/morning-20261104.md). No
+sleep timers — owner turns PC off.
+GO RECEIVED 09:1x: D1–D5 queued to dashboard inbox (all open, IDs
+e6f21055/801e7b25/f4d32668/302f4ff1/d23a49d4) — owner answers there.
+Phase 0+1 DONE: Modal rename live + 21/21 green, docs pushed
+(sibling main 73185b7); R2 verified-done; R3 verified (66 unit + 6
+live); R4 in_reply_to merged+pushed (6a716bb, 578 green);
+eligibility ELIGIBLE; Docker up. Track B filed:
+docs/plans/track-b-20261104.md. Manual findings batch merged+pushed
+(sibling main 701fe38, 580 green): humanized replies, source-first
+chat, hosted power note, judge status, threadless hide, dictation hint,
+importer copy, README install steps. Local serve restarted meta mode
+(live grant spark-1.3 $8/50). Hosted redeployed (701fe38) 21/21 green.
+NEXT: owner retests local+hosted, runs laptop installer E2E.
+Follow-up: dictate feedback fix pushed (b1649b0); boot wrapper now
+meta mode (meta-key.txt created, grant-expiry-safe); serve runtime
+fixed to phone/tasks (stray db removed, 9 threads visible). SSH to
+GitHub flapping (publickey intermittent, HTTPS ok) — retry pushes.
+Dictate: sim regression committed (tests/js_dictate_sim.cjs, 4 rounds
+green incl. hostile); mic-wait note added; pushed e3db3be. Installer:
+password confirm, decline examples, sign-in recheck, Docker offer —
+pushed e3db3be. Awaiting owner dictate retest details.
+
+# Previous — 2026-11-03 night: workbench security trio MERGED to master
+
+Workbench master @ 1edb4de pushed (full gate green): exec-replay sandbox,
+env-narrow (ambient-env cut, 2 regressions fixed in review), bounds-guard
+(path guard + bounded reads). Develop @ 4bba4a4. Branches pushed, not
+deleted. Next-day snapshot will refuse legacy string commands (re-run
+`close`) — loud, one-time.
+Video verdict FOUND (dashboard inbox 49ba349b): plan APPROVED 19:57 UTC +
+"who records, me or AI?" — answer: owner records; AI cannot.
+Subagents (owner-authorized fan-out): installer built+pushed, NOT merged
+(sibling feature/ro-installer-20261103 @ 965f43e, 2 files, isolated tests
+24/24, E2E deliberately not run); repo-choice probe = needs-design, video
+via 2 serves on 2 ports; Modal probe = conditional GO on workspace rename
+tonight (renamable-check + nothing submitted + 2h slack, else keep URL).
+Backlog created: docs/plans/backlog.md (fan-out visibility; repo-choice
+rule: workbench = inspiration only, AI redigest OK, direct copy forbidden).
+Pending owner calls: merge installer branch; Modal rename GO/NO-GO;
+visitor-note 18bffe5 merge (sibling, NOT covered by tonight's approval);
+MSI "do A and C" (inbox #486, context needed); recording/upload/submission
+each need explicit OK.
+
+# Previous — 2026-11-03 evening window CLOSED ~19:35 CET (owner back 20:00)
+
+Window ran 17:34→19:35 CET (all rows COMPLETE; closed on completion,
+video answer still owner-pending). Plan with ledger:
+[unattended-work-plan.md](docs/plans/unattended-work-plan.md).
+Closeout sleep SCHEDULED 19:40:15 CET (receipt
+.tmp/sleep-20261103-1734/closeout.json, PID 30708, verified
+sleep_scheduled); cancel with `.\cancel-sleep.cmd` from repo root.
+NEXT SESSION (20:00 review): video-plan answer?, merge copy-fix bc43bdc
++ runjob-durable a06ead7, submit runbook in sibling docs/.
+
+HOSTED REVERIFY COMPLETE. Sibling main @ 2636a64 pushed: redeploy @
+4d8671e + live judge simlive4 11/11 + browser 5/5 (evidence d008289,
+smoke fixes dcbeb39, runbook 4de0950, open-access README 2636a64).
+Repo made PUBLIC per owner; visitor code in README (open entry).
+Grant renewed per owner (ELIGIBLE on real files). Serves on old code
+(freeze holds; one mistaken static merge undone pre-push — see ledger).
+
+COPY-FIX BRANCH `fix/frontend-copy-20261103` @ bc43bdc pushed, NOT
+merged (static, freeze): mode-aware key funding note + inline run/
+supervision scopes + js_actions coverage (576/9/265 green). Merge queued
+for 20:00. Frontend 24/24 accounted (verdicts appendix merged to
+workbench develop; touch-targets 24px queued, contrast FP by measure).
+
+INBOX: 5 answered + acted + closed + mailed (sent:true 18:38).
+1 OPEN: video plan follow-up with full text inline (49ba349b).
+Post-hackathon noted: inbox doc rendering/linking.
+QUEUED for 20:00 merges: copy-fix bc43bdc (static) + runjob-durable
+a06ead7 (src, data-loss-class, 577 green).
+
+Workbench develop @ 278e5b4 pushed (registry, triage, 23 verdicts;
+UNREVIEWED 200→176, all HIGH/CRITICAL done; one push needed a retry
+after a transient ref failure, gates green).
+Consolidation checklist in docs/plans (local file, uncommitted).
+Spend: audit $2.19/25 closed, holes ~$0/2, baseten $0.08/5, judge-sim
+active $2, frontend $0.08/2 closed. Next: watch video answer,
+renew ≤19:10, 19:55 closeout.
+
+---
+# Previous context — 2026-11-03 loop3 day (attended, superseded)
+
+Morning boot green: serve :8765 (notify-live branch), dash :8766, ollama
+:11434, docker up. Sibling main merged+pushed @ 44244e3 (notify/H1b/guided/
+STT live). Dashboard detail-views merged+pushed to origin/develop @ d872893.
+Inbox template fix live as 2c43241.
+
+Loop3 EXTENDED batch awaiting owner merge approval (2 mails sent, 2nd
+~12:2x): wave-1 four (onboard b20ba70, bellchat 3fd4d05, H1a
+14428de+c6a4390, reviewloop 2dcc06e) + openweights 3eaf37f (473/9 green,
+couplings+node OK, $0) + judgedocs 9afafd5+07b178b (docs; parent fixed
+openweights map, self-grant limits, provenance row; hosted claims confirmed
+vs 2026-10-27 receipts) + feature/loop3-dashboard 466d512+2c43241 ->
+workbench develop (53 green, zero-conflict). Tree is ON
+feature/loop3-dashboard (inbox fix live via serve). Bell ack-on-open FYI
+sent (MARK-SEEN opt-in). STT backend + translate verified (469/491 green).
+Owner APPROVED ALL (~13:0x). EXECUTED: sibling main hotfix 6cd9450
+(TDZ 1-line + JS load smoke test, 448 green) then 7 batch merges pushed to
+origin/main @ 7f9bc2b (bellchat 58935e5, reviewloop 2dbe143, LF-norm
+08a7eff, onboard 3ea8737, H1a 5e45487, openweights bbf727f, identity
+81e239e, judgedocs 7f9bc2b; final 494/9 green, ruff clean). Workbench
+develop merged b8efda0 + pushed (dashboard filters/inbox, 53 green).
+Merged UI verified LIVE on :8765 (all markers); :8766 200.
+Owner answered 4: (1) restart = his 2 commands (pending); (2) lingo
+scope needs elaboration (see report); (3) STT/translate = Merge both
+(cond: checks pass) -> REVIEWED (privacy/readability/factuality clean),
+merged 0b9f338+c5ea0c2+b5c6ee1, pushed origin/main @ b5c6ee1 (560/9
+green); .idea/ accidentally committed via add -A, removed in c5ea0c2 +
+gitignored (lesson: name files, never -A); (4) notifier merged bf504c7 +
+pushed. UI batch: 6 issues root-caused, fixed on
+fix/operator-ux-batch-20261103 @ 6195845 (561/9 green), tree ON branch
+so fixes are live on :8765 to try. Inbox: 3 implemented closed, UX merge
+ask open (ebe4a4e5). Owner: restart DONE (verified PID 16352, STT route live), lingo =
+full approve, timestamps = FALSE, remove (veto). UX batch revised
+(first-seen removed from UI+CSS+docs), merged 0ce7969 + pushed (561/9).
+Lingo branch fix/plain-language-20261103 @ 7acd216 done (5 docs +
+strings, 561/9 x2 green, 1 transient flake noted), serves branch files
+live, inbox ask open 80566f37. Lingo merged 99a4eb0 + pushed, live. Timestamps -> backlog idea
+(real server times, not priority). Worker pill built on
+fix/worker-pill-20261103 @ fb28f40 (562/9 green, Offline/Idle/
+Working/Stalled + Activity jump), inbox ask ed424a66 with readable
+body. Pill merged b25d5b2 + pushed, live, ask closed, inbox 0.
+UI FREEZE CONFIRMED (no changes; owner reviews). PowerShell
+"cannot predate support" diagnosed: transient console render
+artifact, nothing deeper (shell green, log 0 malformed, no
+crashes, phrase absent from all outputs). Guide pasted; assessment delivered. Findings: Stage One safe
+(real Meta trials Oct 27 + Nov 1); gaps = hosted stale (redeploy
++ reverify needed), judge-funded live path NEVER tested on the
+deployed URL, Baseten zero calls + credits likely unclaimed,
+video not started, X/community undecided, repo-public to
+confirm. Known-stale: openweights doc cites old banner text
+(queued post-freeze). UI freeze holds. Spend $0.
+
+# EOD 2026-11-02 (superseded by above; PC was off overnight)
+
+2026-11-02 was a full day: morning ladder + followups, evening 8-stream loop,
+missed-message incident + fix, 12 workbench merges pushed, sibling notify batch
+live. Owner gaming in the evening, now sleeping; PC off overnight.
+
+## Repo state (verified 23:4x local, day_cycle close READY FOR POWER OFF)
+
+- ai-workbench develop == origin @ a32ae0c (12 merges 2026-11-02, gates green).
+  Tree clean. main/master untouched.
+- remote-ai-operator on branch fix/operator-notify-live @ 9649a2e (LOCAL ONLY,
+  unpushed): notify fix (LIVE) + H1 + guided v2+v3 + STT + stale-claim fixes.
+  Sibling main still @ cc3577e. Morning: decide merge to sibling main (decision
+  inbox #2 has the gate pre-check), push branch.
+- Serves at close: :8765 UP (notify code, PID 12200), :8766 UP (PID 17116),
+  Ollama :11434 UP, docker up. Morning boot: task autostart relaunches serve
+  onto the FULL batch (tree already on the branch) — H1+guided+STT go live.
+- Dashboard seeded live: 3 plans, 9 runs, 10 open decisions (answer in Inbox).
+- MSI.CentralServer leak: restart deferred (gaming); MSI Center already latest.
+  UDP ~2300 at close, no 4266 since reboot. Trap armed.
+- Protocol correction in memory: decisions push immediately (chat/operator/mail),
+  blocked time -> other work, sleep only when nothing can move.
+- Morning first: 10 inbox decisions (or at least STT/translate/H1/sibling-main),
+  then demos/polish/hosting per tomorrow-20261103.md.
+
+- Operator serve :8765 UP since ~10:51Z 2026-11-02, restarted by the OWNER
+  (PID 17700, auth enforced). CORRECTION: the agent's 11:04Z attempt validated
+  token-loading (reached bind, no token error) then bounced on the taken port;
+  the earlier "relaunched by agent" claim was wrong. Timezone note: PC local
+  is UTC+1; earlier 11:51Z/12:05Z stamps were local times.
+- Window 11:39Z–~12:10Z (closed early, owner returned; now ATTENDED,
+  gaming: no sleep timers, no heavy jobs). All streams COMPLETE. Commits on
+  feature/walk-paging-and-token-20261102 (9 ahead of develop): 366475e
+  rehearsal, 6b55ab8 judge-pool bundle, 1cd6f43 poll retry, 4947d92 expiry
+  align, 5163658 5xx retry. Full suite green 3537/26/0. Heartbeat mail went
+  ~11:53Z (says 12:40Z/8 commits — actual 9; told owner at closeout).
+  TZ discipline: PC local = UTC+1, verify clock before stamping.
+- Next: owner live remote tests from phone (scripted, $0) — Flow A/B
+  findings received, recorded in patches/operator-ux-findings-20261102.md.
+- develop == origin @ ce72c91 (9-commit merge pushed; pyright + pytest push gates passed).
+  Findings merge pushed too → develop == origin @ d0246f2.
+- Decided: D5=A guided rewrite TODAY (one-endpoint stacking is part of the
+  confusion — organize into flows); D6=build STT now (Meta STT on hackathon
+  credits + free alt for post-Nov9); D7=backlog order approved (R1→R2→R3+J).
+- UI rewrite DONE as patch bundle (50fa237 on feature/ui-guided-patch-20261102):
+  Demo/Supervise/Review/Activity views, approve-below-settings, thread runs +
+  Review buttons, verdict line, Review auto-switch; 91/91 IDs, node clean.
+- STT research DONE (364fef2 on feature/operator-stt-20261102, stacked on UI
+  branch): Meta muse-voice-transcribe-1.0 ($0.18/hr) + Web Speech free path
+  recommended; 7 owner questions open (Q3 answered: Tailnet HTTPS verified).
+- Decided: D1 Medium, D2 BYOK-first, D3 owner-key + visible, D4 workbench
+  first; pool UNFUNDED (BYOK-only until X-sharing); STT Q1/Q2/Q3/Q5 answered
+  (browser-cloud ok personal, Redmi+Chrome target, no auto-send).
+- D4 bugs retrieved from dashboard chats.sqlite3 (4 items, see batch branch).
+  Shared visual style across projects recorded to memory.
+- P3#2 IMPLEMENTED (22592b7 on fix/bridge-cancel-on-abandon-20261102):
+  cancel on any abandon + bulletproof swallow; 68 passed, gates clean.
+- PC rebooted ~15:35Z after UDP-ephemeral-port exhaustion (Tcpip 4266 at
+  15:18Z) killed DNS-dependent apps. Services restored via day_cycle open
+  (serve was already up via RemoteOperatorServe task). Cause: leaker unknown
+  — needs an event-triggered capture (proposed, awaiting owner).
+- Edge-case research E scheduled in company backlog.
+- UDP trap INSTALLED (aa8e6af): scheduled task UDPPortExhaustionTrap fires
+  on Tcpip 4266, snapshots UDP owners to .tmp/udp-trap/trap.log. Tested OK.
+- E=B IMPLEMENTED as bundle v2 (dded067 on feature/ui-review-v2-20261102):
+  approval subject header + PASS/FAIL checklist; split views parked post-event.
+- develop == origin @ d05504e; v2 merge a1fed15 pushed? VERIFY (push raced
+  hooks; re-pushed serially, confirm origin).
+- LOOP ~16:25Z: ALL streams done+committed. develop == origin @ a1fed15.
+  Merge queue: D4 batch (a746582), STT v1 (4679e9c), H1 (5fbed57), edge W4
+  (0a68957). W1 reverted (false positive). Monitor ticking, mails sent.
+- Interrupted turns: provider-side generation failures, nothing local (log
+  shows healthy streams). Context ~343K — recommend fresh session in the
+  morning from this handoff + loop ledger.
+  UI batch queued (separate branch, after gaming).
+
+## Completed tonight
+
+Drain worker, single-chat REPLY fold, chat-first UI + settings backend,
+remote power, digest probe+fetch + hosted summarize ($0.0046), drain
+supervision, admission messages, thread labels, run mails, unattended-notify
+proof, hosted 200 judges app, GO-META-UI trial (live Meta wrote widget.html,
+9 req $0.99/$2), window surface, sender Phase 1, chatbot brief + decision
+(B first, then A; D as mode; C held), activity one-poll, build marker,
+main merge.
+
+## Completed 2026-11-02 morning (all on develop == origin c3685dd)
+
+- L3 ladder via new `scripts/l3_ladder.py`: Meta full T0-T3 PASS (~$0.026);
+  Requesty gemma full PASS $0; OpenRouter walked 429 to dots PASS; OpenCode
+  walked kimi-400 to deepseek PASS; Baseten T3 unbounded-verbose FAIL.
+- T1 2048->4096, T3 4096->16384, `--max-output-tokens` override; probes confirm.
+- day_cycle: Docker Desktop auto-launch + warning filter (item 9 DONE).
+- Selection: first-row auto-pick retired; orchestrator resolution, tier gates
+  (max 3, no escalation), (route,model) skip-list; ADR-080; 4 catalog entries
+  (25 routes); mapping + bands tables cover all 25; kimi entry suspect (400).
+- Standing: cost-scheduled onboarding (free now, paid deferred) in roadmap P2
+  (local-only file); provider/product/route/source terms defined there.
+- Vision (owner, durable): planning-session workflows should run through
+  ai-operator; post-hackathon ai-workbench is the main dev tool via dashboard;
+  mobile-from-operator strictly after hackathon (ownership split first).
+- 3h window plan: docs/plans/unattended-work-plan.md (R1=B patch bundles, no
+  second session possible from here; spend Meta ≤$8/Modal ≤$10/Baseten ≤$5;
+  NO sleep; phone script delivered; STT confirmed absent).
+- Queued, not started: judge grant + video (owner hold), 4 dashboard UI bugs
+  (+ limitation tooltips; UI batch approved to start next), kimi-400
+  investigation, exact-band drift note.
+- Follow-ups done ~11:05Z, COMMITTED on feature/walk-paging-and-token-20261102 (4 commits; merge queued for approval):
+  tier-aware paging (free walk all, paid 3, parked-streak stop, `--max-candidates 0`);
+  open injects OPERATOR_* from secret store; .env.example rebuilt (11 missing keys,
+  required/optional tags); operator-serve owner-restarted ~10:51Z (agent attempt validated token path).
+
+## Owner decisions (2026-11-01 ~21:05Z)
+
+- Chatbot B1 (coding help) first; B2/B3 later (fit owner use more).
+- P6 phased v1/v2/v3 confirmed.
+- Full L3 ladder; use hackathon models/credits where recommended.
+
+## Pending owner inputs
+
+1. DEPLOY approval for judges redeploy (5e5bb2b).
+2. Band renaming (Strong/Solid/Competent ambiguous; cutoffs must not move).
+3. Meta grant: $1.01/1req left, expires 22:00Z.
+4. Remote-operator silent-connect defect — fix approved; needs a slice.
+
+## Active implementation (4h loop to ~23:45Z)
+
+- P6 v1 slice A MERGED to develop (459a772, pushed); live on :8766 (PID 31556).
+- L3 T1-T3 MERGED to develop (7729b13); push gates running.
+- Remote connect-feedback fix MERGED to main (454f34b, pushed); gate 423.
+- Dashboard server :8766 left running for owner; Ollama up (gpt-oss:20b etc).
+- Brief completion merged (5a8e7d4). Push "rejections" diagnosed: NOT
+  remote — pre-push pytest failed on flaky
+  test_close_interrupts_incomplete_headers_or_body (raced 401 head vs
+  EOF; fail-closed 401 is by design). Fix merged (8f57706): accept EOF
+  or non-200 status line, still fail on grants. LANDED 8f57706.
+- P6 slice B (ideas tab) LANDED 1874c85 (gates green). Live :8766
+  serves ideas (verified). Fixed tasks.ps1 matcher + stop race.
+- VOICE probe (doc-level): Meta Muse Voice Transcribe
+  (muse-voice-transcribe-1.0) EXISTS on api.meta.ai, $0.18/audio-hr,
+  #1 streaming STT benchmark (8+ sources agree). STT viable pending
+  entitlement/quality live probe (needs keys). TTS: no Meta endpoint
+  found — STT-only recommended for hackathon. (source-state append due.)
+- DEPLOY runbook (tomorrow, owner-gated): merge UI+provenance to main;
+  `modal deploy --strategy recreate modal_app.py` (never rolling);
+  verify /api/config 200 + build marker + judge login + scripted task;
+  judge grant needs OPERATOR_JUDGE_MODEL + spend approval.
+- UI polish MERGED to operator main (0459eb1, pushed): judge hints,
+  tooltips, error copy, mobile CSS. Provenance worker still running.
+- BLOCKER for all live work: provider keys absent (env/files/config).
+  Owner must provide META_API_KEY etc. or point at loader.
+
+## Owner chatbot directions (2026-11-01 ~21:50Z; last sentence truncated)
+
+- Company-site bot (C): security critical — purpose confinement,
+  jailbreak resistance incl. social-engineering/emotional-manipulation,
+  no protected/cross-user data leakage. (Tracked-doc append pending.)
+- Operator bot: UI copilot ("which button for X") + ideally acts for the
+  user (less-manual interaction mode). Tension: acting for the user must
+  not bypass exact-change approval — needs an approval design decision.
+- Both hosted bots need serious model-tiering research: public models
+  can't be dumb, but no frontier models for simple tasks. Feeds P2/L3.
+- Workbench bot: complex code management is priority; runs LOCAL, no
+  hosting needed (models may still be remote). Local supervisor likely
+  beneficial (reliable, cheap) but needs research. Designated the "most
+  unsafe" bot: dashboard built around it, growing ecosystem run through
+  it, mostly-unrestricted access = powerful and dangerous. Implication:
+  strongest internal guardrails (permissions, approvals, audit) despite
+  local-only; local != trusted. (Tracked-doc completion pending push.)
+
+## Owner product directions (2026-11-01 ~22:00Z)
+
+- Interruptible chat (ALL chats): user messages during runs get answers
+  without breaking development (steering queue, non-blocking turns).
+  Owner-confirmed P4 behavior; record as chat requirement. Dashboard
+  chat already non-blocking (sync single-shot, no long runs yet).
+- Ideas tab (dashboard, clearly accessible): fast capture inbox for
+  owner brain-dumps; planning sessions triage into directions. Third-
+  party mode: friend on phone, tagged "third-party idea", describes
+  software they need; system evaluates + plans + reports to owner, who
+  judges (prototype / integrate / commercialize). = client-intake
+  rehearsal; P7-adjacent. V1 SHIPPED (slice B, :8766 live); triage
+  agent later.
+
+## Owner product directions (2026-11-01 ~22:40Z, recorded)
+
+- Data viz (P6): model catalog viewable; ask about parts/grades ("why
+  graded like this"); DYNAMIC queries ("free-model sources for task X
+  right now") — orchestrator knowledge visualized for the user.
+- Integration runs (P5): new app/module connection schedules a run
+  checking what data to expose, how to integrate, usability,
+  non-redundancy with existing systems.
+- Source onboarding runs (P2/P5): new source auto-schedules capability
+  runs — offline first (Aider+SWE = L2 readers), then live micro-eval
+  (L3), plus feature-compatibility/problem checks.
+- Backlog scan (WHEN IDLE ONLY): code smells, vulnerabilities,
+  cross-app redundancy; build-vs-buy vs Meta/OpenAI equivalents when
+  theirs is better. Queued as next-loop filler, not started tonight.
+- Scheduler priorities: eventually-commercial>tooling>hobby (owner
+  correction). Establishing tiers NOT a priority until real commercial
+  work exists; ASAP when company forms. KEY ECONOMICS: expiring-soon
+  credits count as FREE (extends P5 emergency-spend). In P5 proposal.
+
+## End of day 2026-11-01 (closeout ~23:45Z)
+
+- ai-workbench develop 415200f == origin (P6 A+B, L3, secrets, day-cycle,
+  briefs, flake fix). master at 7b52552 (no re-promotion tonight).
+- remote-operator main cc3577e == origin (connect fix, UI polish,
+  provenance). Judges app DEPLOYED cc3577e, verified live (marker,
+  judge login, scripted mode). Judge grant NOT yet enabled.
+- Live Meta T0 PASS $0.0019 via secrets harness. Full ladder tomorrow.
+- Servers left RUNNING for close snapshot; owner powering OFF.
+- Morning: `day_cycle open` replays snapshot; then prompt below.
+
+## Tomorrow first (priority order)
+
+1. `day_cycle open` + read this handoff + session-history tail. DONE 2026-11-02.
+2. Full live L3 ladder async (keys load via harness now). DONE + followups shipped.
+3. Judge grant decision + hosted Meta proof run (needs owner spend OK). HELD per owner.
+4. Submission video planning (primary artifact, Nov 4 9PM ET). HELD per owner.
+5. STT live probe (muse-voice-transcribe-1.0 entitlement/quality).
+6. Discord decision (manual curation vs permitted bot; NO self-bots).
+7. Async-consistency audit doc (threads vs asyncio map).
+8. Backlog scan ONLY when idle (smells/vulns/redundancy/build-vs-buy).
+9. day_cycle cosmetic: stderr warning leaks into untracked list. DONE 2026-11-02.
+   (filter `warning: ` lines); fix + push in the morning, verdict logic
+   already correct.
+
+## Owner directions (2026-11-01 pre-sleep, recorded, for tomorrow)
+
+- Ideas tab: multi-idea capture in one brainstorming flow (user files
+  each idea to its own entry, not one blob). RESEARCH: enforce entry
+  structure vs freeform + AI restructure (gaps/strengths visible)?
+  Author lean: freeform capture, structure at triage (friction kills
+  brainstorming). Triage-agent design input.
+- Advice surface: collaboration advice must live where the user works:
+  tooltips in dashboard + operator, or a short interaction guide.
+  Author lean: one short guide as source of truth, tooltips link it,
+  both apps share the content.
+- CURRENT_CONTEXT gitignore under review: owner open to reevaluating.
+  Artifacts-on-git still disliked; needs a separate backup design
+  (private backup repo? encrypted branch? second-disk snapshots?).
+  MATERIAL decision (privacy/architecture) - decide tomorrow, no
+  unilateral change. Handoff robustness for fresh sessions is the
+  acceptance bar either way.
+- Transcript pipeline (staged): (1) verify full AI-run transcripts are
+  collected (chats.sqlite, run records, session logs - mostly yes);
+  (2) scheduled analyzer runs mining them for workflow fixes/advice;
+  (3) FAR future: retraining on that data (needs data-quality +
+  privacy design first). Items 2-3 are roadmap, not active work.
+ 
+ CURRENT plan:
+ 
+   Goal
+
+  Merge remote-operator's proven parts into ai-workbench (dashboard-first), so one local place shows projects, AI tasks, plans, runs, and approvals, with easy AI-driven development. remote-operator repo is frozen hackathon-only — all work happens in ai-workbench, and the  hackathon inspiration-only rule no longer binds (same owner, post-contest reuse).
+
+  Success Criteria
+
+  • Dashboard runs a supervised loop end-to-end on a local repo: chat → plan → approve → run → review diff → approve → applied, with receipts at every step.
+  • Operator UI structure is gone; its parts (dictation, progress/events, approval checklist, inbox bell, staged approvals) live in the dashboard look-and-feel.
+  • Provider boundary intact: no operator code bypasses ai_provider adapters or the orchestrator.
+  • Existing workbench suites green; new behavior covered by focused tests.
+
+  Approach
+
+  Absorb, don't port. Workbench already owns the provider layer (adapters/meta.py), an OperatorBridge approval round-trip, run_tracking.py, and shared_approvals.py — so operator's interaction patterns (supervised loop, staged approvals, dictation UX, grant metering) move  over, not its plumbing. Dashboard stays stdlib HTTP + vanilla JS (apps/workbench_dashboard/web/), which makes operator's vanilla-JS parts directly reusable.
+
+  Take / leave:
+  • Take: control.py tool loop + staged approvals + recovery-as-result; supervisor*.py threads/plans/runs/drain/inbox; project-dev work-roots + staged project approvals; stt.py transcribe + ffmpeg; chat_text + translate.py;
+    dictation/progress/approval-checklist/inbox-bell UI parts; receipt/event-store patterns; grant-metering as the P5 allowance prototype; installer patterns (uv/ffmpeg offers, Tailscale opt-out).
+  • Leave frozen: Modal hosted app, judge accounts, sample CSV task + scripted reference, Docker sample validation, Build/Review view structure, access-code phone flow, PC sleep controls.
+
+  Steps
+
+  1. Part inventory (1 subagent). Map each operator file above to its workbench target package + named functions to absorb. Output: table with target paths. Depends on: nothing.
+  2. Chat wake-path (first feature, per backlog). Dashboard chat turns trigger agent work (the recorded post-submit gap). Wire dashboard_chat.py → agent run queue with visible receipt. Depends on: 1.
+  3. Supervised loop slice (2 subagents in parallel). (a) Backend: threads/plans/runs/drain in ai_agent + dashboard stores, reusing run_tracking/shared_approvals. (b) UI: progress/events, approval checklist + diff views, inbox bell in dashboard style. Depends on: 1.
+  4. Project registry + staged approvals (1 subagent). Multi-project picker (ties to gap-doc G6) + work-root allowlist + no-checks project approvals with revalidation. Depends on: 3a.
+  5. Dictation + language (1 subagent). stt.py transcribe path + ffmpeg handling and translate.py normalization behind provider-privacy rules; UI dictate wiring. Depends on: 1.
+  6. Grant metering → P5 prototype (1 subagent). Adapt operator's finite-grant model (requests + USD + expiry) as the allowance enforcement prototype. Depends on: 1.
+  7. Installer parity fixes. Port uv/ffmpeg offers and Tailscale opt-out to the workbench install path. Depends on: none (parallel with 2–6).
+  8. Docs + ADR. Merge ADR (what moved, what stayed frozen, why), dashboard README update, backlog cleanup. Depends on: 2–7.
+
+  Subagent policy for the session: fan out at steps 1, 3a/3b, 4, 5, 6 (each owns disjoint files); integrate on develop via short-lived branches with gates green before each merge.
+
+  Validation Plan
+
+  • Each step: focused pytest for its package (apps/workbench_dashboard/tests/, packages/ai_agent tests) + ruff check/format + pyright on touched trees; JS parts via a js_actions-style harness if added.
+  • E2E (step 3+4): local dashboard run of a real repo task to applied diff, manually driven once, then encoded as an integration test with fixture transports (no live spend by default).
+  • Highest-risk check: step 3's drain + approval interplay — verify paused/question/approve/reject transitions with the store, not mocks of the store.
+  • STT path: synthetic-clip probe (as done pre-submit) before claiming it works.
+
+  Risks / Open Questions
+
+  • Scope creep into hosted multi-user: explicitly out — workbench stays local-first; remote access remains token + Tailscale. Revisit only on owner call.
+  • Chat wake-path authorization: agent runs from chat need the fan-out/allowance policy (backlog item) — assume most-restrictive default until the owner picks, and surface the effective policy in the UI.
+  • P5/P6/P7 proposals constrain slices 4–6 (docs/plans/): the session must read the relevant proposals first; where they conflict with operator's patterns, operator's proven behavior wins for the loop mechanics, proposals win for data shapes — conflicts go to the owner.  • Assumption: owner ok with dashboard visual style staying as-is while absorbing parts. Say otherwise and step 3b re-plans.
+
+  Reply go to execute this plan, or tell me what to change.
