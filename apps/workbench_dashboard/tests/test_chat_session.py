@@ -96,3 +96,37 @@ def test_delete_removes_messages(chat) -> None:
     chat.delete_session(record.session_id)
     with pytest.raises(ValueError, match="not found"):
         chat.list_messages(record.session_id)
+
+
+def test_system_prompt_grounds_capabilities(tmp_path) -> None:
+    """The supervisor prompt states its real limits (no tools/mail/live view)."""
+    from ai_provider.contracts import MessageRole
+    from dashboard_chat import SUPERVISOR_SYSTEM_PROMPT, DashboardChat
+
+    made: list = []
+
+    def factory(config):
+        client = FakeClient(config)
+        made.append(client)
+        return client
+
+    store = SQLiteChatTranscriptStore(tmp_path / "chats.sqlite3")
+    chat = DashboardChat(
+        store,
+        DashboardConfig(provider="ollama", model="fake"),
+        tmp_path,
+        client_factory=factory,
+    )
+    record = chat.create_session(title="t")
+    chat.send(record.session_id, "Hi")
+    system = made[0].seen[0].messages[0]
+    assert system.role is MessageRole.SYSTEM
+    assert system.content == SUPERVISOR_SYSTEM_PROMPT
+    for phrase in (
+        "cannot run tools",
+        "never claim an email was or will be sent",
+        "no live view of services",
+        "Request-run button",
+        "runs Windows",
+    ):
+        assert phrase in SUPERVISOR_SYSTEM_PROMPT

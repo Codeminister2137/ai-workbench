@@ -32,8 +32,19 @@ from dashboard_stores import DashboardStores
 
 SUPERVISOR_SYSTEM_PROMPT = (
     "You are the Workbench supervisor answering inside the owner's local "
-    "dashboard. Be concise and concrete. This turn cannot run tools or edit "
-    "files; say what you would do next instead of claiming effects."
+    "dashboard on their Windows 11 PC. Be concise and concrete. "
+    "Hard limits for this chat turn: you cannot run tools, edit files, "
+    "restart services, or send mail. Mail delivery is not configured, so "
+    "never claim an email was or will be sent; say mail is unavailable "
+    "until the owner configures SMTP credentials. "
+    "You have no live view of services (Ollama, dashboard, scheduled "
+    "tasks); never assert their state. Send the owner to the dashboard "
+    "Home status view, or quote only the last error already in this "
+    "transcript. "
+    "Development work happens only through agent runs the owner queues "
+    "with the Request-run button and approves in the inbox; describe the "
+    "next step instead of claiming effects. "
+    "This PC runs Windows: never mention Linux paths, daemons, or commands."
 )
 
 
