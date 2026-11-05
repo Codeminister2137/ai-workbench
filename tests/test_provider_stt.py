@@ -197,3 +197,54 @@ class TestMetaAsrEngine:
             engine.transcribe(b"wav", language_bias=["English"], timeout_s=5)
         assert excinfo.value.http_status == 429
         assert excinfo.value.retry_after == "7"
+
+
+class TestMetaAsrWireProbe:
+    """Synthetic-clip probe: real WAV bytes through the real engine wire format."""
+
+    def test_wire_shape_with_synthetic_clip(self):
+        httpx_mod = pytest.importorskip("httpx")
+        clip = _wav_bytes(seconds=0.5)
+        seen: dict = {}
+
+        def handler(request):
+            seen["method"] = request.method
+            seen["params"] = dict(request.url.params)
+            seen["authorization"] = request.headers["Authorization"]
+            body = request.read()
+            seen["body"] = body
+            return httpx_mod.Response(200, json={"transcript": "hello world", "turns": []})
+
+        engine = MetaAsrEngine("key-1", transport=httpx_mod.MockTransport(handler))
+        result = engine.transcribe(clip, language_bias=["English"], timeout_s=5)
+        assert result.text == "hello world"
+        assert seen["method"] == "POST"
+        assert len(seen["params"].get("sessionId", "")) == 32
+        assert seen["authorization"] == "Bearer key-1"
+        body = seen["body"]
+        assert b'"audioEncoding": "WAV"' in body
+        assert b'"languageBias": ["English"]' in body
+        assert b'"mode": ' in body and b'"model": ' in body
+        assert clip in body
+        assert b"key-1" not in body
+
+    def test_full_flow_with_real_engine(self):
+        httpx_mod = pytest.importorskip("httpx")
+
+        def handler(request):
+            return httpx_mod.Response(200, json={"transcript": "czesc", "turns": []})
+
+        engine = MetaAsrEngine("key-1", transport=httpx_mod.MockTransport(handler))
+        metering = _FakeMetering()
+        result = transcribe_audio(
+            engine=engine,
+            metering=metering,
+            audio_bytes=_wav_bytes(seconds=1.0),
+            content_type="audio/wav",
+            language="pl",
+        )
+        assert result["text"] == "czesc"
+        assert result["language"] == "pl"
+        assert result["duration_seconds"] == pytest.approx(1.0)
+        assert metering.reserved[0]["operation"] == "audio"
+        assert metering.committed[0]["actual"] >= 1
