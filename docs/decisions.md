@@ -1,3 +1,23 @@
+## ADR-084 - P7 client intake as validate → review → approve-to-plan
+
+**Status:** Accepted direction (implementation), 2026-11-05.
+
+Chatbot briefs validate against the P7 v1.0.0 closed schema plus
+actionability rules, list with valid/draft verdicts, and approve into
+`proposed` plans (file moved to approved/; nothing executes). Q3/Q6
+resolved as reversible defaults (disk intake dir, manual approve click);
+Q1/Q2/Q4/Q5/Q7 filed to the owner inbox. See
+[ADR-084](decisions/ADR-084-p7-intake-implementation.md).
+
+## ADR-083 - AgentLoop executor with owner-approved full tools
+
+**Status:** Accepted by the owner, 2026-11-05.
+
+Drained runs execute through AgentLoop with the full coding toolset,
+TRUSTED_LOCAL permissions, one-level subagents, and owner-task filing.
+File writes stage by convention (shell can bypass; accepted). See
+[ADR-083](decisions/ADR-083-agentloop-executor-full-tools.md).
+
 ## ADR-082 - Dashboard stays centralized; no per-client data split
 
 **Status:** Accepted by the owner, 2026-11-05.
