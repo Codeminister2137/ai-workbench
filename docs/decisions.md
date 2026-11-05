@@ -1,3 +1,14 @@
+## ADR-081 - Absorb remote-operator's supervised loop into the workbench dashboard
+
+**Status:** Accepted by the owner, 2026-11-05.
+
+Post-submission merge, dashboard-first: chat run-requests, approval-gated
+drain, staged project approvals, STT/translation behind provider-privacy
+rules, P5 spend-ledger prototype, local-first installer. Operator mechanics
+win for the loop, P4/P5/P6 win for data shapes; provider boundary intact.
+See
+[ADR-081](decisions/ADR-081-remote-operator-merge-into-workbench.md).
+
 ## ADR-080 - Cost-tier fallback walks within the authorized tier
 
 **Status:** Accepted by the owner, 2026-11-02.

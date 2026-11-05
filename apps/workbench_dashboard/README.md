@@ -24,15 +24,24 @@ inspect the owned process only.
 - Home: backend, active plan, recent runs, evidence counts, inbox count,
   chat quick-entry. Every list is one click away; items cross-link.
 - Chat: supervisor answers with full local transcripts
-  (`data/chats.sqlite3`). Turns cannot run tools yet — the assistant
-  says what it would do instead of claiming effects.
-- Plans/Runs: read-only views of file-backed `data/plans/` and
-  `data/runs/` records created by existing Workbench flows. Each run
-  shows one fan-out indicator (allowed/restricted/denied, or unknown
-  for records that predate the field).
+  (`data/chats.sqlite3`). Turns stay tool-less, but any message can be
+  queued as an agent run (Request run, optional project scope): the run
+  lands in `data/runs/` as `queued` with fan-out `restricted` unless
+  `chat_fanout_policy` says otherwise, an inbox approval decision is
+  created, and the thread keeps a system receipt. Nothing executes
+  until the owner approves and a worker drains the queue.
+- Plans/Runs: plans carry a phase checklist and an approve/reject flow;
+  runs show live status, events/receipts, Did/Found/Next synthesis, and
+  one fan-out indicator (allowed/restricted/denied, or unknown for
+  records that predate the field). Project-scoped runs show staged
+  diffs for review with approve-and-apply.
 - Inbox: decisions/clarifications assigned to the owner; answers flow
   back as record updates. Creation requires the supervisor token when
-  `data/supervisor.token` exists.
+  `data/supervisor.token` exists. The nav badge is a live open count.
+- Voice/language: the chat Dictate button posts microphone clips to
+  `POST /api/stt/transcribe`; messages accept a `language` tag and
+  translate at ingestion with source provenance. Both fail closed
+  (409) until a keyed engine, metering, and translator are wired.
 - Ideas: fast capture inbox for brain-dumps, tagged `owner` or
   `third-party` (with optional contact); triage to
   reviewing/adopted/parked/declined with a decision note.
@@ -41,8 +50,12 @@ inspect the owned process only.
 
 ## Limits (honest)
 
-- Chat answers are single-shot completions, not agent runs: no tools,
-  no approvals, no delegation yet.
+- Chat answers are single-shot completions; agent runs execute through
+  the drain with an injected executor (AgentLoop wiring is pending),
+  so runs complete with fixture receipts until that lands.
+- Transcription/translation need owner-wired keys and metering; the
+  endpoints answer 409 until then. No per-project data isolation yet:
+  runs/inbox stay global with per-run project refs (G6 owner question).
 - Schedule is a read-only placeholder until the P5 scheduler exists.
 - Helper-process inventory deepens with the P5 queue; v1 lists runs,
   plans, inbox, and route evidence.
