@@ -204,7 +204,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                     self._stores().runs,
                     parsed.query,
                     enrich=with_fanout_policy,
-                    project_field="project_id",
+                    filterable=("project_id", "plan_id"),
                 )
             if path == "/api/documents":
                 return self._send_json({"ok": True, "documents": self._library().list_documents()})
@@ -497,6 +497,9 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 project_id = str(roots.select(project))
             except StagedEditError as exc:
                 return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        plan = payload.get("plan")
+        if plan is not None and (not isinstance(plan, str) or not plan.strip()):
+            return self._send_json({"ok": False, "error": "Plan must be a plan id"}, status=400)
         try:
             receipt = self._chat(config).request_run(
                 session_id,
@@ -504,6 +507,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 stores=self._stores(),
                 title=title or None,
                 project=project_id,
+                plan=plan,
             )
         except (StoreError, ValueError) as exc:
             code = 404 if "not found" in str(exc).lower() else 400
@@ -524,7 +528,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         query: str,
         *,
         enrich: Callable[[dict], dict] | None = None,
-        project_field: str | None = None,
+        filterable: tuple[str, ...] = (),
     ) -> None:
         params = parse_qs(query)
         try:
@@ -533,11 +537,13 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         except ValueError:
             return self._send_json({"ok": False, "error": "Invalid limit or offset"}, status=400)
         items, total = collection.list(limit=limit, offset=offset)
-        project_id = params.get("project_id", [None])[0]
-        if project_id is not None and project_field is not None:
-            # Post-list filter: collections here are tiny (tens of rows),
-            # so page-then-filter stays honest via the filtered total.
-            items = [item for item in items if item.get(project_field) == project_id]
+        for field in filterable:
+            wanted = params.get(field, [None])[0]
+            if wanted is not None:
+                # Post-list filter: collections here are tiny (tens of rows),
+                # so page-then-filter stays honest via the filtered total.
+                items = [item for item in items if item.get(field) == wanted]
+        if any(params.get(field, [None])[0] is not None for field in filterable):
             total = len(items)
         if enrich is not None:
             items = [enrich(item) for item in items]

@@ -235,6 +235,31 @@ async function loadProjectPicker() {
     + roots.map((r) => `<option value="${esc(r.id)}">${esc(r.display_name || r.path)}</option>`).join("");
 }
 
+async function loadPlanPicker() {
+  const picker = document.getElementById("plan-picker");
+  const note = document.getElementById("plan-note");
+  if (!picker || !note) return;
+  let plans = null;
+  try {
+    const data = await api("/api/plans");
+    plans = Array.isArray(data.items) ? data.items : [];
+  } catch (err) { plans = null; }
+  if (plans === null) {
+    picker.hidden = true;
+    note.textContent = "Plan list unavailable - run stays unlinked.";
+    return;
+  }
+  if (!plans.length) {
+    picker.hidden = true;
+    note.textContent = "No plans on file - run stays unlinked.";
+    return;
+  }
+  picker.hidden = false;
+  note.textContent = "";
+  picker.innerHTML = '<option value="">No plan (unlinked run)</option>'
+    + plans.map((p) => `<option value="${esc(p.id)}">${esc(p.title || p.id)}</option>`).join("");
+}
+
 /* Staged project changes: GET /api/runs/{id}/staged -> {ok, files:[...]}.
    Missing endpoint (404) or empty list renders a graceful placeholder. */
 function stagedFileHtml(f) {
@@ -395,7 +420,9 @@ async function renderChatThread(id, initial) {
     <button type="button" id="run-request-btn" title="Queue this message as an agent run (needs inbox approval)">Request run</button>
     <button type="button" id="dictate-btn" title="Dictate with the microphone (server transcription)">Dictate</button></form>
     <p><select id="project-picker" title="Project for the next run request (optional)"></select>
-    <span id="project-note" class="muted"></span></p>`;
+    <span id="project-note" class="muted"></span></p>
+    <p><select id="plan-picker" title="Plan this run implements (optional)"></select>
+    <span id="plan-note" class="muted"></span></p>`;
   document.getElementById("rename-form").addEventListener("submit", async (ev) => {
     ev.preventDefault();
     const title = ev.target.title.value.trim();
@@ -474,11 +501,13 @@ async function renderChatThread(id, initial) {
     if (!text) { toast("Message text is required", false); return; }
     const picker = document.getElementById("project-picker");
     const project = picker && !picker.hidden ? picker.value || null : null;
+    const planPicker = document.getElementById("plan-picker");
+    const plan = planPicker && !planPicker.hidden ? planPicker.value || null : null;
     try {
       const out = await api("/api/chat/sessions/" + encodeURIComponent(id) + "/run-request", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({text, project}),
+        body: JSON.stringify({text, project, plan}),
       });
       toast("Run queued (fan-out: " + out.fanout_effective + ")", true);
       render();
@@ -487,6 +516,7 @@ async function renderChatThread(id, initial) {
     }
   });
   loadProjectPicker();
+  loadPlanPicker();
   let dictationRecorder = null;
   const dictateBtn = document.getElementById("dictate-btn");
   dictateBtn.addEventListener("click", async () => {
@@ -534,6 +564,15 @@ async function renderPlans(id) {
   if (id) {
     const payload = await api("/api/plans/" + encodeURIComponent(id));
     const plan = payload.item;
+    let linkedRuns = "";
+    try {
+      const runs = await api("/api/runs?plan_id=" + encodeURIComponent(id));
+      linkedRuns = runs.items.length
+        ? `<h3>Linked runs</h3><ul class="plain">` + runs.items.map((r) =>
+            `<li><a href="#/runs/${esc(r.id)}">${gtext(r.title || r.id)}</a>
+             <span class="pill st-${esc((r.status || "none").replace(/\s+/g, "-"))}">${esc(r.status || "")}</span></li>`).join("") + `</ul>`
+        : "";
+    } catch (err) { linkedRuns = ""; }
     view.innerHTML = `<h1>Plan</h1><p><a href="#/plans">All plans</a></p>
       <div class="card"><h2>${gtext(plan.title || plan.id)}</h2>
       <p class="muted">${esc(plan.status || "")}${plan.updated_at_utc ? " · updated " + esc(plan.updated_at_utc) : ""}</p>
@@ -541,7 +580,7 @@ async function renderPlans(id) {
       ${plan.source ? `<p class="muted">Source: ${esc(plan.source)}</p>` : ""}
       <h3>Phase checklist</h3>
       ${phaseChecklistHtml(plan)}
-      <pre>${gtext(plan.body || "(empty plan)")}</pre></div>`;
+      <pre>${gtext(plan.body || "(empty plan)")}</pre>${linkedRuns}</div>`;
     return;
   }
   const payload = await api("/api/plans");
@@ -575,6 +614,9 @@ async function renderRuns(id) {
     const inboxLink = run.inbox_id
       ? `<p><a href="#/inbox/${esc(run.inbox_id)}" title="Approve or reject via the linked inbox task">Review approval in inbox</a></p>`
       : "";
+    const planLink = run.plan_id
+      ? `<p><a href="#/plans/${esc(run.plan_id)}" title="Open the plan this run implements">View plan</a></p>`
+      : "";
     view.innerHTML = `<h1>Run</h1><p><a href="#/runs">All runs</a></p>
       <div class="card"><h2>${gtext(run.title || run.id)}</h2>
       <p class="muted" id="run-status">${meta}</p>
@@ -587,7 +629,7 @@ async function renderRuns(id) {
       <div id="staged-list" data-applied="${run.staged_applied ? "1" : ""}"><p class="muted">Loading staged changes...</p></div>
       <h3>Events and receipts</h3>
       <div id="receipts-list"><p class="muted">Loading receipts...</p></div>
-      ${inboxLink}
+      ${inboxLink}${planLink}
       ${report}</div>`;
     renderReceiptsInto(id);
     renderStagedInto(id);
