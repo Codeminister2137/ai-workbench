@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 import re
+import shutil
+import subprocess
 from pathlib import Path
+
+import pytest
 
 WEB_DIR = Path(__file__).parent.parent / "web"
 
@@ -380,6 +384,67 @@ def test_documents_view_lists_and_previews() -> None:
     assert "/file" in js
     assert "Open file" in js
     assert "Private files never leave this PC" in js
+
+
+def test_document_preview_renders_markdown() -> None:
+    """Doc preview renders markdown into a wrapped container, not a raw dump."""
+    html = _read("index.html")
+    md_pos = html.find('<script src="md.js"></script>')
+    app_pos = html.find('<script src="app.js"></script>')
+    assert md_pos != -1 and app_pos != -1 and md_pos < app_pos
+    js = _read("app.js")
+    assert "<pre>${esc(full.content)}</pre>" not in js
+    assert "mdToHtml(full.content)" in js
+    assert 'class="doc-body"' in js
+    css = _read("app.css")
+    assert ".doc-body" in css
+    assert "pre-wrap" in css
+    assert "overflow-wrap" in css
+
+
+def test_md_renderer_cases() -> None:
+    """The doc markdown renderer covers blocks, inline code, links, and XSS."""
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node is required to execute the renderer")
+    md_js = WEB_DIR / "md.js"
+    assert md_js.is_file(), "web/md.js must exist for the documents preview"
+    driver = (
+        "const { mdToHtml } = require(process.argv[1]);\n"
+        "const assert = require('assert');\n"
+        "assert.strictEqual(mdToHtml('# Hi'), '<h1>Hi</h1>');\n"
+        "assert.strictEqual(mdToHtml('# Hi\\r\\n\\r\\nBody\\r\\n'), '<h1>Hi</h1><p>Body</p>');\n"
+        "assert.strictEqual(\n"
+        "  mdToHtml('**b** and `c`'),\n"
+        "  '<p><strong>b</strong> and <code>c</code></p>',\n"
+        ");\n"
+        "assert.strictEqual(\n"
+        "  mdToHtml('[t](https://x.example/a)'),\n"
+        '  \'<p><a href="https://x.example/a" rel="noopener">t</a></p>\',\n'
+        ");\n"
+        "assert.ok(!mdToHtml('[x](javascript:alert(1))').includes('javascript:'));\n"
+        "assert.ok(!mdToHtml('[x](javascript:alert(1))').includes('<a '));\n"
+        "assert.ok(mdToHtml('```\\n<a>\\n```').includes('&lt;a&gt;'));\n"
+        "assert.ok(!mdToHtml('<img src=x onerror=y>').includes('<img'));\n"
+        "assert.strictEqual(\n"
+        "  mdToHtml('- a\\n- b'),\n"
+        "  '<ul><li>a</li><li>b</li></ul>',\n"
+        ");\n"
+        "assert.ok(mdToHtml('a'.repeat(500)).includes('a'.repeat(500)));\n"
+        "assert.strictEqual(\n"
+        "  mdToHtml('| a | b |\\n|---|---|\\n| 1 | 2 |'),\n"
+        "  '<table><thead><tr><th>a</th><th>b</th></tr></thead>'\n"
+        "    + '<tbody><tr><td>1</td><td>2</td></tr></tbody></table>',\n"
+        ");\n"
+        "console.log('md cases ok');\n"
+    )
+    proc = subprocess.run(
+        [node, "-e", driver, str(md_js)],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert proc.returncode == 0, proc.stderr or proc.stdout
 
 
 def test_inbox_supports_owner_tasks() -> None:
