@@ -64,10 +64,12 @@ inspect the owned process only.
   the checkout root; a missing file reads as idle.
 - Agent executor: drained runs execute through `AgentLoop` with the
   full coding toolset (read/search/git/shell/python/navigate plus
-  staged writes). Project file changes stage into the run record for
-  owner review/apply; shell and Python run unconfined under the
-  per-run approval (owner decision). Delegation is excluded until a
-  child runner exists; fan-out still flows from the run record.
+  staged writes, one-level `delegate_task` subagents, and
+  `request_owner_task` human tasks). Project file changes stage into
+  the run record for owner review/apply; human tasks land in the
+  inbox; shell and Python run unconfined under the per-run approval
+  (owner decision). Child fan-out follows the run policy; child
+  staged files carry back into the parent receipt.
 
 ## Limits (honest)
 

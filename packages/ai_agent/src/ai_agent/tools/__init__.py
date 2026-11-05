@@ -11,6 +11,7 @@ from ai_agent.tools.filesystem import (
     ReadFileTool,
 )
 from ai_agent.tools.git import GitDiffTool, GitStatusTool
+from ai_agent.tools.owner_tasks import OwnerTaskTool
 from ai_agent.tools.python_runtime import PythonRuntimeTool
 from ai_agent.tools.refactor import (
     PythonNavigateTool,
@@ -55,6 +56,7 @@ __all__ = [
     "GitDiffTool",
     "GitStatusTool",
     "ListDirTool",
+    "OwnerTaskTool",
     "ReadFileTool",
     "PythonRuntimeTool",
     "PythonNavigateTool",

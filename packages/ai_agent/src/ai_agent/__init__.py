@@ -24,6 +24,7 @@ from ai_agent.contracts import (
     ToolParameter,
     ToolResult,
 )
+from ai_agent.delegation_runner import build_child_runner
 from ai_agent.loop import AgentLoop, AgentResult, ToolExecutionEvent
 from ai_agent.permissions import ApprovalPolicyPreset, PermissionManager, PermissionPolicy
 from ai_agent.recovery import RecoveryState
@@ -39,8 +40,10 @@ from ai_agent.tools import (
     GitStatusTool,
     GrepSearchTool,
     ListDirTool,
+    OwnerTaskTool,
     ReadFileTool,
     RunCommandTool,
+    StageFileTool,
     ToolContext,
     ToolRegistry,
     coding_tools_with_delegation,
@@ -67,6 +70,7 @@ __all__ = [
     "GitStatusTool",
     "GrepSearchTool",
     "ListDirTool",
+    "OwnerTaskTool",
     "PermissionAction",
     "PermissionManager",
     "PermissionPolicy",
@@ -74,7 +78,9 @@ __all__ = [
     "RecoveryState",
     "RunCommandTool",
     "RunDrain",
+    "StageFileTool",
     "TerminalHook",
+    "build_child_runner",
     "ServiceAuthorization",
     "SupervisorThreads",
     "ToolCall",
