@@ -1,8 +1,8 @@
-# Workbench dashboard keep-alive.
+# Workbench dashboard + Ollama keep-alive.
 #
-# Probes http://127.0.0.1:8766/api/status; starts the dashboard when it does
-# not answer. Never stops, kills, or reconfigures anything. Safe to run
-# manually for a status check.
+# Probes http://127.0.0.1:8766/api/status and http://127.0.0.1:11434/api/tags;
+# starts whichever does not answer. Never stops, kills, or reconfigures
+# anything. Safe to run manually for a status check.
 #
 # Log: <repo>/.tmp/dashboard-keepalive/keepalive.log (gitignored scratch).
 # Scheduled task 'WorkbenchDashboard' runs this every 5 minutes at user logon.
@@ -10,39 +10,51 @@
 
 $ErrorActionPreference = 'Continue'
 $repo = 'C:\Users\Jakub\PycharmProjects\ai-workbench'
+$ollamaExe = 'C:\Users\Jakub\AppData\Local\Programs\Ollama\ollama.exe'
 $dir = Join-Path $repo '.tmp\dashboard-keepalive'
 New-Item -ItemType Directory -Force -Path $dir | Out-Null
 $log = Join-Path $dir 'keepalive.log'
 
+function Test-Endpoint($url) {
+    try {
+        return (Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 8).StatusCode -eq 200
+    } catch {
+        return $false
+    }
+}
+
 $stamp = (Get-Date).ToString('o')
-$up = $false
-try {
-    $response = Invoke-WebRequest -Uri 'http://127.0.0.1:8766/api/status' -UseBasicParsing -TimeoutSec 8
-    $up = ($response.StatusCode -eq 200)
-} catch {
-    $up = $false
-}
+$failures = @()
 
-if ($up) {
+if (Test-Endpoint 'http://127.0.0.1:8766/api/status') {
     'dashboard up at ' + $stamp
-    exit 0
+} else {
+    Start-Process -WindowStyle Hidden `
+        -FilePath (Join-Path $repo '.venv\Scripts\python.exe') `
+        -ArgumentList 'dashboard_web_app.py', '--host', '127.0.0.1', '--port', '8766' `
+        -WorkingDirectory (Join-Path $repo 'apps\workbench_dashboard') `
+        -RedirectStandardOutput (Join-Path $env:TEMP 'dashboard-8766.log') `
+        -RedirectStandardError (Join-Path $env:TEMP 'dashboard-8766.err.log')
+    Start-Sleep -Seconds 5
+    $recovered = Test-Endpoint 'http://127.0.0.1:8766/api/status'
+    $line = "$stamp dashboard was down; restart attempted; up_after_restart=$recovered"
+    $line | Out-File -FilePath $log -Append -Encoding utf8
+    $line
+    if (-not $recovered) { $failures += 'dashboard' }
 }
 
-Start-Process -WindowStyle Hidden `
-    -FilePath (Join-Path $repo '.venv\Scripts\python.exe') `
-    -ArgumentList 'dashboard_web_app.py', '--host', '127.0.0.1', '--port', '8766' `
-    -WorkingDirectory (Join-Path $repo 'apps\workbench_dashboard') `
-    -RedirectStandardOutput (Join-Path $env:TEMP 'dashboard-8766.log') `
-    -RedirectStandardError (Join-Path $env:TEMP 'dashboard-8766.err.log')
-Start-Sleep -Seconds 5
-$recovered = $false
-try {
-    $response = Invoke-WebRequest -Uri 'http://127.0.0.1:8766/api/status' -UseBasicParsing -TimeoutSec 8
-    $recovered = ($response.StatusCode -eq 200)
-} catch {
-    $recovered = $false
+if (Test-Endpoint 'http://127.0.0.1:11434/api/tags') {
+    'ollama up at ' + $stamp
+} else {
+    Start-Process -WindowStyle Hidden -FilePath $ollamaExe -ArgumentList 'serve' `
+        -RedirectStandardOutput (Join-Path $env:TEMP 'ollama-serve.log') `
+        -RedirectStandardError (Join-Path $env:TEMP 'ollama-serve.err.log')
+    Start-Sleep -Seconds 12
+    $recovered = Test-Endpoint 'http://127.0.0.1:11434/api/tags'
+    $line = "$stamp ollama was down; restart attempted; up_after_restart=$recovered"
+    $line | Out-File -FilePath $log -Append -Encoding utf8
+    $line
+    if (-not $recovered) { $failures += 'ollama' }
 }
-$line = "$stamp dashboard was down; restart attempted; up_after_restart=$recovered"
-$line | Out-File -FilePath $log -Append -Encoding utf8
-$line
-if ($recovered) { exit 0 } else { exit 1 }
+
+if ($failures.Count -eq 0) { exit 0 } else { exit 1 }
