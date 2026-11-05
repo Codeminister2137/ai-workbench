@@ -8,6 +8,7 @@ import math
 import subprocess
 import time
 from collections.abc import Callable, Sequence
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -559,3 +560,105 @@ def fallback_details(args: argparse.Namespace) -> dict[str, Any]:
         "fallback_attempts": list(session.attempts),
         **({"fallback_handoff": session.handoff} if session.handoff is not None else {}),
     }
+
+
+TERMINAL_RUN_STATUSES = frozenset({"completed", "failed", "cancelled"})
+
+
+def _run_utc_now() -> str:
+    return datetime.now(UTC).isoformat()
+
+
+def append_run_event(
+    record: dict,
+    kind: str,
+    payload: dict | None = None,
+    *,
+    at_utc: str | None = None,
+) -> dict:
+    """Append one host-owned ordered event to a file-backed run record.
+
+    ``record`` is mutated in place and returned. Sequence numbers are
+    assigned by the host (max + 1), so executor output can never reorder or
+    forge the lifecycle log.
+    """
+    if not isinstance(record, dict):
+        raise TypeError("Run record must be a dict")
+    if not isinstance(kind, str) or not kind.strip() or len(kind) > 64:
+        raise ValueError("Event kind must be 1-64 characters")
+    if payload is not None and not isinstance(payload, dict):
+        raise TypeError("Event payload must be a dict")
+    if at_utc is not None and not isinstance(at_utc, str):
+        raise TypeError("Event timestamp must be a string")
+    events = record.get("events")
+    if events is None:
+        events = []
+        record["events"] = events
+    if not isinstance(events, list):
+        raise ValueError("Run record events must be a list")
+    seq = 0
+    for entry in events:
+        if isinstance(entry, dict) and isinstance(entry.get("seq"), int) and entry["seq"] > seq:
+            seq = entry["seq"]
+    events.append(
+        {
+            "seq": seq + 1,
+            "kind": kind.strip(),
+            "payload": dict(payload or {}),
+            "at_utc": at_utc or _run_utc_now(),
+        }
+    )
+    return record
+
+
+def run_events(record: dict, *, after: int = 0) -> list[dict]:
+    """Return ordered run events after ``after`` sequence (exclusive)."""
+    if not isinstance(record, dict):
+        raise TypeError("Run record must be a dict")
+    if type(after) is not int or after < 0:
+        raise ValueError("after must be a nonnegative integer")
+    events = record.get("events", [])
+    if not isinstance(events, list):
+        raise ValueError("Run record events must be a list")
+    ordered = sorted(
+        (entry for entry in events if isinstance(entry, dict)),
+        key=lambda entry: entry.get("seq", 0) if isinstance(entry.get("seq"), int) else 0,
+    )
+    return [
+        {**entry, "payload": dict(entry.get("payload", {}))}
+        for entry in ordered
+        if isinstance(entry.get("seq"), int) and entry["seq"] > after
+    ]
+
+
+def request_run_cancel(record: dict, *, at_utc: str | None = None) -> dict:
+    """Record a cancellation request; refuses terminal or executing runs.
+
+    The drain observes the flag at its execute boundary and marks the run
+    cancelled without executing, so a raced cancellation invalidates the run
+    instead of racing the executor.
+    """
+    if not isinstance(record, dict):
+        raise TypeError("Run record must be a dict")
+    status = record.get("status")
+    if status in TERMINAL_RUN_STATUSES:
+        raise ValueError("Run is already terminal; cancellation refused")
+    if status == "running":
+        raise ValueError("Run is already executing; cancellation refused")
+    record["cancel_requested"] = True
+    record["updated_at_utc"] = at_utc or _run_utc_now()
+    append_run_event(record, "cancellation_requested", {}, at_utc=at_utc)
+    return record
+
+
+def run_cancelled(record: dict) -> bool:
+    """Return whether ``record`` carries a cancellation request."""
+    if not isinstance(record, dict):
+        raise TypeError("Run record must be a dict")
+    return bool(record.get("cancel_requested"))
+
+
+def ensure_run_not_cancelled(record: dict) -> None:
+    """Raise when a raced cancellation invalidated this run's execution."""
+    if run_cancelled(record):
+        raise ValueError("Cancellation invalidated this run")
