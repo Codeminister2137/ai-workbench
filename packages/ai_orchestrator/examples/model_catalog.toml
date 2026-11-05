@@ -42,7 +42,7 @@ billing_source = "local_free"
 cost_policy_tier = "local_only"
 quality = "standard"
 latency = "interactive"
-notes = "Local Ollama model. Latency is measured locally; quality is not yet evaluated."
+notes = "Local Ollama model. Latency is measured locally; quality is not yet evaluated. Runtime budget 65536 covers implement-mode overhead; num_ctx is requested per call."
 
 [models.capabilities]
 chat = true
@@ -54,7 +54,7 @@ embeddings = false
 
 [models.context_limits]
 context_window_tokens = 131072
-runtime_context_tokens = 4096
+runtime_context_tokens = 65536
 
 [models.estimate]
 typical_latency_seconds = 5.35
