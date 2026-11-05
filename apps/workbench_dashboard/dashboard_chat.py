@@ -196,6 +196,7 @@ class DashboardChat:
         *,
         stores: DashboardStores,
         title: str | None = None,
+        project: str | None = None,
     ) -> RunRequestReceipt:
         """Queue one agent run from a chat turn; the owner approves it in the inbox.
 
@@ -204,6 +205,10 @@ class DashboardChat:
         the linked inbox decision is approved and a run worker drains the
         queue. The approval is written before the run so a full inbox refuses
         the request without leaving a queued run behind.
+
+        ``project`` is an already-validated work-root path stored as
+        ``project_id`` on the run; runs and inbox stay global (no
+        per-project data-dir splitting in this slice).
         """
         session = self.store.get_session(session_id)
         if session is None:
@@ -211,6 +216,8 @@ class DashboardChat:
         text = text.strip()
         if not text:
             raise ValueError("Run request text is required")
+        if project is not None and (not isinstance(project, str) or not project.strip()):
+            raise ValueError("Project ref must be a non-empty string")
         try:
             policy = FanoutPolicy.coerce(self.config.chat_fanout_policy)
         except ValueError as exc:
@@ -243,16 +250,18 @@ class DashboardChat:
                 "fanout_policy": policy.value,
                 "fanout_effective": policy.value,
                 "inbox_id": approval["id"],
+                "project_id": project,
                 "created_at_utc": now,
                 "updated_at_utc": now,
             },
         )
+        project_note = f" Project: {project}." if project else ""
         self.store.append_message(
             session_id,
             role="system",
             content=(
                 f"Run requested: {run_title} (id {run_id}, "
-                f"fan-out {policy.value}). Queued for owner approval "
+                f"fan-out {policy.value}).{project_note} Queued for owner approval "
                 f"in inbox task {approval['id']}."
             ),
         )

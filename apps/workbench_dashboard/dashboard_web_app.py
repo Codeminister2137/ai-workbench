@@ -7,12 +7,21 @@ import json
 import socket
 import threading
 from collections.abc import Callable
+from datetime import UTC, datetime
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, cast
 from urllib.parse import parse_qs, urlparse
 
+from ai_agent.staged_edits import (
+    ProjectRoots,
+    StagedConflictError,
+    StagedEditError,
+    apply_staged,
+    approve_staged,
+    review_staged,
+)
 from ai_orchestrator.evidence import merge_probe_eval
 from ai_provider.chat_transcripts import SQLiteChatTranscriptStore
 from dashboard_chat import DashboardChat
@@ -108,6 +117,22 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         store = SQLiteChatTranscriptStore(self.data_dir / "chats.sqlite3")
         return DashboardChat(store, config, self.repo_root)
 
+    def _project_roots(self, config: DashboardConfig) -> ProjectRoots:
+        """Build the request-time work-root allowlist (fail-closed).
+
+        Every entry must be an existing directory on every request; a root
+        overlapping the dashboard data dir, the checkout venv, or the
+        checkout git dir is refused. Raises ``StagedEditError``.
+        """
+        return ProjectRoots(
+            config.work_roots,
+            protected_dirs=(
+                self.data_dir,
+                self.repo_root / ".venv",
+                self.repo_root / ".git",
+            ),
+        )
+
     def do_GET(self) -> None:
         if not self._trusted_request():
             return
@@ -127,6 +152,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 return self._send_json({"ok": True, **self._status(config)})
             if path == "/api/evidence":
                 return self._send_json({"ok": True, **evidence_snapshot(self.repo_root)})
+            if path == "/api/work-roots":
+                return self._send_work_roots(config)
             if path == "/api/chat/sessions":
                 return self._send_chat_sessions(config)
             if path.startswith("/api/chat/sessions/") and path.endswith("/messages"):
@@ -143,6 +170,9 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             if path.startswith("/api/runs/") and path.endswith("/receipts"):
                 run_id = path[len("/api/runs/") : -len("/receipts")]
                 return self._send_run_receipts(run_id)
+            if path.startswith("/api/runs/") and path.endswith("/staged"):
+                run_id = path[len("/api/runs/") : -len("/staged")]
+                return self._send_run_staged(config, run_id)
             if path.startswith("/api/runs/"):
                 return self._send_item(
                     self._stores().runs,
@@ -210,6 +240,9 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             if path.startswith("/api/runs/") and path.endswith("/report-request"):
                 run_id = path[len("/api/runs/") : -len("/report-request")]
                 return self._request_run_report(run_id)
+            if path.startswith("/api/runs/") and path.endswith("/approve-staged"):
+                run_id = path[len("/api/runs/") : -len("/approve-staged")]
+                return self._approve_run_staged(config, run_id, payload)
         except (StoreError, ValueError) as exc:
             return self._send_json({"ok": False, "error": str(exc)}, status=400)
         return self._send_json({"ok": False, "error": "Unknown endpoint"}, status=404)
@@ -332,9 +365,28 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         title = payload.get("title", "")
         if not isinstance(title, str):
             return self._send_json({"ok": False, "error": "Title must be a string"}, status=400)
+        project = payload.get("project")
+        if project is not None and (not isinstance(project, str) or not project.strip()):
+            return self._send_json(
+                {"ok": False, "error": "Project must be a root id or path"}, status=400
+            )
+        project_id: str | None = None
+        if project:
+            try:
+                roots = self._project_roots(config)
+            except StagedEditError as exc:
+                return self._send_json({"ok": False, "error": str(exc)}, status=500)
+            try:
+                project_id = str(roots.select(project))
+            except StagedEditError as exc:
+                return self._send_json({"ok": False, "error": str(exc)}, status=400)
         try:
             receipt = self._chat(config).request_run(
-                session_id, text, stores=self._stores(), title=title or None
+                session_id,
+                text,
+                stores=self._stores(),
+                title=title or None,
+                project=project_id,
             )
         except (StoreError, ValueError) as exc:
             code = 404 if "not found" in str(exc).lower() else 400
@@ -450,6 +502,49 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             return self._send_json({"ok": False, "error": str(exc)}, status=status)
         self._send_json({"ok": True, "receipts": receipts})
 
+    def _send_work_roots(self, config: DashboardConfig) -> None:
+        try:
+            roots = self._project_roots(config)
+        except StagedEditError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=500)
+        self._send_json(
+            {
+                "ok": True,
+                "roots": [
+                    {"id": entry.id, "path": entry.path, "display_name": entry.display_name}
+                    for entry in roots.entries()
+                ],
+            }
+        )
+
+    def _send_run_staged(self, config: DashboardConfig, run_id: str) -> None:
+        try:
+            run = self._stores().runs.get(run_id)
+        except StoreError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        if run is None:
+            return self._send_json({"ok": False, "error": "Not found"}, status=404)
+        staged = run.get("staged") or []
+        if not staged:
+            return self._send_json({"ok": True, "files": []})
+        if not isinstance(staged, list):
+            return self._send_json(
+                {"ok": False, "error": "Run staged files are malformed"}, status=400
+            )
+        project_id = run.get("project_id")
+        if not isinstance(project_id, str) or not project_id:
+            return self._send_json({"ok": False, "error": "Run has no project root"}, status=400)
+        try:
+            roots = self._project_roots(config)
+        except StagedEditError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=500)
+        try:
+            root = roots.select(project_id)
+            files = review_staged(root, staged)
+        except StagedEditError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        self._send_json({"ok": True, "files": files})
+
     def _send_ideas(self, query: str) -> None:
         from dashboard_stores import IDEA_SOURCES, IDEA_STATUSES
 
@@ -528,6 +623,56 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         run["report_request_id"] = record["id"]
         self._stores().runs.put(run_id, run)
         self._send_json({"ok": True, "id": record["id"]})
+
+    def _approve_run_staged(self, config: DashboardConfig, run_id: str, payload: dict) -> None:
+        approved = payload.get("approved")
+        if type(approved) is not bool:
+            return self._send_json(
+                {"ok": False, "error": "approved must be true or false"}, status=400
+            )
+        try:
+            run = self._stores().runs.get(run_id)
+        except StoreError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        if run is None:
+            return self._send_json({"ok": False, "error": "Not found"}, status=404)
+        staged = run.get("staged") or []
+        if not staged or not isinstance(staged, list):
+            return self._send_json({"ok": False, "error": "Run has no staged changes"}, status=400)
+        now = datetime.now(UTC).isoformat()
+        if not approved:
+            run["staged_approved"] = False
+            run["staged_applied"] = False
+            run["updated_at_utc"] = now
+            try:
+                self._stores().runs.put(run_id, run)
+            except StoreError as exc:
+                return self._send_json({"ok": False, "error": str(exc)}, status=400)
+            return self._send_json({"ok": True, "id": run_id, "applied": []})
+        project_id = run.get("project_id")
+        if not isinstance(project_id, str) or not project_id:
+            return self._send_json({"ok": False, "error": "Run has no project root"}, status=400)
+        try:
+            roots = self._project_roots(config)
+        except StagedEditError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=500)
+        try:
+            approval = approve_staged(roots, project_id, staged)
+            applied = apply_staged(roots.select(project_id), staged)
+        except StagedConflictError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=409)
+        except StagedEditError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        run["staged_approved"] = True
+        run["staged_applied"] = True
+        run["staged_checks"] = approval["checks"]
+        run["staged_applied_at"] = now
+        run["updated_at_utc"] = now
+        try:
+            self._stores().runs.put(run_id, run)
+        except StoreError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        self._send_json({"ok": True, "id": run_id, "applied": applied})
 
     def _send_json(self, payload: dict | list, status: int = 200) -> None:
         body = json.dumps(payload).encode("utf-8")

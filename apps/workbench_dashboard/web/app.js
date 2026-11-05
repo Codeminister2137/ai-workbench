@@ -155,6 +155,7 @@ async function refreshRunDetail(id) {
     const statusEl = document.getElementById("run-status");
     if (statusEl) statusEl.textContent = [run.status, run.branch, run.commit].filter(Boolean).join(" · ");
     await renderReceiptsInto(id);
+    await renderStagedInto(id);
   } catch (err) { /* next tick retries; never break the page */ }
 }
 function startRunDetailPoll(id) {
@@ -192,6 +193,86 @@ async function renderReceiptsInto(id) {
     return;
   }
   list.innerHTML = receipts.map(receiptHtml).join("");
+}
+
+/* Project picker: GET /api/work-roots -> {ok, roots:[{id,path,display_name}]}.
+   Empty roots or a failed fetch hides the picker with an honest note and
+   run requests stay unscoped. */
+async function loadProjectPicker() {
+  const picker = document.getElementById("project-picker");
+  const note = document.getElementById("project-note");
+  if (!picker || !note) return;
+  let roots = null;
+  try {
+    const data = await api("/api/work-roots");
+    roots = Array.isArray(data.roots) ? data.roots : [];
+  } catch (err) { roots = null; }
+  if (roots === null) {
+    picker.hidden = true;
+    note.textContent = "Project list unavailable — runs stay unscoped.";
+    return;
+  }
+  if (!roots.length) {
+    picker.hidden = true;
+    note.textContent = "No project roots configured — runs stay unscoped.";
+    return;
+  }
+  picker.hidden = false;
+  note.textContent = "";
+  picker.innerHTML = '<option value="">No project (unscoped run)</option>'
+    + roots.map((r) => `<option value="${esc(r.id)}">${esc(r.display_name || r.path)}</option>`).join("");
+}
+
+/* Staged project changes: GET /api/runs/{id}/staged -> {ok, files:[...]}.
+   Missing endpoint (404) or empty list renders a graceful placeholder. */
+function stagedFileHtml(f) {
+  const file = f && typeof f === "object" ? f : {};
+  const rel = file.relpath || "file";
+  const diff = file.diff || "(no diff available)";
+  return `<div class="staged-file"><h4>${esc(rel)}</h4><pre>${esc(diff)}</pre></div>`;
+}
+async function renderStagedInto(id) {
+  const list = document.getElementById("staged-list");
+  if (!list) return;
+  let files = null;
+  try {
+    const data = await api("/api/runs/" + encodeURIComponent(id) + "/staged");
+    files = Array.isArray(data.files) ? data.files : [];
+  } catch (err) { files = null; }
+  if (files === null) {
+    list.innerHTML = '<p class="muted">Staged changes unavailable.</p>';
+    return;
+  }
+  if (!files.length) {
+    list.innerHTML = '<p class="muted">No staged changes.</p>';
+    return;
+  }
+  const applied = list.dataset.applied === "1";
+  list.innerHTML = files.map(stagedFileHtml).join("")
+    + (applied
+      ? '<p class="muted">Applied — see the project root for current files.</p>'
+      : `<p><button id="staged-approve-btn" title="Approve and apply these staged files to the project root">Approve and apply</button>
+        <button id="staged-reject-btn" title="Reject these staged files (nothing is applied)">Reject staged</button></p>`);
+  if (!applied) wireStagedButtons(id);
+}
+async function decideStaged(id, approved) {
+  try {
+    await api("/api/runs/" + encodeURIComponent(id) + "/approve-staged", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({approved}),
+    });
+    toast(approved ? "Staged changes applied" : "Staged changes rejected", true);
+    render();
+  } catch (err) {
+    toast(err.message, false);
+  }
+}
+function wireStagedButtons(id) {
+  const approveBtn = document.getElementById("staged-approve-btn");
+  if (approveBtn) approveBtn.addEventListener("click", () => decideStaged(id, true));
+  const rejectBtn = document.getElementById("staged-reject-btn");
+  if (rejectBtn) rejectBtn.addEventListener("click", () => decideStaged(id, false));
 }
 
 /* P4 turn synthesis: Did/Found/Next line when the record carries it. */
@@ -298,7 +379,9 @@ async function renderChatThread(id, initial) {
     <div id="thread">${msgs || '<p class="muted">No messages yet.</p>'}</div>
     <form class="inline" id="chat-form"><input type="text" name="text" placeholder="Message..." title="Message the supervisor" required>
     <button type="submit" title="Send message">Send</button>
-    <button type="button" id="run-request-btn" title="Queue this message as an agent run (needs inbox approval)">Request run</button></form>`;
+    <button type="button" id="run-request-btn" title="Queue this message as an agent run (needs inbox approval)">Request run</button></form>
+    <p><select id="project-picker" title="Project for the next run request (optional)"></select>
+    <span id="project-note" class="muted"></span></p>`;
   document.getElementById("rename-form").addEventListener("submit", async (ev) => {
     ev.preventDefault();
     const title = ev.target.title.value.trim();
@@ -362,11 +445,13 @@ async function renderChatThread(id, initial) {
   document.getElementById("run-request-btn").addEventListener("click", async () => {
     const text = form.text.value.trim();
     if (!text) { toast("Message text is required", false); return; }
+    const picker = document.getElementById("project-picker");
+    const project = picker && !picker.hidden ? picker.value || null : null;
     try {
       const out = await api("/api/chat/sessions/" + encodeURIComponent(id) + "/run-request", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({text}),
+        body: JSON.stringify({text, project}),
       });
       toast("Run queued (fan-out: " + out.fanout_effective + ")", true);
       render();
@@ -374,6 +459,7 @@ async function renderChatThread(id, initial) {
       toast(err.message, false);
     }
   });
+  loadProjectPicker();
   if (initial) send(initial);
 }
 
@@ -430,11 +516,14 @@ async function renderRuns(id) {
       ${run.validation ? `<p><strong>Validation:</strong> ${esc(run.validation)}</p>` : ""}
       ${run.body ? `<pre>${gtext(run.body)}</pre>` : ""}
       ${diff}
+      <h3>Staged project changes</h3>
+      <div id="staged-list" data-applied="${run.staged_applied ? "1" : ""}"><p class="muted">Loading staged changes...</p></div>
       <h3>Events and receipts</h3>
       <div id="receipts-list"><p class="muted">Loading receipts...</p></div>
       ${inboxLink}
       ${report}</div>`;
     renderReceiptsInto(id);
+    renderStagedInto(id);
     startRunDetailPoll(id);
     const reportBtn = document.getElementById("report-btn");
     if (reportBtn) reportBtn.addEventListener("click", async () => {
