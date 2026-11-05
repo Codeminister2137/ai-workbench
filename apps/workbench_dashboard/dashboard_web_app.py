@@ -44,6 +44,7 @@ from dashboard_config import (
 from dashboard_stores import DashboardStores, StoreError, effective_fanout_policy
 from document_library import DocumentLibrary
 from owner_mail import mail_configured
+from window_status import load_window_status
 
 ROOT = Path(__file__).parent
 STATIC_ROOT = ROOT / "web"
@@ -182,6 +183,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 return self._send_work_roots(config)
             if path == "/api/settings":
                 return self._send_settings(config)
+            if path == "/api/agent-status":
+                return self._send_json({"ok": True, **load_window_status(self.repo_root)})
             if path == "/api/chat/sessions":
                 return self._send_chat_sessions(config)
             if path.startswith("/api/chat/sessions/") and path.endswith("/messages"):
