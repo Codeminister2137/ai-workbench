@@ -2,17 +2,19 @@
 
 from __future__ import annotations
 
+import json
 import math
 import time
 from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from ai_provider import (
     AIMessage,
     AIRequest,
     AIResponse,
+    AIToolCall,
     AIToolDefinition,
     AIToolParameter,
     ChatClient,
@@ -40,6 +42,21 @@ class AgentIterationLimitExceeded(RuntimeError):
 
 
 @dataclass(frozen=True, slots=True)
+class ToolExecutionEvent:
+    """One tool_started/tool_completed observation from an agent run.
+
+    Events bracket real tool dispatches only. Unknown tools, permission
+    refusals and duplicate call-ids produce error results without events,
+    since nothing was dispatched and nothing was pending.
+    """
+
+    type: Literal["tool_started", "tool_completed"]
+    name: str
+    call_id: str | None
+    is_error: bool = False
+
+
+@dataclass(frozen=True, slots=True)
 class AgentResult:
     """Final response and tool execution history from an agent run."""
 
@@ -53,7 +70,15 @@ class AgentResult:
 
 
 class AgentLoop:
-    """Run authorized tools, optionally requiring declared evidence before completion."""
+    """Run authorized tools, optionally requiring declared evidence before completion.
+
+    An identical call repeated inside one response is executed once and never
+    auto-replayed; each new turn's calls are fresh model instructions and run
+    even if identical to an earlier turn. Dispatched tools are tracked in
+    :attr:`pending` and bracketed by tool_started/tool_completed events, and
+    tool failures return as results so the model can adapt. Protocol failures
+    (provider, deadline, delegation) still raise.
+    """
 
     def __init__(
         self,
@@ -69,6 +94,7 @@ class AgentLoop:
         diagnostic: Callable[[str], None] | None = None,
         completion_requirements: tuple[CompletionRequirement, ...] = (),
         fanout_policy: FanoutPolicy | str = "allowed",
+        on_event: Callable[[ToolExecutionEvent], None] | None = None,
     ) -> None:
         if max_iterations < 1:
             raise ValueError("max_iterations must be at least 1")
@@ -84,6 +110,8 @@ class AgentLoop:
         self.temperature = temperature
         self.top_p = top_p
         self.diagnostic = diagnostic
+        self.on_event = on_event
+        self._pending: dict[str, ToolCall] = {}
         if (
             not isinstance(completion_requirements, tuple)
             or len(completion_requirements) > 16
@@ -108,6 +136,20 @@ class AgentLoop:
             error.partial_messages = tuple(messages)
             raise error
 
+    @property
+    def pending(self) -> tuple[ToolCall, ...]:
+        """Dispatched tool calls awaiting completion.
+
+        Non-empty only while a tool executes. A protocol failure escaping a
+        tool keeps its call here: the effect is uncertain and must be
+        reconciled before continuing.
+        """
+        return tuple(self._pending.values())
+
+    def _emit_event(self, event: ToolExecutionEvent) -> None:
+        if self.on_event is not None:
+            self.on_event(event)
+
     def run(
         self,
         prompt: str,
@@ -117,7 +159,13 @@ class AgentLoop:
         privacy_class: PrivacyClass = PrivacyClass.LOCAL_ONLY,
     ) -> AgentResult:
         """Execute a prompt and any requested tools until a final answer is returned."""
-        from ai_provider.credential_guard import credential_values, enforce_credential_policy
+        from ai_provider.credential_guard import (
+            contains_credentials,
+            credential_values,
+            enforce_credential_policy,
+        )
+
+        self._pending.clear()
 
         self.context = replace(
             self.context,
@@ -302,10 +350,38 @@ class AgentLoop:
                     completion_failures=completion_failures,
                 )
 
-            for call in tool_calls:
+            seen_in_batch: set[tuple[str, str, str]] = set()
+            for position, call in enumerate(tool_calls):
                 self._check_deadline(messages)
                 if self.context.delegation is not None:
                     self.context.delegation.budget.consume_tool()
+                replay_key = _replay_key(call)
+                if replay_key is not None and replay_key in seen_in_batch:
+                    # Never auto-replay: an identical call already completed in
+                    # this response keeps its recorded outcome. No dispatch,
+                    # no pending, no events.
+                    result = ToolResult(
+                        name=call.name,
+                        output=(
+                            f"Error: tool call {call.id!r} already completed in this "
+                            "response; not replayed. Earlier effects and observations "
+                            "remain above; continue with unfinished work only."
+                        ),
+                        call_id=call.id,
+                        is_error=True,
+                    )
+                    tool_results.append(result)
+                    recovery.observe(result)
+                    messages.append(
+                        AIMessage(
+                            role=MessageRole.TOOL,
+                            content=result.output,
+                            tool_call_id=call.id,
+                            name=call.name,
+                        )
+                    )
+                    self._check_deadline(messages)
+                    continue
                 agent_call = ToolCall(name=call.name, arguments=call.arguments, call_id=call.id)
                 tool = self.registry.get(call.name)
                 if tool is None:
@@ -352,8 +428,52 @@ class AgentLoop:
                         is_error=True,
                     )
                 else:
+                    pending_key = call.id if call.id else f"anonymous:{iteration}:{position}"
                     self._check_deadline(messages)
-                    result = tool.run(agent_call, self.context)
+                    self._pending[pending_key] = agent_call
+                    self._emit_event(ToolExecutionEvent("tool_started", call.name, call.id or None))
+                    try:
+                        result = tool.run(agent_call, self.context)
+                    except ProviderError as exc:
+                        # Protocol failure: the effect is uncertain, so the call
+                        # stays pending for reconciliation instead of becoming
+                        # model feedback.
+                        if not exc.partial_messages:
+                            exc.partial_messages = tuple(messages)
+                        raise
+                    except Exception as exc:  # noqa: BLE001 - recovery-as-result
+                        # A tool bug escaping BaseTool.run still returns as a
+                        # result so the model can adapt; it never crashes the run.
+                        output = f"Error executing tool {call.name}: {exc}"
+                        if contains_credentials(output, extra=self.context.credential_secrets):
+                            output = (
+                                "Credential-bearing tool output withheld. Effects may already "
+                                "have occurred; inspect locally before continuing."
+                            )
+                        result = ToolResult(
+                            name=call.name,
+                            output=output,
+                            call_id=call.id,
+                            is_error=True,
+                        )
+                        self._pending.pop(pending_key, None)
+                        self._emit_event(
+                            ToolExecutionEvent(
+                                "tool_completed", call.name, call.id or None, is_error=True
+                            )
+                        )
+                    else:
+                        self._pending.pop(pending_key, None)
+                        self._emit_event(
+                            ToolExecutionEvent(
+                                "tool_completed",
+                                call.name,
+                                call.id or None,
+                                is_error=result.is_error,
+                            )
+                        )
+                if replay_key is not None:
+                    seen_in_batch.add(replay_key)
                 tool_results.append(result)
                 recovery.observe(result)
                 messages.append(
@@ -375,6 +495,23 @@ class AgentLoop:
         )
         error.partial_messages = tuple(messages)
         raise error
+
+
+def _replay_key(call: AIToolCall) -> tuple[str, str, str] | None:
+    """Identify one issued call for within-response never-replay tracking.
+
+    The key covers the call-id and the full operation: an identical repeat
+    inside one response is a replay and is refused, while a repeated id
+    carrying a different operation is a fresh call. Calls without an id are
+    never deduplicated.
+    """
+    if not call.id:
+        return None
+    try:
+        fingerprint = json.dumps(call.arguments, sort_keys=True, default=str)
+    except (TypeError, ValueError):
+        return None
+    return (call.id, call.name, fingerprint)
 
 
 def _tool_definition(definition: Any) -> AIToolDefinition:

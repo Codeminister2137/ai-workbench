@@ -216,6 +216,34 @@ class DashboardStores:
         self.inbox.put(item_id, record)
         return record
 
+    def decide_plan(self, plan_id: str, *, approved: bool) -> dict:
+        """Approve or reject one proposed plan; only proposed plans decide."""
+        if type(approved) is not bool:
+            raise StoreError("Plan decision needs true or false")
+        record = self.plans.get(plan_id)
+        if record is None:
+            raise StoreError("Plan not found")
+        if record.get("status") != "proposed":
+            raise StoreError("Plan is not awaiting approval")
+        now = _utc_now()
+        record["status"] = "approved" if approved else "rejected"
+        record["decided_at"] = now
+        record["updated_at_utc"] = now
+        self.plans.put(plan_id, record)
+        return record
+
+    def get_run_receipts(self, run_id: str) -> list[dict]:
+        """Return one run's receipts; absent receipts read as empty."""
+        record = self.runs.get(run_id)
+        if record is None:
+            raise StoreError("Run not found")
+        receipts = record.get("receipts", [])
+        if receipts is None:
+            return []
+        if not isinstance(receipts, list):
+            raise StoreError("Run receipts are malformed")
+        return receipts
+
     def create_idea(
         self,
         *,

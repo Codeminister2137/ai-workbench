@@ -38,6 +38,7 @@ _GIT_REPOSITORY_ENV = frozenset(
 GROUPS = {
     "provider": (
         "tests/test_ai_provider_*.py",
+        "tests/test_provider_*.py",
         "tests/test_baseten_adapter.py",
         "tests/test_ollama_*.py",
         "tests/test_openai_compatible_adapter.py",
@@ -127,6 +128,7 @@ GROUPS = {
         "tests/test_wake_on_lan.py",
         "tests/test_day_cycle.py",
         "tests/test_l3_ladder.py",
+        "tests/test_install_workbench.py",
     ),
     "research": (
         "tests/test_research_*.py",

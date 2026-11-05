@@ -114,6 +114,192 @@ function startRunsPoll() {
   }, 10000);
 }
 
+/* Inbox badge: honest live open count from /api/inbox every ~10s.
+   Best-effort read-only refresh; opening the inbox just re-renders,
+   it never answers or acknowledges anything. */
+let inboxPollTimer = null;
+function stopInboxPoll() {
+  if (inboxPollTimer) { clearInterval(inboxPollTimer); inboxPollTimer = null; }
+}
+async function pollInboxBadge() {
+  try {
+    const payload = await api("/api/inbox");
+    const open = (payload.items || []).filter((t) => t.status === "open").length;
+    if (open > 0) {
+      badge.textContent = open;
+      badge.hidden = false;
+    } else {
+      badge.hidden = true;
+    }
+  } catch (err) { /* keep the last badge; next tick retries */ }
+}
+function startInboxPoll() {
+  if (inboxPollTimer) return;
+  pollInboxBadge();
+  inboxPollTimer = setInterval(async () => {
+    if (document.hidden) return;
+    await pollInboxBadge();
+  }, 10000);
+}
+
+/* Run detail auto-refresh: re-read status + receipts every ~10s while
+   the detail view is visible. Stopped on navigation (see render()). */
+let runDetailPollTimer = null;
+function stopRunDetailPoll() {
+  if (runDetailPollTimer) { clearInterval(runDetailPollTimer); runDetailPollTimer = null; }
+}
+async function refreshRunDetail(id) {
+  try {
+    const payload = await api("/api/runs/" + encodeURIComponent(id));
+    const run = payload.item;
+    const statusEl = document.getElementById("run-status");
+    if (statusEl) statusEl.textContent = [run.status, run.branch, run.commit].filter(Boolean).join(" · ");
+    await renderReceiptsInto(id);
+    await renderStagedInto(id);
+  } catch (err) { /* next tick retries; never break the page */ }
+}
+function startRunDetailPoll(id) {
+  if (runDetailPollTimer) return;
+  runDetailPollTimer = setInterval(async () => {
+    if (document.hidden) return;
+    const here = (location.hash || "").split("?")[0];
+    if (here !== "#/runs/" + id) return;
+    await refreshRunDetail(id);
+  }, 10000);
+}
+
+/* Events/receipts section: GET /api/runs/{id}/receipts -> {ok, receipts:[...]}.
+   Missing endpoint (404) or empty list renders a graceful placeholder. */
+function receiptHtml(r) {
+  const rec = r && typeof r === "object" ? r : {};
+  const title = rec.title || rec.kind || rec.type || "receipt";
+  const turn = rec.turn != null ? "Turn " + rec.turn + " — " : "";
+  const when = rec.created_at_utc || rec.created_at || rec.at || rec.ts || "";
+  const body = rec.body || rec.message || rec.detail || rec.text || "";
+  return `<details class="turn"><summary>${esc(turn + title)}`
+    + `${when ? ` <span class="muted">${esc(when)}</span>` : ""}</summary>`
+    + `<div>${body ? esc(body) : esc(JSON.stringify(rec))}</div></details>`;
+}
+async function renderReceiptsInto(id) {
+  const list = document.getElementById("receipts-list");
+  if (!list) return;
+  let receipts = null;
+  try {
+    const data = await api("/api/runs/" + encodeURIComponent(id) + "/receipts");
+    receipts = Array.isArray(data.receipts) ? data.receipts : [];
+  } catch (err) { receipts = null; }
+  if (!receipts || !receipts.length) {
+    list.innerHTML = '<p class="muted">No receipts yet.</p>';
+    return;
+  }
+  list.innerHTML = receipts.map(receiptHtml).join("");
+}
+
+/* Project picker: GET /api/work-roots -> {ok, roots:[{id,path,display_name}]}.
+   Empty roots or a failed fetch hides the picker with an honest note and
+   run requests stay unscoped. */
+async function loadProjectPicker() {
+  const picker = document.getElementById("project-picker");
+  const note = document.getElementById("project-note");
+  if (!picker || !note) return;
+  let roots = null;
+  try {
+    const data = await api("/api/work-roots");
+    roots = Array.isArray(data.roots) ? data.roots : [];
+  } catch (err) { roots = null; }
+  if (roots === null) {
+    picker.hidden = true;
+    note.textContent = "Project list unavailable — runs stay unscoped.";
+    return;
+  }
+  if (!roots.length) {
+    picker.hidden = true;
+    note.textContent = "No project roots configured — runs stay unscoped.";
+    return;
+  }
+  picker.hidden = false;
+  note.textContent = "";
+  picker.innerHTML = '<option value="">No project (unscoped run)</option>'
+    + roots.map((r) => `<option value="${esc(r.id)}">${esc(r.display_name || r.path)}</option>`).join("");
+}
+
+/* Staged project changes: GET /api/runs/{id}/staged -> {ok, files:[...]}.
+   Missing endpoint (404) or empty list renders a graceful placeholder. */
+function stagedFileHtml(f) {
+  const file = f && typeof f === "object" ? f : {};
+  const rel = file.relpath || "file";
+  const diff = file.diff || "(no diff available)";
+  return `<div class="staged-file"><h4>${esc(rel)}</h4><pre>${esc(diff)}</pre></div>`;
+}
+async function renderStagedInto(id) {
+  const list = document.getElementById("staged-list");
+  if (!list) return;
+  let files = null;
+  try {
+    const data = await api("/api/runs/" + encodeURIComponent(id) + "/staged");
+    files = Array.isArray(data.files) ? data.files : [];
+  } catch (err) { files = null; }
+  if (files === null) {
+    list.innerHTML = '<p class="muted">Staged changes unavailable.</p>';
+    return;
+  }
+  if (!files.length) {
+    list.innerHTML = '<p class="muted">No staged changes.</p>';
+    return;
+  }
+  const applied = list.dataset.applied === "1";
+  list.innerHTML = files.map(stagedFileHtml).join("")
+    + (applied
+      ? '<p class="muted">Applied — see the project root for current files.</p>'
+      : `<p><button id="staged-approve-btn" title="Approve and apply these staged files to the project root">Approve and apply</button>
+        <button id="staged-reject-btn" title="Reject these staged files (nothing is applied)">Reject staged</button></p>`);
+  if (!applied) wireStagedButtons(id);
+}
+async function decideStaged(id, approved) {
+  try {
+    await api("/api/runs/" + encodeURIComponent(id) + "/approve-staged", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({approved}),
+    });
+    toast(approved ? "Staged changes applied" : "Staged changes rejected", true);
+    render();
+  } catch (err) {
+    toast(err.message, false);
+  }
+}
+function wireStagedButtons(id) {
+  const approveBtn = document.getElementById("staged-approve-btn");
+  if (approveBtn) approveBtn.addEventListener("click", () => decideStaged(id, true));
+  const rejectBtn = document.getElementById("staged-reject-btn");
+  if (rejectBtn) rejectBtn.addEventListener("click", () => decideStaged(id, false));
+}
+
+/* P4 turn synthesis: Did/Found/Next line when the record carries it. */
+function synthesisHtml(run) {
+  if (typeof run.synthesis === "string" && run.synthesis.trim()) {
+    return `<p id="run-synthesis">${gtext(run.synthesis.trim())}</p>`;
+  }
+  const parts = [["Did", run.did], ["Found", run.found], ["Next", run.next]]
+    .filter(([, v]) => typeof v === "string" && v.trim());
+  if (!parts.length) return "";
+  return `<p id="run-synthesis">${parts.map(([k, v]) =>
+    `<strong>${k}:</strong> ${gtext(v.trim())}`).join(" · ")}</p>`;
+}
+
+/* P4 phase header + checklist from the plan record; graceful when absent. */
+function phaseChecklistHtml(plan) {
+  const phases = Array.isArray(plan.phases) ? plan.phases : [];
+  if (!phases.length) return '<p class="muted">No phases recorded yet.</p>';
+  const rows = phases.map((p) => {
+    const ph = p && typeof p === "object" ? p : {};
+    const name = ph.title || ph.name || "phase";
+    const st = ph.status || "pending";
+    return `<li>${gtext(name)} <span class="pill st-${esc(st.replace(/\s+/g, "-"))}">${esc(st)}</span></li>`;
+  }).join("");
+  return `<ul class="plain checklist" id="phase-checklist">${rows}</ul>`;
+}
+
 async function renderHome() {
   const status = await api("/api/status");
   const plan = status.current_plan
@@ -174,7 +360,7 @@ async function renderChatList() {
          <span class="muted">${esc(s.updated_at_utc)} · ${esc(s.privacy_class)}</span></li>`).join("")
     : '<li class="muted">No chats yet — use + New.</li>';
   view.innerHTML = `<h1>Chat</h1>
-    <p class="muted">Supervisor answers; turns cannot run tools yet. Full transcripts stay local.</p>
+    <p class="muted">Supervisor answers; queue agent runs for approval from a thread. Full transcripts stay local.</p>
     <ul class="plain">${items}</ul>`;
 }
 
@@ -192,7 +378,11 @@ async function renderChatThread(id, initial) {
     <p><button id="delete-btn" title="Delete this chat and its transcript">Delete chat</button></p>
     <div id="thread">${msgs || '<p class="muted">No messages yet.</p>'}</div>
     <form class="inline" id="chat-form"><input type="text" name="text" placeholder="Message..." title="Message the supervisor" required>
-    <button type="submit" title="Send message">Send</button></form>`;
+    <button type="submit" title="Send message">Send</button>
+    <button type="button" id="run-request-btn" title="Queue this message as an agent run (needs inbox approval)">Request run</button>
+    <button type="button" id="dictate-btn" title="Dictate with the microphone (server transcription)">Dictate</button></form>
+    <p><select id="project-picker" title="Project for the next run request (optional)"></select>
+    <span id="project-note" class="muted"></span></p>`;
   document.getElementById("rename-form").addEventListener("submit", async (ev) => {
     ev.preventDefault();
     const title = ev.target.title.value.trim();
@@ -253,6 +443,64 @@ async function renderChatThread(id, initial) {
     const text = ev.target.text.value.trim();
     if (text) send(text);
   });
+  document.getElementById("run-request-btn").addEventListener("click", async () => {
+    const text = form.text.value.trim();
+    if (!text) { toast("Message text is required", false); return; }
+    const picker = document.getElementById("project-picker");
+    const project = picker && !picker.hidden ? picker.value || null : null;
+    try {
+      const out = await api("/api/chat/sessions/" + encodeURIComponent(id) + "/run-request", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({text, project}),
+      });
+      toast("Run queued (fan-out: " + out.fanout_effective + ")", true);
+      render();
+    } catch (err) {
+      toast(err.message, false);
+    }
+  });
+  loadProjectPicker();
+  let dictationRecorder = null;
+  const dictateBtn = document.getElementById("dictate-btn");
+  dictateBtn.addEventListener("click", async () => {
+    if (dictationRecorder) { dictationRecorder.stop(); return; }
+    if (!navigator.mediaDevices || !window.MediaRecorder) {
+      toast("Dictation needs microphone + MediaRecorder support", false);
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({audio: true});
+      const chunks = [];
+      const recorder = new MediaRecorder(stream);
+      dictationRecorder = recorder;
+      dictateBtn.dataset.live = "1";
+      dictateBtn.textContent = "Stop (recording...)";
+      recorder.ondataavailable = (ev) => { if (ev.data.size) chunks.push(ev.data); };
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        dictationRecorder = null;
+        dictateBtn.dataset.live = "";
+        dictateBtn.textContent = "Dictate";
+        const lang = (navigator.language || "en").toLowerCase().startsWith("pl") ? "pl" : "en";
+        try {
+          const data = new FormData();
+          data.append("audio", new Blob(chunks, {type: recorder.mimeType || "audio/webm"}), "clip.webm");
+          data.append("language", lang);
+          const res = await fetch("/api/stt/transcribe", {method: "POST", body: data});
+          const out = await res.json();
+          if (!res.ok || !out.ok) throw new Error(out.error || ("Transcription failed (" + res.status + ")"));
+          form.text.value = out.text;
+          toast("Dictated (" + out.language + ", " + out.billed_seconds + "s billed)", true);
+        } catch (err) {
+          toast("Dictation failed: " + err.message + " — type instead", false);
+        }
+      };
+      recorder.start();
+    } catch (err) {
+      toast("Microphone unavailable: " + err.message, false);
+    }
+  });
   if (initial) send(initial);
 }
 
@@ -263,7 +511,10 @@ async function renderPlans(id) {
     view.innerHTML = `<h1>Plan</h1><p><a href="#/plans">All plans</a></p>
       <div class="card"><h2>${gtext(plan.title || plan.id)}</h2>
       <p class="muted">${esc(plan.status || "")}${plan.updated_at_utc ? " · updated " + esc(plan.updated_at_utc) : ""}</p>
+      <p><strong>Phase:</strong> <span class="pill">${esc(plan.phase || plan.status || "unknown")}</span></p>
       ${plan.source ? `<p class="muted">Source: ${esc(plan.source)}</p>` : ""}
+      <h3>Phase checklist</h3>
+      ${phaseChecklistHtml(plan)}
       <pre>${gtext(plan.body || "(empty plan)")}</pre></div>`;
     return;
   }
@@ -282,6 +533,7 @@ async function renderPlans(id) {
 async function renderRuns(id) {
   if (id) {
     stopRunsPoll();
+    stopRunDetailPoll();
     const payload = await api("/api/runs/" + encodeURIComponent(id));
     const run = payload.item;
     const meta = [run.status, run.branch, run.commit].filter(Boolean).map(esc).join(" · ");
@@ -291,13 +543,29 @@ async function renderRuns(id) {
       : run.report_request_id
         ? `<p class="muted">Report requested — see the inbox task.</p>`
         : `<p><button id="report-btn" title="Ask for a completion report for this run">Generate report</button></p>`;
+    const diff = run.diff
+      ? `<h3>Diff</h3><pre id="run-diff">${gtext(run.diff)}</pre>`
+      : "";
+    const inboxLink = run.inbox_id
+      ? `<p><a href="#/inbox/${esc(run.inbox_id)}" title="Approve or reject via the linked inbox task">Review approval in inbox</a></p>`
+      : "";
     view.innerHTML = `<h1>Run</h1><p><a href="#/runs">All runs</a></p>
       <div class="card"><h2>${gtext(run.title || run.id)}</h2>
-      <p class="muted">${meta}</p>
+      <p class="muted" id="run-status">${meta}</p>
       <p title="Whether this run may spawn subagent children"><strong>Fan-out:</strong> <span class="pill">${esc(fanout)}</span></p>
+      ${synthesisHtml(run)}
       ${run.validation ? `<p><strong>Validation:</strong> ${esc(run.validation)}</p>` : ""}
       ${run.body ? `<pre>${gtext(run.body)}</pre>` : ""}
+      ${diff}
+      <h3>Staged project changes</h3>
+      <div id="staged-list" data-applied="${run.staged_applied ? "1" : ""}"><p class="muted">Loading staged changes...</p></div>
+      <h3>Events and receipts</h3>
+      <div id="receipts-list"><p class="muted">Loading receipts...</p></div>
+      ${inboxLink}
       ${report}</div>`;
+    renderReceiptsInto(id);
+    renderStagedInto(id);
+    startRunDetailPoll(id);
     const reportBtn = document.getElementById("report-btn");
     if (reportBtn) reportBtn.addEventListener("click", async () => {
       try {
@@ -568,6 +836,7 @@ function renderSchedule() {
 
 async function render() {
   stopRunsPoll();
+  stopRunDetailPoll();
   document.querySelectorAll("nav a").forEach((a) => a.classList.remove("active"));
   const raw = (location.hash || "#/home").slice(2);
   const [path, query] = raw.split("?");
@@ -609,3 +878,4 @@ document.querySelectorAll("[data-create]").forEach((btn) => {
 
 window.addEventListener("hashchange", render);
 render();
+startInboxPoll();
