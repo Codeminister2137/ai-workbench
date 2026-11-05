@@ -278,6 +278,9 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             if path.startswith("/api/chat/sessions/") and path.endswith("/run-request"):
                 session_id = path[len("/api/chat/sessions/") : -len("/run-request")]
                 return self._request_chat_run(config, session_id, payload)
+            if path.startswith("/api/chat/sessions/") and path.endswith("/draft-plan"):
+                session_id = path[len("/api/chat/sessions/") : -len("/draft-plan")]
+                return self._draft_plan_from_chat(config, session_id, payload)
             if path == "/api/inbox":
                 return self._create_inbox_task(payload)
             if path == "/api/ideas":
@@ -455,6 +458,22 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         except ValueError as exc:
             return self._send_json({"ok": False, "error": str(exc)}, status=404)
         self._send_json({"ok": True, "id": session_id})
+
+    def _draft_plan_from_chat(
+        self, config: DashboardConfig, session_id: str, payload: dict
+    ) -> None:
+        title = payload.get("title")
+        if title is not None and not isinstance(title, str):
+            return self._send_json({"ok": False, "error": "Title must be a string"}, status=400)
+        try:
+            plan = self._chat(config).draft_plan(session_id, stores=self._stores(), title=title)
+        except StoreError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        except ValueError as exc:
+            if "not found" in str(exc).lower():
+                return self._send_json({"ok": False, "error": str(exc)}, status=404)
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        self._send_json({"ok": True, "plan": plan})
 
     def _request_chat_run(self, config: DashboardConfig, session_id: str, payload: dict) -> None:
         text = payload.get("text", "")

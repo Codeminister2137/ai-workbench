@@ -387,7 +387,8 @@ async function renderChatThread(id, initial) {
   view.innerHTML = `<h1>Chat: ${esc(found.title || id)}</h1><p><a href="#/chat">All chats</a></p>
     <form id="rename-form" class="inline"><input type="text" name="title" value="${esc(found.title || "")}" title="Chat title">
     <button type="submit" title="Rename this chat">Rename</button></form>
-    <p><button id="delete-btn" title="Delete this chat and its transcript">Delete chat</button></p>
+    <p><button id="delete-btn" title="Delete this chat and its transcript">Delete chat</button>
+    <button type="button" id="draft-plan-btn" title="Draft a proposed plan from this chat transcript">Draft plan</button></p>
     <div id="thread">${msgs || '<p class="muted">No messages yet.</p>'}</div>
     <form class="inline" id="chat-form"><input type="text" name="text" placeholder="Message..." title="Message the supervisor" required>
     <button type="submit" title="Send message">Send</button>
@@ -407,6 +408,19 @@ async function renderChatThread(id, initial) {
       });
       toast("Chat renamed", true);
       render();
+    } catch (err) {
+      toast(err.message, false);
+    }
+  });
+  document.getElementById("draft-plan-btn").addEventListener("click", async () => {
+    try {
+      const out = await api("/api/chat/sessions/" + encodeURIComponent(id) + "/draft-plan", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: "{}",
+      });
+      toast("Draft plan opened: " + out.plan.id, true);
+      location.hash = "#/plans/" + encodeURIComponent(out.plan.id);
     } catch (err) {
       toast(err.message, false);
     }

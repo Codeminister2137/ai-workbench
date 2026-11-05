@@ -37,6 +37,11 @@ SUPERVISOR_SYSTEM_PROMPT = (
 )
 
 
+def _truncate(text: str, limit: int) -> str:
+    """Cap text at limit characters with an ellipsis marker."""
+    return text if len(text) <= limit else text[:limit] + "…"
+
+
 @dataclass(slots=True)
 class DashboardTurnOutcome:
     """Host-observed result of one dashboard chat turn."""
@@ -211,6 +216,59 @@ class DashboardChat:
             provider=result.provider,
             model=self.config.model,
         )
+
+    def draft_plan(
+        self, session_id: str, *, stores: DashboardStores, title: str | None = None
+    ) -> dict:
+        """Draft a proposed plan deterministically from a chat transcript.
+
+        Pure code, no model call: goal from the first user turn, full turn
+        digest, and open sections for the owner/supervisor to refine.
+        Raises ValueError for unknown sessions and empty transcripts.
+        """
+        session = self.store.get_session(session_id)
+        if session is None:
+            raise ValueError("Chat session not found")
+        turns = [
+            message
+            for message in self.store.list_messages(session_id)
+            if message.role in ("user", "assistant") and message.content.strip()
+        ]
+        if not turns:
+            raise ValueError("Chat session has no turns to draft from")
+        if title is not None and (not isinstance(title, str) or not title.strip()):
+            raise ValueError("Title must be a non-empty string")
+        plan_title = title.strip() if title else f"{session.title} (draft plan)"
+        goal = next(
+            (message.content.strip() for message in turns if message.role == "user"),
+            "(no user turns)",
+        )
+        digest = "\n".join(
+            f"- **{message.role}**: {_truncate(message.content.strip(), 1000)}"
+            for message in turns[:50]
+        )
+        body = (
+            f"# Draft plan: {plan_title}\n\n"
+            f"Source: chat session {session_id} ({len(turns)} turns) — "
+            "deterministic digest, refine before approving.\n\n"
+            f"## Goal (first user message)\n\n> {_truncate(goal, 500)}\n\n"
+            f"## Discussion\n\n{digest}\n\n"
+            "## Open sections\n\n"
+            "- Scope: what is in and out.\n"
+            "- Steps: ordered implementation phases.\n"
+            "- Acceptance: how done is verified.\n"
+        )
+        plan_id = uuid.uuid4().hex
+        record = {
+            "id": plan_id,
+            "title": plan_title[:200],
+            "status": "proposed",
+            "body": body,
+            "source": f"chat:{session_id}",
+            "updated_at_utc": datetime.now(UTC).isoformat(),
+        }
+        stores.plans.put(plan_id, record)
+        return record
 
     def request_run(
         self,
