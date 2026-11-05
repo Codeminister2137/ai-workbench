@@ -34,9 +34,16 @@ from ai_provider.stt import (
 )
 from ai_provider.translation import TranslationError, Translator
 from dashboard_chat import DashboardChat
-from dashboard_config import DEFAULT_CONFIG_PATH, DEFAULT_DATA_DIR, DashboardConfig, load_config
+from dashboard_config import (
+    DEFAULT_CONFIG_PATH,
+    DEFAULT_DATA_DIR,
+    DashboardConfig,
+    load_config,
+    save_supervision,
+)
 from dashboard_stores import DashboardStores, StoreError, effective_fanout_policy
 from document_library import DocumentLibrary
+from owner_mail import mail_configured
 
 ROOT = Path(__file__).parent
 STATIC_ROOT = ROOT / "web"
@@ -173,6 +180,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 return self._send_json({"ok": True, **evidence_snapshot(self.repo_root)})
             if path == "/api/work-roots":
                 return self._send_work_roots(config)
+            if path == "/api/settings":
+                return self._send_settings(config)
             if path == "/api/chat/sessions":
                 return self._send_chat_sessions(config)
             if path.startswith("/api/chat/sessions/") and path.endswith("/messages"):
@@ -254,6 +263,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 return self._create_inbox_task(payload)
             if path == "/api/ideas":
                 return self._create_idea(payload)
+            if path == "/api/settings":
+                return self._save_settings(payload)
             if path.startswith("/api/inbox/") and path.endswith("/answer"):
                 item_id = path[len("/api/inbox/") : -len("/answer")]
                 return self._answer_inbox_task(item_id, payload)
@@ -275,6 +286,27 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         except (StoreError, ValueError) as exc:
             return self._send_json({"ok": False, "error": str(exc)}, status=400)
         return self._send_json({"ok": False, "error": "Unknown endpoint"}, status=404)
+
+    def _send_settings(self, config: DashboardConfig) -> None:
+        self._send_json(
+            {
+                "ok": True,
+                "supervision": config.supervision,
+                "mail_configured": mail_configured(),
+            }
+        )
+
+    def _save_settings(self, payload: dict) -> None:
+        supervision = payload.get("supervision")
+        if not isinstance(supervision, str):
+            return self._send_json(
+                {"ok": False, "error": "supervision must be a string"}, status=400
+            )
+        try:
+            saved = save_supervision(self.config_path, supervision)
+        except ValueError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        self._send_json({"ok": True, "supervision": saved, "mail_configured": mail_configured()})
 
     def _status(self, config: DashboardConfig) -> dict[str, Any]:
         stores = self._stores()

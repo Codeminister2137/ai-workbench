@@ -23,6 +23,7 @@ class DashboardConfig:
     history_budget_chars: int = 20000
     chat_fanout_policy: str = "restricted"
     work_roots: tuple[str, ...] = ()
+    supervision: str = "attended"
 
 
 def load_config(path: Path = DEFAULT_CONFIG_PATH) -> DashboardConfig:
@@ -43,6 +44,7 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> DashboardConfig:
         "history_budget_chars": int,
         "chat_fanout_policy": str,
         "work_roots": list,
+        "supervision": str,
     }
     values: dict[str, object] = {}
     for key, types in known.items():
@@ -64,4 +66,31 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> DashboardConfig:
             raise ValueError("Dashboard config key 'work_roots' must hold strings")
         # Dumb carrier: existence/overlap checks happen per request, not here.
         values["work_roots"] = tuple(entries)
+    supervision = values.get("supervision", "attended")
+    if supervision not in ("attended", "unattended"):
+        raise ValueError("Dashboard config key 'supervision' must be attended or unattended")
     return DashboardConfig(**values)  # type: ignore[arg-type]
+
+
+def save_supervision(path: Path, supervision: str) -> str:
+    """Persist the supervision mode, preserving all other config keys.
+
+    A missing config file is created; other keys round-trip untouched.
+    Raises ``ValueError`` for an unknown mode or an unreadable file.
+    """
+    if supervision not in ("attended", "unattended"):
+        raise ValueError("supervision must be attended or unattended")
+    payload: dict[str, object] = {}
+    if path.exists():
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+        except (ValueError, UnicodeError) as exc:
+            raise ValueError(f"Dashboard config is not valid JSON: {path}") from exc
+        if not isinstance(raw, dict):
+            raise ValueError("Dashboard config must be a JSON object")
+        payload = raw
+    payload["supervision"] = supervision
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    tmp.replace(path)
+    return supervision
