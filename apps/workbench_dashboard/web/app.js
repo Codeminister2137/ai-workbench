@@ -99,6 +99,18 @@ function filterList(listId, query) {
   });
 }
 
+/* Project filter shared by the Runs and Inbox list views. */
+let runsProjectFilter = "";
+let inboxProjectFilter = "";
+async function projectOptions(selected) {
+  try {
+    const data = await api("/api/projects");
+    const opts = (data.projects || []).map((p) =>
+      `<option value="${esc(p.id)}"${p.id === selected ? " selected" : ""}>${gtext(p.name)}</option>`).join("");
+    return `<option value="">All projects</option>` + opts;
+  } catch (err) { return `<option value="">All projects</option>`; }
+}
+
 /* Runs list auto-refresh: poll /api/runs every ~10s while the view is visible. */
 let runsPollTimer = null;
 function stopRunsPoll() {
@@ -583,7 +595,8 @@ async function renderRuns(id) {
     return;
   }
   const prevFilter = (document.getElementById("filter-runs") || {}).value || "";
-  const payload = await api("/api/runs");
+  const runsUrl = runsProjectFilter ? "/api/runs?project_id=" + encodeURIComponent(runsProjectFilter) : "/api/runs";
+  const payload = await api(runsUrl);
   const items = payload.items.length
     ? payload.items.map((r) =>
         `<li><a href="#/runs/${esc(r.id)}">${gtext(r.title || r.id)}</a>
@@ -603,11 +616,15 @@ async function renderRuns(id) {
     evidence = '<p class="muted">Evidence unavailable: ' + esc(err.message) + "</p>";
   }
   view.innerHTML = `<h1>Runs</h1>
-    <p><input type="text" id="filter-runs" placeholder="Filter runs..." title="Filter runs by text"></p>
+    <p><input type="text" id="filter-runs" placeholder="Filter runs..." title="Filter runs by text">
+    <select id="filter-runs-project" title="Show runs for one project">${await projectOptions(runsProjectFilter)}</select></p>
     <ul class="plain" id="runs-list">${items}</ul>${evidence}`;
   const filterInput = document.getElementById("filter-runs");
   filterInput.addEventListener("input", (ev) => filterList("runs-list", ev.target.value));
   if (prevFilter) { filterInput.value = prevFilter; filterList("runs-list", prevFilter); }
+  document.getElementById("filter-runs-project").addEventListener("change", (ev) => {
+    runsProjectFilter = ev.target.value; renderRuns();
+  });
   startRunsPoll();
 }
 
@@ -682,7 +699,8 @@ async function renderInbox(id) {
     return;
   }
   const tab = new URLSearchParams((location.hash.split("?")[1] || "")).get("status") || "active";
-  const payload = await api("/api/inbox");
+  const inboxUrl = inboxProjectFilter ? "/api/inbox?project_id=" + encodeURIComponent(inboxProjectFilter) : "/api/inbox";
+  const payload = await api(inboxUrl);
   const shown = payload.items.filter((t) => tab === "archive" ? t.status === "closed" : t.status !== "closed");
   const items = shown.length
     ? shown.map((t) =>
@@ -691,9 +709,13 @@ async function renderInbox(id) {
     : '<li class="muted">Nothing here. The supervisor assigns decisions and tasks to the inbox.</li>';
   view.innerHTML = `<h1>Inbox</h1>
     <p><a href="#/inbox">Active</a> · <a href="#/inbox?status=archive">Archive</a></p>
-    <p><input type="text" id="filter-inbox" placeholder="Filter tasks..." title="Filter inbox by text"></p>
+    <p><input type="text" id="filter-inbox" placeholder="Filter tasks..." title="Filter inbox by text">
+    <select id="filter-inbox-project" title="Show inbox tasks for one project">${await projectOptions(inboxProjectFilter)}</select></p>
     <ul class="plain" id="inbox-list">${items}</ul>`;
   document.getElementById("filter-inbox").addEventListener("input", (ev) => filterList("inbox-list", ev.target.value));
+  document.getElementById("filter-inbox-project").addEventListener("change", (ev) => {
+    inboxProjectFilter = ev.target.value; renderInbox();
+  });
 }
 
 async function markIdeaSeen(id, item) {

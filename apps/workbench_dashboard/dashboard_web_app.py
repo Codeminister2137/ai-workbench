@@ -198,7 +198,10 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 return self._send_item(self._stores().plans, path[len("/api/plans/") :])
             if path == "/api/runs":
                 return self._send_collection(
-                    self._stores().runs, parsed.query, enrich=with_fanout_policy
+                    self._stores().runs,
+                    parsed.query,
+                    enrich=with_fanout_policy,
+                    project_field="project_id",
                 )
             if path == "/api/documents":
                 return self._send_json({"ok": True, "documents": self._library().list_documents()})
@@ -491,7 +494,12 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         )
 
     def _send_collection(
-        self, collection, query: str, *, enrich: Callable[[dict], dict] | None = None
+        self,
+        collection,
+        query: str,
+        *,
+        enrich: Callable[[dict], dict] | None = None,
+        project_field: str | None = None,
     ) -> None:
         params = parse_qs(query)
         try:
@@ -500,6 +508,12 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         except ValueError:
             return self._send_json({"ok": False, "error": "Invalid limit or offset"}, status=400)
         items, total = collection.list(limit=limit, offset=offset)
+        project_id = params.get("project_id", [None])[0]
+        if project_id is not None and project_field is not None:
+            # Post-list filter: collections here are tiny (tens of rows),
+            # so page-then-filter stays honest via the filtered total.
+            items = [item for item in items if item.get(project_field) == project_id]
+            total = len(items)
         if enrich is not None:
             items = [enrich(item) for item in items]
         self._send_json({"ok": True, "items": items, "total": total})
@@ -522,7 +536,25 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         items, _total = self._stores().inbox.list(limit=100)
         if wanted is not None:
             items = [item for item in items if item.get("status") == wanted]
+        project_id = params.get("project_id", [None])[0]
+        if project_id is not None:
+            runs, _total = self._stores().runs.list(limit=100)
+            project_runs = {run.get("id") for run in runs if run.get("project_id") == project_id}
+            items = [item for item in items if self._inbox_item_in_project(item, project_runs)]
         self._send_json({"ok": True, "items": items, "total": len(items)})
+
+    @staticmethod
+    def _inbox_item_in_project(item: dict, project_runs: set) -> bool:
+        """Match an inbox item to a project via its linked run, if any."""
+        if item.get("task_id") in project_runs:
+            return True
+        refs = item.get("context_refs") or []
+        if not isinstance(refs, list):
+            return False
+        return any(
+            isinstance(ref, str) and ref.startswith("run:") and ref[len("run:") :] in project_runs
+            for ref in refs
+        )
 
     def _create_inbox_task(self, payload: dict) -> None:
         stores = self._stores()
