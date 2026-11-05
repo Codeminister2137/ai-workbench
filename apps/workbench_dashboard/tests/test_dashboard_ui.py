@@ -53,7 +53,7 @@ def test_static_controls_have_titles() -> None:
     for tag in re.findall(r"<button\b[^>]*>", html):
         assert "title=" in tag, f"button without title: {tag}"
     nav_links = re.findall(r"<a\b[^>]*data-view[^>]*>", html)
-    assert len(nav_links) == 8
+    assert len(nav_links) == 9  # +intake
     for tag in nav_links:
         assert "title=" in tag, f"nav link without title: {tag}"
 
@@ -63,8 +63,8 @@ def test_dynamic_buttons_have_titles() -> None:
     js = _read("app.js")
     buttons = re.findall(r"<button\b[^>]*>", js)
     assert (
-        len(buttons) == 15
-    )  # +report/rename/delete/submit/create/cancel/run-request/staged-approve/staged-reject/dictate
+        len(buttons) == 16
+    )  # +report/rename/delete/submit/create/cancel/run-request/staged-approve/staged-reject/dictate/intake-approve
     for tag in buttons:
         assert "title=" in tag, f"button without title: {tag}"
 
@@ -315,7 +315,8 @@ def test_run_approval_links_to_inbox_only() -> None:
     assert 'title="Approve or reject via the linked inbox task"' in js
     # No bare run/plan approve endpoint; staged-file approval is approve-staged.
     assert "/approve-staged" in js
-    assert '/approve"' not in js
+    approvals = [line for line in js.splitlines() if '/approve"' in line]
+    assert len(approvals) == 1 and "/api/intake/" in approvals[0]  # intake→draft-plan only
     assert "/reject" not in js
 
 
