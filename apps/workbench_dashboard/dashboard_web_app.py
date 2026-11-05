@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, cast
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
+from ai_agent.run_tracking import request_run_cancel
 from ai_agent.staged_edits import (
     ProjectRoots,
     StagedConflictError,
@@ -283,6 +284,9 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             if path.startswith("/api/runs/") and path.endswith("/report-request"):
                 run_id = path[len("/api/runs/") : -len("/report-request")]
                 return self._request_run_report(run_id)
+            if path.startswith("/api/runs/") and path.endswith("/cancel"):
+                run_id = path[len("/api/runs/") : -len("/cancel")]
+                return self._cancel_run(run_id)
             if path.startswith("/api/runs/") and path.endswith("/approve-staged"):
                 run_id = path[len("/api/runs/") : -len("/approve-staged")]
                 return self._approve_run_staged(config, run_id, payload)
@@ -666,6 +670,20 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             code = 404 if "not found" in str(exc).lower() else 400
             return self._send_json({"ok": False, "error": str(exc)}, status=code)
         self._send_json({"ok": True, "id": record["id"], "status": record["status"]})
+
+    def _cancel_run(self, run_id: str) -> None:
+        try:
+            run = self._stores().runs.get(run_id)
+        except StoreError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        if run is None:
+            return self._send_json({"ok": False, "error": "Not found"}, status=404)
+        try:
+            request_run_cancel(run)
+            self._stores().runs.put(run_id, run)
+        except (StoreError, ValueError) as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        self._send_json({"ok": True, "run": with_fanout_policy(run)})
 
     def _request_run_report(self, run_id: str) -> None:
         try:
