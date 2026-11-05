@@ -1,3 +1,12 @@
+## ADR-082 - Dashboard stays centralized; no per-client data split
+
+**Status:** Accepted by the owner, 2026-11-05.
+
+Resolves G6's owner question: global runs/inbox/chats/library with
+project refs; split only on clear need (second real client retriggers).
+Companion backup decision (private repo + disk snapshot) queued. See
+[ADR-082](decisions/ADR-082-centralized-dashboard-no-client-split.md).
+
 ## ADR-081 - Absorb remote-operator's supervised loop into the workbench dashboard
 
 **Status:** Accepted by the owner, 2026-11-05.

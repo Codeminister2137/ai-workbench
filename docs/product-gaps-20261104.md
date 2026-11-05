@@ -161,9 +161,13 @@ Those plan files are gitignored and absent here; citations below marked
   writes across projects. Files: `dashboard_config.py`,
   `dashboard_stores.py`, `dashboard_web_app.py`, `web/app.js`,
   `tests/test_stores.py`, `tests/test_web_app.py`. Estimate: 6–10h.
-- **Owner decision first?** Yes — per-client data isolation/privacy
-  boundary and P7 intake-location question (files on disk vs API/email)
-  `[plans:p7-project-file-format-proposal.md:144-151]` constrain the design.
+- **Owner decision first?** Decided 2026-11-05 ([ADR-082](decisions/ADR-082-centralized-dashboard-no-client-split.md)):
+  NO per-client split — runs/inbox/chats/library stay global with
+  per-record project refs, since ai-workbench is the primary centralized
+  interface. Split only on clear need; second real client project is the
+  revisit trigger. (Registry + staged approvals landed via the merge;
+  project filters in views still to add. P7 intake-location question
+  remains open.)
 
 ### G7. Client intake exists only on paper (multi-project/company)
 
