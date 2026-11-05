@@ -761,6 +761,44 @@ async function renderIdeas(id) {
   document.getElementById("filter-ideas").addEventListener("input", (ev) => filterList("ideas-list", ev.target.value));
 }
 
+async function renderDocuments(id) {
+  if (id) {
+    const payload = await api("/api/documents/" + id.split("/").map(encodeURIComponent).join("/"));
+    const item = payload.entry;
+    let body = `<p><a href="/api/documents/${id.split("/").map(encodeURIComponent).join("/")}/file" target="_blank" rel="noopener" title="Open the file (browser opens PDFs, other types download)">Open file</a></p>`;
+    if (item.renderable) {
+      try {
+        const full = await api("/api/documents/" + id.split("/").map(encodeURIComponent).join("/") + "?content=1");
+        body += `<pre>${esc(full.content)}</pre>`
+          + (full.truncated ? '<p class="muted">Preview truncated at 100 KB — open the file for the rest.</p>' : "");
+      } catch (err) {
+        body += `<p class="muted">Preview unavailable: ${esc(err.message)} — open the file instead.</p>`;
+      }
+    } else {
+      body += '<p class="muted">No in-tab preview for this file type — open it with one click above.</p>';
+    }
+    view.innerHTML = `<h1>Document</h1><p><a href="#/documents">All documents</a></p>
+      <div class="card"><h2>${esc(item.title)}</h2>
+      <p class="muted">${esc(item.root)} · ${esc(item.sensitivity)} · ${esc((item.modified_utc || "").slice(0, 10))} · ${item.size} bytes</p>
+      ${(item.tags || []).length ? `<p>${item.tags.map((t) => `<span class="pill">${esc(t)}</span>`).join(" ")}</p>` : ""}
+      ${item.project ? `<p><strong>Project:</strong> ${esc(item.project)}</p>` : ""}
+      ${body}</div>`;
+    return;
+  }
+  const payload = await api("/api/documents");
+  const items = payload.documents.length
+    ? payload.documents.map((d) =>
+        `<li><a href="#/documents/${encodeURIComponent(d.id)}">${esc(d.title)}</a>
+         <span class="muted">${esc(d.root)} · ${esc((d.modified_utc || "").slice(0, 10))}</span>
+         <span class="pill st-${esc(d.sensitivity)}">${esc(d.sensitivity)}</span></li>`).join("")
+    : '<li class="muted">No documents yet.</li>';
+  view.innerHTML = `<h1>Documents</h1>
+    <p class="muted">Company knowledge: public library, private research, and existing plans. Private files never leave this PC.</p>
+    <p><input type="text" id="filter-documents" placeholder="Filter documents..." title="Filter documents by text"></p>
+    <ul class="plain" id="documents-list">${items}</ul>`;
+  document.getElementById("filter-documents").addEventListener("input", (ev) => filterList("documents-list", ev.target.value));
+}
+
 function fieldRow(label, inner, hint) {
   return `<p><label><strong>${label}</strong><br>${inner}</label><br><span class="muted">${hint}</span></p>`;
 }
@@ -840,7 +878,9 @@ async function render() {
   document.querySelectorAll("nav a").forEach((a) => a.classList.remove("active"));
   const raw = (location.hash || "#/home").slice(2);
   const [path, query] = raw.split("?");
-  const [name, id] = path.split("/");
+  // Document ids are multi-segment (root/relpath); single-segment ids behave as before.
+  const [name, ...rest] = path.split("/");
+  const id = rest.length ? decodeURIComponent(rest.join("/")) : undefined;
   const active = document.querySelector(`nav a[data-view="${name}"]`);
   if (active) active.classList.add("active");
   try {
@@ -855,6 +895,7 @@ async function render() {
     else if (name === "runs") await renderRuns(id);
     else if (name === "inbox") await renderInbox(id);
     else if (name === "ideas") await renderIdeas(id);
+    else if (name === "documents") await renderDocuments(id);
     else if (name === "schedule") renderSchedule();
     else if (name === "create" && id) renderCreate(id);
     else view.innerHTML = "<h1>Not found</h1>";

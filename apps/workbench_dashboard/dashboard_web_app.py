@@ -12,7 +12,7 @@ from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, cast
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, quote, unquote, urlparse
 
 from ai_agent.staged_edits import (
     ProjectRoots,
@@ -36,6 +36,7 @@ from ai_provider.translation import TranslationError, Translator
 from dashboard_chat import DashboardChat
 from dashboard_config import DEFAULT_CONFIG_PATH, DEFAULT_DATA_DIR, DashboardConfig, load_config
 from dashboard_stores import DashboardStores, StoreError, effective_fanout_policy
+from document_library import DocumentLibrary
 
 ROOT = Path(__file__).parent
 STATIC_ROOT = ROOT / "web"
@@ -128,6 +129,9 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
     def _stores(self) -> DashboardStores:
         return DashboardStores(self.data_dir)
 
+    def _library(self) -> DocumentLibrary:
+        return DocumentLibrary(self.repo_root)
+
     def _chat(self, config: DashboardConfig) -> DashboardChat:
         store = SQLiteChatTranscriptStore(self.data_dir / "chats.sqlite3")
         return DashboardChat(store, config, self.repo_root)
@@ -182,6 +186,14 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 return self._send_collection(
                     self._stores().runs, parsed.query, enrich=with_fanout_policy
                 )
+            if path == "/api/documents":
+                return self._send_json({"ok": True, "documents": self._library().list_documents()})
+            if path.startswith("/api/documents/") and path.endswith("/file"):
+                doc_id = unquote(path[len("/api/documents/") : -len("/file")])
+                return self._send_document_file(doc_id)
+            if path.startswith("/api/documents/"):
+                doc_id = unquote(path[len("/api/documents/") :])
+                return self._send_document(doc_id, parsed.query)
             if path.startswith("/api/runs/") and path.endswith("/receipts"):
                 run_id = path[len("/api/runs/") : -len("/receipts")]
                 return self._send_run_receipts(run_id)
@@ -700,6 +712,62 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         except StoreError as exc:
             return self._send_json({"ok": False, "error": str(exc)}, status=400)
         self._send_json({"ok": True, "id": run_id, "applied": applied})
+
+    def _send_document(self, doc_id: str, query: str) -> None:
+        try:
+            entry = self._library().get(doc_id)
+        except KeyError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=404)
+        except ValueError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        payload: dict = {
+            "ok": True,
+            "entry": {
+                "id": entry.id,
+                "root": entry.root,
+                "relpath": entry.relpath,
+                "title": entry.title,
+                "tags": list(entry.tags),
+                "project": entry.project,
+                "size": entry.size,
+                "modified_utc": entry.modified_utc,
+                "sensitivity": entry.sensitivity,
+                "renderable": entry.renderable,
+            },
+        }
+        if parse_qs(query).get("content", ["0"])[0] == "1":
+            if not entry.renderable:
+                return self._send_json(
+                    {"ok": False, "error": "Document is not renderable"}, status=400
+                )
+            try:
+                body, truncated = self._library().read_text(doc_id)
+            except (KeyError, ValueError) as exc:
+                code = 404 if isinstance(exc, KeyError) else 400
+                return self._send_json({"ok": False, "error": str(exc)}, status=code)
+            payload["content"] = body
+            payload["truncated"] = truncated
+        self._send_json(payload)
+
+    def _send_document_file(self, doc_id: str) -> None:
+        try:
+            data, content_type = self._library().read_bytes(doc_id)
+        except KeyError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=404)
+        except ValueError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        name = doc_id.rsplit("/", 1)[-1]
+        ascii_name = "".join(char if ord(char) < 128 else "_" for char in name)
+        self.send_response(200)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "no-store")
+        self.send_header(
+            "Content-Disposition",
+            f"inline; filename=\"{ascii_name}\"; filename*=UTF-8''{quote(name)}",
+        )
+        self.end_headers()
+        self.wfile.write(data)
 
     def _transcribe_audio(self) -> None:
         try:
