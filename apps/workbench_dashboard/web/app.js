@@ -813,13 +813,43 @@ async function renderDocuments(id) {
     ? payload.documents.map((d) =>
         `<li><a href="#/documents/${encodeURIComponent(d.id)}">${esc(d.title)}</a>
          <span class="muted">${esc(d.root)} · ${esc((d.modified_utc || "").slice(0, 10))}</span>
-         <span class="pill st-${esc(d.sensitivity)}">${esc(d.sensitivity)}</span></li>`).join("")
+         <span class="pill st-${esc(d.sensitivity)}">${esc(d.sensitivity)}</span>
+         ${d.project ? `<span class="pill" title="Linked project">${esc(d.project)}</span>` : ""}</li>`).join("")
     : '<li class="muted">No documents yet.</li>';
   view.innerHTML = `<h1>Documents</h1>
     <p class="muted">Company knowledge: public library, private research, and existing plans. Private files never leave this PC.</p>
     <p><input type="text" id="filter-documents" placeholder="Filter documents..." title="Filter documents by text"></p>
     <ul class="plain" id="documents-list">${items}</ul>`;
   document.getElementById("filter-documents").addEventListener("input", (ev) => filterList("documents-list", ev.target.value));
+}
+
+async function renderIntake() {
+  const payload = await api("/api/intake");
+  const items = payload.files.length
+    ? payload.files.map((f) =>
+        `<li><strong>${esc(f.name)}</strong>
+         <span class="pill st-${f.valid ? "ready" : "draft"}">${f.valid ? "ready" : "draft"}</span>
+         <br><span class="muted">${gtext(f.summary || "no summary")}</span>
+         ${f.errors.length ? `<br><span class="muted">Errors: ${esc(f.errors.join("; "))}</span>` : ""}
+         ${f.warnings.length ? `<br><span class="muted">Warnings: ${esc(f.warnings.join("; "))}</span>` : ""}
+         ${f.valid ? `<br><button data-approve="${esc(f.name)}" title="Approve this brief into a proposed plan">Approve into plan</button>` : ""}</li>`).join("")
+    : '<li class="muted">No intake files. Drop chatbot briefs into p7-projects/ (gitignored, stays on this PC).</li>';
+  view.innerHTML = `<h1>Client intake</h1>
+    <p class="muted">Review website briefs, then approve valid ones into draft plans. Nothing executes or spends.</p>
+    <ul class="plain" id="intake-list">${items}</ul>`;
+  view.querySelectorAll("[data-approve]").forEach((btn) => btn.addEventListener("click", async () => {
+    try {
+      const out = await api("/api/intake/" + encodeURIComponent(btn.dataset.approve) + "/approve", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: "{}",
+      });
+      toast("Draft plan opened: " + out.plan.id, true);
+      renderIntake();
+    } catch (err) {
+      toast(err.message, false);
+    }
+  }));
 }
 
 function fieldRow(label, inner, hint) {
@@ -919,6 +949,7 @@ async function render() {
     else if (name === "inbox") await renderInbox(id);
     else if (name === "ideas") await renderIdeas(id);
     else if (name === "documents") await renderDocuments(id);
+    else if (name === "intake") await renderIntake();
     else if (name === "schedule") renderSchedule();
     else if (name === "create" && id) renderCreate(id);
     else view.innerHTML = "<h1>Not found</h1>";

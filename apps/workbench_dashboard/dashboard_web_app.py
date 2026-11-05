@@ -46,6 +46,7 @@ from dashboard_projects import create_project, get_project, list_projects
 from dashboard_stores import DashboardStores, StoreError, effective_fanout_policy
 from document_library import DocumentLibrary
 from owner_mail import mail_configured
+from p7_intake import approve_intake, list_intake
 from window_status import load_window_status
 
 ROOT = Path(__file__).parent
@@ -187,6 +188,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 return self._send_settings(config)
             if path == "/api/agent-status":
                 return self._send_json({"ok": True, **load_window_status(self.repo_root)})
+            if path == "/api/intake":
+                return self._send_json({"ok": True, "files": list_intake(self.repo_root)})
             if path == "/api/chat/sessions":
                 return self._send_chat_sessions(config)
             if path.startswith("/api/chat/sessions/") and path.endswith("/messages"):
@@ -301,6 +304,9 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             if path.startswith("/api/runs/") and path.endswith("/cancel"):
                 run_id = path[len("/api/runs/") : -len("/cancel")]
                 return self._cancel_run(run_id)
+            if path.startswith("/api/intake/") and path.endswith("/approve"):
+                name = unquote(path[len("/api/intake/") : -len("/approve")])
+                return self._approve_intake(name)
             if path.startswith("/api/runs/") and path.endswith("/approve-staged"):
                 run_id = path[len("/api/runs/") : -len("/approve-staged")]
                 return self._approve_run_staged(config, run_id, payload)
@@ -740,6 +746,13 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         except StagedEditError as exc:
             return self._send_json({"ok": False, "error": str(exc)}, status=400)
         self._send_json({"ok": True, "project": project})
+
+    def _approve_intake(self, name: str) -> None:
+        try:
+            plan = approve_intake(self.repo_root, self.data_dir, name)
+        except (ValueError, StoreError) as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        self._send_json({"ok": True, "plan": plan})
 
     def _cancel_run(self, run_id: str) -> None:
         try:

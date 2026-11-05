@@ -12,6 +12,8 @@ data/
 logs/
 *.log
 window-status.json
+# Client intake briefs (P7): contain client PII, never committed
+p7-projects/
 *.sqlite
 *.sqlite3
 *.sqlite3-*
