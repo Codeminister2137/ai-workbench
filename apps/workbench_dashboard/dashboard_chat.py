@@ -11,9 +11,11 @@ from __future__ import annotations
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 
 from ai_agent.coding_chat import CodingChatController, CodingTurnRequest, CodingTurnResult
+from ai_agent.fanout import FanoutPolicy
 from ai_provider import AIMessage, AIRequest, MessageRole
 from ai_provider.chat_transcripts import (
     ChatMessageRecord,
@@ -25,6 +27,7 @@ from ai_provider.contracts import ChatClient, PrivacyClass
 from ai_provider.errors import ProviderError
 from ai_provider.factory import create_chat_client
 from dashboard_config import DashboardConfig
+from dashboard_stores import DashboardStores
 
 SUPERVISOR_SYSTEM_PROMPT = (
     "You are the Workbench supervisor answering inside the owner's local "
@@ -42,6 +45,16 @@ class DashboardTurnOutcome:
     failure_reason: str | None
     provider: str | None
     model: str | None
+
+
+@dataclass(slots=True)
+class RunRequestReceipt:
+    """Host-observed receipt for one chat-triggered agent run request."""
+
+    run_id: str
+    inbox_id: str
+    status: str
+    fanout_effective: str
 
 
 class DashboardChat:
@@ -174,4 +187,78 @@ class DashboardChat:
             failure_reason=result.failure_reason,
             provider=result.provider,
             model=self.config.model,
+        )
+
+    def request_run(
+        self,
+        session_id: str,
+        text: str,
+        *,
+        stores: DashboardStores,
+        title: str | None = None,
+    ) -> RunRequestReceipt:
+        """Queue one agent run from a chat turn; the owner approves it in the inbox.
+
+        Most-restrictive by default: the run inherits ``chat_fanout_policy``
+        (default ``restricted`` — no child spawns) and nothing executes until
+        the linked inbox decision is approved and a run worker drains the
+        queue. The approval is written before the run so a full inbox refuses
+        the request without leaving a queued run behind.
+        """
+        session = self.store.get_session(session_id)
+        if session is None:
+            raise ValueError("Chat session not found")
+        text = text.strip()
+        if not text:
+            raise ValueError("Run request text is required")
+        try:
+            policy = FanoutPolicy.coerce(self.config.chat_fanout_policy)
+        except ValueError as exc:
+            raise ValueError(f"Invalid chat fan-out policy: {exc}") from exc
+        run_id = uuid.uuid4().hex
+        run_title = (title or "").strip() or text[:60]
+        now = datetime.now(UTC).isoformat()
+        approval = stores.create_inbox_task(
+            title=f"Approve agent run: {run_title}",
+            body=(
+                f"Chat requested an agent run (fan-out: {policy.value}).\n\n"
+                f"Request:\n{text}\n\n"
+                "Approve to let a run worker execute it; "
+                "Reject leaves it parked (never executed)."
+            ),
+            task_type="decision",
+            task_id=run_id,
+            context_refs=[f"run:{run_id}", f"chat:{session_id}"],
+            options=["Approve", "Reject"],
+        )
+        stores.runs.put(
+            run_id,
+            {
+                "id": run_id,
+                "title": run_title,
+                "status": "queued",
+                "body": text,
+                "origin": "chat",
+                "session_id": session_id,
+                "fanout_policy": policy.value,
+                "fanout_effective": policy.value,
+                "inbox_id": approval["id"],
+                "created_at_utc": now,
+                "updated_at_utc": now,
+            },
+        )
+        self.store.append_message(
+            session_id,
+            role="system",
+            content=(
+                f"Run requested: {run_title} (id {run_id}, "
+                f"fan-out {policy.value}). Queued for owner approval "
+                f"in inbox task {approval['id']}."
+            ),
+        )
+        return RunRequestReceipt(
+            run_id=run_id,
+            inbox_id=approval["id"],
+            status="queued",
+            fanout_effective=policy.value,
         )
