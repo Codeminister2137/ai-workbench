@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 
 ROOT = Path(__file__).parent
 DEFAULT_CONFIG_PATH = ROOT / "dashboard.json"
@@ -21,6 +22,7 @@ class DashboardConfig:
     title: str = "Workbench Dashboard"
     history_budget_chars: int = 20000
     chat_fanout_policy: str = "restricted"
+    work_roots: tuple[str, ...] = ()
 
 
 def load_config(path: Path = DEFAULT_CONFIG_PATH) -> DashboardConfig:
@@ -40,6 +42,7 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> DashboardConfig:
         "title": str,
         "history_budget_chars": int,
         "chat_fanout_policy": str,
+        "work_roots": list,
     }
     values: dict[str, object] = {}
     for key, types in known.items():
@@ -54,4 +57,11 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> DashboardConfig:
     budget = values.get("history_budget_chars")
     if isinstance(budget, int) and budget < 0:
         raise ValueError("history_budget_chars must be zero or greater")
+    roots = values.get("work_roots")
+    if roots is not None:
+        entries = cast("list[object]", roots)
+        if any(not isinstance(entry, str) for entry in entries):
+            raise ValueError("Dashboard config key 'work_roots' must hold strings")
+        # Dumb carrier: existence/overlap checks happen per request, not here.
+        values["work_roots"] = tuple(entries)
     return DashboardConfig(**values)  # type: ignore[arg-type]

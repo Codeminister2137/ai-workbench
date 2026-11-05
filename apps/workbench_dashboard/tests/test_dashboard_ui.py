@@ -62,7 +62,9 @@ def test_dynamic_buttons_have_titles() -> None:
     """Every button rendered by app.js templates carries a tooltip title."""
     js = _read("app.js")
     buttons = re.findall(r"<button\b[^>]*>", js)
-    assert len(buttons) == 12  # +report/rename/delete/submit/create/cancel/run-request
+    assert (
+        len(buttons) == 14
+    )  # +report/rename/delete/submit/create/cancel/run-request/staged-approve/staged-reject
     for tag in buttons:
         assert "title=" in tag, f"button without title: {tag}"
 
@@ -75,7 +77,7 @@ def test_dynamic_inputs_and_selects_have_titles() -> None:
     for tag in inputs:
         assert "title=" in tag, f"input without title: {tag}"
     selects = re.findall(r"<select\b[^>]*>", js)
-    assert len(selects) == 3  # +inbox-type/idea-origin create selects
+    assert len(selects) == 4  # +inbox-type/idea-origin create selects, +project picker
     for tag in selects:
         assert "title=" in tag, f"select without title: {tag}"
 
@@ -311,5 +313,43 @@ def test_run_approval_links_to_inbox_only() -> None:
     assert '"#/inbox/${esc(run.inbox_id)}"' in js
     assert "Review approval in inbox" in js
     assert 'title="Approve or reject via the linked inbox task"' in js
-    assert "/approve" not in js
+    # No bare run/plan approve endpoint; staged-file approval is approve-staged.
+    assert "/approve-staged" in js
+    assert '/approve"' not in js
     assert "/reject" not in js
+
+
+def test_chat_thread_has_project_picker() -> None:
+    """Run requests can target a registered project; empty roots hide the picker."""
+    js = _read("app.js")
+    assert 'id="project-picker"' in js
+    assert 'title="Project for the next run request (optional)"' in js
+    assert 'id="project-note"' in js
+    assert "loadProjectPicker" in js
+    assert 'api("/api/work-roots")' in js
+    assert "No project roots configured" in js
+    assert "runs stay unscoped" in js
+    assert "JSON.stringify({text, project})" in js
+    assert "No project (unscoped run)" in js
+
+
+def test_run_detail_renders_staged_review() -> None:
+    """Run detail reviews staged diffs with titled approve/reject buttons."""
+    js = _read("app.js")
+    assert "<h3>Staged project changes</h3>" in js
+    assert 'id="staged-list"' in js
+    assert "renderStagedInto" in js
+    assert '"/staged"' in js
+    assert "No staged changes." in js
+    assert "Loading staged changes..." in js
+    assert "stagedFileHtml" in js
+    assert 'id="staged-approve-btn"' in js
+    assert 'title="Approve and apply these staged files to the project root"' in js
+    assert 'id="staged-reject-btn"' in js
+    assert 'title="Reject these staged files (nothing is applied)"' in js
+    assert "/approve-staged" in js
+    assert "Staged changes applied" in js
+    assert "Staged changes rejected" in js
+    assert "data-applied" in js
+    css = _read("app.css")
+    assert ".staged-file" in css

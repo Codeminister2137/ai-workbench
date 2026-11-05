@@ -35,3 +35,6 @@ abbr[title] { text-decoration: underline dotted; cursor: help; }
 details.turn { border-top: 1px solid #8884; padding: 0.4rem 0; }
 details.turn summary { cursor: pointer; }
 details.turn div { white-space: pre-wrap; }
+.staged-file { border-top: 1px solid #8884; padding: 0.4rem 0; }
+.staged-file h4 { margin: 0.2rem 0; font-size: 0.95rem; }
+.staged-file pre { white-space: pre-wrap; }
