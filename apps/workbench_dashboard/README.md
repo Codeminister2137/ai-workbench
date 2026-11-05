@@ -59,6 +59,9 @@ inspect the owned process only.
   failed/waiting runs mail, or every terminal outcome does.
 - Feedback standard: every action shows a visible receipt — success,
   progress, or the exact error. Silent no-ops are defects.
+- Agent status: `GET /api/agent-status` reports what the agent is
+  working on from the gitignored `window-status.json` heartbeat at
+  the checkout root; a missing file reads as idle.
 
 ## Limits (honest)
 
