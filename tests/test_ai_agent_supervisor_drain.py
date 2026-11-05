@@ -307,3 +307,82 @@ def test_max_runs_budgets_claims_not_parks(drain, stores, calls) -> None:
         drain.drain(max_runs=0)
     with pytest.raises(ValueError, match="max_runs"):
         drain.drain(max_runs=101)
+
+
+def test_terminal_hook_fires_on_completed(stores, calls) -> None:
+    _queue_chat_run(stores, answer="Approve")
+    seen: list[dict] = []
+    drain = RunDrain(
+        runs_dir=stores.data_dir / "runs",
+        get_inbox=stores.inbox.get,
+        executor=lambda run: {"status": "completed"},
+        on_terminal=seen.append,
+    )
+    assert drain.drain() == [{"run_id": "run1", "status": "completed"}]
+    assert seen == [{"run_id": "run1", "status": "completed", "title": "test", "error": None}]
+
+
+def test_terminal_hook_fires_on_failed_with_error(stores) -> None:
+    _queue_chat_run(stores, answer="Approve")
+    seen: list[dict] = []
+
+    def boom(run):
+        raise RuntimeError("boom")
+
+    drain = RunDrain(
+        runs_dir=stores.data_dir / "runs",
+        get_inbox=stores.inbox.get,
+        executor=boom,
+        on_terminal=seen.append,
+    )
+    assert drain.drain() == [{"run_id": "run1", "status": "failed"}]
+    assert seen == [
+        {"run_id": "run1", "status": "failed", "title": "test", "error": "RuntimeError: boom"}
+    ]
+
+
+def test_terminal_hook_fires_on_cancelled(stores) -> None:
+    run_id, _inbox_id = _queue_chat_run(stores, answer="Approve")
+    record = stores.runs.get(run_id)
+    request_run_cancel(record)
+    stores.runs.put(run_id, record)
+    seen: list[dict] = []
+    drain = RunDrain(
+        runs_dir=stores.data_dir / "runs",
+        get_inbox=stores.inbox.get,
+        executor=lambda run: {"status": "completed"},
+        on_terminal=seen.append,
+    )
+    assert drain.drain() == [{"run_id": run_id, "status": "cancelled"}]
+    assert [entry["status"] for entry in seen] == ["cancelled"]
+
+
+def test_terminal_hook_failure_never_breaks_drain(stores) -> None:
+    _queue_chat_run(stores, answer="Approve")
+
+    def bad_hook(summary):
+        raise RuntimeError("mailer down")
+
+    drain = RunDrain(
+        runs_dir=stores.data_dir / "runs",
+        get_inbox=stores.inbox.get,
+        executor=lambda run: {"status": "completed"},
+        on_terminal=bad_hook,
+    )
+    assert drain.drain() == [{"run_id": "run1", "status": "completed"}]
+    assert stores.runs.get("run1")["status"] == "completed"
+
+
+def test_parked_and_paused_runs_do_not_notify(stores) -> None:
+    _queue_chat_run(stores, run_id="parked")
+    _queue_chat_run(stores, run_id="pauser", answer="Approve")
+    seen: list[dict] = []
+    drain = RunDrain(
+        runs_dir=stores.data_dir / "runs",
+        get_inbox=stores.inbox.get,
+        executor=lambda run: {"status": "paused"},
+        on_terminal=seen.append,
+    )
+    outcomes = drain.drain()
+    assert [outcome["run_id"] for outcome in outcomes] == ["parked", "pauser"]
+    assert seen == []

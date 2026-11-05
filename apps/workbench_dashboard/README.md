@@ -49,6 +49,14 @@ inspect the owned process only.
 - Ideas: fast capture inbox for brain-dumps, tagged `owner` or
   `third-party` (with optional contact); triage to
   reviewing/adopted/parked/declined with a decision note.
+- Owner mail: terminal run outcomes can notify the owner by email.
+  Set `WORKBENCH_OWNER_EMAIL` + `WORKBENCH_SMTP_HOST` (plus optional
+  `_PORT`/`_USER`/`_PASS`/`_STARTTLS`) in the environment; without
+  them the notifier stays silent. Delivery is fail-closed to the
+  owner address only, with a receipt per send. `supervision` in
+  `dashboard.json` (`attended` default, or `unattended`, switchable
+  via `GET`/`POST /api/settings`) selects whether only
+  failed/waiting runs mail, or every terminal outcome does.
 - Feedback standard: every action shows a visible receipt — success,
   progress, or the exact error. Silent no-ops are defects.
 

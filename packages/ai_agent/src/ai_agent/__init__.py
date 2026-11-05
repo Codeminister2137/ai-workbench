@@ -27,7 +27,7 @@ from ai_agent.contracts import (
 from ai_agent.loop import AgentLoop, AgentResult, ToolExecutionEvent
 from ai_agent.permissions import ApprovalPolicyPreset, PermissionManager, PermissionPolicy
 from ai_agent.recovery import RecoveryState
-from ai_agent.supervisor_drain import RunDrain
+from ai_agent.supervisor_drain import RunDrain, TerminalHook
 from ai_agent.supervisor_threads import SupervisorThreads
 from ai_agent.tools import (
     BaseTool,
@@ -74,6 +74,7 @@ __all__ = [
     "RecoveryState",
     "RunCommandTool",
     "RunDrain",
+    "TerminalHook",
     "ServiceAuthorization",
     "SupervisorThreads",
     "ToolCall",

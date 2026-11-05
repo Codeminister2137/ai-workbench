@@ -23,6 +23,7 @@ checks are check-then-act without a transaction.
 from __future__ import annotations
 
 import json
+import logging
 import time
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -40,6 +41,9 @@ TMP_SUFFIX = ".json.tmp"
 
 Executor = Callable[[dict], dict]
 InboxGet = Callable[[str], dict | None]
+TerminalHook = Callable[[dict], None]
+
+logger = logging.getLogger(__name__)
 
 
 def _read_json(path: Path) -> dict | None:
@@ -65,6 +69,8 @@ class RunDrain:
     ``executor`` maps a run record to its receipt dict. A receipt selects
     the outcome through its ``status`` (``completed`` when absent,
     ``failed`` or ``paused`` on request); anything else fails the run.
+    ``on_terminal`` is an optional observer for terminal outcomes
+    (completed/failed/cancelled); it never breaks the drain.
     """
 
     def __init__(
@@ -74,11 +80,27 @@ class RunDrain:
         get_inbox: InboxGet,
         executor: Executor,
         now: Callable[[], float] | None = None,
+        on_terminal: TerminalHook | None = None,
     ) -> None:
         self._runs_dir = runs_dir
         self._get_inbox = get_inbox
         self._executor = executor
         self._now = now or time.time
+        self._on_terminal = on_terminal
+
+    def _notify_terminal(self, run: dict, status: str) -> None:
+        if self._on_terminal is None:
+            return
+        summary = {
+            "run_id": str(run.get("id", "?")),
+            "status": status,
+            "title": run.get("title"),
+            "error": run.get("error"),
+        }
+        try:
+            self._on_terminal(summary)
+        except Exception as exc:
+            logger.warning("terminal hook failed for run %s: %s", summary["run_id"], exc)
 
     def _iso_now(self) -> str:
         return datetime.fromtimestamp(self._now(), UTC).isoformat()
@@ -260,6 +282,7 @@ class RunDrain:
                     run, "run_cancelled", {"reason": "cancel raced execution; never executed"}
                 )
                 self._publish(path, claim, run)
+                self._notify_terminal(run, "cancelled")
                 return {"run_id": run_id, "status": "cancelled"}
             run["status"] = "running"
             run["attempts"] = int(run.get("attempts", 0)) + 1
@@ -336,4 +359,5 @@ class RunDrain:
             )
         append_run_event(run, "run_finished", {"status": status})
         self._publish(path, claim, run)
+        self._notify_terminal(run, status)
         return {"run_id": run.get("id", path.stem), "status": status}
