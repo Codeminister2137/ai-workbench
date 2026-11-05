@@ -631,6 +631,7 @@ async function renderInbox(id) {
       <p class="muted">${esc(item.type)} · ${esc(item.status)} · from ${esc(item.created_by || "")} · opened ${stamp(item.created_at)}</p>
       <h3>Request</h3>
       <p>${gtext(item.body || "")}</p>
+      ${item.type === "task" ? '<p class="muted">Do the steps above, then answer Done with a note. Never paste secrets here — put keys in .env / User env.</p>' : ""}
       ${refs ? `<ul class="plain">${refs}</ul>` : ""}
       ${record}
       <h3>Decision record</h3>
@@ -687,7 +688,7 @@ async function renderInbox(id) {
     ? shown.map((t) =>
         `<li><a href="#/inbox/${esc(t.id)}">${gtext(t.title)}</a>
          <span class="pill st-${esc((t.status || "none").replace(/\s+/g, "-"))}">${esc(t.type)} · ${esc(t.status)}</span></li>`).join("")
-    : '<li class="muted">Nothing here. The supervisor assigns decisions to the inbox.</li>';
+    : '<li class="muted">Nothing here. The supervisor assigns decisions and tasks to the inbox.</li>';
   view.innerHTML = `<h1>Inbox</h1>
     <p><a href="#/inbox">Active</a> · <a href="#/inbox?status=archive">Archive</a></p>
     <p><input type="text" id="filter-inbox" placeholder="Filter tasks..." title="Filter inbox by text"></p>
@@ -809,7 +810,7 @@ function renderCreate(kind) {
     inbox: {heading: "New inbox item", fields: `
       ${fieldRow("Title *", '<input type="text" id="f-title" title="Inbox item title (required)">', "required")}
       ${fieldRow("Details", '<textarea id="f-body" rows="3" title="Details (optional)"></textarea>', "optional")}
-      ${fieldRow("Type *", `<select id="f-type" title="Item type (required)"><option value="clarification">clarification</option><option value="decision">decision</option></select>`, "required")}`},
+      ${fieldRow("Type *", `<select id="f-type" title="Item type (required)"><option value="clarification">clarification</option><option value="decision">decision</option><option value="task">task</option></select>`, "required")}`},
     idea: {heading: "New idea", fields: `
       ${fieldRow("Title *", '<input type="text" id="f-title" title="Idea title (required)">', "required")}
       ${fieldRow("Description", '<textarea id="f-body" rows="3" title="Description (optional)"></textarea>', "optional")}

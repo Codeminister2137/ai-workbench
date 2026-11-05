@@ -379,3 +379,13 @@ def test_documents_view_lists_and_previews() -> None:
     assert "/file" in js
     assert "Open file" in js
     assert "Private files never leave this PC" in js
+
+
+def test_inbox_supports_owner_tasks() -> None:
+    """Task items are creatable and carry do-the-steps guidance, no new controls."""
+    js = _read("app.js")
+    assert '<option value="task">task</option>' in js
+    assert 'item.type === "task"' in js
+    assert "answer Done with a note" in js
+    assert "Never paste secrets here" in js
+    assert "assigns decisions and tasks to the inbox" in js

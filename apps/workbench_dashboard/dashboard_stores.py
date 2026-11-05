@@ -15,7 +15,7 @@ from pathlib import Path
 
 MAX_RESPONSE_BYTES = 100_000
 MAX_OPEN_TASKS = 50
-INBOX_TYPES = ("decision", "clarification", "order")
+INBOX_TYPES = ("decision", "clarification", "order", "task")
 INBOX_STATUSES = ("open", "answered", "closed")
 FANOUT_POLICIES = ("allowed", "restricted", "denied")
 FANOUT_UNKNOWN = "unknown"
@@ -146,7 +146,7 @@ class DashboardStores:
         context_refs: list[str] | None = None,
         options: list[str] | None = None,
     ) -> dict:
-        """Create one owner task; decisions and clarifications only in v1."""
+        """Create one owner task; tasks default to a single Done choice."""
         title = title.strip()
         if not title:
             raise StoreError("Inbox task needs a title")
@@ -163,7 +163,9 @@ class DashboardStores:
             "title": title,
             "body": body,
             "context_refs": list(context_refs or []),
-            "options": list(options or []),
+            "options": list(options)
+            if options is not None
+            else (["Done"] if task_type == "task" else []),
             "status": "open",
             "created_by": "supervisor",
             "assignee": "owner",
