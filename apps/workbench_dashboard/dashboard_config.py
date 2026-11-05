@@ -20,6 +20,7 @@ class DashboardConfig:
     base_url: str | None = None
     title: str = "Workbench Dashboard"
     history_budget_chars: int = 20000
+    chat_fanout_policy: str = "restricted"
 
 
 def load_config(path: Path = DEFAULT_CONFIG_PATH) -> DashboardConfig:
@@ -38,6 +39,7 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> DashboardConfig:
         "base_url": (str, type(None)),
         "title": str,
         "history_budget_chars": int,
+        "chat_fanout_policy": str,
     }
     values: dict[str, object] = {}
     for key, types in known.items():

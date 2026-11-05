@@ -185,6 +185,9 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             if path.startswith("/api/chat/sessions/") and path.endswith("/delete"):
                 session_id = path[len("/api/chat/sessions/") : -len("/delete")]
                 return self._delete_chat_session(config, session_id)
+            if path.startswith("/api/chat/sessions/") and path.endswith("/run-request"):
+                session_id = path[len("/api/chat/sessions/") : -len("/run-request")]
+                return self._request_chat_run(config, session_id, payload)
             if path == "/api/inbox":
                 return self._create_inbox_task(payload)
             if path == "/api/ideas":
@@ -315,6 +318,30 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         except ValueError as exc:
             return self._send_json({"ok": False, "error": str(exc)}, status=404)
         self._send_json({"ok": True, "id": session_id})
+
+    def _request_chat_run(self, config: DashboardConfig, session_id: str, payload: dict) -> None:
+        text = payload.get("text", "")
+        if not isinstance(text, str) or not text.strip():
+            return self._send_json({"ok": False, "error": "Message text is required"}, status=400)
+        title = payload.get("title", "")
+        if not isinstance(title, str):
+            return self._send_json({"ok": False, "error": "Title must be a string"}, status=400)
+        try:
+            receipt = self._chat(config).request_run(
+                session_id, text, stores=self._stores(), title=title or None
+            )
+        except (StoreError, ValueError) as exc:
+            code = 404 if "not found" in str(exc).lower() else 400
+            return self._send_json({"ok": False, "error": str(exc)}, status=code)
+        self._send_json(
+            {
+                "ok": True,
+                "run_id": receipt.run_id,
+                "inbox_id": receipt.inbox_id,
+                "status": receipt.status,
+                "fanout_effective": receipt.fanout_effective,
+            }
+        )
 
     def _send_collection(
         self, collection, query: str, *, enrich: Callable[[dict], dict] | None = None

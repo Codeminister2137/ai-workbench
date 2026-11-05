@@ -62,7 +62,7 @@ def test_dynamic_buttons_have_titles() -> None:
     """Every button rendered by app.js templates carries a tooltip title."""
     js = _read("app.js")
     buttons = re.findall(r"<button\b[^>]*>", js)
-    assert len(buttons) == 11  # +report/rename/delete/submit/create/cancel
+    assert len(buttons) == 12  # +report/rename/delete/submit/create/cancel/run-request
     for tag in buttons:
         assert "title=" in tag, f"button without title: {tag}"
 
@@ -211,3 +211,13 @@ def test_runs_list_shows_fanout_pill() -> None:
     """Runs list rows carry the same fan-out indicator as the detail."""
     js = _read("app.js")
     assert 'fan-out: ${esc(r.fanout_effective || r.fanout_policy || "unknown")}' in js
+
+
+def test_chat_thread_has_run_request_button() -> None:
+    """Chat threads queue agent runs explicitly; the receipt shows fan-out."""
+    js = _read("app.js")
+    assert 'id="run-request-btn"' in js
+    assert 'title="Queue this message as an agent run (needs inbox approval)"' in js
+    assert "/run-request" in js
+    assert "Run queued (fan-out: " in js
+    assert "queue agent runs for approval from a thread" in js

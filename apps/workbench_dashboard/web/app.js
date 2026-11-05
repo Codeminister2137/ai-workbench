@@ -174,7 +174,7 @@ async function renderChatList() {
          <span class="muted">${esc(s.updated_at_utc)} · ${esc(s.privacy_class)}</span></li>`).join("")
     : '<li class="muted">No chats yet — use + New.</li>';
   view.innerHTML = `<h1>Chat</h1>
-    <p class="muted">Supervisor answers; turns cannot run tools yet. Full transcripts stay local.</p>
+    <p class="muted">Supervisor answers; queue agent runs for approval from a thread. Full transcripts stay local.</p>
     <ul class="plain">${items}</ul>`;
 }
 
@@ -192,7 +192,8 @@ async function renderChatThread(id, initial) {
     <p><button id="delete-btn" title="Delete this chat and its transcript">Delete chat</button></p>
     <div id="thread">${msgs || '<p class="muted">No messages yet.</p>'}</div>
     <form class="inline" id="chat-form"><input type="text" name="text" placeholder="Message..." title="Message the supervisor" required>
-    <button type="submit" title="Send message">Send</button></form>`;
+    <button type="submit" title="Send message">Send</button>
+    <button type="button" id="run-request-btn" title="Queue this message as an agent run (needs inbox approval)">Request run</button></form>`;
   document.getElementById("rename-form").addEventListener("submit", async (ev) => {
     ev.preventDefault();
     const title = ev.target.title.value.trim();
@@ -252,6 +253,21 @@ async function renderChatThread(id, initial) {
     ev.preventDefault();
     const text = ev.target.text.value.trim();
     if (text) send(text);
+  });
+  document.getElementById("run-request-btn").addEventListener("click", async () => {
+    const text = form.text.value.trim();
+    if (!text) { toast("Message text is required", false); return; }
+    try {
+      const out = await api("/api/chat/sessions/" + encodeURIComponent(id) + "/run-request", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({text}),
+      });
+      toast("Run queued (fan-out: " + out.fanout_effective + ")", true);
+      render();
+    } catch (err) {
+      toast(err.message, false);
+    }
   });
   if (initial) send(initial);
 }
