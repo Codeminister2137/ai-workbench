@@ -347,6 +347,9 @@ class RunDrain:
             run.pop("error", None)
         if receipt is not None:
             _append_receipt(run, receipt)
+            staged = receipt.get("staged")
+            if isinstance(staged, list):
+                run["staged"] = staged
         else:
             _append_receipt(
                 run,

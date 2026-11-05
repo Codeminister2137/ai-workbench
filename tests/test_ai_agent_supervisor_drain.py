@@ -386,3 +386,26 @@ def test_parked_and_paused_runs_do_not_notify(stores) -> None:
     outcomes = drain.drain()
     assert [outcome["run_id"] for outcome in outcomes] == ["parked", "pauser"]
     assert seen == []
+
+
+def test_receipt_staged_copies_to_run_record(stores) -> None:
+    _queue_chat_run(stores, answer="Approve")
+    staged = [{"relpath": "a.py", "content": "x", "digest": "d", "base_digest": None}]
+    drain = RunDrain(
+        runs_dir=stores.data_dir / "runs",
+        get_inbox=stores.inbox.get,
+        executor=lambda run: {"status": "completed", "staged": staged},
+    )
+    assert drain.drain() == [{"run_id": "run1", "status": "completed"}]
+    assert stores.runs.get("run1")["staged"] == staged
+
+
+def test_non_list_staged_ignored(stores) -> None:
+    _queue_chat_run(stores, answer="Approve")
+    drain = RunDrain(
+        runs_dir=stores.data_dir / "runs",
+        get_inbox=stores.inbox.get,
+        executor=lambda run: {"status": "completed", "staged": "bogus"},
+    )
+    assert drain.drain() == [{"run_id": "run1", "status": "completed"}]
+    assert "staged" not in stores.runs.get("run1")

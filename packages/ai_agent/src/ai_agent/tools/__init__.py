@@ -20,6 +20,7 @@ from ai_agent.tools.refactor import (
 )
 from ai_agent.tools.search import FindFilesTool, GrepSearchTool
 from ai_agent.tools.shell import RunCommandTool
+from ai_agent.tools.staged import StageFileTool
 
 
 def default_coding_tools(*, rename_plans: RenamePlanStore | None = None) -> ToolRegistry:
@@ -61,6 +62,7 @@ __all__ = [
     "RenamePlanStore",
     "RenamePreviewTool",
     "RunCommandTool",
+    "StageFileTool",
     "ToolContext",
     "ToolRegistry",
     "coding_tools_with_delegation",
