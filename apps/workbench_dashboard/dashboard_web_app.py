@@ -140,6 +140,9 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 return self._send_collection(
                     self._stores().runs, parsed.query, enrich=with_fanout_policy
                 )
+            if path.startswith("/api/runs/") and path.endswith("/receipts"):
+                run_id = path[len("/api/runs/") : -len("/receipts")]
+                return self._send_run_receipts(run_id)
             if path.startswith("/api/runs/"):
                 return self._send_item(
                     self._stores().runs,
@@ -198,6 +201,9 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             if path.startswith("/api/inbox/") and path.endswith("/close"):
                 item_id = path[len("/api/inbox/") : -len("/close")]
                 return self._close_inbox_task(item_id)
+            if path.startswith("/api/plans/") and path.endswith("/approve"):
+                plan_id = path[len("/api/plans/") : -len("/approve")]
+                return self._decide_plan(plan_id, payload)
             if path.startswith("/api/ideas/") and path.endswith("/review"):
                 item_id = path[len("/api/ideas/") : -len("/review")]
                 return self._review_idea(item_id, payload)
@@ -422,6 +428,27 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             status = 404 if "not found" in str(exc).lower() else 400
             return self._send_json({"ok": False, "error": str(exc)}, status=status)
         self._send_json({"ok": True, "id": record["id"], "status": record["status"]})
+
+    def _decide_plan(self, plan_id: str, payload: dict) -> None:
+        approved = payload.get("approved")
+        if type(approved) is not bool:
+            return self._send_json(
+                {"ok": False, "error": "approved must be true or false"}, status=400
+            )
+        try:
+            record = self._stores().decide_plan(plan_id, approved=approved)
+        except StoreError as exc:
+            status = 404 if "not found" in str(exc).lower() else 400
+            return self._send_json({"ok": False, "error": str(exc)}, status=status)
+        self._send_json({"ok": True, "id": record["id"], "status": record["status"]})
+
+    def _send_run_receipts(self, run_id: str) -> None:
+        try:
+            receipts = self._stores().get_run_receipts(run_id)
+        except StoreError as exc:
+            status = 404 if "not found" in str(exc).lower() else 400
+            return self._send_json({"ok": False, "error": str(exc)}, status=status)
+        self._send_json({"ok": True, "receipts": receipts})
 
     def _send_ideas(self, query: str) -> None:
         from dashboard_stores import IDEA_SOURCES, IDEA_STATUSES
