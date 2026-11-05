@@ -695,3 +695,28 @@ def test_tools_incapable_route_rejected_when_tools_required():
     )
     with pytest.raises(ValueError, match="No model candidate satisfied"):
         recommend_model(with_tools, catalog)
+
+
+def test_example_catalog_gpt_oss_admits_implement_sized_input(monkeypatch):
+    """The default local tools route fits implement-mode overhead (~40k tokens)."""
+    evidence = next(item for item in NATIVE_TOOL_EVIDENCE if item.model == "gpt-oss:20b")
+    monkeypatch.setattr(
+        "ai_provider.native_admission.installed_native_identity",
+        lambda config: (evidence.model_digest, evidence.runtime_version),
+    )
+    client = RecordingClient()
+    wrapped = prepare_native_coding_client(
+        client,
+        BackendConfig(ProviderKind.OLLAMA, "gpt-oss:20b"),
+        Namespace(catalog=CATALOG),
+        None,
+    )
+    assert isinstance(wrapped, NativeCodingClient)
+    assert wrapped.context_tokens == 65536
+    fits = AIRequest((AIMessage(MessageRole.USER, "x" * 90_000),))
+    wrapped.complete(fits)
+    assert client.requests
+    assert client.requests[0].metadata["ollama_context_length"] == 65536
+    overflow = AIRequest((AIMessage(MessageRole.USER, "x" * 120_000),))
+    with pytest.raises(ProviderError, match="does not fit"):
+        wrapped.complete(overflow)
