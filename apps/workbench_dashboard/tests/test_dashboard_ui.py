@@ -77,7 +77,7 @@ def test_dynamic_inputs_and_selects_have_titles() -> None:
     for tag in inputs:
         assert "title=" in tag, f"input without title: {tag}"
     selects = re.findall(r"<select\b[^>]*>", js)
-    assert len(selects) == 6  # +create selects, +run-request picker, +runs/inbox project filters
+    assert len(selects) == 7  # +create selects, +run-request pickers, +runs/inbox project filters
     for tag in selects:
         assert "title=" in tag, f"select without title: {tag}"
 
@@ -330,7 +330,7 @@ def test_chat_thread_has_project_picker() -> None:
     assert 'api("/api/work-roots")' in js
     assert "No project roots configured" in js
     assert "runs stay unscoped" in js
-    assert "JSON.stringify({text, project})" in js
+    assert "JSON.stringify({text, project, plan})" in js
     assert "No project (unscoped run)" in js
 
 

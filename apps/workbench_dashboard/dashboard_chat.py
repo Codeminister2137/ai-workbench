@@ -278,6 +278,7 @@ class DashboardChat:
         stores: DashboardStores,
         title: str | None = None,
         project: str | None = None,
+        plan: str | None = None,
     ) -> RunRequestReceipt:
         """Queue one agent run from a chat turn; the owner approves it in the inbox.
 
@@ -289,7 +290,8 @@ class DashboardChat:
 
         ``project`` is an already-validated work-root path stored as
         ``project_id`` on the run; runs and inbox stay global (no
-        per-project data-dir splitting in this slice).
+        per-project data-dir splitting in this slice). ``plan`` is an
+        existing plan id linked onto the run (fail-closed on unknown).
         """
         session = self.store.get_session(session_id)
         if session is None:
@@ -299,6 +301,10 @@ class DashboardChat:
             raise ValueError("Run request text is required")
         if project is not None and (not isinstance(project, str) or not project.strip()):
             raise ValueError("Project ref must be a non-empty string")
+        if plan is not None and (not isinstance(plan, str) or not plan.strip()):
+            raise ValueError("Plan ref must be a non-empty string")
+        if plan is not None and stores.plans.get(plan) is None:
+            raise ValueError("Unknown plan ref")
         try:
             policy = FanoutPolicy.coerce(self.config.chat_fanout_policy)
         except ValueError as exc:
@@ -316,7 +322,9 @@ class DashboardChat:
             ),
             task_type="decision",
             task_id=run_id,
-            context_refs=[f"run:{run_id}", f"chat:{session_id}"],
+            plan_id=plan,
+            context_refs=[f"run:{run_id}", f"chat:{session_id}"]
+            + ([f"plan:{plan}"] if plan else []),
             options=["Approve", "Reject"],
         )
         stores.runs.put(
@@ -332,6 +340,7 @@ class DashboardChat:
                 "fanout_effective": policy.value,
                 "inbox_id": approval["id"],
                 "project_id": project,
+                "plan_id": plan,
                 "created_at_utc": now,
                 "updated_at_utc": now,
             },
