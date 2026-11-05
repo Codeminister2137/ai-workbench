@@ -3,22 +3,35 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
+import math
 import os
+import time
 from collections.abc import Callable
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from ai_agent.contracts import ToolCall, ToolCategory, ToolDefinition, ToolResult
 from ai_agent.delegation_scope import DelegationBudget, DelegationScope, FanoutPolicy
 from ai_agent.permissions import PermissionManager
 from ai_agent.tools.base import BaseTool, ToolContext, ToolRegistry
 
+ApprovalOutcome = Literal["approved", "denied", "expired", "evidence_changed"]
+
 
 class TerminalApproval:
-    """Ask once for this exact operation; never read model-controlled stdio."""
+    """Ask once for this exact operation; never read model-controlled stdio.
+
+    With ``timeout_seconds`` the prompt carries an expiry window: a "yes"
+    arriving after the window is refused as ``expired``. With
+    ``evidence_reader`` the approval is bound to freshly inspected evidence:
+    the fingerprint is snapshotted before prompting and re-verified at
+    approve time, and any change fails closed as ``evidence_changed``.
+    :meth:`revalidate` opens one fresh window after either outcome.
+    """
 
     def __init__(
         self,
@@ -27,15 +40,75 @@ class TerminalApproval:
         workspace: Path,
         is_active: Callable[[], bool] | None = None,
         approval_reader: Callable[[str, Callable[[], bool]], str] | None = None,
+        *,
+        timeout_seconds: float | None = None,
+        evidence_reader: Callable[[ToolCall], str] | None = None,
     ):
+        if timeout_seconds is not None and (
+            isinstance(timeout_seconds, bool)
+            or not math.isfinite(timeout_seconds)
+            or timeout_seconds <= 0
+        ):
+            raise ValueError("Approval timeout must be finite positive seconds")
         self.task_id, self.run_id, self.workspace = task_id, run_id, workspace.resolve()
         self.is_active = is_active
         self.approval_reader = approval_reader
+        self.timeout_seconds = timeout_seconds
+        self.evidence_reader = evidence_reader
+        self.last_outcome: ApprovalOutcome | None = None
 
     def __call__(self, call: ToolCall, category: ToolCategory) -> bool:
         operation = json.dumps({"tool": call.name, "arguments": call.arguments}, ensure_ascii=True)
         if len(operation) > 64000:
+            self.last_outcome = "denied"
             return False  # Never shorten the operation the human is being asked to approve.
+        snapshot: str | None = None
+        if self.evidence_reader is not None:
+            try:
+                snapshot = self.evidence_reader(call)
+            except Exception:  # noqa: BLE001 - evidence failure fails closed
+                self.last_outcome = "evidence_changed"
+                return False
+            if not isinstance(snapshot, str):
+                self.last_outcome = "evidence_changed"
+                return False
+        start = time.monotonic()
+        deadline = None if self.timeout_seconds is None else start + self.timeout_seconds
+        if not self._ask_once(call, category, operation, deadline):
+            self.last_outcome = "denied"
+            return False
+        if deadline is not None and time.monotonic() >= deadline:
+            self.last_outcome = "expired"
+            return False
+        if self.evidence_reader is not None:
+            try:
+                current = self.evidence_reader(call)
+            except Exception:  # noqa: BLE001 - evidence failure fails closed
+                self.last_outcome = "evidence_changed"
+                return False
+            if (
+                snapshot is None
+                or not isinstance(current, str)
+                or not hmac.compare_digest(snapshot.encode("utf-8"), current.encode("utf-8"))
+            ):
+                self.last_outcome = "evidence_changed"
+                return False
+        self.last_outcome = "approved"
+        return True
+
+    def revalidate(self, call: ToolCall, category: ToolCategory) -> bool:
+        """Open one fresh approval window after expiry or an evidence change.
+
+        Re-snapshots evidence and re-prompts once under a new window. The
+        permission manager calls ``__call__`` once per tool call; the host
+        invokes this only to recover an ``expired`` or ``evidence_changed``
+        outcome instead of failing the run.
+        """
+        return self(call, category)
+
+    def _ask_once(
+        self, call: ToolCall, category: ToolCategory, operation: str, deadline: float | None
+    ) -> bool:
         if self.approval_reader is not None:
             prompt = (
                 json.dumps(
@@ -79,16 +152,16 @@ class TerminalApproval:
                 writer.flush()
                 if self.is_active is None:
                     return reader.readline().strip().lower() == "yes"
-                return self._scoped_answer(reader, writer)
+                return self._scoped_answer(reader, writer, deadline)
         except (OSError, EOFError, KeyboardInterrupt):
             return False
 
-    def _scoped_answer(self, reader, writer) -> bool:
+    def _scoped_answer(self, reader, writer, deadline: float | None = None) -> bool:
         """Poll the controlling terminal so revoked HTTP scopes can shut down."""
-        import time
-
         answer = ""
         while self.is_active and self.is_active():
+            if deadline is not None and time.monotonic() >= deadline:
+                return False
             if os.name == "nt":
                 import msvcrt
 
