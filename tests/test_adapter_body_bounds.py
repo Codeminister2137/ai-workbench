@@ -103,12 +103,9 @@ def test_openai_responses_body_bound_exceeded():
 def test_anthropic_messages_body_bound_exceeded():
     from ai_provider.adapters.anthropic_messages import AnthropicMessagesChatClient
 
-    provider = (
-        ProviderKind.ANTHROPIC if hasattr(ProviderKind, "ANTHROPIC") else list(ProviderKind)[0]
-    )
     client = AnthropicMessagesChatClient(
         config=BackendConfig(
-            provider=provider,
+            provider=ProviderKind.OPENAI,
             model="test-model",
             api_key="test",
             base_url="https://api.anthropic.com/v1",
