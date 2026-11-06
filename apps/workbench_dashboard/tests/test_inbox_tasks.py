@@ -8,6 +8,7 @@ from http.server import ThreadingHTTPServer
 from urllib.request import Request, urlopen
 
 import pytest
+from dashboard_stores import DashboardStores, StoreError
 from dashboard_web_app import DashboardRequestHandler
 
 
@@ -94,3 +95,66 @@ def test_task_lists_alongside_decisions(tasks_server) -> None:
     inbox = get_json(base, "/api/inbox")
     types = {item["type"] for item in inbox["items"]}
     assert "task" in types
+
+
+def _lifecycle_stores(tmp_path):
+    return DashboardStores(tmp_path / "data")
+
+
+def _lifecycle_task(stores):
+    return stores.create_inbox_task(
+        title="Ship it?", body="b", task_type="decision", options=["Yes", "No"]
+    )
+
+
+def test_close_requires_resolution(tmp_path) -> None:
+    stores = _lifecycle_stores(tmp_path)
+    task = _lifecycle_task(stores)
+    with pytest.raises(StoreError, match="resolution"):
+        stores.close_inbox_task(task["id"])
+    with pytest.raises(StoreError, match="resolution"):
+        stores.close_inbox_task(task["id"], resolution="   ")
+
+
+def test_close_stores_resolution_resolved_at_closed(tmp_path) -> None:
+    stores = _lifecycle_stores(tmp_path)
+    task = _lifecycle_task(stores)
+    closed = stores.close_inbox_task(task["id"], resolution="Shipped in abc123.")
+    assert closed["status"] == "closed"
+    assert closed["resolution"] == "Shipped in abc123."
+    assert closed["resolved_at"]
+
+
+def test_reclose_updates_resolution(tmp_path) -> None:
+    stores = _lifecycle_stores(tmp_path)
+    task = _lifecycle_task(stores)
+    stores.close_inbox_task(task["id"], resolution="First outcome.")
+    updated = stores.close_inbox_task(task["id"], resolution="Follow-up outcome.")
+    assert updated["status"] == "closed"
+    assert updated["resolution"] == "Follow-up outcome."
+
+
+def test_reopen_closed_to_open_keeping_history(tmp_path) -> None:
+    stores = _lifecycle_stores(tmp_path)
+    task = _lifecycle_task(stores)
+    stores.answer_inbox_task(task["id"], answer="Yes")
+    stores.close_inbox_task(task["id"], resolution="Done.")
+    reopened = stores.reopen_inbox_task(task["id"])
+    assert reopened["status"] == "open"
+    assert reopened["answer"] == "Yes"
+    assert reopened["resolution"] == "Done."
+
+
+def test_reopen_of_open_task_errors(tmp_path) -> None:
+    stores = _lifecycle_stores(tmp_path)
+    task = _lifecycle_task(stores)
+    with pytest.raises(StoreError):
+        stores.reopen_inbox_task(task["id"])
+
+
+def test_answer_still_refused_on_closed(tmp_path) -> None:
+    stores = _lifecycle_stores(tmp_path)
+    task = _lifecycle_task(stores)
+    stores.close_inbox_task(task["id"], resolution="Done.")
+    with pytest.raises(StoreError):
+        stores.answer_inbox_task(task["id"], answer="Late")

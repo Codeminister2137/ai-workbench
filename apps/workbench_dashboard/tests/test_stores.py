@@ -23,8 +23,9 @@ def test_create_answer_close_inbox_task(stores) -> None:
     assert answered["status"] == "answered"
     assert answered["answer"] == "Hosted"
 
-    closed = stores.close_inbox_task(record["id"])
+    closed = stores.close_inbox_task(record["id"], resolution="Hosted won.")
     assert closed["status"] == "closed"
+    assert closed["resolution"] == "Hosted won."
     with pytest.raises(StoreError, match="re-answered"):
         stores.answer_inbox_task(record["id"], answer="Changed mind")
 

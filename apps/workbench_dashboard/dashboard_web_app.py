@@ -310,7 +310,10 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 return self._answer_inbox_task(item_id, payload)
             if path.startswith("/api/inbox/") and path.endswith("/close"):
                 item_id = path[len("/api/inbox/") : -len("/close")]
-                return self._close_inbox_task(item_id)
+                return self._close_inbox_task(item_id, payload)
+            if path.startswith("/api/inbox/") and path.endswith("/reopen"):
+                item_id = path[len("/api/inbox/") : -len("/reopen")]
+                return self._reopen_inbox_task(item_id)
             if path.startswith("/api/plans/") and path.endswith("/approve"):
                 plan_id = path[len("/api/plans/") : -len("/approve")]
                 return self._decide_plan(plan_id, payload)
@@ -657,9 +660,20 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             return self._send_json({"ok": False, "error": str(exc)}, status=status)
         self._send_json({"ok": True, "id": record["id"], "status": record["status"]})
 
-    def _close_inbox_task(self, item_id: str) -> None:
+    def _close_inbox_task(self, item_id: str, payload: dict) -> None:
+        resolution = payload.get("resolution", "")
+        if not isinstance(resolution, str):
+            return self._send_json({"ok": False, "error": "Invalid resolution payload"}, status=400)
         try:
-            record = self._stores().close_inbox_task(item_id)
+            record = self._stores().close_inbox_task(item_id, resolution=resolution)
+        except StoreError as exc:
+            status = 404 if "not found" in str(exc).lower() else 400
+            return self._send_json({"ok": False, "error": str(exc)}, status=status)
+        self._send_json({"ok": True, "id": record["id"], "status": record["status"]})
+
+    def _reopen_inbox_task(self, item_id: str) -> None:
+        try:
+            record = self._stores().reopen_inbox_task(item_id)
         except StoreError as exc:
             status = 404 if "not found" in str(exc).lower() else 400
             return self._send_json({"ok": False, "error": str(exc)}, status=status)

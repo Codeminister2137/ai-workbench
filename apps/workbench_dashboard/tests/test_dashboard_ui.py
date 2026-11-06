@@ -67,8 +67,8 @@ def test_dynamic_buttons_have_titles() -> None:
     js = _read("app.js")
     buttons = re.findall(r"<button\b[^>]*>", js)
     assert (
-        len(buttons) == 18
-    )  # +report/rename/delete/submit/create/cancel/run-request/staged-approve/staged-reject/dictate/intake-approve/draft-plan/drain
+        len(buttons) == 19
+    )  # +report/rename/delete/submit/create/cancel/run-request/staged-approve/staged-reject/dictate/intake-approve/draft-plan/drain/reopen
     for tag in buttons:
         assert "title=" in tag, f"button without title: {tag}"
 
@@ -499,3 +499,15 @@ def test_sticky_header_is_opaque() -> None:
     assert "background: Canvas" in rule
     assert "background: inherit" not in rule
     assert "z-index" in rule
+
+
+def test_inbox_close_form_and_reopen_markers() -> None:
+    """Detail page records outcomes on close and offers reopen when closed."""
+    js = _read("app.js")
+    assert 'id="close-form"' in js
+    assert 'name="resolution"' in js
+    assert "/close" in js and "resolution:" in js
+    assert 'id="reopen-btn"' in js
+    assert "/reopen" in js
+    assert "<h3>Outcome</h3>" in js
+    assert "#/inbox?status=archive" in js
