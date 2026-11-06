@@ -64,19 +64,19 @@ verification before action — several audit claims were already proven wrong
 
 ## ai-workbench/11
 
-- [MEDIUM] Predictable PID tmp file allows symlink hijack — `tests/test_pid_publication.py` → **UNREVIEWED**
-- [LOW] Unbounded PID file read — `tests/test_pid_publication.py` → **UNREVIEWED**
-- [LOW] Dynamic PowerShell code execution via Invoke-Expression — `tests/test_research_runner.py` → **UNREVIEWED**
+- [MEDIUM] Predictable PID tmp file allows symlink hijack — `tests/test_pid_publication.py` → **DOWNGRADED 2026-11-06 (test-only pattern in owner-only tmp_path; no attacker can pre-place symlinks mid-test; O_EXCL noted)**
+- [LOW] Unbounded PID file read — `tests/test_pid_publication.py` → **DOWNGRADED 2026-11-06 (test-local reader over own tmp files; byte-bound is hygiene)**
+- [LOW] Dynamic PowerShell code execution via Invoke-Expression — `tests/test_research_runner.py` → **FALSE POSITIVE 2026-11-06 (executes the repo's OWN function AST under test to verify quoting; a compromised repo already owns pytest via imports — no new boundary)**
 - [HIGH] cp1252 stdout test crashes on emoji print — `tests/test_requesty_free_models.py` → **FALSE POSITIVE (the CLI reconfigures stdout to UTF-8/replace; the test passes and the suite is green — the crash was imagined)**
-- [MEDIUM] Hardlink test lacks Windows/privilege guard — `tests/test_research_tools.py` → **UNREVIEWED**
-- [MEDIUM] Descendant-kill assertion is timing-flaky — `tests/test_research_runner.py` → **UNREVIEWED**
-- [MEDIUM] Relative catalog path depends on CWD — `tests/test_repair_progress.py` → **UNREVIEWED**
-- [MEDIUM] Stale PID ValueError escapes FileNotFoundError contract — `tests/test_pid_publication.py` → **UNREVIEWED**
-- [LOW] Broad exception swallow hides publication races — `tests/test_pid_publication.py` → **UNREVIEWED**
-- [LOW] Test pollutes shared parent temp dir — `tests/test_operator_bridge.py` → **UNREVIEWED**
-- [LOW] Duplicated candidate/entry builders across suites — `tests/test_orchestrator_recommender.py` → **UNREVIEWED**
-- [LOW] Duplicated pinned-HTTP fake connection harness — `tests/test_research_search.py` → **UNREVIEWED**
-- [LOW] Fixed sleeps instead of clock injection — `tests/test_pid_publication.py` → **UNREVIEWED**
+- [MEDIUM] Hardlink test lacks Windows/privilege guard — `tests/test_research_tools.py` → **DOWNGRADED 2026-11-06 (NTFS hardlinks need no privilege — passes; guard matters only for exotic filesystems; wrap-with-skip queued to match the symlink sibling)**
+- [MEDIUM] Descendant-kill assertion is timing-flaky — `tests/test_research_runner.py` → **DOWNGRADED 2026-11-06 (flake is false-pass direction — slow CI delays the marker past the check; false FAIL needs genuinely broken descendant-kill; poll-with-deadline queued)**
+- [MEDIUM] Relative catalog path depends on CWD — `tests/test_repair_progress.py` → **DOWNGRADED 2026-11-06 (12 files share the pattern; suite always runs from repo root via run-tests.py; __file__-anchor queued as opportunistic hygiene, not a 12-file churn run)**
+- [MEDIUM] Stale PID ValueError escapes FileNotFoundError contract — `tests/test_pid_publication.py` → **DOWNGRADED 2026-11-06 (test-helper design point: garbage fails loud immediately vs poll-through — either defensible; pin one behavior queued)**
+- [LOW] Broad exception swallow hides publication races — `tests/test_pid_publication.py` → **FALSE POSITIVE 2026-11-06 (swallow feeds `assert 'error' not in observed` — ANY exception fails the test; nothing masked)**
+- [LOW] Test pollutes shared parent temp dir — `tests/test_operator_bridge.py` → **FALSE POSITIVE 2026-11-06 (parent file is the deliberate traversal target; pytest numbers parents per-test; no xdist — serial; basetemp retention cleans residue)**
+- [LOW] Duplicated candidate/entry builders across suites — `tests/test_orchestrator_recommender.py` → **BACKLOG 2026-11-06 (7 files confirmed; extract shared helper on the next touch, not as churn)**
+- [LOW] Duplicated pinned-HTTP fake connection harness — `tests/test_research_search.py` → **BACKLOG 2026-11-06 (2 sites confirmed; share on the next touch)**
+- [LOW] Fixed sleeps instead of clock injection — `tests/test_pid_publication.py` → **DOWNGRADED 2026-11-06 (measured 0.47s for the file; Event handshake is optional polish)**
 
 ## ai-workbench/12
 
