@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import argparse
 import ctypes
+import json
 import math
 import os
 import queue
@@ -132,3 +134,21 @@ def read_native_account_usage(
                 status="unknown", reason="cleanup_unverified", windows=[], observed_at_utc=None
             )
     return report
+
+
+def run_allowance_cli(
+    *,
+    description: str | None,
+    reader: Callable[..., dict[str, Any]],
+    argv: list[str] | None = None,
+) -> int:
+    """Run one allowance reader as a JSON CLI (exit 0 iff available)."""
+    parser = argparse.ArgumentParser(description=description)
+    parser.add_argument("--timeout-seconds", type=float, default=15)
+    args = parser.parse_args(argv)
+    try:
+        report = reader(timeout_seconds=args.timeout_seconds)
+    except ValueError:
+        parser.error("Timeout must be finite and between zero and 120 seconds")
+    print(json.dumps(report, allow_nan=False))
+    return 0 if report["status"] == "available" else 1

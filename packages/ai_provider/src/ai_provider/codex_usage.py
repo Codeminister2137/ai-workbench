@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import argparse
 import json
 import math
 import re
@@ -13,7 +12,10 @@ from typing import Any
 from ai_orchestrator import AccessMethod, ExecutionTarget
 
 from ai_provider.external_agents import external_agent_command
-from ai_provider.native_account_usage import read_native_account_usage
+from ai_provider.native_account_usage import (
+    read_native_account_usage,
+    run_allowance_cli,
+)
 
 MAX_LINE_BYTES = 1_048_576
 MAX_RESPONSE_BYTES = 2_097_152
@@ -140,15 +142,7 @@ def _exchange_rate_limits(process: subprocess.Popen[Any], deadline: float) -> li
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--timeout-seconds", type=float, default=15)
-    args = parser.parse_args(argv)
-    try:
-        report = read_codex_allowance(timeout_seconds=args.timeout_seconds)
-    except ValueError:
-        parser.error("Timeout must be finite and between zero and 120 seconds")
-    print(json.dumps(report, allow_nan=False))
-    return 0 if report["status"] == "available" else 1
+    return run_allowance_cli(description=__doc__, reader=read_codex_allowance, argv=argv)
 
 
 if __name__ == "__main__":

@@ -6,7 +6,6 @@ their profile, hook and slash-command isolation contracts are verified.
 
 from __future__ import annotations
 
-import argparse
 import json
 import math
 import os
@@ -21,7 +20,10 @@ from typing import Any
 from ai_orchestrator import AccessMethod
 
 from ai_provider.external_agents import external_agent_command
-from ai_provider.native_account_usage import read_native_account_usage
+from ai_provider.native_account_usage import (
+    read_native_account_usage,
+    run_allowance_cli,
+)
 
 SOURCE = "kiro_isolated_v2_usage"
 VERIFIED_VERSION = "kiro-cli-chat 2.24.0"
@@ -196,15 +198,7 @@ def _exchange_usage(process: subprocess.Popen[Any], deadline: float) -> list[dic
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--timeout-seconds", type=float, default=15)
-    args = parser.parse_args(argv)
-    try:
-        report = read_kiro_allowance(timeout_seconds=args.timeout_seconds)
-    except ValueError:
-        parser.error("Timeout must be finite and between zero and 120 seconds")
-    print(json.dumps(report, allow_nan=False))
-    return 0 if report["status"] == "available" else 1
+    return run_allowance_cli(description=__doc__, reader=read_kiro_allowance, argv=argv)
 
 
 if __name__ == "__main__":
