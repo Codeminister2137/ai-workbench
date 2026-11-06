@@ -54,6 +54,22 @@ def _truncate(text: str, limit: int) -> str:
     return text if len(text) <= limit else text[:limit] + "…"
 
 
+def _transcript_digest(
+    store, session_id: str, *, max_turns: int = 30, per_turn: int = 500
+) -> tuple[int, str]:
+    """Deterministic capped digest of user/assistant turns for run context."""
+    turns = [
+        message
+        for message in store.list_messages(session_id)
+        if message.role in ("user", "assistant") and message.content.strip()
+    ]
+    digest = "\n".join(
+        f"- **{message.role}**: {_truncate(message.content.strip(), per_turn)}"
+        for message in turns[:max_turns]
+    )
+    return len(turns), digest
+
+
 @dataclass(slots=True)
 class DashboardTurnOutcome:
     """Host-observed result of one dashboard chat turn."""
@@ -263,10 +279,7 @@ class DashboardChat:
             (message.content.strip() for message in turns if message.role == "user"),
             "(no user turns)",
         )
-        digest = "\n".join(
-            f"- **{message.role}**: {_truncate(message.content.strip(), 1000)}"
-            for message in turns[:50]
-        )
+        _count, digest = _transcript_digest(self.store, session_id, max_turns=50, per_turn=1000)
         body = (
             f"# Draft plan: {plan_title}\n\n"
             f"Source: chat session {session_id} ({len(turns)} turns) — "
@@ -332,11 +345,18 @@ class DashboardChat:
         run_id = uuid.uuid4().hex
         run_title = (title or "").strip() or text[:60]
         now = datetime.now(UTC).isoformat()
+        turn_count, digest = _transcript_digest(self.store, session_id)
+        context_block = (
+            f"\n\n--- Session transcript ({session_id}, {turn_count} turns) ---\n{digest}"
+            if digest
+            else ""
+        )
         approval = stores.create_inbox_task(
             title=f"Approve agent run: {run_title}",
             body=(
                 f"Chat requested an agent run (fan-out: {policy.value}).\n\n"
-                f"Request:\n{text}\n\n"
+                f"Request:\n{text}\n"
+                f"{context_block}\n"
                 "Approve to let a run worker execute it; "
                 "Reject leaves it parked (never executed)."
             ),
@@ -353,7 +373,7 @@ class DashboardChat:
                 "id": run_id,
                 "title": run_title,
                 "status": "queued",
-                "body": text,
+                "body": text + context_block,
                 "origin": "chat",
                 "session_id": session_id,
                 "fanout_policy": policy.value,
