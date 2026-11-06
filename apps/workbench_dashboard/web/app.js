@@ -801,14 +801,14 @@ async function renderInbox(id) {
   const tab = new URLSearchParams((location.hash.split("?")[1] || "")).get("status") || "active";
   const inboxUrl = inboxProjectFilter ? "/api/inbox?project_id=" + encodeURIComponent(inboxProjectFilter) : "/api/inbox";
   const payload = await api(inboxUrl);
-  const shown = payload.items.filter((t) => tab === "archive" ? t.status === "closed" : t.status !== "closed");
+  const shown = payload.items.filter((t) => tab === "archive" ? t.status === "closed" : tab === "queue" ? (t.assignee === "agent" && t.status === "open") : t.status !== "closed");
   const items = shown.length
     ? shown.map((t) =>
         `<li><a href="#/inbox/${esc(t.id)}">${gtext(t.title)}</a>
-         <span class="pill st-${esc((t.status || "none").replace(/\s+/g, "-"))}">${esc(t.type)} · ${esc(t.status)}</span></li>`).join("")
+         <span class="pill st-${esc((t.status || "none").replace(/\s+/g, "-"))}">${esc(t.type)} · ${esc(t.status)}${t.assignee === "agent" ? " · for AI" : ""}</span></li>`).join("")
     : '<li class="muted">Nothing here. The supervisor assigns decisions and tasks to the inbox.</li>';
   view.innerHTML = `<h1>Inbox</h1>
-    <p><a href="#/inbox">Active</a> · <a href="#/inbox?status=archive">Archive</a></p>
+    <p><a href="#/inbox">Active</a> · <a href="#/inbox?status=queue">AI queue</a> · <a href="#/inbox?status=archive">Archive</a></p>
     <p><input type="text" id="filter-inbox" placeholder="Filter tasks..." title="Filter inbox by text">
     <select id="filter-inbox-project" title="Show inbox tasks for one project">${await projectOptions(inboxProjectFilter)}</select></p>
     <ul class="plain" id="inbox-list">${items}</ul>`;
@@ -962,7 +962,8 @@ function renderCreate(kind) {
     inbox: {heading: "New inbox item", fields: `
       ${fieldRow("Title *", '<input type="text" id="f-title" title="Inbox item title (required)">', "required")}
       ${fieldRow("Details", '<textarea id="f-body" rows="3" title="Details (optional)"></textarea>', "optional")}
-      ${fieldRow("Type *", `<select id="f-type" title="Item type (required)"><option value="clarification">clarification</option><option value="decision">decision</option><option value="task">task</option></select>`, "required")}`},
+      ${fieldRow("Type *", `<select id="f-type" title="Item type (required)"><option value="clarification">clarification</option><option value="decision">decision</option><option value="task">task</option></select>`, "required")}
+      ${fieldRow("For *", `<select id="f-for" title="Who should do this (required)"><option value="owner">me</option><option value="agent">AI agent</option></select>`, "required")}`},
     idea: {heading: "New idea", fields: `
       ${fieldRow("Title *", '<input type="text" id="f-title" title="Idea title (required)">', "required")}
       ${fieldRow("Description", '<textarea id="f-body" rows="3" title="Description (optional)"></textarea>', "optional")}
@@ -998,6 +999,8 @@ function renderCreate(kind) {
             title,
             body: document.getElementById("f-body").value,
             type: document.getElementById("f-type").value,
+            created_by: "owner",
+            assignee: document.getElementById("f-for").value,
           }),
         });
         toast("Inbox item created", true);

@@ -17,6 +17,8 @@ MAX_RESPONSE_BYTES = 100_000
 MAX_OPEN_TASKS = 50
 INBOX_TYPES = ("decision", "clarification", "order", "task")
 INBOX_STATUSES = ("open", "answered", "closed")
+INBOX_PARTIES = ("supervisor", "owner", "agent")
+INBOX_ASSIGNEES = ("owner", "agent")
 FANOUT_POLICIES = ("allowed", "restricted", "denied")
 FANOUT_UNKNOWN = "unknown"
 IDEA_SOURCES = ("owner", "third-party")
@@ -145,13 +147,22 @@ class DashboardStores:
         task_id: str | None = None,
         context_refs: list[str] | None = None,
         options: list[str] | None = None,
+        created_by: str = "supervisor",
+        assignee: str = "owner",
     ) -> dict:
-        """Create one owner task; tasks default to a single Done choice."""
+        """Create one inbox task; tasks default to a single Done choice.
+
+        Direction defaults to supervisor->owner; owner->agent files AI backlog.
+        """
         title = title.strip()
         if not title:
             raise StoreError("Inbox task needs a title")
         if task_type not in INBOX_TYPES:
             raise StoreError(f"Inbox task type must be one of {INBOX_TYPES}")
+        if created_by not in INBOX_PARTIES:
+            raise StoreError(f"Inbox creator must be one of {INBOX_PARTIES}")
+        if assignee not in INBOX_ASSIGNEES:
+            raise StoreError(f"Inbox assignee must be one of {INBOX_ASSIGNEES}")
         if self.open_inbox_count() >= MAX_OPEN_TASKS:
             raise StoreError("Too many open inbox tasks")
         now = _utc_now()
@@ -167,14 +178,26 @@ class DashboardStores:
             if options is not None
             else (["Done"] if task_type == "task" else []),
             "status": "open",
-            "created_by": "supervisor",
-            "assignee": "owner",
+            "created_by": created_by,
+            "assignee": assignee,
             "created_at": now,
             "answered_at": None,
             "answer": None,
         }
         self.inbox.put(record["id"], record)
         return record
+
+    def agent_queue(self, *, limit: int = 50) -> list[dict]:
+        """Open owner->agent items, oldest-first (FIFO backlog)."""
+        items, _total = self.inbox.list(limit=MAX_OPEN_TASKS + 1)
+        # list() is newest-first; reverse so equal timestamps keep oldest first.
+        queued = [
+            item
+            for item in reversed(items)
+            if item.get("status") == "open" and item.get("assignee") == "agent"
+        ]
+        queued.sort(key=lambda item: item.get("created_at") or "")
+        return queued[: max(limit, 0)]
 
     def answer_inbox_task(
         self, item_id: str, *, answer: str, option_index: int | None = None

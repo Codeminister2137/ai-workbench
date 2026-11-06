@@ -599,9 +599,14 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         wanted = params.get("status", [None])[0]
         if wanted is not None and wanted not in {"open", "answered", "closed"}:
             return self._send_json({"ok": False, "error": "Invalid status filter"}, status=400)
+        for_agent = params.get("assignee", [None])[0]
+        if for_agent is not None and for_agent not in {"owner", "agent"}:
+            return self._send_json({"ok": False, "error": "Invalid assignee filter"}, status=400)
         items, _total = self._stores().inbox.list(limit=100)
         if wanted is not None:
             items = [item for item in items if item.get("status") == wanted]
+        if for_agent is not None:
+            items = [item for item in items if item.get("assignee") == for_agent]
         project_id = params.get("project_id", [None])[0]
         if project_id is not None:
             runs, _total = self._stores().runs.list(limit=100)
@@ -633,10 +638,19 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             return self._send_json(
                 {"ok": False, "error": "title, body, and type must be strings"}, status=400
             )
+        created_by = payload.get("created_by", "supervisor")
+        assignee = payload.get("assignee", "owner")
+        if not all(isinstance(value, str) for value in (created_by, assignee)):
+            return self._send_json(
+                {"ok": False, "error": "created_by and assignee must be strings"},
+                status=400,
+            )
         record = stores.create_inbox_task(
             title=title,
             body=body,
             task_type=task_type,
+            created_by=created_by,
+            assignee=assignee,
             plan_id=payload.get("plan_id"),
             task_id=payload.get("task_id"),
             context_refs=payload.get("context_refs"),

@@ -81,7 +81,9 @@ def test_dynamic_inputs_and_selects_have_titles() -> None:
     for tag in inputs:
         assert "title=" in tag, f"input without title: {tag}"
     selects = re.findall(r"<select\b[^>]*>", js)
-    assert len(selects) == 7  # +create selects, +run-request pickers, +runs/inbox project filters
+    assert (
+        len(selects) == 8
+    )  # +create selects, +run-request pickers, +runs/inbox project filters, +agent-queue assignee
     for tag in selects:
         assert "title=" in tag, f"select without title: {tag}"
 

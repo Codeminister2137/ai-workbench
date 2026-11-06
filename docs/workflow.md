@@ -235,6 +235,9 @@ select a dependency, deployment, privacy boundary or third-party permission.
   receipt, record the attended-presence override with its start time, and
   resume interactive work. Never schedule or renew sleep while the override
   stands; re-arm only on explicit direction with a fresh receipt path.
+- Agent queue: at session start, list open owner->agent inbox items
+  (`GET /api/inbox?assignee=agent&status=open`, oldest first) and work them
+  FIFO unless the owner directs otherwise; close each with a resolution note.
 - While unattended: decisions go to the dashboard inbox + mail notification
   (mail-inbox tandem), and work continues on independent items. A queued
   question is never a reason to stop or idle.
