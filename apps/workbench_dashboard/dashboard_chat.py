@@ -161,9 +161,16 @@ class DashboardChat:
             return CodingTurnResult(
                 1, None, "failed", f"Unknown provider {self.config.provider!r}."
             )
-        client = self.client_factory(
-            BackendConfig(provider=provider, model=self.config.model, base_url=self.config.base_url)
-        )
+        try:
+            client = self.client_factory(
+                BackendConfig(
+                    provider=provider, model=self.config.model, base_url=self.config.base_url
+                )
+            )
+        except (ProviderError, ValueError) as exc:
+            return CodingTurnResult(
+                1, None, "failed", f"Chat client unavailable: {exc}", provider=provider.value
+            )
         privacy = (
             PrivacyClass.LOCAL_ONLY
             if provider is ProviderKind.OLLAMA

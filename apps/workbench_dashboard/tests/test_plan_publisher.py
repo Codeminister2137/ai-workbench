@@ -96,3 +96,17 @@ def test_sync_run_carries_report(tmp_path) -> None:
     assert record["report"] == "Done."
     got = stores.runs.get("w4")
     assert got is not None and got["report"] == "Done."
+
+
+def test_sync_decision_case_insensitive_dedupe(tmp_path) -> None:
+    stores = DashboardStores(tmp_path / "data")
+    first = sync_decision(stores, title="Foo", body="details", options=["Yes", "No"])
+    second = sync_decision(stores, title="foo", body="changed", options=["Yes", "No"])
+    assert second.get("deduped") is True
+    assert second["id"] == first["id"]
+    items, total = stores.inbox.list(limit=10)
+    assert total == 1
+    third = sync_decision(stores, title="Bar", body="other", options=["Yes", "No"])
+    assert third.get("deduped") is None
+    items, total = stores.inbox.list(limit=10)
+    assert total == 2
