@@ -90,6 +90,51 @@ def public_ip(*, timeout: float = 10) -> str | None:
     return answer
 
 
+def previous_public_ip(notifications: Path) -> str | None:
+    """Latest public_ip from earlier ping receipts, or None. Fail-soft."""
+    try:
+        candidates = sorted(notifications.glob("*.json"), key=lambda item: item.stat().st_mtime)
+    except OSError:
+        return None
+    for path in reversed(candidates):
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (ValueError, UnicodeError, OSError):
+            continue
+        if not isinstance(payload, dict):
+            continue
+        address = payload.get("public_ip")
+        if isinstance(address, str) and address:
+            return address
+    return None
+
+
+LAST_IP_FILENAME = "last-public-ip.txt"
+
+
+def stable_ip_path(root: Path = ROOT) -> Path:
+    """Repo-local last-known-IP file (gitignored scratch, cross-window)."""
+    return root / ".tmp" / LAST_IP_FILENAME
+
+
+def read_last_ip(path: Path) -> str | None:
+    """Read the last-known public IP, or None. Fail-soft."""
+    try:
+        address = path.read_text(encoding="utf-8").strip()
+    except (ValueError, UnicodeError, OSError):
+        return None
+    return address or None
+
+
+def write_last_ip(path: Path, address: str) -> None:
+    """Record the last-known public IP. Fail-soft; never breaks a ping."""
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(address + "\n", encoding="utf-8")
+    except (ValueError, UnicodeError, OSError):
+        return
+
+
 def send_ping(
     *,
     subject: str,
@@ -113,10 +158,19 @@ def send_ping(
     if not target or (owner and target != owner):
         raise ValueError("Loop pings are restricted to the owner's Gmail address")
     address = public_ip()
-    if address is not None:
-        body = f"{body}\n\nPublic IP: {address}"
     notifications = run_dir / "notifications"
     notifications.mkdir(parents=True, exist_ok=True)
+    previous = previous_public_ip(notifications) if address is not None else None
+    if previous is None:
+        previous = read_last_ip(stable_ip_path())
+    if address is not None:
+        body = f"{body}\n\nPublic IP: {address}"
+        if previous is not None and previous != address:
+            body += (
+                f"\nNOTE: public IP changed since last ping: "
+                f"{previous} -> {address} (update the phone WoL app)"
+            )
+        write_last_ip(stable_ip_path(), address)
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     receipt_path = notifications / f"{event}-{stamp}.json"
     live_config = config if not dry_run else None

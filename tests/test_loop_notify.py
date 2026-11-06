@@ -15,6 +15,14 @@ notify = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(notify)
 
 
+@pytest.fixture(autouse=True)
+def _isolate_stable_ip(tmp_path, monkeypatch):
+    """Keep the cross-window IP file inside the test tmp dir."""
+    monkeypatch.setattr(
+        notify, "stable_ip_path", lambda root=notify.ROOT: tmp_path / "stable-ip.txt"
+    )
+
+
 def test_dry_run_ping_writes_receipt(tmp_path, monkeypatch):
     monkeypatch.setattr(notify, "read_gmail_config", lambda root=notify.ROOT: None)
     receipt = notify.send_ping(
@@ -188,3 +196,64 @@ def test_public_ip_fails_soft(tmp_path, monkeypatch):
         lambda *args, **kwargs: (_ for _ in ()).throw(OSError("down")),
     )
     assert notify.public_ip() is None
+
+
+def _seed_receipt(run_dir: Path, address: str | None) -> None:
+    notifications = run_dir / "notifications"
+    notifications.mkdir(parents=True, exist_ok=True)
+    (notifications / "progress-20261106T120000Z.json").write_text(
+        json.dumps({"event": "progress", "public_ip": address}), encoding="utf-8"
+    )
+
+
+def _capture(monkeypatch, tmp_path, address):
+    calls = []
+
+    class OwnerMailModule:
+        @staticmethod
+        def send_owner_mail(**kwargs):
+            calls.append(kwargs)
+            return {
+                "sent": True,
+                "finished": "t",
+                "error": None,
+                "receipt": None,
+            }
+
+    monkeypatch.setattr(notify, "_load_owner_mail", lambda: OwnerMailModule())
+    monkeypatch.setattr(
+        notify, "read_gmail_config", lambda root=notify.ROOT: ("owner@example.com", "pw")
+    )
+    monkeypatch.setattr(notify, "public_ip", lambda timeout=10: address)
+    return calls
+
+
+def test_ip_change_flagged_in_body(tmp_path, monkeypatch) -> None:
+    _seed_receipt(tmp_path, "83.26.59.90")
+    calls = _capture(monkeypatch, tmp_path, "83.26.80.50")
+    receipt = notify.send_ping(subject="s", body="b", run_dir=tmp_path, event="progress")
+    assert receipt["success"] is True
+    assert "Public IP: 83.26.80.50" in calls[0]["body"]
+    assert "83.26.59.90 -> 83.26.80.50" in calls[0]["body"]
+
+
+def test_same_ip_not_flagged(tmp_path, monkeypatch) -> None:
+    _seed_receipt(tmp_path, "83.26.80.50")
+    calls = _capture(monkeypatch, tmp_path, "83.26.80.50")
+    notify.send_ping(subject="s", body="b", run_dir=tmp_path, event="progress")
+    assert "Public IP: 83.26.80.50" in calls[0]["body"]
+    assert "changed since last ping" not in calls[0]["body"]
+
+
+def test_first_ping_no_flag(tmp_path, monkeypatch) -> None:
+    calls = _capture(monkeypatch, tmp_path, "83.26.80.50")
+    notify.send_ping(subject="s", body="b", run_dir=tmp_path, event="progress")
+    assert "changed since last ping" not in calls[0]["body"]
+
+
+def test_cross_window_change_flagged_via_stable_file(tmp_path, monkeypatch) -> None:
+    (tmp_path / "stable-ip.txt").write_text("83.26.59.90\n", encoding="utf-8")
+    calls = _capture(monkeypatch, tmp_path, "83.26.80.50")
+    notify.send_ping(subject="s", body="b", run_dir=tmp_path, event="progress")
+    assert "83.26.59.90 -> 83.26.80.50" in calls[0]["body"]
+    assert (tmp_path / "stable-ip.txt").read_text(encoding="utf-8").strip() == ("83.26.80.50")
