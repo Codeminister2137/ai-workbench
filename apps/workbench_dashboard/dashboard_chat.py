@@ -17,6 +17,7 @@ from pathlib import Path
 from ai_agent.coding_chat import CodingChatController, CodingTurnRequest, CodingTurnResult
 from ai_agent.fanout import FanoutPolicy
 from ai_agent.messenger import MessengerResult, run_messenger_turn
+from ai_agent.supervisor_prompt import SUPERVISOR_CORE_INSTRUCTIONS, assemble_supervisor_prompt
 from ai_provider.chat_transcripts import (
     ChatMessageRecord,
     ChatSessionRecord,
@@ -30,23 +31,7 @@ from ai_provider.translation import Translator, normalize_input
 from dashboard_config import DashboardConfig
 from dashboard_stores import DashboardStores
 
-SUPERVISOR_SYSTEM_PROMPT = (
-    "You are the Workbench supervisor answering inside the owner's local "
-    "dashboard on their Windows 11 PC. Be concise and concrete. "
-    "You can inspect the workspace (read, list, and search files; git status) "
-    "but you cannot edit files, execute commands, restart services, or send "
-    "mail. Mail delivery is not configured, so "
-    "never claim an email was or will be sent; say mail is unavailable "
-    "until the owner configures SMTP credentials. "
-    "You have no live view of services (Ollama, dashboard, scheduled "
-    "tasks); never assert their state. Send the owner to the dashboard "
-    "Home status view, or quote only the last error already in this "
-    "transcript. "
-    "Development work happens only through agent runs the owner queues "
-    "with the Request-run button and approves in the inbox; describe the "
-    "next step instead of claiming effects. "
-    "This PC runs Windows: never mention Linux paths, daemons, or commands."
-)
+SUPERVISOR_SYSTEM_PROMPT = SUPERVISOR_CORE_INSTRUCTIONS
 
 
 def _truncate(text: str, limit: int) -> str:
@@ -187,7 +172,9 @@ class DashboardChat:
                 workspace_root=self.workspace,
                 history_text=request.history,
                 prompt=request.text,
-                system_prompt=SUPERVISOR_SYSTEM_PROMPT,
+                system_prompt=assemble_supervisor_prompt(
+                    approval_policy=self.config.chat_fanout_policy
+                ),
                 privacy_class=privacy,
             )
         except ProviderError as exc:

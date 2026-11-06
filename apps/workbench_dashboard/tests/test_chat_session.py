@@ -100,6 +100,10 @@ def test_delete_removes_messages(chat) -> None:
 
 def test_system_prompt_grounds_capabilities(tmp_path) -> None:
     """The supervisor prompt states its real limits (no tools/mail/live view)."""
+    from ai_agent.supervisor_prompt import (
+        SUPERVISOR_CORE_BUDGET_CHARS,
+        assemble_supervisor_prompt,
+    )
     from ai_provider.contracts import MessageRole
     from dashboard_chat import SUPERVISOR_SYSTEM_PROMPT, DashboardChat
 
@@ -121,7 +125,9 @@ def test_system_prompt_grounds_capabilities(tmp_path) -> None:
     chat.send(record.session_id, "Hi")
     system = made[0].seen[0].messages[0]
     assert system.role is MessageRole.SYSTEM
-    assert system.content == SUPERVISOR_SYSTEM_PROMPT
+    assert system.content == assemble_supervisor_prompt(approval_policy="restricted")
+    assert system.content.startswith(SUPERVISOR_SYSTEM_PROMPT)
+    assert len(SUPERVISOR_SYSTEM_PROMPT) <= SUPERVISOR_CORE_BUDGET_CHARS
     for phrase in (
         "inspect the workspace",
         "cannot edit files",

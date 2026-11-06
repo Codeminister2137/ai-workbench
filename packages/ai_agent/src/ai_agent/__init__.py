@@ -30,6 +30,11 @@ from ai_agent.messenger import MessengerResult, run_messenger_turn
 from ai_agent.permissions import ApprovalPolicyPreset, PermissionManager, PermissionPolicy
 from ai_agent.recovery import RecoveryState
 from ai_agent.supervisor_drain import RunDrain, TerminalHook
+from ai_agent.supervisor_prompt import (
+    SUPERVISOR_CORE_BUDGET_CHARS,
+    SUPERVISOR_CORE_INSTRUCTIONS,
+    assemble_supervisor_prompt,
+)
 from ai_agent.supervisor_threads import SupervisorThreads
 from ai_agent.tools import (
     BaseTool,
@@ -79,6 +84,8 @@ __all__ = [
     "ReadFileTool",
     "RecoveryState",
     "RunCommandTool",
+    "SUPERVISOR_CORE_BUDGET_CHARS",
+    "SUPERVISOR_CORE_INSTRUCTIONS",
     "RunDrain",
     "StageFileTool",
     "TerminalHook",
@@ -95,6 +102,7 @@ __all__ = [
     "coding_tools_with_delegation",
     "ToolResult",
     "default_coding_tools",
+    "assemble_supervisor_prompt",
     "codex_authorization_from_status",
     "codex_authorization_registry",
     "run_messenger_turn",
