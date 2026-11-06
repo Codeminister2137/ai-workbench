@@ -66,6 +66,7 @@ GROUPS = {
         "tests/test_opencode_go_route.py",
         "tests/test_wb_bounds_guard.py",
         "tests/test_wb_exec_sandbox.py",
+        "tests/test_adapter_body_bounds.py",
     ),
     "orchestrator": (
         "tests/test_orchestrator_*.py",
@@ -130,6 +131,8 @@ GROUPS = {
         "tests/test_day_cycle.py",
         "tests/test_l3_ladder.py",
         "tests/test_install_workbench.py",
+        "tests/test_scrutiny_response_guard.py",
+        "tests/test_watchdog_tasks.py",
     ),
     "research": (
         "tests/test_research_*.py",
