@@ -47,20 +47,20 @@ verification before action — several audit claims were already proven wrong
 
 ## ai-workbench/10
 
-- [MEDIUM] Loopback handler enforces auth with `assert` — `tests/test_hosted_delegation_acceptance.py` → **UNREVIEWED**
-- [LOW] Global `sys.path` mutation without restore — `tests/test_mail_digest.py` → **UNREVIEWED**
-- [LOW] Global `sys.modules` pollution by script loader — `tests/test_l3_ladder.py` → **UNREVIEWED**
-- [HIGH] Bounded join then hard liveness assert is flaky — `tests/test_hosted_delegation_acceptance.py` → **FALSE POSITIVE (no liveness assert exists; daemon thread, join result ignored in the finalizer)**
-- [MEDIUM] Incorrect POSIX shell quoting of interpreter path — `tests/test_hosted_delegation_acceptance.py` → **UNREVIEWED**
-- [MEDIUM] Cross-test module import creates order dependency — `tests/test_measured_prefix_admission.py` → **UNREVIEWED**
-- [MEDIUM] Whole `time` module replaced by sleep-only stub — `tests/test_loop_notify.py` → **UNREVIEWED**
-- [MEDIUM] Stale-bytecode test assumes nanosecond mtime fidelity — `tests/test_opencode_go_coding_chat_acceptance.py` → **UNREVIEWED**
-- [MEDIUM] Double shutdown path for test HTTP server — `tests/test_hosted_delegation_acceptance.py` → **UNREVIEWED**
-- [LOW] Deadlines asserted with wall-clock bounds — `tests/test_kiro_usage.py` → **UNREVIEWED**
-- [LOW] Unverified version path leaks request expectation — `tests/test_kiro_usage.py` → **UNREVIEWED**
-- [MEDIUM] Duplicated `Response`/`FakeHttpResponse` harnesses — `tests/test_go_source_info.py` → **UNREVIEWED**
-- [LOW] Repeated `spec_from_file_location` script loading — `tests/test_loop_notify.py` → **UNREVIEWED**
-- [LOW] Hard-coded heartbeat sleep tight-loop in SDK test — `tests/test_ide_bridge_sdk.py` → **UNREVIEWED**
+- [MEDIUM] Loopback handler enforces auth with `assert` — `tests/test_hosted_delegation_acceptance.py` → **FALSE POSITIVE 2026-11-06 (pytest suites depend on assert; a handler failure ERRORS the test loudly — no silent 400 path)**
+- [LOW] Global `sys.path` mutation without restore — `tests/test_mail_digest.py` → **DOWNGRADED 2026-11-06 (redundant under pytest pythonpath — same dir already present, nothing new shadowed; monkeypatch.syspath tidy queued)**
+- [LOW] Global `sys.modules` pollution by script loader — `tests/test_l3_ladder.py` → **DOWNGRADED 2026-11-06 (10 files use unique script-module names with no collision against real packages; delitem finalizer queued as hygiene)**
+- [HIGH] Bounded join then hard liveness assert is flaky — `tests/test_hosted_delegation_acceptance.py` → **DOWNGRADED 2026-11-06 — corrected (the assert EXISTS at test:354; prior 'no liveness assert' was wrong). Near-vacuous: shutdown() blocks until the loop exits, so join(2)+assert can only flake on a >2s stuck handler; untimed-join queued)**
+- [MEDIUM] Incorrect POSIX shell quoting of interpreter path — `tests/test_hosted_delegation_acceptance.py` → **DOWNGRADED 2026-11-06 (''-escaping is CORRECT PowerShell quoting on the win32 suite; the POSIX branch is latent — shlex.quote queued for it)**
+- [MEDIUM] Cross-test module import creates order dependency — `tests/test_measured_prefix_admission.py` → **DOWNGRADED 2026-11-06 (verified: file collects+runs standalone; rename-fragile only; move shared fixture to conftest on next touch)**
+- [MEDIUM] Whole `time` module replaced by sleep-only stub — `tests/test_loop_notify.py` → **FALSE POSITIVE 2026-11-06 (loop_notify uses ONLY time.sleep — verified; the stub is complete and nothing is masked)**
+- [MEDIUM] Stale-bytecode test assumes nanosecond mtime fidelity — `tests/test_opencode_go_coding_chat_acceptance.py` → **DOWNGRADED 2026-11-06 (weakness is false-pass direction only — the test can never flake red from this; strengthen-with-skip queued)**
+- [MEDIUM] Double shutdown path for test HTTP server — `tests/test_hosted_delegation_acceptance.py` → **FALSE POSITIVE 2026-11-06 (structurally double, but shutdown()/ server_close()/join() are all idempotent-safe — no raise, no masked error)**
+- [LOW] Deadlines asserted with wall-clock bounds — `tests/test_kiro_usage.py` → **DOWNGRADED 2026-11-06 (8x headroom over the 0.6s hang timeout; bound guards hang-recovery, not perf)**
+- [LOW] Unverified version path leaks request expectation — `tests/test_kiro_usage.py` → **DOWNGRADED 2026-11-06 (count==1 pins the exact process budget — that IS the no-session-without-version contract; strictness is deliberate)**
+- [MEDIUM] Duplicated `Response`/`FakeHttpResponse` harnesses — `tests/test_go_source_info.py` → **BACKLOG 2026-11-06 (same family as /9 shim item: extract tests/_http_stubs.py on the next touch, not as churn)**
+- [LOW] Repeated `spec_from_file_location` script loading — `tests/test_loop_notify.py` → **BACKLOG 2026-11-06 (conftest load_script helper on the next touch, not as churn)**
+- [LOW] Hard-coded heartbeat sleep tight-loop in SDK test — `tests/test_ide_bridge_sdk.py` → **DOWNGRADED 2026-11-06 (measured 0.28s for the file; 10ms loop scoped to one 0.5s-timeout test; event-driven rewrite optional)**
 
 ## ai-workbench/11
 
