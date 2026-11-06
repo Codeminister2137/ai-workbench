@@ -5,7 +5,7 @@ only variable *names* and credential *status*, never values. Update this
 file when a slice adds, removes, or changes a capability (proposed
 Definition-of-Done rule, pending owner approval).
 
-Last verified: 2026-11-06 morning (post-reboot health check).
+Last verified: 2026-11-06 ~10:30 (drain v1 E2E on live server).
 
 ## One command
 
@@ -49,7 +49,12 @@ Codex note: PyCharm-bundled 0.137.0 is too stale (400s); PATH 0.166.0 wins.
 - Relay turns with inspection tools (read/list/search, git status) plus
   visible receipts; writes and execution stay approval-gated.
 - System prompt grounded 2026-11-05: no mail/service claims, no Linux paths.
-- Request-run queues approval-gated runs; transcript scope fix queued.
+- Request-run queues approval-gated runs; transcript scope: capped digest
+  (30 turns / 500 chars) + session ref, attachments surfaced.
+- Drain worker v1 (2026-11-06): `POST /api/runs/drain` executes approved
+  runs oldest-first (`max_runs`, default 1); "Drain now" button on Runs;
+  E2E proven approve→drain→completed on live server. No scheduler yet —
+  one click/shot per call.
 
 ## Mail (two call-sites, one missing credential)
 
@@ -76,5 +81,7 @@ Codex note: PyCharm-bundled 0.137.0 is too stale (400s); PATH 0.166.0 wins.
 
 ## Known gaps (see inbox + todos for live state)
 
-- Drain worker (approved runs sit `queued`), slim instructions, P7 answers,
+- Slim supervisor instructions (in progress), chat-channel tools
+  (in progress), P7 answers,
   mail credential + unification, MSI uninstall safety research (after data).
+  Drain has no scheduler yet.
