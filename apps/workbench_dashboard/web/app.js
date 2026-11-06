@@ -712,6 +712,10 @@ async function renderInbox(id) {
     const stamp = (v) => v ? esc(v.slice(0, 16).replace("T", " ")) : "";
     const record = (item.options || []).length && item.status === "closed"
       ? `<h3>Choices offered</h3><ol>${item.options.map((o) => `<li>${esc(o)}</li>`).join("")}</ol>` : "";
+    const outcome = item.resolution
+      ? `<h3>Outcome</h3><p>${gtext(item.resolution)}</p>`
+        + (item.resolved_at ? `<p class="muted">Resolved ${stamp(item.resolved_at)}</p>` : "")
+      : "";
     const decision = item.answer || item.note
       ? `${item.answer ? `<p><strong>Answer:</strong> ${esc(item.answer)}</p>` : ""}
          ${item.note ? `<p><strong>Note:</strong> ${esc(item.note)}</p>` : ""}
@@ -727,7 +731,11 @@ async function renderInbox(id) {
       ${record}
       <h3>Decision record</h3>
       ${decision}
-      ${item.status === "closed" ? '<p class="muted">Closed; answers are immutable.</p>' : `
+      ${outcome}
+      ${item.status === "closed"
+        ? `<p class="muted">Closed; answers are immutable.</p>`
+          + `<p><button id="reopen-btn" title="Return this task to the active list">Reopen task</button></p>`
+        : `
       <h3>Your choices</h3>
       <form id="answer-form">
         ${options}
@@ -736,7 +744,10 @@ async function renderInbox(id) {
         <p><button type="submit" title="Record your choice and note">Submit answer</button></p>
       </form>
       <h3>Actions</h3>
-      <p><button id="close-btn" title="Close this task (answers become immutable)">Close task</button></p>`}</div>`;
+      <form id="close-form">
+        <div><textarea name="resolution" rows="3" placeholder="Outcome note (required) — what was implemented, with technical details..." title="Implementation outcome, stored with the archived task"></textarea></div>
+        <p><button type="submit" title="Record the outcome and archive this task">Close with outcome</button></p>
+      </form>`}</div>`;
     const form = document.getElementById("answer-form");
     if (form) form.addEventListener("submit", async (ev) => {
       ev.preventDefault();
@@ -756,15 +767,30 @@ async function renderInbox(id) {
         toast(err.message, false);
       }
     });
-    const closeBtn = document.getElementById("close-btn");
-    if (closeBtn) closeBtn.addEventListener("click", async () => {
+    const closeForm = document.getElementById("close-form");
+    if (closeForm) closeForm.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
       try {
         await api("/api/inbox/" + encodeURIComponent(id) + "/close", {
           method: "POST",
           headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({resolution: ev.target.resolution.value}),
+        });
+        toast("Outcome recorded, task archived", true);
+        render();
+      } catch (err) {
+        toast(err.message, false);
+      }
+    });
+    const reopenBtn = document.getElementById("reopen-btn");
+    if (reopenBtn) reopenBtn.addEventListener("click", async () => {
+      try {
+        await api("/api/inbox/" + encodeURIComponent(id) + "/reopen", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
           body: "{}",
         });
-        toast("Task closed", true);
+        toast("Task reopened", true);
         render();
       } catch (err) {
         toast(err.message, false);

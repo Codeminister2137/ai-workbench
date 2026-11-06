@@ -209,12 +209,28 @@ class DashboardStores:
         self.inbox.put(item_id, record)
         return record
 
-    def close_inbox_task(self, item_id: str) -> dict:
+    def close_inbox_task(self, item_id: str, *, resolution: str | None = None) -> dict:
         """Close one inbox task; it stays in the audit trail."""
         record = self.inbox.get(item_id)
         if record is None:
             raise StoreError("Inbox task not found")
+        if resolution is None or not resolution.strip():
+            raise StoreError("Closing needs a resolution note")
+        resolution = resolution.strip()
+        record["resolution"] = resolution
+        record["resolved_at"] = _utc_now()
         record["status"] = "closed"
+        self.inbox.put(item_id, record)
+        return record
+
+    def reopen_inbox_task(self, item_id: str) -> dict:
+        """Reopen a closed inbox task; history is preserved."""
+        record = self.inbox.get(item_id)
+        if record is None:
+            raise StoreError("Inbox task not found")
+        if record.get("status") != "closed":
+            raise StoreError("Only closed tasks can be reopened")
+        record["status"] = "open"
         self.inbox.put(item_id, record)
         return record
 

@@ -129,8 +129,12 @@ def test_inbox_flow_and_token_gate(dashboard_server, tmp_path) -> None:
     )
     assert answered["status"] == "answered"
 
-    closed = post_json(dashboard_server, f"/api/inbox/{item_id}/close", {})
+    closed = post_json(dashboard_server, f"/api/inbox/{item_id}/close", {"resolution": "Picked A."})
     assert closed["status"] == "closed"
+    item = get_json(dashboard_server, f"/api/inbox/{item_id}")
+    assert item["item"]["resolution"] == "Picked A."
+    reopened = post_json(dashboard_server, f"/api/inbox/{item_id}/reopen", {})
+    assert reopened["status"] == "open"
 
     (tmp_path / "data").mkdir(exist_ok=True)
     (tmp_path / "data" / "supervisor.token").write_text("s3cret", encoding="utf-8")
@@ -386,3 +390,15 @@ def test_status_reports_live_scheduler_state(dashboard_server, monkeypatch) -> N
     assert sched["ticks"] == 3
     assert sched["errors"] == 1
     assert sched["last_error"] == "boom"
+
+
+def test_inbox_close_requires_resolution(dashboard_server) -> None:
+    created = post_json(
+        dashboard_server,
+        "/api/inbox",
+        {"title": "t", "body": "b", "type": "decision"},
+    )
+    with pytest.raises(HTTPError) as raised:
+        post_json(dashboard_server, f"/api/inbox/{created['id']}/close", {})
+    assert raised.value.code == 400
+    raised.value.close()
