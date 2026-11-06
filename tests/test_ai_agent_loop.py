@@ -484,3 +484,55 @@ def test_empty_registry_unknown_call_retains_safe_refusal_feedback(tmp_path):
     assert "No operation was attempted." in refusal.output
     assert "PRIVATE" not in refusal.output and "Registered tool names:" not in refusal.output
     assert not list(tmp_path.iterdir())
+
+
+class _ScriptClient:
+    backend = FakeClient.backend
+
+    def __init__(self, script) -> None:
+        self.requests = []
+        self._script = script
+
+    def complete(self, request):
+        self.requests.append(request)
+        message = self._script[min(len(self.requests) - 1, len(self._script) - 1)]
+        return AIResponse(
+            message=message,
+            backend=self.backend,
+            finish_reason=FinishReason.STOP,
+            usage=UsageMetadata(),
+        )
+
+    def stream(self, request):
+        raise NotImplementedError
+
+
+def test_blank_response_without_tools_is_retried(tmp_path):
+    client = _ScriptClient(
+        [
+            AIMessage(MessageRole.ASSISTANT, "   "),
+            AIMessage(MessageRole.ASSISTANT, "Recovered"),
+        ]
+    )
+    result = AgentLoop(
+        client,
+        default_coding_tools(),
+        ToolContext(tmp_path),
+        permissions=PermissionManager(policy=PermissionPolicy.permissive()),
+    ).run("Say something")
+    assert result.response.message.content == "Recovered"
+    assert len(client.requests) == 2
+    assert "last response was empty" in repr(client.requests[1].messages)
+
+
+def test_blank_response_at_limit_is_returned(tmp_path):
+    client = _ScriptClient([AIMessage(MessageRole.ASSISTANT, "")])
+    result = AgentLoop(
+        client,
+        default_coding_tools(),
+        ToolContext(tmp_path),
+        permissions=PermissionManager(policy=PermissionPolicy.permissive()),
+        max_iterations=1,
+    ).run("Say something")
+    assert result.response.message.content == ""
+    assert len(client.requests) == 1

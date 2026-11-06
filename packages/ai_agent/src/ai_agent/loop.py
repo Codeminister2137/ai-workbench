@@ -283,6 +283,18 @@ class AgentLoop:
             self._check_deadline(messages)
             tool_calls = response.tool_calls or response.message.tool_calls
             if not tool_calls:
+                if not (response.message.content or "").strip() and iteration < self.max_iterations:
+                    if self.diagnostic:
+                        self.diagnostic("empty_response: feedback")
+                    messages.append(
+                        AIMessage(
+                            MessageRole.USER,
+                            "Host execution feedback: the last response was empty. "
+                            "Author the final report or the next tool call now; "
+                            "do not return an empty response.",
+                        )
+                    )
+                    continue
                 if (
                     self.completion_requirements
                     and response.finish_reason not in {FinishReason.LENGTH, FinishReason.ERROR}
