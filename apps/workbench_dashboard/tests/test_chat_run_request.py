@@ -179,3 +179,24 @@ def test_run_request_rejects_unknown_policy(chat_run_server) -> None:
     assert (
         post_status(base, f"/api/chat/sessions/{session_id}/run-request", {"text": "Do it"}) == 400
     )
+
+
+def test_run_request_attaches_transcript_digest(chat_run_server) -> None:
+    """Run body and approval carry the conversation, not just one message."""
+    from ai_provider.chat_transcripts import SQLiteChatTranscriptStore
+
+    base, tmp_path = chat_run_server
+    session_id = _new_session(base)
+    store = SQLiteChatTranscriptStore(tmp_path / "data" / "chats.sqlite3")
+    store.append_message(session_id, role="user", content="We need a status page")
+    store.append_message(session_id, role="assistant", content="Drafted the layout")
+
+    receipt = post_json(base, f"/api/chat/sessions/{session_id}/run-request", {"text": "Build it"})
+    assert receipt["ok"] is True
+    run = _read_json(tmp_path / "data" / "runs" / f"{receipt['run_id']}.json")
+    assert "Build it" in run["body"]
+    assert "We need a status page" in run["body"]
+    assert "Drafted the layout" in run["body"]
+    assert session_id in run["body"]
+    inbox = _read_json(tmp_path / "data" / "inbox" / f"{receipt['inbox_id']}.json")
+    assert "We need a status page" in inbox["body"]
