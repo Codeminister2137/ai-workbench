@@ -51,7 +51,8 @@ inspect the owned process only.
   reviewing/adopted/parked/declined with a decision note.
 - Owner mail: terminal run outcomes can notify the owner by email.
   Set `WORKBENCH_OWNER_EMAIL` + `WORKBENCH_SMTP_HOST` (plus optional
-  `_PORT`/`_USER`/`_PASS`/`_STARTTLS`) in the environment; without
+  `_PORT`/`_USER`/`_PASS`/`_STARTTLS`) in the environment, or just
+  `GMAIL_EMAIL` + `GMAIL_PASSWORD` (env or root `.env`, Gmail SMTP); without
   them the notifier stays silent. Delivery is fail-closed to the
   owner address only, with a receipt per send. `supervision` in
   `dashboard.json` (`attended` default, or `unattended`, switchable

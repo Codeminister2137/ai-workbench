@@ -337,7 +337,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             {
                 "ok": True,
                 "supervision": config.supervision,
-                "mail_configured": mail_configured(),
+                "mail_configured": mail_configured(root=self.repo_root),
             }
         )
 
@@ -351,7 +351,13 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             saved = save_supervision(self.config_path, supervision)
         except ValueError as exc:
             return self._send_json({"ok": False, "error": str(exc)}, status=400)
-        self._send_json({"ok": True, "supervision": saved, "mail_configured": mail_configured()})
+        self._send_json(
+            {
+                "ok": True,
+                "supervision": saved,
+                "mail_configured": mail_configured(root=self.repo_root),
+            }
+        )
 
     def _status(self, config: DashboardConfig) -> dict[str, Any]:
         stores = self._stores()

@@ -6,6 +6,11 @@ variables (never from the config file or request bodies), delivery is
 fail-closed to the configured owner address, and every send attempt is
 captured in a receipt. Missing SMTP configuration means a silent skip —
 never a crash and never dry-run receipt spam.
+
+When ``WORKBENCH_*`` is absent, configuration falls back to the single
+``GMAIL_EMAIL``/``GMAIL_PASSWORD`` credential pair (process environment,
+then the repository-root ``.env`` file) over Gmail SMTP — the same pair
+``scripts/loop_notify.py`` uses, so one credential provisions both paths.
 """
 
 from __future__ import annotations
@@ -24,6 +29,10 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 DEFAULT_SMTP_PORT = 587
+GMAIL_SMTP_HOST = "smtp.gmail.com"
+GMAIL_EMAIL_ENV = "GMAIL_EMAIL"
+GMAIL_PASSWORD_ENV = "GMAIL_PASSWORD"
+REPO_ROOT = Path(__file__).resolve().parents[2]
 SMTP_TIMEOUT_SECONDS = 15
 MAX_SUBJECT_CHARS = 300
 MAX_BODY_CHARS = 50_000
@@ -35,13 +44,61 @@ ATTENDED_NOTIFY_STATUSES = frozenset({"failed", "waiting_on_owner"})
 UNATTENDED_NOTIFY_STATUSES = frozenset({"completed", "failed", "cancelled", "waiting_on_owner"})
 
 
-def load_smtp_config(env: Mapping[str, str] | None = None) -> dict:
-    """Read SMTP settings from ``env`` (default: process environment)."""
+def _read_env_file(path: Path) -> dict[str, str]:
+    """Read ``GMAIL_*`` entries from a dotenv file (values never logged)."""
+    values: dict[str, str] = {}
+    try:
+        text = path.read_text(encoding="utf-8-sig")
+    except OSError:
+        return values
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        name, _, value = stripped.partition("=")
+        name = name.strip()
+        if name in (GMAIL_EMAIL_ENV, GMAIL_PASSWORD_ENV) and name not in values:
+            values[name] = value.strip().strip("\"'")
+    return values
+
+
+def load_smtp_config(
+    env: Mapping[str, str] | None = None, *, root: Path | str | None = None
+) -> dict:
+    """Read SMTP settings from ``env`` (default: process environment).
+
+    ``WORKBENCH_*`` wins when complete; otherwise the ``GMAIL_*`` pair is
+    resolved from the same mapping, then from ``root/.env`` (default: the
+    repository root) over Gmail SMTP. Anything else raises ``ValueError``.
+    """
     source = os.environ if env is None else env
     owner = (source.get("WORKBENCH_OWNER_EMAIL") or "").strip()
     host = (source.get("WORKBENCH_SMTP_HOST") or "").strip()
-    if not owner or not host:
-        raise ValueError("Set WORKBENCH_OWNER_EMAIL and WORKBENCH_SMTP_HOST to notify")
+    if owner and host:
+        return _explicit_smtp_config(source, owner, host)
+    email = (source.get(GMAIL_EMAIL_ENV) or "").strip()
+    password = source.get(GMAIL_PASSWORD_ENV) or ""
+    if not (email and password):
+        base = Path(root) if root is not None else REPO_ROOT
+        found = _read_env_file(base / ".env")
+        email = email or found.get(GMAIL_EMAIL_ENV, "")
+        password = password or found.get(GMAIL_PASSWORD_ENV, "")
+    if email and password:
+        return {
+            "owner": email,
+            "host": GMAIL_SMTP_HOST,
+            "port": DEFAULT_SMTP_PORT,
+            "username": email,
+            "password": password,
+            "starttls": True,
+        }
+    raise ValueError(
+        "Set WORKBENCH_OWNER_EMAIL and WORKBENCH_SMTP_HOST "
+        "(or GMAIL_EMAIL/GMAIL_PASSWORD) to notify"
+    )
+
+
+def _explicit_smtp_config(source: Mapping[str, str], owner: str, host: str) -> dict:
     try:
         port = int(source.get("WORKBENCH_SMTP_PORT", str(DEFAULT_SMTP_PORT)))
     except ValueError:
@@ -58,10 +115,12 @@ def load_smtp_config(env: Mapping[str, str] | None = None) -> dict:
     }
 
 
-def mail_configured(env: Mapping[str, str] | None = None) -> bool:
+def mail_configured(
+    env: Mapping[str, str] | None = None, *, root: Path | str | None = None
+) -> bool:
     """Return True when owner-mail SMTP settings are present (no secrets)."""
     try:
-        load_smtp_config(env)
+        load_smtp_config(env, root=root)
     except (ValueError, OSError):
         return False
     return True
@@ -150,6 +209,8 @@ def notify_plan(
     supervision: str,
     receipts_dir: Path,
     env: Mapping[str, str] | None = None,
+    *,
+    root: Path | str | None = None,
 ) -> tuple[Callable[[Mapping[str, object]], dict] | None, frozenset[str]]:
     """Return ``(sender, notify_on)`` for terminal run outcomes.
 
@@ -158,7 +219,7 @@ def notify_plan(
     Never raises for settings or config problems.
     """
     try:
-        config = load_smtp_config(env)
+        config = load_smtp_config(env, root=root)
     except (ValueError, OSError):
         logger.warning("supervision without SMTP settings; not notifying")
         return None, UNATTENDED_NOTIFY_STATUSES
