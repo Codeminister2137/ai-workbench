@@ -177,3 +177,30 @@ class TestSuiteSelection:
             suites.subprocess, "run", lambda *a, **kw: SimpleNamespace(returncode=next(statuses))
         )
         assert suites.main(["full", "--", "-q"]) == 1
+
+    def test_command_label_infers_group_from_paths(self):
+        assert suites.command_label(["python", "-m", "pytest", "tests/test_x.py"]) == "workspace"
+        assert (
+            suites.command_label(["python", "-m", "pytest", "apps/ai_council/tests/test_c.py"])
+            == "council"
+        )
+        assert (
+            suites.command_label(
+                ["python", "-m", "pytest", "apps\\job_search\\job-email\\test_j.py"]
+            )
+            == "job-search"
+        )
+
+    def test_summary_table_names_failing_group(self, monkeypatch, capsys):
+        from types import SimpleNamespace
+
+        statuses = iter((0, 3, 0))
+        monkeypatch.setattr(
+            suites.subprocess, "run", lambda *a, **kw: SimpleNamespace(returncode=next(statuses))
+        )
+        assert suites.main(["full", "--", "-q"]) == 3
+        out = capsys.readouterr().out
+        assert "Running workspace:" in out
+        assert "Running council:" in out
+        assert "council" in out and "FAIL(3)" in out
+        assert out.count("FAIL(") == 1

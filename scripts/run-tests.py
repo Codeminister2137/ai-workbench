@@ -10,6 +10,7 @@ import argparse
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -215,6 +216,17 @@ def test_commands(names: list[str], extra: list[str], *, root: Path = ROOT) -> l
     return commands
 
 
+def command_label(command: list[str]) -> str:
+    """Infer the summary-table label from pytest module paths (display only)."""
+    for path in command:
+        normalized = path.replace("\\", "/")
+        if normalized.startswith("apps/ai_council/"):
+            return "council"
+        if normalized.startswith("apps/job_search/"):
+            return "job-search"
+    return "workspace"
+
+
 def test_environment() -> dict[str, str]:
     """Isolate fixture repositories while preserving ordinary test/tool settings."""
     return {
@@ -239,11 +251,21 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"{name}: {len(paths)} modules")
             return 0
         status = 0
+        rows: list[tuple[str, int, int, float]] = []
         for command in test_commands(args.groups or ["full"], extra):
-            print(f"Running {len(command) - 3 - len(extra)} test modules", flush=True)
+            label = command_label(command)
+            modules = len(command) - 3 - len(extra)
+            print(f"Running {label}: {modules} test modules", flush=True)
+            started = time.monotonic()
             result = subprocess.run(command, cwd=ROOT, env=test_environment(), check=False)
+            elapsed = time.monotonic() - started
+            rows.append((label, modules, result.returncode, elapsed))
             if result.returncode and not status:
                 status = result.returncode
+        print("group      modules  result   seconds")
+        for label, modules, code, elapsed in rows:
+            outcome = "ok" if code == 0 else f"FAIL({code})"
+            print(f"{label:<10} {modules:<7} {outcome:<8} {elapsed:.1f}")
         return status
     except ValueError as exc:
         parser.error(str(exc))
