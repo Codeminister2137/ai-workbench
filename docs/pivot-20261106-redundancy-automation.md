@@ -67,8 +67,9 @@ fallback to `user_config` is possible; minor. Note only.
   file was rejected as over-engineering (callers redirect; the
   table says where to look), and streaming output is preserved.
 - A2 Triage verdict helper for future audits (12 near-identical
-  apply scripts were written this window). Small; deferred to a
-  future window, no owner decision needed.
+  apply scripts were written this window) — IMPLEMENTED same window
+  as `scripts/triage-apply.py` (fail-loud exact-match, dry-run,
+  6 tests; verdicts supplied as JSON).
 - A3 Inbox decision lifecycle (auto-appended outcome, close,
   archive) — DONE in loop-2.
 - R3 Brief pre-flight size estimate — REJECTED (the slice driver
