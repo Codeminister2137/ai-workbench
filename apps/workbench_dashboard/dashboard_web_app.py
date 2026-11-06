@@ -36,6 +36,7 @@ from ai_provider.stt import (
     transcribe_audio,
 )
 from ai_provider.translation import TranslationError, Translator
+from chat_channel_tools import build_chat_channel_tools
 from dashboard_chat import DashboardChat
 from dashboard_config import (
     DEFAULT_CONFIG_PATH,
@@ -152,7 +153,12 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
 
     def _chat(self, config: DashboardConfig) -> DashboardChat:
         store = SQLiteChatTranscriptStore(self.data_dir / "chats.sqlite3")
-        return DashboardChat(store, config, self.repo_root)
+        return DashboardChat(
+            store,
+            config,
+            self.repo_root,
+            chat_tools=build_chat_channel_tools(self._stores(), self._library()),
+        )
 
     def _project_roots(self, config: DashboardConfig) -> ProjectRoots:
         """Build the request-time work-root allowlist (fail-closed).

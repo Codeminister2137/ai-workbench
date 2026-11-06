@@ -1,9 +1,9 @@
 """Dashboard chat sessions over coding-chat transcripts.
 
 Maps dashboard chat sessions to ``coding_chat`` conversations so every turn
-keeps a provider-neutral transcript. Turn execution in v1 is a single-shot
-provider answer (no tools, no approvals); the executor is injectable so
-tests stay offline and the agent loop can replace it in a later slice.
+keeps a provider-neutral transcript. Turn execution runs through the
+inspection relay (read-only workspace tools plus optional chat-channel
+lookups); the relay runner is injectable so tests stay offline.
 """
 
 from __future__ import annotations
@@ -18,6 +18,7 @@ from ai_agent.coding_chat import CodingChatController, CodingTurnRequest, Coding
 from ai_agent.fanout import FanoutPolicy
 from ai_agent.messenger import MessengerResult, run_messenger_turn
 from ai_agent.supervisor_prompt import SUPERVISOR_CORE_INSTRUCTIONS, assemble_supervisor_prompt
+from ai_agent.tools.base import BaseTool
 from ai_provider.chat_transcripts import (
     ChatMessageRecord,
     ChatSessionRecord,
@@ -92,12 +93,14 @@ class DashboardChat:
         *,
         client_factory: Callable[[BackendConfig], ChatClient] = create_chat_client,
         relay_runner: Callable[..., MessengerResult] | None = None,
+        chat_tools: tuple[BaseTool, ...] | None = None,
     ) -> None:
         self.store = store
         self.config = config
         self.workspace = workspace.resolve()
         self.client_factory = client_factory
         self.relay_runner = relay_runner or _default_relay_runner
+        self.chat_tools = tuple(chat_tools or ())
 
     def create_session(self, *, title: str, privacy_class: str = "local_only") -> ChatSessionRecord:
         """Create one supervisor chat session bound to the dashboard workspace."""
@@ -167,6 +170,9 @@ class DashboardChat:
             else PrivacyClass.EXTERNAL_ALLOWED
         )
         try:
+            extra_kwargs: dict[str, object] = (
+                {"extra_tools": self.chat_tools} if self.chat_tools else {}
+            )
             result = self.relay_runner(
                 client=client,
                 workspace_root=self.workspace,
@@ -176,6 +182,7 @@ class DashboardChat:
                     approval_policy=self.config.chat_fanout_policy
                 ),
                 privacy_class=privacy,
+                **extra_kwargs,
             )
         except ProviderError as exc:
             return CodingTurnResult(
