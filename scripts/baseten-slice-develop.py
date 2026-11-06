@@ -21,6 +21,7 @@ import argparse
 import dataclasses
 import hashlib
 import json
+import re
 import subprocess
 import sys
 import time
@@ -229,10 +230,16 @@ def main() -> int:
                         raise ValueError(f"{name}: no real newlines (escaped?)")
                     compile(src, name, "exec")
             test_paths = [n for n in allow if "/tests/" in n or n.startswith("tests/")]
-            if test_paths and all(
-                (root / n).read_bytes() == (pristine_bytes.get(n) or b"") for n in test_paths
-            ):
-                raise ValueError("allowlisted test files returned unchanged")
+            if test_paths:
+
+                def _test_count(data: bytes) -> int:
+                    return len(re.findall(rb"^def (test_\w+)", data, re.MULTILINE))
+
+                before = sum(_test_count(pristine_bytes.get(n) or b"") for n in test_paths)
+                after = sum(_test_count((root / n).read_bytes()) for n in test_paths)
+                # Tests must grow: byte-diffs alone once hid a file swap.
+                if after <= before and not any(pristine_bytes.get(n) is None for n in test_paths):
+                    raise ValueError("allowlisted tests gained no test functions")
         except (ValueError, SyntaxError) as exc:
             send["status"] = f"rejected: {exc}"[:200]
             # Restore pre-slice bytes so the retry starts from real sources.
