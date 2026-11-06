@@ -123,10 +123,40 @@ def test_system_prompt_grounds_capabilities(tmp_path) -> None:
     assert system.role is MessageRole.SYSTEM
     assert system.content == SUPERVISOR_SYSTEM_PROMPT
     for phrase in (
-        "cannot run tools",
+        "inspect the workspace",
+        "cannot edit files",
         "never claim an email was or will be sent",
         "no live view of services",
         "Request-run button",
         "runs Windows",
     ):
         assert phrase in SUPERVISOR_SYSTEM_PROMPT
+
+
+def test_send_uses_relay_and_appends_receipts(tmp_path) -> None:
+    """Relay answers land in the transcript with visible tool receipts."""
+    from ai_agent.messenger import MessengerResult
+    from dashboard_chat import DashboardChat
+
+    seen: dict = {}
+
+    def fake_relay(**kwargs):
+        seen.update(kwargs)
+        return MessengerResult(answer="Found it.", tool_receipts=("read_file",), iterations=2)
+
+    store = SQLiteChatTranscriptStore(tmp_path / "chats.sqlite3")
+    chat = DashboardChat(
+        store,
+        DashboardConfig(provider="ollama", model="fake"),
+        tmp_path,
+        client_factory=lambda config: FakeClient(config),
+        relay_runner=fake_relay,
+    )
+    record = chat.create_session(title="t")
+    outcome = chat.send(record.session_id, "Hi")
+    assert outcome.response_text == "Found it.\n\n_Checked with tools: read_file._"
+    assert outcome.execution_status == "completed"
+    assert seen["prompt"] == "Hi"
+    assert seen["workspace_root"] == tmp_path.resolve()
+    messages = chat.list_messages(record.session_id)
+    assert messages[1].content.endswith("read_file._")

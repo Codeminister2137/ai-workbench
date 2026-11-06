@@ -26,6 +26,7 @@ from ai_agent.contracts import (
 )
 from ai_agent.delegation_runner import build_child_runner
 from ai_agent.loop import AgentLoop, AgentResult, ToolExecutionEvent
+from ai_agent.messenger import MessengerResult, run_messenger_turn
 from ai_agent.permissions import ApprovalPolicyPreset, PermissionManager, PermissionPolicy
 from ai_agent.recovery import RecoveryState
 from ai_agent.supervisor_drain import RunDrain, TerminalHook
@@ -70,6 +71,7 @@ __all__ = [
     "GitStatusTool",
     "GrepSearchTool",
     "ListDirTool",
+    "MessengerResult",
     "OwnerTaskTool",
     "PermissionAction",
     "PermissionManager",
@@ -95,4 +97,5 @@ __all__ = [
     "default_coding_tools",
     "codex_authorization_from_status",
     "codex_authorization_registry",
+    "run_messenger_turn",
 ]
