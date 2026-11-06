@@ -260,7 +260,7 @@ verification before action — several audit claims were already proven wrong
 ## remote-operator/2
 
 - [MEDIUM] `cmd /c mklink` test helper allows shell metachar injection — `tests/test_sessions.py` → **DOWNGRADED 2026-11-06 (paths are fixed alphanumeric tmp names — no metachar surface; symlink-first with junction fallback is already the portable pattern)**
-- [LOW] Predictable owner bearer token pattern reused across suites — `tests/test_web.py` → **UNREVIEWED**
+- [LOW] Predictable owner bearer token pattern reused across suites — `tests/test_web.py` → **DOWNGRADED 2026-11-06 (clearly-marked synthetic fixture; no prod default path exists; per-test secrets factory is optional polish)**
 - [LOW] Shared hardcoded demo access code across hosted suites — `tests/test_hosted_drain.py` → **DOWNGRADED 2026-11-06 (4 files confirmed; tests use isolated temp roots; prod requires env-supplied code; factory is optional)**
 - [LOW] Synthetic secrets passed to Docker via `-e` env list — `tests/test_modal_runner.py` → **DOWNGRADED 2026-11-06 (synthetic-marked values asserting docker argv shape; no real key flows this path)**
 - [HIGH] Cross-subject isolation only checks `runs`, not direct `tasks/{id}` — `tests/test_hosted_drain.py` → **TEST GAP CLOSED** (product already scoped per-subject; tasks/id isolation test added (batch1))
