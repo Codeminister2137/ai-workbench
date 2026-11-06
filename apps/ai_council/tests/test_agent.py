@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pytest
 from agent import LocalAgent, to_provider_messages
 from ai_provider import (
     AIMessage,
@@ -57,6 +58,19 @@ def test_to_provider_messages_preserves_conversation_roles() -> None:
         AIMessage(MessageRole.USER, "Question?"),
         AIMessage(MessageRole.ASSISTANT, "Analyst: Answer."),
     ]
+
+
+def test_to_provider_messages_rejects_unknown_role() -> None:
+    with pytest.raises(ValueError) as exc_info:
+        to_provider_messages(
+            [
+                {"role": "user", "content": "Hello"},
+                {"role": "system", "content": "You are helpful."},
+            ]
+        )
+
+    assert "system" in str(exc_info.value)
+    assert "Unknown chat role" in str(exc_info.value)
 
 
 def test_local_agent_uses_provider_completion(monkeypatch) -> None:

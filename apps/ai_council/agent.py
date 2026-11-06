@@ -68,5 +68,7 @@ def to_provider_messages(rows: list[dict[str, str]]) -> list[AIMessage]:
         elif role == "assistant":
             prefix = f"{member_name}: " if member_name else ""
             messages.append(AIMessage(MessageRole.ASSISTANT, f"{prefix}{content}"))
+        else:
+            raise ValueError(f"Unknown chat role: {role!r}")
 
     return messages

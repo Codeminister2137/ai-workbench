@@ -39,6 +39,51 @@ def test_ask_collects_one_answer_per_member_and_persists_them(tmp_path, monkeypa
     assert messages[0]["content"] == "Question?"
 
 
+def test_ask_isolates_per_member_failures_and_continues(tmp_path, monkeypatch) -> None:
+    class FailingFirstAgent(FakeAgent):
+        def answer(self, conversation):
+            if self.member.name == "Analyst":
+                raise RuntimeError("model unavailable")
+            return super().answer(conversation)
+
+    config_path = tmp_path / "council.json"
+    db_path = tmp_path / "council.sqlite3"
+    write_config(config_path)
+    config = load_config(config_path)
+    store = ConversationStore(db_path)
+
+    monkeypatch.setattr("council.LocalAgent", FailingFirstAgent)
+    answers = LocalCouncil(config, store).ask("Question?")
+
+    conversation_id = store.get_or_create_conversation("test-conversation")
+    messages = store.list_messages(conversation_id)
+    store.close()
+
+    # still returns one entry per member
+    assert len(answers) == 2
+    assert [a["member"] for a in answers] == ["Analyst", "Skeptic"]
+
+    failed = answers[0]
+    assert failed["member"] == "Analyst"
+    assert failed["answer"] == ""
+    assert "error" in failed
+    assert failed["error"] != ""
+    assert "model unavailable" in failed["error"]
+    # model field is present
+    assert "model" in failed
+
+    healthy = answers[1]
+    assert healthy["member"] == "Skeptic"
+    assert healthy["answer"] != ""
+    assert healthy["answer"] == "Skeptic answered after 1 messages"
+
+    # failed answers are NOT stored as assistant messages
+    assert [m["role"] for m in messages] == ["user", "assistant"]
+    assert messages[0]["content"] == "Question?"
+    assert messages[1]["content"] == healthy["answer"]
+    assert messages[1]["member_name"] == "Skeptic"
+
+
 def test_ask_events_has_stable_streaming_contract(tmp_path, monkeypatch) -> None:
     config_path = tmp_path / "council.json"
     db_path = tmp_path / "council.sqlite3"
