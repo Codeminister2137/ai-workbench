@@ -210,12 +210,26 @@ def build_executor(
                 except Exception as exc:
                     return {"status": "failed", "error": f"Owner-task filing failed: {exc}"}
                 filed.append(str(item.get("id", "?")))
+        # Collect receipt data before fallback so fallback can reference it.
+        iterations = result.iterations
+        tool_calls = [item.name for item in result.tool_results]
+        staged = _collect_staged(result)
+        if not summary.strip():
+            logger.info("run %s blank summary; fallback from receipts", run_id)
+            tools_str = ", ".join(tool_calls) if tool_calls else "none"
+            staged_str = ", ".join(r["relpath"] for r in staged) if staged else "none"
+            summary = (
+                f"Run {run_id} completed in {iterations} iterations without a model summary. "
+                f"Tools used: {tools_str}. "
+                f"Staged files: {staged_str}. "
+                f"Owner tasks filed: {len(filed)}."
+            )
         receipt: dict[str, Any] = {
             "status": "completed",
             "summary": summary[:MAX_SUMMARY_CHARS],
-            "iterations": result.iterations,
-            "tool_calls": [item.name for item in result.tool_results],
-            "staged": _collect_staged(result),
+            "iterations": iterations,
+            "tool_calls": tool_calls,
+            "staged": staged,
             "owner_tasks": filed,
         }
         logger.info("run %s completed in %d iterations", run_id, result.iterations)
