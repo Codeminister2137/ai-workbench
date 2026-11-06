@@ -53,6 +53,25 @@ _DEFAULT_BASE_URLS = {
     ProviderKind.GOOGLE: "https://generativelanguage.googleapis.com/v1beta/openai",
 }
 
+_REASONING_METADATA_KEYS = frozenset({"reasoning_content", "reasoning", "reasoning_details"})
+
+
+def strip_reasoning_metadata(value: Any) -> Any:
+    """Remove reasoning text recursively while retaining usage totals.
+
+    Shared scrub for adapters whose raw metadata may carry chain-of-thought.
+    One implementation so the key set cannot drift between adapters.
+    """
+    if isinstance(value, dict):
+        return {
+            key: strip_reasoning_metadata(item)
+            for key, item in value.items()
+            if key not in _REASONING_METADATA_KEYS
+        }
+    if isinstance(value, list):
+        return [strip_reasoning_metadata(item) for item in value]
+    return value
+
 
 @dataclass(slots=True)
 class OpenAICompatibleChatClient:
