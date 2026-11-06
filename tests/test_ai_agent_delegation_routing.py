@@ -172,6 +172,7 @@ def test_narrow_resolves_child_backends(tmp_path) -> None:
     scope = _scope(tmp_path, FakeClient([]), client_factory, allowed=("muse",))
     child = scope.narrow(model="muse")
     assert child.backends == frozenset({("fake", "muse", None)})
+    assert child.approved_client is not None
     assert child.approved_client.backend.model == "muse"
 
 

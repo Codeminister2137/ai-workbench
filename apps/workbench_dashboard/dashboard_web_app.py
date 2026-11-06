@@ -24,7 +24,7 @@ from ai_agent.staged_edits import (
     approve_staged,
     review_staged,
 )
-from ai_agent.supervisor_drain import RunDrain
+from ai_agent.supervisor_drain import Executor, RunDrain
 from ai_orchestrator.evidence import merge_probe_eval
 from ai_provider.chat_transcripts import SQLiteChatTranscriptStore
 from ai_provider.stt import (
@@ -119,7 +119,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
     stt_engine_factory: Callable[[], TranscribeEngine] | None = None
     stt_metering: MeteringHook | None = None
     chat_translator: Translator | None = None
-    drain_executor_factory: ClassVar[Callable[[], object] | None] = None
+    drain_executor_factory: ClassVar[Callable[[], Executor] | None] = None
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(STATIC_ROOT), **kwargs)
@@ -1083,7 +1083,7 @@ def build_run_drain(
     data_dir: Path,
     repo_root: Path,
     stores: DashboardStores,
-    executor_factory: Callable[[], object] | None = None,
+    executor_factory: Callable[[], Executor] | None = None,
 ) -> RunDrain:
     """Build the approved-runs drain shared by manual and scheduled drains."""
     roots = ProjectRoots(
