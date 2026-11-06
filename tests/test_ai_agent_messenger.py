@@ -124,3 +124,36 @@ def test_messenger_falls_back_on_iteration_limit(tmp_path: Path) -> None:
     assert result.hit_iteration_limit is True
     assert "ran out of steps" in result.answer
     assert result.tool_receipts == ("list_dir",)
+
+
+def test_messenger_empty_answer_falls_back_to_receipts(tmp_path: Path) -> None:
+    (tmp_path / "notes.txt").write_text("hello workspace", encoding="utf-8")
+    client = FakeClient(
+        [
+            _tool_message("read_file", {"path": "notes.txt"}),
+            AIMessage(MessageRole.ASSISTANT, ""),
+        ]
+    )
+    result = run_messenger_turn(
+        client=client,
+        workspace_root=tmp_path,
+        history_text="",
+        prompt="What is in notes.txt?",
+        system_prompt="Be brief.",
+    )
+    assert result.answer.strip() != ""
+    assert "read_file" in result.answer
+    assert result.tool_receipts == ("read_file",)
+
+
+def test_messenger_empty_answer_without_receipts(tmp_path: Path) -> None:
+    client = FakeClient([AIMessage(MessageRole.ASSISTANT, "   ")])
+    result = run_messenger_turn(
+        client=client,
+        workspace_root=tmp_path,
+        history_text="",
+        prompt="Hi",
+        system_prompt="Be brief.",
+    )
+    assert result.answer.strip() != ""
+    assert result.tool_receipts == ()
