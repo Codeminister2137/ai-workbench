@@ -6,7 +6,7 @@ import json
 import math
 import time
 from collections import Counter
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -95,6 +95,7 @@ class AgentLoop:
         completion_requirements: tuple[CompletionRequirement, ...] = (),
         fanout_policy: FanoutPolicy | str = "allowed",
         on_event: Callable[[ToolExecutionEvent], None] | None = None,
+        request_metadata: Mapping[str, object] | None = None,
     ) -> None:
         if max_iterations < 1:
             raise ValueError("max_iterations must be at least 1")
@@ -111,6 +112,7 @@ class AgentLoop:
         self.top_p = top_p
         self.diagnostic = diagnostic
         self.on_event = on_event
+        self.request_metadata = dict(request_metadata or {})
         self._pending: dict[str, ToolCall] = {}
         if (
             not isinstance(completion_requirements, tuple)
@@ -235,6 +237,7 @@ class AgentLoop:
                     tools=tuple(
                         _tool_definition(tool) for tool in self.registry.list_definitions()
                     ),
+                    metadata=dict(self.request_metadata),
                 )
                 enforce_credential_policy(request, extra=self.context.credential_secrets)
                 response = self.client.complete(request)

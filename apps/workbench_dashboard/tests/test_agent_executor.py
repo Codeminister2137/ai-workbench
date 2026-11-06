@@ -318,3 +318,11 @@ def test_delegate_tool_carries_run_fanout(harness) -> None:
     assert registry.get("delegate_task").fanout.value == "allowed"
     execute({"id": "r2", "title": "t", "body": "b"})
     assert FakeLoop.instances[-1].registry.get("delegate_task").fanout.value == "restricted"
+
+
+def test_executor_sizes_ollama_context(harness, tmp_path) -> None:
+    execute, _, _ = harness
+    receipt = execute({"id": "r1", "title": "Do it", "body": "do the thing"})
+    assert receipt["status"] == "completed"
+    metadata = FakeLoop.instances[-1].kwargs["request_metadata"]
+    assert metadata["ollama_context_length"] == 32768

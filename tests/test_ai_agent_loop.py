@@ -484,3 +484,29 @@ def test_empty_registry_unknown_call_retains_safe_refusal_feedback(tmp_path):
     assert "No operation was attempted." in refusal.output
     assert "PRIVATE" not in refusal.output and "Registered tool names:" not in refusal.output
     assert not list(tmp_path.iterdir())
+
+
+def test_loop_forwards_request_metadata(tmp_path):
+    client = FakeClient()
+    AgentLoop(
+        client,
+        default_coding_tools(),
+        ToolContext(tmp_path),
+        permissions=PermissionManager(policy=PermissionPolicy.permissive()),
+        request_metadata={"ollama_context_length": 16_384, "other": "kept"},
+    ).run("Say something")
+    assert client.requests[0].metadata == {
+        "ollama_context_length": 16_384,
+        "other": "kept",
+    }
+
+
+def test_loop_metadata_defaults_empty(tmp_path):
+    client = FakeClient()
+    AgentLoop(
+        client,
+        default_coding_tools(),
+        ToolContext(tmp_path),
+        permissions=PermissionManager(policy=PermissionPolicy.permissive()),
+    ).run("Say something")
+    assert client.requests[0].metadata == {}

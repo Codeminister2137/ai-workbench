@@ -29,6 +29,24 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Adaptive Ollama context tiers (prompt chars -> num_ctx). Ollama's server
+# default (4096) silently truncates long chat prompts, which confabulates
+# the model; size the window to the prompt instead. Model capacity here is
+# 131072, so even the top tier has wide headroom.
+CHAT_CONTEXT_TIERS: tuple[tuple[int, int], ...] = (
+    (8_000, 8_192),
+    (32_000, 16_384),
+    (128_000, 32_768),
+)
+
+
+def chat_context_tokens(prompt_chars: int) -> int:
+    """Return the Ollama num_ctx tier covering ``prompt_chars``."""
+    for limit, tokens in CHAT_CONTEXT_TIERS:
+        if prompt_chars <= limit:
+            return tokens
+    return CHAT_CONTEXT_TIERS[-1][1]
+
 
 @dataclass(frozen=True, slots=True)
 class MessengerResult:
@@ -89,6 +107,7 @@ def run_messenger_turn(
         if event.type == "tool_completed":
             receipts.append(event.name if not event.is_error else f"{event.name}:error")
 
+    prompt_chars = len(history_text) + len(prompt) + len(system_prompt) + 200
     loop = AgentLoop(
         client,
         registry,
@@ -97,6 +116,7 @@ def run_messenger_turn(
         max_iterations=max_iterations,
         deadline=deadline,
         on_event=on_event,
+        request_metadata={"ollama_context_length": chat_context_tokens(prompt_chars)},
     )
     history = history_text.strip()
     full_prompt = (
