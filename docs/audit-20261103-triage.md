@@ -110,16 +110,16 @@ verification before action — several audit claims were already proven wrong
 ## ai-workbench/3
 
 - [HIGH] Unbounded provider response reads allow OOM — `packages/ai_provider/src/ai_provider/adapters/openai_compatible.py` → **FIXED 2026-11-06** (Baseten slices 2a/2b1/2b2: ollama, openrouter, openai_responses, anthropic_messages, meta_asr migrated to read_bounded with unmapped overflow; tests/test_adapter_body_bounds.py 5 green + adapter suites); was REAL — POST-HACKATHON)
-- [MEDIUM] Codex MCP server_name TOML injection + unconstrained write — `packages/ai_provider/src/ai_provider/codex_mcp.py` → **UNREVIEWED**
-- [MEDIUM] netstat path from attacker-influenced environment — `packages/ai_provider/src/ai_provider/acceptance_processes.py` → **UNREVIEWED**
-- [MEDIUM] Closeout log injection via unsanitized route ids and CR — `packages/ai_provider/src/ai_provider/closeout.py` → **UNREVIEWED**
-- [MEDIUM] Stored chat role crash on invalid value — `packages/ai_provider/src/ai_provider/chat_transcripts.py` → **UNREVIEWED**
-- [MEDIUM] Coding-session process observer assumes keys/types — `packages/ai_provider/src/ai_provider/coding_sessions.py` → **UNREVIEWED**
-- [MEDIUM] Missing stream-chunk size bound in all adapters — `packages/ai_provider/src/ai_provider/adapters/ollama.py` → **UNREVIEWED**
-- [LOW] Negative/limitless chat session listing — `packages/ai_provider/src/ai_provider/chat_transcripts.py` → **UNREVIEWED**
-- [LOW] Rolling-summary metadata stored but dropped from return — `packages/ai_provider/src/ai_provider/chat_transcripts.py` → **UNREVIEWED**
-- [LOW] Prior snapshot read has no byte bound — `packages/ai_provider/src/ai_provider/capability_bands.py` → **UNREVIEWED**
-- [LOW] Duplicated Ollama startup branches — `packages/ai_provider/src/ai_provider/coding_assist.py` → **UNREVIEWED**
+- [MEDIUM] Codex MCP server_name TOML injection + unconstrained write — `packages/ai_provider/src/ai_provider/codex_mcp.py` → **FIXED 2026-11-06 (Baseten V1b: fullmatch [A-Za-z0-9_.-]+ guard + test; verified present in code)**
+- [MEDIUM] netstat path from attacker-influenced environment — `packages/ai_provider/src/ai_provider/acceptance_processes.py` → **DOWNGRADED 2026-11-06 (SystemRoot is boot-set; a process-local override implies an already-owned box; fixed-path hardening queued as trivial hygiene)**
+- [MEDIUM] Closeout log injection via unsanitized route ids and CR — `packages/ai_provider/src/ai_provider/closeout.py` → **FIXED 2026-11-06 (Baseten V1b: LF/CR-to-space sanitize + test; verified present in code)**
+- [MEDIUM] Stored chat role crash on invalid value — `packages/ai_provider/src/ai_provider/chat_transcripts.py` → **FIXED 2026-11-06 (Baseten V1a: invalid role raises ValueError + test; verified present in code)**
+- [MEDIUM] Coding-session process observer assumes keys/types — `packages/ai_provider/src/ai_provider/coding_sessions.py` → **FIXED 2026-11-06 (Baseten V1c: isinstance/sentinel guards + test; verified present in code)**
+- [MEDIUM] Missing stream-chunk size bound in all adapters — `packages/ai_provider/src/ai_provider/adapters/ollama.py` → **FIXED 2026-11-06 (Baseten V2: read_bounded + shared MAX_RESPONSE_BYTES + tests; verified present in code)**
+- [LOW] Negative/limitless chat session listing — `packages/ai_provider/src/ai_provider/chat_transcripts.py` → **FIXED 2026-11-06 (Baseten V1a: limit=max(1,limit) clamp + test; verified present in code)**
+- [LOW] Rolling-summary metadata stored but dropped from return — `packages/ai_provider/src/ai_provider/chat_transcripts.py` → **FIXED 2026-11-06 (Baseten V1a: metadata plumbed through + test; verified present in code)**
+- [LOW] Prior snapshot read has no byte bound — `packages/ai_provider/src/ai_provider/capability_bands.py` → **DOWNGRADED 2026-11-06 (operator CLI on own snapshot file; self-DoS only; READ_LIMIT hygiene queued)**
+- [LOW] Duplicated Ollama startup branches — `packages/ai_provider/src/ai_provider/coding_assist.py` → **FIXED 2026-11-06 (Baseten V1c: branches collapsed to one helper; verified present in code)**
 
 ## ai-workbench/4
 
