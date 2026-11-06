@@ -2,6 +2,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import pytest
 from ai_provider.codex_mcp import build_codex_mcp_add_command, setup_project_codex_mcp
 
 
@@ -125,3 +126,19 @@ def test_build_codex_mcp_add_command_uses_repo_workspace_root(tmp_path: Path) ->
         "--workspace-root",
         str(tmp_path.resolve()),
     )
+
+
+def test_codex_mcp_server_name_injection_rejected(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="invalid codex MCP server name"):
+        setup_project_codex_mcp(tmp_path, server_name="x]\n[evil", register_global=False)
+
+
+def test_codex_mcp_default_server_name_still_works(tmp_path: Path) -> None:
+    # Default setup must still succeed (regression guard).
+    result = setup_project_codex_mcp(tmp_path, register_global=False)
+    assert result.config_path.exists()
+    text = result.config_path.read_text(encoding="utf-8")
+    assert "[mcp_servers.repo_assistant_tools]" in text
+    # build command with default name
+    cmd = build_codex_mcp_add_command(tmp_path, codex_command="codex-test")
+    assert "repo_assistant_tools" in cmd

@@ -125,6 +125,47 @@ def test_closeout_reports_validation_failure_and_fallback_attempts() -> None:
     assert "### Agent report\nNo final response was captured." in output
 
 
+def test_closeout_sanitizes_fallback_attempt_injection() -> None:
+    """fallback_attempts route_id/status are passed through _one_line."""
+    output = format_cli_closeout(
+        response_text="ok",
+        status="failed",
+        execution_status="completed",
+        fallback_attempts=[
+            {"route_id": "\r\nFAKE=x", "status": "\r\nFAKE=y"},
+        ],
+        failure_reason="provider failed",
+    )
+    # Envelope must not contain raw CR or injected new lines from the fields.
+    assert "\r" not in output
+    # The malicious payload flattened to spaces and stripped, so no injected line.
+    assert "\nFAKE=x" not in output
+    assert "\nFAKE=y" not in output
+    # Flattened values still appear on the Notes line.
+    assert "FAKE=x:FAKE=y" in output
+    assert "- Notes:" in output
+
+
+def test_closeout_flattens_failure_reason_crlf() -> None:
+    output = format_cli_closeout(
+        response_text="ok",
+        status="failed",
+        execution_status="completed",
+        failure_reason="\r\nprovider\r\nfailed\r\n",
+    )
+    assert "\r" not in output
+    # _one_line flattens CR/LF to spaces and strips - no injected line break.
+    assert "\nprovider" not in output
+    # Flattened value appears on Notes line with provider and failed tokens.
+    assert "failure_reason=" in output
+    assert "provider" in output
+    assert "failed" in output
+    # Ensure failure_reason value does not contain newline after flattening.
+    notes_line = next(line for line in output.splitlines() if "failure_reason=" in line)
+    assert "\n" not in notes_line
+    assert "\r" not in notes_line
+
+
 def test_final_response_instruction_requires_the_same_schema() -> None:
     assert "## **SUMMARY**" in FINAL_RESPONSE_INSTRUCTION
     assert "- Changed: ..." in FINAL_RESPONSE_INSTRUCTION
