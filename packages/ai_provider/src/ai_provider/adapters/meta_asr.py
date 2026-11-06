@@ -19,6 +19,8 @@ from typing import Any
 
 import httpx
 
+from ai_provider.errors import ProviderError
+from ai_provider.http_transport import read_bounded
 from ai_provider.stt import SttFailure, TranscribeResult
 
 STT_MODEL = "muse-voice-transcribe-1.0"
@@ -128,7 +130,9 @@ class MetaAsrEngine:
                         "audio": ("clip.wav", wav_bytes, "audio/wav"),
                     },
                 )
-                raw = response.read()
+                raw = read_bounded(response, provider="meta_asr")
+        except ProviderError:
+            raise
         except httpx.TimeoutException as exc:
             raise SttFailure("timeout", type(exc).__name__, 502) from None
         except httpx.HTTPError as exc:
