@@ -46,7 +46,8 @@ Codex note: PyCharm-bundled 0.137.0 is too stale (400s); PATH 0.166.0 wins.
 
 ## Dashboard chat (supervisor)
 
-- Single-shot turns, no tools (messenger relay + chat tools queued).
+- Relay turns with inspection tools (read/list/search, git status) plus
+  visible receipts; writes and execution stay approval-gated.
 - System prompt grounded 2026-11-05: no mail/service claims, no Linux paths.
 - Request-run queues approval-gated runs; transcript scope fix queued.
 
