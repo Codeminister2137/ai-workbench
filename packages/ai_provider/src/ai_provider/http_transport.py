@@ -63,6 +63,14 @@ def _overflow_error(*, provider: str | None, limit: int) -> ProviderError:
     )
 
 
+def _single_line_overflow_error(*, provider: str | None, limit: int) -> ProviderError:
+    return ProviderError(
+        f"Provider response exceeded the {limit} byte body limit (single line exceeded the limit).",
+        category=ProviderErrorCategory.NON_RETRYABLE,
+        provider=provider,
+    )
+
+
 def _check_content_length(response: Any, *, provider: str | None, limit: int) -> None:
     declared = _content_length(response)
     if declared is not None and declared > limit:
@@ -111,6 +119,55 @@ def iter_response_lines(
     bound = MAX_RESPONSE_BYTES if limit is None else limit
     _check_content_length(response, provider=provider, limit=bound)
     total = 0
+    # Try chunked read path; mirror read_bounded's legacy handling.
+    read = getattr(response, "read", None)
+    if callable(read):
+        try:
+            first_chunk = read(65536)
+        except TypeError:
+            # Legacy no-arg read() stub: the legacy path cannot bound single lines.
+            for line in response:
+                total += len(line)
+                if total > bound:
+                    raise _overflow_error(provider=provider, limit=bound) from None
+                yield line
+            return
+        # Chunked path
+        buffer = b""
+        chunk: Any = first_chunk
+        while True:
+            if chunk:
+                buffer += chunk
+                # Split complete lines (keepends, split on \n)
+                while b"\n" in buffer:
+                    idx = buffer.index(b"\n")
+                    line = buffer[: idx + 1]
+                    buffer = buffer[idx + 1 :]
+                    # single-line check sans trailing newline
+                    content = line[:-1] if line.endswith(b"\n") else line
+                    if len(content) > bound:
+                        raise _single_line_overflow_error(provider=provider, limit=bound)
+                    total += len(line)
+                    if total > bound:
+                        raise _overflow_error(provider=provider, limit=bound)
+                    yield line
+                # If buffer (partial line) already exceeds bound, fail before further reads.
+                # This handles giant line without newline materializing fully unchecked.
+                if len(buffer) > bound:
+                    raise _single_line_overflow_error(provider=provider, limit=bound)
+            else:
+                break
+            chunk = read(65536)
+        # Flush trailing partial line at EOF under same rules
+        if buffer:
+            if len(buffer) > bound:
+                raise _single_line_overflow_error(provider=provider, limit=bound)
+            total += len(buffer)
+            if total > bound:
+                raise _overflow_error(provider=provider, limit=bound)
+            yield buffer
+        return
+    # Fallback if no read attr: iterate directly with cumulative-only check
     for line in response:
         total += len(line)
         if total > bound:
