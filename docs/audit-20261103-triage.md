@@ -15,18 +15,18 @@ verification before action — several audit claims were already proven wrong
 ## ai-workbench/0
 
 - [HIGH] Public Modal endpoint depends solely on in-container API key — `deploy/modal/qwen25-coder-7b/modal_app.py` → **INTENDED (single-token vLLM auth is the documented design for this private dev endpoint; app is not currently deployed — zero exposure)**
-- [MEDIUM] Supervisor token absent means allow-all — `apps/workbench_dashboard/dashboard_stores.py` → **UNREVIEWED**
-- [MEDIUM] Transcript list crashes on concurrent delete/unreadable file — `apps/workbench_dashboard/dashboard_stores.py` → **UNREVIEWED**
-- [MEDIUM] Chat factory exception bypasses failure envelope — `apps/workbench_dashboard/dashboard_chat.py` → **UNREVIEWED**
-- [MEDIUM] Approve path leaks raw OSError on missing CV — `apps/job_search/job-email/approval.py` → **UNREVIEWED**
-- [MEDIUM] Unknown chat roles silently dropped — `apps/ai_council/agent.py` → **UNREVIEWED**
-- [MEDIUM] Blocking council ask aborts on first member failure — `apps/ai_council/council.py` → **UNREVIEWED**
-- [MEDIUM] Chat session id taken from raw URL slice — `apps/workbench_dashboard/dashboard_web_app.py` → **UNREVIEWED**
-- [MEDIUM] Sent-ledger append without lock or fsync — `apps/job_search/job-email/outreach_cli.py` → **UNREVIEWED**
-- [LOW] vLLM shutdown never waits/kills — `deploy/modal/qwen25-coder-7b/modal_app.py` → **UNREVIEWED**
-- [LOW] 48-bit application id truncation — `apps/job_search/job-email/preparation.py` → **UNREVIEWED**
-- [LOW] New provider client per member per turn — `apps/ai_council/council.py` → **UNREVIEWED**
-- [LOW] Decision dedupe is exact case-sensitive title match — `apps/workbench_dashboard/plan_publisher.py` → **UNREVIEWED**
+- [MEDIUM] Supervisor token absent means allow-all — `apps/workbench_dashboard/dashboard_stores.py` → **DOWNGRADED 2026-11-06** (single-user tailnet-membership is the auth boundary; deny-by-default would lock out remote use without a token-distribution story; stale localhost-only comment corrected)
+- [MEDIUM] Transcript list crashes on concurrent delete/unreadable file → **FALSE POSITIVE 2026-11-06** (stale: transcripts are SQLite-backed (chats.sqlite3); the file-race shape no longer exists)
+- [MEDIUM] Chat factory exception bypasses failure envelope → **FIXED 2026-11-06** (Baseten U1: factory wrapped in try/except (ProviderError, ValueError) returning the failed-turn envelope + test)
+- [MEDIUM] Approve path leaks raw OSError on missing CV → **FIXED 2026-11-06** (Baseten U3: wrapped as ApplicationLifecycleError with filename only + test)
+- [MEDIUM] Unknown chat roles silently dropped → **FIXED 2026-11-06** (Baseten U2: unknown roles raise ValueError; only user/assistant ever stored, verified + test)
+- [MEDIUM] Blocking council ask aborts on first member failure → **FIXED 2026-11-06** (Baseten U2: per-member try mirroring ask_events member_error entries + test)
+- [MEDIUM] Chat session id taken from raw URL slice → **FALSE POSITIVE 2026-11-06** (JsonCollection.get/put reject slashes/leading dots; traversal blocked at the store boundary)
+- [MEDIUM] Sent-ledger append without lock or fsync → **DOWNGRADED 2026-11-06** (single-operator manual CLI; OSError already fails closed with reconcile guidance; concurrent-send locking out of scope)
+- [LOW] vLLM shutdown never waits/kills → **INTENDED 2026-11-06** (app not deployed — zero exposure; revisit on deploy)
+- [LOW] 48-bit application id truncation → **DOWNGRADED 2026-11-06** (deterministic 12-hex ids; birthday bound ~16M apps — ample for single-operator volume; determinism aids idempotency)
+- [LOW] New provider client per member per turn → **DOWNGRADED 2026-11-06** (clients are lightweight config holders over stdlib urlopen; no pool to preserve; ~zero cost)
+- [LOW] Decision dedupe is exact case-sensitive title match → **FIXED 2026-11-06** (Baseten U1: casefold+strip both sides + test)
 
 ## ai-workbench/1
 
@@ -96,20 +96,20 @@ verification before action — several audit claims were already proven wrong
 ## ai-workbench/2
 
 - [HIGH] Arbitrary shell execution via model-controlled command — `packages/ai_agent/src/ai_agent/tools/shell.py` → **INTENDED (capability primitive behind the permission-manager + approval-callback architecture with cwd jailing; permissive only under an explicit user preset)**
-- [HIGH] Full parent environment inherited by model-chosen subprocess — `packages/ai_agent/src/ai_agent/tools/base.py` → **REAL — POST-HACKATHON (inherit_environment defaults True, so delegated children receive full ambient env incl. secrets with no gating; tool-output scrubbing is partial mitigation only; default-deny env for delegated contexts)**
-- [MEDIUM] Untrusted skill file becomes trusted model instructions — `packages/ai_agent/src/ai_agent/skills.py` → **UNREVIEWED**
-- [MEDIUM] Candidate-controlled text concatenated into reviewer prompts — `packages/ai_agent/src/ai_agent/scrutiny_workflow.py` → **UNREVIEWED**
-- [MEDIUM] Catalog base_url trusted without validation enables SSRF — `packages/ai_provider/examples/orchestrator_execution_target.py` → **UNREVIEWED**
-- [LOW] Credential-path blocklist misses common secret filenames — `packages/ai_agent/src/ai_agent/tools/credential_paths.py` → **UNREVIEWED**
+- [HIGH] Full parent environment inherited by model-chosen subprocess — `packages/ai_agent/src/ai_agent/tools/base.py` → **FIXED 2026-11-06** (verified in-loop: default False + __post_init__ narrowing + for_interactive_owner only opt-in (dc9e391); test_wb_env_narrow 8 green); was REAL — POST-HACKATHON)
+- [MEDIUM] Untrusted skill file becomes trusted model instructions → **INTENDED 2026-11-06** (configured-directory trust boundary: defaults are reviewed repo paths, operator --skill-dir otherwise; traversal + exactly-one-source + 64KB guards enforced)
+- [MEDIUM] Candidate-controlled text concatenated into reviewer prompts → **FIXED 2026-11-06** (Baseten U4: treat-as-data guard in RESPONSE system prompt + builder (marker byte-identical per pinned tests) + guard test)
+- [MEDIUM] Catalog base_url trusted without validation enables SSRF → **DOWNGRADED 2026-11-06** (example scope, not a product path; hardening noted as good-first-task)
+- [LOW] Credential-path blocklist misses common secret filenames → **FIXED 2026-11-06** (Baseten U4: .pem/.key extensions + .gitconfig/secrets.yaml/yml/json/service-account.json + tests incl. .pem.txt negative)
 - [HIGH] Rename apply can half-succeed with no rollback — `packages/ai_agent/src/ai_agent/tools/refactor.py` → **DOWNGRADED (all hashes pre-validated before any write, per-file atomic replace, exact applied-list + shas on failure; only a crash-mid-apply leaves partial state, honestly reported)**
-- [MEDIUM] Model IDs lowercased in derived route_id — `packages/ai_orchestrator/src/ai_orchestrator/catalog.py` → **UNREVIEWED**
-- [MEDIUM] Unbounded last-message file read after Codex run — `packages/ai_orchestrator/examples/codex_cli_executor.py` → **UNREVIEWED**
-- [LOW] Git failure returned as data tuple masks errors — `packages/ai_agent/src/ai_agent/run_tracking.py` → **UNREVIEWED**
-- [LOW] Repeated workspace resolve + file reads in scrutiny loop — `packages/ai_agent/src/ai_agent/scrutiny_workflow.py` → **UNREVIEWED**
+- [MEDIUM] Model IDs lowercased in derived route_id → **DOWNGRADED 2026-11-06** (cosmetic display only; exact-match lookup derives both sides identically)
+- [MEDIUM] Unbounded last-message file read after Codex run → **DOWNGRADED 2026-11-06** (example scope, operator's own CLI-output file; bound noted as good-first-task)
+- [LOW] Git failure returned as data tuple masks errors → **DOWNGRADED 2026-11-06** (display-only handoff metadata; failure text preserved inline, no automated consumer to fool)
+- [LOW] Repeated workspace resolve + file reads in scrutiny loop → **DOWNGRADED 2026-11-06** (trivial local perf; loop is bounded and infrequent)
 
 ## ai-workbench/3
 
-- [HIGH] Unbounded provider response reads allow OOM — `packages/ai_provider/src/ai_provider/adapters/openai_compatible.py` → **REAL — POST-HACKATHON (response.read() unbounded in every adapter via shared http_transport.urlopen; bound once in the transport)**
+- [HIGH] Unbounded provider response reads allow OOM — `packages/ai_provider/src/ai_provider/adapters/openai_compatible.py` → **FIXED 2026-11-06** (Baseten slices 2a/2b1/2b2: ollama, openrouter, openai_responses, anthropic_messages, meta_asr migrated to read_bounded with unmapped overflow; tests/test_adapter_body_bounds.py 5 green + adapter suites); was REAL — POST-HACKATHON)
 - [MEDIUM] Codex MCP server_name TOML injection + unconstrained write — `packages/ai_provider/src/ai_provider/codex_mcp.py` → **UNREVIEWED**
 - [MEDIUM] netstat path from attacker-influenced environment — `packages/ai_provider/src/ai_provider/acceptance_processes.py` → **UNREVIEWED**
 - [MEDIUM] Closeout log injection via unsanitized route ids and CR — `packages/ai_provider/src/ai_provider/closeout.py` → **UNREVIEWED**
@@ -123,9 +123,9 @@ verification before action — several audit claims were already proven wrong
 
 ## ai-workbench/4
 
-- [CRITICAL] Unsafe exec of model output with escapable bare namespace — `packages/ai_provider/src/ai_provider/route_eval.py` → **REAL — POST-HACKATHON** (in-process exec of model text; builtins-stripped but dunder-escape possible; grade in subprocess sandbox)
+- [CRITICAL] Unsafe exec of model output with escapable bare namespace — `packages/ai_provider/src/ai_provider/route_eval.py` → **FIXED 2026-11-06** (verified in-loop: _SANDBOX_SCRIPT grading child via subprocess.Popen -I with minimal env (c706db6); sole exec() is inside the child script; 72 eval tests green; was REAL — POST-HACKATHON)
 - [HIGH] Model-proposed shell execution via /bin/sh -c — `packages/ai_provider/src/ai_provider/repo_actions.py` → **DOWNGRADED** (only caller passes interactive authorizer; library default None is a footgun — consider required authorizer)
-- [HIGH] Full parent env (secrets) inherited by external agent child — `packages/ai_provider/src/ai_provider/foreground_tools.py` → **REAL — POST-HACKATHON (shared_child_env copies full os.environ to the MCP child; same delegated-env issue as the ToolContext default)**
+- [HIGH] Full parent env (secrets) inherited by external agent child — `packages/ai_provider/src/ai_provider/foreground_tools.py` → **FIXED 2026-11-06** (verified in-loop: _child_env host-allowlist + session token only; foreground suites green); was REAL — POST-HACKATHON)
 - [MEDIUM] Arbitrary base_url fetched without loopback/redirect guard — `packages/ai_provider/src/ai_provider/ollama_models.py` → **UNREVIEWED**
 - [MEDIUM] User prompt preview persisted to SQLite without redaction — `packages/ai_provider/src/ai_provider/orchestrated_runs.py` → **UNREVIEWED**
 - [MEDIUM] Env-controlled executable used as subprocess without validation — `packages/ai_provider/src/ai_provider/external_agents.py` → **UNREVIEWED**
@@ -163,8 +163,8 @@ verification before action — several audit claims were already proven wrong
 ## ai-workbench/6
 
 - [CRITICAL] Arbitrary local file read exfiltrated to Baseten — `scripts/plan-with-supervisor.py` → **FALSE POSITIVE** (operator CLI reading operator-named files is the tool function; no boundary crossed)
-- [HIGH] Snapshot command-line replay gives local RCE — `scripts/day_cycle.py` → **REAL — POST-HACKATHON** (artifacts file-write replays on open (Windows Popen-str); store argv + allowlist, echo cmdline; POSIX path broken anyway)
-- [HIGH] All provider keys exposed to every agent subprocess — `scripts/alternate-agent-acceptance.py` → **REAL — POST-HACKATHON** (agent children inherit full parent os.environ; only 4 names are loaded explicitly but the rest ride along; pass a per-route minimal env post-hackathon)
+- [HIGH] Snapshot command-line replay gives local RCE — `scripts/day_cycle.py` → **FIXED 2026-11-06** (verified in-loop: argv+allowlist replay, untrusted snapshot shapes refused (c706db6); test_day_cycle green); was REAL — POST-HACKATHON)
+- [HIGH] All provider keys exposed to every agent subprocess — `scripts/alternate-agent-acceptance.py` → **FIXED 2026-11-06** (verified in-loop: build_route_env/build_base_env minimal per-route env, no os.environ mutation; test_alternate_agent_routes green); was REAL — POST-HACKATHON)
 - [HIGH] Private Gmail content sent to external Meta model — `scripts/mail_digest.py` → **INTENDED** (owner tool, owner key, documented no-training route; subject+snippet only)
 - [MEDIUM] Unencoded server-controlled IDs in fetch paths — `patches/operator-ui-guided/app.js` → **UNREVIEWED**
 - [MEDIUM] Owner ping leaks host IP to external service by default — `scripts/loop_notify.py` → **UNREVIEWED**
@@ -179,7 +179,7 @@ verification before action — several audit claims were already proven wrong
 
 ## ai-workbench/7
 
-- [HIGH] Worktree-joined model file write without traversal check — `scripts/unattended-development-loop.py` → **REAL — POST-HACKATHON (proposal['changes'] keys are model-controlled, written via worktree/rel_path with mkdir parents and no guard (L552); script not in tonight's path; add traversal check post-hackathon)**
+- [HIGH] Worktree-joined model file write without traversal check — `scripts/unattended-development-loop.py` → **FIXED 2026-11-06** (verified in-loop: resolve_worktree_target rejects absolute/drive/..-escape/symlink-outside with ValueError; 4 traversal tests green); was REAL — POST-HACKATHON)
 - [HIGH] External exfiltration via unvalidated `worktree/files` join — `scripts/unattended-development-loop.py` → **FALSE POSITIVE on location (no worktree/files route exists in the cited file; closest match is the L552 model-write join, filed separately)**
 - [HIGH] Objective-id used as filesystem path without sanitization — `scripts/unattended-development-loop.py` → **DOWNGRADED (queue is host-owned per the file header contract; owner-typo robustness only, not a trust-boundary issue)**
 - [HIGH] Destructive git wipe on unvalidated queue path — `scripts/unattended-development-loop.py` → **DOWNGRADED (worktree comes from the host-owned queue; checkout+clean is the documented validation-failure recovery inside that dir)**
@@ -278,13 +278,13 @@ verification before action — several audit claims were already proven wrong
 ## Verdict counts
 
 - BACKLOG: 3
-- DOWNGRADED: 7
-- FALSE POSITIVE: 12
-- FIXED: 6
-- INTENDED: 3
-- REAL — POST-HACKATHON: 7
+- DOWNGRADED: 16
+- FALSE POSITIVE: 14
+- FIXED: 20
+- INTENDED: 5
+- REAL — POST-HACKATHON: 0 (all resolved 2026-11-06)
 - TEST GAP CLOSED: 1
-- UNREVIEWED: 176
+- UNREVIEWED: 156
 
 ## Appendix: frontend-audit leftovers verified 2026-11-03 evening
 
