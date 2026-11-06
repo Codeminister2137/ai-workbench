@@ -16,7 +16,7 @@ from pathlib import Path
 
 from ai_agent.coding_chat import CodingChatController, CodingTurnRequest, CodingTurnResult
 from ai_agent.fanout import FanoutPolicy
-from ai_provider import AIMessage, AIRequest, MessageRole
+from ai_agent.messenger import MessengerResult, run_messenger_turn
 from ai_provider.chat_transcripts import (
     ChatMessageRecord,
     ChatSessionRecord,
@@ -33,8 +33,9 @@ from dashboard_stores import DashboardStores
 SUPERVISOR_SYSTEM_PROMPT = (
     "You are the Workbench supervisor answering inside the owner's local "
     "dashboard on their Windows 11 PC. Be concise and concrete. "
-    "Hard limits for this chat turn: you cannot run tools, edit files, "
-    "restart services, or send mail. Mail delivery is not configured, so "
+    "You can inspect the workspace (read, list, and search files; git status) "
+    "but you cannot edit files, execute commands, restart services, or send "
+    "mail. Mail delivery is not configured, so "
     "never claim an email was or will be sent; say mail is unavailable "
     "until the owner configures SMTP credentials. "
     "You have no live view of services (Ollama, dashboard, scheduled "
@@ -74,6 +75,11 @@ class RunRequestReceipt:
     fanout_effective: str
 
 
+def _default_relay_runner(**kwargs) -> MessengerResult:
+    """Run one chat turn through the inspection relay (read-only tools)."""
+    return run_messenger_turn(**kwargs)
+
+
 class DashboardChat:
     """Own dashboard chat sessions; the provider owns answers, the store owns history."""
 
@@ -84,11 +90,13 @@ class DashboardChat:
         workspace: Path,
         *,
         client_factory: Callable[[BackendConfig], ChatClient] = create_chat_client,
+        relay_runner: Callable[..., MessengerResult] | None = None,
     ) -> None:
         self.store = store
         self.config = config
         self.workspace = workspace.resolve()
         self.client_factory = client_factory
+        self.relay_runner = relay_runner or _default_relay_runner
 
     def create_session(self, *, title: str, privacy_class: str = "local_only") -> ChatSessionRecord:
         """Create one supervisor chat session bound to the dashboard workspace."""
@@ -142,7 +150,7 @@ class DashboardChat:
             raise ValueError(f"Chat session unavailable: {exc}") from exc
 
     def _execute(self, request: CodingTurnRequest) -> CodingTurnResult:
-        """Answer one turn with a single provider completion (no tools)."""
+        """Answer one turn through the inspection relay (read-only tools)."""
         try:
             provider = ProviderKind(self.config.provider)
         except ValueError:
@@ -152,23 +160,20 @@ class DashboardChat:
         client = self.client_factory(
             BackendConfig(provider=provider, model=self.config.model, base_url=self.config.base_url)
         )
-        history = request.history.strip()
-        messages = [AIMessage(role=MessageRole.SYSTEM, content=SUPERVISOR_SYSTEM_PROMPT)]
-        if history:
-            messages.append(
-                AIMessage(
-                    role=MessageRole.SYSTEM,
-                    content=f"Conversation history (oldest first, possibly reduced):\n{history}",
-                )
-            )
-        messages.append(AIMessage(role=MessageRole.USER, content=request.text))
         privacy = (
             PrivacyClass.LOCAL_ONLY
             if provider is ProviderKind.OLLAMA
             else PrivacyClass.EXTERNAL_ALLOWED
         )
         try:
-            response = client.complete(AIRequest(messages=tuple(messages), privacy_class=privacy))
+            result = self.relay_runner(
+                client=client,
+                workspace_root=self.workspace,
+                history_text=request.history,
+                prompt=request.text,
+                system_prompt=SUPERVISOR_SYSTEM_PROMPT,
+                privacy_class=privacy,
+            )
         except ProviderError as exc:
             return CodingTurnResult(
                 1,
@@ -181,13 +186,17 @@ class DashboardChat:
             return CodingTurnResult(
                 1, None, "failed", f"Chat turn failed: {exc}", provider=provider.value
             )
+        text = result.answer
+        if result.tool_receipts:
+            text += f"\n\n_Checked with tools: {', '.join(result.tool_receipts)}._"
         return CodingTurnResult(
             0,
-            response.message.content,
+            text,
             "completed",
             provider=provider.value,
             inference_observation={
-                "latency_ms": int(response.latency_ms or 0),
+                "relay_iterations": result.iterations,
+                "relay_tools_used": len(result.tool_receipts),
             },
         )
 
