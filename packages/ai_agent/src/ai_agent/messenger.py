@@ -9,6 +9,7 @@ permission policy refuses anything else.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -24,6 +25,9 @@ from ai_agent.tools.base import BaseTool, ToolContext
 
 if TYPE_CHECKING:
     from ai_provider.contracts import ChatClient
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -119,8 +123,26 @@ def run_messenger_turn(
             iterations=max_iterations,
             hit_iteration_limit=True,
         )
+    content = result.response.message.content or ""
+    if not content.strip():
+        checked = ", ".join(receipts) if receipts else "nothing"
+        logger.info(
+            "messenger empty final content; receipts=%s iterations=%d",
+            checked,
+            result.iterations,
+        )
+        if receipts:
+            content = (
+                f"I checked {checked} but couldn't compose a final answer. "
+                "Ask me to continue or narrow the question."
+            )
+        else:
+            content = (
+                "I couldn't produce an answer for that turn. "
+                "Please rephrase or narrow the question."
+            )
     return MessengerResult(
-        answer=result.response.message.content,
+        answer=content,
         tool_receipts=tuple(receipts),
         iterations=result.iterations,
     )
