@@ -211,3 +211,29 @@ def test_parent_loop_end_to_end_routed_delegation(tmp_path) -> None:
     assert any(
         item.name == "delegate_task" and item.is_error is False for item in result.tool_results
     )
+
+
+def test_delegated_native_failure_is_label_only_model_visible() -> None:
+    from ai_agent.repo_coding_assistant import _delegated_failure_result
+
+    progress: list[str] = []
+    result = _delegated_failure_result(
+        RuntimeError("synthetic-secret-in-message must-not-leak"),
+        progress.append,
+    )
+
+    assert result.name == "delegate_task"
+    assert result.is_error is True
+    assert result.output == "Error: delegated subtask failed: RuntimeError"
+    assert "synthetic-secret-in-message" not in result.output
+    assert len(progress) == 1
+    assert "synthetic-secret-in-message" in progress[0]
+
+
+def test_delegated_native_failure_without_callback() -> None:
+    from ai_agent.repo_coding_assistant import _delegated_failure_result
+
+    result = _delegated_failure_result(ValueError("boom"), None)
+
+    assert result.output == "Error: delegated subtask failed: ValueError"
+    assert result.is_error is True

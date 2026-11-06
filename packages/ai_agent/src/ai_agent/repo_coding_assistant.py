@@ -63,6 +63,7 @@ from ai_provider.closeout import (
     REPORT_SCOPE,
     format_cli_closeout,
     observed_inference,
+    safe_diagnostic_label,
     safe_fallback_handoff,
 )
 from ai_provider.codex_mcp import setup_project_codex_mcp
@@ -3921,11 +3922,7 @@ def _run_native_agent(
                 progress_callback=progress_callback,
             )
         except Exception as exc:  # noqa: BLE001
-            return ToolResult(
-                name="delegate_task",
-                output=f"Error: delegated subtask failed: {exc}",
-                is_error=True,
-            )
+            return _delegated_failure_result(exc, progress_callback)
 
         output = _format_delegated_task_output(
             task=task,
@@ -4220,6 +4217,20 @@ def _contains_textual_tool_request(content: str, tool_names: set[str]) -> bool:
             ):
                 return True
     return False
+
+
+def _delegated_failure_result(
+    exc: Exception, progress_callback: Callable[[str], None] | None
+) -> ToolResult:
+    """Build a label-only model-visible failure; details stay host-side."""
+    kind = safe_diagnostic_label(type(exc).__name__) or "unknown"
+    if progress_callback is not None:
+        progress_callback(f"delegated_agent_activity: failed - kind={kind} detail={exc}")
+    return ToolResult(
+        name="delegate_task",
+        output=f"Error: delegated subtask failed: {kind}",
+        is_error=True,
+    )
 
 
 def _format_delegated_task_output(
