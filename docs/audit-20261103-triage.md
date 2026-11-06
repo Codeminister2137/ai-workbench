@@ -259,21 +259,21 @@ verification before action — several audit claims were already proven wrong
 
 ## remote-operator/2
 
-- [MEDIUM] `cmd /c mklink` test helper allows shell metachar injection — `tests/test_sessions.py` → **UNREVIEWED**
+- [MEDIUM] `cmd /c mklink` test helper allows shell metachar injection — `tests/test_sessions.py` → **DOWNGRADED 2026-11-06 (paths are fixed alphanumeric tmp names — no metachar surface; symlink-first with junction fallback is already the portable pattern)**
 - [LOW] Predictable owner bearer token pattern reused across suites — `tests/test_web.py` → **UNREVIEWED**
-- [LOW] Shared hardcoded demo access code across hosted suites — `tests/test_hosted_drain.py` → **UNREVIEWED**
-- [LOW] Synthetic secrets passed to Docker via `-e` env list — `tests/test_modal_runner.py` → **UNREVIEWED**
+- [LOW] Shared hardcoded demo access code across hosted suites — `tests/test_hosted_drain.py` → **DOWNGRADED 2026-11-06 (4 files confirmed; tests use isolated temp roots; prod requires env-supplied code; factory is optional)**
+- [LOW] Synthetic secrets passed to Docker via `-e` env list — `tests/test_modal_runner.py` → **DOWNGRADED 2026-11-06 (synthetic-marked values asserting docker argv shape; no real key flows this path)**
 - [HIGH] Cross-subject isolation only checks `runs`, not direct `tasks/{id}` — `tests/test_hosted_drain.py` → **TEST GAP CLOSED** (product already scoped per-subject; tasks/id isolation test added (batch1))
-- [MEDIUM] Login throttle pins trigger but not reset/expiry or success-after-lock — `tests/test_judges.py` → **UNREVIEWED**
-- [MEDIUM] Busy/drain race covers single lock, not parallel double-claim — `tests/test_supervisor_runner.py` → **UNREVIEWED**
-- [MEDIUM] Drain-worker survival test relies on fixed sleep — `tests/test_supervisor_drain_worker.py` → **UNREVIEWED**
-- [MEDIUM] Audio body-cap exemption only proves 413 on non-multipart — `tests/test_stt.py` → **UNREVIEWED**
-- [LOW] 30-day self-grant expiry only tested at -31 days — `tests/test_judges.py` → **UNREVIEWED**
-- [LOW] Malformed job file covers single `not json{` case — `tests/test_supervisor_runner.py` → **UNREVIEWED**
-- [LOW] STT concurrency test reaches into private semaphore — `tests/test_stt.py` → **UNREVIEWED**
-- [MEDIUM] Duplicated `Validator`/`AskOnceModel`/`grant()` doubles in every file — `tests/test_hosted_drain.py` → **UNREVIEWED**
-- [LOW] Duplicated `_operator` / `_planned` / `_serve` HTTP scaffolding — `tests/test_notify_fix.py` → **UNREVIEWED**
-- [LOW] Deadline polling loops duplicated with magic intervals — `tests/test_hosted_drain.py` → **UNREVIEWED**
+- [MEDIUM] Login throttle pins trigger but not reset/expiry or success-after-lock — `tests/test_judges.py` → **DOWNGRADED 2026-11-06 (lock checked before password verify — secure by construction; reset/expiry are 3 obviously-correct lines; extra tests are sibling polish)**
+- [MEDIUM] Busy/drain race covers single lock, not parallel double-claim — `tests/test_supervisor_runner.py` → **DOWNGRADED 2026-11-06 (single-worker by docstring AND deployment — one supervised worker per container; parallel drain is an undeployed topology)**
+- [MEDIUM] Drain-worker survival test relies on fixed sleep — `tests/test_supervisor_drain_worker.py` → **DOWNGRADED 2026-11-06 (assertLogs already gates on the error; 0.3s gives 6x interval headroom; event-gate is sibling polish)**
+- [MEDIUM] Audio body-cap exemption only proves 413 on non-multipart — `tests/test_stt.py` → **FALSE POSITIVE 2026-11-06 (the 413 test posts MULTIPART via post_clip — the core claim is factually wrong; ±1 boundary pins are optional)**
+- [LOW] 30-day self-grant expiry only tested at -31 days — `tests/test_judges.py` → **DOWNGRADED 2026-11-06 (30-day window; a ±1s boundary error has zero practical impact; pins are sibling polish)**
+- [LOW] Malformed job file covers single `not json{` case — `tests/test_supervisor_runner.py` → **DOWNGRADED 2026-11-06 (all shapes safe by construction — unreadable→skipped, {}→ignored; extra params cover no new code path)**
+- [LOW] STT concurrency test reaches into private semaphore — `tests/test_stt.py` → **DOWNGRADED 2026-11-06 (coupling is real but the test needs semaphore control for its purpose; injectable limiter is a sibling refactor note)**
+- [MEDIUM] Duplicated `Validator`/`AskOnceModel`/`grant()` doubles in every file — `tests/test_hosted_drain.py` → **BACKLOG 2026-11-06 (12 Validator copies confirmed; extract on touch — sibling deprecated so likely never)**
+- [LOW] Duplicated `_operator` / `_planned` / `_serve` HTTP scaffolding — `tests/test_notify_fix.py` → **BACKLOG 2026-11-06 (9 files confirmed; same note)**
+- [LOW] Deadline polling loops duplicated with magic intervals — `tests/test_hosted_drain.py` → **BACKLOG 2026-11-06 (same family; wait_for helper on touch)**
 
 ## Verdict counts
 
