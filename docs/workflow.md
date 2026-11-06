@@ -155,7 +155,7 @@ Suggested notice:
 
 > ## **APPROVAL PENDING**
 >
-> I’m about to run `<exact command>` from `<working directory>`. It will
+> Iâ€™m about to run `<exact command>` from `<working directory>`. It will
 > `<expected bounded effects>` and will pause for `<approval prompt/action>` in
 > the terminal. Please confirm when you are present and ready to approve it.
 
@@ -223,6 +223,21 @@ before proposing a custom application or capability. Compare functional fit,
 maintenance, licence, data flow and integration cost; write only the missing
 pieces that serve a demonstrated need. This preference does not automatically
 select a dependency, deployment, privacy boundary or third-party permission.
+
+## Session mode toggle (one word each way)
+
+- Owner says **"unattended"** (optionally with a duration, e.g. "unattended
+  2h"): switch this session to the unattended loop below immediately. If no
+  duration is given, assume 2 hours, state the assumed deadline, and let the
+  owner correct it by mail -- never park execution on a blocking question.
+- Owner says **"attended"** (or "I am back", or is clearly interacting): cancel
+  all sleep timers via `.\cancel-sleep.cmd`, verify each `sleep_cancelled`
+  receipt, record the attended-presence override with its start time, and
+  resume interactive work. Never schedule or renew sleep while the override
+  stands; re-arm only on explicit direction with a fresh receipt path.
+- While unattended: decisions go to the dashboard inbox + mail notification
+  (mail-inbox tandem), and work continues on independent items. A queued
+  question is never a reason to stop or idle.
 
 ## Unattended execution windows
 
