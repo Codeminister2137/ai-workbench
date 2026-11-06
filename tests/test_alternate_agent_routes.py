@@ -1,5 +1,6 @@
 """Contracts for private preferences and approved alternate CLI execution."""
 
+import importlib.util
 import json
 import subprocess
 from dataclasses import replace
@@ -14,6 +15,41 @@ from ai_provider.external_agents import (
     run_external_agent,
 )
 from ai_provider.user_config import load_user_config
+
+
+def _load_acceptance_module():
+    path = Path(__file__).resolve().parents[1] / "scripts" / "alternate-agent-acceptance.py"
+    spec = importlib.util.spec_from_file_location("alternate_agent_acceptance", path)
+    mod = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_load_dotenv_secrets_missing_env_raises_clear_error(tmp_path: Path) -> None:
+    mod = _load_acceptance_module()
+    # tmp_path has no .env, so load should raise FileNotFoundError with actionable message
+    with pytest.raises(FileNotFoundError) as exc_info:
+        mod.load_dotenv_secrets(tmp_path)
+    message = str(exc_info.value)
+    # message must name the path
+    assert str(tmp_path / ".env") in message
+    # message must mention wanted keys
+    wanted = {key for keys in mod.ROUTE_ENV_KEYS.values() for key in keys}
+    for key in wanted:
+        assert key in message
+
+
+def test_load_dotenv_secrets_present_parses_exactly(tmp_path: Path) -> None:
+    mod = _load_acceptance_module()
+    wanted_key = next(iter(next(iter(mod.ROUTE_ENV_KEYS.values()))))
+    # one wanted key with quotes/whitespace + one unwanted key ignored
+    env_content = f'  {wanted_key}  =  "  secret-value  "  \nUNWANTED_KEY=ignored\n'
+    (tmp_path / ".env").write_text(env_content, encoding="utf-8")
+    result = mod.load_dotenv_secrets(tmp_path)
+    # strip whitespace and quotes: value parsing should match original logic
+    assert result == {wanted_key: "  secret-value  "}
+    assert "UNWANTED_KEY" not in result
 
 
 def test_user_config_default_and_private_override(tmp_path: Path) -> None:
