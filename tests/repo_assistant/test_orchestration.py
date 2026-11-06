@@ -200,6 +200,7 @@ def test_auxiliary_panel_uses_local_cheap_route_with_fake_client(monkeypatch) ->
 
     def start_server(base_url, **kwargs):
         captured["startup"] = kwargs
+        captured["startup"]["base_url"] = base_url
 
     monkeypatch.setattr("ai_provider.coding_assist.ensure_ollama_server", start_server)
 
@@ -248,6 +249,9 @@ def test_auxiliary_panel_uses_local_cheap_route_with_fake_client(monkeypatch) ->
     assert captured["startup"]["command"] == "custom-ollama"
     assert captured["startup"]["startup_timeout_seconds"] == 7.0
     assert captured["startup"]["log_path"] == Path("auxiliary-ollama.log")
+    # None selects ensure_ollama_server's loopback default (localhost:11434);
+    # a test double must never silently accept a non-loopback URL here.
+    assert captured["startup"]["base_url"] is None
     assert result.provider == "ollama"
     assert result.model is not None
     assert result.response_text == "check tests and decision boundaries"
