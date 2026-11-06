@@ -78,6 +78,9 @@ action with actual work or a specific evidenced restriction. Try smaller actions
 permitted by each blocker. If evidence is missing, continue investigation.
 Passing checks, a documentation sweep, no obvious defect, an incomplete milestone
 or the absence of permission for another full pilot do not prove exhaustion.
+Every completion claim (mail, chat, report) must quote the output of
+`scripts/loop_status.py --plan <this file>`; never report "done" or "nothing
+left" while it lists remaining or blocked-pending rows.
 
 ## Mandatory final step
 
