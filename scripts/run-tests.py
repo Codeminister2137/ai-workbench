@@ -137,6 +137,7 @@ GROUPS = {
         "tests/test_watchdog_tasks.py",
         "tests/test_triage_apply.py",
         "tests/test_slice_develop_core.py",
+        "tests/test_script_dotenv_readers.py",
     ),
     "research": (
         "tests/test_research_*.py",

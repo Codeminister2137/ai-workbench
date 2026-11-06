@@ -43,6 +43,7 @@ from ai_provider.adapters.baseten import (  # noqa: E402
 )
 from ai_provider.config import BackendConfig, ProviderKind  # noqa: E402
 from ai_provider.contracts import AIMessage, AIRequest, MessageRole, PrivacyClass  # noqa: E402
+from ai_provider.secrets import read_secret_key  # noqa: E402
 
 DEFAULT_MAX_CALLS = 5
 
@@ -55,14 +56,9 @@ class LowReasoningClient(BasetenChatClient):
 
 
 def _read_key() -> str:
-    values = [
-        line.partition("=")[2].strip().strip("\"'")
-        for line in (ROOT / ".env").read_text(encoding="utf-8-sig").splitlines()
-        if line.partition("=")[0].strip() == "BASETEN_HACKATHON_API_KEY"
-    ]
-    if len(values) != 1 or not values[0]:
-        raise ValueError("Exactly one BASETEN_HACKATHON_API_KEY entry is required in .env")
-    return values[0]
+    return read_secret_key(
+        ROOT / ".env", "BASETEN_HACKATHON_API_KEY", label="Baseten event credential"
+    )
 
 
 def _load_file_context(paths: list[str]) -> str:

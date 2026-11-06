@@ -93,21 +93,9 @@ def _resolve_model(cli_model: str | None, role: str | None = None) -> str:
 
 
 def read_key() -> str:
-    try:
-        lines = (ROOT / ".env").read_text(encoding="utf-8-sig").splitlines()
-    except FileNotFoundError:
-        raise ValueError(
-            "Exactly one Baseten event credential is required "
-            f"(missing {ROOT / '.env'}; set {ENV_NAME})"
-        ) from None
-    values = [
-        line.partition("=")[2].strip().strip("\"'")
-        for line in lines
-        if line.partition("=")[0].strip() == ENV_NAME
-    ]
-    if len(values) != 1 or not values[0]:
-        raise ValueError("Exactly one Baseten event credential is required")
-    return values[0]
+    from ai_provider.secrets import read_secret_key
+
+    return read_secret_key(ROOT / ".env", ENV_NAME, label="Baseten event credential")
 
 
 def _parse_json_object(text: str) -> dict:
