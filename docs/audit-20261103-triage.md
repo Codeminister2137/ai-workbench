@@ -145,20 +145,20 @@ verification before action — several audit claims were already proven wrong
 
 ## ai-workbench/5
 
-- [MEDIUM] Inbox run_id path traversal read — `patches/operator-notify-fix/src/remote_operator/supervisor_inbox.py` → **UNREVIEWED**
-- [MEDIUM] Cost policy configured but never applied — `packages/ai_provider/src/ai_provider/user_config.py` → **UNREVIEWED**
-- [MEDIUM] Transcript logs full prompts verbatim — `packages/ai_provider/src/ai_provider/transcripts.py` → **UNREVIEWED**
-- [MEDIUM] .env permission never checked — `packages/ai_provider/src/ai_provider/secrets.py` → **UNREVIEWED**
-- [MEDIUM] probe_route allows arbitrary URL fetch — `packages/ai_provider/src/ai_provider/route_probe.py` → **UNREVIEWED**
-- [MEDIUM] Shared profile writes literal "None" session id — `packages/ai_provider/src/ai_provider/shared_client_tools.py` → **UNREVIEWED**
-- [MEDIUM] Negative/NaN schedule accepted at plan time — `packages/ai_provider/src/ai_provider/task_scheduler.py` → **UNREVIEWED**
-- [LOW] Research scrutiny prompt unbounded — `packages/ai_provider/src/ai_provider/scrutiny.py` → **UNREVIEWED**
-- [LOW] SWE-bench source_url unvalidated fetch — `packages/ai_provider/src/ai_provider/swe_bench_scores.py` → **UNREVIEWED**
-- [LOW] Workspace join bypass if CONFIG_PATH absolute — `packages/ai_provider/src/ai_provider/shared_client_tools.py` → **UNREVIEWED**
-- [LOW] Drain crash on corrupt attempts value — `patches/operator-notify-fix/src/remote_operator/supervisor_runner.py` → **UNREVIEWED**
-- [LOW] Unbounded TOML config read — `packages/ai_provider/src/ai_provider/user_config.py` → **UNREVIEWED**
-- [LOW] dotenv export prefix silently dropped — `packages/ai_provider/src/ai_provider/secrets.py` → **UNREVIEWED**
-- [LOW] Display key whitespace not normalized — `packages/ai_provider/src/ai_provider/swe_bench_scores.py` → **UNREVIEWED**
+- [MEDIUM] Inbox run_id path traversal read — `patches/operator-notify-fix/src/remote_operator/supervisor_inbox.py` → **DOWNGRADED 2026-11-06 (inert sibling-repo patch mirror, not live code here; payload is server-written; read errors return None, nothing is mailed)**
+- [MEDIUM] Cost policy configured but never applied — `packages/ai_provider/src/ai_provider/user_config.py` → **FALSE POSITIVE 2026-11-06 (cost_policy IS applied explicitly per entry point — repo_coding_assistant 998/1111-1112, coding_chat_cli 85; generic-keys loop intentionally covers plain defaults only)**
+- [MEDIUM] Transcript logs full prompts verbatim — `packages/ai_provider/src/ai_provider/transcripts.py` → **FALSE POSITIVE 2026-11-06 (full-prompt transcript requires explicit opt-in pair --log-full-prompt + --log-file; default runs persist nothing to transcript files)**
+- [MEDIUM] .env permission never checked — `packages/ai_provider/src/ai_provider/secrets.py` → **DOWNGRADED 2026-11-06 (POSIX-only concern; primary platform is Windows where mode bits don't apply; docstring 'owner-only' overclaims — docstring fix queued)**
+- [MEDIUM] probe_route allows arbitrary URL fetch — `packages/ai_provider/src/ai_provider/route_probe.py` → **FALSE POSITIVE 2026-11-06 (sole caller is probe_all with hardcoded ROUTES URLs; CLI accepts no URL arg; audit's exposure assumption does not hold)**
+- [MEDIUM] Shared profile writes literal "None" session id — `packages/ai_provider/src/ai_provider/shared_client_tools.py` → **REAL 2026-11-06 — fix queued (guard checks session_database only; session_id=None renders literal 'None'; require both or neither)**
+- [MEDIUM] Negative/NaN schedule accepted at plan time — `packages/ai_provider/src/ai_provider/task_scheduler.py` → **FALSE POSITIVE 2026-11-06 (audit's stated assumption is wrong: ScheduledTask.__post_init__ rejects non-positive/non-finite, reached via ResearchTask construction at plan time — loud ValueError)**
+- [LOW] Research scrutiny prompt unbounded — `packages/ai_provider/src/ai_provider/scrutiny.py` → **REAL-minor 2026-11-06 — fix queued (research_evidence IS bounded upstream via byte-budget loop; only the no-results fallback json.dumps(stage.details) in format_validation_failures_for_prompt is unbounded — truncate it)**
+- [LOW] SWE-bench source_url unvalidated fetch — `packages/ai_provider/src/ai_provider/swe_bench_scores.py` → **FALSE POSITIVE 2026-11-06 (CLI exposes no URL arg; only tests override source_url; production uses hardcoded leaderboard URL via guarded http_transport)**
+- [LOW] Workspace join bypass if CONFIG_PATH absolute — `packages/ai_provider/src/ai_provider/shared_client_tools.py` → **FALSE POSITIVE 2026-11-06 (CONFIG_PATH is a hardcoded relative Path('data/pycharm-mcp.json') constant; the 'if absolute' cannot occur at runtime)**
+- [LOW] Drain crash on corrupt attempts value — `patches/operator-notify-fix/src/remote_operator/supervisor_runner.py` → **DOWNGRADED 2026-11-06 (inert sibling-repo patch mirror, not live code here; corruption requires operator store tampering)**
+- [LOW] Unbounded TOML config read — `packages/ai_provider/src/ai_provider/user_config.py` → **DOWNGRADED 2026-11-06 (owner-only config file; giant file is self-DoS only; st_size guard is cheap defense-in-depth — queued)**
+- [LOW] dotenv export prefix silently dropped — `packages/ai_provider/src/ai_provider/secrets.py` → **REAL-minor 2026-11-06 — fix queued ('export FOO=bar' lines fail the alnum check and vanish silently; strip the prefix, warn on skips)**
+- [LOW] Display key whitespace not normalized — `packages/ai_provider/src/ai_provider/swe_bench_scores.py` → **DOWNGRADED 2026-11-06 (grouping key uses _normalized_model which strips+collapses; edge whitespace affects display strings only — cosmetic)**
 
 ## ai-workbench/6
 
