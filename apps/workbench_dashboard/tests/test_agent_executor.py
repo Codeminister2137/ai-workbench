@@ -326,3 +326,38 @@ def test_executor_sizes_ollama_context(harness, tmp_path) -> None:
     assert receipt["status"] == "completed"
     metadata = FakeLoop.instances[-1].kwargs["request_metadata"]
     assert metadata["ollama_context_length"] == 32768
+
+
+def test_blank_summary_falls_back_to_receipt(tmp_path) -> None:
+    FakeLoop.instances = []
+    loop_result = AgentResult(
+        response=_response("   "),
+        tool_results=(
+            ToolResult(name="read_file", output="ok"),
+            ToolResult(
+                name="stage_file",
+                output="staged",
+                metadata={"staged": {"relpath": "a.py", "content": "x"}},
+            ),
+        ),
+        iterations=2,
+    )
+
+    def factory_loop(client, registry, context, **kwargs):
+        loop = FakeLoop(client, registry, context, **kwargs)
+        loop.result = loop_result
+        return loop
+
+    config = DashboardConfig(provider="ollama", model="fake")
+    execute = build_executor(
+        config,
+        ProjectRoots(()),
+        tmp_path,
+        client_factory=lambda backend: object(),
+        loop_factory=factory_loop,
+    )
+    receipt = execute({"id": "r1", "title": "t", "body": "b"})
+    assert receipt["status"] == "completed"
+    assert receipt["summary"].strip() != ""
+    assert "read_file" in receipt["summary"]
+    assert "a.py" in receipt["summary"]
