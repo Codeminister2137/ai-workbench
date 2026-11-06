@@ -5,7 +5,7 @@ only variable *names* and credential *status*, never values. Update this
 file when a slice adds, removes, or changes a capability (proposed
 Definition-of-Done rule, pending owner approval).
 
-Last verified: 2026-11-06 ~12:10 (unattended loop: mail/delegation/scheduler/chat-fix merged).
+Last verified: 2026-11-06 ~13:35 (unattended loop: +R2 name note, restrictions view, mail cutover).
 
 ## One command
 
@@ -88,11 +88,12 @@ Codex note: PyCharm-bundled 0.137.0 is too stale (400s); PATH 0.166.0 wins.
 
 - One credential: `GMAIL_EMAIL`/`GMAIL_PASSWORD` in root `.env`
   (verified + live-tested 2026-11-06). Legacy job-email `.env` deleted.
-- `scripts/loop_notify.py`: yagmail transport, receipted pings, 3× retry.
+- `scripts/loop_notify.py`: stdlib SMTP since 2026-11-06 (decision A cutover);
+  receipted pings, 3× retry. `sender.py` stays the job-search transport only.
 - `apps/workbench_dashboard/owner_mail.py`: stdlib SMTP; falls back to
   the `GMAIL_*` pair (env, then root `.env`) when `WORKBENCH_*` absent.
-- OPEN DECISION (inbox): canonical transport — stdlib (recommended) vs
-  yagmail vs keep both as fallback pair. Both work; no urgency.
+- Transport decision CLOSED 2026-11-06 (owner chose A): canonical = stdlib
+  `owner_mail`; notifier cut over, sender-unify tests updated.
 
 ## Documents + research (private, gitignored)
 
@@ -106,6 +107,18 @@ Codex note: PyCharm-bundled 0.137.0 is too stale (400s); PATH 0.166.0 wins.
   template/AI product, market bifurcating; lean avoid + rescue-care.
 - MSI note 2026-11-06: removal safe via staged path; LAN Manager flagged
   second network suspect; removal itself = owner decision.
+- R2 name evaluation 2026-11-06: `codeministry-name-evaluation-20261106` —
+  verdict NO-GO (5 same-market EU/UK users); Kodministerstwo / Code
+  Chancellery smoke-clear; surname pattern safest. 76 docs served.
+
+## Dashboard UI (2026-11-06)
+
+- Restrictions tab: read-only overview of 6 agent-restriction dimensions;
+  no enforcement source of truth exists, so all show honest
+  `not yet evaluated` + feeder (10 nav links, 42 UI tests green).
+- Ollama context sizing: adaptive chat tiers 8/16/32k + executor 32k
+  (was 4k default truncating 14.6k prompts — the SeerX/OpenRouter
+  confabulation root cause).
 
 ## Grants (remote-operator — deprecated path)
 
@@ -115,6 +128,6 @@ Codex note: PyCharm-bundled 0.137.0 is too stale (400s); PATH 0.166.0 wins.
 
 ## Known gaps (see inbox + todos for live state)
 
-- P7 answers (owner deliberating), mail transport decision (inbox),
+- P7 answers (owner deliberating; pricing part informed by threat study),
   drain-scheduler enablement (owner decision), MSI removal (owner decision),
   executor blank-summary backlog, live Meta delegation E2E (route proven, E2E pending).
