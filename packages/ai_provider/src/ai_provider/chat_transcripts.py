@@ -53,6 +53,7 @@ class ChatRollingSummaryRecord:
     updated_at_utc: str
     provider: str | None = None
     model: str | None = None
+    metadata: dict[str, object] | None = None
 
 
 class SQLiteChatTranscriptStore:
@@ -268,6 +269,7 @@ class SQLiteChatTranscriptStore:
         """Return recent chat sessions newest-first."""
 
         self.initialize()
+        limit = max(1, limit)
         with self._connect() as connection:
             rows = connection.execute(
                 """
@@ -294,7 +296,13 @@ class SQLiteChatTranscriptStore:
         """Append and return one ordered message in a session."""
 
         self.initialize()
-        role_value = role.value if isinstance(role, MessageRole) else role
+        if isinstance(role, MessageRole):
+            role_value = role.value
+        else:
+            try:
+                role_value = MessageRole(role).value
+            except ValueError as exc:
+                raise ValueError(f"invalid chat role: {role!r}") from exc
         now = _utc_now()
         with self._connect() as connection:
             session_exists = connection.execute(
@@ -382,7 +390,7 @@ class SQLiteChatTranscriptStore:
             row = connection.execute(
                 """
                 SELECT session_id, summary, covered_message_order, updated_at_utc,
-                       provider, model
+                       provider, model, metadata_json
                 FROM chat_rolling_summaries
                 WHERE session_id = ?
                 """,
@@ -411,6 +419,7 @@ class SQLiteChatTranscriptStore:
             updated_at_utc=now,
             provider=provider,
             model=model,
+            metadata=metadata or {},
         )
         with self._connect() as connection:
             session_exists = connection.execute(
@@ -495,6 +504,12 @@ def _message_from_row(row: sqlite3.Row) -> ChatMessageRecord:
 
 
 def _rolling_summary_from_row(row: sqlite3.Row) -> ChatRollingSummaryRecord:
+    metadata_json = row["metadata_json"]
+    if metadata_json is None:
+        metadata = None
+    else:
+        parsed = json.loads(str(metadata_json))
+        metadata = parsed if isinstance(parsed, dict) else {}
     return ChatRollingSummaryRecord(
         session_id=str(row["session_id"]),
         summary=str(row["summary"]),
@@ -502,6 +517,7 @@ def _rolling_summary_from_row(row: sqlite3.Row) -> ChatRollingSummaryRecord:
         updated_at_utc=str(row["updated_at_utc"]),
         provider=row["provider"],
         model=row["model"],
+        metadata=metadata,
     )
 
 
