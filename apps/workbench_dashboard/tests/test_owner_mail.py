@@ -129,11 +129,11 @@ def test_smtp_config_defaults() -> None:
     assert config["starttls"] is True
 
 
-def test_smtp_config_requires_owner_and_host() -> None:
+def test_smtp_config_requires_owner_and_host(tmp_path) -> None:
     with pytest.raises(ValueError, match="WORKBENCH_OWNER_EMAIL"):
-        load_smtp_config({"WORKBENCH_SMTP_HOST": "h"})
+        load_smtp_config({"WORKBENCH_SMTP_HOST": "h"}, root=tmp_path)
     with pytest.raises(ValueError, match="WORKBENCH_OWNER_EMAIL"):
-        load_smtp_config({"WORKBENCH_OWNER_EMAIL": "o@x.test"})
+        load_smtp_config({"WORKBENCH_OWNER_EMAIL": "o@x.test"}, root=tmp_path)
 
 
 def test_smtp_config_validates_port() -> None:
@@ -145,9 +145,9 @@ def test_smtp_config_validates_port() -> None:
         load_smtp_config(bad)
 
 
-def test_mail_configured_probe() -> None:
+def test_mail_configured_probe(tmp_path) -> None:
     assert mail_configured(dict(SMTP_ENV)) is True
-    assert mail_configured({}) is False
+    assert mail_configured({}, root=tmp_path) is False
 
 
 def test_send_refuses_off_owner_address(tmp_path) -> None:
@@ -219,7 +219,7 @@ def test_transport_failure_captured_in_receipt(tmp_path, fake_smtp, monkeypatch)
 
 
 def test_notify_plan_silent_without_smtp(tmp_path) -> None:
-    sender, notify_on = notify_plan("unattended", tmp_path, {})
+    sender, notify_on = notify_plan("unattended", tmp_path, {}, root=tmp_path)
     assert sender is None
     assert notify_on == UNATTENDED_NOTIFY_STATUSES
     assert list(tmp_path.iterdir()) == []
@@ -269,3 +269,48 @@ def test_settings_rejects_bad_mode(dashboard_server) -> None:
     with pytest.raises(HTTPError) as exc:
         post_json(dashboard_server, "/api/settings", {"supervision": 42})
     assert exc.value.code == 400
+
+
+GMAIL_ENV = {
+    "GMAIL_EMAIL": "owner@gmail.test",
+    "GMAIL_PASSWORD": "app-pass",
+}
+
+
+def test_gmail_fallback_from_env(tmp_path) -> None:
+    config = load_smtp_config(dict(GMAIL_ENV), root=tmp_path)
+    assert config["owner"] == "owner@gmail.test"
+    assert config["host"] == "smtp.gmail.com"
+    assert config["port"] == 587
+    assert config["username"] == "owner@gmail.test"
+    assert config["password"] == "app-pass"
+    assert config["starttls"] is True
+    assert mail_configured(dict(GMAIL_ENV), root=tmp_path) is True
+
+
+def test_gmail_fallback_from_root_env_file(tmp_path) -> None:
+    (tmp_path / ".env").write_text(
+        "GMAIL_EMAIL=file@gmail.test\nGMAIL_PASSWORD=file-pass\n",
+        encoding="utf-8",
+    )
+    config = load_smtp_config({}, root=tmp_path)
+    assert config["owner"] == "file@gmail.test"
+    assert config["host"] == "smtp.gmail.com"
+    assert config["password"] == "file-pass"
+
+
+def test_explicit_smtp_wins_over_gmail(tmp_path) -> None:
+    both = dict(SMTP_ENV, **GMAIL_ENV)
+    config = load_smtp_config(both, root=tmp_path)
+    assert config["owner"] == "owner@example.test"
+    assert config["host"] == "smtp.example.test"
+
+
+def test_notify_plan_uses_gmail_fallback(tmp_path, fake_smtp) -> None:
+    sender, notify_on = notify_plan("unattended", tmp_path, dict(GMAIL_ENV), root=tmp_path)
+    assert sender is not None
+    assert notify_on == UNATTENDED_NOTIFY_STATUSES
+    receipt = sender({"run_id": "run-abcdef12", "status": "completed", "title": "t"})
+    assert receipt["sent"] is True
+    assert fake_smtp.instances[0].host == "smtp.gmail.com"
+    assert fake_smtp.instances[0].logins == [("owner@gmail.test", "app-pass")]
