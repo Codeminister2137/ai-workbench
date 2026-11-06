@@ -4117,3 +4117,170 @@ main merge.
   • P5/P6/P7 proposals constrain slices 4–6 (docs/plans/): the session must read the relevant proposals first; where they conflict with operator's patterns, operator's proven behavior wins for the loop mechanics, proposals win for data shapes — conflicts go to the owner.  • Assumption: owner ok with dashboard visual style staying as-is while absorbing parts. Say otherwise and step 3b re-plans.
 
   Reply go to execute this plan, or tell me what to change.
+
+## 2026-11-05 evening (attended; archived 2026-11-06)
+
+# Prior context -- 2026-11-05 evening: ATTENDED (owner home ~20:08 Warsaw; no sleep)
+
+
+
+## Attended evening (owner back; unattended CLOSED)
+
+
+
+- PC slept 18:42 -> woke 20:08 (lease expiry during compaction gap). Sleep
+
+  timers fired; cancel-sleep run post-wake found nothing pending. NO SLEEP.
+
+- ROOT CAUSE of all transport/DNS failures: MSI.CentralServer UDP leak --
+
+  15,484 endpoints at 15:01 (Tcpip 4266, trap captured). Killed DNS ~15:15+,
+
+  hence api.meta.ai + github failures. MSI restarted fresh (pid 6900, 63 UDP
+
+  at 20:47); network green since wake. Trap UDPPortExhaustionTrap still armed.
+
+- develop == origin/develop @ c25f220 (all pushed 01:0x). Merged today:
+
+  run-plan link, parity doc, doc-markdown preview (md.js, live), gpt-oss 64k
+
+  runtime budget, dashboard trusted_hosts + tailnet serve (live, verified GET
+
+  + POST at https://desktop-j2m5erf.tailc59785.ts.net -- Tailscale only).
+
+- Live dashboard.json (gitignored) has trusted_hosts=[tailnet name]. Dashboard
+
+  restarted (new code); serve: tailscale serve --bg http://127.0.0.1:8766.
+
+- Workbench agent e2e: implement-mode RUNS on ollama/gpt-oss:20b (3-4 calls,
+
+  reads+lists files) but later turns overflow 64k (history growth). Next: slim
+
+  instructions or history cap. Scoped reads + max-action-rounds 12 help.
+
+- Remote-operator: site says 'Inference grant expired' = owner BasetenGrant
+
+  file on Modal expired. Renewal needs owner spend bounds (decision brief).
+
+  Owner used tailnet phone (seen 10m before 20:0x) -- dashboard URL above.
+
+- Codex CLI NOT installed -- codex_cli routes unusable until installed+authed.
+
+- Owner: home, no sleep; company-plan inbox questions deferred to tomorrow;
+
+  other inbox items OK anytime. Mail still unset (SMTP env) -- inbox only.
+
+
+
+## Prior state (develop @ 8703dd6 local; origin/develop @ 51db395)
+
+## Executor slice (51db395; PUSHED via HTTPS, SSH URL restored)
+
+- Owner voted FULL executor tools. Implemented: agent_executor.py
+  (build_executor from dashboard config, client via create_chat_client,
+  TRUSTED_LOCAL permissions, run fan-out rip-through), 11-tool registry
+  (read/list/search/git/shell/python/navigate/preview + NEW StageFileTool;
+  direct Create/Edit/RenameApply excluded by design, delegation excluded
+  — no child runner yet), receipt {completed/failed, summary, iterations,
+  tool_calls, staged}; drain copies receipt staged → run["staged"].
+- Safety posture (explicit): shell/python unconfined under per-run
+  approval; file writes stage BY CONVENTION (system prompt + staged
+  tools) — advisory only, since shell can write directly. Owner
+  accepted arbitrary-code-execution equivalence in the vote. Staged
+  delete/rename unsupported by apply_staged (writes only).
+- Tests: 9 executor + 4 staged-tool + 2 drain staged-copy; dashboard
+  suite 167 green; ruff + pyright clean. GROUPS globs cover new files.
+- Process notes: pre-commit ruff-format can fail-then-fix a commit
+  (restage + retry); direct-develop commit from a branch mishap was
+  rewound (soft reset, unpushed) into feature/agent-executor + merge.
+  Branch switches re-apply CRLF to committed files (normalize again).
+
+## Done this continuation (develop == origin/develop == f75fa0a)
+
+- Dashboard SERVED on http://127.0.0.1:8766 (verified: /api/status ok,
+  73 documents, /api/settings + /api/agent-status live). Wart: each
+  start spawns a waiter-parent + worker-child python pair (external
+  re-exec, not our code); stop kills both, single listener. Harmless.
+- Remote-operator audit DONE: ADR-081 scope fully merged; frozen items
+  stay frozen (hosted/judge/Docker/phone/multi-tenant). Remaining
+  value extracted: owner-mail + window-status (below).
+- Backup A+B DONE: private repo Codeminister2137/ai-workbench-private
+  (74 files, 0 secret-like names, verified via API) + snapshot zip in
+  artifacts/private-snapshots/ + scripts/backup-private.ps1 (fail-closed
+  denylist, idempotent). gh 2.103.3 installed; authed as Codeminister2137
+  (repo scope) — device flow stalls in sandbox, owner-terminal login works.
+- Owner-mail slice MERGED (1917827): owner_mail.py (WORKBENCH_SMTP_* env,
+  fail-closed, receipted), supervision config + GET/POST /api/settings,
+  RunDrain on_terminal seam (exception-safe), 16 dashboard + 5 drain tests.
+- Window-status slice MERGED (f75fa0a): window-status.py reader + shared
+  writer, GET /api/agent-status, gitignored heartbeat file, 8 tests.
+- Push transport: SSH push failed 3x (hang/broken-pipe/closed); HTTPS via
+  `gh auth setup-git` credential helper succeeded. Remote URL restored
+  to SSH. Pre-push hooks run full pytest+pyright (slow; don't compete).
+- Verified: dashboard 150+8 tests green, drain tests green, ruff +
+  pyright clean, live endpoints probed.
+- Drain driver DECIDED: defer (owner) — AgentLoop executor is now the
+  immediate priority.
+- Executor design (investigated, awaiting capability decision):
+  `apps/workbench_dashboard/agent_executor.py` builds the RunDrain
+  Executor from dashboard config, reusing DashboardChat's
+  client_factory/BackendConfig pattern; run → prompt, AgentLoop.run
+  with the run's fanout_policy, AgentResult → receipt; file writes go
+  through stage_file into the run record for the existing staged
+  review/approve endpoints (direct Create/Edit NEVER registered).
+  Tools on hand: Read/List/search (safe), Create/Edit (direct —
+  needs staged variants), RunCommandTool (shell), python_runtime,
+  git, refactor, delegation. QUEUED OWNER DECISION: executor tool
+  capabilities (staged-only vs +allowlisted verify commands vs full).
+
+## Merge (COMPLETE locally, needs push)
+
+- Integration branch `feature/merge-loop-integration-20261105` merged to
+  local `develop` @ `3dc65ee` (owner-approved). Remote `origin/develop`
+  still at `b0cfde7`: **push fails 3x** with `unable to write flush
+  packet: Broken pipe`. SSH auth OK, push tiny (~100KB), hooks green →
+  transient transport suspected. DO NOT hammer; retry once next session,
+  else owner checks network or approves HTTPS-remote fallback.
+- Verified: root suite 3691 passed/35 skipped, dashboard 118, ruff+pyright
+  clean, live-server E2E green (chat→queue→approve→drain→staged→applied).
+- ADR-081 recorded; worktrees + 8 slice branches removed.
+- Next: push develop, then merge `feature/documents-tab-20261105` (8fc9856)
+  and `feature/inbox-tasks-20261105` (c0ccfea) — each needs owner approval.
+
+## Done this session (develop @ 051e404, push in flight)
+
+- Merge → `develop` (owner pushed `3dc65ee` after 3 local transport
+  failures; remote caught up). Then merged (owner-approved): Documents
+  tab (6bb352d), owner-task inbox items (fc8adb8, conflict resolved,
+  134 dashboard green), G6 decision docs ADR-082 (051e404).
+- Owner decisions recorded (chat + inbox answered/closed): G6 = A
+  centralized (ADR-082, gap doc updated); backup = A+B (private repo +
+  disk snapshot — implementation QUEUED, not started).
+- Slice branches removed; tree clean on develop.
+- PUSHED: origin/develop == 051e404 (verified via ls-remote). Earlier
+  failures were real transport drops; this attempt's "failed" label was
+  a stderr-pipe artifact — ls-remote is ground truth.
+- Queued next: backup A+B implementation (private repo needs owner
+  creation/authorization with a name; snapshot script is local work).
+- Deep dives DONE: 3 reports in `docs/library-private/` (gitignored,
+  verified ignored on all branches): services-by-effort (~35 sources),
+  pricing-global-local (~60 sources), advertising-channels (R3, benchmarks
+  + RODO notes). Each has dated sources + "Data still needed". Research
+  worktrees/branches removed.
+- Prior-work survey: services/pricing PARTIAL (offering R1+§7, 04 plan),
+  advertising was NOT STARTED (R3 backlog only) — now covered.
+
+## Standing notes
+
+- Old handoff archived to `docs/session-history.md` (2026-11-05).
+- Lesson: never run local suites while a push's pre-push hooks run theirs —
+  contention causes flakes (proven twice this session).
+- CRLF: worktree/checkout files need LF normalize before exact-match edits
+  (BOM-less .NET write); subagents must use absolute worktree paths.
+- Owner invite stands: suggest redo/deletion of obsolete features as
+  decision briefs; none strong yet (nit queued: unused FANOUT_POLICIES).
+- Privacy lesson: never have subagents COMMIT private content to branches
+  (research reports briefly lived as git objects on research/*; branches
+  deleted, objects unreachable, never pushed — but avoid the pattern).
+- Open owner questions: G6 per-client data isolation; ignored-file backup
+  design (Nov-1); default-runner wrap-up; pipeline auto-screen.
