@@ -120,6 +120,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
     stt_metering: MeteringHook | None = None
     chat_translator: Translator | None = None
     drain_executor_factory: ClassVar[Callable[[], Executor] | None] = None
+    # Live scheduler handle (None when off). Set once in main(); read by _status.
+    drain_scheduler: ClassVar[DrainScheduler | None] = None
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(STATIC_ROOT), **kwargs)
@@ -366,6 +368,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         plans, plan_total = stores.plans.list(limit=1)
         runs, _run_total = stores.runs.list(limit=3)
         current_plan = plans[0] if plans else None
+        scheduler = self.drain_scheduler
         return {
             "title": config.title,
             "provider": config.provider,
@@ -386,6 +389,13 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 "available": evidence["available"],
                 "routes": len(evidence["routes"]),
                 "passed": sum(1 for row in evidence["routes"] if row["passed_eval"] is True),
+            },
+            "drain_scheduler": {
+                "started": bool(scheduler is not None and scheduler.started),
+                "interval_seconds": config.drain_interval_seconds,
+                "ticks": scheduler.ticks if scheduler is not None else 0,
+                "errors": scheduler.errors if scheduler is not None else 0,
+                "last_error": scheduler.last_error if scheduler is not None else None,
             },
         }
 
@@ -1141,7 +1151,9 @@ def main() -> None:
     DashboardRequestHandler.config_path = args.config
     DashboardRequestHandler.data_dir = args.data_dir
     try:
-        maybe_start_drain_scheduler(args.config, args.data_dir)
+        DashboardRequestHandler.drain_scheduler = maybe_start_drain_scheduler(
+            args.config, args.data_dir
+        )
     except Exception as exc:  # noqa: BLE001 - scheduler must never block serving
         print(f"Workbench dashboard: drain scheduler failed to start: {exc}")
     server = ThreadingHTTPServer((args.host, args.port), DashboardRequestHandler)

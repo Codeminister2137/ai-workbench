@@ -361,3 +361,28 @@ def test_runs_list_resolves_fanout_per_item(dashboard_server, tmp_path) -> None:
     payload = get_json(dashboard_server, "/api/runs")
     by_id = {item["id"]: item["fanout_effective"] for item in payload["items"]}
     assert by_id == {"new": "allowed", "old": "unknown"}
+
+
+def test_status_reports_scheduler_off_by_default(dashboard_server) -> None:
+    """Fresh servers report the drain scheduler as not started."""
+    payload = get_json(dashboard_server, "/api/status")
+    sched = payload["drain_scheduler"]
+    assert sched["started"] is False
+    assert sched["interval_seconds"] == 0
+    assert sched["ticks"] == 0
+    assert sched["errors"] == 0
+    assert sched["last_error"] is None
+
+
+def test_status_reports_live_scheduler_state(dashboard_server, monkeypatch) -> None:
+    """An injected scheduler handle surfaces ticks/errors on /api/status."""
+    from types import SimpleNamespace
+
+    fake = SimpleNamespace(started=True, ticks=3, errors=1, last_error="boom")
+    monkeypatch.setattr(DashboardRequestHandler, "drain_scheduler", fake)
+    payload = get_json(dashboard_server, "/api/status")
+    sched = payload["drain_scheduler"]
+    assert sched["started"] is True
+    assert sched["ticks"] == 3
+    assert sched["errors"] == 1
+    assert sched["last_error"] == "boom"
