@@ -29,7 +29,12 @@ def approve_package(
         raise ApplicationLifecycleError("Cannot approve an explicitly rejected/skipped package.")
     if not approved_by.strip():
         raise ApplicationLifecycleError("Approval requires an operator identity.")
-    digest = package.materials_digest(Path(package.cv_attachment_path).read_bytes())
+    try:
+        digest = package.materials_digest(Path(package.cv_attachment_path).read_bytes())
+    except OSError as exc:
+        raise ApplicationLifecycleError(
+            f"CV attachment unreadable: {Path(package.cv_attachment_path).name}"
+        ) from exc
 
     return replace(
         package,

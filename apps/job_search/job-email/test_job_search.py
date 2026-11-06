@@ -6,6 +6,7 @@ from dataclasses import replace
 
 import pytest
 from approval import (
+    ApplicationLifecycleError,
     approve_package,
     reject_package,
     update_package_content,
@@ -329,3 +330,20 @@ def test_fit_uses_unique_requirements_and_preserves_required_status(
     result = analyze_vacancy_fit(vacancy, sample_profile)
     assert result.has_critical_gaps is critical
     assert result.match_score == score
+
+
+def test_approve_raises_when_cv_attachment_missing(sample_profile, sample_vacancy, tmp_path):
+    missing_path = tmp_path / "missing_cv.pdf"
+    # Ensure file does not exist
+    assert not missing_path.exists()
+    package = prepare_application(sample_profile, sample_vacancy)
+    package_with_missing_cv = replace(package, cv_attachment_path=str(missing_path))
+    with pytest.raises(ApplicationLifecycleError) as exc_info:
+        approve_package(package_with_missing_cv)
+    assert isinstance(exc_info.value.__cause__, OSError)
+    assert exc_info.value.__cause__ is not None
+    # Filename only should be in message, not full path
+    assert missing_path.name in str(exc_info.value)
+    assert str(missing_path) not in str(exc_info.value)
+    # Ensure it is not leaking raw FileNotFoundError
+    assert not isinstance(exc_info.value, FileNotFoundError)
