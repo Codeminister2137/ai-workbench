@@ -57,7 +57,7 @@ def test_static_controls_have_titles() -> None:
     for tag in re.findall(r"<button\b[^>]*>", html):
         assert "title=" in tag, f"button without title: {tag}"
     nav_links = re.findall(r"<a\b[^>]*data-view[^>]*>", html)
-    assert len(nav_links) == 9  # +intake
+    assert len(nav_links) == 10  # +intake, +restrictions
     for tag in nav_links:
         assert "title=" in tag, f"nav link without title: {tag}"
 
@@ -469,3 +469,23 @@ def test_create_form_disables_submit_while_creating() -> None:
     assert 'ev.target.querySelector("button[type=submit]")' in js
     assert "createBtn.disabled = true;" in js
     assert "createBtn.disabled = false;" in js
+
+
+def test_restrictions_view_is_read_only_overview() -> None:
+    """Restrictions tab defines dimensions without fabricating live posture."""
+    html = _read("index.html")
+    assert 'data-view="restrictions"' in html
+    js = _read("app.js")
+    assert "renderRestrictions" in js
+    assert 'name === "restrictions"' in js
+    for dimension in (
+        "Outbound network",
+        "Filesystem writes",
+        "Secret handling",
+        "Subprocess execution",
+        "Delegation scope",
+        "Human approval gates",
+    ):
+        assert dimension in js
+    assert js.count("not yet evaluated") == 7  # intro + one per dimension
+    assert "Would be fed by" in js
