@@ -99,7 +99,14 @@ def run_checks(root: Path, pytest_files: list[str], changed: list[str]) -> tuple
         ok_all = ok_all and proc.returncode == 0
     py_files = [f for f in changed if f.endswith(".py")]
     if py_files:
-        # Formatting is deterministic host work: apply it, then verify.
+        # Formatting and safe fixes are deterministic host work: apply, then verify.
+        subprocess.run(
+            [str(py), "-m", "ruff", "check", "--fix", *py_files],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
         subprocess.run(
             [str(py), "-m", "ruff", "format", *py_files],
             cwd=root,
@@ -221,7 +228,7 @@ def main() -> int:
                     if "\n" not in src:
                         raise ValueError(f"{name}: no real newlines (escaped?)")
                     compile(src, name, "exec")
-            test_paths = [n for n in written if "/tests/" in n or n.startswith("tests/")]
+            test_paths = [n for n in allow if "/tests/" in n or n.startswith("tests/")]
             if test_paths and all(
                 (root / n).read_bytes() == (pristine_bytes.get(n) or b"") for n in test_paths
             ):
