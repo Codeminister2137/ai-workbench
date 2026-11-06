@@ -673,13 +673,31 @@ async function renderRuns(id) {
   }
   view.innerHTML = `<h1>Runs</h1>
     <p><input type="text" id="filter-runs" placeholder="Filter runs..." title="Filter runs by text">
-    <select id="filter-runs-project" title="Show runs for one project">${await projectOptions(runsProjectFilter)}</select></p>
+    <select id="filter-runs-project" title="Show runs for one project">${await projectOptions(runsProjectFilter)}</select>
+    <button id="drain-runs" title="Execute approved queued runs (one per click)">Drain now</button></p>
     <ul class="plain" id="runs-list">${items}</ul>${evidence}`;
   const filterInput = document.getElementById("filter-runs");
   filterInput.addEventListener("input", (ev) => filterList("runs-list", ev.target.value));
   if (prevFilter) { filterInput.value = prevFilter; filterList("runs-list", prevFilter); }
   document.getElementById("filter-runs-project").addEventListener("change", (ev) => {
     runsProjectFilter = ev.target.value; renderRuns();
+  });
+  document.getElementById("drain-runs").addEventListener("click", async (ev) => {
+    const btn = ev.target;
+    btn.disabled = true;
+    try {
+      const out = await api("/api/runs/drain", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: "{}",
+      });
+      const ran = out.outcomes.filter((o) => !o.action).length;
+      toast("Drain: " + ran + " executed, " + (out.outcomes.length - ran) + " parked/skipped", true);
+      renderRuns();
+    } catch (err) {
+      toast(err.message, false);
+      btn.disabled = false;
+    }
   });
   startRunsPoll();
 }

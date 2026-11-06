@@ -11,9 +11,10 @@ from datetime import UTC, datetime
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, ClassVar, cast
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
+from agent_executor import build_executor
 from ai_agent.run_tracking import request_run_cancel
 from ai_agent.staged_edits import (
     ProjectRoots,
@@ -23,6 +24,7 @@ from ai_agent.staged_edits import (
     approve_staged,
     review_staged,
 )
+from ai_agent.supervisor_drain import RunDrain
 from ai_orchestrator.evidence import merge_probe_eval
 from ai_provider.chat_transcripts import SQLiteChatTranscriptStore
 from ai_provider.stt import (
@@ -115,6 +117,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
     stt_engine_factory: Callable[[], TranscribeEngine] | None = None
     stt_metering: MeteringHook | None = None
     chat_translator: Translator | None = None
+    drain_executor_factory: ClassVar[Callable[[], object] | None] = None
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(STATIC_ROOT), **kwargs)
@@ -311,6 +314,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             if path.startswith("/api/runs/") and path.endswith("/cancel"):
                 run_id = path[len("/api/runs/") : -len("/cancel")]
                 return self._cancel_run(run_id)
+            if path == "/api/runs/drain":
+                return self._drain_runs(config, payload)
             if path.startswith("/api/intake/") and path.endswith("/approve"):
                 name = unquote(path[len("/api/intake/") : -len("/approve")])
                 return self._approve_intake(name)
@@ -782,6 +787,35 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         except (ValueError, StoreError) as exc:
             return self._send_json({"ok": False, "error": str(exc)}, status=400)
         self._send_json({"ok": True, "plan": plan})
+
+    def _drain_runs(self, config: DashboardConfig, payload: dict) -> None:
+        """Execute approved queued runs; default one run per call."""
+        max_runs = payload.get("max_runs", 1)
+        if isinstance(max_runs, bool) or not isinstance(max_runs, int) or not 1 <= max_runs <= 100:
+            return self._send_json(
+                {"ok": False, "error": "max_runs must be an integer between 1 and 100"},
+                status=400,
+            )
+        stores = self._stores()
+        try:
+            roots = self._project_roots(config)
+        except StagedEditError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        # Plain factory, not a method: tests inject staticmethod(fake_factory).
+        factory = self.drain_executor_factory  # pyright: ignore[reportAttributeAccessIssue]
+        if factory is not None:
+            executor = factory()
+        else:
+            executor = build_executor(
+                config, roots, self.repo_root, inbox_create=stores.create_inbox_task
+            )
+        drain = RunDrain(
+            runs_dir=self.data_dir / "runs",
+            get_inbox=lambda inbox_id: stores.inbox.get(inbox_id),
+            executor=executor,
+        )
+        outcomes = drain.drain(max_runs=max_runs)
+        self._send_json({"ok": True, "outcomes": outcomes})
 
     def _cancel_run(self, run_id: str) -> None:
         try:
