@@ -24,7 +24,7 @@ function New-FiveMinuteLogonTrigger {
 
 $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable `
     -ExecutionTimeLimit (New-TimeSpan -Minutes 5) `
-    -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+    -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -Hidden
 
 $tasks = @(
     @{
@@ -46,7 +46,7 @@ foreach ($task in $tasks) {
     if (-not (Test-Path -LiteralPath $scriptPath)) { throw "missing script: $scriptPath" }
     Unregister-ScheduledTask -TaskName $task.Name -Confirm:$false -ErrorAction SilentlyContinue
     $action = New-ScheduledTaskAction -Execute 'powershell' `
-        -Argument ('-NoProfile -ExecutionPolicy Bypass -File ' + $scriptPath)
+        -Argument ('-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ' + $scriptPath)
     $principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" `
         -LogonType Interactive -RunLevel $task.RunLevel
     Register-ScheduledTask -TaskName $task.Name -Trigger (New-FiveMinuteLogonTrigger) `
