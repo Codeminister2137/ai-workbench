@@ -117,11 +117,11 @@ class DashboardStores:
 
     @property
     def token_path(self) -> Path:
-        """Local supervisor token file; absent means localhost-trust only."""
+        """Local supervisor token file; absent means tailnet-membership trust."""
         return self.data_dir / "supervisor.token"
 
     def check_supervisor_token(self, provided: str | None) -> bool:
-        """Accept when no token is configured, else require an exact match."""
+        """Accept when no token is configured (single-user tailnet), else exact match."""
         path = self.token_path
         if not path.exists():
             return True
