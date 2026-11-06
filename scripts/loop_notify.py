@@ -1,9 +1,9 @@
 """Owner-self email pings for unattended loop runs.
 
-Reuses the job-search prototype's email transports
-(``apps/job_search/job-email/sender.py``): real delivery through
-``YagmailEmailTransport`` (Gmail app password) and offline ``DryRunEmailTransport``
-otherwise. Every ping writes a JSON receipt under the run directory.
+Delivers through the dashboard's stdlib SMTP mailer
+(``apps/workbench_dashboard/owner_mail.py``) over Gmail SMTP; offline pings
+record dry-run receipts instead. Every ping writes a JSON receipt under the
+run directory.
 
 Standing boundary: pings go only to the owner's own Gmail address, for run
 events (objective error, run finished, sleep scheduled) carrying run metadata
@@ -15,7 +15,6 @@ can reach the machine from outside the home network.
 from __future__ import annotations
 
 import argparse
-import dataclasses
 import json
 import os
 import sys
@@ -25,7 +24,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-JOB_EMAIL_DIR = ROOT / "apps/job_search/job-email"
+DASHBOARD_DIR = ROOT / "apps" / "workbench_dashboard"
 
 EMAIL_ENV = "GMAIL_EMAIL"
 PASSWORD_ENV = "GMAIL_PASSWORD"
@@ -67,11 +66,12 @@ def read_gmail_config(root: Path = ROOT) -> tuple[str, str] | None:
     return None
 
 
-def _load_sender():
-    sys.path.insert(0, str(JOB_EMAIL_DIR))
-    import sender
+def _load_owner_mail():
+    """Import the dashboard stdlib mailer without installing it."""
+    sys.path.insert(0, str(DASHBOARD_DIR))
+    import owner_mail  # noqa: PLC0415 - local app module, not installed
 
-    return sender
+    return owner_mail
 
 
 def public_ip(*, timeout: float = 10) -> str | None:
@@ -106,7 +106,7 @@ def send_ping(
     failures are captured in the receipt, never raised, so a broken notifier
     cannot break a run. Returns the receipt dict.
     """
-    sender = _load_sender()
+    owner_mail = _load_owner_mail()
     config = read_gmail_config()
     owner = config[0] if config else ""
     target = (recipient or owner).strip()
@@ -123,34 +123,67 @@ def send_ping(
     attempts = 0
     try:
         if live_config is not None:
-            transport = sender.YagmailEmailTransport(live_config[0], live_config[1])
-            transport_name = "yagmail"
+            mail_config = {
+                "owner": live_config[0],
+                "host": "smtp.gmail.com",
+                "port": 587,
+                "username": live_config[0],
+                "password": live_config[1],
+                "starttls": True,
+            }
+            transport_name = "owner_mail"
             use_live = True
         else:
-            transport = sender.DryRunEmailTransport()
+            mail_config = {
+                "owner": target,
+                "host": "",
+                "port": 587,
+                "username": "",
+                "password": "",
+                "starttls": True,
+            }
             transport_name = "dry_run"
             use_live = False
         # Retry transient send failures (e.g. DNS down right after a
         # sleep/wake cycle): run-11 lost its finished email this way.
-        result = None
+        # send_owner_mail captures transport errors in its receipt instead
+        # of raising; ValueError (bad subject/body/recipient) fails fast.
+        sent: bool | None = None
+        finished = datetime.now(UTC).isoformat()
+        error_message: str | None = None
         for attempt in range(3):
             attempts = attempt + 1
             try:
-                result = transport.send(
-                    to_email=target, subject=subject, contents=body, attachments=None
+                mail_receipt = owner_mail.send_owner_mail(
+                    to=target,
+                    subject=subject,
+                    body=body,
+                    config=mail_config,
+                    dry_run=not use_live,
+                    receipts_dir=notifications,
                 )
+            except ValueError:
+                raise
             except Exception:
-                result = None
+                mail_receipt = None
                 if attempt == 2:
                     raise
                 time.sleep(30)
                 continue
-            if result.success or attempt == 2:
+            sent = mail_receipt["sent"] if use_live else True
+            finished = mail_receipt["finished"]
+            error_message = mail_receipt["error"]
+            if sent or attempt == 2:
                 break
             time.sleep(30)
-        assert result is not None
-        payload = dataclasses.asdict(result)
-        payload["live"] = bool(use_live and result.success)
+        assert sent is not None
+        payload = {
+            "success": sent,
+            "recipient": target,
+            "timestamp_utc": finished,
+            "error_message": error_message,
+        }
+        payload["live"] = bool(use_live and sent)
         payload["transport_name"] = transport_name
         payload["attempts"] = attempts
     except Exception as error:  # noqa: BLE001 - ping must never break a run
