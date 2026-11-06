@@ -39,6 +39,33 @@ sender is the owner's phone app, delivery depends on the router + ISP.
    only), send the packet, confirm wake. If it fails, the router forward
    (mode 2/3) is the next suspect, not the PC.
 
+## Durable router fixes (owner decision C, 2026-11-06)
+
+Security analysis (2026-11-06 night, loop-3): both changes are SAFE.
+
+- **DHCP reservation** (pin 192.168.1.12 to the PC's MAC) is LAN-only
+  admin state. It opens no ports, publishes nothing, and cannot be
+  abused remotely. It kills failure mode 2 permanently.
+- **Router DDNS** (stable hostname -> rotating WAN IP) publishes only a
+  hostname-to-IP mapping - scanners already enumerate the IP range and
+  the UDP forward regardless. It opens no new ports and does not weaken
+  WoL authentication (magic packets are unauthenticated by design; the
+  MAC stays the shared secret and must never be posted publicly).
+  Requirements: a RANDOM hostname (no name/company - avoid a privacy
+  leak via public DNS), set up on the ROUTER (a PC-side updater cannot
+  run while the PC is asleep, which is exactly when wake matters).
+  If the FunBox has no usable DDNS client, keep the mail-IP flow:
+  every loop mail carries the current IP plus a rotation NOTE.
+
+Steps (FunBox admin UI; exact menu labels vary by firmware):
+1. DHCP/static-lease section -> reserve 192.168.1.12 for MAC
+   `34:5A:60:38:44:C8` -> reboot router -> confirm the PC still gets .12.
+2. DDNS section -> provider account -> random hostname -> confirm it
+   resolves to the current WAN IP -> point the phone app at the
+   hostname -> re-run the E2E test above.
+3. Record the hostname in the Decisions/task closure (hostname only if
+   it leaks no identity), not in this public doc unless random.
+
 ## Durable fixes (owner decision, all router-side)
 
 - **Router DDNS** (recommended): enable the router's built-in dynamic-DNS
