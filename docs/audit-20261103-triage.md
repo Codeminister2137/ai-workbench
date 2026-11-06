@@ -166,16 +166,16 @@ verification before action — several audit claims were already proven wrong
 - [HIGH] Snapshot command-line replay gives local RCE — `scripts/day_cycle.py` → **FIXED 2026-11-06** (verified in-loop: argv+allowlist replay, untrusted snapshot shapes refused (c706db6); test_day_cycle green); was REAL — POST-HACKATHON)
 - [HIGH] All provider keys exposed to every agent subprocess — `scripts/alternate-agent-acceptance.py` → **FIXED 2026-11-06** (verified in-loop: build_route_env/build_base_env minimal per-route env, no os.environ mutation; test_alternate_agent_routes green); was REAL — POST-HACKATHON)
 - [HIGH] Private Gmail content sent to external Meta model — `scripts/mail_digest.py` → **INTENDED** (owner tool, owner key, documented no-training route; subject+snippet only)
-- [MEDIUM] Unencoded server-controlled IDs in fetch paths — `patches/operator-ui-guided/app.js` → **UNREVIEWED**
-- [MEDIUM] Owner ping leaks host IP to external service by default — `scripts/loop_notify.py` → **UNREVIEWED**
+- [MEDIUM] Unencoded server-controlled IDs in fetch paths — `patches/operator-ui-guided/app.js` → **DOWNGRADED 2026-11-06 (inert sibling-repo patch mirror, not live code here; unencoded/encoded inconsistency is real within the bundle — fix belongs to the sibling)**
+- [MEDIUM] Owner ping leaks host IP to external service by default — `scripts/loop_notify.py` → **INTENDED 2026-11-06 (owner-approved 2026-11-06: public IP in mail notifications covers rotation; ipify lookup is that mechanism)**
 - [HIGH] Validator allowance keys accessed without validation — `scripts/meta-supervised-develop.py` → **DOWNGRADED (malformed host-authored file raises fail-closed before any model call; tampering after prepare is caught by the AUTHORIZED job-digest check)**
-- [MEDIUM] Security gates use `assert`, stripped under `python -O` — `scripts/fallback-acceptance.py` → **UNREVIEWED**
-- [MEDIUM] Unbounded mailbox/body reads allow DoS/OOM — `scripts/mail_digest.py` → **UNREVIEWED**
-- [MEDIUM] `.env` read crashes when file missing — `scripts/alternate-agent-acceptance.py` → **UNREVIEWED**
-- [MEDIUM] Controller launch parses JSON without handling — `scripts/bounded-acceptance-controller.py` → **UNREVIEWED**
-- [MEDIUM] Duplicated model-resolution branches drift — `scripts/baseten-supervised-develop.py` → **UNREVIEWED**
-- [LOW] PowerShell port-parse fragile to locale/whitespace — `scripts/day_cycle.py` → **UNREVIEWED**
-- [LOW] `save_json` temp suffix collides on concurrent runs — `scripts/research-review-evaluation.py` → **UNREVIEWED**
+- [MEDIUM] Security gates use `assert`, stripped under `python -O` — `scripts/fallback-acceptance.py` → **DOWNGRADED 2026-11-06 (manually-run harness, never invoked with -O; explicit-failure conversion is trivial hygiene — queued)**
+- [MEDIUM] Unbounded mailbox/body reads allow DoS/OOM — `scripts/mail_digest.py` → **DOWNGRADED 2026-11-06 (operator CLI on own mailbox; stored output bounded to metadata/snippet/urls; only transient per-message memory for giant mails; --fetch/per-message caps queued)**
+- [MEDIUM] `.env` read crashes when file missing — `scripts/alternate-agent-acceptance.py` → **REAL-minor 2026-11-06 — fix queued (all three scripts still raise raw FileNotFoundError; wrap with a clear missing-.env error)**
+- [MEDIUM] Controller launch parses JSON without handling — `scripts/bounded-acceptance-controller.py` → **REAL-minor 2026-11-06 — fix queued (corrupt run.json/checksums.json crash instead of becoming failures entries / controller_error lines)**
+- [MEDIUM] Duplicated model-resolution branches drift — `scripts/baseten-supervised-develop.py` → **REAL-minor 2026-11-06 — fix queued (lines 87-90 loop is dead code re-checking vars that just failed; collapse to helper + pin precedence with a test)**
+- [LOW] PowerShell port-parse fragile to locale/whitespace — `scripts/day_cycle.py` → **DOWNGRADED 2026-11-06 (strict exactly-2-digit-tokens filter cannot misattribute a PID; worst case is a missed listener, and a relaunch then fails loud on bind)**
+- [LOW] `save_json` temp suffix collides on concurrent runs — `scripts/research-review-evaluation.py` → **DOWNGRADED 2026-11-06 (sequential script, zero concurrency primitives; collision needs two simultaneous manual runs on the same path; NamedTemporaryFile hygiene queued)**
 
 ## ai-workbench/7
 
