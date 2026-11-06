@@ -46,6 +46,8 @@ def setup_project_codex_mcp(
 ) -> CodexMcpSetupResult:
     """Create/update Codex MCP config for repo inspection and delegation tools."""
 
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+", server_name):
+        raise ValueError(f"invalid codex MCP server name: {server_name!r}")
     repo_root = repo_root.resolve()
     config_path = repo_root / ".codex" / "config.toml"
     command = sys.executable

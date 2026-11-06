@@ -15,6 +15,10 @@ REPORT_SCOPE_NOTICE = (
 )
 
 
+def _one_line(value: object) -> str:
+    return str(value).replace(chr(10), " ").replace(chr(13), " ").strip()
+
+
 def observed_inference() -> dict[str, int] | None:
     """Snapshot adapter receipts, without implying a census of host network traffic."""
     ledger = ACTIVE_USAGE.get()
@@ -200,14 +204,14 @@ def format_cli_closeout(
     notes = [f"status={status}", f"execution_status={execution_status}"]
     if fallback_attempts:
         attempts = ", ".join(
-            f"{attempt.get('route_id', 'unknown route')}:{attempt.get('status', 'unknown')}"
+            f"{_one_line(attempt.get('route_id', 'unknown route'))}:{_one_line(attempt.get('status', 'unknown'))}"
             for attempt in fallback_attempts
         )
         notes.append(f"fallback_attempts={attempts}")
     else:
         notes.append("fallback_attempts=none")
     if failure_reason:
-        notes.append(f"failure_reason={failure_reason.replace(chr(10), ' ').strip()}")
+        notes.append(f"failure_reason={_one_line(failure_reason)}")
         for key, value in (
             ("provider", provider),
             ("category", category),
