@@ -16,10 +16,11 @@ from typing import TYPE_CHECKING
 from ai_provider.contracts import PrivacyClass
 from ai_provider.errors import ProviderError
 
+from ai_agent.contracts import ToolCategory
 from ai_agent.loop import AgentIterationLimitExceeded, AgentLoop, ToolExecutionEvent
 from ai_agent.permissions import PermissionManager, PermissionPolicy
 from ai_agent.tool_profiles import INSPECTION_PROFILE, shared_tool_registry
-from ai_agent.tools.base import ToolContext
+from ai_agent.tools.base import BaseTool, ToolContext
 
 if TYPE_CHECKING:
     from ai_provider.contracts import ChatClient
@@ -45,11 +46,38 @@ def run_messenger_turn(
     max_iterations: int = 4,
     deadline: float | None = None,
     privacy_class: PrivacyClass = PrivacyClass.LOCAL_ONLY,
+    extra_tools: tuple[BaseTool, ...] | None = None,
 ) -> MessengerResult:
-    """Run one chat turn with inspection tools; never writes or executes."""
+    """Run one chat turn with inspection tools; never writes or executes.
+
+    ``extra_tools`` extends the registry for the chat channel only. Every
+    extra tool must be read-only (READ/SEARCH category) with a name outside
+    the inspection profile; anything else is refused before any model call.
+    When no extras are given the turn is exactly the inspection relay.
+    """
+    extras = tuple(extra_tools or ())
+    for tool in extras:
+        if tool.definition.category not in {ToolCategory.READ, ToolCategory.SEARCH}:
+            raise ValueError(
+                f"Messenger extra tool {tool.definition.name!r} must be read-only "
+                "(READ/SEARCH category)"
+            )
+    extra_names = [tool.definition.name for tool in extras]
+    if len(set(extra_names)) != len(extra_names):
+        raise ValueError("Messenger extra tools must have unique names")
+    if set(extra_names) & set(INSPECTION_PROFILE.tool_names):
+        raise ValueError("Messenger extra tools must not shadow the inspection profile")
     registry = shared_tool_registry("inspection")
+    for tool in extras:
+        registry.register(tool)
     names = {tool.name for tool in registry.list_definitions()}
-    if names != set(INSPECTION_PROFILE.tool_names):
+    expected = set(INSPECTION_PROFILE.tool_names) | set(extra_names)
+    if names != expected:
+        if extras:
+            raise ValueError(
+                "Messenger registry must hold exactly the inspection profile "
+                "plus the chat-channel tools"
+            )
         raise ValueError("Messenger registry must hold exactly the inspection profile")
     receipts: list[str] = []
 
