@@ -39,7 +39,7 @@ Remove: `Unregister-ScheduledTask -TaskName WorkbenchDashboard,MsiUdpWatchdog -C
 | `ollama/gpt-oss:20b` | local runtime, 64k budget | implement-mode runs; 8-turn probe 8/8 clean post-slim (overflow resolved) |
 | `ollama/qwen3:14b` | local runtime | tools-capable; 4k budget (too small for implement) |
 | `openai/codex-gpt-6.1-sol` | `codex` CLI 0.166.0 (PATH), ChatGPT login | verified `completed` — spend freely |
-| `meta/muse-spark-1.3` | provider API | wired; needs reachability re-probe after network outage |
+| `meta/muse-spark-1.3` | provider API | wired; re-probed 200 on 2026-11-06 (outage was local MSI fallout) |
 | requesty/openrouter/modal | provider APIs | wired; keys in `.env` (names only, see `.env.example`) |
 
 Codex note: PyCharm-bundled 0.137.0 is too stale (400s); PATH 0.166.0 wins.
@@ -117,4 +117,4 @@ Codex note: PyCharm-bundled 0.137.0 is too stale (400s); PATH 0.166.0 wins.
 
 - P7 answers (owner deliberating), mail transport decision (inbox),
   drain-scheduler enablement (owner decision), MSI removal (owner decision),
-  executor blank-summary backlog, Meta reachability re-probe.
+  executor blank-summary backlog, live Meta delegation E2E (route proven, E2E pending).
