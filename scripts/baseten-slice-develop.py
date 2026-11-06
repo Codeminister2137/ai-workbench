@@ -221,6 +221,11 @@ def main() -> int:
                     if "\n" not in src:
                         raise ValueError(f"{name}: no real newlines (escaped?)")
                     compile(src, name, "exec")
+            test_paths = [n for n in written if "/tests/" in n or n.startswith("tests/")]
+            if test_paths and all(
+                (root / n).read_bytes() == (pristine_bytes.get(n) or b"") for n in test_paths
+            ):
+                raise ValueError("allowlisted test files returned unchanged")
         except (ValueError, SyntaxError) as exc:
             send["status"] = f"rejected: {exc}"[:200]
             # Restore pre-slice bytes so the retry starts from real sources.
