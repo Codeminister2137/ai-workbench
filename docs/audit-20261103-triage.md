@@ -231,16 +231,16 @@ verification before action — several audit claims were already proven wrong
 - [MEDIUM] Judge USD cap has no upper bound — `src/remote_operator/judge_grants.py` → **FIXED** (cap 100 server+UI+test (batch1))
 - [HIGH] Duplicate `id="preview"` leaves one button dead — `src/remote_operator/index.html` → **FIXED** (removed dead dup; page-ids-unique test (batch1, 8e825f5))
 - [HIGH] Expire inside open transaction uses second connection — `src/remote_operator/external_actions.py` → **FALSE POSITIVE** (separate connection is comment-documented (rolls back otherwise); no lock held on SELECT)
-- [MEDIUM] `request()` decode failure escapes as exception — `src/remote_operator/modal_runner.py` → **UNREVIEWED**
+- [MEDIUM] `request()` decode failure escapes as exception — `src/remote_operator/modal_runner.py` → **DOWNGRADED 2026-11-06 (confirmed: decode at :169 sits outside the try at :220; trigger is the operator's own non-UTF8 file; sibling is deprecated — move-inside-try is a sibling note)**
 - [MEDIUM] `_redact` with empty key corrupts every string — `src/remote_operator/meta.py` → **FIXED** (empty-key guard meta+baseten+tests (batch1); unreachable in current flows (latent))
 - [MEDIUM] Same empty-key redact in Baseten path — `src/remote_operator/baseten.py` → **FIXED** (see above (batch1))
-- [MEDIUM] `schedule_sleep` claims scheduled on non-Windows — `src/remote_operator/power.py` → **UNREVIEWED**
-- [MEDIUM] Unbounded judge signup fills SQLite — `src/remote_operator/judge_accounts.py` → **UNREVIEWED**
-- [LOW] Debug `print` in host loop — `src/remote_operator/development.py` → **UNREVIEWED**
-- [LOW] Expiry error leaks token-hash prefix — `src/remote_operator/hosted.py` → **UNREVIEWED**
-- [LOW] `send_owner_mail` lets non-transport errors escape — `src/remote_operator/notify.py` → **UNREVIEWED**
-- [LOW] Narrow `cancel_sleep` leaves stale scheduled receipt — `src/remote_operator/power.py` → **UNREVIEWED**
-- [LOW] Env parser strips quotes asymmetrically — `scripts/check_submission_eligibility.py` → **UNREVIEWED**
+- [MEDIUM] `schedule_sleep` claims scheduled on non-Windows — `src/remote_operator/power.py` → **DOWNGRADED 2026-11-06 (route is owner-only with hosted 403; owner PC is Windows so Linux-helper-crash is hypothetical; platform gate is a sibling note)**
+- [MEDIUM] Unbounded judge signup fills SQLite — `src/remote_operator/judge_accounts.py` → **DOWNGRADED 2026-11-06 (code-gate CONFIRMED in web.py; pbkdf2 per signup throttles mass creation; disk-fill needs millions of authed signups on a time-boxed demo)**
+- [LOW] Debug `print` in host loop — `src/remote_operator/development.py` → **DOWNGRADED 2026-11-06 (one confirmed debug print; trivial; deprecated sibling)**
+- [LOW] Expiry error leaks token-hash prefix — `src/remote_operator/hosted.py` → **FALSE POSITIVE 2026-11-06 (no hex()[:8] exists anywhere — expiry messages are already generic; audit evidence is stale)**
+- [LOW] `send_owner_mail` lets non-transport errors escape — `src/remote_operator/notify.py` → **DOWNGRADED 2026-11-06 (to/subject/body pre-validated before delivery; escape needs a malformed owner address in config; deprecated sibling)**
+- [LOW] Narrow `cancel_sleep` leaves stale scheduled receipt — `src/remote_operator/power.py` → **DOWNGRADED 2026-11-06 (mixed state needs a crash inside a 2-line window; the helper independently honors the cancel file, so no phantom sleep; deprecated sibling)**
+- [LOW] Env parser strips quotes asymmetrically — `scripts/check_submission_eligibility.py` → **DOWNGRADED 2026-11-06 (strip-both-ends is lenient by design and suits a presence/format checker; matched-pair strictness is cosmetic; deprecated sibling)**
 
 ## remote-operator/1
 
