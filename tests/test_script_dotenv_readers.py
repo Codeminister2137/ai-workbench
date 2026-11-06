@@ -151,3 +151,57 @@ def test_meta_read_meta_key_file_duplicate_key(tmp_path) -> None:
     )
     with pytest.raises(ValueError):
         _meta_module.read_meta_key_file(tmp_path / ".env")
+
+
+_meta_supervised_module = _load_script_module(
+    "meta_supervised_develop_under_test", "meta-supervised-develop.py"
+)
+
+
+def test_meta_supervised_read_meta_key_happy_path(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("META_API_KEY", raising=False)
+    monkeypatch.setattr(_meta_supervised_module, "ROOT", tmp_path)
+    _write_env(tmp_path, f"{META_KEY}=sk-test-meta-sup-123\n")
+    assert _meta_supervised_module._read_meta_key() == "sk-test-meta-sup-123"
+
+
+def test_meta_supervised_read_meta_key_env_var_wins(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(_meta_supervised_module, "ROOT", tmp_path)
+    _write_env(tmp_path, f"{META_KEY}=sk-from-file\n")
+    monkeypatch.setenv("META_API_KEY", "sk-from-env")
+    assert _meta_supervised_module._read_meta_key() == "sk-from-env"
+
+
+def test_meta_supervised_read_meta_key_missing_file(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("META_API_KEY", raising=False)
+    monkeypatch.setattr(_meta_supervised_module, "ROOT", tmp_path)
+    assert not (tmp_path / ".env").exists()
+    with pytest.raises(ValueError):
+        _meta_supervised_module._read_meta_key()
+
+
+def test_meta_supervised_read_meta_key_missing_key(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("META_API_KEY", raising=False)
+    monkeypatch.setattr(_meta_supervised_module, "ROOT", tmp_path)
+    _write_env(tmp_path, "SOME_OTHER_KEY=value\n")
+    with pytest.raises(ValueError):
+        _meta_supervised_module._read_meta_key()
+
+
+def test_meta_supervised_read_meta_key_empty_value(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("META_API_KEY", raising=False)
+    monkeypatch.setattr(_meta_supervised_module, "ROOT", tmp_path)
+    _write_env(tmp_path, f"{META_KEY}=\n")
+    with pytest.raises(ValueError):
+        _meta_supervised_module._read_meta_key()
+
+
+def test_meta_supervised_read_meta_key_duplicate_key(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("META_API_KEY", raising=False)
+    monkeypatch.setattr(_meta_supervised_module, "ROOT", tmp_path)
+    _write_env(
+        tmp_path,
+        f"{META_KEY}=first-value\n{META_KEY}=second-value\n",
+    )
+    with pytest.raises(ValueError):
+        _meta_supervised_module._read_meta_key()
