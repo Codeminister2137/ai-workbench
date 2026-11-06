@@ -32,12 +32,26 @@ def validation_stage_needs_repair(stage: OrchestratedStageRecord | None) -> bool
     return validation_status_from_stage(stage) in {"failed", "timeout"}
 
 
+_VALIDATION_FALLBACK_CHARS = 4_000
+
+
+def _truncated_details(details: object) -> str:
+    """Render details with a hard bound for prompt inclusion."""
+    rendered = json.dumps(details, indent=2, sort_keys=True)
+    if len(rendered) <= _VALIDATION_FALLBACK_CHARS:
+        return rendered
+    return (
+        rendered[:_VALIDATION_FALLBACK_CHARS]
+        + "\n[... validation details truncated to fit prompt budget]"
+    )
+
+
 def format_validation_failures_for_prompt(stage: OrchestratedStageRecord | None) -> str:
     if stage is None or not stage.details:
         return "No deterministic validation details were recorded."
     results = stage.details.get("results")
     if not isinstance(results, list) or not results:
-        return json.dumps(stage.details, indent=2, sort_keys=True)
+        return _truncated_details(stage.details)
     formatted: list[str] = []
     for index, item in enumerate(results, start=1):
         if not isinstance(item, dict):
@@ -55,7 +69,7 @@ def format_validation_failures_for_prompt(stage: OrchestratedStageRecord | None)
             formatted.append("Stderr preview:")
             formatted.append(str(item["stderr_preview"]))
         formatted.append("")
-    return "\n".join(formatted).strip() or json.dumps(stage.details, indent=2, sort_keys=True)
+    return "\n".join(formatted).strip() or _truncated_details(stage.details)
 
 
 def build_orchestrated_repair_prompt(

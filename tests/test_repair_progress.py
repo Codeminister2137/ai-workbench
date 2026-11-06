@@ -522,3 +522,43 @@ def test_neutral_policy_and_review_reserve():
     assert repair_progress(state_changed=False, failure_changed=False) == "no_progress"
     assert review_reserve_seconds(30) == 3
     assert review_reserve_seconds(10000) == 120
+
+
+def test_validation_fallback_dump_is_bounded() -> None:
+    from ai_agent.repair_workflow import (
+        _VALIDATION_FALLBACK_CHARS,
+        format_validation_failures_for_prompt,
+    )
+    from ai_provider.orchestrated_runs import OrchestratedStageRecord
+
+    stage = OrchestratedStageRecord(
+        run_id="r",
+        stage_order=0,
+        name="validation",
+        route_policy="p",
+        status="failed",
+        purpose="u",
+        details={"blob": "x" * (_VALIDATION_FALLBACK_CHARS + 500)},
+    )
+
+    rendered = format_validation_failures_for_prompt(stage)
+
+    assert len(rendered) <= _VALIDATION_FALLBACK_CHARS + 100
+    assert "truncated to fit prompt budget" in rendered
+
+
+def test_validation_fallback_small_details_verbatim() -> None:
+    from ai_agent.repair_workflow import format_validation_failures_for_prompt
+    from ai_provider.orchestrated_runs import OrchestratedStageRecord
+
+    stage = OrchestratedStageRecord(
+        run_id="r",
+        stage_order=0,
+        name="validation",
+        route_policy="p",
+        status="failed",
+        purpose="u",
+        details={"reason": "tiny"},
+    )
+
+    assert '"tiny"' in format_validation_failures_for_prompt(stage)
