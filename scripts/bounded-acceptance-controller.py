@@ -82,7 +82,11 @@ def main() -> int:
         failures.append("run.json is missing")
         run = {}
     else:
-        run = json.loads(run_path.read_text(encoding="utf-8"))
+        try:
+            run = json.loads(run_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError, UnicodeError) as error:
+            failures.append(f"run.json is unreadable: {type(error).__name__}")
+            run = {}
 
     route_id = run.get("route_id", "")
     if not route_id:
@@ -104,9 +108,15 @@ def main() -> int:
         if not checksums.exists():
             failures.append("checksums.json is missing")
         else:
-            manifest = json.loads(checksums.read_text(encoding="utf-8"))
+            try:
+                manifest = json.loads(checksums.read_text(encoding="utf-8"))
+            except (OSError, ValueError, UnicodeError) as error:
+                failures.append(f"checksums.json is unreadable: {type(error).__name__}")
+                manifest = {}
             if not manifest:
-                failures.append("checksums.json is empty")
+                # Avoid duplicate empty message when we already reported unreadable
+                if not any("checksums.json is unreadable" in f for f in failures):
+                    failures.append("checksums.json is empty")
             for rel, expected in sorted(manifest.items()):
                 target = fixture / rel
                 if not target.exists():

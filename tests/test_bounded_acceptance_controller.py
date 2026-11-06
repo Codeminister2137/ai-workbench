@@ -312,3 +312,53 @@ def test_validate_gate_allows_declared_new_paths_and_cache_directories(tmp_path)
         text=True,
     )
     assert run.returncode == 0, run.stdout + run.stderr
+
+
+def test_corrupt_run_json_yields_failure_not_crash(tmp_path):
+    module = controller()
+    fixture = _fixture(tmp_path)
+    controller_dir = tmp_path / "controller"
+    assert _prepare(module, fixture, controller_dir) == 0
+    (controller_dir / "run.json").write_bytes(b"{ invalid json \xff")
+    result = subprocess.run(
+        [sys.executable, str(controller_dir / "coherence.py")],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 1
+    assert "run.json" in result.stdout
+    assert "is unreadable" in result.stdout
+    assert "controller_error" not in result.stdout.lower()
+
+
+def test_corrupt_checksums_json_yields_failure_not_crash(tmp_path):
+    module = controller()
+    fixture = _fixture(tmp_path)
+    controller_dir = tmp_path / "controller"
+    assert _prepare(module, fixture, controller_dir) == 0
+    (controller_dir / "checksums.json").write_bytes(b"\xff\xfe not json")
+    result = subprocess.run(
+        [sys.executable, str(controller_dir / "coherence.py")],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 1
+    assert "checksums.json" in result.stdout
+    assert "is unreadable" in result.stdout
+
+
+def test_valid_files_still_report_missing_route(tmp_path):
+    module = controller()
+    fixture = _fixture(tmp_path)
+    controller_dir = tmp_path / "controller"
+    assert _prepare(module, fixture, controller_dir) == 0
+    run = json.loads((controller_dir / "run.json").read_text(encoding="utf-8"))
+    run.pop("route_id", None)
+    (controller_dir / "run.json").write_text(json.dumps(run), encoding="utf-8")
+    result = subprocess.run(
+        [sys.executable, str(controller_dir / "coherence.py")],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 1
+    assert "route_id" in result.stdout
