@@ -5,7 +5,7 @@ only variable *names* and credential *status*, never values. Update this
 file when a slice adds, removes, or changes a capability (proposed
 Definition-of-Done rule, pending owner approval).
 
-Last verified: 2026-11-06 ~13:35 (unattended loop: +R2 name note, restrictions view, mail cutover).
+Last verified: 2026-11-06 evening (Baseten loop: drain@300 live, 7 REAL audit items resolved, 7 UNREVIEWED fixed, inbox decisions implemented).
 
 ## One command
 
@@ -40,9 +40,11 @@ Remove: `Unregister-ScheduledTask -TaskName WorkbenchDashboard,MsiUdpWatchdog -C
 | `ollama/qwen3:14b` | local runtime | tools-capable; 4k budget (too small for implement) |
 | `openai/codex-gpt-6.1-sol` | `codex` CLI 0.166.0 (PATH), ChatGPT login | verified `completed` — spend freely |
 | `meta/muse-spark-1.3` | provider API | wired; re-probed 200 on 2026-11-06 (outage was local MSI fallout) |
+| `baseten/muse-spark-open-1026` | `BASETEN_HACKATHON_API_KEY` event key | loop-proven 2026-11-06 (9 slices); verbose — caps: 2k probes / 16k code; needs host review (strays) |
 | requesty/openrouter/modal | provider APIs | wired; keys in `.env` (names only, see `.env.example`) |
 
 Codex note: PyCharm-bundled 0.137.0 is too stale (400s); PATH 0.166.0 wins.
+Spend order D1 (owner, till ~Nov10): Baseten > Modal-if-possible > Meta > Codex. Modal inference NOT possible (no deployed endpoint; only the mgmt key).
 
 ## Dashboard chat (supervisor)
 
@@ -62,9 +64,8 @@ Codex note: PyCharm-bundled 0.137.0 is too stale (400s); PATH 0.166.0 wins.
 - Drain worker v1 (2026-11-06): `POST /api/runs/drain` executes approved
   runs oldest-first (`max_runs`, default 1); "Drain now" button on Runs;
   E2E proven approve→drain→completed on live server.
-- Drain scheduler v1 (2026-11-06): `drain_interval_seconds` (≥60) in
-  `dashboard.json` + restart; one run per tick; tick failures logged.
-  Default OFF — enabling is an owner decision. No UI toggle yet.
+- Drain scheduler v1 (2026-11-06): owner voted ENABLE at 300s; live and ticking; state on /api/status (started/ticks/errors).
+  Code default stays OFF; live `dashboard.json` carries 300. No UI toggle yet.
 - Empty-answer fallback (2026-11-06): blank model content now yields a
   receipt summary instead of an empty reply + bare receipts (owner report).
 - Restart protocol: check chat for recent activity before restarting the
@@ -120,6 +121,13 @@ Codex note: PyCharm-bundled 0.137.0 is too stale (400s); PATH 0.166.0 wins.
   (was 4k default truncating 14.6k prompts — the SeerX/OpenRouter
   confabulation root cause).
 
+## Audit triage (2026-11-06 Baseten loop)
+
+- REAL — POST-HACKATHON: 0 (was 7; 6 pre-fixed verified, body-bounds fixed in-loop).
+- UNREVIEWED: 156 (was 176; /0+/2 batches triaged, 7 fixed with tests).
+- Watcher consoles hidden (task + script); stale token-gate comment corrected 
+  (tailnet-membership trust, single-user).
+
 ## Grants (remote-operator — deprecated path)
 
 - Local operator serve: DEPRECATED, verified not running. Do not revive.
@@ -129,5 +137,5 @@ Codex note: PyCharm-bundled 0.137.0 is too stale (400s); PATH 0.166.0 wins.
 ## Known gaps (see inbox + todos for live state)
 
 - P7 answers (owner deliberating; pricing part informed by threat study),
-  drain-scheduler enablement (owner decision), MSI removal (owner decision),
+  MSI removal (owner decision), naming (owner voted DEFER),
   executor blank-summary backlog, live Meta delegation E2E (route proven, E2E pending).
