@@ -179,34 +179,17 @@ def run_coding_prompt(
     if start_ollama and config.provider is ProviderKind.OLLAMA:
         if progress_callback is not None:
             progress_callback(f"{progress_prefix}: ollama_start - base_url={config.base_url}")
-        if ollama_log_path is None and ollama_resource_profile is None:
-            ensure_ollama_server(
-                config.base_url,
-                command=ollama_command,
-                startup_timeout_seconds=ollama_startup_timeout_seconds,
-            )
-        elif ollama_resource_profile is None:
-            ensure_ollama_server(
-                config.base_url,
-                command=ollama_command,
-                startup_timeout_seconds=ollama_startup_timeout_seconds,
-                log_path=ollama_log_path,
-            )
-        elif ollama_log_path is None:
-            ensure_ollama_server(
-                config.base_url,
-                command=ollama_command,
-                startup_timeout_seconds=ollama_startup_timeout_seconds,
-                resource_profile=ollama_resource_profile,
-            )
-        else:
-            ensure_ollama_server(
-                config.base_url,
-                command=ollama_command,
-                startup_timeout_seconds=ollama_startup_timeout_seconds,
-                log_path=ollama_log_path,
-                resource_profile=ollama_resource_profile,
-            )
+        kwargs: dict = {}
+        if ollama_log_path is not None:
+            kwargs["log_path"] = ollama_log_path
+        if ollama_resource_profile is not None:
+            kwargs["resource_profile"] = ollama_resource_profile
+        ensure_ollama_server(
+            config.base_url,
+            command=ollama_command,
+            startup_timeout_seconds=ollama_startup_timeout_seconds,
+            **kwargs,
+        )
 
     client = client_factory(config)
     response = client.complete(request)

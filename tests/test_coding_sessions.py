@@ -157,3 +157,12 @@ def test_invalid_session_options_fail_before_creating_storage(tmp_path):
         )
     assert exc.value.code == 2
     assert not database.exists()
+
+
+def test_observe_process_ignores_partial_metadata_without_error(tmp_path):
+    """Missing keys are skipped: callers run this in finally blocks."""
+    session = CodingSession.open(tmp_path / "sessions.sqlite3", "new", tmp_path, "Work", [])
+    session.observe_process({"process_handle": "h", "status": "running"})  # missing pid/returncode
+    with session.connection() as connection:
+        rows = connection.execute("SELECT * FROM coding_processes").fetchall()
+    assert rows == []
