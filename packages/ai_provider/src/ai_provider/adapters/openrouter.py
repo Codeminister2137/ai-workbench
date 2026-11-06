@@ -25,7 +25,7 @@ from ai_provider.contracts import (
     ProviderContinuation,
 )
 from ai_provider.errors import ProviderError, ProviderErrorCategory
-from ai_provider.http_transport import urlopen
+from ai_provider.http_transport import read_bounded, urlopen
 from ai_provider.reviewed_input import has_reviewed_non_sensitive_input
 from ai_provider.turn_usage import observe_usage
 
@@ -116,7 +116,11 @@ class OpenRouterFreeChatClient(OpenAICompatibleChatClient):
         request = Request(f"{self.base_url}/{path}", headers=self._headers(), method="GET")
         try:
             with urlopen(request, timeout=self.config.timeout_seconds) as response:
-                raw = json.loads(response.read().decode("utf-8"))
+                raw = json.loads(
+                    read_bounded(response, provider=self.config.provider.value).decode("utf-8")
+                )
+        except ProviderError:
+            raise
         except HTTPError as exc:
             raise self._http_error(exc) from exc
         except (URLError, TimeoutError, ValueError, UnicodeDecodeError) as exc:
