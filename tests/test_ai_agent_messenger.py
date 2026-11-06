@@ -157,3 +157,45 @@ def test_messenger_empty_answer_without_receipts(tmp_path: Path) -> None:
     )
     assert result.answer.strip() != ""
     assert result.tool_receipts == ()
+
+
+def test_chat_context_tiers_cover_prompt_sizes() -> None:
+    from ai_agent.messenger import chat_context_tokens
+
+    assert chat_context_tokens(0) == 8_192
+    assert chat_context_tokens(8_000) == 8_192
+    assert chat_context_tokens(8_001) == 16_384
+    assert chat_context_tokens(32_000) == 16_384
+    assert chat_context_tokens(32_001) == 32_768
+    assert chat_context_tokens(10_000_000) == 32_768
+
+
+def test_history_budget_fits_selected_tier() -> None:
+    from ai_agent.messenger import chat_context_tokens
+
+    tier = chat_context_tokens(20_000 + 1_000 + 200)
+    assert tier >= 20_000 / 3
+
+
+def test_messenger_sends_context_length_metadata(tmp_path: Path) -> None:
+    client = FakeClient([AIMessage(MessageRole.ASSISTANT, "hi")])
+    run_messenger_turn(
+        client=client,
+        workspace_root=tmp_path,
+        history_text="x" * 10_000,
+        prompt="Hello?",
+        system_prompt="Be brief.",
+    )
+    assert client.requests[0].metadata["ollama_context_length"] == 16_384
+
+
+def test_messenger_small_prompt_uses_smallest_tier(tmp_path: Path) -> None:
+    client = FakeClient([AIMessage(MessageRole.ASSISTANT, "hi")])
+    run_messenger_turn(
+        client=client,
+        workspace_root=tmp_path,
+        history_text="",
+        prompt="Hello?",
+        system_prompt="Be brief.",
+    )
+    assert client.requests[0].metadata["ollama_context_length"] == 8_192

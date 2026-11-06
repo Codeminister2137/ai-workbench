@@ -45,6 +45,9 @@ from dashboard_config import DashboardConfig
 logger = logging.getLogger(__name__)
 
 MAX_SUMMARY_CHARS = 2000
+# Fixed Ollama window for runs: tool results accumulate over iterations, so
+# size for growth, not for the small initial prompt. Model capacity is 131072.
+EXECUTOR_CONTEXT_TOKENS = 32768
 
 EXECUTOR_SYSTEM_PROMPT = """You are the workbench run agent. Complete the task below inside the
 project workspace. Rules: change project files ONLY through the stage_file
@@ -172,6 +175,7 @@ def build_executor(
                 permissions=permissions,
                 max_iterations=max_iterations,
                 fanout_policy=fanout,
+                request_metadata={"ollama_context_length": EXECUTOR_CONTEXT_TOKENS},
             )
         except ValueError as exc:
             return {"status": "failed", "error": str(exc)}
