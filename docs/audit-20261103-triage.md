@@ -80,18 +80,18 @@ verification before action — several audit claims were already proven wrong
 
 ## ai-workbench/12
 
-- [MEDIUM] Sys.path insert + plain import enables module hijack — `tests/test_sender_unify.py` → **UNREVIEWED**
-- [MEDIUM] PowerShell commands built by single-quote interpolation of paths — `tests/test_workstation_sleep.py` → **UNREVIEWED**
-- [LOW] Test executes product scripts at import time — `tests/test_test_suites.py` → **UNREVIEWED**
-- [LOW] Dynamic `python -c` worker built by f-string — `tests/test_task_scheduler.py` → **UNREVIEWED**
-- [MEDIUM] Resource bound guard only covers `rb` mode — `tests/test_semantic_refactor.py` → **UNREVIEWED**
-- [MEDIUM] Unbounded busy-wait for `release` sentinel — `tests/test_shell_process_ownership.py` → **UNREVIEWED**
-- [MEDIUM] Receipt poll swallows `PermissionError` — `tests/test_workstation_sleep.py` → **UNREVIEWED**
-- [LOW] Non-atomic consumer receipt write — `tests/test_sender_unify.py` → **UNREVIEWED**
-- [LOW] `/proc` stat parse assumes `) `-delimited format — `tests/test_validation_process_ownership.py` → **UNREVIEWED**
-- [LOW] Duplicated suspend-shim string replacement — `tests/test_workstation_sleep.py` → **UNREVIEWED**
-- [LOW] Hard-coded timing assertions invite flakes — `tests/test_shell_process_ownership.py` → **UNREVIEWED**
-- [LOW] Inline TOML catalogs duplicated across suites — `tests/test_shared_coding_fallback.py` → **UNREVIEWED**
+- [MEDIUM] Sys.path insert + plain import enables module hijack — `tests/test_sender_unify.py` → **DOWNGRADED 2026-11-06 (both sites confirmed, but hijack needs write access to the operator's own checkout — past which all bets are off; spec_from_file_location queued for the test and live loop_notify)**
+- [MEDIUM] PowerShell commands built by single-quote interpolation of paths — `tests/test_workstation_sleep.py` → **DOWNGRADED 2026-11-06 (interpolated paths are pytest tmp (quote-free) + fixed repo path; real helper verified to never interpolate (-Command/&/IEX absent); -File+argv queued)**
+- [LOW] Test executes product scripts at import time — `tests/test_test_suites.py` → **FALSE POSITIVE 2026-11-06 (run-tests.py is main-guarded; import defines data/functions only — the demanded property already holds)**
+- [LOW] Dynamic `python -c` worker built by f-string — `tests/test_task_scheduler.py` → **DOWNGRADED 2026-11-06 (interpolated value is a hardcoded int choice — no injection surface; static-fixture rewrite is optional style)**
+- [MEDIUM] Resource bound guard only covers `rb` mode — `tests/test_semantic_refactor.py` → **FALSE POSITIVE 2026-11-06 (production has exactly ONE source-read path — bounded 'rb' via _read_source; no text-mode path exists to bypass the guard)**
+- [MEDIUM] Unbounded busy-wait for `release` sentinel — `tests/test_shell_process_ownership.py` → **DOWNGRADED 2026-11-06 (outer communicate(timeout=12) bounds the hang and fails the test — no infinite CI hang; inner deadline queued)**
+- [MEDIUM] Receipt poll swallows `PermissionError` — `tests/test_workstation_sleep.py` → **FALSE POSITIVE 2026-11-06 (retry handles transient Windows write-locks; persistent denial fails the test at 10s with the path — nothing masked)**
+- [LOW] Non-atomic consumer receipt write — `tests/test_sender_unify.py` → **DOWNGRADED 2026-11-06 (diagnostic receipts only; torn write fails loud on read; tmp+replace queued for the helper and loop_notify)**
+- [LOW] `/proc` stat parse assumes `) `-delimited format — `tests/test_validation_process_ownership.py` → **DOWNGRADED 2026-11-06 (win32 branch returns before the parse — never executes here; Linux malformed-stat fails loud; try/except queued)**
+- [LOW] Duplicated suspend-shim string replacement — `tests/test_workstation_sleep.py` → **BACKLOG 2026-11-06 (3 sites confirmed; extract helper on the next touch)**
+- [LOW] Hard-coded timing assertions invite flakes — `tests/test_shell_process_ownership.py` → **DOWNGRADED 2026-11-06 (elapsed<10 is relative to the 12s outer deadline by design; relative-bound rewrite queued as polish)**
+- [LOW] Inline TOML catalogs duplicated across suites — `tests/test_shared_coding_fallback.py` → **BACKLOG 2026-11-06 (3 files confirmed; shared fixture on the next touch)**
 
 ## ai-workbench/2
 
