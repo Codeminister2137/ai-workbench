@@ -33,17 +33,17 @@ verification before action — several audit claims were already proven wrong
 - [HIGH] MCP stdio server crashes on tool exception — `packages/ai_agent/src/ai_agent/mcp_server.py` → **FALSE POSITIVE (BaseTool.run catches every Exception into an error ToolResult; only control-flow BaseExceptions propagate, correctly)**
 - [HIGH] Delegated child uses permissive permissions — `packages/ai_agent/src/ai_agent/mcp_server.py` → **FALSE POSITIVE (_GrantedTool.execute re-checks each child call against the LIVE parent permission manager; a permissive child profile cannot authorize what the parent denies)**
 - [HIGH] Delegated CLI scope also escalates to permissive — `packages/ai_agent/src/ai_agent/repo_coding_assistant.py` → **FALSE POSITIVE (same _GrantedTool parent re-check per call; see above)**
-- [MEDIUM] Fallback handoff writes files outside permission system — `packages/ai_agent/src/ai_agent/repo_coding_assistant.py` → **UNREVIEWED**
-- [MEDIUM] Process handle map accessed without lock — `packages/ai_agent/src/ai_agent/processes.py` → **UNREVIEWED**
-- [MEDIUM] Codex login subprocess can hang forever — `packages/ai_agent/src/ai_agent/repo_coding_assistant.py` → **UNREVIEWED**
-- [MEDIUM] Unbounded repair loop when max-cycles=-1 and no deadline — `packages/ai_agent/src/ai_agent/repair_workflow.py` → **UNREVIEWED**
-- [MEDIUM] Research source retain crashes on malformed receipt — `packages/ai_agent/src/ai_agent/research_evidence.py` → **UNREVIEWED**
-- [MEDIUM] IDE tool cannot run inside existing event loop — `packages/ai_agent/src/ai_agent/ide_bridge.py` → **UNREVIEWED**
-- [MEDIUM] Provider model-list probe can SSRF to catalog URL — `packages/ai_agent/src/ai_agent/repo_coding_assistant.py` → **UNREVIEWED**
-- [MEDIUM] Delegated error string leaks internals to model — `packages/ai_agent/src/ai_agent/repo_coding_assistant.py` → **UNREVIEWED**
-- [LOW] Negative context budgets not rejected — `packages/ai_agent/src/ai_agent/repo_assistant_args.py` → **UNREVIEWED**
-- [LOW] Env passthrough skips argv-style validation — `packages/ai_agent/src/ai_agent/processes.py` → **UNREVIEWED**
-- [LOW] Review-source allocation recomputes UTF-8 size per share — `packages/ai_agent/src/ai_agent/research_evidence.py` → **UNREVIEWED**
+- [MEDIUM] Fallback handoff writes files outside permission system — `packages/ai_agent/src/ai_agent/repo_coding_assistant.py` → **INTENDED 2026-11-06 (host-side metadata-only stop receipt on the no-model path — model approval is inapplicable where no model is invoked; containment-checked, uuid-named, ignored dir)**
+- [MEDIUM] Process handle map accessed without lock — `packages/ai_agent/src/ai_agent/processes.py` → **FALSE POSITIVE 2026-11-06 (map is add-only — handles never removed; GIL-atomic get; reader threads never touch the map; close() funnels through stop())**
+- [MEDIUM] Codex login subprocess can hang forever — `packages/ai_agent/src/ai_agent/repo_coding_assistant.py` → **INTENDED 2026-11-06 (explicit interactive --codex-login command, parser-rejected with any prompt; unreachable from orchestrated paths; a timeout would break device-auth flows)**
+- [MEDIUM] Unbounded repair loop when max-cycles=-1 and no deadline — `packages/ai_agent/src/ai_agent/repair_workflow.py` → **DOWNGRADED 2026-11-06 (-1 is an explicit operator opt-out of the default-3 cap; no-progress>=2 breaker catches stalls; livelock needs perpetual novel failures with full operator visibility; attempt ceiling for -1 queued)**
+- [MEDIUM] Research source retain crashes on malformed receipt — `packages/ai_agent/src/ai_agent/research_evidence.py` → **DOWNGRADED 2026-11-06 (retain() is uncalled in production — only the constructor path runs, using .get safely; validate-and-raise queued as API hygiene)**
+- [MEDIUM] IDE tool cannot run inside existing event loop — `packages/ai_agent/src/ai_agent/ide_bridge.py` → **FALSE POSITIVE 2026-11-06 (no async host exists anywhere in ai_agent — the only coroutines are ide_bridge's own, driven by these asyncio.run calls; tools execute synchronously)**
+- [MEDIUM] Provider model-list probe can SSRF to catalog URL — `packages/ai_agent/src/ai_agent/repo_coding_assistant.py` → **DOWNGRADED 2026-11-06 (base_url is operator config or hardcoded provider default; --catalog is a local TOML file, not a URL — the audit's assumption is wrong; no untrusted input reaches the probe)**
+- [MEDIUM] Delegated error string leaks internals to model — `packages/ai_agent/src/ai_agent/repo_coding_assistant.py` → **REAL-minor 2026-11-06 — fix queued (raw {exc} is model-visible; the codebase already has safe_diagnostic_label for this — apply it here and log details host-side)**
+- [LOW] Negative context budgets not rejected — `packages/ai_agent/src/ai_agent/repo_assistant_args.py` → **FALSE POSITIVE 2026-11-06 (negatives rejected fail-closed in load_prompt_context with ValueError; 0→None disable mapping exists at the CLI; argparse validator is cosmetic)**
+- [LOW] Env passthrough skips argv-style validation — `packages/ai_agent/src/ai_agent/processes.py` → **FALSE POSITIVE 2026-11-06 (env is host-built — model supplies argv/cwd only; Popen raises before handle allocation, so no orphaned handle is possible)**
+- [LOW] Review-source allocation recomputes UTF-8 size per share — `packages/ai_agent/src/ai_agent/research_evidence.py` → **DOWNGRADED 2026-11-06 (confirmed re-encode, but n<=30 small texts per review = microseconds; precompute-sizes queued as trivial hygiene with the next touch)**
 
 ## ai-workbench/10
 
