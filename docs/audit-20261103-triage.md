@@ -183,17 +183,17 @@ verification before action — several audit claims were already proven wrong
 - [HIGH] External exfiltration via unvalidated `worktree/files` join — `scripts/unattended-development-loop.py` → **FALSE POSITIVE on location (no worktree/files route exists in the cited file; closest match is the L552 model-write join, filed separately)**
 - [HIGH] Objective-id used as filesystem path without sanitization — `scripts/unattended-development-loop.py` → **DOWNGRADED (queue is host-owned per the file header contract; owner-typo robustness only, not a trust-boundary issue)**
 - [HIGH] Destructive git wipe on unvalidated queue path — `scripts/unattended-development-loop.py` → **DOWNGRADED (worktree comes from the host-owned queue; checkout+clean is the documented validation-failure recovery inside that dir)**
-- [MEDIUM] PATH fallback for linter binary — `scripts/unattended-development-loop.py` → **UNREVIEWED**
-- [MEDIUM] Unbounded WOL flooder to arbitrary target — `scripts/wake_on_lan.py` → **UNREVIEWED**
+- [MEDIUM] PATH fallback for linter binary — `scripts/unattended-development-loop.py` → **DOWNGRADED 2026-11-06 (PATH is operator-controlled; a hijacked ruff implies an owned box; fail-closed when pinned ruff.exe is missing queued as trivial hygiene)**
+- [MEDIUM] Unbounded WOL flooder to arbitrary target — `scripts/wake_on_lan.py` → **DOWNGRADED 2026-11-06 (owner-only CLI; flooding needs the owner to type it; IPv4/port/count bounds queued as trivial hygiene)**
 - [HIGH] `except BaseException` swallows cancel/exit — `scripts/unattended-development-loop.py` → **DOWNGRADED (per-objective isolation; deadline/stop re-checked at the next iteration boundary, so shutdown is delayed, not swallowed)**
 - [HIGH] Malformed queue crashes error handler — `scripts/unattended-development-loop.py` → **DOWNGRADED (handler itself is defensive — item.get('kind'); a missing id aborts loudly at the outer level; host-owned input)**
-- [MEDIUM] Missing size/symlink guard on workbench file ingest — `scripts/unattended-development-loop.py` → **UNREVIEWED**
-- [MEDIUM] Hardcoded Windows interpreters + username leak — `scripts/unattended-development-loop.py` → **UNREVIEWED**
-- [MEDIUM] Missing CLI bounds in WOL and report validator — `scripts/wake_on_lan.py` → **UNREVIEWED**
-- [MEDIUM] Receipt/phase files assumed present and well-formed — `scripts/unattended-development-loop.py` → **UNREVIEWED**
-- [LOW] Insecure `.env` parsing for event credential — `scripts/unattended-development-loop.py` → **UNREVIEWED**
-- [LOW] Blocking `Popen` receipt wait can mask closeout failure — `scripts/unattended-development-loop.py` → **UNREVIEWED**
-- [LOW] Stream research-file hash instead of `read_bytes` — `scripts/validate_research_report.py` → **UNREVIEWED**
+- [MEDIUM] Missing size/symlink guard on workbench file ingest — `scripts/unattended-development-loop.py` → **DOWNGRADED 2026-11-06 (host-owned queue per file header contract; owner-typo robustness only — reuse resolve_worktree_target + size cap + OSError guard queued)**
+- [MEDIUM] Hardcoded Windows interpreters + username leak — `scripts/unattended-development-loop.py` → **DOWNGRADED 2026-11-06 (Windows-only operator script by design; no leak — username is already the git author; brittleness if the sibling checkout moves; resolve-venv-at-startup queued)**
+- [MEDIUM] Missing CLI bounds in WOL and report validator — `scripts/wake_on_lan.py` → **DOWNGRADED 2026-11-06 (owner CLIs; negative port/count fail loud, validator file already fully read above the hash; bounds + chunked hash queued)**
+- [MEDIUM] Receipt/phase files assumed present and well-formed — `scripts/unattended-development-loop.py` → **DOWNGRADED 2026-11-06 (missing/corrupt receipt becomes a recorded per-objective error; report.json still written; only diagnostic precision lacking — explicit receipt check queued)**
+- [LOW] Insecure `.env` parsing for event credential — `scripts/unattended-development-loop.py` → **REAL-minor 2026-11-06 — fix queued (4th missing-.env raw-traceback site; same clear-error wrap as the /6 trio)**
+- [LOW] Blocking `Popen` receipt wait can mask closeout failure — `scripts/unattended-development-loop.py` → **DOWNGRADED 2026-11-06 (report files written before scheduling; receipt read is exists-checked + try/except; Popen failure needs a missing powershell/repo file; try/except wrap queued)**
+- [LOW] Stream research-file hash instead of `read_bytes` — `scripts/validate_research_report.py` → **DOWNGRADED 2026-11-06 (operator validator on own report; file already fully read above for validation — hash adds no new memory class; chunked read queued)**
 
 ## ai-workbench/8
 
