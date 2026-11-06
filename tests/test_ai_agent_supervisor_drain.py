@@ -125,7 +125,7 @@ def test_rejected_approval_parks(drain, stores, calls) -> None:
 
 def test_closed_without_approval_parks(drain, stores, calls) -> None:
     run_id, inbox_id = _queue_chat_run(stores)
-    stores.close_inbox_task(inbox_id)
+    stores.close_inbox_task(inbox_id, resolution="Withdrawn.")
     outcomes = drain.drain()
     assert outcomes[0]["action"] == "parked"
     assert outcomes[0]["reason"] == "approval is closed"
@@ -135,7 +135,7 @@ def test_closed_without_approval_parks(drain, stores, calls) -> None:
 def test_closed_after_approve_executes(drain, stores, calls) -> None:
     """Close is archival: a recorded Approve survives close-before-drain."""
     run_id, inbox_id = _queue_chat_run(stores, answer="Approve")
-    stores.close_inbox_task(inbox_id)
+    stores.close_inbox_task(inbox_id, resolution="Approved then archived.")
     assert stores.inbox.get(inbox_id)["answer"] == "Approve"
     outcomes = drain.drain()
     assert outcomes == [{"run_id": run_id, "status": "completed"}]
