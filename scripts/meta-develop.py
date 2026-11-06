@@ -127,21 +127,9 @@ class NoRedirect(HTTPRedirectHandler):
 
 def read_meta_key_file(env_file: Path) -> str:
     """Read exactly one META_API_KEY from a .env file; clear error when missing."""
-    try:
-        lines = env_file.read_text(encoding="utf-8-sig").splitlines()
-    except FileNotFoundError:
-        raise ValueError(
-            f"One META_API_KEY is required (missing {env_file}; "
-            "set META_API_KEY in env or the repo .env)"
-        ) from None
-    values = [
-        line.partition("=")[2].strip().strip("\"'")
-        for line in lines
-        if line.partition("=")[0].strip() == "META_API_KEY"
-    ]
-    if len(values) != 1 or not values[0]:
-        raise ValueError("One META_API_KEY is required")
-    return values[0]
+    from ai_provider.secrets import read_secret_key
+
+    return read_secret_key(env_file, "META_API_KEY", label="Meta API credential")
 
 
 def main() -> int:

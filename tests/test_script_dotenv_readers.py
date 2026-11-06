@@ -35,9 +35,11 @@ _supervised_module = _load_script_module(
     "baseten_supervised_develop_under_test", "baseten-supervised-develop.py"
 )
 _plan_module = _load_script_module("plan_with_supervisor_under_test", "plan-with-supervisor.py")
+_meta_module = _load_script_module("meta_develop_under_test", "meta-develop.py")
 
 SUPERVISED_KEY = "BASETEN_HACKATHON_API_KEY"
 PLAN_KEY = "BASETEN_HACKATHON_API_KEY"
+META_KEY = "META_API_KEY"
 
 
 def _write_env(root: Path, text: str) -> None:
@@ -116,3 +118,36 @@ def test_plan_read_key_duplicate_key(tmp_path, monkeypatch) -> None:
     )
     with pytest.raises(ValueError):
         _plan_module._read_key()
+
+
+def test_meta_read_meta_key_file_happy_path(tmp_path) -> None:
+    _write_env(tmp_path, f"{META_KEY}=sk-test-789\n")
+    assert _meta_module.read_meta_key_file(tmp_path / ".env") == "sk-test-789"
+
+
+def test_meta_read_meta_key_file_missing_file(tmp_path) -> None:
+    env_file = tmp_path / ".env"
+    assert not env_file.exists()
+    with pytest.raises(ValueError):
+        _meta_module.read_meta_key_file(env_file)
+
+
+def test_meta_read_meta_key_file_missing_key(tmp_path) -> None:
+    _write_env(tmp_path, "SOME_OTHER_KEY=value\n")
+    with pytest.raises(ValueError):
+        _meta_module.read_meta_key_file(tmp_path / ".env")
+
+
+def test_meta_read_meta_key_file_empty_value(tmp_path) -> None:
+    _write_env(tmp_path, f"{META_KEY}=\n")
+    with pytest.raises(ValueError):
+        _meta_module.read_meta_key_file(tmp_path / ".env")
+
+
+def test_meta_read_meta_key_file_duplicate_key(tmp_path) -> None:
+    _write_env(
+        tmp_path,
+        f"{META_KEY}=first-value\n{META_KEY}=second-value\n",
+    )
+    with pytest.raises(ValueError):
+        _meta_module.read_meta_key_file(tmp_path / ".env")
