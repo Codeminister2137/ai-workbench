@@ -210,19 +210,19 @@ verification before action — several audit claims were already proven wrong
 ## ai-workbench/9
 
 - [HIGH] Test helper executes workspace-controlled file via `exec` — `tests/test_execution_fallback.py` → **FALSE POSITIVE (no exec() call in the file; the audit matched the module name execution_fallback)**
-- [MEDIUM] Full host environ forwarded to stdio proxy child — `tests/test_foreground_http.py` → **UNREVIEWED**
-- [MEDIUM] Eval harness suggests in-process `exec` of model output — `tests/test_ai_provider_route_eval.py` → **UNREVIEWED**
-- [LOW] Redirect test proves credential-bearing retry would leak prompt — `tests/test_ai_provider_transport.py` → **UNREVIEWED**
-- [MEDIUM] Receipt poll has no corrupt/missing-dir contract — `tests/test_baseten_receipts.py` → **UNREVIEWED**
-- [MEDIUM] `valid_source` only tested against naive payloads — `tests/test_fallback_acceptance.py` → **UNREVIEWED**
-- [MEDIUM] Exhausted-deadline / allowance-observer races untested for partial writes — `tests/test_execution_fallback.py` → **UNREVIEWED**
-- [LOW] Dotenv parser leaves `export` / inline-comment behavior undefined — `tests/test_ai_provider_secrets.py` → **UNREVIEWED**
-- [LOW] Band validator bool edge only half-covered — `tests/test_capability_bands.py` → **UNREVIEWED**
-- [LOW] Pricing-read assertion allows unbounded extra fetches — `tests/test_free_provider_fallback.py` → **UNREVIEWED**
-- [LOW] SQLite connection-leak test is process-global — `tests/test_chat_transcripts.py` → **UNREVIEWED**
-- [LOW] Duplicated `Response(BytesIO)` / `transport` shims across suites — `tests/test_ai_provider_route_probe.py` → **UNREVIEWED**
-- [LOW] Repeated catalog-path and `ScriptedClient` boilerplate — `tests/test_execution_fallback.py` → **UNREVIEWED**
-- [LOW] Synthetic `time.sleep(30)` children make suite timing-fragile — `tests/test_codex_usage.py` → **UNREVIEWED**
+- [MEDIUM] Full host environ forwarded to stdio proxy child — `tests/test_foreground_http.py` → **FALSE POSITIVE 2026-11-06 (cited evidence does not exist at those lines — the test ASSERTS scoped shared_child_env allowlisting, the opposite of the claim)**
+- [MEDIUM] Eval harness suggests in-process `exec` of model output — `tests/test_ai_provider_route_eval.py` → **FALSE POSITIVE 2026-11-06 (in-process exec already replaced by _SANDBOX_SCRIPT subprocess grading per /4 CRITICAL FIXED; _exec_candidate does not exist)**
+- [LOW] Redirect test proves credential-bearing retry would leak prompt — `tests/test_ai_provider_transport.py` → **FALSE POSITIVE 2026-11-06 (the test PINS the existing _RejectRedirect fail-closed behavior across 301/302/303/307/308 x GET/POST — nothing leaks)**
+- [MEDIUM] Receipt poll has no corrupt/missing-dir contract — `tests/test_baseten_receipts.py` → **DOWNGRADED 2026-11-06 (digest-comparison design: corrupt JSON and missing dir are safe by construction; only a permission error propagates, loudly, in an operator CLI — queued)**
+- [MEDIUM] `valid_source` only tested against naive payloads — `tests/test_fallback_acceptance.py` → **DOWNGRADED 2026-11-06 (validator is AST-exact — single Assign of int Constant 2 to `value`; executable constructs structurally impossible; adversarial cases are defense-in-depth, queued)**
+- [MEDIUM] Exhausted-deadline / allowance-observer races untested for partial writes — `tests/test_execution_fallback.py` → **DOWNGRADED 2026-11-06 (core no-leak assertion exists at test:262; explicit continuation-cleared assert is incremental, queued)**
+- [LOW] Dotenv parser leaves `export` / inline-comment behavior undefined — `tests/test_ai_provider_secrets.py` → **REAL-minor 2026-11-06 — fix queued (fold into dotenv slice: strip `export`, pin inline-comment + duplicate-key behavior with tests)**
+- [LOW] Band validator bool edge only half-covered — `tests/test_capability_bands.py` → **DOWNGRADED 2026-11-06 (one bool-first check rejects both True and False — no divergent path exists; add False to params opportunistically)**
+- [LOW] Pricing-read assertion allows unbounded extra fetches — `tests/test_free_provider_fallback.py` → **DOWNGRADED 2026-11-06 (model-call counts pinned exactly; >= covers only cache reads which legitimately vary by param case; == would couple to cache internals)**
+- [LOW] SQLite connection-leak test is process-global — `tests/test_chat_transcripts.py` → **FALSE POSITIVE 2026-11-06 (monkeypatch is function-scoped and auto-reverted; suite runs serially; rename-after-close passes on Windows — the pattern is sound)**
+- [LOW] Duplicated `Response(BytesIO)` / `transport` shims across suites — `tests/test_ai_provider_route_probe.py` → **BACKLOG 2026-11-06 (8 copies confirmed; stable passing tests — extract tests/fake_transport.py on the next touch, not as churn)**
+- [LOW] Repeated catalog-path and `ScriptedClient` boilerplate — `tests/test_execution_fallback.py` → **BACKLOG 2026-11-06 (3+ copies confirmed; extract shared helper on the next touch, not as churn)**
+- [LOW] Synthetic `time.sleep(30)` children make suite timing-fragile — `tests/test_codex_usage.py` → **FALSE POSITIVE 2026-11-06 (measured: 33 passed in 1.02s; sleepers are unreached kill-ceilings)**
 
 ## remote-operator/0
 
