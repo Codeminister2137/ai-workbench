@@ -245,17 +245,17 @@ verification before action — several audit claims were already proven wrong
 ## remote-operator/1
 
 - [HIGH] Host allowlist bypass via spoofable Host header — `src/remote_operator/web.py` → **BACKLOG** (true in theory; unreachable (bind 127.0.0.1, Modal routes by Host); client.host hardening needs test rework (TestClient host))
-- [MEDIUM] Session cookie Secure conditional on public_origin — `src/remote_operator/web.py` → **UNREVIEWED**
-- [MEDIUM] Sandbox file materialization follows symlinks as root — `src/remote_operator/sandbox_bootstrap.py` → **UNREVIEWED**
-- [MEDIUM] Allowance ledger allows non-finite USD to bypass cap — `src/remote_operator/store.py` → **UNREVIEWED**
+- [MEDIUM] Session cookie Secure conditional on public_origin — `src/remote_operator/web.py` → **FALSE POSITIVE 2026-11-06 (hosted deployment REFUSES to start without OPERATOR_PUBLIC_ORIGIN — Secure is always set where it matters; loopback dev doesn't need it)**
+- [MEDIUM] Sandbox file materialization follows symlinks as root — `src/remote_operator/sandbox_bootstrap.py` → **FALSE POSITIVE 2026-11-06 (fresh ephemeral Modal container from pinned image; no party can pre-place symlinks in /workspace or /checks)**
+- [MEDIUM] Allowance ledger allows non-finite USD to bypass cap — `src/remote_operator/store.py` → **FALSE POSITIVE 2026-11-06 (all callers pass grant-validated finite 0-100 values; fingerprint rejects mutation; exploit needs server-side store corruption — the audit's assumption fails)**
 - [HIGH] Sandbox request assumes string payload without validation — `src/remote_operator/sandbox_bootstrap.py` → **FIXED** (payload validated before writes + test (batch1))
 - [HIGH] Run-job files lack durability hook used by task store — `src/remote_operator/supervisor_runner.py` → **FIXED** (_write_job now fires store._durable() after every job mutation; 12 runner call sites covered incl. _finish_job; queue path was already durable via store.save; test_job_write_fires_durable_hook added + prefix-verified; sibling branch fix/runjob-durable-20261103 a06ead7, 577 green, merge queued for 20:00 review)
-- [MEDIUM] Owner-replies lookup capped at 50 threads creates duplicates — `src/remote_operator/supervisor.py` → **UNREVIEWED**
-- [MEDIUM] SQLite busy errors escape allowance/cancel transactions — `src/remote_operator/store.py` → **UNREVIEWED**
-- [MEDIUM] Inbox terminal-run mapping trusts mutable job file over event — `src/remote_operator/supervisor_inbox.py` → **UNREVIEWED**
-- [LOW] Window loader hides corruption as idle — `src/remote_operator/window_status.py` → **UNREVIEWED**
-- [LOW] Inbox does N+1 store reads and full run-dir scan per item — `src/remote_operator/supervisor_inbox.py` → **UNREVIEWED**
-- [LOW] Planning-thread listing fetches full records to filter — `src/remote_operator/supervisor.py` → **UNREVIEWED**
+- [MEDIUM] Owner-replies lookup capped at 50 threads creates duplicates — `src/remote_operator/supervisor.py` → **DOWNGRADED 2026-11-06 (confirmed; needs 50+ threads on a deprecated demo; index/paginate is a sibling note)**
+- [MEDIUM] SQLite busy errors escape allowance/cancel transactions — `src/remote_operator/store.py` → **DOWNGRADED 2026-11-06 (confirmed no retry; needs >5s lock contention on a low-traffic demo; backoff is a sibling note)**
+- [MEDIUM] Inbox terminal-run mapping trusts mutable job file over event — `src/remote_operator/supervisor_inbox.py` → **DOWNGRADED 2026-11-06 (deliberate documented back-compat for old payloads, filtered to INBOX_RUN_STATUSES; re-surface needs post-report mutation; deprecated sibling)**
+- [LOW] Window loader hides corruption as idle — `src/remote_operator/window_status.py` → **DOWNGRADED 2026-11-06 ('never raises' is the deliberate poll-path contract; corrupt flag is a sibling note)**
+- [LOW] Inbox does N+1 store reads and full run-dir scan per item — `src/remote_operator/supervisor_inbox.py` → **DOWNGRADED 2026-11-06 (confirmed; microsecond-scale local SQLite on a deprecated demo; batching is a sibling note)**
+- [LOW] Planning-thread listing fetches full records to filter — `src/remote_operator/supervisor.py` → **DOWNGRADED 2026-11-06 (confirmed recent_tasks(50)+get-each; demo-scale; index is a sibling note)**
 
 ## remote-operator/2
 
