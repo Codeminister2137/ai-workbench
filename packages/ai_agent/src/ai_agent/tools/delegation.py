@@ -39,7 +39,8 @@ class DelegateTaskTool(BaseTool):
             description=(
                 "Delegate coding within the host-bound parent authority and shared budget. "
                 "Use this for scoped inspection, implementation and validation when granted. "
-                "A model request cannot escalate the supervisor's actual authority."
+                "A model request cannot escalate the supervisor's actual authority: "
+                "unknown or unconfigured models are refused."
             ),
             category=ToolCategory.CUSTOM,
             parameters=(
@@ -95,6 +96,15 @@ class DelegateTaskTool(BaseTool):
                     required=False,
                     item_type_name="string",
                 ),
+                ToolParameter(
+                    name="model",
+                    type_name="string",
+                    description=(
+                        "Optional child model route from the host allowlist; "
+                        "refused when not granted or unconfigured."
+                    ),
+                    required=False,
+                ),
             ),
         )
 
@@ -120,8 +130,13 @@ class DelegateTaskTool(BaseTool):
             for name in ("allowed_tools", "allowed_paths", "allowed_commands")
         }
         profile = arguments.get("permission_profile", "inherit")
+        model = arguments.get("model")
         if scope is None:
-            if profile != "inherit" or any(value is not None for value in overrides.values()):
+            if (
+                profile != "inherit"
+                or model is not None
+                or any(value is not None for value in overrides.values())
+            ):
                 return ToolResult(
                     self.definition.name,
                     "Error: no host-bound parent authority for permission overrides.",
@@ -140,6 +155,7 @@ class DelegateTaskTool(BaseTool):
                 commands=tuple(overrides["allowed_commands"])
                 if overrides["allowed_commands"] is not None
                 else None,
+                model=model,
             )
             with scope.budget.child():
                 return self.runner(task.strip(), replace(context, delegation=child))

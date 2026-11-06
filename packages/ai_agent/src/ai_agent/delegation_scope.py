@@ -103,6 +103,10 @@ class DelegationScope:
     environment: tuple[tuple[str, str], ...] = ()
     approved_client: ChatClient | None = field(default=None, repr=False, compare=False)
     request_timeout_seconds: float | None = None
+    allowed_models: frozenset[str] = frozenset()
+    client_factory: Callable[[str], ChatClient] | None = field(
+        default=None, repr=False, compare=False
+    )
 
     def __post_init__(self) -> None:
         # Coerce host-supplied strings once so every enforcement point can
@@ -121,6 +125,7 @@ class DelegationScope:
         tools: tuple[str, ...] | None = None,
         paths: tuple[str, ...] | None = None,
         commands: tuple[str, ...] | None = None,
+        model: str | None = None,
     ) -> DelegationScope:
         if not self.fanout.allows_spawn:
             raise ValueError(
@@ -146,6 +151,21 @@ class DelegationScope:
         selected_commands = frozenset(commands) if commands is not None else self.commands
         if self.commands is not None and selected_commands is not None:
             selected_commands &= self.commands
+        child_client = self.approved_client
+        child_backends = self.backends
+        if model is not None:
+            if not isinstance(model, str) or not model.strip():
+                raise ValueError("Child model must be a non-empty string")
+            if model not in self.allowed_models:
+                raise ValueError(f"Child model is not granted by this scope: {model}")
+            if self.client_factory is None:
+                raise ValueError("Child model routing is not configured for this scope")
+            try:
+                child_client = self.client_factory(model)
+            except Exception as exc:
+                raise ValueError(f"Child client build failed: {type(exc).__name__}") from exc
+            backend = child_client.backend
+            child_backends = frozenset({(backend.provider, backend.model, backend.base_url)})
         return replace(
             self,
             is_active=self.active,
@@ -155,6 +175,8 @@ class DelegationScope:
             paths=selected_paths,
             commands=selected_commands,
             inherited_profiles=(*self.inherited_profiles, self.profile),
+            approved_client=child_client,
+            backends=child_backends,
         )
 
     def child_registry(self) -> ToolRegistry:
