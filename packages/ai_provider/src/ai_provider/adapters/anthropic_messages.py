@@ -32,7 +32,11 @@ from ai_provider.contracts import (
     UsageMetadata,
     UsageSource,
 )
-from ai_provider.errors import ProviderError, ProviderErrorCategory
+from ai_provider.errors import (
+    ProviderError,
+    ProviderErrorCategory,
+    http_error_to_provider_error,
+)
 from ai_provider.http_transport import read_bounded, urlopen
 from ai_provider.privacy import enforce_privacy_policy
 from ai_provider.turn_usage import observe_completion, observe_stream, observe_usage
@@ -336,21 +340,8 @@ class AnthropicMessagesChatClient:
         }
 
     def _http_error(self, exc: HTTPError) -> ProviderError:
-        if exc.code in {401, 403}:
-            category = ProviderErrorCategory.AUTHENTICATION
-        elif exc.code == 429:
-            category = ProviderErrorCategory.RATE_LIMIT
-        elif 500 <= exc.code < 600:
-            category = ProviderErrorCategory.RETRYABLE
-        else:
-            category = ProviderErrorCategory.NON_RETRYABLE
-        return ProviderError(
-            f"Messages API provider returned HTTP {exc.code}.",
-            category=category,
-            retryable=category
-            in {ProviderErrorCategory.RATE_LIMIT, ProviderErrorCategory.RETRYABLE},
-            provider=self.config.provider.value,
-            raw_error=exc,
+        return http_error_to_provider_error(
+            exc, provider=self.config.provider.value, api_label="Messages API"
         )
 
     def _safe_metadata(self, raw: dict[str, Any]) -> dict[str, Any]:
