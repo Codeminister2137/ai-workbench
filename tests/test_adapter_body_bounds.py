@@ -1,7 +1,9 @@
 from unittest.mock import patch
 
+import httpx
 import pytest
 from ai_provider.adapters.ollama import OllamaChatClient
+from ai_provider.adapters.openai_responses import OpenAIResponsesChatClient
 from ai_provider.adapters.openrouter import BASE_URL, OpenRouterFreeChatClient
 from ai_provider.config import BackendConfig, ProviderKind
 from ai_provider.errors import ProviderError, ProviderErrorCategory
@@ -49,6 +51,26 @@ def _make_openrouter_client():
     )
 
 
+def _resolve_openai_provider():
+    for name in ("OPENAI_RESPONSES", "OPENAI", "OPENAI_CHAT"):
+        if hasattr(ProviderKind, name):
+            return getattr(ProviderKind, name)
+    # Fallback: use any existing provider - transport bound still validated
+    return list(ProviderKind)[0]
+
+
+def _make_openai_responses_client():
+    return OpenAIResponsesChatClient(
+        config=BackendConfig(
+            provider=_resolve_openai_provider(),
+            model="test-model",
+            api_key="test",
+            base_url="https://api.openai.com/v1",
+            timeout_seconds=5,
+        )
+    )
+
+
 def test_ollama_body_bound_exceeded():
     client = _make_ollama_client()
     oversized = b"x" * (BOUND + 1)
@@ -64,4 +86,54 @@ def test_openrouter_body_bound_exceeded():
     with patch("ai_provider.adapters.openrouter.urlopen", return_value=FakeResponse(oversized)):
         with pytest.raises(ProviderError) as excinfo:
             client._metadata("models")
+    assert excinfo.value.category == ProviderErrorCategory.NON_RETRYABLE
+
+
+def test_openai_responses_body_bound_exceeded():
+    client = _make_openai_responses_client()
+    oversized = b"x" * (BOUND + 1)
+    with patch(
+        "ai_provider.adapters.openai_responses.urlopen", return_value=FakeResponse(oversized)
+    ):
+        with pytest.raises(ProviderError) as excinfo:
+            client._post_responses({"model": "test-model"})
+    assert excinfo.value.category == ProviderErrorCategory.NON_RETRYABLE
+
+
+def test_anthropic_messages_body_bound_exceeded():
+    from ai_provider.adapters.anthropic_messages import AnthropicMessagesChatClient
+
+    provider = (
+        ProviderKind.ANTHROPIC if hasattr(ProviderKind, "ANTHROPIC") else list(ProviderKind)[0]
+    )
+    client = AnthropicMessagesChatClient(
+        config=BackendConfig(
+            provider=provider,
+            model="test-model",
+            api_key="test",
+            base_url="https://api.anthropic.com/v1",
+            timeout_seconds=5,
+        )
+    )
+    oversized = b"x" * (BOUND + 1)
+    with patch(
+        "ai_provider.adapters.anthropic_messages.urlopen", return_value=FakeResponse(oversized)
+    ):
+        with pytest.raises(ProviderError) as excinfo:
+            client._post_messages({"model": "test-model", "messages": []})
+    assert excinfo.value.category == ProviderErrorCategory.NON_RETRYABLE
+
+
+def test_meta_asr_body_bound_exceeded():
+    from ai_provider.adapters.meta_asr import MetaAsrEngine
+
+    oversized = b"x" * (BOUND + 1)
+
+    def handler(request):
+        return httpx.Response(200, content=oversized)
+
+    transport = httpx.MockTransport(handler)
+    engine = MetaAsrEngine(api_key="test-key", transport=transport)
+    with pytest.raises(ProviderError) as excinfo:
+        engine.transcribe(b"RIFF", language_bias=[], timeout_s=5)
     assert excinfo.value.category == ProviderErrorCategory.NON_RETRYABLE

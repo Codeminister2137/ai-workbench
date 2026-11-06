@@ -35,7 +35,7 @@ from ai_provider.contracts import (
     UsageSource,
 )
 from ai_provider.errors import ProviderError, ProviderErrorCategory, ToolCallFormatError
-from ai_provider.http_transport import urlopen
+from ai_provider.http_transport import read_bounded, urlopen
 from ai_provider.privacy import enforce_privacy_policy
 from ai_provider.turn_usage import observe_completion, observe_stream, observe_usage
 
@@ -443,7 +443,11 @@ class OpenAIResponsesChatClient:
         )
         try:
             with urlopen(request, timeout=self.config.timeout_seconds) as response:
-                return json.loads(response.read().decode("utf-8"))
+                return json.loads(
+                    read_bounded(response, provider=self.config.provider.value).decode("utf-8")
+                )
+        except ProviderError:
+            raise
         except (json.JSONDecodeError, UnicodeDecodeError) as exc:
             raise ProviderError(
                 "Responses API returned invalid JSON.",
