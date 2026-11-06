@@ -19,22 +19,27 @@ class LocalCouncil:
         answers: list[dict[str, str]] = []
 
         for member in self.config.members:
-            agent = LocalAgent(member, ollama_base_url=self.config.ollama_base_url)
-            answer = agent.answer(history)
-            self.store.add_message(
-                conversation_id,
-                role="assistant",
-                content=answer,
-                member_name=member.name,
-                model=member.model,
-            )
-            answers.append(
-                {
-                    "member": member.name,
-                    "model": member.model,
-                    "answer": answer,
-                }
-            )
+            try:
+                agent = LocalAgent(member, ollama_base_url=self.config.ollama_base_url)
+                answer = agent.answer(history)
+                self.store.add_message(
+                    conversation_id,
+                    role="assistant",
+                    content=answer,
+                    member_name=member.name,
+                    model=member.model,
+                )
+                answers.append(
+                    {
+                        "member": member.name,
+                        "model": member.model,
+                        "answer": answer,
+                    }
+                )
+            except Exception as exc:
+                answers.append(
+                    {"member": member.name, "model": member.model, "answer": "", "error": str(exc)}
+                )
 
         return answers
 
