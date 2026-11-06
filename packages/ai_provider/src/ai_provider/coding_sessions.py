@@ -206,7 +206,14 @@ class CodingSession:
         )
 
     def observe_process(self, metadata: dict) -> None:
+        _sentinel = object()
         if not isinstance(metadata.get("process_handle"), str):
+            return
+        if metadata.get("pid", _sentinel) is _sentinel:
+            return
+        if metadata.get("status", _sentinel) is _sentinel:
+            return
+        if metadata.get("returncode", _sentinel) is _sentinel:
             return
         with self.connection() as connection:
             connection.execute(
