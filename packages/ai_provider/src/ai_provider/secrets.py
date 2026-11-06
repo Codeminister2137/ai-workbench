@@ -37,12 +37,27 @@ def parse_dotenv_lines(text: str) -> dict[str, str]:
 
     Values may be single- or double-quoted; quotes are stripped. No escape
     processing and no ``$`` expansion, so file content cannot execute.
+
+    A single optional leading ``export `` prefix (the word ``export``
+    followed by whitespace) is stripped before parsing, so
+    ``export FOO=bar`` loads ``FOO``. A bare ``export`` with no
+    assignment is skipped.
+
+    Inline comments are not stripped: values keep any trailing
+    `` # comment`` text. This leniency is intentional because ``#`` is
+    legal inside passwords and stripping would corrupt credentials.
+
+    Duplicate keys resolve last-wins: later lines overwrite earlier ones.
     """
     values: dict[str, str] = {}
     for raw_line in text.splitlines():
         line = raw_line.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
+        if line.startswith("export") and len(line) > 6 and line[6].isspace():
+            line = line[6:].lstrip()
+            if not line or "=" not in line:
+                continue
         name, _, value = line.partition("=")
         name = name.strip()
         value = value.strip()

@@ -50,3 +50,30 @@ def test_load_dotenv_existing_env_wins_by_default(tmp_path, monkeypatch) -> None
     assert os.environ["FAKE_KEEP_KEY"] == "ambient-value"
     assert load_dotenv(tmp_path, override=True) == ("FAKE_KEEP_KEY",)
     assert os.environ["FAKE_KEEP_KEY"] == "store-value"
+
+
+def test_parse_dotenv_lines_export_prefix() -> None:
+    text = "\n".join(
+        [
+            "export FOO=bar",
+            "export  FOO = spaced",
+        ]
+    )
+    parsed = parse_dotenv_lines(text)
+    assert parsed["FOO"] == "spaced"
+
+
+def test_parse_dotenv_lines_inline_comment_kept() -> None:
+    parsed = parse_dotenv_lines("KEY=value # keep me")
+    assert parsed["KEY"] == "value # keep me"
+
+
+def test_parse_dotenv_lines_duplicate_last_wins() -> None:
+    text = "\n".join(["DUP=first", "DUP=second"])
+    parsed = parse_dotenv_lines(text)
+    assert parsed["DUP"] == "second"
+
+
+def test_parse_dotenv_lines_bare_export_skipped() -> None:
+    parsed = parse_dotenv_lines("export")
+    assert parsed == {}
