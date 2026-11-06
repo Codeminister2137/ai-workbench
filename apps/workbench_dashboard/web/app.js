@@ -1002,6 +1002,40 @@ function renderSchedule() {
     <p class="muted">Read-only until the P5 scheduler exists. Queued work today lives in plans and runs.</p>`;
 }
 
+function renderRestrictions() {
+  // v1: static definitions only. No enforcement source of truth exists yet,
+  // so every dimension is honestly "not yet evaluated" with its feeder named.
+  view.innerHTML = `<h1>Agent restrictions</h1>
+    <p class="muted">Read-only overview of what agents may and may not do. No live
+    enforcement data feeds this page yet — each dimension shows its definition, an
+    honest <strong>not yet evaluated</strong> status, and what would feed it.</p>
+    <div class="card"><h2>Dimensions</h2><ul class="plain">
+      <li><strong>Outbound network</strong> — which hosts an agent may call.
+        Status: not yet evaluated. Would be fed by: an egress allowlist in
+        agent-executor policy (not yet defined).</li>
+      <li><strong>Filesystem writes</strong> — which roots an agent may create,
+        edit, or delete under. Status: not yet evaluated. Would be fed by: a
+        writable-roots policy in agent-executor (not yet defined).</li>
+      <li><strong>Secret handling</strong> — credentials stay in .env / user env,
+        never in prompts, logs, or the owner inbox. Status: not yet evaluated.
+        Would be fed by: a secret-scan of run transcripts (not yet built).</li>
+      <li><strong>Subprocess execution</strong> — shell commands run only through
+        approval-gated run requests. Status: not yet evaluated. Would be fed by:
+        run-request receipts (exist) plus an executor-side gate audit (not yet built).</li>
+      <li><strong>Delegation scope</strong> — subagents inherit the
+        supervisor's authority, never more (ADR-074). Status: not yet
+        evaluated. Would be fed by: delegation-scope records (exist in chat
+        channel tools) plus a scope audit (not yet built).</li>
+      <li><strong>Human approval gates</strong> — writes, execution, and
+        external sends wait for inbox approval. Status: not yet evaluated.
+        Would be fed by: inbox approval records (exist) wired per dimension
+        (not yet wired).</li>
+    </ul></div>
+    <div class="card"><h2>Related reading</h2><ul class="plain">
+      <li>docs/decisions/ADR-074 — delegation inherits supervisor authority</li>
+      <li>docs/capabilities.md — what each route can do today</li>
+    </ul></div>`;
+}
 async function render() {
   stopRunsPoll();
   stopRunDetailPoll();
@@ -1028,6 +1062,7 @@ async function render() {
     else if (name === "documents") await renderDocuments(id);
     else if (name === "intake") await renderIntake();
     else if (name === "schedule") renderSchedule();
+    else if (name === "restrictions") renderRestrictions();
     else if (name === "create" && id) renderCreate(id);
     else view.innerHTML = "<h1>Not found</h1>";
   } catch (err) {
