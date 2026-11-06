@@ -3,35 +3,9 @@
 from __future__ import annotations
 
 import json
-import threading
-from http.server import ThreadingHTTPServer
 from urllib.request import urlopen
 
-import pytest
-from dashboard_web_app import DashboardRequestHandler
 from window_status import load_window_status, write_window_status
-
-
-@pytest.fixture
-def dashboard_server(tmp_path):
-    config_path = tmp_path / "dashboard.json"
-    config_path.write_text(json.dumps({"title": "Test Board"}), encoding="utf-8")
-
-    class TestHandler(DashboardRequestHandler):
-        def log_message(self, format, *args):
-            return
-
-    TestHandler.config_path = config_path
-    TestHandler.data_dir = tmp_path / "data"
-    TestHandler.repo_root = tmp_path
-    server = ThreadingHTTPServer(("127.0.0.1", 0), TestHandler)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    try:
-        yield f"http://127.0.0.1:{server.server_port}"
-    finally:
-        server.shutdown()
-        server.server_close()
 
 
 def test_missing_file_means_idle(tmp_path) -> None:

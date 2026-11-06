@@ -2,11 +2,7 @@
 
 from __future__ import annotations
 
-import json
-import threading
-from http.server import ThreadingHTTPServer
 from urllib.error import HTTPError
-from urllib.request import Request, urlopen
 
 import pytest
 from ai_provider import AIRequest
@@ -14,7 +10,7 @@ from ai_provider.chat_transcripts import SQLiteChatTranscriptStore
 from dashboard_chat import DashboardChat
 from dashboard_config import DashboardConfig
 from dashboard_stores import DashboardStores
-from dashboard_web_app import DashboardRequestHandler
+from dashboard_test_http import post_json
 
 
 class FakeClient:
@@ -77,39 +73,6 @@ def test_draft_plan_custom_title_and_empty_chat(chat, tmp_path) -> None:
         chat.draft_plan(empty.session_id, stores=stores)
     with pytest.raises(ValueError, match="not found"):
         chat.draft_plan("ghost", stores=stores)
-
-
-@pytest.fixture
-def dashboard_server(tmp_path):
-    config_path = tmp_path / "dashboard.json"
-    config_path.write_text(json.dumps({"title": "Test Board"}), encoding="utf-8")
-
-    class TestHandler(DashboardRequestHandler):
-        def log_message(self, format, *args):
-            return
-
-    TestHandler.config_path = config_path
-    TestHandler.data_dir = tmp_path / "data"
-    TestHandler.repo_root = tmp_path
-    server = ThreadingHTTPServer(("127.0.0.1", 0), TestHandler)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    try:
-        yield f"http://127.0.0.1:{server.server_port}"
-    finally:
-        server.shutdown()
-        server.server_close()
-
-
-def post_json(base: str, path: str, payload: dict) -> dict:
-    request = Request(
-        f"{base}{path}",
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    with urlopen(request, timeout=10) as response:
-        return json.loads(response.read().decode("utf-8"))
 
 
 def test_draft_plan_endpoint(dashboard_server, tmp_path) -> None:

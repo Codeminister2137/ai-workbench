@@ -3,15 +3,12 @@
 from __future__ import annotations
 
 import json
-import threading
 from datetime import UTC, datetime, timedelta
-from http.server import ThreadingHTTPServer
 from urllib.error import HTTPError
-from urllib.request import Request, urlopen
 
 import pytest
 from dashboard_stores import DashboardStores
-from dashboard_web_app import DashboardRequestHandler
+from dashboard_test_http import get_json, post_json
 from p7_intake import approve_intake, list_intake, validate_p7
 
 
@@ -124,44 +121,6 @@ def test_list_and_approve_round_trip(tmp_path) -> None:
         approve_intake(tmp_path, tmp_path / "data", "missing.json")
     with pytest.raises(ValueError, match="Unknown"):
         approve_intake(tmp_path, tmp_path / "data", "../dashboard.json")
-
-
-@pytest.fixture
-def dashboard_server(tmp_path):
-    config_path = tmp_path / "dashboard.json"
-    config_path.write_text(json.dumps({"title": "Test Board"}), encoding="utf-8")
-
-    class TestHandler(DashboardRequestHandler):
-        def log_message(self, format, *args):
-            return
-
-    TestHandler.config_path = config_path
-    TestHandler.data_dir = tmp_path / "data"
-    TestHandler.repo_root = tmp_path
-    server = ThreadingHTTPServer(("127.0.0.1", 0), TestHandler)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    try:
-        yield f"http://127.0.0.1:{server.server_port}"
-    finally:
-        server.shutdown()
-        server.server_close()
-
-
-def get_json(base: str, path: str) -> dict:
-    with urlopen(f"{base}{path}", timeout=5) as response:
-        return json.loads(response.read().decode("utf-8"))
-
-
-def post_json(base: str, path: str, payload: dict) -> dict:
-    request = Request(
-        f"{base}{path}",
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    with urlopen(request, timeout=10) as response:
-        return json.loads(response.read().decode("utf-8"))
 
 
 def test_intake_endpoints(dashboard_server, tmp_path) -> None:
