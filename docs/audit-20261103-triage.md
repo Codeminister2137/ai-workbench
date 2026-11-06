@@ -275,16 +275,20 @@ verification before action — several audit claims were already proven wrong
 - [LOW] Duplicated `_operator` / `_planned` / `_serve` HTTP scaffolding — `tests/test_notify_fix.py` → **BACKLOG 2026-11-06 (9 files confirmed; same note)**
 - [LOW] Deadline polling loops duplicated with magic intervals — `tests/test_hosted_drain.py` → **BACKLOG 2026-11-06 (same family; wait_for helper on touch)**
 
-## Verdict counts
+## Verdict counts (final, 2026-11-06 evening — 0 UNREVIEWED)
 
-- BACKLOG: 3
-- DOWNGRADED: 16
-- FALSE POSITIVE: 14
-- FIXED: 20
-- INTENDED: 5
-- REAL — POST-HACKATHON: 0 (all resolved 2026-11-06)
+- FIXED: 28
+- FALSE POSITIVE: 47
+- INTENDED: 10
+- DOWNGRADED: 104
+- BACKLOG: 14
 - TEST GAP CLOSED: 1
-- UNREVIEWED: 156
+- REAL (fix queued): 2 — empty-answer receipt rule, session-id None guard
+- REAL-minor (fix queued): 8 — delegated error label, validation truncate,
+  dotenv export+behavior pins, .env missing errors x4, controller JSON,
+  model-resolve dead loop
+- REAL-test-gap (fix queued): 1 — auxiliary base_url assert
+- UNREVIEWED: 0
 
 ## Appendix: frontend-audit leftovers verified 2026-11-03 evening
 
