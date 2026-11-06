@@ -40,7 +40,7 @@ verification before action — several audit claims were already proven wrong
 - [MEDIUM] Research source retain crashes on malformed receipt — `packages/ai_agent/src/ai_agent/research_evidence.py` → **DOWNGRADED 2026-11-06 (retain() is uncalled in production — only the constructor path runs, using .get safely; validate-and-raise queued as API hygiene)**
 - [MEDIUM] IDE tool cannot run inside existing event loop — `packages/ai_agent/src/ai_agent/ide_bridge.py` → **FALSE POSITIVE 2026-11-06 (no async host exists anywhere in ai_agent — the only coroutines are ide_bridge's own, driven by these asyncio.run calls; tools execute synchronously)**
 - [MEDIUM] Provider model-list probe can SSRF to catalog URL — `packages/ai_agent/src/ai_agent/repo_coding_assistant.py` → **DOWNGRADED 2026-11-06 (base_url is operator config or hardcoded provider default; --catalog is a local TOML file, not a URL — the audit's assumption is wrong; no untrusted input reaches the probe)**
-- [MEDIUM] Delegated error string leaks internals to model — `packages/ai_agent/src/ai_agent/repo_coding_assistant.py` → **REAL-minor 2026-11-06 — fix queued (raw {exc} is model-visible; the codebase already has safe_diagnostic_label for this — apply it here and log details host-side)**
+- [MEDIUM] Delegated error string leaks internals to model — `packages/ai_agent/src/ai_agent/repo_coding_assistant.py` → **FIXED 2026-11-06 (host: safe_diagnostic_label + host-side detail via _delegated_failure_result + 2 tests)**
 - [LOW] Negative context budgets not rejected — `packages/ai_agent/src/ai_agent/repo_assistant_args.py` → **FALSE POSITIVE 2026-11-06 (negatives rejected fail-closed in load_prompt_context with ValueError; 0→None disable mapping exists at the CLI; argparse validator is cosmetic)**
 - [LOW] Env passthrough skips argv-style validation — `packages/ai_agent/src/ai_agent/processes.py` → **FALSE POSITIVE 2026-11-06 (env is host-built — model supplies argv/cwd only; Popen raises before handle allocation, so no orphaned handle is possible)**
 - [LOW] Review-source allocation recomputes UTF-8 size per share — `packages/ai_agent/src/ai_agent/research_evidence.py` → **DOWNGRADED 2026-11-06 (confirmed re-encode, but n<=30 small texts per review = microseconds; precompute-sizes queued as trivial hygiene with the next touch)**
@@ -135,7 +135,7 @@ verification before action — several audit claims were already proven wrong
 - [MEDIUM] Exclusive settings create has no exists-handling — `packages/ai_provider/src/ai_provider/gemini_cli.py` → **INTENDED 2026-11-06 (documented exclusive-create design: 'never overwrite a native configuration'; abort-with-file-untouched is fail-closed; only message cosmetics could improve)**
 - [MEDIUM] Unvalidated timeout flows into min()/urlopen — `packages/ai_provider/src/ai_provider/native_admission.py` → **DOWNGRADED 2026-11-06 (negatives rejected in __post_init__, inf capped by min(), NaN fails loud at socket use; only gap is NaN passing construction — cosmetic validation follow-up)**
 - [MEDIUM] Silent diagnostic swallow hides fallback mode — `packages/ai_provider/src/ai_provider/fallback_context.py` → **FALSE POSITIVE 2026-11-06 (swallow fires only when the sink itself is broken, e.g. closed console; when the sink works the mode IS reported; defensive and correct)**
-- [MEDIUM] Kiro/An antigravity headless denial masked as success elsewhere — `packages/ai_provider/src/ai_provider/external_agents.py` → **REAL 2026-11-06 — fix queued (receipt marks rc-0/empty-answer/no-failure runs 'completed' for non-Antigravity clients; generalize the empty-answer rule with a last_message guard)**
+- [MEDIUM] Kiro/An antigravity headless denial masked as success elsewhere — `packages/ai_provider/src/ai_provider/external_agents.py` → **FIXED 2026-11-06 (host W1: general empty-answer rule for all clients + 3 tests; 1 pinned-test contract change documented)**
 - [LOW] TOCTOU on Kiro/Gemini workspace check — `packages/ai_provider/src/ai_provider/external_agents.py` → **DOWNGRADED 2026-11-06 (theoretical: requires attacker mid-run write access to the operator's own workspace, past which the game is already over; post-create re-resolve is optional hardening)**
 - [LOW] Blocking input() for outside-repo approval — `packages/ai_provider/src/ai_provider/repo_actions.py` → **DOWNGRADED 2026-11-06 (EOFError fails closed to deny — covers normal unattended stdin-closed runs; hang needs an open-but-silent stdin pipe; allow_outside_files flag exists)**
 - [LOW] History compaction can still throw after preserving required data — `packages/ai_provider/src/ai_provider/research_execution.py` → **DOWNGRADED 2026-11-06 (multi-tier compaction + actionable error with byte overage + 'no model request was sent'; report-pointer tier is an enhancement, not a gap)**
@@ -150,14 +150,14 @@ verification before action — several audit claims were already proven wrong
 - [MEDIUM] Transcript logs full prompts verbatim — `packages/ai_provider/src/ai_provider/transcripts.py` → **FALSE POSITIVE 2026-11-06 (full-prompt transcript requires explicit opt-in pair --log-full-prompt + --log-file; default runs persist nothing to transcript files)**
 - [MEDIUM] .env permission never checked — `packages/ai_provider/src/ai_provider/secrets.py` → **DOWNGRADED 2026-11-06 (POSIX-only concern; primary platform is Windows where mode bits don't apply; docstring 'owner-only' overclaims — docstring fix queued)**
 - [MEDIUM] probe_route allows arbitrary URL fetch — `packages/ai_provider/src/ai_provider/route_probe.py` → **FALSE POSITIVE 2026-11-06 (sole caller is probe_all with hardcoded ROUTES URLs; CLI accepts no URL arg; audit's exposure assumption does not hold)**
-- [MEDIUM] Shared profile writes literal "None" session id — `packages/ai_provider/src/ai_provider/shared_client_tools.py` → **REAL 2026-11-06 — fix queued (guard checks session_database only; session_id=None renders literal 'None'; require both or neither)**
+- [MEDIUM] Shared profile writes literal "None" session id — `packages/ai_provider/src/ai_provider/shared_client_tools.py` → **FIXED 2026-11-06 (Baseten W2: fail-closed ValueError + 3 tests)**
 - [MEDIUM] Negative/NaN schedule accepted at plan time — `packages/ai_provider/src/ai_provider/task_scheduler.py` → **FALSE POSITIVE 2026-11-06 (audit's stated assumption is wrong: ScheduledTask.__post_init__ rejects non-positive/non-finite, reached via ResearchTask construction at plan time — loud ValueError)**
-- [LOW] Research scrutiny prompt unbounded — `packages/ai_provider/src/ai_provider/scrutiny.py` → **REAL-minor 2026-11-06 — fix queued (research_evidence IS bounded upstream via byte-budget loop; only the no-results fallback json.dumps(stage.details) in format_validation_failures_for_prompt is unbounded — truncate it)**
+- [LOW] Research scrutiny prompt unbounded — `packages/ai_provider/src/ai_provider/scrutiny.py` → **FIXED 2026-11-06 (host: 4000-char _truncated_details fallback + 2 tests)**
 - [LOW] SWE-bench source_url unvalidated fetch — `packages/ai_provider/src/ai_provider/swe_bench_scores.py` → **FALSE POSITIVE 2026-11-06 (CLI exposes no URL arg; only tests override source_url; production uses hardcoded leaderboard URL via guarded http_transport)**
 - [LOW] Workspace join bypass if CONFIG_PATH absolute — `packages/ai_provider/src/ai_provider/shared_client_tools.py` → **FALSE POSITIVE 2026-11-06 (CONFIG_PATH is a hardcoded relative Path('data/pycharm-mcp.json') constant; the 'if absolute' cannot occur at runtime)**
 - [LOW] Drain crash on corrupt attempts value — `patches/operator-notify-fix/src/remote_operator/supervisor_runner.py` → **DOWNGRADED 2026-11-06 (inert sibling-repo patch mirror, not live code here; corruption requires operator store tampering)**
 - [LOW] Unbounded TOML config read — `packages/ai_provider/src/ai_provider/user_config.py` → **DOWNGRADED 2026-11-06 (owner-only config file; giant file is self-DoS only; st_size guard is cheap defense-in-depth — queued)**
-- [LOW] dotenv export prefix silently dropped — `packages/ai_provider/src/ai_provider/secrets.py` → **REAL-minor 2026-11-06 — fix queued ('export FOO=bar' lines fail the alnum check and vanish silently; strip the prefix, warn on skips)**
+- [LOW] dotenv export prefix silently dropped — `packages/ai_provider/src/ai_provider/secrets.py` → **FIXED 2026-11-06 (Baseten W3: export-strip + documented leniency + 4 tests; covers the /9 dotenv behavior item too)**
 - [LOW] Display key whitespace not normalized — `packages/ai_provider/src/ai_provider/swe_bench_scores.py` → **DOWNGRADED 2026-11-06 (grouping key uses _normalized_model which strips+collapses; edge whitespace affects display strings only — cosmetic)**
 
 ## ai-workbench/6
@@ -171,9 +171,9 @@ verification before action — several audit claims were already proven wrong
 - [HIGH] Validator allowance keys accessed without validation — `scripts/meta-supervised-develop.py` → **DOWNGRADED (malformed host-authored file raises fail-closed before any model call; tampering after prepare is caught by the AUTHORIZED job-digest check)**
 - [MEDIUM] Security gates use `assert`, stripped under `python -O` — `scripts/fallback-acceptance.py` → **DOWNGRADED 2026-11-06 (manually-run harness, never invoked with -O; explicit-failure conversion is trivial hygiene — queued)**
 - [MEDIUM] Unbounded mailbox/body reads allow DoS/OOM — `scripts/mail_digest.py` → **DOWNGRADED 2026-11-06 (operator CLI on own mailbox; stored output bounded to metadata/snippet/urls; only transient per-message memory for giant mails; --fetch/per-message caps queued)**
-- [MEDIUM] `.env` read crashes when file missing — `scripts/alternate-agent-acceptance.py` → **REAL-minor 2026-11-06 — fix queued (all three scripts still raise raw FileNotFoundError; wrap with a clear missing-.env error)**
-- [MEDIUM] Controller launch parses JSON without handling — `scripts/bounded-acceptance-controller.py` → **REAL-minor 2026-11-06 — fix queued (corrupt run.json/checksums.json crash instead of becoming failures entries / controller_error lines)**
-- [MEDIUM] Duplicated model-resolution branches drift — `scripts/baseten-supervised-develop.py` → **REAL-minor 2026-11-06 — fix queued (lines 87-90 loop is dead code re-checking vars that just failed; collapse to helper + pin precedence with a test)**
+- [MEDIUM] `.env` read crashes when file missing — `scripts/alternate-agent-acceptance.py` → **FIXED 2026-11-06 (Baseten W4a: clear FileNotFoundError + 2 tests)**
+- [MEDIUM] Controller launch parses JSON without handling — `scripts/bounded-acceptance-controller.py` → **FIXED 2026-11-06 (Baseten W4b: failures entries + 3 tests, host-fixed strays)**
+- [MEDIUM] Duplicated model-resolution branches drift — `scripts/baseten-supervised-develop.py` → **FIXED 2026-11-06 (Baseten W4c: _first_env collapse + 5 precedence tests)**
 - [LOW] PowerShell port-parse fragile to locale/whitespace — `scripts/day_cycle.py` → **DOWNGRADED 2026-11-06 (strict exactly-2-digit-tokens filter cannot misattribute a PID; worst case is a missed listener, and a relaunch then fails loud on bind)**
 - [LOW] `save_json` temp suffix collides on concurrent runs — `scripts/research-review-evaluation.py` → **DOWNGRADED 2026-11-06 (sequential script, zero concurrency primitives; collision needs two simultaneous manual runs on the same path; NamedTemporaryFile hygiene queued)**
 
@@ -191,7 +191,7 @@ verification before action — several audit claims were already proven wrong
 - [MEDIUM] Hardcoded Windows interpreters + username leak — `scripts/unattended-development-loop.py` → **DOWNGRADED 2026-11-06 (Windows-only operator script by design; no leak — username is already the git author; brittleness if the sibling checkout moves; resolve-venv-at-startup queued)**
 - [MEDIUM] Missing CLI bounds in WOL and report validator — `scripts/wake_on_lan.py` → **DOWNGRADED 2026-11-06 (owner CLIs; negative port/count fail loud, validator file already fully read above the hash; bounds + chunked hash queued)**
 - [MEDIUM] Receipt/phase files assumed present and well-formed — `scripts/unattended-development-loop.py` → **DOWNGRADED 2026-11-06 (missing/corrupt receipt becomes a recorded per-objective error; report.json still written; only diagnostic precision lacking — explicit receipt check queued)**
-- [LOW] Insecure `.env` parsing for event credential — `scripts/unattended-development-loop.py` → **REAL-minor 2026-11-06 — fix queued (4th missing-.env raw-traceback site; same clear-error wrap as the /6 trio)**
+- [LOW] Insecure `.env` parsing for event credential — `scripts/unattended-development-loop.py` → **FIXED 2026-11-06 (host: read_event_key with clear error + 2 tests)**
 - [LOW] Blocking `Popen` receipt wait can mask closeout failure — `scripts/unattended-development-loop.py` → **DOWNGRADED 2026-11-06 (report files written before scheduling; receipt read is exists-checked + try/except; Popen failure needs a missing powershell/repo file; try/except wrap queued)**
 - [LOW] Stream research-file hash instead of `read_bytes` — `scripts/validate_research_report.py` → **DOWNGRADED 2026-11-06 (operator validator on own report; file already fully read above for validation — hash adds no new memory class; chunked read queued)**
 
@@ -203,7 +203,7 @@ verification before action — several audit claims were already proven wrong
 - [MEDIUM] Git helpers run without timeout — `tests/test_ai_agent_git_tools.py` → **DOWNGRADED 2026-11-06 (local git on tmp_path with captured output — no TTY, so no prompts; hang needs pathological git; timeout= queued as cheap hygiene)**
 - [MEDIUM] Junction creation via PowerShell has no timeout — `tests/test_ai_agent_boundaries.py` → **DOWNGRADED 2026-11-06 (local one-shot fixture command; hang needs a hung powershell itself; timeout= queued with the git helper)**
 - [MEDIUM] Fixed 2-item input iterator masks over-prompting — `tests/repo_assistant/test_protocol_continuity.py` → **DOWNGRADED 2026-11-06 (a third prompt raises StopIteration out of input() and ERRORS the test — loud, not masked; explicit AssertionError queued as clarity hygiene)**
-- [MEDIUM] Auxiliary startup stub ignores `base_url` — `tests/repo_assistant/test_orchestration.py` → **REAL-test-gap 2026-11-06 — fix queued (stub swallows the URL production passes at coding_assist.py:187-188; capture and assert it equals the expected loopback URL)**
+- [MEDIUM] Auxiliary startup stub ignores `base_url` — `tests/repo_assistant/test_orchestration.py` → **FIXED 2026-11-06 (host TEST GAP CLOSED: capture + None-default loopback pin)**
 - [LOW] Duplicate create_file byte-count tests — `tests/test_ai_agent_tools.py` → **DOWNGRADED 2026-11-06 (overlapping passing tests are harmless; parametrization is optional style — touch only when editing these tests)**
 - [LOW] 30-60s fixture sleeps slow and flake — `tests/repo_assistant/test_protocol_continuity.py` → **FALSE POSITIVE 2026-11-06 (measured: file passes in 1.18s; sleep(45) is an unreached kill-ceiling — the test stops the child and the finalizer closes supervisors)**
 
@@ -216,7 +216,7 @@ verification before action — several audit claims were already proven wrong
 - [MEDIUM] Receipt poll has no corrupt/missing-dir contract — `tests/test_baseten_receipts.py` → **DOWNGRADED 2026-11-06 (digest-comparison design: corrupt JSON and missing dir are safe by construction; only a permission error propagates, loudly, in an operator CLI — queued)**
 - [MEDIUM] `valid_source` only tested against naive payloads — `tests/test_fallback_acceptance.py` → **DOWNGRADED 2026-11-06 (validator is AST-exact — single Assign of int Constant 2 to `value`; executable constructs structurally impossible; adversarial cases are defense-in-depth, queued)**
 - [MEDIUM] Exhausted-deadline / allowance-observer races untested for partial writes — `tests/test_execution_fallback.py` → **DOWNGRADED 2026-11-06 (core no-leak assertion exists at test:262; explicit continuation-cleared assert is incremental, queued)**
-- [LOW] Dotenv parser leaves `export` / inline-comment behavior undefined — `tests/test_ai_provider_secrets.py` → **REAL-minor 2026-11-06 — fix queued (fold into dotenv slice: strip `export`, pin inline-comment + duplicate-key behavior with tests)**
+- [LOW] Dotenv parser leaves `export` / inline-comment behavior undefined — `tests/test_ai_provider_secrets.py` → **FIXED 2026-11-06 (covered by Baseten W3 — see dotenv export item)**
 - [LOW] Band validator bool edge only half-covered — `tests/test_capability_bands.py` → **DOWNGRADED 2026-11-06 (one bool-first check rejects both True and False — no divergent path exists; add False to params opportunistically)**
 - [LOW] Pricing-read assertion allows unbounded extra fetches — `tests/test_free_provider_fallback.py` → **DOWNGRADED 2026-11-06 (model-call counts pinned exactly; >= covers only cache reads which legitimately vary by param case; == would couple to cache internals)**
 - [LOW] SQLite connection-leak test is process-global — `tests/test_chat_transcripts.py` → **FALSE POSITIVE 2026-11-06 (monkeypatch is function-scoped and auto-reverted; suite runs serially; rename-after-close passes on Windows — the pattern is sound)**
@@ -275,19 +275,15 @@ verification before action — several audit claims were already proven wrong
 - [LOW] Duplicated `_operator` / `_planned` / `_serve` HTTP scaffolding — `tests/test_notify_fix.py` → **BACKLOG 2026-11-06 (9 files confirmed; same note)**
 - [LOW] Deadline polling loops duplicated with magic intervals — `tests/test_hosted_drain.py` → **BACKLOG 2026-11-06 (same family; wait_for helper on touch)**
 
-## Verdict counts (final, 2026-11-06 evening — 0 UNREVIEWED)
+## Verdict counts (final, 2026-11-06 evening — 0 UNREVIEWED, 0 REAL)
 
-- FIXED: 28
+- FIXED: 39 (28 audit + 11 loop-2 W-slice/host fixes, all tested)
 - FALSE POSITIVE: 47
 - INTENDED: 10
 - DOWNGRADED: 104
 - BACKLOG: 14
 - TEST GAP CLOSED: 1
-- REAL (fix queued): 2 — empty-answer receipt rule, session-id None guard
-- REAL-minor (fix queued): 8 — delegated error label, validation truncate,
-  dotenv export+behavior pins, .env missing errors x4, controller JSON,
-  model-resolve dead loop
-- REAL-test-gap (fix queued): 1 — auxiliary base_url assert
+- REAL: 0 (all 11 fixed and tested this window)
 - UNREVIEWED: 0
 
 ## Appendix: frontend-audit leftovers verified 2026-11-03 evening
