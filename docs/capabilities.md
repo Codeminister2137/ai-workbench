@@ -5,7 +5,7 @@ only variable *names* and credential *status*, never values. Update this
 file when a slice adds, removes, or changes a capability (proposed
 Definition-of-Done rule, pending owner approval).
 
-Last verified: 2026-11-06 ~11:00 (steps 4+5 merged, chat smoke live).
+Last verified: 2026-11-06 ~12:10 (unattended loop: mail/delegation/scheduler/chat-fix merged).
 
 ## One command
 
@@ -36,7 +36,7 @@ Remove: `Unregister-ScheduledTask -TaskName WorkbenchDashboard,MsiUdpWatchdog -C
 
 | Route | Access | Status 2026-11-06 |
 |---|---|---|
-| `ollama/gpt-oss:20b` | local runtime, 64k budget | implement-mode runs; multi-turn overflows (slim fix queued) |
+| `ollama/gpt-oss:20b` | local runtime, 64k budget | implement-mode runs; 8-turn probe 8/8 clean post-slim (overflow resolved) |
 | `ollama/qwen3:14b` | local runtime | tools-capable; 4k budget (too small for implement) |
 | `openai/codex-gpt-6.1-sol` | `codex` CLI 0.166.0 (PATH), ChatGPT login | verified `completed` — spend freely |
 | `meta/muse-spark-1.3` | provider API | wired; needs reachability re-probe after network outage |
@@ -54,32 +54,58 @@ Codex note: PyCharm-bundled 0.137.0 is too stale (400s); PATH 0.166.0 wins.
 - Slim supervisor instructions (2026-11-06): static prompt 872→581 chars
   (600-char budget, asserted); per-delegation assembly adds only receipts /
   policy / paths; long-form guidance moved to `docs/supervisor-handbook.md`
-  (reference-only, never sent). Multi-turn overflow risk reduced, not yet
-  re-measured under load.
+  (reference-only, never sent). Overflow re-measured 2026-11-06: 8/8
+  history-growing turns clean (6–26s).
 - Chat-channel tools (2026-11-06): `get_run_status`, `list_pending_inbox`
   (id+type+title only, no bodies/secrets), `read_dashboard_doc` (4k cap).
   Read-only, fail-closed, visible receipts; executor registry untouched.
 - Drain worker v1 (2026-11-06): `POST /api/runs/drain` executes approved
   runs oldest-first (`max_runs`, default 1); "Drain now" button on Runs;
-  E2E proven approve→drain→completed on live server. No scheduler yet —
-  one click/shot per call.
+  E2E proven approve→drain→completed on live server.
+- Drain scheduler v1 (2026-11-06): `drain_interval_seconds` (≥60) in
+  `dashboard.json` + restart; one run per tick; tick failures logged.
+  Default OFF — enabling is an owner decision. No UI toggle yet.
+- Empty-answer fallback (2026-11-06): blank model content now yields a
+  receipt summary instead of an empty reply + bare receipts (owner report).
+- Restart protocol: check chat for recent activity before restarting the
+  dashboard — a restart raced an owner turn on 2026-11-06 (HTTP 502).
 
-## Mail (two call-sites, one missing credential)
+## Delegation (supervisor creates/runs agents)
 
-- `scripts/loop_notify.py`: Gmail app password (`GMAIL_EMAIL`, `GMAIL_PASSWORD`
-  in `.env`), receipted pings to owner only. Went LIVE before; credential
-  currently absent — owner re-adding 2026-11-06, then delivery test.
-- `apps/workbench_dashboard/owner_mail.py`: SMTP (`WORKBENCH_SMTP_*`), receipted.
-  Uncredentialed. Unification decision: point at Gmail SMTP once creds land.
-- Legacy `.env` at `apps/job_search/job-email/.env`: delete after move verified.
+- `delegate_task`: one level deep, narrowed registry/permissions/paths,
+  shared reply+tool budget, staged files carry back to the parent receipt.
+- Per-task model routing (2026-11-06): supervisor may request a child
+  model per call; host allowlist + client factory; unknown/unconfigured
+  models refused fail-closed. E2E parent-loop test green.
+- Blank-handling contract: the loop returns what the model says; callers
+  decide — native wrapper rejects blanks (ProviderError), messenger falls
+  back to a receipt summary. (A loop-level retry was tried and reverted
+  2026-11-06: it broke 6 pinned tests; see plan file.)
+- Backlog: executor path silently accepts blank final summaries
+  (no observed failure; reject-vs-fallback needs owner input).
+
+## Mail (unified credential, two transports)
+
+- One credential: `GMAIL_EMAIL`/`GMAIL_PASSWORD` in root `.env`
+  (verified + live-tested 2026-11-06). Legacy job-email `.env` deleted.
+- `scripts/loop_notify.py`: yagmail transport, receipted pings, 3× retry.
+- `apps/workbench_dashboard/owner_mail.py`: stdlib SMTP; falls back to
+  the `GMAIL_*` pair (env, then root `.env`) when `WORKBENCH_*` absent.
+- OPEN DECISION (inbox): canonical transport — stdlib (recommended) vs
+  yagmail vs keep both as fallback pair. Both work; no urgency.
 
 ## Documents + research (private, gitignored)
 
 - Dashboard Documents tab serves `docs/library-private/` (services-by-effort,
-  pricing-global-local, advertising), `docs/plans/`, proposals. Markdown
+  pricing-global-local, pricing-lowend-threat, advertising,
+  msi-uninstall-safety), `docs/plans/`, proposals. Markdown
   previews render in-tab; one-click file open.
 - Market correction 2026-11-06: HU/HUF artifacts fixed to PL/PLN; website-line
   bands under owner deliberation (~500 PLN observed floor).
+- Low-end threat study 2026-11-06: 70+ datapoints; 500 PLN tier is
+  template/AI product, market bifurcating; lean avoid + rescue-care.
+- MSI note 2026-11-06: removal safe via staged path; LAN Manager flagged
+  second network suspect; removal itself = owner decision.
 
 ## Grants (remote-operator — deprecated path)
 
@@ -89,6 +115,6 @@ Codex note: PyCharm-bundled 0.137.0 is too stale (400s); PATH 0.166.0 wins.
 
 ## Known gaps (see inbox + todos for live state)
 
-- P7 answers (owner deliberating — research correction folded in),
-  mail credential + unification, MSI uninstall safety research (after data).
-  Drain has no scheduler yet.
+- P7 answers (owner deliberating), mail transport decision (inbox),
+  drain-scheduler enablement (owner decision), MSI removal (owner decision),
+  executor blank-summary backlog, Meta reachability re-probe.
