@@ -74,10 +74,10 @@ inspect the owned process only.
 
 ## Limits (honest)
 
-- Chat answers are single-shot completions; drained runs execute
-  through the AgentLoop-backed executor, but no production drain
-  driver exists yet (owner-deferred), so the drain only runs when
-  invoked directly (tests, scripts).
+- Runs drain manually (Runs "Drain now" / `POST /api/runs/drain`,
+  one run per call) or on a schedule (`drain_interval_seconds` ≥ 60
+  in `dashboard.json` + restart; default off). No UI/API toggle yet;
+  one run per tick; tick failures are logged, not mailed.
 - Transcription/translation need owner-wired keys and metering; the
   endpoints answer 409 until then. No per-project data isolation yet:
   runs/inbox stay global with per-run project refs (G6 owner question).

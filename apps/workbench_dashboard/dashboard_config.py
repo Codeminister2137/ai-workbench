@@ -25,6 +25,7 @@ class DashboardConfig:
     work_roots: tuple[str, ...] = ()
     supervision: str = "attended"
     trusted_hosts: tuple[str, ...] = ()
+    drain_interval_seconds: int = 0
 
 
 def load_config(path: Path = DEFAULT_CONFIG_PATH) -> DashboardConfig:
@@ -47,6 +48,7 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> DashboardConfig:
         "work_roots": list,
         "supervision": str,
         "trusted_hosts": list,
+        "drain_interval_seconds": int,
     }
     values: dict[str, object] = {}
     for key, types in known.items():
@@ -61,6 +63,9 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> DashboardConfig:
     budget = values.get("history_budget_chars")
     if isinstance(budget, int) and budget < 0:
         raise ValueError("history_budget_chars must be zero or greater")
+    interval = values.get("drain_interval_seconds")
+    if isinstance(interval, int) and interval < 0:
+        raise ValueError("drain_interval_seconds must be zero or greater")
     roots = values.get("work_roots")
     if roots is not None:
         entries = cast("list[object]", roots)

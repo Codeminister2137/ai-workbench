@@ -48,6 +48,7 @@ from dashboard_config import (
 from dashboard_projects import create_project, get_project, list_projects
 from dashboard_stores import DashboardStores, StoreError, effective_fanout_policy
 from document_library import DocumentLibrary
+from drain_scheduler import DrainScheduler
 from owner_mail import mail_configured
 from p7_intake import approve_intake, list_intake
 from window_status import load_window_status
@@ -809,23 +810,18 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 status=400,
             )
         stores = self._stores()
-        try:
-            roots = self._project_roots(config)
-        except StagedEditError as exc:
-            return self._send_json({"ok": False, "error": str(exc)}, status=400)
         # Plain factory, not a method: tests inject staticmethod(fake_factory).
         factory = self.drain_executor_factory  # pyright: ignore[reportAttributeAccessIssue]
-        if factory is not None:
-            executor = factory()
-        else:
-            executor = build_executor(
-                config, roots, self.repo_root, inbox_create=stores.create_inbox_task
+        try:
+            drain = build_run_drain(
+                config,
+                self.data_dir,
+                self.repo_root,
+                stores,
+                executor_factory=factory,
             )
-        drain = RunDrain(
-            runs_dir=self.data_dir / "runs",
-            get_inbox=lambda inbox_id: stores.inbox.get(inbox_id),
-            executor=executor,
-        )
+        except StagedEditError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
         outcomes = drain.drain(max_runs=max_runs)
         self._send_json({"ok": True, "outcomes": outcomes})
 
@@ -1073,6 +1069,64 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         return payload
 
 
+DRAIN_SCHEDULER_MIN_INTERVAL_SECONDS = 60
+SCHEDULER_DRAIN_MAX_RUNS = 1
+
+
+def should_start_drain_scheduler(config: DashboardConfig) -> bool:
+    """Return True when the config enables periodic run drains."""
+    return config.drain_interval_seconds >= DRAIN_SCHEDULER_MIN_INTERVAL_SECONDS
+
+
+def build_run_drain(
+    config: DashboardConfig,
+    data_dir: Path,
+    repo_root: Path,
+    stores: DashboardStores,
+    executor_factory: Callable[[], object] | None = None,
+) -> RunDrain:
+    """Build the approved-runs drain shared by manual and scheduled drains."""
+    roots = ProjectRoots(
+        config.work_roots,
+        protected_dirs=(
+            data_dir,
+            repo_root / ".venv",
+            repo_root / ".git",
+        ),
+    )
+    if executor_factory is not None:
+        executor = executor_factory()
+    else:
+        executor = build_executor(config, roots, repo_root, inbox_create=stores.create_inbox_task)
+    return RunDrain(
+        runs_dir=data_dir / "runs",
+        get_inbox=lambda inbox_id: stores.inbox.get(inbox_id),
+        executor=executor,
+    )
+
+
+def maybe_start_drain_scheduler(config_path: Path, data_dir: Path) -> DrainScheduler | None:
+    """Start periodic drains when configured; never raises."""
+    try:
+        config = load_config(config_path)
+    except ValueError as exc:
+        print(f"Workbench dashboard: drain scheduler off (config: {exc})")
+        return None
+    if not should_start_drain_scheduler(config):
+        return None
+    stores = DashboardStores(data_dir)
+
+    def tick() -> None:
+        drain = build_run_drain(config, data_dir, REPO_ROOT, stores)
+        outcomes = drain.drain(max_runs=SCHEDULER_DRAIN_MAX_RUNS)
+        print(f"Workbench dashboard: scheduled drain: {outcomes}")
+
+    scheduler = DrainScheduler(tick, config.drain_interval_seconds)
+    scheduler.start()
+    print(f"Workbench dashboard: drain scheduler every {config.drain_interval_seconds}s")
+    return scheduler
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run the Workbench dashboard UI.")
     parser.add_argument("--host", default="127.0.0.1", choices=("127.0.0.1", "localhost"))
@@ -1086,6 +1140,10 @@ def main() -> None:
     args = build_parser().parse_args()
     DashboardRequestHandler.config_path = args.config
     DashboardRequestHandler.data_dir = args.data_dir
+    try:
+        maybe_start_drain_scheduler(args.config, args.data_dir)
+    except Exception as exc:  # noqa: BLE001 - scheduler must never block serving
+        print(f"Workbench dashboard: drain scheduler failed to start: {exc}")
     server = ThreadingHTTPServer((args.host, args.port), DashboardRequestHandler)
     print(f"Workbench dashboard: http://{args.host}:{args.port}")
     server.serve_forever()
