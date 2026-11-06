@@ -1413,6 +1413,24 @@ def _external_agent_result_from_completed_process(
                     "Configure permission for the required tools or use an interactive session."
                 ),
             )
+    if (
+        completed.returncode == 0
+        and not (last_message or "").strip()
+        and not (events and (events.final_answer or events.failure_reason))
+        and not stdout.strip()
+    ):
+        # Any client that exits 0 with no stdout, no message file, and no
+        # parsed answer produced no observable result. Preserve the process
+        # status and receipts, but do not claim task completion.
+        events = events or parse_external_agent_jsonl(stdout)
+        if events.failure_reason is None:
+            events = replace(
+                events,
+                failure_reason=(
+                    f"{config.access_method.value} exited 0 without producing "
+                    "an answer, event stream, or message file."
+                ),
+            )
     return ExternalAgentResult(
         command=command,
         returncode=completed.returncode,

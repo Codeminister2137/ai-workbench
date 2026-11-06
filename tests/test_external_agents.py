@@ -138,7 +138,10 @@ def test_antigravity_permission_diagnostic_does_not_override_answer(tmp_path: Pa
     assert result.events is None
 
 
-def test_antigravity_benign_stderr_does_not_create_a_failure(tmp_path: Path) -> None:
+def test_antigravity_empty_output_is_a_failure_despite_benign_stderr(tmp_path: Path) -> None:
+    # Contract change 2026-11-06 (audit REAL): rc 0 with empty stdout and
+    # no message file is not completion for any client, even when stderr
+    # carries no denial diagnostic.
     config = ExternalAgentConfig(
         access_method=AccessMethod.ANTIGRAVITY_CLI,
         command="agy",
@@ -150,7 +153,45 @@ def test_antigravity_benign_stderr_does_not_create_a_failure(tmp_path: Path) -> 
         ("agy",), config, subprocess.CompletedProcess(("agy",), 0, "", "warning: retrying")
     )
 
-    assert result.events is None
+    assert result.returncode == 0
+    assert result.events is not None
+    assert result.events.failure_reason is not None
+    assert "without producing" in result.events.failure_reason
+    assert "headless tool permission was denied" not in result.events.failure_reason
+
+
+def test_codex_empty_output_is_a_failure(tmp_path: Path) -> None:
+    config = ExternalAgentConfig(
+        access_method=AccessMethod.CODEX_CLI,
+        command="codex",
+        model="fixture",
+        cwd=tmp_path,
+        timeout_seconds=60.0,
+    )
+    result = _external_agent_result_from_completed_process(
+        ("codex",), config, subprocess.CompletedProcess(("codex",), 0, "", "")
+    )
+
+    assert result.returncode == 0
+    assert result.events is not None
+    assert "without producing" in (result.events.failure_reason or "")
+
+
+def test_codex_nonempty_stdout_is_not_flagged_as_empty(tmp_path: Path) -> None:
+    config = ExternalAgentConfig(
+        access_method=AccessMethod.CODEX_CLI,
+        command="codex",
+        model="fixture",
+        cwd=tmp_path,
+        timeout_seconds=60.0,
+    )
+    result = _external_agent_result_from_completed_process(
+        ("codex",),
+        config,
+        subprocess.CompletedProcess(("codex",), 0, "Task complete.\n", ""),
+    )
+
+    assert result.events is None or "without producing" not in (result.events.failure_reason or "")
 
 
 def test_build_external_agent_command_can_enable_codex_search(tmp_path: Path) -> None:
