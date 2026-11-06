@@ -217,7 +217,10 @@ def test_yagmail_failure_path_returns_receipt_without_network(monkeypatch):
     assert "yagmail" in (receipt.error_message or "")
 
 
-def test_loop_notify_consumer_uses_unified_sender_dry_run(tmp_path, monkeypatch):
+def test_loop_notify_consumer_dry_run(tmp_path, monkeypatch):
+    # Owner decision A (inbox eebfd0c1, 2026-11-06): loop pings moved to the
+    # dashboard stdlib mailer; sender.py stays the job-search app's transport.
+    # The dry-run receipt contract below is unchanged by that move.
     script = Path(__file__).resolve().parents[1] / "scripts/loop_notify.py"
     spec = importlib.util.spec_from_file_location("loop_notify_phase1", script)
     assert spec is not None

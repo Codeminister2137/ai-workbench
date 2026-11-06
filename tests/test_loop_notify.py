@@ -1,6 +1,5 @@
 """Offline checks for loop email pings; real delivery is never attempted."""
 
-import dataclasses
 import importlib.util
 import json
 from pathlib import Path
@@ -51,19 +50,25 @@ def test_misdirected_ping_is_refused(tmp_path, monkeypatch):
     assert list((tmp_path / "notifications").glob("evil-*.json")) == []
 
 
+def _om_receipt(sent: bool, error=None) -> dict:
+    return {
+        "to": "owner@example.com",
+        "subject": "s",
+        "dry_run": False,
+        "sent": sent,
+        "error": error,
+        "finished": "t",
+        "receipt": None,
+    }
+
+
 def test_transport_failure_is_captured_not_raised(tmp_path, monkeypatch):
-    class Broken:
-        def send(self, **kwargs):
+    class OwnerMailModule:
+        @staticmethod
+        def send_owner_mail(**kwargs):
             raise RuntimeError("smtp down")
 
-    class SenderModule:
-        def YagmailEmailTransport(self, email, password):
-            return Broken()
-
-        def DryRunEmailTransport(self):
-            raise AssertionError("live path expected")
-
-    monkeypatch.setattr(notify, "_load_sender", lambda: SenderModule())
+    monkeypatch.setattr(notify, "_load_owner_mail", lambda: OwnerMailModule())
     monkeypatch.setattr(
         notify, "read_gmail_config", lambda root=notify.ROOT: ("owner@example.com", "pw")
     )
@@ -75,33 +80,19 @@ def test_transport_failure_is_captured_not_raised(tmp_path, monkeypatch):
     assert "smtp down" in receipt["error_message"]
 
 
-@dataclasses.dataclass
-class PingResult:
-    success: bool
-    recipient: str
-    timestamp_utc: str
-    error_message: str | None
-
-
 def test_ping_retries_raising_transport_then_succeeds(tmp_path, monkeypatch):
     calls = []
     sleeps = []
 
-    class Flaky:
-        def send(self, **kwargs):
+    class OwnerMailModule:
+        @staticmethod
+        def send_owner_mail(**kwargs):
             calls.append(kwargs)
             if len(calls) < 3:
                 raise OSError("getaddrinfo failed")
-            return PingResult(True, kwargs["to_email"], "t", None)
+            return _om_receipt(True)
 
-    class SenderModule:
-        def YagmailEmailTransport(self, email, password):
-            return Flaky()
-
-        def DryRunEmailTransport(self):
-            raise AssertionError("live path expected")
-
-    monkeypatch.setattr(notify, "_load_sender", lambda: SenderModule())
+    monkeypatch.setattr(notify, "_load_owner_mail", lambda: OwnerMailModule())
     monkeypatch.setattr(
         notify, "read_gmail_config", lambda root=notify.ROOT: ("owner@example.com", "pw")
     )
@@ -117,21 +108,15 @@ def test_ping_retries_raising_transport_then_succeeds(tmp_path, monkeypatch):
 def test_ping_retries_returned_failure_then_succeeds(tmp_path, monkeypatch):
     calls = []
 
-    class Flapping:
-        def send(self, **kwargs):
+    class OwnerMailModule:
+        @staticmethod
+        def send_owner_mail(**kwargs):
             calls.append(kwargs)
             if len(calls) < 2:
-                return PingResult(False, kwargs["to_email"], "t", "dns down")
-            return PingResult(True, kwargs["to_email"], "t", None)
+                return _om_receipt(False, "SMTPException: dns down")
+            return _om_receipt(True)
 
-    class SenderModule:
-        def YagmailEmailTransport(self, email, password):
-            return Flapping()
-
-        def DryRunEmailTransport(self):
-            raise AssertionError("live path expected")
-
-    monkeypatch.setattr(notify, "_load_sender", lambda: SenderModule())
+    monkeypatch.setattr(notify, "_load_owner_mail", lambda: OwnerMailModule())
     monkeypatch.setattr(
         notify, "read_gmail_config", lambda root=notify.ROOT: ("owner@example.com", "pw")
     )
@@ -166,33 +151,23 @@ def test_gmail_config_precedence(tmp_path, monkeypatch):
 def test_ping_carries_public_ip(tmp_path, monkeypatch):
     captured = {}
 
-    class Capturing:
-        def send(self, **kwargs):
+    class OwnerMailModule:
+        @staticmethod
+        def send_owner_mail(**kwargs):
             captured.update(kwargs)
-            from types import SimpleNamespace
+            return _om_receipt(True)
 
-            return SimpleNamespace(
-                success=True,
-                recipient=kwargs["to_email"],
-                timestamp_utc="t",
-                error_message=None,
-            )
-
-    class SenderModule:
-        def YagmailEmailTransport(self, email, password):
-            return Capturing()
-
-        def DryRunEmailTransport(self):
-            raise AssertionError("live path expected")
-
-    monkeypatch.setattr(notify, "_load_sender", lambda: SenderModule())
+    monkeypatch.setattr(notify, "_load_owner_mail", lambda: OwnerMailModule())
     monkeypatch.setattr(
         notify, "read_gmail_config", lambda root=notify.ROOT: ("owner@example.com", "pw")
     )
     monkeypatch.setattr(notify, "public_ip", lambda **kwargs: "203.0.113.7")
     receipt = notify.send_ping(subject="s", body="b", run_dir=tmp_path, event="ip")
     assert receipt["public_ip"] == "203.0.113.7"
-    assert "Public IP: 203.0.113.7" in captured["contents"]
+    assert "Public IP: 203.0.113.7" in captured["body"]
+    assert captured["config"]["host"] == "smtp.gmail.com"
+    assert captured["config"]["username"] == "owner@example.com"
+    assert captured["dry_run"] is False
 
 
 def test_public_ip_fails_soft(tmp_path, monkeypatch):
