@@ -212,6 +212,10 @@ _alternate_module = _load_script_module(
 )
 _loop_notify_module = _load_script_module("loop_notify_under_test", "loop_notify.py")
 
+_udl_module = _load_script_module(
+    "unattended_development_loop_under_test", "unattended-development-loop.py"
+)
+
 
 def test_alternate_honors_export_prefix(tmp_path) -> None:
     (tmp_path / ".env").write_text("export REQUESTY_API_KEY=sk-export-123\n", encoding="utf-8")
@@ -236,3 +240,35 @@ def test_loop_notify_last_wins_on_duplicates(tmp_path) -> None:
         encoding="utf-8",
     )
     assert _loop_notify_module._read_env_file(env_file)["GMAIL_EMAIL"] == "second@example.com"
+
+
+UDL_KEY = "BASETEN_HACKATHON_API_KEY"
+
+
+def test_udl_read_event_key_happy_path(tmp_path) -> None:
+    _write_env(tmp_path, f"{UDL_KEY}=[REDACTED]\n")
+    assert _udl_module.read_event_key(tmp_path) == "[REDACTED]"
+
+
+def test_udl_read_event_key_missing_file(tmp_path) -> None:
+    assert not (tmp_path / ".env").exists()
+    with pytest.raises(ValueError):
+        _udl_module.read_event_key(tmp_path)
+
+
+def test_udl_read_event_key_missing_key(tmp_path) -> None:
+    _write_env(tmp_path, "SOME_OTHER_KEY=value\n")
+    with pytest.raises(ValueError):
+        _udl_module.read_event_key(tmp_path)
+
+
+def test_udl_read_event_key_empty_value(tmp_path) -> None:
+    _write_env(tmp_path, f"{UDL_KEY}=\n")
+    with pytest.raises(ValueError):
+        _udl_module.read_event_key(tmp_path)
+
+
+def test_udl_read_event_key_duplicate_key(tmp_path) -> None:
+    _write_env(tmp_path, f"{UDL_KEY}=first-value\n{UDL_KEY}=second-value\n")
+    with pytest.raises(ValueError):
+        _udl_module.read_event_key(tmp_path)

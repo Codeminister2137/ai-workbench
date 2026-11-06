@@ -40,14 +40,12 @@ def slice_arg_parser(description: str) -> argparse.ArgumentParser:
 
 def read_env_key(root: Path, env_name: str, *, label: str) -> str:
     """Read exactly one credential from the repo .env (no fallback)."""
-    values = [
-        line.partition("=")[2].strip().strip("\"'")
-        for line in (root / ".env").read_text(encoding="utf-8-sig").splitlines()
-        if line.partition("=")[0].strip() == env_name
-    ]
-    if len(values) != 1 or not values[0]:
-        raise ValueError(f"Exactly one {label} is required")
-    return values[0]
+    from ai_provider.secrets import read_secret_key
+
+    try:
+        return read_secret_key(root / ".env", env_name, label=label)
+    except ValueError as exc:
+        raise ValueError(f"Exactly one {label} is required ({exc})") from exc
 
 
 def parse_changes(text: str) -> dict:
