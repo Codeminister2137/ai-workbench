@@ -55,45 +55,40 @@ REQUEST_TIMEOUT_SECONDS = 150.0
 MAX_RESPONSE_BYTES = 1048576
 
 
+def _first_env(*names: str) -> str | None:
+    """Return the first non-empty stripped env value for the given names."""
+    for name in names:
+        v = os.getenv(name)
+        if v and v.strip():
+            return v.strip()
+    return None
+
+
 def _resolve_model(cli_model: str | None, role: str | None = None) -> str:
     """Resolve the model to use.
 
     Precedence:
-    1. --model (cli_model) if provided and non-empty
-    2. role-specific env vars (SUPERVISOR_MODEL for supervisor, IMPLEMENTER_MODEL for implementer)
-    3. generic env vars (SUPERVISOR_MODEL / IMPLEMENTER_MODEL fallback)
-    4. hardcoded default (MODEL)
+    1. cli_model if provided and non-empty (stripped)
+    2. role-specific env (SUPERVISOR_MODEL for "supervisor", IMPLEMENTER_MODEL for "implementer")
+    3. the other role's env var as fallback (both roles, and unroled)
+    4. hardcoded MODEL default
     """
     if cli_model is not None:
         stripped = cli_model.strip() if isinstance(cli_model, str) else ""
         if stripped:
             return stripped
     if role == "supervisor":
-        env_val = os.getenv("SUPERVISOR_MODEL")
-        if env_val and env_val.strip():
-            return env_val.strip()
+        val = _first_env("SUPERVISOR_MODEL", "IMPLEMENTER_MODEL")
+        if val is not None:
+            return val
     elif role == "implementer":
-        env_val = os.getenv("IMPLEMENTER_MODEL")
-        if env_val and env_val.strip():
-            return env_val.strip()
+        val = _first_env("IMPLEMENTER_MODEL", "SUPERVISOR_MODEL")
+        if val is not None:
+            return val
     else:
-        env_val = os.getenv("SUPERVISOR_MODEL")
-        if env_val and env_val.strip():
-            return env_val.strip()
-        env_val = os.getenv("IMPLEMENTER_MODEL")
-        if env_val and env_val.strip():
-            return env_val.strip()
-        # fallback to either if role-specific empty but generic check failed
-        for key in ("SUPERVISOR_MODEL", "IMPLEMENTER_MODEL"):
-            v = os.getenv(key)
-            if v and v.strip():
-                return v.strip()
-    # role-specific fallback: if no role-specific env, try the other
-    if role is not None:
-        for key in ("SUPERVISOR_MODEL", "IMPLEMENTER_MODEL"):
-            v = os.getenv(key)
-            if v and v.strip():
-                return v.strip()
+        val = _first_env("SUPERVISOR_MODEL", "IMPLEMENTER_MODEL")
+        if val is not None:
+            return val
     return MODEL
 
 
