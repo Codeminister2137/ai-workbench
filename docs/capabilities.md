@@ -5,7 +5,7 @@ only variable *names* and credential *status*, never values. Update this
 file when a slice adds, removes, or changes a capability (proposed
 Definition-of-Done rule, pending owner approval).
 
-Last verified: 2026-11-06 ~10:30 (drain v1 E2E on live server).
+Last verified: 2026-11-06 ~11:00 (steps 4+5 merged, chat smoke live).
 
 ## One command
 
@@ -51,6 +51,14 @@ Codex note: PyCharm-bundled 0.137.0 is too stale (400s); PATH 0.166.0 wins.
 - System prompt grounded 2026-11-05: no mail/service claims, no Linux paths.
 - Request-run queues approval-gated runs; transcript scope: capped digest
   (30 turns / 500 chars) + session ref, attachments surfaced.
+- Slim supervisor instructions (2026-11-06): static prompt 872→581 chars
+  (600-char budget, asserted); per-delegation assembly adds only receipts /
+  policy / paths; long-form guidance moved to `docs/supervisor-handbook.md`
+  (reference-only, never sent). Multi-turn overflow risk reduced, not yet
+  re-measured under load.
+- Chat-channel tools (2026-11-06): `get_run_status`, `list_pending_inbox`
+  (id+type+title only, no bodies/secrets), `read_dashboard_doc` (4k cap).
+  Read-only, fail-closed, visible receipts; executor registry untouched.
 - Drain worker v1 (2026-11-06): `POST /api/runs/drain` executes approved
   runs oldest-first (`max_runs`, default 1); "Drain now" button on Runs;
   E2E proven approve→drain→completed on live server. No scheduler yet —
@@ -81,7 +89,6 @@ Codex note: PyCharm-bundled 0.137.0 is too stale (400s); PATH 0.166.0 wins.
 
 ## Known gaps (see inbox + todos for live state)
 
-- Slim supervisor instructions (in progress), chat-channel tools
-  (in progress), P7 answers,
+- P7 answers (owner deliberating — research correction folded in),
   mail credential + unification, MSI uninstall safety research (after data).
   Drain has no scheduler yet.
