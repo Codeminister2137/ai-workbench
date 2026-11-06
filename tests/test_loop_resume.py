@@ -3,6 +3,8 @@
 import importlib.util
 from pathlib import Path
 
+import pytest
+
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts/unattended-development-loop.py"
 spec = importlib.util.spec_from_file_location("unattended_development_loop", SCRIPT)
 assert spec is not None
@@ -113,3 +115,13 @@ def test_should_mail_error_only_first_mid_run_error():
     assert driver.should_mail_error(5, 0) is True
     assert driver.should_mail_error(5, 1) is False
     assert driver.should_mail_error(0, 1) is False
+
+
+def test_read_event_key_missing_reports_clear_error(tmp_path) -> None:
+    with pytest.raises(ValueError, match="Baseten event credential"):
+        driver.read_event_key(tmp_path)
+
+
+def test_read_event_key_present_unchanged(tmp_path) -> None:
+    (tmp_path / ".env").write_text("BASETEN_HACKATHON_API_KEY=e-1\n", encoding="utf-8")
+    assert driver.read_event_key(tmp_path) == "e-1"

@@ -93,9 +93,16 @@ def _resolve_model(cli_model: str | None, role: str | None = None) -> str:
 
 
 def read_key() -> str:
+    try:
+        lines = (ROOT / ".env").read_text(encoding="utf-8-sig").splitlines()
+    except FileNotFoundError:
+        raise ValueError(
+            "Exactly one Baseten event credential is required "
+            f"(missing {ROOT / '.env'}; set {ENV_NAME})"
+        ) from None
     values = [
         line.partition("=")[2].strip().strip("\"'")
-        for line in (ROOT / ".env").read_text(encoding="utf-8-sig").splitlines()
+        for line in lines
         if line.partition("=")[0].strip() == ENV_NAME
     ]
     if len(values) != 1 or not values[0]:

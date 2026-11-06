@@ -125,6 +125,25 @@ class NoRedirect(HTTPRedirectHandler):
         return None
 
 
+def read_meta_key_file(env_file: Path) -> str:
+    """Read exactly one META_API_KEY from a .env file; clear error when missing."""
+    try:
+        lines = env_file.read_text(encoding="utf-8-sig").splitlines()
+    except FileNotFoundError:
+        raise ValueError(
+            f"One META_API_KEY is required (missing {env_file}; "
+            "set META_API_KEY in env or the repo .env)"
+        ) from None
+    values = [
+        line.partition("=")[2].strip().strip("\"'")
+        for line in lines
+        if line.partition("=")[0].strip() == "META_API_KEY"
+    ]
+    if len(values) != 1 or not values[0]:
+        raise ValueError("One META_API_KEY is required")
+    return values[0]
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-root", type=Path, required=True)
@@ -185,14 +204,7 @@ def main() -> int:
     key = os.environ.get("META_API_KEY")
     if not key:
         env_file = Path(__file__).resolve().parents[1] / ".env"
-        values = [
-            line.partition("=")[2].strip().strip("\"'")
-            for line in env_file.read_text(encoding="utf-8-sig").splitlines()
-            if line.partition("=")[0].strip() == "META_API_KEY"
-        ]
-        if len(values) != 1 or not values[0]:
-            raise ValueError("One META_API_KEY is required")
-        key = values[0]
+        key = read_meta_key_file(env_file)
     os.environ["META_API_KEY"] = key
     from ai_agent.cli import main as cli_main
     from ai_provider.adapters import openai_responses

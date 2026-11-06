@@ -224,3 +224,14 @@ def test_hands_off_grants_file_edits_denies_execution_and_restores_policy(raises
         PermissionPolicy.from_approval_preset("workspace_write").shell_action
         == PermissionAction.ASK_USER
     )
+
+
+def test_read_meta_key_file_missing_reports_clear_error(tmp_path) -> None:
+    with pytest.raises(ValueError, match="META_API_KEY"):
+        launcher.read_meta_key_file(tmp_path / ".env")
+
+
+def test_read_meta_key_file_present_unchanged(tmp_path) -> None:
+    env_file = tmp_path / ".env"
+    env_file.write_text("META_API_KEY = 'm-1'\nOTHER=1\n", encoding="utf-8")
+    assert launcher.read_meta_key_file(env_file) == "m-1"

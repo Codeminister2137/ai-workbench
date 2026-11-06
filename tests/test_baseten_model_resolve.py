@@ -1,6 +1,8 @@
 import importlib.util
 from pathlib import Path
 
+import pytest
+
 SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "baseten-supervised-develop.py"
 spec = importlib.util.spec_from_file_location("baseten_supervised_develop", SCRIPT)
 mod = importlib.util.module_from_spec(spec)
@@ -71,3 +73,15 @@ def test_empty_whitespace_env_ignored(monkeypatch):
     monkeypatch.delenv("SUPERVISOR_MODEL", raising=False)
     monkeypatch.delenv("IMPLEMENTER_MODEL", raising=False)
     assert _resolve_model("   ") == MODEL
+
+
+def test_read_key_missing_env_reports_clear_error(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(mod, "ROOT", tmp_path)
+    with pytest.raises(ValueError, match="Baseten event credential"):
+        mod.read_key()
+
+
+def test_read_key_present_env_unchanged(tmp_path, monkeypatch) -> None:
+    (tmp_path / ".env").write_text('BASETEN_HACKATHON_API_KEY="k-1"\n', encoding="utf-8")
+    monkeypatch.setattr(mod, "ROOT", tmp_path)
+    assert mod.read_key() == "k-1"
