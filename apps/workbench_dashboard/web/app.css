@@ -1,6 +1,6 @@
 :root { color-scheme: light dark; }
 body { font-family: system-ui, sans-serif; margin: 0 auto; max-width: 960px; padding: 0 1rem 3rem; }
-header { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 0; border-bottom: 1px solid #8884; position: sticky; top: 0; background: inherit; }
+header { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 0; border-bottom: 1px solid #8884; position: sticky; top: 0; background: Canvas; z-index: 5; }
 nav a { margin-right: 1rem; text-decoration: none; }
 nav a.active { font-weight: bold; text-decoration: underline; }
 .badge { background: #c00; color: #fff; border-radius: 1rem; padding: 0 0.5rem; font-size: 0.8rem; }

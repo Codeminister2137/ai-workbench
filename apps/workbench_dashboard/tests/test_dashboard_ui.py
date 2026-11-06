@@ -489,3 +489,13 @@ def test_restrictions_view_is_read_only_overview() -> None:
         assert dimension in js
     assert js.count("not yet evaluated") == 7  # intro + one per dimension
     assert "Would be fed by" in js
+
+
+def test_sticky_header_is_opaque() -> None:
+    css = _read("app.css")
+    m = re.search(r"header\s*\{[^}]*\}", css, re.DOTALL)
+    assert m, "header rule not found"
+    rule = m.group(0)
+    assert "background: Canvas" in rule
+    assert "background: inherit" not in rule
+    assert "z-index" in rule
