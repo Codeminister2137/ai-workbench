@@ -10,7 +10,20 @@ def is_credential_path(path: Path) -> bool:
     name = parts[-1]
     if name == ".env" or (name.startswith(".env.") and name != ".env.example"):
         return True
-    if name in {".modal.toml", ".git-credentials", ".netrc", ".pypirc", ".npmrc"}:
+    if name in {
+        ".modal.toml",
+        ".git-credentials",
+        ".netrc",
+        ".pypirc",
+        ".npmrc",
+        ".gitconfig",
+        "secrets.yaml",
+        "secrets.yml",
+        "secrets.json",
+        "service-account.json",
+    }:
+        return True
+    if name.endswith(".pem") or name.endswith(".key"):
         return True
     if len(parts) >= 2:
         parent = parts[-2]

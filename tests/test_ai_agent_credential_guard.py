@@ -153,3 +153,38 @@ def test_real_command_output_is_withheld_and_mcp_metadata_is_safe(tmp_path, monk
     )
     assert SECRET not in json.dumps(reply)
     assert reply is not None and reply["result"]["isError"]
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "key.pem",
+        "id.key",
+        ".gitconfig",
+        "secrets.yaml",
+        "service-account.json",
+        "secrets.yml",
+        "secrets.json",
+    ],
+)
+def test_additional_credential_names_refused(tmp_path, name):
+    path = tmp_path / name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(SECRET)
+    context = ToolContext(tmp_path)
+    read = ReadFileTool().run(ToolCall("read_file", {"path": name}), context)
+    write = CreateFileTool().run(
+        ToolCall("create_file", {"path": name, "content": "replaced", "overwrite": True}), context
+    )
+    assert read.is_error and write.is_error
+    assert SECRET not in read.output and path.read_text() == SECRET
+
+
+@pytest.mark.parametrize("name", ["readme.md", "archive.pem.txt"])
+def test_non_credential_names_allowed(tmp_path, name):
+    path = tmp_path / name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("hello")
+    context = ToolContext(tmp_path)
+    result = ReadFileTool().run(ToolCall("read_file", {"path": name}), context)
+    assert not result.is_error
