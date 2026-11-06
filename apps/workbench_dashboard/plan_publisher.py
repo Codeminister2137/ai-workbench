@@ -90,7 +90,10 @@ def sync_decision(
     if dedupe_open:
         items, _total = stores.inbox.list(limit=100)
         for item in items:
-            if item.get("status") == "open" and item.get("title") == title.strip():
+            if (
+                item.get("status") == "open"
+                and (item.get("title") or "").strip().casefold() == title.strip().casefold()
+            ):
                 return {**item, "deduped": True}
     return stores.create_inbox_task(
         title=title,

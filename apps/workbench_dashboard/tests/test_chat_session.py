@@ -166,3 +166,24 @@ def test_send_uses_relay_and_appends_receipts(tmp_path) -> None:
     assert seen["workspace_root"] == tmp_path.resolve()
     messages = chat.list_messages(record.session_id)
     assert messages[1].content.endswith("read_file._")
+
+
+def test_send_factory_failure_returns_failed_turn(tmp_path) -> None:
+    from ai_provider.errors import ProviderError
+
+    def failing_factory(config):
+        raise ProviderError("missing key")
+
+    store = SQLiteChatTranscriptStore(tmp_path / "chats.sqlite3")
+    chat = DashboardChat(
+        store,
+        DashboardConfig(provider="ollama", model="fake"),
+        tmp_path,
+        client_factory=failing_factory,
+    )
+    record = chat.create_session(title="t")
+    outcome = chat.send(record.session_id, "Hi")
+    assert outcome.execution_status == "failed"
+    assert "unavailable" in (outcome.failure_reason or "").lower()
+    messages = chat.list_messages(record.session_id)
+    assert messages[-1].role == "assistant"
