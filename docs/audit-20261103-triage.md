@@ -199,13 +199,13 @@ verification before action — several audit claims were already proven wrong
 
 - [HIGH] Malicious validator escape only verified on Windows — `tests/test_acceptance_jobs.py` → **BACKLOG (documented Windows v1 scope via explicit skipif; Linux coverage is future work, not a defect)**
 - [HIGH] Owned-child cleanup has no Linux coverage — `tests/test_acceptance_jobs.py` → **BACKLOG (documented Windows v1 scope via explicit skipif; Linux coverage is future work, not a defect)**
-- [MEDIUM] Test SSRF/size guards use `assert` (stripped under `-O`) — `tests/repo_assistant/test_protocol_continuity.py` → **UNREVIEWED**
-- [MEDIUM] Git helpers run without timeout — `tests/test_ai_agent_git_tools.py` → **UNREVIEWED**
-- [MEDIUM] Junction creation via PowerShell has no timeout — `tests/test_ai_agent_boundaries.py` → **UNREVIEWED**
-- [MEDIUM] Fixed 2-item input iterator masks over-prompting — `tests/repo_assistant/test_protocol_continuity.py` → **UNREVIEWED**
-- [MEDIUM] Auxiliary startup stub ignores `base_url` — `tests/repo_assistant/test_orchestration.py` → **UNREVIEWED**
-- [LOW] Duplicate create_file byte-count tests — `tests/test_ai_agent_tools.py` → **UNREVIEWED**
-- [LOW] 30-60s fixture sleeps slow and flake — `tests/repo_assistant/test_protocol_continuity.py` → **UNREVIEWED**
+- [MEDIUM] Test SSRF/size guards use `assert` (stripped under `-O`) — `tests/repo_assistant/test_protocol_continuity.py` → **FALSE POSITIVE 2026-11-06 (pytest suites inherently depend on assert; -O is not a supported configuration for any test run, so these guards vanish only where every test already would)**
+- [MEDIUM] Git helpers run without timeout — `tests/test_ai_agent_git_tools.py` → **DOWNGRADED 2026-11-06 (local git on tmp_path with captured output — no TTY, so no prompts; hang needs pathological git; timeout= queued as cheap hygiene)**
+- [MEDIUM] Junction creation via PowerShell has no timeout — `tests/test_ai_agent_boundaries.py` → **DOWNGRADED 2026-11-06 (local one-shot fixture command; hang needs a hung powershell itself; timeout= queued with the git helper)**
+- [MEDIUM] Fixed 2-item input iterator masks over-prompting — `tests/repo_assistant/test_protocol_continuity.py` → **DOWNGRADED 2026-11-06 (a third prompt raises StopIteration out of input() and ERRORS the test — loud, not masked; explicit AssertionError queued as clarity hygiene)**
+- [MEDIUM] Auxiliary startup stub ignores `base_url` — `tests/repo_assistant/test_orchestration.py` → **REAL-test-gap 2026-11-06 — fix queued (stub swallows the URL production passes at coding_assist.py:187-188; capture and assert it equals the expected loopback URL)**
+- [LOW] Duplicate create_file byte-count tests — `tests/test_ai_agent_tools.py` → **DOWNGRADED 2026-11-06 (overlapping passing tests are harmless; parametrization is optional style — touch only when editing these tests)**
+- [LOW] 30-60s fixture sleeps slow and flake — `tests/repo_assistant/test_protocol_continuity.py` → **FALSE POSITIVE 2026-11-06 (measured: file passes in 1.18s; sleep(45) is an unreached kill-ceiling — the test stops the child and the finalizer closes supervisors)**
 
 ## ai-workbench/9
 
