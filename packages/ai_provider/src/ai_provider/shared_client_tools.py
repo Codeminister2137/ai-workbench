@@ -69,6 +69,8 @@ def inspection_server(workspace: Path, run: SharedToolRun | None = None) -> dict
         if run.terminal_approvals:
             extra.append("--terminal-approvals")
         if run.session_database is not None:
+            if run.session_id is None or not str(run.session_id).strip():
+                raise ValueError("session_database requires a non-empty session_id")
             extra.extend(
                 [
                     "--session-database",

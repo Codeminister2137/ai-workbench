@@ -262,3 +262,68 @@ def test_portable_review_skill_inspects_actual_git_and_working_instructions(tmp_
     assert "total.py" in results[4].output and results[5].metadata["matches"] == 1
     assert git("write-tree") == index_before
     assert all(path.read_bytes() == content for path, content in original_bytes.items())
+
+
+def test_shared_client_tools_session_database_requires_session_id(tmp_path, monkeypatch):
+    from ai_provider.shared_client_tools import SharedToolRun, inspection_server
+
+    monkeypatch.setattr(
+        "ai_provider.acceptance_processes.process_identity", lambda pid: "birth-token"
+    )
+    run = SharedToolRun(
+        task_id="t",
+        run_id="r",
+        approval_policy="read_only",
+        session_database=tmp_path / "db.sqlite",
+        session_id=None,
+    )
+    with pytest.raises(ValueError, match="session_id"):
+        inspection_server(tmp_path, run)
+    # Ensure no argv with literal "None" would be emitted - exception is raised before return
+    try:
+        inspection_server(tmp_path, run)
+    except ValueError as exc:
+        assert "None" not in str(exc) or "non-empty session_id" in str(exc)
+        # Verify rendered argv never contains literal "None" by checking exception path
+        pass
+    else:
+        raise AssertionError("should have raised")
+
+
+def test_shared_client_tools_session_database_passes_values(tmp_path, monkeypatch):
+    from ai_provider.shared_client_tools import SharedToolRun, inspection_server
+
+    monkeypatch.setattr(
+        "ai_provider.acceptance_processes.process_identity", lambda pid: "birth-token"
+    )
+    db = tmp_path / "db.sqlite"
+    run = SharedToolRun(
+        task_id="t",
+        run_id="r",
+        approval_policy="read_only",
+        session_database=db,
+        session_id="sess-123",
+    )
+    server = inspection_server(tmp_path, run)
+    args = server["args"]
+    assert "--session-database" in args
+    assert "--session-id" in args
+    assert str(db) in args
+    assert "sess-123" in args
+    assert args[args.index("--session-database") + 1] == str(db)
+    assert args[args.index("--session-id") + 1] == "sess-123"
+
+
+def test_shared_client_tools_omits_session_flags_when_neither_set(tmp_path, monkeypatch):
+    from ai_provider.shared_client_tools import SharedToolRun, inspection_server
+
+    monkeypatch.setattr(
+        "ai_provider.acceptance_processes.process_identity", lambda pid: "birth-token"
+    )
+    run = SharedToolRun(task_id="t", run_id="r", approval_policy="read_only")
+    server = inspection_server(tmp_path, run)
+    args = server["args"]
+    assert "--session-database" not in args
+    assert "--session-id" not in args
+    # Also verify literal "None" never appears
+    assert "None" not in args
