@@ -36,6 +36,9 @@ class FakeClient:
             usage=UsageMetadata(),
         )
 
+    def stream(self, request):
+        raise NotImplementedError
+
 
 def _tool_message(name: str, arguments: dict) -> AIMessage:
     return AIMessage(
