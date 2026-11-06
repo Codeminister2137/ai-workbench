@@ -93,19 +93,15 @@ def build_route_env(route: str, source: Mapping[str, str]) -> dict[str, str]:
 def load_dotenv_secrets(repo: Path) -> dict[str, str]:
     """Read route credentials from the repo .env without mutating os.environ."""
     wanted = {key for keys in ROUTE_ENV_KEYS.values() for key in keys}
-    secrets: dict[str, str] = {}
     path = repo / ".env"
+    from ai_provider.secrets import read_dotenv_values
+
     try:
-        text = path.read_text(encoding="utf-8-sig")
+        return read_dotenv_values(path, wanted, missing="raise")
     except FileNotFoundError:
         raise FileNotFoundError(
             f"missing {path}: set {sorted(wanted)} in the repo .env or environment"
         ) from None
-    for line in text.splitlines():
-        name, separator, value = line.partition("=")
-        if separator and name.strip() in wanted:
-            secrets[name.strip()] = value.strip().strip("\"'")
-    return secrets
 
 
 def main() -> int:

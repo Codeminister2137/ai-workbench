@@ -205,3 +205,34 @@ def test_meta_supervised_read_meta_key_duplicate_key(tmp_path, monkeypatch) -> N
     )
     with pytest.raises(ValueError):
         _meta_supervised_module._read_meta_key()
+
+
+_alternate_module = _load_script_module(
+    "alternate_agent_acceptance_under_test", "alternate-agent-acceptance.py"
+)
+_loop_notify_module = _load_script_module("loop_notify_under_test", "loop_notify.py")
+
+
+def test_alternate_honors_export_prefix(tmp_path) -> None:
+    (tmp_path / ".env").write_text("export REQUESTY_API_KEY=sk-export-123\n", encoding="utf-8")
+    assert _alternate_module.load_dotenv_secrets(tmp_path)["REQUESTY_API_KEY"] == "sk-export-123"
+
+
+def test_loop_notify_skips_comment_lines(tmp_path) -> None:
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "# GMAIL_EMAIL=ignored@example.com\nGMAIL_EMAIL=real@example.com\nGMAIL_PASSWORD=secret123\n",
+        encoding="utf-8",
+    )
+    values = _loop_notify_module._read_env_file(env_file)
+    assert values["GMAIL_EMAIL"] == "real@example.com"
+    assert values["GMAIL_PASSWORD"] == "secret123"
+
+
+def test_loop_notify_last_wins_on_duplicates(tmp_path) -> None:
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "GMAIL_EMAIL=first@example.com\nGMAIL_EMAIL=second@example.com\n",
+        encoding="utf-8",
+    )
+    assert _loop_notify_module._read_env_file(env_file)["GMAIL_EMAIL"] == "second@example.com"
