@@ -151,3 +151,56 @@ def test_sqlite_chat_transcript_store_persists_rolling_summary(tmp_path: Path) -
     updated = store.get_rolling_summary(session.session_id)
     assert updated is not None
     assert updated.summary == "Updated summary."
+
+
+def test_append_message_invalid_role_raises_value_error(tmp_path: Path) -> None:
+    store = SQLiteChatTranscriptStore(tmp_path / "chats.sqlite3")
+    session = store.create_session(
+        repo_root=tmp_path, title="role validation", privacy_class="local_only"
+    )
+    invalid_role = "not-a-valid-role"
+    with pytest.raises(ValueError) as exc_info:
+        store.append_message(session.session_id, role=invalid_role, content="hello")
+    message = str(exc_info.value)
+    assert "invalid chat role" in message.lower()
+    assert invalid_role in message
+    # valid roles are stored canonically and do not raise
+    store.append_message(session.session_id, role=MessageRole.USER, content="ok")
+    assert store.list_messages(session.session_id)[0].role == "user"
+
+
+def test_list_sessions_limit_negative_one_clamped_to_one(tmp_path: Path) -> None:
+    store = SQLiteChatTranscriptStore(tmp_path / "chats.sqlite3")
+    store.create_session(repo_root=tmp_path, title="First", privacy_class="local_only")
+    store.create_session(repo_root=tmp_path, title="Second", privacy_class="local_only")
+    # SQLite LIMIT -1 means unlimited; implementation must clamp to max(1, limit)
+    sessions = store.list_sessions(limit=-1)
+    assert len(sessions) <= 1
+    assert len(sessions) == 1
+
+
+def test_rolling_summary_metadata_round_trips(tmp_path: Path) -> None:
+    store = SQLiteChatTranscriptStore(tmp_path / "chats.sqlite3")
+    session = store.create_session(
+        repo_root=tmp_path, title="metadata roundtrip", privacy_class="local_only"
+    )
+    # with metadata -> persisted and returned
+    store.upsert_rolling_summary(
+        session.session_id,
+        summary="summary with metadata",
+        covered_message_order=2,
+        metadata={"k": "v"},
+    )
+    first = store.get_rolling_summary(session.session_id)
+    assert first is not None
+    assert first.metadata == {"k": "v"}
+    # without metadata -> NULL in DB -> None in record (or empty dict if impl defaults)
+    store.upsert_rolling_summary(
+        session.session_id,
+        summary="summary without metadata",
+        covered_message_order=4,
+    )
+    second = store.get_rolling_summary(session.session_id)
+    assert second is not None
+    assert second.metadata in (None, {})
+    assert second.summary == "summary without metadata"
