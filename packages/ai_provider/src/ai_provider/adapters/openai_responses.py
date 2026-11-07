@@ -14,7 +14,7 @@ from dataclasses import dataclass, replace
 from typing import Any, ClassVar
 
 from ai_provider.adapters._responses_base import _ResponsesProtocolBase
-from ai_provider.config import BackendConfig, _provider_api_key
+from ai_provider.config import BackendConfig, _provider_api_key, resolve_api_key
 from ai_provider.contracts import (
     AIMessage,
     AIRequest,
@@ -24,13 +24,12 @@ from ai_provider.contracts import (
     AIStreamFinal,
     AIToolCall,
     BackendInfo,
-    BackendLocation,
     FinishReason,
     MessageRole,
-    ModelCapabilities,
     ProviderContinuation,
     UsageMetadata,
     UsageSource,
+    build_backend_info,
 )
 from ai_provider.errors import (
     ProviderError,
@@ -53,12 +52,10 @@ class OpenAIResponsesChatClient(_ResponsesProtocolBase):
 
     @property
     def backend(self) -> BackendInfo:
-        return BackendInfo(
+        return build_backend_info(
             provider=self.config.provider.value,
             model=self.config.model,
-            location=BackendLocation.EXTERNAL,
             base_url=self.base_url,
-            capabilities=ModelCapabilities(chat=True, streaming=True, tools=True),
         )
 
     @property
@@ -67,16 +64,7 @@ class OpenAIResponsesChatClient(_ResponsesProtocolBase):
 
     @property
     def api_key(self) -> str:
-        if self.config.api_key and self.config.api_key.strip():
-            return self.config.api_key.strip()
-        provider_key = _provider_api_key(self.config.provider)
-        if provider_key and provider_key.strip():
-            return provider_key.strip()
-        raise ProviderError(
-            f"{self.config.provider.value} API key is required.",
-            category=ProviderErrorCategory.CONFIGURATION,
-            provider=self.config.provider.value,
-        )
+        return resolve_api_key(self.config)
 
     @observe_stream
     def stream(self, request: AIRequest) -> Iterator[AIStreamEvent]:
@@ -418,12 +406,10 @@ class OpenAIResponsesChatClient(_ResponsesProtocolBase):
         )
 
     def _backend_for_model(self, model: str) -> BackendInfo:
-        return BackendInfo(
+        return build_backend_info(
             provider=self.config.provider.value,
             model=model,
-            location=BackendLocation.EXTERNAL,
             base_url=self.base_url,
-            capabilities=ModelCapabilities(chat=True, streaming=True, tools=True),
         )
 
     def _post_responses(self, payload: dict[str, Any]) -> dict[str, Any]:

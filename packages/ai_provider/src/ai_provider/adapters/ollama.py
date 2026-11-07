@@ -24,10 +24,10 @@ from ai_provider.contracts import (
     BackendLocation,
     FinishReason,
     MessageRole,
-    ModelCapabilities,
     ProviderContinuation,
     UsageMetadata,
     UsageSource,
+    build_backend_info,
 )
 from ai_provider.errors import ProviderError, ProviderErrorCategory, ToolCallFormatError
 from ai_provider.http_transport import read_bounded
@@ -131,12 +131,11 @@ class OllamaChatClient:
     def backend(self) -> BackendInfo:
         """Return local Ollama backend identity and capabilities."""
 
-        return BackendInfo(
+        return build_backend_info(
             provider="ollama",
             model=self.config.model,
-            location=BackendLocation.LOCAL,
             base_url=self.base_url,
-            capabilities=ModelCapabilities(chat=True, streaming=True, tools=True),
+            location=BackendLocation.LOCAL,
         )
 
     @property
@@ -368,12 +367,11 @@ class OllamaChatClient:
                 tool_calls=tool_calls,
                 continuation=continuation,
             ),
-            backend=BackendInfo(
+            backend=build_backend_info(
                 provider="ollama",
                 model=model,
-                location=BackendLocation.LOCAL,
                 base_url=self.base_url,
-                capabilities=ModelCapabilities(chat=True, streaming=True, tools=True),
+                location=BackendLocation.LOCAL,
             ),
             usage=self._usage_from_response(raw_response),
             finish_reason=self._finish_reason(done_reason),

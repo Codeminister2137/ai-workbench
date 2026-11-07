@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from typing import Any, ClassVar
 
 from ai_provider.adapters._responses_base import _ResponsesProtocolBase
-from ai_provider.config import _provider_api_key
+from ai_provider.config import _provider_api_key, resolve_api_key
 from ai_provider.contracts import (
     AIMessage,
     AIRequest,
@@ -22,12 +22,11 @@ from ai_provider.contracts import (
     AIStreamEvent,
     AIStreamFinal,
     BackendInfo,
-    BackendLocation,
     FinishReason,
     MessageRole,
-    ModelCapabilities,
     UsageMetadata,
     UsageSource,
+    build_backend_info,
 )
 from ai_provider.errors import ProviderError, ProviderErrorCategory
 from ai_provider.privacy import enforce_privacy_policy
@@ -46,12 +45,11 @@ class AnthropicMessagesChatClient(_ResponsesProtocolBase):
 
     @property
     def backend(self) -> BackendInfo:
-        return BackendInfo(
+        return build_backend_info(
             provider=self.config.provider.value,
             model=self.config.model,
-            location=BackendLocation.EXTERNAL,
             base_url=self.base_url,
-            capabilities=ModelCapabilities(chat=True, streaming=True, tools=False),
+            tools=False,
         )
 
     @property
@@ -60,16 +58,7 @@ class AnthropicMessagesChatClient(_ResponsesProtocolBase):
 
     @property
     def api_key(self) -> str:
-        if self.config.api_key and self.config.api_key.strip():
-            return self.config.api_key.strip()
-        provider_key = _provider_api_key(self.config.provider)
-        if provider_key and provider_key.strip():
-            return provider_key.strip()
-        raise ProviderError(
-            f"{self.config.provider.value} API key is required.",
-            category=ProviderErrorCategory.CONFIGURATION,
-            provider=self.config.provider.value,
-        )
+        return resolve_api_key(self.config)
 
     def _protocol_payload(self, request: AIRequest, *, stream: bool) -> dict[str, Any]:
         return self._messages_payload(request, stream=stream)
@@ -203,12 +192,11 @@ class AnthropicMessagesChatClient(_ResponsesProtocolBase):
         )
 
     def _backend_for_model(self, model: str) -> BackendInfo:
-        return BackendInfo(
+        return build_backend_info(
             provider=self.config.provider.value,
             model=model,
-            location=BackendLocation.EXTERNAL,
             base_url=self.base_url,
-            capabilities=ModelCapabilities(chat=True, streaming=True, tools=False),
+            tools=False,
         )
 
     def _headers(self) -> dict[str, str]:

@@ -19,7 +19,12 @@ from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request
 
-from ai_provider.config import BackendConfig, ProviderKind, _provider_api_key
+from ai_provider.config import (
+    BackendConfig,
+    ProviderKind,
+    _provider_api_key,
+    resolve_api_key,
+)
 from ai_provider.contracts import (
     AIMessage,
     AIRequest,
@@ -29,13 +34,12 @@ from ai_provider.contracts import (
     AIStreamFinal,
     AIToolCall,
     BackendInfo,
-    BackendLocation,
     FinishReason,
     MessageRole,
-    ModelCapabilities,
     ProviderContinuation,
     UsageMetadata,
     UsageSource,
+    build_backend_info,
 )
 from ai_provider.errors import (
     ProviderError,
@@ -91,12 +95,10 @@ class OpenAICompatibleChatClient:
     def backend(self) -> BackendInfo:
         """Return hosted backend identity and capabilities."""
 
-        return BackendInfo(
+        return build_backend_info(
             provider=self.config.provider.value,
             model=self.config.model,
-            location=BackendLocation.EXTERNAL,
             base_url=self.base_url,
-            capabilities=ModelCapabilities(chat=True, streaming=True, tools=True),
         )
 
     @property
@@ -109,16 +111,7 @@ class OpenAICompatibleChatClient:
     def api_key(self) -> str:
         """Return the configured API key or raise a configuration error."""
 
-        if self.config.api_key and self.config.api_key.strip():
-            return self.config.api_key.strip()
-        provider_key = _provider_api_key(self.config.provider)
-        if provider_key and provider_key.strip():
-            return provider_key.strip()
-        raise ProviderError(
-            f"{self.config.provider.value} API key is required.",
-            category=ProviderErrorCategory.CONFIGURATION,
-            provider=self.config.provider.value,
-        )
+        return resolve_api_key(self.config)
 
     @observe_completion
     def complete(self, request: AIRequest) -> AIResponse:
@@ -329,12 +322,10 @@ class OpenAICompatibleChatClient:
         )
 
     def _backend_for_model(self, model: str) -> BackendInfo:
-        return BackendInfo(
+        return build_backend_info(
             provider=self.config.provider.value,
             model=model,
-            location=BackendLocation.EXTERNAL,
             base_url=self.base_url,
-            capabilities=ModelCapabilities(chat=True, streaming=True, tools=True),
         )
 
     def _post_chat(self, payload: dict[str, Any]) -> dict[str, Any]:

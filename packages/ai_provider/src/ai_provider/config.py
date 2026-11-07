@@ -116,3 +116,17 @@ def _provider_api_key(provider: ProviderKind) -> str | None:
             return os.getenv("BASETEN_API_KEY")
         case ProviderKind.OLLAMA:
             return None
+
+
+def resolve_api_key(config: BackendConfig) -> str:
+    """Return the configured key or the conventional provider env key."""
+    if config.api_key and config.api_key.strip():
+        return config.api_key.strip()
+    provider_key = _provider_api_key(config.provider)
+    if provider_key and provider_key.strip():
+        return provider_key.strip()
+    raise ProviderError(
+        f"{config.provider.value} API key is required.",
+        category=ProviderErrorCategory.CONFIGURATION,
+        provider=config.provider.value,
+    )
