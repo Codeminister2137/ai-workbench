@@ -10,7 +10,10 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from ai_provider.adapters.openai_compatible import OpenAICompatibleChatClient
+from ai_provider.adapters.openai_compatible import (
+    OpenAICompatibleChatClient,
+    strip_reasoning_metadata,
+)
 from ai_provider.config import BackendConfig, ProviderKind
 from ai_provider.contracts import AIRequest
 from ai_provider.errors import ProviderError, ProviderErrorCategory
@@ -71,17 +74,5 @@ class BasetenChatClient(OpenAICompatibleChatClient):
             )
 
     def _safe_metadata(self, raw: dict[str, Any]) -> dict[str, Any]:
-        """Remove reasoning text recursively while retaining provider usage totals."""
-
-        def clean(value: Any) -> Any:
-            if isinstance(value, dict):
-                return {
-                    key: clean(item)
-                    for key, item in value.items()
-                    if key not in {"reasoning_content", "reasoning", "reasoning_details"}
-                }
-            if isinstance(value, list):
-                return [clean(item) for item in value]
-            return value
-
-        return clean(raw)
+        """Remove reasoning text recursively while retaining usage totals."""
+        return strip_reasoning_metadata(raw)

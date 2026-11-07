@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
 
+from ai_provider.contracts import tool_parameter_json_schema
+
 
 class ToolCategory(StrEnum):
     """Broad category defining tool risk and side-effect profile."""
@@ -39,17 +41,13 @@ class ToolParameter:
 
     def to_json_schema(self) -> dict[str, Any]:
         """Convert parameter specification into a standard JSON schema fragment."""
-        schema: dict[str, Any] = {
-            "type": self.type_name,
-            "description": self.description,
-        }
-        if self.enum_values:
-            schema["enum"] = list(self.enum_values)
-        if self.default is not None:
-            schema["default"] = self.default
-        if self.type_name == "array" and self.item_type_name is not None:
-            schema["items"] = {"type": self.item_type_name}
-        return schema
+        return tool_parameter_json_schema(
+            type_name=self.type_name,
+            description=self.description,
+            enum_values=self.enum_values,
+            default=self.default,
+            item_type_name=self.item_type_name,
+        )
 
 
 @dataclass(frozen=True, slots=True)

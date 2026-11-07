@@ -37,7 +37,11 @@ from ai_provider.contracts import (
     UsageMetadata,
     UsageSource,
 )
-from ai_provider.errors import ProviderError, ProviderErrorCategory
+from ai_provider.errors import (
+    ProviderError,
+    ProviderErrorCategory,
+    http_error_to_provider_error,
+)
 from ai_provider.http_transport import iter_response_lines, read_bounded, urlopen
 from ai_provider.privacy import enforce_privacy_policy
 from ai_provider.turn_usage import observe_completion, observe_stream, observe_usage
@@ -48,6 +52,25 @@ _DEFAULT_BASE_URLS = {
     ProviderKind.OPENROUTER: "https://openrouter.ai/api/v1",
     ProviderKind.GOOGLE: "https://generativelanguage.googleapis.com/v1beta/openai",
 }
+
+_REASONING_METADATA_KEYS = frozenset({"reasoning_content", "reasoning", "reasoning_details"})
+
+
+def strip_reasoning_metadata(value: Any) -> Any:
+    """Remove reasoning text recursively while retaining usage totals.
+
+    Shared scrub for adapters whose raw metadata may carry chain-of-thought.
+    One implementation so the key set cannot drift between adapters.
+    """
+    if isinstance(value, dict):
+        return {
+            key: strip_reasoning_metadata(item)
+            for key, item in value.items()
+            if key not in _REASONING_METADATA_KEYS
+        }
+    if isinstance(value, list):
+        return [strip_reasoning_metadata(item) for item in value]
+    return value
 
 
 @dataclass(slots=True)
@@ -431,22 +454,8 @@ class OpenAICompatibleChatClient:
         }
 
     def _http_error(self, exc: HTTPError) -> ProviderError:
-        if exc.code in {401, 403}:
-            category = ProviderErrorCategory.AUTHENTICATION
-        elif exc.code == 429:
-            category = ProviderErrorCategory.RATE_LIMIT
-        elif 500 <= exc.code < 600:
-            category = ProviderErrorCategory.RETRYABLE
-        else:
-            category = ProviderErrorCategory.NON_RETRYABLE
-
-        return ProviderError(
-            f"Chat Completions provider returned HTTP {exc.code}.",
-            category=category,
-            retryable=category
-            in {ProviderErrorCategory.RATE_LIMIT, ProviderErrorCategory.RETRYABLE},
-            provider=self.config.provider.value,
-            raw_error=exc,
+        return http_error_to_provider_error(
+            exc, provider=self.config.provider.value, api_label="Chat Completions"
         )
 
     @staticmethod

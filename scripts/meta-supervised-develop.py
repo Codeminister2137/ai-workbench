@@ -116,6 +116,16 @@ def prepare(args) -> tuple[dict, str]:
     return job, digest(json.dumps(job, sort_keys=True, ensure_ascii=False).encode())
 
 
+def _read_meta_key() -> str:
+    """Env-first Meta credential; the .env leg uses the central reader."""
+    key = os.environ.get("META_API_KEY")
+    if not key:
+        from ai_provider.secrets import read_secret_key
+
+        key = read_secret_key(ROOT / ".env", "META_API_KEY", label="Meta API credential")
+    return key
+
+
 def execute(args, job, admission, transport) -> int:
     phase = Path(job["phase"])
     if (phase / "AUTHORIZED").read_text(encoding="utf-8").strip() != admission:
@@ -142,16 +152,7 @@ def execute(args, job, admission, transport) -> int:
     from remote_operator.development import ValidationResult, run_development_loop
     from remote_operator.development_json import JsonRoles
 
-    key = os.environ.get("META_API_KEY")
-    if not key:
-        values = [
-            line.partition("=")[2].strip().strip("\"'")
-            for line in (ROOT / ".env").read_text(encoding="utf-8-sig").splitlines()
-            if line.partition("=")[0].strip() == "META_API_KEY"
-        ]
-        if len(values) != 1 or not values[0]:
-            raise ValueError("Exactly one Meta credential required")
-        key = values[0]
+    key = _read_meta_key()
 
     def send(role, payload):
         allowance = json.loads((phase / "modal-allowance.json").read_text(encoding="utf-8-sig"))

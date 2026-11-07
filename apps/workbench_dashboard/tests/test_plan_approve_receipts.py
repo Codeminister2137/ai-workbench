@@ -6,10 +6,10 @@ import json
 import threading
 from http.server import ThreadingHTTPServer
 from urllib.error import HTTPError
-from urllib.request import Request, urlopen
 
 import pytest
 from dashboard_stores import DashboardStores, StoreError
+from dashboard_test_http import get_json, post_json
 from dashboard_web_app import DashboardRequestHandler
 
 
@@ -37,22 +37,6 @@ def dashboard_server(tmp_path, monkeypatch):
     finally:
         server.shutdown()
         server.server_close()
-
-
-def get_json(base: str, path: str) -> dict:
-    with urlopen(f"{base}{path}", timeout=5) as response:
-        return json.loads(response.read().decode("utf-8"))
-
-
-def post_json(base: str, path: str, payload: dict) -> dict:
-    request = Request(
-        f"{base}{path}",
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    with urlopen(request, timeout=10) as response:
-        return json.loads(response.read().decode("utf-8"))
 
 
 def _write_plan(tmp_path, plan_id: str, record: dict) -> None:

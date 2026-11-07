@@ -418,21 +418,11 @@ def verify_and_commit(worktree: Path, objective_id: str, branch: str, log: Path)
 
 def read_event_key(root: Path) -> str:
     """Read exactly one Baseten event credential; clear error when missing."""
-    try:
-        lines = (root / ".env").read_text(encoding="utf-8-sig").splitlines()
-    except FileNotFoundError:
-        raise ValueError(
-            "Exactly one Baseten event credential required "
-            f"(missing {root / '.env'}; set BASETEN_HACKATHON_API_KEY)"
-        ) from None
-    values = [
-        line.partition("=")[2].strip().strip("\"'")
-        for line in lines
-        if line.partition("=")[0].strip() == "BASETEN_HACKATHON_API_KEY"
-    ]
-    if len(values) != 1 or not values[0]:
-        raise ValueError("Exactly one Baseten event credential required")
-    return values[0]
+    from ai_provider.secrets import read_secret_key
+
+    return read_secret_key(
+        root / ".env", "BASETEN_HACKATHON_API_KEY", label="Baseten event credential"
+    )
 
 
 def propose(

@@ -14,6 +14,7 @@ from urllib.request import Request, urlopen
 import pytest
 from ai_provider.stt import TranscribeResult
 from ai_provider.translation import TranslationResult
+from dashboard_test_http import get_json, post_json
 from dashboard_web_app import DashboardRequestHandler
 
 
@@ -135,22 +136,6 @@ def post_raw(base: str, path: str, content_type: str, body: bytes) -> dict:
         f"{base}{path}", data=body, headers={"Content-Type": content_type}, method="POST"
     )
     with urlopen(request, timeout=10) as response:
-        return json.loads(response.read().decode("utf-8"))
-
-
-def post_json(base: str, path: str, payload: dict) -> dict:
-    request = Request(
-        f"{base}{path}",
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    with urlopen(request, timeout=10) as response:
-        return json.loads(response.read().decode("utf-8"))
-
-
-def get_json(base: str, path: str) -> dict:
-    with urlopen(f"{base}{path}", timeout=5) as response:
         return json.loads(response.read().decode("utf-8"))
 
 

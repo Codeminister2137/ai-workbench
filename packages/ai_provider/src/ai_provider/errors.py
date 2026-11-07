@@ -43,6 +43,29 @@ class ProviderError(RuntimeError):
         self.partial_messages: tuple[AIMessage, ...] = ()
 
 
+def http_error_to_provider_error(exc, *, provider: str, api_label: str) -> ProviderError:
+    """Map an HTTPError to a categorized ProviderError (shared adapter helper).
+
+    Status mapping is provider-agnostic; only the provider id and the API
+    label in the message vary per adapter. `exc` needs a numeric `code`.
+    """
+    if exc.code in {401, 403}:
+        category = ProviderErrorCategory.AUTHENTICATION
+    elif exc.code == 429:
+        category = ProviderErrorCategory.RATE_LIMIT
+    elif 500 <= exc.code < 600:
+        category = ProviderErrorCategory.RETRYABLE
+    else:
+        category = ProviderErrorCategory.NON_RETRYABLE
+    return ProviderError(
+        f"{api_label} provider returned HTTP {exc.code}.",
+        category=category,
+        retryable=category in {ProviderErrorCategory.RATE_LIMIT, ProviderErrorCategory.RETRYABLE},
+        provider=provider,
+        raw_error=exc,
+    )
+
+
 class ToolCallFormatError(ProviderError):
     """Known malformed generated arguments, before any call in that response runs.
 

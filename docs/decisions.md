@@ -1,3 +1,16 @@
+## Supervised drivers stay per-provider (R2) - owner decision 2026-11-06
+
+**Status:** Accepted by the owner (inbox: keep two independent drivers).
+
+`baseten-supervised-develop.py` and `meta-supervised-develop.py` (~37%
+shared lines) stay separate files. Owner rationale: every provider
+ships its own adapters and stays deletable without touching shared
+code; uniformity is enforced at the provider-boundary interface, not
+by merging drivers. Cross-provider orchestration that is genuinely
+provider-agnostic (the slice send/validate/retry loop) is shared
+instead — see `scripts/slice_develop_core.py` with thin per-provider
+drivers. Revisit if a third supervised driver appears.
+
 ## ADR-084 - P7 client intake as validate → review → approve-to-plan
 
 **Status:** Accepted direction (implementation), 2026-11-05.

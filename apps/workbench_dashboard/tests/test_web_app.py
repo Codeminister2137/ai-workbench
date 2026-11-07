@@ -7,7 +7,19 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 import pytest
+from dashboard_test_http import get_json
 from dashboard_web_app import DashboardRequestHandler
+
+
+def post_json(base: str, path: str, payload: dict, headers: dict | None = None) -> dict:
+    request = Request(
+        f"{base}{path}",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json", **(headers or {})},
+        method="POST",
+    )
+    with urlopen(request, timeout=10) as response:
+        return json.loads(response.read().decode("utf-8"))
 
 
 @pytest.fixture
@@ -42,22 +54,6 @@ def dashboard_server(tmp_path, monkeypatch):
     finally:
         server.shutdown()
         server.server_close()
-
-
-def get_json(base: str, path: str) -> dict:
-    with urlopen(f"{base}{path}", timeout=5) as response:
-        return json.loads(response.read().decode("utf-8"))
-
-
-def post_json(base: str, path: str, payload: dict, headers: dict | None = None) -> dict:
-    request = Request(
-        f"{base}{path}",
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json", **(headers or {})},
-        method="POST",
-    )
-    with urlopen(request, timeout=10) as response:
-        return json.loads(response.read().decode("utf-8"))
 
 
 def test_status_reports_empty_state(dashboard_server) -> None:

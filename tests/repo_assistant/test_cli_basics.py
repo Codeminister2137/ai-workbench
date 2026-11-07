@@ -335,24 +335,9 @@ def test_stable_ai_assistant_entry_point_loads_cli() -> None:
     assert stable_main(["--mode", "plan", "Review code.", "--provider", "ollama"]) == 0
 
 
-@pytest.mark.parametrize(
-    "module", ["cli", "repo_coding_assistant", "repo_assistant_args", "external_execution"]
-)
-def test_legacy_import_preserves_module_identity_and_attribute_updates(module, monkeypatch):
-    current = importlib.import_module(f"ai_agent.{module}")
-    legacy = importlib.import_module(f"ai_provider.{module}")
-    assert legacy is current
-    sentinel = object()
-    monkeypatch.setattr(legacy, "_compatibility_probe", sentinel, raising=False)
-    assert current._compatibility_probe is sentinel
-
-
-@pytest.mark.parametrize(
-    "module", ["ai_agent.repo_coding_assistant", "ai_provider.repo_coding_assistant"]
-)
-def test_module_entry_points_offer_help_without_execution(module):
+def test_module_entry_points_offer_help_without_execution():
     result = subprocess.run(
-        [sys.executable, "-m", module, "--help"],
+        [sys.executable, "-m", "ai_agent.repo_coding_assistant", "--help"],
         capture_output=True,
         text=True,
         timeout=15,
@@ -361,6 +346,31 @@ def test_module_entry_points_offer_help_without_execution(module):
     assert result.returncode == 0, result.stderr
     assert "--approval-policy" in result.stdout
     assert "--shared-tools" in result.stdout
+
+
+@pytest.mark.parametrize(
+    "module",
+    [
+        "ai_provider.cli",
+        "ai_provider.external_execution",
+        "ai_provider.repo_assistant_args",
+        "ai_provider.repo_coding_assistant",
+    ],
+)
+def test_legacy_provider_paths_absent(module):
+    with pytest.raises(ModuleNotFoundError):
+        importlib.import_module(module)
+
+
+def test_legacy_entry_point_fails_without_execution():
+    result = subprocess.run(
+        [sys.executable, "-m", "ai_provider.repo_coding_assistant", "--help"],
+        capture_output=True,
+        text=True,
+        timeout=15,
+        check=False,
+    )
+    assert result.returncode != 0
 
 
 def test_command_belongs_to_agent_without_reverse_provider_dependency():

@@ -18,7 +18,10 @@ from dataclasses import dataclass, field
 from typing import Any
 from uuid import uuid4
 
-from ai_provider.adapters.openai_compatible import OpenAICompatibleChatClient
+from ai_provider.adapters.openai_compatible import (
+    OpenAICompatibleChatClient,
+    strip_reasoning_metadata,
+)
 from ai_provider.config import BackendConfig, ProviderKind
 from ai_provider.contracts import (
     AIMessage,
@@ -123,15 +126,5 @@ class OpenCodeGoChatClient(OpenAICompatibleChatClient):
             state["reasoning_content"] = state.get("reasoning_content", "") + reasoning
 
     def _safe_metadata(self, raw: dict[str, Any]) -> dict[str, Any]:
-        def clean(value: Any) -> Any:
-            if isinstance(value, dict):
-                return {
-                    key: clean(item)
-                    for key, item in value.items()
-                    if key not in {"reasoning_content", "reasoning", "reasoning_details"}
-                }
-            if isinstance(value, list):
-                return [clean(item) for item in value]
-            return value
-
-        return clean(raw)
+        """Remove reasoning text recursively while retaining usage totals."""
+        return strip_reasoning_metadata(raw)

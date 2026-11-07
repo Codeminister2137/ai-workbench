@@ -15,7 +15,10 @@ from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request
 
-from ai_provider.adapters.openai_compatible import OpenAICompatibleChatClient
+from ai_provider.adapters.openai_compatible import (
+    OpenAICompatibleChatClient,
+    strip_reasoning_metadata,
+)
 from ai_provider.config import ProviderKind
 from ai_provider.contracts import (
     AIMessage,
@@ -92,18 +95,8 @@ class OpenRouterFreeChatClient(OpenAICompatibleChatClient):
                     previous[key] = deepcopy(value)
 
     def _safe_metadata(self, raw: dict[str, Any]) -> dict[str, Any]:
-        def clean(value: Any) -> Any:
-            if isinstance(value, dict):
-                return {
-                    key: clean(item)
-                    for key, item in value.items()
-                    if key not in {"reasoning", "reasoning_details", "reasoning_content"}
-                }
-            if isinstance(value, list):
-                return [clean(item) for item in value]
-            return value
-
-        return clean(raw)
+        """Remove reasoning text recursively while retaining usage totals."""
+        return strip_reasoning_metadata(raw)
 
     def _refusal(self, message: str) -> ProviderError:
         return ProviderError(

@@ -60,6 +60,10 @@ MAX_REQUEST_BYTES = 512_000
 REQUEST_TIMEOUT_SECONDS = 5.0
 DEFAULT_PORT = 8766
 
+# Served inline in the dashboard origin: active types would execute with
+# full API access, so they are downgraded to inert text (audit 2026-11-06).
+_ACTIVE_CONTENT_TYPES = frozenset({"text/html", "image/svg+xml", "application/xhtml+xml"})
+
 
 class InvalidRequest(ValueError):
     def __init__(self, status: int, message: str):
@@ -1001,12 +1005,15 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             return self._send_json({"ok": False, "error": str(exc)}, status=404)
         except ValueError as exc:
             return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        if content_type in _ACTIVE_CONTENT_TYPES:
+            content_type = "text/plain"
         name = doc_id.rsplit("/", 1)[-1]
         ascii_name = "".join(char if ord(char) < 128 else "_" for char in name)
         self.send_response(200)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(data)))
         self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header(
             "Content-Disposition",
             f"inline; filename=\"{ascii_name}\"; filename*=UTF-8''{quote(name)}",

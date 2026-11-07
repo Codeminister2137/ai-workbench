@@ -31,20 +31,9 @@ PASSWORD_ENV = "GMAIL_PASSWORD"
 
 
 def _read_env_file(path: Path) -> dict[str, str]:
-    values: dict[str, str] = {}
-    try:
-        text = path.read_text(encoding="utf-8-sig")
-    except OSError:
-        return values
-    for line in text.splitlines():
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#") or "=" not in stripped:
-            continue
-        name, _, value = stripped.partition("=")
-        name = name.strip()
-        if name in (EMAIL_ENV, PASSWORD_ENV) and name not in values:
-            values[name] = value.strip().strip("\"'")
-    return values
+    from ai_provider.secrets import read_dotenv_values
+
+    return read_dotenv_values(path, {EMAIL_ENV, PASSWORD_ENV})
 
 
 def read_gmail_config(root: Path = ROOT) -> tuple[str, str] | None:

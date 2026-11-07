@@ -68,6 +68,8 @@ GROUPS = {
         "tests/test_wb_bounds_guard.py",
         "tests/test_wb_exec_sandbox.py",
         "tests/test_adapter_body_bounds.py",
+        "tests/test_metadata_scrub.py",
+        "tests/test_allowance_cli.py",
     ),
     "orchestrator": (
         "tests/test_orchestrator_*.py",
@@ -136,6 +138,9 @@ GROUPS = {
         "tests/test_scrutiny_response_guard.py",
         "tests/test_watchdog_tasks.py",
         "tests/test_triage_apply.py",
+        "tests/test_slice_develop_core.py",
+        "tests/test_script_dotenv_readers.py",
+        "tests/test_find_duplication.py",
     ),
     "research": (
         "tests/test_research_*.py",

@@ -54,6 +54,25 @@ class FinishReason(StrEnum):
     UNKNOWN = "unknown"
 
 
+def tool_parameter_json_schema(
+    *,
+    type_name: str,
+    description: str,
+    enum_values: tuple[str, ...] | None,
+    default: Any,
+    item_type_name: str | None,
+) -> dict[str, Any]:
+    """Build a JSON-schema property fragment (shared by both contract layers)."""
+    schema: dict[str, Any] = {"type": type_name, "description": description}
+    if enum_values:
+        schema["enum"] = list(enum_values)
+    if default is not None:
+        schema["default"] = default
+    if type_name == "array" and item_type_name is not None:
+        schema["items"] = {"type": item_type_name}
+    return schema
+
+
 @dataclass(frozen=True, slots=True)
 class AIToolParameter:
     """JSON-schema parameter exposed to a model as part of a tool definition."""
@@ -68,14 +87,13 @@ class AIToolParameter:
 
     def to_json_schema(self) -> dict[str, Any]:
         """Convert the parameter to a JSON-schema property."""
-        schema: dict[str, Any] = {"type": self.type_name, "description": self.description}
-        if self.enum_values:
-            schema["enum"] = list(self.enum_values)
-        if self.default is not None:
-            schema["default"] = self.default
-        if self.type_name == "array" and self.item_type_name is not None:
-            schema["items"] = {"type": self.item_type_name}
-        return schema
+        return tool_parameter_json_schema(
+            type_name=self.type_name,
+            description=self.description,
+            enum_values=self.enum_values,
+            default=self.default,
+            item_type_name=self.item_type_name,
+        )
 
 
 @dataclass(frozen=True, slots=True)
