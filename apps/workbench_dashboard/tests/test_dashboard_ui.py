@@ -155,6 +155,8 @@ def test_glossary_explains_codes_on_hover() -> None:
     assert "GLOSSARY" in js
     assert "<abbr title=" in js
     assert "gtext(plan.title" in js
+    assert "no engine wired" in js
+    assert "Web Speech v1 live" not in js
 
 
 def test_status_pills_have_css() -> None:

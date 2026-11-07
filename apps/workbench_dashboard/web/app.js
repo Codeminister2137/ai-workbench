@@ -68,7 +68,7 @@ const GLOSSARY = {
   W4: "Edge finding: malformed poll JSON bypassed cancel-on-abandon (fixed)",
   H1: "Edge finding: hosted runs queued but never drained",
   M1: "Edge finding: failed live inference dropped the chat message",
-  STT: "Speech-to-text dictation (Web Speech v1 live, Meta server planned)",
+  STT: "Speech-to-text dictation (no engine wired; Dictate unavailable pending STT decision)",
   R1: "Backlog: company offering drafts",
   R2: "Backlog: Codeministry name + legality research",
   R3: "Backlog: marketing + social bots research",
