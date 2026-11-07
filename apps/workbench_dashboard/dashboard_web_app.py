@@ -26,6 +26,7 @@ from ai_agent.staged_edits import (
 )
 from ai_agent.supervisor_drain import Executor, RunDrain
 from ai_orchestrator.evidence import merge_probe_eval
+from ai_orchestrator.spend_ledger import SpendLedger, allowance_from_file
 from ai_provider.chat_transcripts import SQLiteChatTranscriptStore
 from ai_provider.stt import (
     STT_BODY_MAX_BYTES,
@@ -95,6 +96,25 @@ def with_fanout_policy(run: dict) -> dict:
     that predate the field simply read as ``unknown``.
     """
     return {**run, "fanout_effective": effective_fanout_policy(run)}
+
+
+def spend_status(data_dir: Path) -> dict[str, Any]:
+    """Load spend grants and return the ledger dashboard view.
+
+    Fail-loud on malformed grant files (money); a missing grants dir means
+    unconfigured (deny-by-default), never an error.
+    """
+    ledger = SpendLedger()
+    grants_dir = data_dir / "spend" / "grants"
+    if grants_dir.is_dir():
+        for path in sorted(grants_dir.glob("*.json")):
+            try:
+                ledger.add_allowance(allowance_from_file(path))
+            except ValueError as exc:
+                raise ValueError(f"spend grant {path.name}: {exc}") from exc
+    view = ledger.status()
+    view["configured"] = bool(view["buckets"])
+    return view
 
 
 def evidence_snapshot(repo_root: Path = REPO_ROOT) -> dict[str, Any]:
@@ -202,6 +222,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 return self._send_json({"ok": True, **self._status(config)})
             if path == "/api/evidence":
                 return self._send_json({"ok": True, **evidence_snapshot(self.repo_root)})
+            if path == "/api/spend":
+                return self._send_json({"ok": True, "spend": spend_status(self.data_dir)})
             if path == "/api/work-roots":
                 return self._send_work_roots(config)
             if path == "/api/settings":

@@ -342,6 +342,17 @@ async function renderHome() {
   const plan = status.current_plan
     ? `<a href="#/plans/${esc(status.current_plan.id)}">${esc(status.current_plan.title || status.current_plan.id)}</a>`
     : '<span class="muted">No plan yet</span>';
+  let spend = "";
+  try {
+    const sp = await api("/api/spend");
+    spend = sp.spend.configured
+      ? `<ul class="plain">${sp.spend.buckets.map((b) =>
+          `<li><span class="pill" title="Allowance status">${esc(b.status)}</span> ${esc(b.provider)} ${esc(b.kind)} — ${esc(b.balance_cents)}/${esc(b.granted_cents)}¢</li>`).join("")}</ul>
+        <p class="muted">${esc(sp.spend.open_reservations)} open reservation(s), ${esc(sp.spend.records)} record(s).</p>`
+      : '<p class="muted">No spend grants configured — billable calls are denied by default.</p>';
+  } catch (err) {
+    spend = '<p class="muted">Spend unavailable: ' + esc(err.message) + "</p>";
+  }
   const runs = status.recent_runs.length
     ? status.recent_runs.map((r) =>
         `<li><a href="#/runs/${esc(r.id)}">${esc(r.title || r.id)}</a> <span class="muted">${esc(r.status || "")}</span></li>`).join("")
@@ -362,6 +373,7 @@ async function renderHome() {
       <div>
         <div class="card"><h2>Inbox</h2>
           <p>${status.open_inbox} open task(s). <a href="#/inbox">Open inbox</a></p></div>
+        <div class="card"><h2>Spend</h2>${spend}</div>
         <div class="card"><h2>Ideas</h2>
           <p>${status.new_ideas} new — triage each in Ideas (adopt, park, or decline). <a href="#/ideas">Open ideas</a></p></div>
         <div class="card"><h2>Chat</h2>

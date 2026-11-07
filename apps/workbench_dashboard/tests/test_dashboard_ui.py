@@ -513,3 +513,11 @@ def test_inbox_close_form_and_reopen_markers() -> None:
     assert "/reopen" in js
     assert "<h3>Outcome</h3>" in js
     assert "#/inbox?status=archive" in js
+
+
+def test_home_shows_spend_card() -> None:
+    """Home renders a Spend card backed by /api/spend with an empty state."""
+    js = _read("app.js")
+    assert "<h2>Spend</h2>" in js
+    assert 'await api("/api/spend")' in js
+    assert "No spend grants configured" in js

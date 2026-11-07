@@ -398,3 +398,76 @@ def test_inbox_close_requires_resolution(dashboard_server) -> None:
         post_json(dashboard_server, f"/api/inbox/{created['id']}/close", {})
     assert raised.value.code == 400
     raised.value.close()
+
+
+def _grant(allowance_id, provider="meta", kind="free_daily", granted_cents=500, **extra):
+    payload = {
+        "allowance_id": allowance_id,
+        "provider": provider,
+        "kind": kind,
+        "granted_cents": granted_cents,
+        "local_spending_limit_accepted": True,
+    }
+    payload.update(extra)
+    return payload
+
+
+def _write_grants(tmp_path, files):
+    grants = tmp_path / "data" / "spend" / "grants"
+    grants.mkdir(parents=True)
+    for name, payload in files.items():
+        (grants / name).write_text(json.dumps(payload), encoding="utf-8")
+    return grants
+
+
+def test_spend_unconfigured_empty(dashboard_server) -> None:
+    payload = get_json(dashboard_server, "/api/spend")
+    assert payload["ok"] is True
+    assert payload["spend"]["configured"] is False
+    assert payload["spend"]["buckets"] == []
+    assert payload["spend"]["open_reservations"] == 0
+    assert payload["spend"]["records"] == 0
+
+
+def test_spend_lists_grant_buckets(dashboard_server, tmp_path) -> None:
+    _write_grants(
+        tmp_path,
+        {
+            "a.json": _grant("meta-free"),
+            "b.json": _grant(
+                "meta-exp",
+                kind="allowance_expiring",
+                granted_cents=100,
+                expires_at=4102444800,
+            ),
+        },
+    )
+    payload = get_json(dashboard_server, "/api/spend")
+    assert payload["spend"]["configured"] is True
+    buckets = {item["id"]: item for item in payload["spend"]["buckets"]}
+    assert set(buckets) == {"meta-free", "meta-exp"}
+    assert buckets["meta-free"]["status"] == "active"
+    assert buckets["meta-free"]["balance_cents"] == 500
+    assert buckets["meta-free"]["granted_cents"] == 500
+    assert buckets["meta-exp"]["kind"] == "allowance_expiring"
+    assert buckets["meta-exp"]["status"] == "active"
+
+
+def test_spend_malformed_grant_is_400(dashboard_server, tmp_path) -> None:
+    _write_grants(tmp_path, {"bad.json": {"allowance_id": "x"}})
+    with pytest.raises(HTTPError) as raised:
+        get_json(dashboard_server, "/api/spend")
+    assert raised.value.code == 400
+    assert "bad.json" in raised.value.read().decode("utf-8")
+    raised.value.close()
+
+
+def test_spend_duplicate_grant_id_is_400(dashboard_server, tmp_path) -> None:
+    _write_grants(
+        tmp_path,
+        {"a.json": _grant("dup"), "b.json": _grant("dup", provider="baseten")},
+    )
+    with pytest.raises(HTTPError) as raised:
+        get_json(dashboard_server, "/api/spend")
+    assert raised.value.code == 400
+    raised.value.close()
