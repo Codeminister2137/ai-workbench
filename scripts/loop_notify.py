@@ -10,6 +10,11 @@ events (objective error, run finished, sleep scheduled) carrying run metadata
 (counts, statuses, timings) only. Never prompts, credentials, or third parties.
 Each ping also carries the host's current public IP (best effort) so the owner
 can reach the machine from outside the home network.
+
+Status mails (``--state``) use a closed state set so the run posture is
+readable at a glance: WORKING (progress, work continues), WAITING_FOR_OWNER
+(all implementable work done, owner action pending), BLOCKED (error
+closeout), DONE (window complete, nothing pending).
 """
 
 from __future__ import annotations
@@ -124,6 +129,60 @@ def write_last_ip(path: Path, address: str) -> None:
         return
 
 
+MAIL_STATES = ("WORKING", "WAITING_FOR_OWNER", "BLOCKED", "DONE")
+
+
+def _check_state(state: str) -> str:
+    """Return ``state`` when it is a known mail state, else fail fast."""
+    if state not in MAIL_STATES:
+        raise ValueError(
+            f"unknown mail state: {state!r} (expected one of {', '.join(MAIL_STATES)})"
+        )
+    return state
+
+
+def format_status_subject(state: str, summary: str) -> str:
+    """Build ``[workbench][STATE] summary`` for a structured status mail.
+
+    ``summary`` states the remaining work in one line; the closed state set
+    keeps the run posture readable at a glance in the inbox list.
+    """
+    _check_state(state)
+    summary = (summary or "").strip()
+    if not summary:
+        raise ValueError("status mail needs a remaining-work summary for the subject")
+    return f"[workbench][{state}] {summary}"
+
+
+def format_status_body(
+    *,
+    state: str,
+    done: tuple[str, ...] | list[str] = (),
+    remaining: tuple[str, ...] | list[str] = (),
+    waiting_on: tuple[str, ...] | list[str] = (),
+    sleep: str | None = None,
+    details: str = "",
+) -> str:
+    """Render the fixed-section body for a structured status mail.
+
+    Every section is always present so the owner (and future automation) can
+    rely on the shape; empty lists render as ``- none`` instead of vanishing.
+    """
+    _check_state(state)
+    lines = [f"State: {state}"]
+    sections = (("Done", done), ("Remaining", remaining), ("Waiting on", waiting_on))
+    for title, items in sections:
+        lines.append(f"{title}:")
+        if items:
+            lines.extend(f"- {item}" for item in items)
+        else:
+            lines.append("- none")
+    lines.append(f"Sleep: {(sleep or '').strip() or 'none'}")
+    lines.append("Details:")
+    lines.append(details.strip() or "(no details)")
+    return "\n".join(lines)
+
+
 def send_ping(
     *,
     subject: str,
@@ -132,13 +191,15 @@ def send_ping(
     event: str,
     recipient: str | None = None,
     dry_run: bool = False,
+    state: str | None = None,
 ) -> dict:
     """Send one owner-self ping and record a JSON receipt.
 
     Raises ``ValueError`` when the recipient is not the owner's own address
     (fail closed: misdirected mail is refused, never rerouted). Transport
     failures are captured in the receipt, never raised, so a broken notifier
-    cannot break a run. Returns the receipt dict.
+    cannot break a run. Returns the receipt dict. ``state`` (a MAIL_STATES
+    value, or None for free-form pings) is recorded in the receipt.
     """
     owner_mail = _load_owner_mail()
     config = read_gmail_config()
@@ -239,7 +300,7 @@ def send_ping(
             "live": False,
             "attempts": attempts,
         }
-    payload.update({"event": event, "subject": subject, "public_ip": address})
+    payload.update({"event": event, "subject": subject, "public_ip": address, "state": state})
     receipt_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     return payload
 
@@ -249,22 +310,48 @@ def main(argv=None) -> int:
     parser.add_argument("--run-dir", type=Path, required=True)
     parser.add_argument("--event", required=True)
     parser.add_argument("--subject", required=True)
+    parser.add_argument(
+        "--state",
+        choices=MAIL_STATES,
+        default=None,
+        help="Compose a structured status mail; --subject becomes the remaining-work summary.",
+    )
+    parser.add_argument("--done", action="append", default=[], metavar="ITEM")
+    parser.add_argument("--remaining", action="append", default=[], metavar="ITEM")
+    parser.add_argument(
+        "--waiting-on", dest="waiting_on", action="append", default=[], metavar="ITEM"
+    )
+    parser.add_argument("--sleep-note", default=None)
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--body", default=None)
     group.add_argument("--body-file", type=Path, default=None)
     parser.add_argument("--to", default=None)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
+    if args.state is None and (args.done or args.remaining or args.waiting_on or args.sleep_note):
+        parser.error("--done/--remaining/--waiting-on/--sleep-note require --state")
     body = args.body
     if args.body_file is not None:
         body = args.body_file.read_text(encoding="utf-8-sig")
+    subject = args.subject
+    if args.state is not None:
+        subject = format_status_subject(args.state, args.subject)
+        body = format_status_body(
+            state=args.state,
+            done=args.done,
+            remaining=args.remaining,
+            waiting_on=args.waiting_on,
+            sleep=args.sleep_note,
+            details=body,
+        )
     receipt = send_ping(
-        subject=args.subject,
+        subject=subject,
         body=body,
         run_dir=args.run_dir.resolve(),
         event=args.event,
         recipient=args.to,
         dry_run=args.dry_run,
+        state=args.state,
     )
     print(
         json.dumps(

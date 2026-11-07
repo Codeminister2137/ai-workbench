@@ -257,3 +257,121 @@ def test_cross_window_change_flagged_via_stable_file(tmp_path, monkeypatch) -> N
     notify.send_ping(subject="s", body="b", run_dir=tmp_path, event="progress")
     assert "83.26.59.90 -> 83.26.80.50" in calls[0]["body"]
     assert (tmp_path / "stable-ip.txt").read_text(encoding="utf-8").strip() == ("83.26.80.50")
+
+
+def test_status_subject_tags_state_and_summary() -> None:
+    assert notify.format_status_subject("WAITING_FOR_OWNER", "1 owner task left") == (
+        "[workbench][WAITING_FOR_OWNER] 1 owner task left"
+    )
+
+
+def test_status_subject_rejects_unknown_state_or_blank_summary() -> None:
+    with pytest.raises(ValueError, match="unknown mail state"):
+        notify.format_status_subject("IDLE", "summary")
+    with pytest.raises(ValueError, match="summary"):
+        notify.format_status_subject("DONE", "  ")
+
+
+def test_status_body_has_fixed_sections_in_order() -> None:
+    body = notify.format_status_body(
+        state="WAITING_FOR_OWNER",
+        done=["loop-3 merged", "loop-4 merged"],
+        remaining=["register CloneScan task (owner: run elevated script)"],
+        waiting_on=["owner: inbox f06d2537 Done"],
+        sleep="scheduled 2026-11-07 14:35 Warsaw (+10min closeout)",
+        details="loop_status: 12 complete, 1 blocked, 0 remaining",
+    )
+    lines = body.splitlines()
+    assert lines[0] == "State: WAITING_FOR_OWNER"
+    sections = ("Done:", "Remaining:", "Waiting on:", "Sleep:", "Details:")
+
+    def position(section: str) -> int:
+        return next(
+            i for i, line in enumerate(lines) if line == section or line.startswith(section + " ")
+        )
+
+    positions = [position(section) for section in sections]
+    assert positions == sorted(positions)
+    assert "- loop-3 merged" in lines
+    assert "- register CloneScan task (owner: run elevated script)" in lines
+    assert "- owner: inbox f06d2537 Done" in lines
+    assert "Sleep: scheduled 2026-11-07 14:35 Warsaw (+10min closeout)" in lines
+    assert "loop_status: 12 complete, 1 blocked, 0 remaining" in body
+
+
+def test_status_body_renders_empty_sections_explicitly() -> None:
+    body = notify.format_status_body(state="DONE")
+    assert "State: DONE" in body.splitlines()
+    assert body.count("- none") == 3  # done, remaining, waiting-on
+    assert "Sleep: none" in body
+    assert "(no details)" in body
+
+
+def test_status_body_rejects_unknown_state() -> None:
+    with pytest.raises(ValueError, match="unknown mail state"):
+        notify.format_status_body(state="IDLE")
+
+
+def test_cli_state_composes_structured_ping(tmp_path, monkeypatch) -> None:
+    calls = _capture(monkeypatch, tmp_path, None)
+    assert (
+        notify.main(
+            [
+                "--run-dir",
+                str(tmp_path),
+                "--event",
+                "waiting",
+                "--subject",
+                "1 owner task left",
+                "--state",
+                "WAITING_FOR_OWNER",
+                "--done",
+                "loop-4 merged",
+                "--remaining",
+                "register tasks",
+                "--waiting-on",
+                "owner inbox f06d2537",
+                "--sleep-note",
+                "sleep +10min",
+                "--body",
+                "loop_status quoted here",
+                "--to",
+                "owner@example.com",
+                "--dry-run",
+            ]
+        )
+        == 0
+    )
+    assert calls[0]["subject"] == "[workbench][WAITING_FOR_OWNER] 1 owner task left"
+    assert calls[0]["body"].splitlines()[0] == "State: WAITING_FOR_OWNER"
+    assert "- register tasks" in calls[0]["body"]
+    saved = list((tmp_path / "notifications").glob("waiting-*.json"))
+    assert len(saved) == 1
+    assert json.loads(saved[0].read_text(encoding="utf-8"))["state"] == "WAITING_FOR_OWNER"
+
+
+def test_cli_without_state_keeps_freeform_subject(tmp_path, monkeypatch) -> None:
+    calls = _capture(monkeypatch, tmp_path, None)
+    assert (
+        notify.main(
+            [
+                "--run-dir",
+                str(tmp_path),
+                "--event",
+                "legacy",
+                "--subject",
+                "plain subject",
+                "--body",
+                "plain body",
+                "--to",
+                "owner@example.com",
+                "--dry-run",
+            ]
+        )
+        == 0
+    )
+    assert calls[0]["subject"] == "plain subject"
+    assert calls[0]["body"] == "plain body"
+    saved = list((tmp_path / "notifications").glob("legacy-*.json"))
+    assert len(saved) == 1
+    assert json.loads(saved[0].read_text(encoding="utf-8"))["state"] is None
