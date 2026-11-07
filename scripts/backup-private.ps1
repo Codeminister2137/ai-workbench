@@ -17,7 +17,7 @@ param(
 $ErrorActionPreference = "Stop"
 $RepoRoot = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 $Sources = @("docs/library-private", "docs/plans")
-$SnapshotSources = @("docs/library-private", "docs/plans", "research", "data")
+$SnapshotSources = @("docs/library-private", "docs/plans", "research", "data", "apps/workbench_dashboard/data")
 $DenyList = @("*.env", "*secret*", "*credential*", "*.pem", "*.key", "id_*", "*.pfx", "*.p12")
 $MaxFileBytes = 25MB
 

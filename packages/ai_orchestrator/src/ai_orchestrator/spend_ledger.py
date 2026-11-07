@@ -430,10 +430,16 @@ class SpendLedger:
         open_count = sum(
             1 for item in self._reservations.values() if item.state is ReservationState.RESERVED
         )
+        by_operation: dict[str, dict[str, int]] = {}
+        for record in self._records:
+            slot = by_operation.setdefault(record.task_class, {"calls": 0, "actual_cents": 0})
+            slot["calls"] += 1
+            slot["actual_cents"] += record.actual_cents
         return {
             "buckets": buckets,
             "open_reservations": open_count,
             "records": len(self._records),
+            "by_operation": by_operation,
         }
 
 

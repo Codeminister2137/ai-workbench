@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import socket
 import subprocess
 import sys
 import threading
 import urllib.request
+import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime
 from http import HTTPStatus
@@ -30,7 +32,9 @@ from ai_agent.staged_edits import (
 from ai_agent.supervisor_drain import Executor, RunDrain
 from ai_orchestrator.evidence import merge_probe_eval
 from ai_orchestrator.spend_ledger import SpendLedger, allowance_from_file
+from ai_provider.adapters.meta_asr import MetaAsrEngine
 from ai_provider.chat_transcripts import SQLiteChatTranscriptStore
+from ai_provider.secrets import read_secret_key
 from ai_provider.stt import (
     STT_BODY_MAX_BYTES,
     MeteringHook,
@@ -149,8 +153,8 @@ def with_run_detail(run: dict) -> dict:
     return with_run_failure(with_fanout_policy(run))
 
 
-def spend_status(data_dir: Path) -> dict[str, Any]:
-    """Load spend grants and return the ledger dashboard view.
+def load_spend_ledger(data_dir: Path) -> SpendLedger:
+    """Load grant files into one shared ledger (cef496c3 shared bucket).
 
     Fail-loud on malformed grant files (money); a missing grants dir means
     unconfigured (deny-by-default), never an error.
@@ -163,9 +167,67 @@ def spend_status(data_dir: Path) -> dict[str, Any]:
                 ledger.add_allowance(allowance_from_file(path))
             except ValueError as exc:
                 raise ValueError(f"spend grant {path.name}: {exc}") from exc
-    view = ledger.status()
+    return ledger
+
+
+def spend_status(data_dir: Path, ledger: SpendLedger | None = None) -> dict[str, Any]:
+    """Return the ledger dashboard view, shared when the server holds one.
+
+    A passed ledger keeps STT spend and the spend view on the same buckets;
+    None loads a fresh view (tests, unconfigured servers).
+    """
+    view = (ledger or load_spend_ledger(data_dir)).status()
     view["configured"] = bool(view["buckets"])
     return view
+
+
+class LedgerSttMetering:
+    """MeteringHook over one shared SpendLedger (cef496c3 shared bucket).
+
+    Thread-safe for ThreadingHTTPServer: one lock around admit/settle.
+    Deny-by-default: deferred/rejected admissions raise SttFailure (409),
+    so STT never spends without a fitting grant.
+    """
+
+    def __init__(self, ledger: SpendLedger, *, provider: str = "meta") -> None:
+        self._ledger = ledger
+        self._provider = provider
+        self._lock = threading.Lock()
+
+    def reserve(self, *, operation: str, estimated_cents: int, **kwargs: object) -> str:
+        with self._lock:
+            admission = self._ledger.admit(
+                task_id=f"stt-{uuid.uuid4().hex[:12]}",
+                task_class=f"stt:{operation}",
+                estimated_cents=estimated_cents,
+                provider=self._provider,
+            )
+        if admission.decision != "admitted" or admission.reservation is None:
+            raise SttFailure(
+                "allowance",
+                f"STT allowance {admission.decision}: {admission.reason}",
+                409,
+            )
+        return admission.reservation.id
+
+    def commit(self, receipt_id: str, actual_cents: int) -> None:
+        with self._lock:
+            self._ledger.settle(receipt_id, actual_cents=actual_cents)
+
+
+def meta_stt_key() -> str | None:
+    """Return the Meta STT key from ambient env or the repo .env file.
+
+    Never logged: callers pass it straight to the engine constructor.
+    None means unconfigured (Dictate keeps its honest 409).
+    """
+    key = os.environ.get("META_API_KEY", "").strip()
+    if key:
+        return key
+    try:
+        return read_secret_key(REPO_ROOT / ".env", "META_API_KEY", label="Meta STT credential")
+    except ValueError:
+        return None
 
 
 FLEET_TASKS = (
@@ -335,6 +397,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
     # engine, metering, and translator. Tests inject fakes here.
     stt_engine_factory: Callable[[], TranscribeEngine] | None = None
     stt_metering: MeteringHook | None = None
+    spend_ledger: ClassVar[SpendLedger | None] = None
     chat_translator: Translator | None = None
     drain_executor_factory: ClassVar[Callable[[], Executor] | None] = None
     # Live scheduler handle (None when off). Set once in main(); read by _status.
@@ -416,7 +479,9 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             if path == "/api/evidence":
                 return self._send_json({"ok": True, **evidence_snapshot(self.repo_root)})
             if path == "/api/spend":
-                return self._send_json({"ok": True, "spend": spend_status(self.data_dir)})
+                return self._send_json(
+                    {"ok": True, "spend": spend_status(self.data_dir, self.spend_ledger)}
+                )
             if path == "/api/fleet":
                 return self._send_json(
                     {"ok": True, "fleet": fleet_status(self.repo_root, self._stores())}
@@ -1410,6 +1475,23 @@ def main() -> None:
         )
     except Exception as exc:  # noqa: BLE001 - scheduler must never block serving
         print(f"Workbench dashboard: drain scheduler failed to start: {exc}")
+    try:
+        DashboardRequestHandler.spend_ledger = load_spend_ledger(args.data_dir)
+    except ValueError as exc:
+        print(f"Workbench dashboard: spend grants invalid, STT metering off: {exc}")
+    stt_key = meta_stt_key()
+    if stt_key is not None and DashboardRequestHandler.spend_ledger is not None:
+
+        def _meta_engine() -> MetaAsrEngine:
+            return MetaAsrEngine(stt_key)
+
+        DashboardRequestHandler.stt_engine_factory = staticmethod(_meta_engine)
+        DashboardRequestHandler.stt_metering = LedgerSttMetering(
+            DashboardRequestHandler.spend_ledger
+        )
+        print("Workbench dashboard: Meta STT engine wired (shared spend bucket)")
+    else:
+        print("Workbench dashboard: STT engine unwired (no key or no ledger)")
     server = ThreadingHTTPServer((args.host, args.port), DashboardRequestHandler)
     print(f"Workbench dashboard: http://{args.host}:{args.port}")
     server.serve_forever()

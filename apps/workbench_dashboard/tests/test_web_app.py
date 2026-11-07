@@ -7,14 +7,18 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 import pytest
+from ai_orchestrator.spend_ledger import SpendLedger, allowance_from_file
+from ai_provider.stt import SttFailure, TranscribeResult
 from dashboard_test_http import get_json
 from dashboard_web_app import (
     FLEET_TASKS,
     DashboardRequestHandler,
+    LedgerSttMetering,
     fleet_ollama,
     fleet_sleep,
     fleet_tasks,
     run_failure,
+    spend_status,
     with_run_failure,
 )
 
@@ -566,6 +570,127 @@ def test_spend_duplicate_grant_id_is_400(dashboard_server, tmp_path) -> None:
     with pytest.raises(HTTPError) as raised:
         get_json(dashboard_server, "/api/spend")
     assert raised.value.code == 400
+    raised.value.close()
+
+
+def _wav_silence(seconds: float = 1.0) -> bytes:
+    import io
+    import wave
+
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as clip:
+        clip.setnchannels(1)
+        clip.setsampwidth(2)
+        clip.setframerate(16000)
+        clip.writeframes(b"\x00" * int(16000 * seconds) * 2)
+    return buffer.getvalue()
+
+
+def _multipart(audio: bytes, language: str = "en") -> tuple[bytes, str]:
+    boundary = "BOUNDARY123"
+    body = (
+        (
+            f"--{boundary}\r\n"
+            'Content-Disposition: form-data; name="audio"; filename="clip.wav"\r\n'
+            "Content-Type: audio/wav\r\n\r\n"
+        ).encode("latin-1")
+        + audio
+        + (
+            f"\r\n--{boundary}\r\n"
+            'Content-Disposition: form-data; name="language"\r\n\r\n'
+            f"{language}\r\n--{boundary}--\r\n"
+        ).encode("latin-1")
+    )
+    return body, f"multipart/form-data; boundary={boundary}"
+
+
+def _post_bytes(base: str, path: str, body: bytes, content_type: str) -> dict:
+    request = Request(
+        f"{base}{path}",
+        data=body,
+        headers={"Content-Type": content_type},
+        method="POST",
+    )
+    with urlopen(request, timeout=10) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+class _FakeEngine:
+    id = "fake:stt"
+
+    def transcribe(self, wav_bytes: bytes, *, language_bias: list, timeout_s: int):
+        assert language_bias == ["English"]
+        return TranscribeResult(text="hello world")
+
+
+def _metering(tmp_path) -> LedgerSttMetering:
+    grants = tmp_path / "grants"
+    grants.mkdir()
+    (grants / "m.json").write_text(json.dumps(_grant("m1", granted_cents=50)), encoding="utf-8")
+    ledger = SpendLedger()
+    ledger.add_allowance(allowance_from_file(grants / "m.json"))
+    return LedgerSttMetering(ledger)
+
+
+def test_stt_metering_round_trip_records_operation(tmp_path) -> None:
+    metering = _metering(tmp_path)
+    receipt = metering.reserve(operation="audio", estimated_cents=1)
+    metering.commit(receipt, 1)
+    view = metering._ledger.status()
+    assert view["by_operation"] == {"stt:audio": {"calls": 1, "actual_cents": 1}}
+    assert metering._ledger.get_allowance("m1").balance_cents == 49
+
+
+def test_stt_metering_denies_without_grant() -> None:
+    metering = LedgerSttMetering(SpendLedger())
+    with pytest.raises(SttFailure) as raised:
+        metering.reserve(operation="audio", estimated_cents=1)
+    assert raised.value.http_status == 409
+    assert "rejected" in str(raised.value)
+
+
+def test_spend_status_shared_ledger_shows_stt_spend(tmp_path) -> None:
+    metering = _metering(tmp_path)
+    receipt = metering.reserve(operation="audio", estimated_cents=1)
+    metering.commit(receipt, 1)
+    view = spend_status(tmp_path / "data", metering._ledger)
+    assert view["configured"] is True
+    assert view["by_operation"] == {"stt:audio": {"calls": 1, "actual_cents": 1}}
+
+
+def test_stt_transcribe_unwired_is_409(dashboard_server) -> None:
+    body, content_type = _multipart(_wav_silence())
+    with pytest.raises(HTTPError) as raised:
+        _post_bytes(dashboard_server, "/api/stt/transcribe", body, content_type)
+    assert raised.value.code == 409
+    assert "no speech engine configured" in raised.value.read().decode("utf-8")
+    raised.value.close()
+
+
+def test_stt_transcribe_wired_engine_succeeds(dashboard_server, tmp_path, monkeypatch) -> None:
+    metering = _metering(tmp_path)
+    monkeypatch.setattr(
+        DashboardRequestHandler, "stt_engine_factory", staticmethod(lambda: _FakeEngine())
+    )
+    monkeypatch.setattr(DashboardRequestHandler, "stt_metering", metering)
+    body, content_type = _multipart(_wav_silence())
+    payload = _post_bytes(dashboard_server, "/api/stt/transcribe", body, content_type)
+    assert payload["ok"] is True
+    assert payload["text"] == "hello world"
+    assert payload["receipt"]["engine"] == "fake:stt"
+    assert metering._ledger.get_allowance("m1").balance_cents == 49
+
+
+def test_stt_transcribe_over_cap_rejected(dashboard_server, tmp_path, monkeypatch) -> None:
+    metering = _metering(tmp_path)
+    monkeypatch.setattr(
+        DashboardRequestHandler, "stt_engine_factory", staticmethod(lambda: _FakeEngine())
+    )
+    monkeypatch.setattr(DashboardRequestHandler, "stt_metering", metering)
+    body, content_type = _multipart(_wav_silence(seconds=61.0))
+    with pytest.raises(HTTPError) as raised:
+        _post_bytes(dashboard_server, "/api/stt/transcribe", body, content_type)
+    assert raised.value.code == 422
     raised.value.close()
 
 
