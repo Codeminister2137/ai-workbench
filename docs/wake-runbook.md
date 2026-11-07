@@ -60,6 +60,9 @@ Security analysis (2026-11-06 night, loop-3): both changes are SAFE.
 Steps (FunBox admin UI; exact menu labels vary by firmware):
 1. DHCP/static-lease section -> reserve 192.168.1.12 for MAC
    `34:5A:60:38:44:C8` -> reboot router -> confirm the PC still gets .12.
+   Fallback 2026-11-07 (static-DHCP UI broken, no factory reset): the UDP
+   forward (WAN 61234 -> 192.168.1.12:9) pins the target; the weekly
+   self-test `lan_ip` check mails on drift.
 2. DDNS section -> provider account -> random hostname -> confirm it
    resolves to the current WAN IP -> point the phone app at the
    hostname -> re-run the E2E test above.

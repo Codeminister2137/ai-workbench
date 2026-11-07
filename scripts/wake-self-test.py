@@ -1,7 +1,9 @@
 """Weekly wake-path self-test: mail the owner only on failure.
 
 Local checks for the remote-wake chain that can regress silently:
-dashboard serve, NIC wake-armed state, public-IP lookup, DDNS hostname
+dashboard serve, NIC wake-armed state, LAN-IP drift (the FunBox cannot
+pin a static lease, so the self-test guards the forward target instead),
+public-IP lookup, DDNS hostname
 resolution (when configured), and Gmail SMTP login (no mail sent).
 Success appends one log line; any failure sends a single owner mail.
 """
@@ -28,6 +30,34 @@ _SPEC.loader.exec_module(loop_notify)
 
 NETWORK_DEVICE = re.compile(r"ethernet|gbe|wi-?fi|wlan|realtek|intel", re.IGNORECASE)
 DDNS_ENV = "WAKE_DDNS_HOSTNAME"
+
+
+EXPECTED_LAN_IP = "192.168.1.12"
+
+
+def primary_lan_ip() -> str | None:
+    """Primary outbound IPv4 without sending traffic (UDP connect trick)."""
+    probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        probe.connect(("8.8.8.8", 80))
+        return probe.getsockname()[0]
+    except OSError:
+        return None
+    finally:
+        probe.close()
+
+
+def check_lan_ip(expected: str = EXPECTED_LAN_IP, probe=primary_lan_ip) -> tuple[bool, str]:
+    """Require the PC to hold the LAN IP the wake forward targets."""
+    try:
+        actual = probe()
+    except Exception as exc:  # noqa: BLE001 - self-test reports, never raises
+        return False, f"{type(exc).__name__}: {exc}"[:200]
+    if not actual:
+        return False, "primary LAN IP undeterminable"
+    if actual == expected:
+        return True, f"holds {actual} (forward target {expected})"
+    return False, f"drift: PC holds {actual}, forward targets {expected}"
 
 
 def check_dashboard(dashboard: str, *, timeout: float = 10) -> tuple[bool, str]:
@@ -74,11 +104,10 @@ def check_ddns(resolve=socket.gethostbyname) -> tuple[bool, str]:
     hostname = os.environ.get(DDNS_ENV, "").strip()
     if not hostname:
         try:
-            from ai_provider.secrets import read_secret_key
+            from ai_provider.secrets import read_dotenv_values
 
-            hostname = (
-                read_secret_key(loop_notify.ROOT / ".env", DDNS_ENV, required=False) or ""
-            ).strip()
+            found = read_dotenv_values(loop_notify.ROOT / ".env", {DDNS_ENV})
+            hostname = (found.get(DDNS_ENV) or "").strip()
         except Exception:  # noqa: BLE001 - missing helper means not configured
             hostname = ""
     if not hostname:
@@ -111,6 +140,7 @@ def check_smtp_login(
 CHECKS = (
     ("dashboard", check_dashboard),
     ("wake_armed", check_wake_armed),
+    ("lan_ip", check_lan_ip),
     ("public_ip", check_public_ip),
     ("ddns", check_ddns),
     ("smtp_login", check_smtp_login),
