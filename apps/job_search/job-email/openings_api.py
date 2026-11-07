@@ -76,6 +76,10 @@ class OpeningsAPI:
             raise ValueError("Invalid Openings port")
         if not isinstance(token, str) or not token.strip() or any(c in token for c in "\r\n"):
             raise ValueError("An explicit valid Openings token is required")
+        try:
+            token.encode("latin-1")
+        except UnicodeEncodeError:
+            raise ValueError("Openings token must be header-safe latin-1 text") from None
         if (
             type(timeout_seconds) not in (int, float)
             or not math.isfinite(timeout_seconds)
