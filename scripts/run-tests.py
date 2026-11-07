@@ -100,6 +100,7 @@ GROUPS = {
         "tests/test_measured_prefix_admission.py",
         "tests/test_operator_bridge.py",
         "tests/test_wb_env_narrow.py",
+        "tests/test_run_reports.py",
     ),
     "cli": (
         "tests/repo_assistant/test_*.py",
@@ -141,6 +142,8 @@ GROUPS = {
         "tests/test_slice_develop_core.py",
         "tests/test_script_dotenv_readers.py",
         "tests/test_find_duplication.py",
+        "tests/test_clone_scan_scheduled.py",
+        "tests/test_wake_self_test.py",
     ),
     "research": (
         "tests/test_research_*.py",
