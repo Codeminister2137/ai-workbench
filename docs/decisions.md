@@ -1,3 +1,9 @@
+## Loop-4 approvals: Responses base, partial clone batch, automation x4 - owner 2026-11-07
+
+**Status:** Accepted by the owner (inbox 42de3331=A, 7629baa3=A, 08ebe007=all four, 718249b7/merge approved; implemented on feature/loop4-approved-batch).
+
+Responses adapters share `_ResponsesProtocolBase` (transport + complete skeleton); stream() stays per-adapter (event models genuinely differ); Meta/OpenCode subclasses preserved. Clone batch: backend/key builders centralized; tool `.definition` tables, `_safe_metadata` variants, and preservation/fallback predicates intentionally left explicit (declarative data or genuinely different semantics - see brief 7629baa3 resolution). Automation: template run reports (zero-token default), weekly clone-scan + wake self-test (mail/brief only on new findings), review diffstat. CloneScan + WakeSelfTest need one elevated registration (owner task f06d2537).
+
 ## Supervised drivers stay per-provider (R2) - owner decision 2026-11-06
 
 **Status:** Accepted by the owner (inbox: keep two independent drivers).

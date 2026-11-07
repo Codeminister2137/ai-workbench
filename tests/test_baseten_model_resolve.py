@@ -5,6 +5,7 @@ import pytest
 
 SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "baseten-supervised-develop.py"
 spec = importlib.util.spec_from_file_location("baseten_supervised_develop", SCRIPT)
+assert spec is not None and spec.loader is not None
 mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(mod)
 

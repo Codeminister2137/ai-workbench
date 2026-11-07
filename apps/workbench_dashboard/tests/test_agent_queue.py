@@ -81,6 +81,7 @@ def test_agent_queue_fifo_open_only(tmp_path) -> None:
         (second, "2026-11-06T11:00:00+00:00"),
     ):
         stored = stores.inbox.get(record["id"])
+        assert stored is not None
         stored["created_at"] = stamp
         stores.inbox.put(record["id"], stored)
     stores.close_inbox_task(first["id"], resolution="Done by agent.")

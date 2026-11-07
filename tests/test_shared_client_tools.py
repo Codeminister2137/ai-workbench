@@ -306,6 +306,7 @@ def test_shared_client_tools_session_database_passes_values(tmp_path, monkeypatc
     )
     server = inspection_server(tmp_path, run)
     args = server["args"]
+    assert isinstance(args, list)
     assert "--session-database" in args
     assert "--session-id" in args
     assert str(db) in args
@@ -323,6 +324,7 @@ def test_shared_client_tools_omits_session_flags_when_neither_set(tmp_path, monk
     run = SharedToolRun(task_id="t", run_id="r", approval_policy="read_only")
     server = inspection_server(tmp_path, run)
     args = server["args"]
+    assert isinstance(args, list)
     assert "--session-database" not in args
     assert "--session-id" not in args
     # Also verify literal "None" never appears

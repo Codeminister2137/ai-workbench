@@ -20,8 +20,8 @@ from ai_provider.user_config import load_user_config
 def _load_acceptance_module():
     path = Path(__file__).resolve().parents[1] / "scripts" / "alternate-agent-acceptance.py"
     spec = importlib.util.spec_from_file_location("alternate_agent_acceptance", path)
+    assert spec is not None and spec.loader is not None
     mod = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
     spec.loader.exec_module(mod)
     return mod
 

@@ -29,10 +29,9 @@ from ai_provider.contracts import (
     AIResponse,
     AIStreamEvent,
     BackendInfo,
-    BackendLocation,
     MessageRole,
-    ModelCapabilities,
     ProviderContinuation,
+    build_backend_info,
 )
 from ai_provider.errors import ProviderError, ProviderErrorCategory
 
@@ -61,12 +60,10 @@ class OpenCodeGoChatClient(OpenAICompatibleChatClient):
 
     @property
     def backend(self) -> BackendInfo:
-        return BackendInfo(
+        return build_backend_info(
             provider=self.config.provider.value,
             model=self.config.model,
-            location=BackendLocation.EXTERNAL,
             base_url=self.base_url,
-            capabilities=ModelCapabilities(chat=True, streaming=True, tools=True),
         )
 
     def _session_id_for(self, request: AIRequest) -> str:

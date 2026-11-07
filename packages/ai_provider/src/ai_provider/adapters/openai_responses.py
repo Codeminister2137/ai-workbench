@@ -8,15 +8,13 @@ provider-specific endpoint identity, authentication and routing headers.
 from __future__ import annotations
 
 import json
-import socket
 import time
 from collections.abc import Iterator
 from dataclasses import dataclass, replace
-from typing import Any
-from urllib.error import HTTPError, URLError
-from urllib.request import Request
+from typing import Any, ClassVar
 
-from ai_provider.config import BackendConfig, _provider_api_key
+from ai_provider.adapters._responses_base import _ResponsesProtocolBase
+from ai_provider.config import BackendConfig, _provider_api_key, resolve_api_key
 from ai_provider.contracts import (
     AIMessage,
     AIRequest,
@@ -26,39 +24,38 @@ from ai_provider.contracts import (
     AIStreamFinal,
     AIToolCall,
     BackendInfo,
-    BackendLocation,
     FinishReason,
     MessageRole,
-    ModelCapabilities,
     ProviderContinuation,
     UsageMetadata,
     UsageSource,
+    build_backend_info,
 )
 from ai_provider.errors import (
     ProviderError,
     ProviderErrorCategory,
     ToolCallFormatError,
-    http_error_to_provider_error,
 )
-from ai_provider.http_transport import read_bounded, urlopen
 from ai_provider.privacy import enforce_privacy_policy
-from ai_provider.turn_usage import observe_completion, observe_stream, observe_usage
+from ai_provider.turn_usage import observe_stream
 
 
 @dataclass(slots=True)
-class OpenAIResponsesChatClient:
+class OpenAIResponsesChatClient(_ResponsesProtocolBase):
     """Chat client for providers that expose the OpenAI Responses API."""
 
     config: BackendConfig
 
+    _api_label: ClassVar[str] = "Responses API"
+    _endpoint_path: ClassVar[str] = "/responses"
+    _stream_label: ClassVar[str] = "Responses"
+
     @property
     def backend(self) -> BackendInfo:
-        return BackendInfo(
+        return build_backend_info(
             provider=self.config.provider.value,
             model=self.config.model,
-            location=BackendLocation.EXTERNAL,
             base_url=self.base_url,
-            capabilities=ModelCapabilities(chat=True, streaming=True, tools=True),
         )
 
     @property
@@ -67,28 +64,7 @@ class OpenAIResponsesChatClient:
 
     @property
     def api_key(self) -> str:
-        if self.config.api_key and self.config.api_key.strip():
-            return self.config.api_key.strip()
-        provider_key = _provider_api_key(self.config.provider)
-        if provider_key and provider_key.strip():
-            return provider_key.strip()
-        raise ProviderError(
-            f"{self.config.provider.value} API key is required.",
-            category=ProviderErrorCategory.CONFIGURATION,
-            provider=self.config.provider.value,
-        )
-
-    @observe_completion
-    def complete(self, request: AIRequest) -> AIResponse:
-        enforce_privacy_policy(self.backend, request.privacy_class)
-        model = request.model or self.config.model
-        payload = self._responses_payload(request, stream=False)
-        started = time.perf_counter()
-        raw_response = self._post_responses(payload)
-        if isinstance(raw_response, dict):
-            observe_usage(self._usage_from_response(raw_response))
-        latency_ms = (time.perf_counter() - started) * 1000
-        return self._response_from_raw(raw_response, model=model, latency_ms=latency_ms)
+        return resolve_api_key(self.config)
 
     @observe_stream
     def stream(self, request: AIRequest) -> Iterator[AIStreamEvent]:
@@ -143,6 +119,9 @@ class OpenAIResponsesChatClient:
                 message=replace(final_response.message, content="".join(content_parts)),
             )
         yield AIStreamFinal(response=final_response)
+
+    def _protocol_payload(self, request: AIRequest, *, stream: bool) -> dict[str, Any]:
+        return self._responses_payload(request, stream=stream)
 
     def _responses_payload(self, request: AIRequest, *, stream: bool) -> dict[str, Any]:
         from ai_provider.credential_guard import enforce_credential_policy
@@ -316,9 +295,6 @@ class OpenAIResponsesChatClient:
             items.append(replay)
         return items
 
-    def _message_payload(self, message: AIMessage) -> dict[str, Any]:
-        return {"role": message.role.value, "content": message.content}
-
     def _response_from_raw(
         self, raw_response: dict[str, Any], *, model: str, latency_ms: float
     ) -> AIResponse:
@@ -430,134 +406,23 @@ class OpenAIResponsesChatClient:
         )
 
     def _backend_for_model(self, model: str) -> BackendInfo:
-        return BackendInfo(
+        return build_backend_info(
             provider=self.config.provider.value,
             model=model,
-            location=BackendLocation.EXTERNAL,
             base_url=self.base_url,
-            capabilities=ModelCapabilities(chat=True, streaming=True, tools=True),
         )
 
     def _post_responses(self, payload: dict[str, Any]) -> dict[str, Any]:
-        body = json.dumps(payload).encode("utf-8")
-        request = Request(
-            f"{self.base_url}/responses",
-            data=body,
-            headers=self._headers(),
-            method="POST",
-        )
-        try:
-            with urlopen(request, timeout=self.config.timeout_seconds) as response:
-                return json.loads(
-                    read_bounded(response, provider=self.config.provider.value).decode("utf-8")
-                )
-        except ProviderError:
-            raise
-        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
-            raise ProviderError(
-                "Responses API returned invalid JSON.",
-                category=ProviderErrorCategory.NON_RETRYABLE,
-                provider=self.config.provider.value,
-                raw_error=exc,
-            ) from exc
-        except TimeoutError as exc:
-            raise ProviderError(
-                "Responses API request timed out.",
-                category=ProviderErrorCategory.TIMEOUT,
-                retryable=True,
-                provider=self.config.provider.value,
-                raw_error=exc,
-            ) from exc
-        except HTTPError as exc:
-            raise self._http_error(exc) from exc
-        except URLError as exc:
-            if isinstance(exc.reason, (TimeoutError, socket.timeout)):
-                raise ProviderError(
-                    "Responses API request timed out.",
-                    category=ProviderErrorCategory.TIMEOUT,
-                    retryable=True,
-                    provider=self.config.provider.value,
-                    raw_error=exc,
-                ) from exc
-            raise ProviderError(
-                "Could not connect to Responses API provider.",
-                category=ProviderErrorCategory.RETRYABLE,
-                retryable=True,
-                provider=self.config.provider.value,
-                raw_error=exc,
-            ) from exc
+        return self._post_protocol(payload)
 
     def _stream_responses(self, payload: dict[str, Any]) -> Iterator[dict[str, Any]]:
-        body = json.dumps(payload).encode("utf-8")
-        request = Request(
-            f"{self.base_url}/responses",
-            data=body,
-            headers=self._headers(),
-            method="POST",
-        )
-        try:
-            with urlopen(request, timeout=self.config.timeout_seconds) as response:
-                for line in response:
-                    raw_line = line.strip()
-                    if not raw_line or raw_line.startswith((b":", b"event:", b"id:", b"retry:")):
-                        continue
-                    if raw_line.startswith(b"data:"):
-                        raw_line = raw_line.removeprefix(b"data:").removeprefix(b" ")
-                        if raw_line == b"[DONE]":
-                            break
-                    chunk = json.loads(raw_line.decode("utf-8"))
-                    if not isinstance(chunk, dict):
-                        raise ProviderError(
-                            "Responses stream chunk must be a JSON object.",
-                            category=ProviderErrorCategory.NON_RETRYABLE,
-                            provider=self.config.provider.value,
-                            raw_error=chunk,
-                        )
-                    yield chunk
-        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
-            raise ProviderError(
-                "Responses stream returned invalid JSON.",
-                category=ProviderErrorCategory.NON_RETRYABLE,
-                provider=self.config.provider.value,
-                raw_error=exc,
-            ) from exc
-        except TimeoutError as exc:
-            raise ProviderError(
-                "Responses API request timed out.",
-                category=ProviderErrorCategory.TIMEOUT,
-                retryable=True,
-                provider=self.config.provider.value,
-                raw_error=exc,
-            ) from exc
-        except HTTPError as exc:
-            raise self._http_error(exc) from exc
-        except URLError as exc:
-            if isinstance(exc.reason, (TimeoutError, socket.timeout)):
-                raise ProviderError(
-                    "Responses API request timed out.",
-                    category=ProviderErrorCategory.TIMEOUT,
-                    retryable=True,
-                    provider=self.config.provider.value,
-                    raw_error=exc,
-                ) from exc
-            raise ProviderError(
-                "Could not connect to Responses API provider.",
-                category=ProviderErrorCategory.RETRYABLE,
-                retryable=True,
-                provider=self.config.provider.value,
-                raw_error=exc,
-            ) from exc
+        yield from self._stream_protocol(payload)
 
     def _headers(self) -> dict[str, str]:
         return {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
         }
-
-    def _http_error(self, exc: HTTPError) -> ProviderError:
-        return http_error_to_provider_error(
-            exc, provider=self.config.provider.value, api_label="Responses API"
-        )
 
     def _safe_metadata(self, raw: dict[str, Any]) -> dict[str, Any]:
         def clean(value: Any) -> Any:

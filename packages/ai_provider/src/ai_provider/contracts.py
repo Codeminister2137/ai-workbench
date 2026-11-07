@@ -176,6 +176,24 @@ class BackendInfo:
     capabilities: ModelCapabilities = field(default_factory=ModelCapabilities)
 
 
+def build_backend_info(
+    *,
+    provider: str,
+    model: str,
+    base_url: str | None,
+    location: BackendLocation = BackendLocation.EXTERNAL,
+    tools: bool = True,
+) -> BackendInfo:
+    """Build the standard chat+streaming backend identity shared by adapters."""
+    return BackendInfo(
+        provider=provider,
+        model=model,
+        location=location,
+        base_url=base_url,
+        capabilities=ModelCapabilities(chat=True, streaming=True, tools=tools),
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class UsageMetadata:
     """Token usage metadata normalized across providers when available."""

@@ -6,8 +6,12 @@
 #   MsiUdpWatchdog     - every 5 min, elevated: restart MSI_Center_Service when
 #                        MSI.CentralServer holds >2000 UDP endpoints; records
 #                        every incident in .tmp/msi-watchdog/incidents.log.
+#   CloneScan          - weekly Sunday 06:00: duplication scan, inbox brief
+#                        only when new clone groups appear.
+#   WakeSelfTest       - weekly Sunday 06:30: wake-path self-test, mail
+#                        only on failure.
 # Idempotent: existing tasks with these names are replaced.
-# Remove: Unregister-ScheduledTask -TaskName WorkbenchDashboard,MsiUdpWatchdog -Confirm:$false
+# Remove: Unregister-ScheduledTask -TaskName WorkbenchDashboard,MsiUdpWatchdog,CloneScan,WakeSelfTest -Confirm:$false
 
 $ErrorActionPreference = 'Stop'
 $repo = 'C:\Users\Jakub\PycharmProjects\ai-workbench'
@@ -20,6 +24,11 @@ function New-FiveMinuteLogonTrigger {
             -RepetitionDuration (New-TimeSpan -Days 1)
     ).Repetition
     return $trigger
+}
+
+function New-WeeklyTrigger {
+    param([string]$At = '06:00')
+    return New-ScheduledTaskTrigger -Weekly -At $At -DaysOfWeek Sunday
 }
 
 $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable `
@@ -38,6 +47,22 @@ $tasks = @(
         Script = 'scripts\msi-udp-watchdog.ps1'
         Description = 'Restart MSI Center service on UDP leak; record incidents.'
         RunLevel = 'Highest'
+    },
+    @{
+        Name = 'CloneScan'
+        Script = 'scripts\clone-scan-scheduled.ps1'
+        Description = 'Weekly duplication scan; inbox brief only on new groups.'
+        RunLevel = 'Limited'
+        Trigger = 'Weekly'
+        At = '06:00'
+    },
+    @{
+        Name = 'WakeSelfTest'
+        Script = 'scripts\wake-self-test.ps1'
+        Description = 'Weekly wake-path self-test; mail only on failure.'
+        RunLevel = 'Limited'
+        Trigger = 'Weekly'
+        At = '06:30'
     }
 )
 
@@ -49,7 +74,8 @@ foreach ($task in $tasks) {
         -Argument ('-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ' + $scriptPath)
     $principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" `
         -LogonType Interactive -RunLevel $task.RunLevel
-    Register-ScheduledTask -TaskName $task.Name -Trigger (New-FiveMinuteLogonTrigger) `
+    $trigger = if ($task.Trigger -eq 'Weekly') { New-WeeklyTrigger -At $task.At } else { New-FiveMinuteLogonTrigger }
+    Register-ScheduledTask -TaskName $task.Name -Trigger $trigger `
         -Action $action -Settings $settings -Principal $principal `
         -Description $task.Description | Out-Null
     "registered: $($task.Name) ($($task.RunLevel))"

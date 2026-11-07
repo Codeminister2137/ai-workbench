@@ -103,7 +103,7 @@ def test_responses_client_sends_session_header(monkeypatch):
             }
         )
 
-    monkeypatch.setattr("ai_provider.adapters.openai_responses.urlopen", send)
+    monkeypatch.setattr("ai_provider.adapters._responses_base.urlopen", send)
 
     client = OpenCodeGoResponsesClient(
         BackendConfig(provider=ProviderKind.OPENCODE_GO, model="grok-4.6", api_key="test-key")
@@ -138,7 +138,7 @@ def test_messages_client_sends_session_header(monkeypatch):
             }
         )
 
-    monkeypatch.setattr("ai_provider.adapters.anthropic_messages.urlopen", send)
+    monkeypatch.setattr("ai_provider.adapters._responses_base.urlopen", send)
 
     client = OpenCodeGoMessagesClient(
         BackendConfig(
@@ -170,7 +170,7 @@ def test_messages_client_hoists_system_prompt_to_top_level(monkeypatch):
             }
         )
 
-    monkeypatch.setattr("ai_provider.adapters.anthropic_messages.urlopen", send)
+    monkeypatch.setattr("ai_provider.adapters._responses_base.urlopen", send)
 
     client = OpenCodeGoMessagesClient(
         BackendConfig(
@@ -212,7 +212,7 @@ def test_responses_client_generates_session_header_when_missing(monkeypatch):
             }
         )
 
-    monkeypatch.setattr("ai_provider.adapters.openai_responses.urlopen", send)
+    monkeypatch.setattr("ai_provider.adapters._responses_base.urlopen", send)
 
     client = OpenCodeGoResponsesClient(
         BackendConfig(provider=ProviderKind.OPENCODE_GO, model="grok-4.6", api_key="test-key")
@@ -238,7 +238,7 @@ def test_messages_client_generates_session_header_when_missing(monkeypatch):
             }
         )
 
-    monkeypatch.setattr("ai_provider.adapters.anthropic_messages.urlopen", send)
+    monkeypatch.setattr("ai_provider.adapters._responses_base.urlopen", send)
 
     client = OpenCodeGoMessagesClient(
         BackendConfig(
@@ -268,7 +268,7 @@ def test_responses_stream_yields_text_and_final(monkeypatch):
             ]
         )
 
-    monkeypatch.setattr("ai_provider.adapters.openai_responses.urlopen", send)
+    monkeypatch.setattr("ai_provider.adapters._responses_base.urlopen", send)
 
     client = OpenCodeGoResponsesClient(
         BackendConfig(provider=ProviderKind.OPENCODE_GO, model="grok-4.6", api_key="test-key")
@@ -298,7 +298,7 @@ def test_messages_stream_yields_text_and_final(monkeypatch):
             ]
         )
 
-    monkeypatch.setattr("ai_provider.adapters.anthropic_messages.urlopen", send)
+    monkeypatch.setattr("ai_provider.adapters._responses_base.urlopen", send)
 
     client = OpenCodeGoMessagesClient(
         BackendConfig(
@@ -322,7 +322,7 @@ def test_generic_openai_responses_base_has_openai_base_url(monkeypatch):
         assert request.full_url == "https://api.openai.com/v1/responses"
         return Response({"output": [], "usage": {"input_tokens": 1, "output_tokens": 1}})
 
-    monkeypatch.setattr("ai_provider.adapters.openai_responses.urlopen", send)
+    monkeypatch.setattr("ai_provider.adapters._responses_base.urlopen", send)
 
     client = OpenAIResponsesChatClient(
         BackendConfig(provider=ProviderKind.OPENAI, model="gpt-5", api_key="test-key")
@@ -340,7 +340,7 @@ def test_generic_anthropic_messages_base_has_anthropic_base_url(monkeypatch):
         assert request.full_url == "https://api.anthropic.com/v1/messages"
         return Response({"content": [], "usage": {"input_tokens": 1, "output_tokens": 1}})
 
-    monkeypatch.setattr("ai_provider.adapters.anthropic_messages.urlopen", send)
+    monkeypatch.setattr("ai_provider.adapters._responses_base.urlopen", send)
 
     client = AnthropicMessagesChatClient(
         BackendConfig(provider=ProviderKind.OPENAI, model="claude-sonnet", api_key="test-key")
@@ -385,7 +385,7 @@ def test_responses_finish_reason_maps_status_and_incomplete_details(monkeypatch)
             }
         )
 
-    monkeypatch.setattr("ai_provider.adapters.openai_responses.urlopen", send)
+    monkeypatch.setattr("ai_provider.adapters._responses_base.urlopen", send)
 
     client = OpenAIResponsesChatClient(
         BackendConfig(provider=ProviderKind.OPENAI, model="gpt-5", api_key="test-key")
@@ -428,7 +428,7 @@ def test_messages_finish_reason_maps_stop_sequence(monkeypatch):
             }
         )
 
-    monkeypatch.setattr("ai_provider.adapters.anthropic_messages.urlopen", send)
+    monkeypatch.setattr("ai_provider.adapters._responses_base.urlopen", send)
 
     client = OpenCodeGoMessagesClient(
         BackendConfig(
@@ -479,7 +479,7 @@ def test_messages_stream_maps_stop_reason(monkeypatch):
         def send(request, *, timeout, _chunks=chunks):
             return Response(_chunks)
 
-        monkeypatch.setattr("ai_provider.adapters.anthropic_messages.urlopen", send)
+        monkeypatch.setattr("ai_provider.adapters._responses_base.urlopen", send)
 
         client = OpenCodeGoMessagesClient(
             BackendConfig(

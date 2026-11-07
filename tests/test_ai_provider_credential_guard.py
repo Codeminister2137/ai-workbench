@@ -47,12 +47,16 @@ def test_explicit_and_json_escaped_credentials_and_cycles():
 @pytest.mark.parametrize("stream", [False, True])
 @pytest.mark.parametrize("kind", ["chat", "responses", "messages", "meta", "modal", "ollama"])
 def test_protocols_refuse_before_any_transport(monkeypatch, kind, stream):
-    from ai_provider.adapters import anthropic_messages, ollama, openai_compatible, openai_responses
+    from ai_provider.adapters import (
+        _responses_base,
+        ollama,
+        openai_compatible,
+    )
 
     def forbidden(*args, **kwargs):
         pytest.fail("Credential-bearing input reached HTTP transport")
 
-    for module in (anthropic_messages, ollama, openai_compatible, openai_responses):
+    for module in (_responses_base, ollama, openai_compatible):
         monkeypatch.setattr(module, "urlopen", forbidden)
     monkeypatch.setenv("SYNTHETIC_API_KEY", SECRET)
     classes = {

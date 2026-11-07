@@ -206,6 +206,21 @@ def stage_file(root: Path, relpath: str, content: str) -> dict:
     }
 
 
+def staged_diffstat(base: str | None, staged: str) -> dict[str, int]:
+    """Count added/removed lines for one staged file (owner scope preview)."""
+    matcher = difflib.SequenceMatcher(None, (base or "").splitlines(), staged.splitlines())
+    added = removed = 0
+    for tag, base_start, base_end, new_start, new_end in matcher.get_opcodes():
+        if tag == "insert":
+            added += new_end - new_start
+        elif tag == "delete":
+            removed += base_end - base_start
+        elif tag == "replace":
+            added += new_end - new_start
+            removed += base_end - base_start
+    return {"added": added, "removed": removed}
+
+
 def staged_diff(base: str | None, staged: str, *, relpath: str) -> str:
     """Render one staged file as unified-diff text for owner review."""
     base_lines = (base or "").splitlines(keepends=True)
@@ -333,6 +348,7 @@ def review_staged(root: Path, staged: Iterable[Mapping]) -> list[dict]:
                 "digest": record["digest"],
                 "base_digest": record["base_digest"],
                 "diff": staged_diff(base, record["content"], relpath=relpath),
+                "diffstat": staged_diffstat(base, record["content"]),
             }
         )
     return views

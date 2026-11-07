@@ -14,7 +14,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from ai_agent import repo_coding_assistant as cli
 from ai_agent.processes import ProcessTool
-from ai_provider.adapters import openai_compatible, openai_responses
+from ai_provider.adapters import (
+    _responses_base,
+    openai_compatible,
+)
 from ai_provider.adapters.baseten import BASETEN_HACKATHON_MODEL
 from ai_provider.chat_transcripts import SQLiteChatTranscriptStore
 from ai_provider.foreground_tools import ACTIVE_FOREGROUND
@@ -144,7 +147,7 @@ def test_two_turn_chat_preserves_process_and_history_across_protocol_fallback(
     request.addfinalizer(stop_server)
     base = f"http://127.0.0.1:{server.server_port}/v1"
     for module, endpoint in (
-        (openai_responses, "/responses"),
+        (_responses_base, "/responses"),
         (openai_compatible, "/chat/completions"),
     ):
         original = module.urlopen

@@ -93,7 +93,7 @@ def test_openai_responses_body_bound_exceeded():
     client = _make_openai_responses_client()
     oversized = b"x" * (BOUND + 1)
     with patch(
-        "ai_provider.adapters.openai_responses.urlopen", return_value=FakeResponse(oversized)
+        "ai_provider.adapters._responses_base.urlopen", return_value=FakeResponse(oversized)
     ):
         with pytest.raises(ProviderError) as excinfo:
             client._post_responses({"model": "test-model"})
@@ -114,7 +114,7 @@ def test_anthropic_messages_body_bound_exceeded():
     )
     oversized = b"x" * (BOUND + 1)
     with patch(
-        "ai_provider.adapters.anthropic_messages.urlopen", return_value=FakeResponse(oversized)
+        "ai_provider.adapters._responses_base.urlopen", return_value=FakeResponse(oversized)
     ):
         with pytest.raises(ProviderError) as excinfo:
             client._post_messages({"model": "test-model", "messages": []})

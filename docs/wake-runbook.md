@@ -78,3 +78,7 @@ Steps (FunBox admin UI; exact menu labels vary by firmware):
 
 Record the chosen DDNS hostname shape here once decided (hostname only if
 it does not leak identity beyond what the repo already carries).
+
+## Automated monitoring (2026-11-07)
+
+`WakeSelfTest` weekly task (Sundays 06:30, Limited) runs `scripts/wake-self-test.py`: dashboard probe, NIC wake-armed check, public-IP lookup, DDNS resolution when `WAKE_DDNS_HOSTNAME` is configured, and Gmail SMTP login (no mail sent). Silent on success (one line in `artifacts/wake-self-test/runs.log`); a single owner mail on any failure. Registered via `scripts/register-watchdog-tasks.ps1` (elevated). Run manually any time: `.venv\Scripts\python.exe scripts/wake-self-test.py --dry-run`.

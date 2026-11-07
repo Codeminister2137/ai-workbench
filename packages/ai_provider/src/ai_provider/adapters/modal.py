@@ -10,7 +10,7 @@ readiness probe, since a dedicated Modal deployment need not implement it).
 from __future__ import annotations
 
 from ai_provider.adapters.openai_compatible import OpenAICompatibleChatClient
-from ai_provider.contracts import BackendInfo, BackendLocation, ModelCapabilities
+from ai_provider.contracts import BackendInfo, build_backend_info
 from ai_provider.errors import ProviderError, ProviderErrorCategory
 
 
@@ -19,12 +19,10 @@ class ModalRuntimeChatClient(OpenAICompatibleChatClient):
 
     @property
     def backend(self) -> BackendInfo:
-        return BackendInfo(
+        return build_backend_info(
             provider=self.config.provider.value,
             model=self.config.model,
-            location=BackendLocation.EXTERNAL,
             base_url=self.base_url,
-            capabilities=ModelCapabilities(chat=True, streaming=True, tools=True),
         )
 
     @property
