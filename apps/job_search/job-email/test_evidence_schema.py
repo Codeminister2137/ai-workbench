@@ -151,3 +151,71 @@ def test_source_kinds_accept_only_lawful_closed_set() -> None:
 def test_unknown_source_kind_rejected(kind: str) -> None:
     with pytest.raises(ValueError, match="unknown evidence source kinds"):
         SkillEvidence("Python", EvidenceStatus.DEMONSTRATED, source_kinds=(kind,))
+
+
+def test_verdicts_carry_status_and_provenance() -> None:
+    profile = CandidateProfile(
+        applicant_name="Provenance Case",
+        applicant_location="Nowhere",
+        applicant_summary="Synthetic.",
+        portfolio_url="https://example.invalid",
+        linkedin_url="https://example.invalid",
+        skills={
+            "Python": SkillEvidence(
+                "Python", EvidenceStatus.DEMONSTRATED, source_kinds=("cv", "github")
+            ),
+        },
+    )
+    vacancy = JobVacancy(
+        id="vac-verdicts",
+        company="Example Corp",
+        title="Python Developer",
+        location="Remote",
+        description="Synthetic vacancy.",
+        required_skills=("Python", "Rust"),
+    )
+    result = analyze_vacancy_fit(vacancy, profile)
+    by_requirement = {v.requirement: v for v in result.verdicts}
+    assert by_requirement["Python"].verdict == "strong"
+    assert by_requirement["Python"].source_kinds == ("cv", "github")
+    assert by_requirement["Rust"].verdict == "missing"
+    assert by_requirement["Rust"].source_kinds == ()
+
+
+def test_verdict_labels_cover_all_states(synthetic_profile: CandidateProfile) -> None:
+    vacancy = JobVacancy(
+        id="vac-labels",
+        company="Example Corp",
+        title="Generalist",
+        location="Remote",
+        description="Synthetic vacancy.",
+        required_skills=("Python", "Docker", "Kubernetes", "Cobol"),
+    )
+    result = analyze_vacancy_fit(vacancy, synthetic_profile)
+    assert [v.verdict for v in result.verdicts] == [
+        "strong",
+        "partial",
+        "uncertain",
+        "missing",
+    ]
+
+
+def test_uncertainty_flags_name_empty_inputs(synthetic_profile: CandidateProfile) -> None:
+    bare = JobVacancy(
+        id="vac-bare",
+        company="Example Corp",
+        title="Mystery Role",
+        location="Remote",
+    )
+    result = analyze_vacancy_fit(bare, synthetic_profile)
+    assert "no_explicit_skills" in result.uncertainty_flags
+    assert "empty_description" in result.uncertainty_flags
+    solid = JobVacancy(
+        id="vac-solid",
+        company="Example Corp",
+        title="Python Developer",
+        location="Remote",
+        description="Synthetic vacancy.",
+        required_skills=("Python",),
+    )
+    assert analyze_vacancy_fit(solid, synthetic_profile).uncertainty_flags == ()
