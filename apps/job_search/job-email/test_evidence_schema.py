@@ -9,7 +9,13 @@ from __future__ import annotations
 
 import pytest
 from evidence import analyze_vacancy_fit, verify_application_claims
-from models import CandidateProfile, EvidenceStatus, JobVacancy, SkillEvidence
+from models import (
+    EVIDENCE_SOURCE_KINDS,
+    CandidateProfile,
+    EvidenceStatus,
+    JobVacancy,
+    SkillEvidence,
+)
 
 
 @pytest.fixture
@@ -129,3 +135,19 @@ def test_vacancy_with_only_unknown_skills_scores_zero(synthetic_profile: Candida
     assert result.missing_requirements == ("Rust",)
     assert result.match_score == 0.0
     assert result.has_critical_gaps is True
+
+
+def test_source_kinds_default_empty_for_backward_compatibility() -> None:
+    assert SkillEvidence("Python", EvidenceStatus.DEMONSTRATED).source_kinds == ()
+
+
+def test_source_kinds_accept_only_lawful_closed_set() -> None:
+    assert EVIDENCE_SOURCE_KINDS == {"cv", "github", "linkedin_export", "manual"}
+    evidence = SkillEvidence("Python", EvidenceStatus.DEMONSTRATED, source_kinds=("cv", "github"))
+    assert evidence.source_kinds == ("cv", "github")
+
+
+@pytest.mark.parametrize("kind", ["linkedin_scrape", "apollo", "CV", ""])
+def test_unknown_source_kind_rejected(kind: str) -> None:
+    with pytest.raises(ValueError, match="unknown evidence source kinds"):
+        SkillEvidence("Python", EvidenceStatus.DEMONSTRATED, source_kinds=(kind,))

@@ -48,6 +48,9 @@ def utc_now_iso() -> str:
     return datetime.now(UTC).isoformat()
 
 
+EVIDENCE_SOURCE_KINDS = frozenset({"cv", "github", "linkedin_export", "manual"})
+
+
 @dataclass(frozen=True, slots=True)
 class SkillEvidence:
     """Evidence record for a single skill or claim in the candidate profile.
@@ -59,6 +62,12 @@ class SkillEvidence:
     status: EvidenceStatus
     notes: str = ""
     evidence_sources: tuple[str, ...] = ()
+    source_kinds: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        unknown = sorted(k for k in self.source_kinds if k not in EVIDENCE_SOURCE_KINDS)
+        if unknown:
+            raise ValueError(f"unknown evidence source kinds: {unknown}")
 
     def is_claim_permitted(self) -> bool:
         """Return True if this skill is backed by demonstrated or adjacent evidence."""
