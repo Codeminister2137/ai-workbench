@@ -1,23 +1,29 @@
 # Backup of company-sensitive working docs (NOT secrets).
 # A: push allowlisted private dirs to the private ai-workbench-private repo.
-# B: write a timestamped zip snapshot under artifacts/private-snapshots/.
+# B: write a timestamped zip snapshot to a SECOND physical disk
+#    (default G:\ai-workbench-backup; G: is disk 1, the C: checkout is disk 2).
+#    Snapshot covers plans + library + research + data/ (incl. sqlite); push
+#    stays plans + library only per the approved design (inbox 1b310ead A+B).
 # Fail-closed: any denylisted filename (env/secret/credential/key material)
-# anywhere in the staged set aborts before any push or zip is written.
+# anywhere in the staged set aborts before any push or zip is written, and a
+# missing snapshot drive aborts instead of silently falling back to C:.
 param(
     [switch] $NoPush,
     [switch] $NoSnapshot,
-    [string] $RemoteUrl = "git@github.com:Codeminister2137/ai-workbench-private.git"
+    [string] $RemoteUrl = "git@github.com:Codeminister2137/ai-workbench-private.git",
+    [string] $SnapshotDir = "G:\ai-workbench-backup"
 )
 
 $ErrorActionPreference = "Stop"
 $RepoRoot = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 $Sources = @("docs/library-private", "docs/plans")
+$SnapshotSources = @("docs/library-private", "docs/plans", "research", "data")
 $DenyList = @("*.env", "*secret*", "*credential*", "*.pem", "*.key", "id_*", "*.pfx", "*.p12")
 $MaxFileBytes = 25MB
 
-function Get-StagedFiles {
+function Get-StagedFiles([string[]] $Sets) {
     $files = @()
-    foreach ($rel in $Sources) {
+    foreach ($rel in $Sets) {
         $dir = Join-Path $RepoRoot $rel
         if (-not (Test-Path $dir)) { continue }
         $files += Get-ChildItem $dir -Recurse -File
@@ -54,22 +60,25 @@ function Assert-BackupSafe($files) {
     }
 }
 
-$files = Get-StagedFiles
+$files = Get-StagedFiles $Sources
 if ($files.Count -eq 0) { throw "Nothing to back up: no files under $($Sources -join ', ')" }
 Assert-BackupSafe $files
-Write-Host "Manifest: $($files.Count) files, $([math]::Round(($files | Measure-Object Length -Sum).Sum / 1KB, 1)) KB"
+$snapFiles = Get-StagedFiles $SnapshotSources
+Assert-BackupSafe $snapFiles
+Write-Host "Manifest: $($files.Count) push files, $($snapFiles.Count) snapshot files, $([math]::Round(($snapFiles | Measure-Object Length -Sum).Sum / 1KB, 1)) KB snapshot"
 
 if (-not $NoSnapshot) {
-    $snapDir = Join-Path $RepoRoot "artifacts/private-snapshots"
-    New-Item -ItemType Directory -Force -Path $snapDir | Out-Null
+    $snapDrive = Split-Path -Qualifier $SnapshotDir
+    if (-not (Test-Path $snapDrive)) { throw "Snapshot drive missing: $snapDrive (refusing C: fallback)" }
+    New-Item -ItemType Directory -Force -Path $SnapshotDir | Out-Null
     $stage = Join-Path ([IO.Path]::GetTempPath()) "wb-private-snap"
     if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
-    foreach ($rel in $Sources) {
+    foreach ($rel in $SnapshotSources) {
         $src = Join-Path $RepoRoot $rel
         if (Test-Path $src) { Copy-Item $src (Join-Path $stage $rel) -Recurse -Force }
     }
     $stamp = (Get-Date).ToUniversalTime().ToString("yyyyMMddTHHmmssZ")
-    $zip = Join-Path $snapDir "private-$stamp.zip"
+    $zip = Join-Path $SnapshotDir "private-$stamp.zip"
     Compress-Archive -Path (Join-Path $stage "*") -DestinationPath $zip -Force
     Remove-Item $stage -Recurse -Force
     Write-Host "Snapshot: $zip"

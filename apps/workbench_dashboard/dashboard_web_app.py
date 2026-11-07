@@ -174,6 +174,7 @@ FLEET_TASKS = (
     "UDPPortExhaustionTrap",
     "CloneScan",
     "WakeSelfTest",
+    "PrivateBackup",
 )
 FLEET_TERMINAL_RUN_STATUSES = frozenset({"completed", "failed", "cancelled", "canceled", "merged"})
 
