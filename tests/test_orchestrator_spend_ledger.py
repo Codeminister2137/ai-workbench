@@ -197,3 +197,24 @@ class TestGrantFiles:
         path.write_text(json.dumps({"blob": "x" * 9000}), encoding="utf-8")
         with pytest.raises(ValueError, match="exceeds 8192"):
             allowance_from_file(path)
+
+
+def test_status_reports_spend_by_operation():
+    ledger = _ledger()
+    ledger.add_allowance(_allowance("exp", granted_cents=500))
+    for task_id, task_class, estimate, actual in [
+        ("s1", "stt:audio", 1, 1),
+        ("s2", "stt:audio", 1, 1),
+        ("e1", "eval", 100, 90),
+    ]:
+        admission = ledger.admit(
+            task_id=task_id, task_class=task_class, estimated_cents=estimate, provider="meta"
+        )
+        assert admission.decision == "admitted"
+        assert admission.reservation is not None
+        ledger.settle(admission.reservation.id, actual_cents=actual)
+    view = ledger.status()
+    assert view["by_operation"] == {
+        "stt:audio": {"calls": 2, "actual_cents": 2},
+        "eval": {"calls": 1, "actual_cents": 90},
+    }

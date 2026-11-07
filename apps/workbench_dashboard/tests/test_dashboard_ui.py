@@ -155,8 +155,19 @@ def test_glossary_explains_codes_on_hover() -> None:
     assert "GLOSSARY" in js
     assert "<abbr title=" in js
     assert "gtext(plan.title" in js
-    assert "no engine wired" in js
+    assert "Meta server + browser fallback" in js
+    assert "no engine wired" not in js
     assert "Web Speech v1 live" not in js
+
+
+def test_dictate_slices_and_falls_back() -> None:
+    """Dictate auto-slices at 55 s and falls back to browser speech."""
+    js = _read("app.js")
+    assert "recorder.start(55000)" in js
+    assert "transcribeSegment" in js
+    assert "dictateViaBrowser" in js
+    assert "window.SpeechRecognition || window.webkitSpeechRecognition" in js
+    assert "Dictated via browser fallback" in js
 
 
 def test_status_pills_have_css() -> None:
@@ -368,7 +379,7 @@ def test_chat_thread_has_dictate_button() -> None:
     """Chat threads dictate via the transcribe endpoint with honest failure copy."""
     js = _read("app.js")
     assert 'id="dictate-btn"' in js
-    assert 'title="Dictate with the microphone (server transcription)"' in js
+    assert 'title="Dictate with the microphone (Meta server first, browser fallback)"' in js
     assert "/api/stt/transcribe" in js
     assert "MediaRecorder" in js
     assert "Stop (recording...)" in js

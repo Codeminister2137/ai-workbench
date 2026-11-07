@@ -68,7 +68,7 @@ const GLOSSARY = {
   W4: "Edge finding: malformed poll JSON bypassed cancel-on-abandon (fixed)",
   H1: "Edge finding: hosted runs queued but never drained",
   M1: "Edge finding: failed live inference dropped the chat message",
-  STT: "Speech-to-text dictation (no engine wired; Dictate unavailable pending STT decision)",
+  STT: "Speech-to-text dictation (Meta server + browser fallback; auto-slices at 55 s)",
   R1: "Backlog: company offering drafts",
   R2: "Backlog: Codeministry name + legality research",
   R3: "Backlog: marketing + social bots research",
@@ -430,7 +430,7 @@ async function renderChatThread(id, initial) {
     <form class="inline" id="chat-form"><input type="text" name="text" placeholder="Message..." title="Message the supervisor" required>
     <button type="submit" title="Send message">Send</button>
     <button type="button" id="run-request-btn" title="Queue this message as an agent run (needs inbox approval)">Request run</button>
-    <button type="button" id="dictate-btn" title="Dictate with the microphone (server transcription)">Dictate</button></form>
+    <button type="button" id="dictate-btn" title="Dictate with the microphone (Meta server first, browser fallback)">Dictate</button></form>
     <p><select id="project-picker" title="Project for the next run request (optional)"></select>
     <span id="project-note" class="muted"></span></p>
     <p><select id="plan-picker" title="Plan this run implements (optional)"></select>
@@ -529,42 +529,99 @@ async function renderChatThread(id, initial) {
   });
   loadProjectPicker();
   loadPlanPicker();
+  const dictateLang = () => ((navigator.language || "en").toLowerCase().startsWith("pl") ? "pl" : "en");
+  async function transcribeSegment(blob, index) {
+    const data = new FormData();
+    data.append("audio", blob, "clip-" + index + ".webm");
+    data.append("language", dictateLang());
+    const res = await fetch("/api/stt/transcribe", {method: "POST", body: data});
+    const out = await res.json();
+    if (!res.ok || !out.ok) throw new Error(out.error || ("Transcription failed (" + res.status + ")"));
+    return out;
+  }
+  async function dictateViaBrowser() {
+    const Engine = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!Engine) {
+      toast("Dictation failed and no browser speech engine exists — type instead", false);
+      return;
+    }
+    dictateBtn.textContent = "Listening (browser fallback)...";
+    toast("Server transcription failed — browser fallback listening, speak now", true);
+    try {
+      const text = await new Promise((resolve, reject) => {
+        let settled = false;
+        const rec = new Engine();
+        rec.lang = dictateLang() === "pl" ? "pl-PL" : "en-US";
+        rec.interimResults = false;
+        rec.maxAlternatives = 1;
+        rec.onresult = (ev) => {
+          if (!settled) { settled = true; resolve(ev.results[0][0].transcript); }
+        };
+        rec.onerror = (ev) => {
+          if (!settled) { settled = true; reject(new Error(ev.error || "recognition error")); }
+        };
+        rec.onend = () => {
+          if (!settled) { settled = true; reject(new Error("no speech heard")); }
+        };
+        rec.start();
+      });
+      form.text.value = (form.text.value ? form.text.value + " " : "") + text;
+      toast("Dictated via browser fallback", true);
+    } catch (err) {
+      toast("Browser dictation failed: " + err.message + " — type instead", false);
+    } finally {
+      dictateBtn.textContent = "Dictate";
+    }
+  }
   let dictationRecorder = null;
+  let dictationSegments = [];
   const dictateBtn = document.getElementById("dictate-btn");
   dictateBtn.addEventListener("click", async () => {
     if (dictationRecorder) { dictationRecorder.stop(); return; }
     if (!navigator.mediaDevices || !window.MediaRecorder) {
-      toast("Dictation needs microphone + MediaRecorder support", false);
+      dictateViaBrowser();
       return;
     }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({audio: true});
-      const chunks = [];
+      dictationSegments = [];
       const recorder = new MediaRecorder(stream);
       dictationRecorder = recorder;
       dictateBtn.dataset.live = "1";
       dictateBtn.textContent = "Stop (recording...)";
-      recorder.ondataavailable = (ev) => { if (ev.data.size) chunks.push(ev.data); };
+      recorder.ondataavailable = (ev) => { if (ev.data.size) dictationSegments.push(ev.data); };
       recorder.onstop = async () => {
         stream.getTracks().forEach((t) => t.stop());
         dictationRecorder = null;
         dictateBtn.dataset.live = "";
         dictateBtn.textContent = "Dictate";
-        const lang = (navigator.language || "en").toLowerCase().startsWith("pl") ? "pl" : "en";
-        try {
-          const data = new FormData();
-          data.append("audio", new Blob(chunks, {type: recorder.mimeType || "audio/webm"}), "clip.webm");
-          data.append("language", lang);
-          const res = await fetch("/api/stt/transcribe", {method: "POST", body: data});
-          const out = await res.json();
-          if (!res.ok || !out.ok) throw new Error(out.error || ("Transcription failed (" + res.status + ")"));
-          form.text.value = out.text;
-          toast("Dictated (" + out.language + ", " + out.billed_seconds + "s billed)", true);
-        } catch (err) {
-          toast("Dictation failed: " + err.message + " — type instead", false);
+        const texts = [];
+        let billed = 0;
+        let failed = null;
+        for (let i = 0; i < dictationSegments.length && !failed; i++) {
+          try {
+            const out = await transcribeSegment(dictationSegments[i], i);
+            texts.push(out.text);
+            billed += out.billed_seconds || 0;
+          } catch (err) {
+            failed = err;
+          }
+        }
+        dictationSegments = [];
+        if (texts.length) form.text.value = texts.join(" ");
+        if (!failed) {
+          toast("Dictated (" + dictateLang() + ", " + billed + "s billed)", true);
+        } else if (texts.length) {
+          toast("Partial dictation kept; server failed (" + failed.message + ") — browser fallback next", false);
+          dictateViaBrowser();
+        } else {
+          toast("Dictation failed: " + failed.message + " — trying browser fallback", false);
+          dictateViaBrowser();
         }
       };
-      recorder.start();
+      // 55 s slices stay under the server 60 s cap; long recordings transcribe
+      // sequentially instead of being whole-clip rejected (6f89d44d).
+      recorder.start(55000);
     } catch (err) {
       toast("Microphone unavailable: " + err.message, false);
     }
