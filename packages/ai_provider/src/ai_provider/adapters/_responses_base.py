@@ -16,7 +16,13 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request
 
 from ai_provider.config import BackendConfig
-from ai_provider.contracts import AIMessage, AIRequest, AIResponse, UsageMetadata
+from ai_provider.contracts import (
+    AIMessage,
+    AIRequest,
+    AIResponse,
+    BackendInfo,
+    UsageMetadata,
+)
 from ai_provider.errors import (
     ProviderError,
     ProviderErrorCategory,
@@ -39,6 +45,10 @@ class _ResponsesProtocolBase:
 
     @property
     def base_url(self) -> str:
+        raise NotImplementedError
+
+    @property
+    def backend(self) -> BackendInfo:
         raise NotImplementedError
 
     def _headers(self) -> dict[str, str]:
@@ -178,9 +188,10 @@ class _ResponsesProtocolBase:
         raise NotImplementedError
 
     def _response_from_raw(
-        self, raw: dict[str, Any], *, model: str, latency_ms: float
+        self, raw_response: dict[str, Any], *, model: str, latency_ms: float
     ) -> AIResponse:
         raise NotImplementedError
 
-    def _usage_from_response(self, raw: dict[str, Any]) -> UsageMetadata:
+    @staticmethod
+    def _usage_from_response(raw_response: dict[str, Any]) -> UsageMetadata:
         raise NotImplementedError
