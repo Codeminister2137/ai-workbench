@@ -57,7 +57,7 @@ def test_static_controls_have_titles() -> None:
     for tag in re.findall(r"<button\b[^>]*>", html):
         assert "title=" in tag, f"button without title: {tag}"
     nav_links = re.findall(r"<a\b[^>]*data-view[^>]*>", html)
-    assert len(nav_links) == 10  # +intake, +restrictions
+    assert len(nav_links) == 11  # +intake, +restrictions, +fleet
     for tag in nav_links:
         assert "title=" in tag, f"nav link without title: {tag}"
 
@@ -521,3 +521,15 @@ def test_home_shows_spend_card() -> None:
     assert "<h2>Spend</h2>" in js
     assert 'await api("/api/spend")' in js
     assert "No spend grants configured" in js
+
+
+def test_fleet_tab_markers() -> None:
+    """Fleet tab is wired: nav, route, live endpoint, sections."""
+    js = _read("app.js")
+    html = _read("index.html")
+    assert 'data-view="fleet"' in html
+    assert 'name === "fleet"' in js
+    assert 'await api("/api/fleet")' in js
+    assert "<h2>Watchdog tasks</h2>" in js
+    assert "<h2>Active runs</h2>" in js
+    assert "<h2>Sleep guard</h2>" in js

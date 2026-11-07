@@ -8,7 +8,12 @@ from urllib.request import Request, urlopen
 
 import pytest
 from dashboard_test_http import get_json
-from dashboard_web_app import DashboardRequestHandler
+from dashboard_web_app import (
+    DashboardRequestHandler,
+    fleet_ollama,
+    fleet_sleep,
+    fleet_tasks,
+)
 
 
 def post_json(base: str, path: str, payload: dict, headers: dict | None = None) -> dict:
@@ -471,3 +476,109 @@ def test_spend_duplicate_grant_id_is_400(dashboard_server, tmp_path) -> None:
         get_json(dashboard_server, "/api/spend")
     assert raised.value.code == 400
     raised.value.close()
+
+
+def test_fleet_shape_with_stubbed_probes(dashboard_server, monkeypatch) -> None:
+    monkeypatch.setattr(
+        "dashboard_web_app.fleet_tasks",
+        lambda runner=None: [
+            {
+                "name": "WorkbenchDashboard",
+                "present": True,
+                "state": "Ready",
+                "last_run": "2026-11-07T15:00:00",
+                "next_run": "2026-11-07T15:05:00",
+                "last_result": 0,
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        "dashboard_web_app.fleet_ollama", lambda urlopen=None: {"up": True, "models": 2}
+    )
+    monkeypatch.setattr(
+        "dashboard_web_app.fleet_sleep",
+        lambda repo_root: {"active": True, "status": "sleep_scheduled"},
+    )
+    payload = get_json(dashboard_server, "/api/fleet")
+    assert payload["ok"] is True
+    assert set(payload["fleet"]) == {"dashboard", "ollama", "tasks", "sleep", "runs"}
+    assert payload["fleet"]["dashboard"] == {"up": True}
+    assert payload["fleet"]["ollama"] == {"up": True, "models": 2}
+    assert payload["fleet"]["tasks"][0]["name"] == "WorkbenchDashboard"
+    assert payload["fleet"]["runs"] == []
+
+
+def test_fleet_tasks_parses_probe_output(monkeypatch) -> None:
+    monkeypatch.setattr("sys.platform", "win32")
+
+    class _Done:
+        stdout = json.dumps(
+            [
+                {
+                    "name": "WorkbenchDashboard",
+                    "present": True,
+                    "state": "Ready",
+                    "last_run": "a",
+                    "next_run": "b",
+                    "last_result": 0,
+                },
+                {"name": "MsiUdpWatchdog", "present": False},
+            ]
+        )
+
+    rows = {row["name"]: row for row in fleet_tasks(runner=lambda *a, **k: _Done())}
+    assert rows["WorkbenchDashboard"]["state"] == "Ready"
+    assert rows["WorkbenchDashboard"]["last_result"] == 0
+    assert rows["MsiUdpWatchdog"] == {
+        "name": "MsiUdpWatchdog",
+        "present": False,
+        "detail": "not registered",
+    }
+    assert rows["CloneScan"]["present"] is False  # probe row missing entirely
+
+
+def test_fleet_tasks_non_windows_is_gap(monkeypatch) -> None:
+    monkeypatch.setattr("sys.platform", "linux")
+    rows = fleet_tasks(runner=lambda *a, **k: None)
+    assert len(rows) == 5
+    assert all(row["detail"] == "task probe is Windows-only" for row in rows)
+
+
+def test_fleet_tasks_reports_runner_failure(monkeypatch) -> None:
+    monkeypatch.setattr("sys.platform", "win32")
+
+    def boom(*args, **kwargs):
+        raise OSError("no powershell")
+
+    rows = fleet_tasks(runner=boom)
+    assert len(rows) == 5
+    assert all(row["present"] is False for row in rows)
+    assert rows[0]["detail"] == "probe failed: OSError"
+
+
+def test_fleet_ollama_down() -> None:
+    def refused(*args, **kwargs):
+        raise ConnectionRefusedError("down")
+
+    assert fleet_ollama(urlopen=refused)["up"] is False
+
+
+def test_fleet_sleep_idle_and_armed(tmp_path) -> None:
+    assert fleet_sleep(tmp_path) == {"active": False}
+    receipts = tmp_path / ".tmp" / "unattended-x"
+    receipts.mkdir(parents=True)
+    (receipts / "sleep-startup.json").write_text(
+        json.dumps(
+            {
+                "status": "sleep_scheduled",
+                "planned_sleep_utc": "due",
+                "window_deadline_utc": "deadline",
+                "process_id": 1234,
+            }
+        ),
+        encoding="utf-8",
+    )
+    summary = fleet_sleep(tmp_path)
+    assert summary["active"] is True
+    assert summary["pid"] == 1234
+    assert summary["receipt"] == "sleep-startup.json"

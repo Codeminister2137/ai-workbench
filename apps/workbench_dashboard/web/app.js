@@ -1043,6 +1043,34 @@ function renderSchedule() {
     <p class="muted">Read-only until the P5 scheduler exists. Queued work today lives in plans and runs.</p>`;
 }
 
+async function renderFleet() {
+  let body = "";
+  try {
+    const payload = await api("/api/fleet");
+    const f = payload.fleet;
+    const taskRows = f.tasks.map((t) =>
+      `<li><span class="pill st-${t.present ? esc((t.state || "unknown").replace(/\s+/g, "-")) : "missing"}">${t.present ? esc(t.state || "unknown") : "missing"}</span> <strong>${esc(t.name)}</strong>` +
+      (t.present
+        ? ` <span class="muted">last ${esc(t.last_run || "?")} · next ${esc(t.next_run || "?")} · result ${esc(t.last_result ?? "?")}</span>`
+        : ` <span class="muted">${esc(t.detail || "")}</span>`) + `</li>`).join("");
+    const runRows = f.runs.length
+      ? f.runs.map((r) => `<li><a href="#/runs/${esc(r.id)}">${esc(r.title || r.id)}</a> <span class="pill">${esc(r.status || "")}</span> <span class="muted">${esc(r.updated || "")}</span></li>`).join("")
+      : '<li class="muted">No active runs.</li>';
+    const sleep = f.sleep.active
+      ? `Armed — due ${esc(f.sleep.due_utc || "?")}, deadline ${esc(f.sleep.deadline_utc || "?")} (PID ${esc(f.sleep.pid ?? "?")})`
+      : `Idle (${esc(f.sleep.status || "no receipt")})`;
+    body = `<div class="card"><h2>Servers</h2><ul class="plain">
+      <li><span class="pill st-ready">up</span> <strong>dashboard</strong> <span class="muted">this server</span></li>
+      <li><span class="pill st-${f.ollama.up ? "ready" : "missing"}">${f.ollama.up ? "up" : "down"}</span> <strong>ollama</strong> <span class="muted">${f.ollama.up ? esc(f.ollama.models) + " model(s)" : esc(f.ollama.detail || "")}</span></li></ul></div>
+      <div class="card"><h2>Watchdog tasks</h2><ul class="plain">${taskRows}</ul></div>
+      <div class="card"><h2>Sleep guard</h2><p>${sleep}</p></div>
+      <div class="card"><h2>Active runs</h2><ul class="plain">${runRows}</ul></div>`;
+  } catch (err) {
+    body = `<div class="card"><h2>Fleet</h2><p class="muted">Fleet unavailable: ${esc(err.message)}</p></div>`;
+  }
+  view.innerHTML = `<h1>Fleet</h1><p class="muted">Probed live on open. Watchdogs, servers, sleep guard, active runs.</p>${body}`;
+}
+
 function renderRestrictions() {
   // v1: static definitions only. No enforcement source of truth exists yet,
   // so every dimension is honestly "not yet evaluated" with its feeder named.
@@ -1103,6 +1131,7 @@ async function render() {
     else if (name === "documents") await renderDocuments(id);
     else if (name === "intake") await renderIntake();
     else if (name === "schedule") renderSchedule();
+    else if (name === "fleet") await renderFleet();
     else if (name === "restrictions") renderRestrictions();
     else if (name === "create" && id) renderCreate(id);
     else view.innerHTML = "<h1>Not found</h1>";

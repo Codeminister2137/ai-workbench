@@ -5,7 +5,10 @@ from __future__ import annotations
 import argparse
 import json
 import socket
+import subprocess
+import sys
 import threading
+import urllib.request
 from collections.abc import Callable
 from datetime import UTC, datetime
 from http import HTTPStatus
@@ -117,6 +120,147 @@ def spend_status(data_dir: Path) -> dict[str, Any]:
     return view
 
 
+FLEET_TASKS = (
+    "WorkbenchDashboard",
+    "MsiUdpWatchdog",
+    "UDPPortExhaustionTrap",
+    "CloneScan",
+    "WakeSelfTest",
+)
+FLEET_TERMINAL_RUN_STATUSES = frozenset({"completed", "failed", "cancelled", "canceled", "merged"})
+
+
+def _fleet_task_script() -> str:
+    names = ",".join(f"'{name}'" for name in FLEET_TASKS)
+    return (
+        f"$names = {names};"
+        " $out = foreach ($n in $names) {"
+        " $t = Get-ScheduledTask -TaskName $n -ErrorAction SilentlyContinue;"
+        " if (-not $t) { [pscustomobject]@{name=$n; present=$false}; continue };"
+        " $i = try { $t | Get-ScheduledTaskInfo -ErrorAction Stop } catch { $null };"
+        " $lr = $null; $nr = $null; $res = $null;"
+        " if ($i -and $i.LastRunTime) { $lr = $i.LastRunTime.ToString('o') };"
+        " if ($i -and $i.NextRunTime) { $nr = $i.NextRunTime.ToString('o') };"
+        " if ($i -and $null -ne $i.LastTaskResult) { $res = $i.LastTaskResult };"
+        " [pscustomobject]@{name=$n; present=$true; state=$t.State.ToString();"
+        " last_run=$lr; next_run=$nr; last_result=$res} };"
+        " $out | ConvertTo-Json -Compress"
+    )
+
+
+def fleet_tasks(runner=None) -> list[dict[str, Any]]:
+    """Probe owned Windows scheduled tasks; fail-soft (a gap is data)."""
+
+    def _missing(detail: str) -> list[dict[str, Any]]:
+        return [{"name": name, "present": False, "detail": detail} for name in FLEET_TASKS]
+
+    if sys.platform != "win32":
+        return _missing("task probe is Windows-only")
+    run = runner or subprocess.run
+    try:
+        completed = run(
+            ["powershell", "-NoProfile", "-Command", _fleet_task_script()],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+    except Exception as exc:  # noqa: BLE001 - health board never raises
+        return _missing(f"probe failed: {type(exc).__name__}")
+    try:
+        payload = json.loads(completed.stdout or "null")
+    except ValueError:
+        return _missing("unparseable probe output")
+    rows = payload if isinstance(payload, list) else [payload]
+    by_name = {row.get("name"): row for row in rows if isinstance(row, dict)}
+    probed = []
+    for name in FLEET_TASKS:
+        row = by_name.get(name)
+        if not isinstance(row, dict) or not row.get("present"):
+            probed.append({"name": name, "present": False, "detail": "not registered"})
+            continue
+        probed.append(
+            {
+                "name": name,
+                "present": True,
+                "state": str(row.get("state") or "unknown"),
+                "last_run": row.get("last_run"),
+                "next_run": row.get("next_run"),
+                "last_result": row.get("last_result"),
+            }
+        )
+    return probed
+
+
+def fleet_ollama(urlopen=None) -> dict[str, Any]:
+    """Probe the local Ollama server; fail-soft."""
+    opener = urlopen or urllib.request.urlopen
+    try:
+        with opener("http://127.0.0.1:11434/api/tags", timeout=4) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+    except Exception as exc:  # noqa: BLE001 - health board never raises
+        return {"up": False, "detail": f"{type(exc).__name__}: {exc}"[:200]}
+    models = payload.get("models", []) if isinstance(payload, dict) else []
+    return {"up": True, "models": len(models)}
+
+
+def fleet_sleep(repo_root: Path) -> dict[str, Any]:
+    """Summarize the newest unattended sleep receipt; idle when none."""
+    try:
+        receipts = sorted(
+            (repo_root / ".tmp").glob("unattended-*/sleep-*.json"),
+            key=lambda path: path.stat().st_mtime,
+        )
+    except OSError:
+        return {"active": False}
+    if not receipts:
+        return {"active": False}
+    try:
+        payload = json.loads(receipts[-1].read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {"active": False, "detail": f"unreadable {receipts[-1].name}"}
+    if not isinstance(payload, dict):
+        return {"active": False, "detail": f"unreadable {receipts[-1].name}"}
+    status = payload.get("status")
+    return {
+        "active": status == "sleep_scheduled",
+        "status": status,
+        "due_utc": payload.get("planned_sleep_utc"),
+        "deadline_utc": payload.get("window_deadline_utc"),
+        "pid": payload.get("process_id"),
+        "receipt": receipts[-1].name,
+    }
+
+
+def fleet_runs(stores) -> list[dict[str, Any]]:
+    """Non-terminal runs (live work plus anything awaiting merge/review)."""
+    try:
+        items, _total = stores.runs.list(limit=100)
+    except Exception:  # noqa: BLE001 - health board never raises
+        return []
+    return [
+        {
+            "id": run.get("id"),
+            "title": run.get("title") or run.get("id"),
+            "status": run.get("status"),
+            "updated": run.get("updated_at_utc"),
+        }
+        for run in items
+        if isinstance(run, dict) and (run.get("status") or "") not in FLEET_TERMINAL_RUN_STATUSES
+    ]
+
+
+def fleet_status(repo_root: Path, stores) -> dict[str, Any]:
+    """Aggregate live fleet probes; every probe is fail-soft."""
+    return {
+        "dashboard": {"up": True},
+        "ollama": fleet_ollama(),
+        "tasks": fleet_tasks(),
+        "sleep": fleet_sleep(repo_root),
+        "runs": fleet_runs(stores),
+    }
+
+
 def evidence_snapshot(repo_root: Path = REPO_ROOT) -> dict[str, Any]:
     """Merge the newest probe/eval snapshots into dashboard evidence rows."""
     probe_file, probes = latest_snapshot(repo_root / "artifacts" / "route-probes", "route-probe")
@@ -224,6 +368,10 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 return self._send_json({"ok": True, **evidence_snapshot(self.repo_root)})
             if path == "/api/spend":
                 return self._send_json({"ok": True, "spend": spend_status(self.data_dir)})
+            if path == "/api/fleet":
+                return self._send_json(
+                    {"ok": True, "fleet": fleet_status(self.repo_root, self._stores())}
+                )
             if path == "/api/work-roots":
                 return self._send_work_roots(config)
             if path == "/api/settings":
