@@ -36,3 +36,20 @@ Future deployment must explicitly bind the server to loopback, configure its
 API token, and resolve its persistence/embedding configuration. The bare web
 entrypoint binds all interfaces; embeddings may download assets by default.
 No deployment settings, credentials or downloads are supplied by this patch.
+
+## Trial findings (loop7, 2026-11-07)
+
+A bounded local trial (pinned 156dedef, loopback, token, embeddings off,
+synthetic postings) verified the mirror fix at runtime: two-source manual
+intake merged into one vacancy and the export/bridge import stayed green.
+Deployment notes for the real setup:
+
+- `openings-web` hardcodes `0.0.0.0`; run `uvicorn openings.web.app:app
+  --host 127.0.0.1` for a loopback-only server instead.
+- The port variable is `OPENINGS_WEB_LISTEN_PORT`, not the documented
+  `OPENINGS_WEB_PORT`; `OPENINGS_WEB_BIND` is ignored by this entrypoint.
+- Settings load from `<OPENINGS_DATA_DIR>/config/settings.yaml`.
+- Disable downloads with `embeddings.enabled: false` (+ embed_on_save and
+  backfill_on_startup false); verified no model fetch occurred.
+- Patch hunk 2 (EOF newline) is obsolete at the pinned revision; hunk 1
+  (the mirror fix) applies cleanly once line endings are LF.
