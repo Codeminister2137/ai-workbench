@@ -9,6 +9,7 @@ from urllib.request import Request, urlopen
 import pytest
 from dashboard_test_http import get_json
 from dashboard_web_app import (
+    FLEET_TASKS,
     DashboardRequestHandler,
     fleet_ollama,
     fleet_sleep,
@@ -630,7 +631,7 @@ def test_fleet_tasks_parses_probe_output(monkeypatch) -> None:
 def test_fleet_tasks_non_windows_is_gap(monkeypatch) -> None:
     monkeypatch.setattr("sys.platform", "linux")
     rows = fleet_tasks(runner=lambda *a, **k: None)
-    assert len(rows) == 5
+    assert [row["name"] for row in rows] == list(FLEET_TASKS)
     assert all(row["detail"] == "task probe is Windows-only" for row in rows)
 
 
@@ -641,7 +642,7 @@ def test_fleet_tasks_reports_runner_failure(monkeypatch) -> None:
         raise OSError("no powershell")
 
     rows = fleet_tasks(runner=boom)
-    assert len(rows) == 5
+    assert [row["name"] for row in rows] == list(FLEET_TASKS)
     assert all(row["present"] is False for row in rows)
     assert rows[0]["detail"] == "probe failed: OSError"
 
