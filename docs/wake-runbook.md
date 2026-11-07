@@ -60,6 +60,9 @@ Security analysis (2026-11-06 night, loop-3): both changes are SAFE.
 Steps (FunBox admin UI; exact menu labels vary by firmware):
 1. DHCP/static-lease section -> reserve 192.168.1.12 for MAC
    `34:5A:60:38:44:C8` -> reboot router -> confirm the PC still gets .12.
+   Fallback 2026-11-07 (static-DHCP UI broken, no factory reset): the UDP
+   forward (WAN 61234 -> 192.168.1.12:9) pins the target; the weekly
+   self-test `lan_ip` check mails on drift.
 2. DDNS section -> provider account -> random hostname -> confirm it
    resolves to the current WAN IP -> point the phone app at the
    hostname -> re-run the E2E test above.
@@ -76,8 +79,14 @@ Steps (FunBox admin UI; exact menu labels vary by firmware):
   the port-forward target never drifts.
 - Optional: static public IP from the ISP (usually paid) removes mode 1.
 
-Record the chosen DDNS hostname shape here once decided (hostname only if
-it does not leak identity beyond what the repo already carries).
+Decided 2026-11-07: provider NO-IP (free tier, 1 hostname, 30-day one-click confirm),
+hostname v7kq2x9pi.ddns.net (random, no identity), router-side FunBox client.
+WAN IP confirmed at setup (NO-IP prefill == loop-mail IP); the FunBox keeps
+it updated — no PC updater (it cannot run while asleep). E2E PASS
+2026-11-07: PC slept, Termux wake via hostname succeeded.
+Off-LAN wake (Termux; keep port 61234 + MAC, the hostname resolves via DNS):
+python -c "import socket; m=bytes.fromhex('345A603844C8'); s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM); s.sendto(b'\xff'*6+m*16,('v7kq2x9pi.ddns.net',61234)); print('sent')"
+Weekly WakeSelfTest monitors resolution via WAKE_DDNS_HOSTNAME (repo .env).
 
 ## Automated monitoring (2026-11-07)
 

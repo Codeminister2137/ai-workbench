@@ -68,7 +68,7 @@ const GLOSSARY = {
   W4: "Edge finding: malformed poll JSON bypassed cancel-on-abandon (fixed)",
   H1: "Edge finding: hosted runs queued but never drained",
   M1: "Edge finding: failed live inference dropped the chat message",
-  STT: "Speech-to-text dictation (Web Speech v1 live, Meta server planned)",
+  STT: "Speech-to-text dictation (no engine wired; Dictate unavailable pending STT decision)",
   R1: "Backlog: company offering drafts",
   R2: "Backlog: Codeministry name + legality research",
   R3: "Backlog: marketing + social bots research",
@@ -342,6 +342,17 @@ async function renderHome() {
   const plan = status.current_plan
     ? `<a href="#/plans/${esc(status.current_plan.id)}">${esc(status.current_plan.title || status.current_plan.id)}</a>`
     : '<span class="muted">No plan yet</span>';
+  let spend = "";
+  try {
+    const sp = await api("/api/spend");
+    spend = sp.spend.configured
+      ? `<ul class="plain">${sp.spend.buckets.map((b) =>
+          `<li><span class="pill" title="Allowance status">${esc(b.status)}</span> ${esc(b.provider)} ${esc(b.kind)} — ${esc(b.balance_cents)}/${esc(b.granted_cents)}¢</li>`).join("")}</ul>
+        <p class="muted">${esc(sp.spend.open_reservations)} open reservation(s), ${esc(sp.spend.records)} record(s).</p>`
+      : '<p class="muted">No spend grants configured — billable calls are denied by default.</p>';
+  } catch (err) {
+    spend = '<p class="muted">Spend unavailable: ' + esc(err.message) + "</p>";
+  }
   const runs = status.recent_runs.length
     ? status.recent_runs.map((r) =>
         `<li><a href="#/runs/${esc(r.id)}">${esc(r.title || r.id)}</a> <span class="muted">${esc(r.status || "")}</span></li>`).join("")
@@ -362,6 +373,7 @@ async function renderHome() {
       <div>
         <div class="card"><h2>Inbox</h2>
           <p>${status.open_inbox} open task(s). <a href="#/inbox">Open inbox</a></p></div>
+        <div class="card"><h2>Spend</h2>${spend}</div>
         <div class="card"><h2>Ideas</h2>
           <p>${status.new_ideas} new — triage each in Ideas (adopt, park, or decline). <a href="#/ideas">Open ideas</a></p></div>
         <div class="card"><h2>Chat</h2>
@@ -617,7 +629,13 @@ async function renderRuns(id) {
     const planLink = run.plan_id
       ? `<p><a href="#/plans/${esc(run.plan_id)}" title="Open the plan this run implements">View plan</a></p>`
       : "";
+    const failure = run.failure
+      ? `<div class="card" title="Why this run failed"><h2><span class="pill st-failed">failed</span> Run failed</h2>` +
+        (run.failure.reason ? `<p>${esc(run.failure.reason)}</p>` : `<p class="muted">No reason recorded.</p>`) +
+        (run.failure.at_utc ? `<p class="muted">${esc(run.failure.at_utc)}</p>` : "") + `</div>`
+      : "";
     view.innerHTML = `<h1>Run</h1><p><a href="#/runs">All runs</a></p>
+      ${failure}
       <div class="card"><h2>${gtext(run.title || run.id)}</h2>
       <p class="muted" id="run-status">${meta}</p>
       <p title="Whether this run may spawn subagent children"><strong>Fan-out:</strong> <span class="pill">${esc(fanout)}</span></p>
@@ -1026,9 +1044,57 @@ function renderCreate(kind) {
   });
 }
 
-function renderSchedule() {
-  view.innerHTML = `<h1>Schedule</h1>
-    <p class="muted">Read-only until the P5 scheduler exists. Queued work today lives in plans and runs.</p>`;
+async function renderSchedule() {
+  let body = "";
+  try {
+    const payload = await api("/api/fleet");
+    const f = payload.fleet;
+    const upcoming = f.tasks
+      .filter((t) => t.present && t.next_run)
+      .sort((a, b) => (a.next_run < b.next_run ? -1 : 1));
+    const recurring = f.tasks.filter((t) => t.present && !t.next_run);
+    const upRows = upcoming.map((t) =>
+      `<li><strong>${esc(t.next_run)}</strong> — ${esc(t.name)} <span class="muted">${esc(t.state || "")}</span></li>`).join("");
+    const sleepRow = f.sleep.active
+      ? `<li><strong>${esc(f.sleep.due_utc || "?")}</strong> — sleep guard due <span class="muted">deadline ${esc(f.sleep.deadline_utc || "?")}</span></li>`
+      : "";
+    const recRows = recurring.length
+      ? recurring.map((t) => `<li><strong>${esc(t.name)}</strong> <span class="muted">recurring, no fixed next run · ${esc(t.state || "")}</span></li>`).join("")
+      : '<li class="muted">None.</li>';
+    body = `<div class="card"><h2>Upcoming</h2><ul class="plain">${sleepRow}${upRows || '<li class="muted">Nothing scheduled.</li>'}</ul></div>
+      <div class="card"><h2>Recurring</h2><ul class="plain">${recRows}</ul></div>`;
+  } catch (err) {
+    body = `<div class="card"><h2>Schedule</h2><p class="muted">Schedule unavailable: ${esc(err.message)}</p></div>`;
+  }
+  view.innerHTML = `<h1>Schedule</h1><p class="muted">Read-only. Live from the fleet probe: scheduled tasks and the sleep guard.</p>${body}`;
+}
+
+async function renderFleet() {
+  let body = "";
+  try {
+    const payload = await api("/api/fleet");
+    const f = payload.fleet;
+    const taskRows = f.tasks.map((t) =>
+      `<li><span class="pill st-${t.present ? esc((t.state || "unknown").replace(/\s+/g, "-")) : "missing"}">${t.present ? esc(t.state || "unknown") : "missing"}</span> <strong>${esc(t.name)}</strong>` +
+      (t.present
+        ? ` <span class="muted">last ${esc(t.last_run || "?")} · next ${esc(t.next_run || "?")} · result ${esc(t.last_result ?? "?")}</span>`
+        : ` <span class="muted">${esc(t.detail || "")}</span>`) + `</li>`).join("");
+    const runRows = f.runs.length
+      ? f.runs.map((r) => `<li><a href="#/runs/${esc(r.id)}">${esc(r.title || r.id)}</a> <span class="pill">${esc(r.status || "")}</span> <span class="muted">${esc(r.updated || "")}</span></li>`).join("")
+      : '<li class="muted">No active runs.</li>';
+    const sleep = f.sleep.active
+      ? `Armed — due ${esc(f.sleep.due_utc || "?")}, deadline ${esc(f.sleep.deadline_utc || "?")} (PID ${esc(f.sleep.pid ?? "?")})`
+      : `Idle (${esc(f.sleep.status || "no receipt")})`;
+    body = `<div class="card"><h2>Servers</h2><ul class="plain">
+      <li><span class="pill st-ready">up</span> <strong>dashboard</strong> <span class="muted">this server</span></li>
+      <li><span class="pill st-${f.ollama.up ? "ready" : "missing"}">${f.ollama.up ? "up" : "down"}</span> <strong>ollama</strong> <span class="muted">${f.ollama.up ? esc(f.ollama.models) + " model(s)" : esc(f.ollama.detail || "")}</span></li></ul></div>
+      <div class="card"><h2>Watchdog tasks</h2><ul class="plain">${taskRows}</ul></div>
+      <div class="card"><h2>Sleep guard</h2><p>${sleep}</p></div>
+      <div class="card"><h2>Active runs</h2><ul class="plain">${runRows}</ul></div>`;
+  } catch (err) {
+    body = `<div class="card"><h2>Fleet</h2><p class="muted">Fleet unavailable: ${esc(err.message)}</p></div>`;
+  }
+  view.innerHTML = `<h1>Fleet</h1><p class="muted">Probed live on open. Watchdogs, servers, sleep guard, active runs.</p>${body}`;
 }
 
 function renderRestrictions() {
@@ -1090,7 +1156,8 @@ async function render() {
     else if (name === "ideas") await renderIdeas(id);
     else if (name === "documents") await renderDocuments(id);
     else if (name === "intake") await renderIntake();
-    else if (name === "schedule") renderSchedule();
+    else if (name === "schedule") await renderSchedule();
+    else if (name === "fleet") await renderFleet();
     else if (name === "restrictions") renderRestrictions();
     else if (name === "create" && id) renderCreate(id);
     else view.innerHTML = "<h1>Not found</h1>";

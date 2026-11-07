@@ -57,7 +57,7 @@ def test_static_controls_have_titles() -> None:
     for tag in re.findall(r"<button\b[^>]*>", html):
         assert "title=" in tag, f"button without title: {tag}"
     nav_links = re.findall(r"<a\b[^>]*data-view[^>]*>", html)
-    assert len(nav_links) == 10  # +intake, +restrictions
+    assert len(nav_links) == 11  # +intake, +restrictions, +fleet
     for tag in nav_links:
         assert "title=" in tag, f"nav link without title: {tag}"
 
@@ -155,6 +155,8 @@ def test_glossary_explains_codes_on_hover() -> None:
     assert "GLOSSARY" in js
     assert "<abbr title=" in js
     assert "gtext(plan.title" in js
+    assert "no engine wired" in js
+    assert "Web Speech v1 live" not in js
 
 
 def test_status_pills_have_css() -> None:
@@ -513,3 +515,45 @@ def test_inbox_close_form_and_reopen_markers() -> None:
     assert "/reopen" in js
     assert "<h3>Outcome</h3>" in js
     assert "#/inbox?status=archive" in js
+
+
+def test_home_shows_spend_card() -> None:
+    """Home renders a Spend card backed by /api/spend with an empty state."""
+    js = _read("app.js")
+    assert "<h2>Spend</h2>" in js
+    assert 'await api("/api/spend")' in js
+    assert "No spend grants configured" in js
+
+
+def test_fleet_tab_markers() -> None:
+    """Fleet tab is wired: nav, route, live endpoint, sections."""
+    js = _read("app.js")
+    html = _read("index.html")
+    assert 'data-view="fleet"' in html
+    assert 'name === "fleet"' in js
+    assert 'await api("/api/fleet")' in js
+    assert "<h2>Watchdog tasks</h2>" in js
+    assert "<h2>Active runs</h2>" in js
+    assert "<h2>Sleep guard</h2>" in js
+
+
+def test_schedule_tab_markers() -> None:
+    """Schedule tab is wired: nav, route, live endpoint, sections."""
+    js = _read("app.js")
+    html = _read("index.html")
+    assert 'data-view="schedule"' in html
+    assert 'name === "schedule"' in js
+    assert "async function renderSchedule()" in js
+    assert "<h2>Upcoming</h2>" in js
+    assert "<h2>Recurring</h2>" in js
+    assert "sleep guard due" in js
+
+
+def test_run_failure_banner_markers() -> None:
+    """Run detail shows a failure banner fed by the derived failure field."""
+    js = _read("app.js")
+    css = _read("app.css")
+    assert "run.failure" in js
+    assert "Run failed" in js
+    assert "No reason recorded." in js
+    assert ".st-failed" in css

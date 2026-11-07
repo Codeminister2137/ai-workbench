@@ -54,6 +54,14 @@ def test_ddns_resolves_and_reports(monkeypatch):
     assert ok and detail == "pc.example.com -> 9.9.9.9"
 
 
+def test_ddns_reads_dotenv_fallback(tmp_path, monkeypatch):
+    monkeypatch.delenv("WAKE_DDNS_HOSTNAME", raising=False)
+    monkeypatch.setattr(mod.loop_notify, "ROOT", tmp_path)
+    (tmp_path / ".env").write_text("WAKE_DDNS_HOSTNAME=pc.example.com\n", encoding="utf-8")
+    ok, detail = mod.check_ddns(resolve=lambda host: "9.9.9.9")
+    assert ok and detail == "pc.example.com -> 9.9.9.9"
+
+
 def test_smtp_login_success_and_failure():
     class _Smtp:
         def __init__(self, *args, **kwargs):
@@ -78,3 +86,30 @@ def test_smtp_login_success_and_failure():
     assert ok and detail.startswith("login ok")
     ok, _ = mod.check_smtp_login(read_config=lambda: None, smtp_class=_Smtp)
     assert not ok
+
+
+def test_lan_ip_ok_when_forward_target_held():
+    ok, detail = mod.check_lan_ip(probe=lambda: "192.168.1.12")
+    assert ok and "192.168.1.12" in detail
+
+
+def test_lan_ip_fails_on_drift():
+    ok, detail = mod.check_lan_ip(probe=lambda: "192.168.1.34")
+    assert not ok and "drift" in detail and "192.168.1.34" in detail
+
+
+def test_lan_ip_fails_when_undeterminable():
+    ok, _ = mod.check_lan_ip(probe=lambda: None)
+    assert not ok
+
+
+def test_lan_ip_probe_error_is_failure():
+    def boom():
+        raise OSError("no route")
+
+    ok, detail = mod.check_lan_ip(probe=boom)
+    assert not ok and "OSError" in detail
+
+
+def test_lan_ip_registered_in_checks():
+    assert "lan_ip" in [name for name, _ in mod.CHECKS]

@@ -8,7 +8,15 @@ from urllib.request import Request, urlopen
 
 import pytest
 from dashboard_test_http import get_json
-from dashboard_web_app import DashboardRequestHandler
+from dashboard_web_app import (
+    FLEET_TASKS,
+    DashboardRequestHandler,
+    fleet_ollama,
+    fleet_sleep,
+    fleet_tasks,
+    run_failure,
+    with_run_failure,
+)
 
 
 def post_json(base: str, path: str, payload: dict, headers: dict | None = None) -> dict:
@@ -363,6 +371,94 @@ def test_runs_list_resolves_fanout_per_item(dashboard_server, tmp_path) -> None:
     assert by_id == {"new": "allowed", "old": "unknown"}
 
 
+def test_run_failure_derives_reason_from_failed_event() -> None:
+    run = {
+        "id": "f1",
+        "status": "failed",
+        "events": [
+            {"seq": 1, "kind": "run_started", "payload": {}, "at_utc": "2026-11-07T10:00:00+00:00"},
+            {
+                "seq": 2,
+                "kind": "run_failed",
+                "payload": {"reason": "pytest red"},
+                "at_utc": "2026-11-07T10:05:00+00:00",
+            },
+        ],
+    }
+    assert run_failure(run) == {
+        "state": "failed",
+        "reason": "pytest red",
+        "at_utc": "2026-11-07T10:05:00+00:00",
+    }
+
+
+def test_run_failure_without_signals_has_no_reason() -> None:
+    assert run_failure({"id": "f2", "status": "failed"}) == {
+        "state": "failed",
+        "reason": None,
+        "at_utc": None,
+    }
+
+
+def test_run_failure_falls_back_to_failed_receipt() -> None:
+    run = {
+        "id": "f3",
+        "status": "failed",
+        "receipts": [
+            {"status": "failed", "detail": "drain crashed", "at_utc": "2026-11-07T11:00:00+00:00"}
+        ],
+    }
+    assert run_failure(run) == {
+        "state": "failed",
+        "reason": "drain crashed",
+        "at_utc": "2026-11-07T11:00:00+00:00",
+    }
+
+
+def test_run_failure_ignores_recovered_receipt() -> None:
+    run = {
+        "id": "ok",
+        "status": "completed",
+        "receipts": [{"status": "failed", "detail": "first try"}],
+    }
+    assert run_failure(run) is None
+
+
+def test_run_failure_ignores_cancelled_and_empty() -> None:
+    assert run_failure({"id": "c", "status": "cancelled"}) is None
+    assert run_failure({}) is None
+    assert run_failure({"id": "x"}) is None
+
+
+def test_with_run_failure_attaches_without_mutating() -> None:
+    run = {"id": "f1", "status": "failed"}
+    enriched = with_run_failure(run)
+    assert enriched["failure"] == {"state": "failed", "reason": None, "at_utc": None}
+    assert "failure" not in run
+
+
+def test_runs_detail_includes_failure_summary(dashboard_server, tmp_path) -> None:
+    _write_run(
+        tmp_path,
+        "f9",
+        {
+            "id": "f9",
+            "status": "failed",
+            "events": [
+                {"seq": 1, "kind": "run_failed", "payload": {"reason": "boom"}, "at_utc": "t"}
+            ],
+        },
+    )
+    run = get_json(dashboard_server, "/api/runs/f9")
+    assert run["item"]["failure"] == {"state": "failed", "reason": "boom", "at_utc": "t"}
+
+
+def test_runs_detail_failure_null_when_healthy(dashboard_server, tmp_path) -> None:
+    _write_run(tmp_path, "ok", {"id": "ok", "status": "merged"})
+    run = get_json(dashboard_server, "/api/runs/ok")
+    assert run["item"]["failure"] is None
+
+
 def test_status_reports_scheduler_off_by_default(dashboard_server) -> None:
     """Fresh servers report the drain scheduler as not started."""
     payload = get_json(dashboard_server, "/api/status")
@@ -398,3 +494,182 @@ def test_inbox_close_requires_resolution(dashboard_server) -> None:
         post_json(dashboard_server, f"/api/inbox/{created['id']}/close", {})
     assert raised.value.code == 400
     raised.value.close()
+
+
+def _grant(allowance_id, provider="meta", kind="free_daily", granted_cents=500, **extra):
+    payload = {
+        "allowance_id": allowance_id,
+        "provider": provider,
+        "kind": kind,
+        "granted_cents": granted_cents,
+        "local_spending_limit_accepted": True,
+    }
+    payload.update(extra)
+    return payload
+
+
+def _write_grants(tmp_path, files):
+    grants = tmp_path / "data" / "spend" / "grants"
+    grants.mkdir(parents=True)
+    for name, payload in files.items():
+        (grants / name).write_text(json.dumps(payload), encoding="utf-8")
+    return grants
+
+
+def test_spend_unconfigured_empty(dashboard_server) -> None:
+    payload = get_json(dashboard_server, "/api/spend")
+    assert payload["ok"] is True
+    assert payload["spend"]["configured"] is False
+    assert payload["spend"]["buckets"] == []
+    assert payload["spend"]["open_reservations"] == 0
+    assert payload["spend"]["records"] == 0
+
+
+def test_spend_lists_grant_buckets(dashboard_server, tmp_path) -> None:
+    _write_grants(
+        tmp_path,
+        {
+            "a.json": _grant("meta-free"),
+            "b.json": _grant(
+                "meta-exp",
+                kind="allowance_expiring",
+                granted_cents=100,
+                expires_at=4102444800,
+            ),
+        },
+    )
+    payload = get_json(dashboard_server, "/api/spend")
+    assert payload["spend"]["configured"] is True
+    buckets = {item["id"]: item for item in payload["spend"]["buckets"]}
+    assert set(buckets) == {"meta-free", "meta-exp"}
+    assert buckets["meta-free"]["status"] == "active"
+    assert buckets["meta-free"]["balance_cents"] == 500
+    assert buckets["meta-free"]["granted_cents"] == 500
+    assert buckets["meta-exp"]["kind"] == "allowance_expiring"
+    assert buckets["meta-exp"]["status"] == "active"
+
+
+def test_spend_malformed_grant_is_400(dashboard_server, tmp_path) -> None:
+    _write_grants(tmp_path, {"bad.json": {"allowance_id": "x"}})
+    with pytest.raises(HTTPError) as raised:
+        get_json(dashboard_server, "/api/spend")
+    assert raised.value.code == 400
+    assert "bad.json" in raised.value.read().decode("utf-8")
+    raised.value.close()
+
+
+def test_spend_duplicate_grant_id_is_400(dashboard_server, tmp_path) -> None:
+    _write_grants(
+        tmp_path,
+        {"a.json": _grant("dup"), "b.json": _grant("dup", provider="baseten")},
+    )
+    with pytest.raises(HTTPError) as raised:
+        get_json(dashboard_server, "/api/spend")
+    assert raised.value.code == 400
+    raised.value.close()
+
+
+def test_fleet_shape_with_stubbed_probes(dashboard_server, monkeypatch) -> None:
+    monkeypatch.setattr(
+        "dashboard_web_app.fleet_tasks",
+        lambda runner=None: [
+            {
+                "name": "WorkbenchDashboard",
+                "present": True,
+                "state": "Ready",
+                "last_run": "2026-11-07T15:00:00",
+                "next_run": "2026-11-07T15:05:00",
+                "last_result": 0,
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        "dashboard_web_app.fleet_ollama", lambda urlopen=None: {"up": True, "models": 2}
+    )
+    monkeypatch.setattr(
+        "dashboard_web_app.fleet_sleep",
+        lambda repo_root: {"active": True, "status": "sleep_scheduled"},
+    )
+    payload = get_json(dashboard_server, "/api/fleet")
+    assert payload["ok"] is True
+    assert set(payload["fleet"]) == {"dashboard", "ollama", "tasks", "sleep", "runs"}
+    assert payload["fleet"]["dashboard"] == {"up": True}
+    assert payload["fleet"]["ollama"] == {"up": True, "models": 2}
+    assert payload["fleet"]["tasks"][0]["name"] == "WorkbenchDashboard"
+    assert payload["fleet"]["runs"] == []
+
+
+def test_fleet_tasks_parses_probe_output(monkeypatch) -> None:
+    monkeypatch.setattr("sys.platform", "win32")
+
+    class _Done:
+        stdout = json.dumps(
+            [
+                {
+                    "name": "WorkbenchDashboard",
+                    "present": True,
+                    "state": "Ready",
+                    "last_run": "a",
+                    "next_run": "b",
+                    "last_result": 0,
+                },
+                {"name": "MsiUdpWatchdog", "present": False},
+            ]
+        )
+
+    rows = {row["name"]: row for row in fleet_tasks(runner=lambda *a, **k: _Done())}
+    assert rows["WorkbenchDashboard"]["state"] == "Ready"
+    assert rows["WorkbenchDashboard"]["last_result"] == 0
+    assert rows["MsiUdpWatchdog"] == {
+        "name": "MsiUdpWatchdog",
+        "present": False,
+        "detail": "not registered",
+    }
+    assert rows["CloneScan"]["present"] is False  # probe row missing entirely
+
+
+def test_fleet_tasks_non_windows_is_gap(monkeypatch) -> None:
+    monkeypatch.setattr("sys.platform", "linux")
+    rows = fleet_tasks(runner=lambda *a, **k: None)
+    assert [row["name"] for row in rows] == list(FLEET_TASKS)
+    assert all(row["detail"] == "task probe is Windows-only" for row in rows)
+
+
+def test_fleet_tasks_reports_runner_failure(monkeypatch) -> None:
+    monkeypatch.setattr("sys.platform", "win32")
+
+    def boom(*args, **kwargs):
+        raise OSError("no powershell")
+
+    rows = fleet_tasks(runner=boom)
+    assert [row["name"] for row in rows] == list(FLEET_TASKS)
+    assert all(row["present"] is False for row in rows)
+    assert rows[0]["detail"] == "probe failed: OSError"
+
+
+def test_fleet_ollama_down() -> None:
+    def refused(*args, **kwargs):
+        raise ConnectionRefusedError("down")
+
+    assert fleet_ollama(urlopen=refused)["up"] is False
+
+
+def test_fleet_sleep_idle_and_armed(tmp_path) -> None:
+    assert fleet_sleep(tmp_path) == {"active": False}
+    receipts = tmp_path / ".tmp" / "unattended-x"
+    receipts.mkdir(parents=True)
+    (receipts / "sleep-startup.json").write_text(
+        json.dumps(
+            {
+                "status": "sleep_scheduled",
+                "planned_sleep_utc": "due",
+                "window_deadline_utc": "deadline",
+                "process_id": 1234,
+            }
+        ),
+        encoding="utf-8",
+    )
+    summary = fleet_sleep(tmp_path)
+    assert summary["active"] is True
+    assert summary["pid"] == 1234
+    assert summary["receipt"] == "sleep-startup.json"
