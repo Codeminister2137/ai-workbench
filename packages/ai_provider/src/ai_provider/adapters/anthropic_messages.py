@@ -7,16 +7,13 @@ provider-specific endpoint identity, authentication and routing headers.
 
 from __future__ import annotations
 
-import json
-import socket
 import time
 from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Any
-from urllib.error import HTTPError, URLError
-from urllib.request import Request
+from typing import Any, ClassVar
 
-from ai_provider.config import BackendConfig, _provider_api_key
+from ai_provider.adapters._responses_base import _ResponsesProtocolBase
+from ai_provider.config import _provider_api_key
 from ai_provider.contracts import (
     AIMessage,
     AIRequest,
@@ -32,22 +29,20 @@ from ai_provider.contracts import (
     UsageMetadata,
     UsageSource,
 )
-from ai_provider.errors import (
-    ProviderError,
-    ProviderErrorCategory,
-    http_error_to_provider_error,
-)
-from ai_provider.http_transport import read_bounded, urlopen
+from ai_provider.errors import ProviderError, ProviderErrorCategory
 from ai_provider.privacy import enforce_privacy_policy
-from ai_provider.turn_usage import observe_completion, observe_stream, observe_usage
+from ai_provider.turn_usage import observe_stream
 
 
 @dataclass(slots=True)
-class AnthropicMessagesChatClient:
+class AnthropicMessagesChatClient(_ResponsesProtocolBase):
     """Chat client for providers that expose the Anthropic Messages API."""
 
-    config: BackendConfig
     _api_version: str = "2023-06-01"
+
+    _api_label: ClassVar[str] = "Messages API"
+    _endpoint_path: ClassVar[str] = "/messages"
+    _stream_label: ClassVar[str] = "Messages"
 
     @property
     def backend(self) -> BackendInfo:
@@ -76,17 +71,14 @@ class AnthropicMessagesChatClient:
             provider=self.config.provider.value,
         )
 
-    @observe_completion
-    def complete(self, request: AIRequest) -> AIResponse:
-        enforce_privacy_policy(self.backend, request.privacy_class)
-        model = request.model or self.config.model
-        payload = self._messages_payload(request, stream=False)
-        started = time.perf_counter()
-        raw_response = self._post_messages(payload)
-        if isinstance(raw_response, dict):
-            observe_usage(self._usage_from_response(raw_response))
-        latency_ms = (time.perf_counter() - started) * 1000
-        return self._response_from_raw(raw_response, model=model, latency_ms=latency_ms)
+    def _protocol_payload(self, request: AIRequest, *, stream: bool) -> dict[str, Any]:
+        return self._messages_payload(request, stream=stream)
+
+    def _post_messages(self, payload: dict[str, Any]) -> dict[str, Any]:
+        return self._post_protocol(payload)
+
+    def _stream_messages(self, payload: dict[str, Any]) -> Iterator[dict[str, Any]]:
+        yield from self._stream_protocol(payload)
 
     @observe_stream
     def stream(self, request: AIRequest) -> Iterator[AIStreamEvent]:
@@ -182,9 +174,6 @@ class AnthropicMessagesChatClient:
             payload["top_p"] = request.top_p
         return payload
 
-    def _message_payload(self, message: AIMessage) -> dict[str, Any]:
-        return {"role": message.role.value, "content": message.content}
-
     def _response_from_raw(
         self, raw_response: dict[str, Any], *, model: str, latency_ms: float
     ) -> AIResponse:
@@ -222,127 +211,12 @@ class AnthropicMessagesChatClient:
             capabilities=ModelCapabilities(chat=True, streaming=True, tools=False),
         )
 
-    def _post_messages(self, payload: dict[str, Any]) -> dict[str, Any]:
-        body = json.dumps(payload).encode("utf-8")
-        request = Request(
-            f"{self.base_url}/messages",
-            data=body,
-            headers=self._headers(),
-            method="POST",
-        )
-        try:
-            with urlopen(request, timeout=self.config.timeout_seconds) as response:
-                return json.loads(
-                    read_bounded(response, provider=self.config.provider.value).decode("utf-8")
-                )
-        except ProviderError:
-            raise
-        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
-            raise ProviderError(
-                "Messages API returned invalid JSON.",
-                category=ProviderErrorCategory.NON_RETRYABLE,
-                provider=self.config.provider.value,
-                raw_error=exc,
-            ) from exc
-        except TimeoutError as exc:
-            raise ProviderError(
-                "Messages API request timed out.",
-                category=ProviderErrorCategory.TIMEOUT,
-                retryable=True,
-                provider=self.config.provider.value,
-                raw_error=exc,
-            ) from exc
-        except HTTPError as exc:
-            raise self._http_error(exc) from exc
-        except URLError as exc:
-            if isinstance(exc.reason, (TimeoutError, socket.timeout)):
-                raise ProviderError(
-                    "Messages API request timed out.",
-                    category=ProviderErrorCategory.TIMEOUT,
-                    retryable=True,
-                    provider=self.config.provider.value,
-                    raw_error=exc,
-                ) from exc
-            raise ProviderError(
-                "Could not connect to Messages API provider.",
-                category=ProviderErrorCategory.RETRYABLE,
-                retryable=True,
-                provider=self.config.provider.value,
-                raw_error=exc,
-            ) from exc
-
-    def _stream_messages(self, payload: dict[str, Any]) -> Iterator[dict[str, Any]]:
-        body = json.dumps(payload).encode("utf-8")
-        request = Request(
-            f"{self.base_url}/messages",
-            data=body,
-            headers=self._headers(),
-            method="POST",
-        )
-        try:
-            with urlopen(request, timeout=self.config.timeout_seconds) as response:
-                for line in response:
-                    raw_line = line.strip()
-                    if not raw_line or raw_line.startswith((b":", b"event:", b"id:", b"retry:")):
-                        continue
-                    if raw_line.startswith(b"data:"):
-                        raw_line = raw_line.removeprefix(b"data:").removeprefix(b" ")
-                        if raw_line == b"[DONE]":
-                            break
-                    chunk = json.loads(raw_line.decode("utf-8"))
-                    if not isinstance(chunk, dict):
-                        raise ProviderError(
-                            "Messages stream chunk must be a JSON object.",
-                            category=ProviderErrorCategory.NON_RETRYABLE,
-                            provider=self.config.provider.value,
-                            raw_error=chunk,
-                        )
-                    yield chunk
-        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
-            raise ProviderError(
-                "Messages stream returned invalid JSON.",
-                category=ProviderErrorCategory.NON_RETRYABLE,
-                provider=self.config.provider.value,
-                raw_error=exc,
-            ) from exc
-        except TimeoutError as exc:
-            raise ProviderError(
-                "Messages API request timed out.",
-                category=ProviderErrorCategory.TIMEOUT,
-                retryable=True,
-                provider=self.config.provider.value,
-                raw_error=exc,
-            ) from exc
-        except HTTPError as exc:
-            raise self._http_error(exc) from exc
-        except URLError as exc:
-            if isinstance(exc.reason, (TimeoutError, socket.timeout)):
-                raise ProviderError(
-                    "Messages API request timed out.",
-                    category=ProviderErrorCategory.TIMEOUT,
-                    retryable=True,
-                    provider=self.config.provider.value,
-                    raw_error=exc,
-                ) from exc
-            raise ProviderError(
-                "Could not connect to Messages API provider.",
-                category=ProviderErrorCategory.RETRYABLE,
-                retryable=True,
-                provider=self.config.provider.value,
-                raw_error=exc,
-            ) from exc
-
     def _headers(self) -> dict[str, str]:
         return {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
             "anthropic-version": self._api_version,
         }
-
-    def _http_error(self, exc: HTTPError) -> ProviderError:
-        return http_error_to_provider_error(
-            exc, provider=self.config.provider.value, api_label="Messages API"
-        )
 
     def _safe_metadata(self, raw: dict[str, Any]) -> dict[str, Any]:
         return raw
