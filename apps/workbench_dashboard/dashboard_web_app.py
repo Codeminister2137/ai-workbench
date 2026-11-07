@@ -1485,7 +1485,8 @@ def main() -> None:
         def _meta_engine() -> MetaAsrEngine:
             return MetaAsrEngine(stt_key)
 
-        DashboardRequestHandler.stt_engine_factory = staticmethod(_meta_engine)
+        # staticmethod keeps instance access unbound (same seam as the tests).
+        DashboardRequestHandler.stt_engine_factory = staticmethod(_meta_engine)  # pyright: ignore[reportAttributeAccessIssue]
         DashboardRequestHandler.stt_metering = LedgerSttMetering(
             DashboardRequestHandler.spend_ledger
         )
