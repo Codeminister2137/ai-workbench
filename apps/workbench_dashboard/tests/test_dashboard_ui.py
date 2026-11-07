@@ -533,3 +533,15 @@ def test_fleet_tab_markers() -> None:
     assert "<h2>Watchdog tasks</h2>" in js
     assert "<h2>Active runs</h2>" in js
     assert "<h2>Sleep guard</h2>" in js
+
+
+def test_schedule_tab_markers() -> None:
+    """Schedule tab is wired: nav, route, live endpoint, sections."""
+    js = _read("app.js")
+    html = _read("index.html")
+    assert 'data-view="schedule"' in html
+    assert 'name === "schedule"' in js
+    assert "async function renderSchedule()" in js
+    assert "<h2>Upcoming</h2>" in js
+    assert "<h2>Recurring</h2>" in js
+    assert "sleep guard due" in js

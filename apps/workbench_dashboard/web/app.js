@@ -1038,9 +1038,29 @@ function renderCreate(kind) {
   });
 }
 
-function renderSchedule() {
-  view.innerHTML = `<h1>Schedule</h1>
-    <p class="muted">Read-only until the P5 scheduler exists. Queued work today lives in plans and runs.</p>`;
+async function renderSchedule() {
+  let body = "";
+  try {
+    const payload = await api("/api/fleet");
+    const f = payload.fleet;
+    const upcoming = f.tasks
+      .filter((t) => t.present && t.next_run)
+      .sort((a, b) => (a.next_run < b.next_run ? -1 : 1));
+    const recurring = f.tasks.filter((t) => t.present && !t.next_run);
+    const upRows = upcoming.map((t) =>
+      `<li><strong>${esc(t.next_run)}</strong> — ${esc(t.name)} <span class="muted">${esc(t.state || "")}</span></li>`).join("");
+    const sleepRow = f.sleep.active
+      ? `<li><strong>${esc(f.sleep.due_utc || "?")}</strong> — sleep guard due <span class="muted">deadline ${esc(f.sleep.deadline_utc || "?")}</span></li>`
+      : "";
+    const recRows = recurring.length
+      ? recurring.map((t) => `<li><strong>${esc(t.name)}</strong> <span class="muted">recurring, no fixed next run · ${esc(t.state || "")}</span></li>`).join("")
+      : '<li class="muted">None.</li>';
+    body = `<div class="card"><h2>Upcoming</h2><ul class="plain">${sleepRow}${upRows || '<li class="muted">Nothing scheduled.</li>'}</ul></div>
+      <div class="card"><h2>Recurring</h2><ul class="plain">${recRows}</ul></div>`;
+  } catch (err) {
+    body = `<div class="card"><h2>Schedule</h2><p class="muted">Schedule unavailable: ${esc(err.message)}</p></div>`;
+  }
+  view.innerHTML = `<h1>Schedule</h1><p class="muted">Read-only. Live from the fleet probe: scheduled tasks and the sleep guard.</p>${body}`;
 }
 
 async function renderFleet() {
@@ -1130,7 +1150,7 @@ async function render() {
     else if (name === "ideas") await renderIdeas(id);
     else if (name === "documents") await renderDocuments(id);
     else if (name === "intake") await renderIntake();
-    else if (name === "schedule") renderSchedule();
+    else if (name === "schedule") await renderSchedule();
     else if (name === "fleet") await renderFleet();
     else if (name === "restrictions") renderRestrictions();
     else if (name === "create" && id) renderCreate(id);
