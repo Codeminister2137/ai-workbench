@@ -202,9 +202,9 @@ def test_ideas_capture_filter_and_triage(dashboard_server) -> None:
 def test_trusted_host_allowlist_accepts_tailnet_origin(dashboard_server, tmp_path) -> None:
     config_path = tmp_path / "dashboard.json"
     payload = json.loads(config_path.read_text(encoding="utf-8"))
-    payload["trusted_hosts"] = ["example.tailc59785.ts.net"]
+    payload["trusted_hosts"] = ["node-1.example-tail.net"]
     config_path.write_text(json.dumps(payload), encoding="utf-8")
-    host = "example.tailc59785.ts.net"
+    host = "node-1.example-tail.net"
     allowed = Request(
         f"{dashboard_server}/api/status",
         headers={"Host": host, "Origin": f"https://{host}"},

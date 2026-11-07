@@ -229,34 +229,34 @@ def _capture(monkeypatch, tmp_path, address):
 
 
 def test_ip_change_flagged_in_body(tmp_path, monkeypatch) -> None:
-    _seed_receipt(tmp_path, "83.26.59.90")
-    calls = _capture(monkeypatch, tmp_path, "83.26.80.50")
+    _seed_receipt(tmp_path, "203.0.113.59")
+    calls = _capture(monkeypatch, tmp_path, "203.0.113.80")
     receipt = notify.send_ping(subject="s", body="b", run_dir=tmp_path, event="progress")
     assert receipt["success"] is True
-    assert "Public IP: 83.26.80.50" in calls[0]["body"]
-    assert "83.26.59.90 -> 83.26.80.50" in calls[0]["body"]
+    assert "Public IP: 203.0.113.80" in calls[0]["body"]
+    assert "203.0.113.59 -> 203.0.113.80" in calls[0]["body"]
 
 
 def test_same_ip_not_flagged(tmp_path, monkeypatch) -> None:
-    _seed_receipt(tmp_path, "83.26.80.50")
-    calls = _capture(monkeypatch, tmp_path, "83.26.80.50")
+    _seed_receipt(tmp_path, "203.0.113.80")
+    calls = _capture(monkeypatch, tmp_path, "203.0.113.80")
     notify.send_ping(subject="s", body="b", run_dir=tmp_path, event="progress")
-    assert "Public IP: 83.26.80.50" in calls[0]["body"]
+    assert "Public IP: 203.0.113.80" in calls[0]["body"]
     assert "changed since last ping" not in calls[0]["body"]
 
 
 def test_first_ping_no_flag(tmp_path, monkeypatch) -> None:
-    calls = _capture(monkeypatch, tmp_path, "83.26.80.50")
+    calls = _capture(monkeypatch, tmp_path, "203.0.113.80")
     notify.send_ping(subject="s", body="b", run_dir=tmp_path, event="progress")
     assert "changed since last ping" not in calls[0]["body"]
 
 
 def test_cross_window_change_flagged_via_stable_file(tmp_path, monkeypatch) -> None:
-    (tmp_path / "stable-ip.txt").write_text("83.26.59.90\n", encoding="utf-8")
-    calls = _capture(monkeypatch, tmp_path, "83.26.80.50")
+    (tmp_path / "stable-ip.txt").write_text("203.0.113.59\n", encoding="utf-8")
+    calls = _capture(monkeypatch, tmp_path, "203.0.113.80")
     notify.send_ping(subject="s", body="b", run_dir=tmp_path, event="progress")
-    assert "83.26.59.90 -> 83.26.80.50" in calls[0]["body"]
-    assert (tmp_path / "stable-ip.txt").read_text(encoding="utf-8").strip() == ("83.26.80.50")
+    assert "203.0.113.59 -> 203.0.113.80" in calls[0]["body"]
+    assert (tmp_path / "stable-ip.txt").read_text(encoding="utf-8").strip() == ("203.0.113.80")
 
 
 def test_status_subject_tags_state_and_summary() -> None:
