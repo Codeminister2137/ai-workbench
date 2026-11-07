@@ -1,3 +1,28 @@
+## Installer scope: full workspace install - owner 2026-11-07
+
+**Status:** Accepted by the owner (inbox 3dd129d7=A; closed by loop6).
+
+`install-workbench.ps1` keeps installing the whole uv workspace
+(`uv sync --locked`): reproducible, matches dev/test exactly, zero new
+packaging work. Dashboard is the product surface; installed-but-invisible
+apps (council, job-search) cost disk only. Owner note (verbatim, truncated
+in storage): future split possible — "ai_provider and orchestrator are base
+of our projects, dashboard is centrailzed way to interact with them. Rest
+could be separated into modules that we can operate together but users do
+have to". Recorded as future direction, not a decision. Open micro-question
+carried (no new brief): `tailscale serve` offer in the installer?
+(SERVE-YES/SERVE-NO.)
+
+## Inbox answers stay dashboard-only; mail is the wake/act triage signal - owner 2026-11-07
+
+**Status:** Accepted by the owner (inbox 8166da77=B; closed by loop6). No
+mail-command bridge is built: no mailbox poller, no sender-allowlisted
+command grammar. Owner rationale: "Reaching through dashboard is fine, mail
+is there for me to decide whether I should wake my PC up and act on
+anything". Standing rule for loops: mails are short triage signals for that
+wake/act decision (counts, statuses, timings, public IP), never a command
+channel and never carrying prompts, credentials, or third-party content.
+
 ## Loop-4 approvals: Responses base, partial clone batch, automation x4 - owner 2026-11-07
 
 **Status:** Accepted by the owner (inbox 42de3331=A, 7629baa3=A, 08ebe007=all four, 718249b7/merge approved; implemented on feature/loop4-approved-batch).
