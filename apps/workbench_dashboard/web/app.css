@@ -17,6 +17,7 @@ nav a.active { font-weight: bold; text-decoration: underline; }
 .toast.err { border-color: #c00; }
 .msg { border-top: 1px solid #8884; padding: 0.5rem 0; white-space: pre-wrap; }
 .msg .role { font-weight: bold; }
+.inbox-body { white-space: pre-wrap; }
 form.inline { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
 input[type="text"], textarea { flex: 1; font: inherit; }
 button { font: inherit; cursor: pointer; }

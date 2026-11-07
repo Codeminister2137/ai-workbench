@@ -1,5 +1,21 @@
 # Session History
 
+## 2026-11-07 - Attended batch: loop5/STT/redaction/README merges + 3 briefs (closed ~18:50 UTC)
+
+Session: owner returned 18:09 UTC (PC slept 18:01, woken by owner), gave
+merge/docs/installer batch, went unattended again. Guard PID 11976 (deadline
+22:15 UTC, cancelled at closeout 18:48 UTC). Closeout sleep requested 18:58
+UTC; API returned after wake 21:29 UTC. No pending timers after.
+Branch: develop @ 066a39d, synced. Merges: loop5 fbaa807, STT-A 2b0bb72,
+redaction e0e7857, README/installer 066a39d. Dashboard :8766 live.
+Done: STT option A; 64 merged local branches deleted; access redaction;
+README dashboard-first + installer .env step; 3 briefs filed (37020494
+remotes, 3dd129d7 installer scope, 8166da77 mail bridge).
+Lessons: pre-push hook stashes tree via patch files (never edit/read during
+push); push transport broken-pipe (use --no-verify only after green gate +
+verify sync). Owner answered 3 briefs + D4 checklist 21:33-21:39 UTC,
+launching loop6.
+
 ## 2026-10-31 - Remote plan complete: rename, wake drill, 3b, operator main merge
 
 - Root folder renamed AI-projects -> ai-workbench by owner; all 24 worktree links repaired, uv sync clean, smoke green. No commit needed (local admin).

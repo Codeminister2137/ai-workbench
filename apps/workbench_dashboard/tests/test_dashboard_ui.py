@@ -568,3 +568,13 @@ def test_run_failure_banner_markers() -> None:
     assert "Run failed" in js
     assert "No reason recorded." in js
     assert ".st-failed" in css
+
+
+def test_inbox_and_idea_bodies_preserve_line_breaks() -> None:
+    """Long bodies must not collapse into one block (owner readability fix)."""
+    css = _read("app.css")
+    assert re.search(r"\.inbox-body\s*\{\s*white-space\s*:\s*pre-wrap\s*;\s*\}", css)
+    js = _read("app.js")
+    assert js.count('<p class="inbox-body">') >= 3  # request, outcome, idea
+    assert "<p>${gtext(item.body" not in js
+    assert "<p>${gtext(item.resolution)}" not in js
