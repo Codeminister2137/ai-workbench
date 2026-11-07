@@ -545,3 +545,13 @@ def test_schedule_tab_markers() -> None:
     assert "<h2>Upcoming</h2>" in js
     assert "<h2>Recurring</h2>" in js
     assert "sleep guard due" in js
+
+
+def test_run_failure_banner_markers() -> None:
+    """Run detail shows a failure banner fed by the derived failure field."""
+    js = _read("app.js")
+    css = _read("app.css")
+    assert "run.failure" in js
+    assert "Run failed" in js
+    assert "No reason recorded." in js
+    assert ".st-failed" in css

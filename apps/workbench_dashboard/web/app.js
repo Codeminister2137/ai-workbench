@@ -629,7 +629,13 @@ async function renderRuns(id) {
     const planLink = run.plan_id
       ? `<p><a href="#/plans/${esc(run.plan_id)}" title="Open the plan this run implements">View plan</a></p>`
       : "";
+    const failure = run.failure
+      ? `<div class="card" title="Why this run failed"><h2><span class="pill st-failed">failed</span> Run failed</h2>` +
+        (run.failure.reason ? `<p>${esc(run.failure.reason)}</p>` : `<p class="muted">No reason recorded.</p>`) +
+        (run.failure.at_utc ? `<p class="muted">${esc(run.failure.at_utc)}</p>` : "") + `</div>`
+      : "";
     view.innerHTML = `<h1>Run</h1><p><a href="#/runs">All runs</a></p>
+      ${failure}
       <div class="card"><h2>${gtext(run.title || run.id)}</h2>
       <p class="muted" id="run-status">${meta}</p>
       <p title="Whether this run may spawn subagent children"><strong>Fan-out:</strong> <span class="pill">${esc(fanout)}</span></p>

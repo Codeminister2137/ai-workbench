@@ -101,6 +101,54 @@ def with_fanout_policy(run: dict) -> dict:
     return {**run, "fanout_effective": effective_fanout_policy(run)}
 
 
+RUN_FAILURE_STATUSES = frozenset({"failed"})
+RUN_FAILURE_EVENT_KINDS = frozenset({"run_failed", "failure", "execution_failed"})
+RUN_FAILURE_RECEIPT_STATUSES = frozenset({"failed", "error"})
+
+
+def run_failure(run: dict) -> dict[str, Any] | None:
+    """Derive a failure summary from existing run-record fields.
+
+    Pure response-side helper: reads ``status``/``events``/``receipts`` only
+    and never writes the store (existing record fields only, no new capture).
+    ``status == "failed"`` is the record's own verdict and the only trigger;
+    a failed receipt under a recovered (non-failed) status means the run
+    recovered, so no banner. ``validation`` is free text, not a signal.
+    Returns ``{"state", "reason", "at_utc"}`` or None when healthy.
+    """
+    if (run.get("status") or "") not in RUN_FAILURE_STATUSES:
+        return None
+    reason = None
+    at_utc = None
+    for event in run.get("events") or []:
+        if not isinstance(event, dict):
+            continue
+        if (event.get("kind") or "") in RUN_FAILURE_EVENT_KINDS:
+            payload = event.get("payload") or {}
+            if isinstance(payload, dict):
+                reason = payload.get("reason") or payload.get("detail") or payload.get("error")
+            at_utc = event.get("at_utc")
+    if reason is None:
+        for receipt in run.get("receipts") or []:
+            if not isinstance(receipt, dict):
+                continue
+            if (receipt.get("status") or "") in RUN_FAILURE_RECEIPT_STATUSES:
+                reason = receipt.get("detail") or receipt.get("summary") or receipt.get("error")
+                at_utc = receipt.get("at_utc")
+                break
+    return {"state": "failed", "reason": reason, "at_utc": at_utc}
+
+
+def with_run_failure(run: dict) -> dict:
+    """Copy one run record with its derived failure summary attached."""
+    return {**run, "failure": run_failure(run)}
+
+
+def with_run_detail(run: dict) -> dict:
+    """Copy one run record with every detail-page enrichment applied."""
+    return with_run_failure(with_fanout_policy(run))
+
+
 def spend_status(data_dir: Path) -> dict[str, Any]:
     """Load spend grants and return the ledger dashboard view.
 
@@ -414,7 +462,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 return self._send_item(
                     self._stores().runs,
                     path[len("/api/runs/") :],
-                    enrich=with_fanout_policy,
+                    enrich=with_run_detail,
                 )
             if path == "/api/inbox":
                 return self._send_inbox(parsed.query)

@@ -13,6 +13,8 @@ from dashboard_web_app import (
     fleet_ollama,
     fleet_sleep,
     fleet_tasks,
+    run_failure,
+    with_run_failure,
 )
 
 
@@ -366,6 +368,94 @@ def test_runs_list_resolves_fanout_per_item(dashboard_server, tmp_path) -> None:
     payload = get_json(dashboard_server, "/api/runs")
     by_id = {item["id"]: item["fanout_effective"] for item in payload["items"]}
     assert by_id == {"new": "allowed", "old": "unknown"}
+
+
+def test_run_failure_derives_reason_from_failed_event() -> None:
+    run = {
+        "id": "f1",
+        "status": "failed",
+        "events": [
+            {"seq": 1, "kind": "run_started", "payload": {}, "at_utc": "2026-11-07T10:00:00+00:00"},
+            {
+                "seq": 2,
+                "kind": "run_failed",
+                "payload": {"reason": "pytest red"},
+                "at_utc": "2026-11-07T10:05:00+00:00",
+            },
+        ],
+    }
+    assert run_failure(run) == {
+        "state": "failed",
+        "reason": "pytest red",
+        "at_utc": "2026-11-07T10:05:00+00:00",
+    }
+
+
+def test_run_failure_without_signals_has_no_reason() -> None:
+    assert run_failure({"id": "f2", "status": "failed"}) == {
+        "state": "failed",
+        "reason": None,
+        "at_utc": None,
+    }
+
+
+def test_run_failure_falls_back_to_failed_receipt() -> None:
+    run = {
+        "id": "f3",
+        "status": "failed",
+        "receipts": [
+            {"status": "failed", "detail": "drain crashed", "at_utc": "2026-11-07T11:00:00+00:00"}
+        ],
+    }
+    assert run_failure(run) == {
+        "state": "failed",
+        "reason": "drain crashed",
+        "at_utc": "2026-11-07T11:00:00+00:00",
+    }
+
+
+def test_run_failure_ignores_recovered_receipt() -> None:
+    run = {
+        "id": "ok",
+        "status": "completed",
+        "receipts": [{"status": "failed", "detail": "first try"}],
+    }
+    assert run_failure(run) is None
+
+
+def test_run_failure_ignores_cancelled_and_empty() -> None:
+    assert run_failure({"id": "c", "status": "cancelled"}) is None
+    assert run_failure({}) is None
+    assert run_failure({"id": "x"}) is None
+
+
+def test_with_run_failure_attaches_without_mutating() -> None:
+    run = {"id": "f1", "status": "failed"}
+    enriched = with_run_failure(run)
+    assert enriched["failure"] == {"state": "failed", "reason": None, "at_utc": None}
+    assert "failure" not in run
+
+
+def test_runs_detail_includes_failure_summary(dashboard_server, tmp_path) -> None:
+    _write_run(
+        tmp_path,
+        "f9",
+        {
+            "id": "f9",
+            "status": "failed",
+            "events": [
+                {"seq": 1, "kind": "run_failed", "payload": {"reason": "boom"}, "at_utc": "t"}
+            ],
+        },
+    )
+    run = get_json(dashboard_server, "/api/runs/f9")
+    assert run["item"]["failure"] == {"state": "failed", "reason": "boom", "at_utc": "t"}
+
+
+def test_runs_detail_failure_null_when_healthy(dashboard_server, tmp_path) -> None:
+    _write_run(tmp_path, "ok", {"id": "ok", "status": "merged"})
+    run = get_json(dashboard_server, "/api/runs/ok")
+    assert run["item"]["failure"] is None
 
 
 def test_status_reports_scheduler_off_by_default(dashboard_server) -> None:
