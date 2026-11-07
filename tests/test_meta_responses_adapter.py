@@ -111,7 +111,7 @@ def test_meta_client_posts_to_meta_endpoint_without_storage(monkeypatch):
         assert headers["authorization"] == "Bearer test-key"
         return Response(_completed())
 
-    monkeypatch.setattr("ai_provider.adapters.openai_responses.urlopen", send)
+    monkeypatch.setattr("ai_provider.adapters._responses_base.urlopen", send)
 
     client = MetaResponsesChatClient(
         BackendConfig(provider=ProviderKind.META, model="muse-spark-1.3", api_key="test-key")
@@ -144,7 +144,7 @@ def test_meta_client_honours_base_url_override(monkeypatch):
         captured["url"] = request.full_url
         return Response(_completed())
 
-    monkeypatch.setattr("ai_provider.adapters.openai_responses.urlopen", send)
+    monkeypatch.setattr("ai_provider.adapters._responses_base.urlopen", send)
 
     client = MetaResponsesChatClient(
         BackendConfig(
@@ -174,7 +174,7 @@ def test_meta_client_streams_text_deltas(monkeypatch):
             ]
         )
 
-    monkeypatch.setattr("ai_provider.adapters.openai_responses.urlopen", send)
+    monkeypatch.setattr("ai_provider.adapters._responses_base.urlopen", send)
 
     client = MetaResponsesChatClient(
         BackendConfig(provider=ProviderKind.META, model="muse-spark-1.3", api_key="test-key")
@@ -198,7 +198,7 @@ def test_meta_client_refuses_local_only_privacy_class(monkeypatch):
     def send(request, *, timeout):  # pragma: no cover - must never be called
         raise AssertionError("local-only request must not reach Meta")
 
-    monkeypatch.setattr("ai_provider.adapters.openai_responses.urlopen", send)
+    monkeypatch.setattr("ai_provider.adapters._responses_base.urlopen", send)
 
     client = MetaResponsesChatClient(
         BackendConfig(provider=ProviderKind.META, model="muse-spark-1.3", api_key="test-key")

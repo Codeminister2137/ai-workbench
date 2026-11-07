@@ -110,7 +110,7 @@ def test_actual_agent_read_roundtrip_uses_responses_items(client, stream, tmp_pa
             assert headers["user-agent"] and headers["x-opencode-session"]
         return Response([{"type": "response.completed", "response": result}] if stream else result)
 
-    monkeypatch.setattr("ai_provider.adapters.openai_responses.urlopen", send)
+    monkeypatch.setattr("ai_provider.adapters._responses_base.urlopen", send)
 
     class Transport:
         backend = client.backend
@@ -230,7 +230,7 @@ def test_bare_reasoning_id_is_never_replayed(client):
 
 def test_orphan_tool_result_fails_before_network(client, monkeypatch):
     monkeypatch.setattr(
-        "ai_provider.adapters.openai_responses.urlopen", lambda *a, **k: pytest.fail("no network")
+        "ai_provider.adapters._responses_base.urlopen", lambda *a, **k: pytest.fail("no network")
     )
     with pytest.raises(ProviderError, match="originating call id"):
         client.complete(
@@ -248,7 +248,7 @@ def test_incomplete_stream_retains_finish_reason_and_usage(client, monkeypatch):
         "incomplete_details": {"reason": "max_output_tokens"},
     }
     monkeypatch.setattr(
-        "ai_provider.adapters.openai_responses.urlopen",
+        "ai_provider.adapters._responses_base.urlopen",
         lambda *a, **k: Response([{"type": "response.incomplete", "response": raw}]),
     )
     final = list(
@@ -298,7 +298,7 @@ def test_streamed_done_items_supply_tools_when_terminal_event_has_usage_only(cli
         {"type": "response.completed", "response": {"usage": {"input_tokens": 3}}},
     ]
     monkeypatch.setattr(
-        "ai_provider.adapters.openai_responses.urlopen", lambda *a, **k: Response(events)
+        "ai_provider.adapters._responses_base.urlopen", lambda *a, **k: Response(events)
     )
     final = list(
         client.stream(
@@ -349,7 +349,7 @@ def test_failed_response_preserves_service_error_and_cannot_deliver_tools(
         "output": [call()],
     }
     monkeypatch.setattr(
-        "ai_provider.adapters.openai_responses.urlopen",
+        "ai_provider.adapters._responses_base.urlopen",
         lambda *a, **k: Response([{"type": "response.failed", "response": raw}] if stream else raw),
     )
     request = AIRequest(

@@ -20,7 +20,10 @@ from ai_agent.tools.shell import RunCommandTool
 from ai_orchestrator import CostPolicyTier, TaskProfile
 from ai_orchestrator import PrivacyClass as RoutingPrivacy
 from ai_provider import BackendConfig, PrivacyClass, ProviderError, ProviderKind, create_chat_client
-from ai_provider.adapters import openai_compatible, openai_responses
+from ai_provider.adapters import (
+    _responses_base,
+    openai_compatible,
+)
 from ai_provider.adapters.baseten import BASETEN_HACKATHON_MODEL
 
 INSTRUCTIONS = "Synthetic acceptance: preserve protected checks and report observed effects."
@@ -174,7 +177,7 @@ def test_nested_delegation_over_real_transport(tmp_path, monkeypatch, provider, 
         )
     )
     # No unregistered origin or fresh child client can silently escape this fixture.
-    transport = openai_responses if provider == "meta" else openai_compatible
+    transport = _responses_base if provider == "meta" else openai_compatible
     original_open = transport.urlopen
 
     def loopback_only(request, *, timeout):
@@ -183,7 +186,7 @@ def test_nested_delegation_over_real_transport(tmp_path, monkeypatch, provider, 
         return original_open(request, timeout=timeout)
 
     monkeypatch.setattr(transport, "urlopen", loopback_only)
-    other_transport = openai_compatible if provider == "meta" else openai_responses
+    other_transport = openai_compatible if provider == "meta" else _responses_base
     monkeypatch.setattr(
         other_transport,
         "urlopen",

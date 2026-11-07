@@ -195,7 +195,7 @@ def main() -> int:
         key = read_meta_key_file(env_file)
     os.environ["META_API_KEY"] = key
     from ai_agent.cli import main as cli_main
-    from ai_provider.adapters import openai_responses
+    from ai_provider.adapters import _responses_base
 
     receipt = {
         "max_requests": MAX_CALLS,
@@ -243,8 +243,8 @@ def main() -> int:
             call,
         )
 
-    original = openai_responses.urlopen
-    openai_responses.urlopen = transport
+    original = _responses_base.urlopen
+    _responses_base.urlopen = transport
     policy_scope = contextlib.ExitStack()
     record()
     try:
@@ -303,7 +303,7 @@ def main() -> int:
         raise
     finally:
         policy_scope.close()
-        openai_responses.urlopen = original
+        _responses_base.urlopen = original
         receipt["elapsed_seconds"] = time.monotonic() - started
         record()
 
