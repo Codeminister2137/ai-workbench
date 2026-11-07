@@ -18,7 +18,7 @@ Last verified: 2026-11-06 evening (Baseten loop: drain@300 live, 7 REAL audit it
 | Service | Address | Status | Notes |
 |---|---|---|---|
 | Dashboard | `http://127.0.0.1:8766` | up | localhost-only by design; remote via tailnet |
-| Remote dashboard | `https://desktop-j2m5erf.tailc59785.ts.net` | up | `tailscale serve`; needs `trusted_hosts` in live `dashboard.json` |
+| Remote dashboard | `https://<your-machine>.<your-tailnet>.ts.net` | up | `tailscale serve`; needs `trusted_hosts` in live `dashboard.json`; find your URL via `tailscale status --json` (`.Self.DNSName`) |
 | Ollama | `http://127.0.0.1:11434` | up | models: gpt-oss:20b, qwen3:14b, qwen2.5-coder:14b, deepseek-coder-v2:16b |
 
 ## Scheduled tasks (machine-local, scripts committed)

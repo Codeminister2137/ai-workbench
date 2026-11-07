@@ -3,7 +3,7 @@
 ## 2026-10-31 - Remote plan complete: rename, wake drill, 3b, operator main merge
 
 - Root folder renamed AI-projects -> ai-workbench by owner; all 24 worktree links repaired, uv sync clean, smoke green. No commit needed (local admin).
-- Wake drill PASS: BIOS PCI-E wake on; Termux one-liner wakes over LAN; off-LAN wakes via FunBox forward (WAN UDP 61234 -> 192.168.1.12:9) with owner-set static IP. Tailscale connects post-wake. No WoL/VPN page on FunBox; static DHCP UI broken (worked around on the PC). Wake-only exposure accepted.
+- Wake drill PASS: BIOS PCI-E wake on; Termux one-liner wakes over LAN; off-LAN wakes via router forward (WAN UDP `WAKE_WOL_PORT` -> `WAKE_LAN_IP`:9; values in local `.env`) with owner-set static IP. Tailscale connects post-wake. No WoL/VPN page on FunBox; static DHCP UI broken (worked around on the PC). Wake-only exposure accepted.
 - Operator 3b shipped and merged: supervisor-drain worker (reconcile/resume, approval boundary) + stdlib-SMTP notifier + CLI + 16 tests + docs, merged to main @ 1f85ac1 and pushed to public GitHub with owner release approval. pytest 314 + 143 subtests, unittest 224 OK, ruff clean, scan clean.
 - Four loop emails went to the owner Gmail (+jobs alias; 2 tests, 2 smokes).
 - No paid inference used; no live model authorship claimed for scripted paths.
@@ -3114,7 +3114,7 @@ The live handoff below was superseded when the 14:38→19:38Z unattended window 
   + 143 subtests, unittest 224 OK, ruff clean, scan clean. Judges' Modal
   deployment untouched by the source merge.
 - Root folder renamed to `ai-workbench`; all 24 worktree links repaired.
-- Remote story proven: WoL LAN + off-LAN PASS (static .12, WAN UDP 61234 -> :9,
+- Remote story proven: WoL LAN + off-LAN PASS (static LAN IP, WAN UDP forward -> :9,
   BIOS PCI-E wake on, firewall all ON); Tailscale connects; Termux wakes.
 - No loop running, no sleep timers. Note: sessions opened before the rename
   still use the old root path; prefer opening fresh sessions at `ai-workbench`.
@@ -4146,7 +4146,7 @@ main merge.
 
   runtime budget, dashboard trusted_hosts + tailnet serve (live, verified GET
 
-  + POST at https://desktop-j2m5erf.tailc59785.ts.net -- Tailscale only).
+  + POST at https://<your-machine>.<your-tailnet>.ts.net -- Tailscale only).
 
 - Live dashboard.json (gitignored) has trusted_hosts=[tailnet name]. Dashboard
 

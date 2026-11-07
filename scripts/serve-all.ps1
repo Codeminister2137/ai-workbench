@@ -85,7 +85,10 @@ if ($serveStatus -match '127\.0\.0\.1:8766') {
 }
 
 try {
-    $remote = Invoke-WebRequest -Uri 'https://desktop-j2m5erf.tailc59785.ts.net/api/status' -UseBasicParsing -TimeoutSec 15
+    $selfName = ((tailscale.exe status --json 2>$null | ConvertFrom-Json).Self.DNSName)
+    if (-not $selfName) { throw 'tailscale self name unknown' }
+    $selfName = $selfName.TrimEnd('.')
+    $remote = Invoke-WebRequest -Uri ('https://' + $selfName + '/api/status') -UseBasicParsing -TimeoutSec 15
     'remote dashboard: HTTP ' + $remote.StatusCode
 } catch {
     'remote dashboard: UNREACHABLE (' + $_.Exception.Message + ')'

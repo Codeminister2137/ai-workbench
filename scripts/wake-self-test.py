@@ -30,9 +30,7 @@ _SPEC.loader.exec_module(loop_notify)
 
 NETWORK_DEVICE = re.compile(r"ethernet|gbe|wi-?fi|wlan|realtek|intel", re.IGNORECASE)
 DDNS_ENV = "WAKE_DDNS_HOSTNAME"
-
-
-EXPECTED_LAN_IP = "192.168.1.12"
+LAN_ENV = "WAKE_LAN_IP"
 
 
 def primary_lan_ip() -> str | None:
@@ -47,17 +45,34 @@ def primary_lan_ip() -> str | None:
         probe.close()
 
 
-def check_lan_ip(expected: str = EXPECTED_LAN_IP, probe=primary_lan_ip) -> tuple[bool, str]:
-    """Require the PC to hold the LAN IP the wake forward targets."""
+def check_lan_ip(expected: str | None = None, probe=primary_lan_ip) -> tuple[bool, str]:
+    """Require the PC to hold the LAN IP the wake forward targets.
+
+    Expected comes from the argument or WAKE_LAN_IP (env, else repo .env);
+    pending when unconfigured, since a downloader's LAN always differs.
+    """
+    import os
+
+    exp = (expected or "").strip() or os.environ.get(LAN_ENV, "").strip()
+    if not exp:
+        try:
+            from ai_provider.secrets import read_dotenv_values
+
+            found = read_dotenv_values(loop_notify.ROOT / ".env", {LAN_ENV})
+            exp = (found.get(LAN_ENV) or "").strip()
+        except Exception:  # noqa: BLE001 - missing helper means not configured
+            exp = ""
+    if not exp:
+        return True, "pending (WAKE_LAN_IP not configured)"
     try:
         actual = probe()
     except Exception as exc:  # noqa: BLE001 - self-test reports, never raises
         return False, f"{type(exc).__name__}: {exc}"[:200]
     if not actual:
         return False, "primary LAN IP undeterminable"
-    if actual == expected:
-        return True, f"holds {actual} (forward target {expected})"
-    return False, f"drift: PC holds {actual}, forward targets {expected}"
+    if actual == exp:
+        return True, f"holds {actual} (forward target {exp})"
+    return False, f"drift: PC holds {actual}, forward targets {exp}"
 
 
 def check_dashboard(dashboard: str, *, timeout: float = 10) -> tuple[bool, str]:
