@@ -9,7 +9,7 @@ from urllib.error import HTTPError
 from urllib.request import Request
 
 import pytest
-from ai_provider.errors import ProviderErrorCategory
+from ai_provider.errors import ProviderError, ProviderErrorCategory
 from ai_provider.http_transport import MAX_RESPONSE_BYTES, iter_response_lines, urlopen
 
 
@@ -111,7 +111,7 @@ def test_iter_response_lines_single_giant_line_raises():
     # Fake response whose read() returns one 3MB line
     big_line = b"x" * (3 * 1024 * 1024)  # 3 MiB, exceeds default 2 MiB bound
     resp = _FakeResponse(big_line)
-    with pytest.raises(Exception) as exc:
+    with pytest.raises(ProviderError) as exc:
         list(iter_response_lines(resp))
     err = exc.value
     assert err.category == ProviderErrorCategory.NON_RETRYABLE
@@ -132,7 +132,7 @@ def test_iter_response_lines_cumulative_overflow_still_raises():
     line = b"a" * 10 + b"\n"  # 11 bytes each
     body = line * 10  # 110 bytes > 100
     resp = _FakeResponse(body)
-    with pytest.raises(Exception) as exc:
+    with pytest.raises(ProviderError) as exc:
         list(iter_response_lines(resp, limit=limit))
     err = exc.value
     assert err.category == ProviderErrorCategory.NON_RETRYABLE
@@ -153,7 +153,7 @@ def test_iter_response_lines_single_line_overflow_without_newline():
     # Giant line without newline should also raise single-line breach
     big_line = b"y" * (MAX_RESPONSE_BYTES + 1)
     resp = _FakeResponse(big_line)
-    with pytest.raises(Exception) as exc:
+    with pytest.raises(ProviderError) as exc:
         list(iter_response_lines(resp))
     assert exc.value.category == ProviderErrorCategory.NON_RETRYABLE
 
@@ -163,6 +163,6 @@ def test_iter_response_lines_legacy_path_cannot_bound_single_lines():
     limit = 50
     lines = [b"a" * 20 + b"\n", b"b" * 20 + b"\n", b"c" * 20 + b"\n"]  # 63 cumulative > 50
     resp = _NoSizeArgResponse(lines)
-    with pytest.raises(Exception) as exc:
+    with pytest.raises(ProviderError) as exc:
         list(iter_response_lines(resp, limit=limit))
     assert exc.value.category == ProviderErrorCategory.NON_RETRYABLE

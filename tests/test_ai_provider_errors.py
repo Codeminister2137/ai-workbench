@@ -1,5 +1,6 @@
 """Shared HTTP-to-provider error mapping (one mapping for all adapters)."""
 
+from email.message import Message
 from urllib.error import HTTPError
 
 import pytest
@@ -7,7 +8,7 @@ from ai_provider.errors import ProviderErrorCategory, http_error_to_provider_err
 
 
 def _http_error(code: int) -> HTTPError:
-    return HTTPError("https://provider.example/v1", code, "reason", {}, None)
+    return HTTPError("https://provider.example/v1", code, "reason", Message(), None)
 
 
 @pytest.mark.parametrize(
