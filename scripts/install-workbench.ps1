@@ -6,8 +6,9 @@
      2. Offers to install uv and ffmpeg when missing, then creates or
         reuses .venv and installs the workbench (prefers uv sync --locked,
         falls back to plain Python).
-     3. Creates apps/workbench_dashboard/dashboard.json from the example
-        config when missing. An existing config is kept and never printed.
+     3. Creates .env from .env.example and
+        apps/workbench_dashboard/dashboard.json from the example config
+        when missing. Existing files are kept and never printed.
      4. Offers to install Tailscale (private-network app for reaching the
         dashboard from another device). You can say no; the dashboard
         still works on this PC.
@@ -127,6 +128,19 @@ function Ensure-Install($Root, $PythonExe) {
 }
 
 # ------------------------------------------------------- dashboard config ---
+
+function Ensure-Dotenv($Root) {
+  $local = Join-Path $Root '.env'
+  $example = Join-Path $Root '.env.example'
+  if (Test-Path $local) {
+    Write-Host 'Kept your existing .env (not shown).'
+    return
+  }
+  if (-not (Test-Path $example)) { throw "Missing example env file: $example" }
+  Copy-Item -Path $example -Destination $local
+  Write-Host 'Created .env from .env.example (safe defaults, no secrets).'
+  Write-Host 'Put your own keys/hostnames in .env; it is never committed.'
+}
 
 function Ensure-DashboardConfig($Root) {
   $appDir = Join-Path $Root 'apps\workbench_dashboard'
@@ -422,6 +436,7 @@ function Invoke-Installer {
 
   # 3. Dashboard config ------------------------------------------------
   Write-Step 'Checking the dashboard config'
+  Ensure-Dotenv $root
   $configChanged = Ensure-DashboardConfig $root
 
   # 4. Private network (optional) --------------------------------------
