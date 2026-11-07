@@ -18,6 +18,7 @@ from ai_agent.staged_edits import (
     root_id,
     stage_file,
     staged_diff,
+    staged_diffstat,
     verify_staged,
 )
 
@@ -229,6 +230,23 @@ def test_staged_diff_renders_unified_text() -> None:
     assert "+++ candidate/main.py" in text
     assert "-old" in text
     assert "+new" in text
+
+
+def test_staged_diffstat_counts_added_removed() -> None:
+    assert staged_diffstat("a\nb\n", "a\nc\nd\n") == {"added": 2, "removed": 1}
+    assert staged_diffstat("a\nb\n", "a\n") == {"added": 0, "removed": 1}
+    assert staged_diffstat(None, "hi\n") == {"added": 1, "removed": 0}
+    assert staged_diffstat("same\n", "same\n") == {"added": 0, "removed": 0}
+
+
+def test_review_staged_includes_diffstat(tmp_path: Path) -> None:
+    root = tmp_path / "proj"
+    root.mkdir()
+    (root / "main.py").write_text("old\n", encoding="utf-8")
+    staged = [stage_file(root, "main.py", "new\n"), stage_file(root, "added.py", "hi\n")]
+    views = review_staged(root, staged)
+    assert views[0]["diffstat"] == {"added": 1, "removed": 1}
+    assert views[1]["diffstat"] == {"added": 1, "removed": 0}
 
 
 def test_review_staged_lists_per_file_diffs(tmp_path: Path) -> None:
