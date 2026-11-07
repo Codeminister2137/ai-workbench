@@ -327,6 +327,16 @@ request a bounded continuation at the checkpoint. Neither path renews a grant,
 resets the original deadline or relaxes safety/privacy/protected-file/freeze
 boundaries. File changes alone are not evidence of progress.
 
+Idle monitoring is not useful work: when the candidate ledger holds no
+implementable READY, NEEDS_INVESTIGATION, or IN_PROGRESS action and every
+remaining row and open inbox item waits on owner input or an owner-side
+action, that is verified exhaustion — close out early at once instead of
+polling to the deadline. The closeout mail must use a structured status
+(`scripts/loop_notify.py --state WAITING_FOR_OWNER ...`) quoting
+`scripts/loop_status.py`, so the owner sees `State: WAITING_FOR_OWNER`
+with explicit Remaining / Waiting-on / Sleep sections. Wake-on-LAN lets
+the owner resume remotely; staying awake to poll is never the default.
+
 At the deadline (with approximately five minutes reserved for closeout), or an
 evidenced early stop, report work completed, validation, remaining candidates,
 specific blockers and elapsed/remaining time. Preserve the original deadline
