@@ -788,7 +788,7 @@ async function renderInbox(id) {
     const record = (item.options || []).length && item.status === "closed"
       ? `<h3>Choices offered</h3><ol>${item.options.map((o) => `<li>${esc(o)}</li>`).join("")}</ol>` : "";
     const outcome = item.resolution
-      ? `<h3>Outcome</h3><p>${gtext(item.resolution)}</p>`
+      ? `<h3>Outcome</h3><p class="inbox-body">${gtext(item.resolution)}</p>`
         + (item.resolved_at ? `<p class="muted">Resolved ${stamp(item.resolved_at)}</p>` : "")
       : "";
     const decision = item.answer || item.note
@@ -800,7 +800,7 @@ async function renderInbox(id) {
       <div class="card"><h2>${gtext(item.title)}</h2>
       <p class="muted">${esc(item.type)} · ${esc(item.status)} · from ${esc(item.created_by || "")} · opened ${stamp(item.created_at)}</p>
       <h3>Request</h3>
-      <p>${gtext(item.body || "")}</p>
+      <p class="inbox-body">${gtext(item.body || "")}</p>
       ${item.type === "task" ? '<p class="muted">Do the steps above, then answer Done with a note. Never paste secrets here — put keys in .env / User env.</p>' : ""}
       ${refs ? `<ul class="plain">${refs}</ul>` : ""}
       ${record}
@@ -916,7 +916,7 @@ async function renderIdeas(id) {
     view.innerHTML = `<h1>Idea</h1><p><a href="#/ideas">All ideas</a></p>
       <div class="card"><h2>${gtext(item.title)}</h2>
       <p class="muted">${esc(item.source)}${item.contact ? " · " + esc(item.contact) : ""} · ${esc(item.status)}</p>
-      <p>${gtext(item.body || "")}</p>
+      <p class="inbox-body">${gtext(item.body || "")}</p>
       ${item.decision ? `<p><strong>Decision:</strong> ${esc(item.decision)}</p>` : ""}
       ${item.status === "new" ? `<p><button id="mark-seen-btn" title="Mark this idea seen (moves it out of new)">Mark seen</button></p>` : ""}
       <form id="review-form" class="inline">
