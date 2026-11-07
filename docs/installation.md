@@ -1,5 +1,10 @@
 # Installation and external runtimes
 
+For the dashboard on Windows, run the installer from the repository root
+(`powershell -ExecutionPolicy Bypass -File .\scripts\install-workbench.ps1`);
+it performs the Python setup below plus config, automatic start, and optional
+Tailscale/ffmpeg. The rest of this doc covers the manual path and runtimes.
+
 ## Python workspace
 
 This repository uses a `uv` workspace with dependencies declared in

@@ -14,11 +14,13 @@ prototypes put those components to use.
 
 The engineering focus is making AI execution understandable: which route runs,
 what it may access, what checks actually executed, and what remains unverified.
-The long-term vision is a unified workbench for coordinating agents and automated
-tasks with human oversight. This is an actively developed portfolio project;
-implemented components do **not** establish production readiness.
+The workbench dashboard is the primary interface: chat with agents, review and
+approve runs, track spend, and monitor scheduled watchdogs from one local page.
+This is an actively developed portfolio project; implemented components do
+**not** establish production readiness.
 
-- **Try it:** the [quick start](#quick-start) includes examples without inference.
+- **Try it:** the [quick start](#quick-start) installs the dashboard and includes
+  examples without inference.
 - **Explore the design:** [architecture](docs/architecture.md),
   [package ownership](docs/project-map.md), and [decisions](docs/decisions.md).
 - **Develop:** [contributing](CONTRIBUTING.md) and [repository instructions](AGENTS.md).
@@ -42,6 +44,14 @@ recommendations and execution plans without inference. Coding workflows can
 continue on eligible routes after usage exhaustion or overload, subject to
 privacy, cost, capability, quality-policy and approval constraints. Fallback
 can refuse continuation; catalog grades do not establish measured output quality.
+
+### Workbench dashboard
+
+Local-first inbox, agent chat, run review/approval, plans, documents, spend,
+fleet and schedule views at `http://127.0.0.1:8766`. Voice dictation uses a
+metered server engine with a free browser fallback. Remote access is the
+operator's own tailnet/VPN only — the installer wires nothing to anyone
+else's machine.
 
 ### Repository-aware development
 
@@ -105,8 +115,8 @@ end-to-end workflow acceptance.
 | Experimental | Public-source research and foreground research jobs | Retrieval/report plumbing is implemented. Quality-first review is opt-in; sustained research-quality acceptance remains incomplete. Structure and receipts do not prove factual accuracy. See [research](docs/repo-assistant/research.md). |
 | Prototype | [AI Council](apps/ai_council/README.md) and [job-search workflows](apps/job_search/README.md) | Council currently uses local Ollama. Job-search preparation and guarded delivery exist; broader automation and real Openings deployment are not established. |
 | Planned | General repository egress protection and broader application workflows | The [restricted-input plan](docs/repo-assistant/restricted-input-plan.md) distinguishes the implemented single reviewed-input path from future general protection. See the [roadmap](docs/repo-assistant/development-roadmap.md) for priorities. |
-| Planned direction | Unified agent/provider dashboard | The [architecture](docs/architecture.md) describes the vision. A unified management UI is not implemented; its detailed product and data decisions remain open. |
-| Prototype (companion repo) | Mobile-to-PC remote control | Supervised chat-first phone UI, run settings, review/approve and hosted judge mode live in the separate remote-operator repo; this repository has only local browser/MCP endpoints and no built-in phone controller. A P3 thin-client bridge between them is in progress. |
+| Implemented | Workbench dashboard (inbox, chat, runs, spend, fleet, schedule, STT) | Local-first single-operator UI; remote use via the operator's own tailnet. Approval-gated run execution and spend metering are enforced; broader multi-user hardening is not done. |
+| Merged | Mobile-to-PC remote control | The separate remote-operator repo is frozen post-hackathon; its chat-first review/approve flow was merged into this dashboard. No separate phone controller remains. |
 
 ## Quick Start
 
@@ -119,6 +129,26 @@ Run workspace commands from the repository root. Requirements:
 
 See [installation](docs/installation.md) for environment ownership and external
 prerequisites. Python dependencies belong in the `uv`-managed workspace `.venv`.
+
+### Run the dashboard (recommended)
+
+On Windows, from the repository root in PowerShell:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\install-workbench.ps1
+```
+
+The installer checks Python, offers `uv`/`ffmpeg`/Tailscale, creates `.venv`,
+writes `.env` and `dashboard.json` from the examples when missing, registers
+automatic start at sign-in, and health-checks the server. Then open
+`http://127.0.0.1:8766` in a browser. Everything runs on your machine with
+your keys; nothing phones home. Re-run with `-Uninstall` to remove the
+automatic start entry.
+
+Without the installer: `python -m uv sync --locked`, copy `.env.example` to
+`.env` and `apps/workbench_dashboard/dashboard.example.json` to
+`apps/workbench_dashboard/dashboard.json`, then serve
+`apps/workbench_dashboard/dashboard_web_app.py --host 127.0.0.1 --port 8766`.
 
 ### Install and check the workspace
 
@@ -214,7 +244,7 @@ and [publication guidance](docs/publication.md).
 
 ```text
 packages/  Reusable provider, orchestrator and agent libraries
-apps/      AI Council and job-search prototypes
+apps/      Workbench dashboard, AI Council and job-search prototypes
 scripts/   Workspace launchers, diagnostics and acceptance helpers
 tests/     Workspace-level tests
 docs/      Architecture, decisions and workflow guides
