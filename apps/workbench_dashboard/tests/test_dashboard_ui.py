@@ -57,7 +57,7 @@ def test_static_controls_have_titles() -> None:
     for tag in re.findall(r"<button\b[^>]*>", html):
         assert "title=" in tag, f"button without title: {tag}"
     nav_links = re.findall(r"<a\b[^>]*data-view[^>]*>", html)
-    assert len(nav_links) == 11  # +intake, +restrictions, +fleet
+    assert len(nav_links) == 12  # +intake, +restrictions, +fleet, +providers
     for tag in nav_links:
         assert "title=" in tag, f"nav link without title: {tag}"
 
@@ -67,8 +67,8 @@ def test_dynamic_buttons_have_titles() -> None:
     js = _read("app.js")
     buttons = re.findall(r"<button\b[^>]*>", js)
     assert (
-        len(buttons) == 19
-    )  # +report/rename/delete/submit/create/cancel/run-request/staged-approve/staged-reject/dictate/intake-approve/draft-plan/drain/reopen
+        len(buttons) == 20
+    )  # +report/rename/delete/submit/create/cancel/run-request/staged-approve/staged-reject/dictate/intake-approve/draft-plan/drain/reopen/providers-refresh
     for tag in buttons:
         assert "title=" in tag, f"button without title: {tag}"
 
@@ -578,3 +578,38 @@ def test_inbox_and_idea_bodies_preserve_line_breaks() -> None:
     assert js.count('<p class="inbox-body">') >= 3  # request, outcome, idea
     assert "<p>${gtext(item.body" not in js
     assert "<p>${gtext(item.resolution)}" not in js
+
+
+def test_spend_card_renders_policy() -> None:
+    """Spend card shows order, prepaid-today, and rules."""
+    js = _read("app.js")
+    assert "spend.policy" in js
+    assert "prepaid-if-allowed" in js
+    assert "Prepaid today" in js
+
+
+def test_providers_view_markers_present() -> None:
+    """Providers route, cards, refresh action, and nav link exist."""
+    js = _read("app.js")
+    assert "renderProviders" in js
+    assert "#/providers" not in js  # route dispatch uses the bare name
+    assert 'name === "providers"' in js
+    assert "/api/providers" in js
+    assert "/api/providers/refresh" in js
+    assert "providers-refresh" in js
+    assert "Log in / register at" in js
+    html = _read("index.html")
+    assert 'data-view="providers"' in html
+
+
+def test_schedule_and_fleet_use_readable_times_and_explanations() -> None:
+    """fmtTime helper exists and schedule/fleet render it plus explanations."""
+    js = _read("app.js")
+    assert "function fmtTime(value)" in js
+    assert "fmtTime(t.next_run)" in js
+    assert "fmtTime(f.sleep.due_utc)" in js
+    assert "fmtTime(t.last_run)" in js
+    assert "t.explain" in js
+    assert "f.sleep.explain" in js
+    assert "f.dashboard.explain" in js
+    assert "f.ollama.explain" in js

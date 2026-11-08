@@ -52,7 +52,11 @@ def test_location_match_is_substring_caseless():
 
 
 def test_unspecified_modes_pass_through():
-    vague = vacancy(work_mode=WorkMode.UNSPECIFIED, employment_type=EmploymentType.UNSPECIFIED)
+    vague = vacancy(
+        work_mode=WorkMode.UNSPECIFIED,
+        employment_type=EmploymentType.UNSPECIFIED,
+        location="",
+    )
     prefs = JobPreferences(locations=("berlin",), remote_ok=False, employment_types=("b2b",))
     assert check_preferences(prefs, vague) == (True, ())
 
@@ -62,3 +66,9 @@ def test_employment_type_excluded_when_known():
     assert check_preferences(prefs, vacancy()) == (False, ("employment_type_excluded",))
     prefs = JobPreferences(employment_types=("b2b",))
     assert check_preferences(prefs, vacancy())[0] is True
+
+
+def test_location_filters_unknown_modes_with_location():
+    vague = vacancy(work_mode=WorkMode.UNSPECIFIED)
+    prefs = JobPreferences(locations=("berlin",))
+    assert check_preferences(prefs, vague) == (False, ("location_excluded",))

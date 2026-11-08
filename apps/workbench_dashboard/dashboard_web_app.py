@@ -31,7 +31,11 @@ from ai_agent.staged_edits import (
 )
 from ai_agent.supervisor_drain import Executor, RunDrain
 from ai_orchestrator.evidence import merge_probe_eval
-from ai_orchestrator.spend_ledger import SpendLedger, allowance_from_file
+from ai_orchestrator.spend_ledger import (
+    SpendLedger,
+    allowance_from_file,
+    policy_from_file,
+)
 from ai_provider.adapters.meta_asr import MetaAsrEngine
 from ai_provider.chat_transcripts import SQLiteChatTranscriptStore
 from ai_provider.secrets import read_secret_key
@@ -59,6 +63,8 @@ from document_library import DocumentLibrary
 from drain_scheduler import DrainScheduler
 from owner_mail import mail_configured
 from p7_intake import approve_intake, list_intake
+from providers_view import provider_status as providers_status
+from providers_view import refresh_provider_status
 from window_status import load_window_status
 
 ROOT = Path(__file__).parent
@@ -159,7 +165,14 @@ def load_spend_ledger(data_dir: Path) -> SpendLedger:
     Fail-loud on malformed grant files (money); a missing grants dir means
     unconfigured (deny-by-default), never an error.
     """
-    ledger = SpendLedger()
+    policy_path = data_dir / "spend" / "policy.json"
+    rules = None
+    if policy_path.is_file():
+        try:
+            rules = policy_from_file(policy_path)
+        except ValueError as exc:
+            raise ValueError(f"spend policy {policy_path.name}: {exc}") from exc
+    ledger = SpendLedger(rules=rules)
     grants_dir = data_dir / "spend" / "grants"
     if grants_dir.is_dir():
         for path in sorted(grants_dir.glob("*.json")):
@@ -237,6 +250,7 @@ FLEET_TASKS = (
     "CloneScan",
     "WakeSelfTest",
     "PrivateBackup",
+    "WorkbenchWeeklyDigest",
 )
 FLEET_TERMINAL_RUN_STATUSES = frozenset({"completed", "failed", "cancelled", "canceled", "merged"})
 
@@ -361,13 +375,67 @@ def fleet_runs(stores) -> list[dict[str, Any]]:
     ]
 
 
+FLEET_SERVICES_DOC = "docs/fleet-services.md"
+
+
+def fleet_explain(repo_root: Path) -> dict[str, str]:
+    """Parse per-service explanations from the fleet services doc.
+
+    Strict ``## <name>`` headers; the first paragraph under each header is
+    the explanation. Fail-soft: unreadable or unparseable docs yield {}.
+    """
+    try:
+        text = (repo_root / FLEET_SERVICES_DOC).read_text(encoding="utf-8")
+    except OSError:
+        return {}
+    found: dict[str, str] = {}
+    name: str | None = None
+    paragraph: list[str] = []
+
+    def _flush() -> None:
+        if name and paragraph:
+            found[name] = " ".join(paragraph)
+
+    for line in text.splitlines():
+        if line.startswith("## "):
+            _flush()
+            name = line[3:].strip()
+            paragraph = []
+        elif name is not None:
+            stripped = line.strip()
+            if not stripped:
+                if paragraph:
+                    _flush()
+                    name = None
+                    paragraph = []
+            elif not line.startswith("#"):
+                paragraph.append(stripped)
+    _flush()
+    return found
+
+
 def fleet_status(repo_root: Path, stores) -> dict[str, Any]:
     """Aggregate live fleet probes; every probe is fail-soft."""
+    explain = fleet_explain(repo_root)
+    dashboard: dict[str, Any] = {"up": True}
+    if explain.get("dashboard"):
+        dashboard["explain"] = explain["dashboard"]
+    ollama = fleet_ollama()
+    if explain.get("ollama"):
+        ollama["explain"] = explain["ollama"]
+    sleep = fleet_sleep(repo_root)
+    if explain.get("sleep guard"):
+        sleep["explain"] = explain["sleep guard"]
+    tasks = []
+    for row in fleet_tasks():
+        if explain.get(row["name"]):
+            row["explain"] = explain[row["name"]]
+        tasks.append(row)
     return {
-        "dashboard": {"up": True},
-        "ollama": fleet_ollama(),
-        "tasks": fleet_tasks(),
-        "sleep": fleet_sleep(repo_root),
+        "dashboard": dashboard,
+        "ollama": ollama,
+        "tasks": tasks,
+        "sleep": sleep,
         "runs": fleet_runs(stores),
     }
 
@@ -482,6 +550,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 return self._send_json(
                     {"ok": True, "spend": spend_status(self.data_dir, self.spend_ledger)}
                 )
+            if path == "/api/providers":
+                return self._send_json(providers_status(self.data_dir))
             if path == "/api/fleet":
                 return self._send_json(
                     {"ok": True, "fleet": fleet_status(self.repo_root, self._stores())}
@@ -585,6 +655,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             if path.startswith("/api/chat/sessions/") and path.endswith("/draft-plan"):
                 session_id = path[len("/api/chat/sessions/") : -len("/draft-plan")]
                 return self._draft_plan_from_chat(config, session_id, payload)
+            if path == "/api/providers/refresh":
+                return self._send_json(refresh_provider_status(self.data_dir))
             if path == "/api/inbox":
                 return self._create_inbox_task(payload)
             if path == "/api/ideas":

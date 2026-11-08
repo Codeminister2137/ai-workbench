@@ -260,3 +260,25 @@ and persistence probes are described above. No dependencies were installed,
 application service started, private profile transmitted or model request made.
 The source snapshots are inspection artifacts, not additions to the workspace
 dependency graph. Adoption decisions should be recorded before implementation.
+
+## Bounded open-jobs trial (loop8, 2026-11-08): service discontinued
+
+Bounds: 4 read-only requests with the documented `open-jobs-tools/0.1` UA,
+no POST to `/embed` or `/jd`, no credentials, no retries. Pinned source
+`309f6c9` inspected for endpoint paths.
+
+Observed (all against `https://backend.dehnbostele.workers.dev`):
+
+- `GET /ats` -> HTTP 410: "Open Jobs stopped running on 10 October 2026.
+  The last snapshot (5 October 2026) stays under /data/."
+- `POST /status` (`{"keys":[]}`) -> HTTP 410, same shutdown notice.
+- `GET /data/manifest.json` -> HTTP 500 (`error code: 1101`, Cloudflare
+  worker exception).
+- `GET /data/` -> HTTP 500, same worker exception.
+
+Verdict: open-jobs is not viable as supplementary discovery. The live API
+is intentionally gone and the promised last snapshot is not retrievable
+(the 5 October snapshot would be stale for active search regardless).
+Drop open-jobs from the integration plan; the target-board coverage gap
+(Just Join IT, Pracuj.pl, RocketJobs) still needs a JobSpy or Openings
+adapter trial.

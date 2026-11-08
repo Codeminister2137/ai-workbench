@@ -191,6 +191,50 @@ def allowance_from_file(path: str | Path) -> Allowance:
     )
 
 
+POLICY_FILE_MAX_BYTES = 8192
+POLICY_RULE_KEYS = frozenset({"scope", "prepaid_allowed", "max_prepaid_cents_per_day"})
+
+
+def policy_from_file(path: str | Path) -> list[PolicyRule]:
+    """Read user prepaid-permission rules; unknown keys fail closed."""
+    path = Path(path)
+    if path.stat().st_size > POLICY_FILE_MAX_BYTES:
+        raise ValueError("Spend policy exceeds 8192 bytes")
+    configuration = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(configuration, dict):
+        raise ValueError("Spend policy must be a JSON object")
+    unknown_doc = sorted(set(configuration) - {"rules"})
+    if unknown_doc:
+        raise ValueError(f"Unknown spend policy keys: {unknown_doc}")
+    raw_rules = configuration.get("rules", [])
+    if not isinstance(raw_rules, list):
+        raise ValueError("Spend policy rules must be a list")
+    rules: list[PolicyRule] = []
+    for index, raw in enumerate(raw_rules):
+        if not isinstance(raw, dict):
+            raise ValueError(f"Rule #{index} must be an object")
+        unknown = sorted(set(raw) - POLICY_RULE_KEYS)
+        if unknown:
+            raise ValueError(f"Rule #{index} unknown keys: {unknown}")
+        scope = raw.get("scope", "global")
+        if not isinstance(scope, str) or not scope.strip():
+            raise ValueError(f"Rule #{index} needs a scope")
+        allowed = raw.get("prepaid_allowed", False)
+        if not isinstance(allowed, bool):
+            raise ValueError(f"Rule #{index} prepaid_allowed must be boolean")
+        cap = raw.get("max_prepaid_cents_per_day")
+        if cap is not None and (not isinstance(cap, int) or cap < 0):
+            raise ValueError(f"Rule #{index} cap must be a non-negative integer")
+        rules.append(
+            PolicyRule(
+                scope=scope,
+                prepaid_allowed=allowed,
+                max_prepaid_cents_per_day=cap,
+            )
+        )
+    return rules
+
+
 class SpendLedger:
     """Single-writer P5 spend enforcement for one orchestrator process."""
 
@@ -435,11 +479,28 @@ class SpendLedger:
             slot = by_operation.setdefault(record.task_class, {"calls": 0, "actual_cents": 0})
             slot["calls"] += 1
             slot["actual_cents"] += record.actual_cents
+        day = time.strftime("%Y-%m-%d", time.gmtime(self._clock()))
         return {
             "buckets": buckets,
             "open_reservations": open_count,
             "records": len(self._records),
             "by_operation": by_operation,
+            "policy": {
+                "spend_order": [
+                    "free_daily",
+                    "allowance_expiring (soonest first)",
+                    "prepaid (only when a rule permits)",
+                ],
+                "rules": [
+                    {
+                        "scope": rule.scope,
+                        "prepaid_allowed": rule.prepaid_allowed,
+                        "max_prepaid_cents_per_day": rule.max_prepaid_cents_per_day,
+                    }
+                    for rule in self._rules
+                ],
+                "prepaid_spent_today_cents": self._prepaid_spent_by_day.get(day, 0),
+            },
         }
 
 
@@ -454,4 +515,5 @@ __all__ = [
     "TaskSpendRecord",
     "allowance_fingerprint",
     "allowance_from_file",
+    "policy_from_file",
 ]

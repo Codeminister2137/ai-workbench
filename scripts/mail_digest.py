@@ -201,13 +201,13 @@ def _meta_api_key() -> str | None:
     key = os.environ.get("META_API_KEY", "").strip()
     if key:
         return key
-    env_file = HERE.parent / ".env"
-    if env_file.is_file():
-        for line in env_file.read_text(encoding="utf-8").splitlines():
-            name, sep, value = line.partition("=")
-            if sep and name.strip() == "META_API_KEY" and value.strip():
-                return value.strip().strip("\"'")
-    return None
+    sys.path.insert(0, str(HERE.parent / "packages" / "ai_provider" / "src"))
+    from ai_provider.secrets import read_secret_key
+
+    try:
+        return read_secret_key(HERE.parent / ".env", "META_API_KEY", label="Meta API credential")
+    except (OSError, ValueError):
+        return None
 
 
 def _summary_client():
