@@ -85,6 +85,13 @@ class TestStaticGuards:
         assert "function Write-TailscaleSkipped" in text
         assert "work on THIS PC" in text
 
+    def test_tailscale_asks_before_install_with_consequences(self):
+        text = _text()
+        assert "Install Tailscale now (winget)?" in text
+        assert "other devices cannot reach it yet" in text
+        assert "or ZeroTier," in text
+        assert "re-run this installer" in text
+
     def test_local_first_no_password_no_docker(self):
         text = _text()
         assert "OPERATOR_ACCESS_TOKEN" not in text
