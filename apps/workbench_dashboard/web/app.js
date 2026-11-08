@@ -345,10 +345,15 @@ async function renderHome() {
   let spend = "";
   try {
     const sp = await api("/api/spend");
+    const policy = sp.spend.policy || { rules: [], prepaid_spent_today_cents: 0 };
+    const policyRules = policy.rules.map((r) =>
+      `<li>${esc(r.scope)}: prepaid ${r.prepaid_allowed ? "allowed" : "blocked"}` + (r.max_prepaid_cents_per_day == null ? "" : `, cap ${esc(r.max_prepaid_cents_per_day)}&#162;/day`) + `</li>`).join("");
     spend = sp.spend.configured
       ? `<ul class="plain">${sp.spend.buckets.map((b) =>
           `<li><span class="pill" title="Allowance status">${esc(b.status)}</span> ${esc(b.provider)} ${esc(b.kind)} — ${esc(b.balance_cents)}/${esc(b.granted_cents)}¢</li>`).join("")}</ul>
-        <p class="muted">${esc(sp.spend.open_reservations)} open reservation(s), ${esc(sp.spend.records)} record(s).</p>`
+        <p class="muted">${esc(sp.spend.open_reservations)} open reservation(s), ${esc(sp.spend.records)} record(s).</p>
+        <p class="muted">Order: free &#8594; expiring &#8594; prepaid-if-allowed. Prepaid today: ${esc(policy.prepaid_spent_today_cents)}&#162;.</p>
+        <ul class="plain">${policyRules}</ul>`
       : '<p class="muted">No spend grants configured — billable calls are denied by default.</p>';
   } catch (err) {
     spend = '<p class="muted">Spend unavailable: ' + esc(err.message) + "</p>";

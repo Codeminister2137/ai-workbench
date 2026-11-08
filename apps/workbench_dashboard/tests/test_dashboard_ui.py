@@ -578,3 +578,11 @@ def test_inbox_and_idea_bodies_preserve_line_breaks() -> None:
     assert js.count('<p class="inbox-body">') >= 3  # request, outcome, idea
     assert "<p>${gtext(item.body" not in js
     assert "<p>${gtext(item.resolution)}" not in js
+
+
+def test_spend_card_renders_policy() -> None:
+    """Spend card shows order, prepaid-today, and rules."""
+    js = _read("app.js")
+    assert "spend.policy" in js
+    assert "prepaid-if-allowed" in js
+    assert "Prepaid today" in js

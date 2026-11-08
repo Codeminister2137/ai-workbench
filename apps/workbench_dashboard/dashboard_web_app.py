@@ -31,7 +31,11 @@ from ai_agent.staged_edits import (
 )
 from ai_agent.supervisor_drain import Executor, RunDrain
 from ai_orchestrator.evidence import merge_probe_eval
-from ai_orchestrator.spend_ledger import SpendLedger, allowance_from_file
+from ai_orchestrator.spend_ledger import (
+    SpendLedger,
+    allowance_from_file,
+    policy_from_file,
+)
 from ai_provider.adapters.meta_asr import MetaAsrEngine
 from ai_provider.chat_transcripts import SQLiteChatTranscriptStore
 from ai_provider.secrets import read_secret_key
@@ -159,7 +163,14 @@ def load_spend_ledger(data_dir: Path) -> SpendLedger:
     Fail-loud on malformed grant files (money); a missing grants dir means
     unconfigured (deny-by-default), never an error.
     """
-    ledger = SpendLedger()
+    policy_path = data_dir / "spend" / "policy.json"
+    rules = None
+    if policy_path.is_file():
+        try:
+            rules = policy_from_file(policy_path)
+        except ValueError as exc:
+            raise ValueError(f"spend policy {policy_path.name}: {exc}") from exc
+    ledger = SpendLedger(rules=rules)
     grants_dir = data_dir / "spend" / "grants"
     if grants_dir.is_dir():
         for path in sorted(grants_dir.glob("*.json")):
