@@ -129,6 +129,7 @@ GROUPS = {
         "tests/test_loop_status.py",
         "tests/test_sender_unify.py",
         "tests/test_mail_digest.py",
+        "tests/test_weekly_digest.py",
         "tests/test_loop_resume.py",
         "tests/test_baseten_receipts.py",
         "tests/test_baseten_model_resolve.py",
