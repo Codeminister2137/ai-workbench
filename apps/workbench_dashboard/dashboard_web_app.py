@@ -250,6 +250,7 @@ FLEET_TASKS = (
     "CloneScan",
     "WakeSelfTest",
     "PrivateBackup",
+    "WorkbenchWeeklyDigest",
 )
 FLEET_TERMINAL_RUN_STATUSES = frozenset({"completed", "failed", "cancelled", "canceled", "merged"})
 
@@ -374,13 +375,67 @@ def fleet_runs(stores) -> list[dict[str, Any]]:
     ]
 
 
+FLEET_SERVICES_DOC = "docs/fleet-services.md"
+
+
+def fleet_explain(repo_root: Path) -> dict[str, str]:
+    """Parse per-service explanations from the fleet services doc.
+
+    Strict ``## <name>`` headers; the first paragraph under each header is
+    the explanation. Fail-soft: unreadable or unparseable docs yield {}.
+    """
+    try:
+        text = (repo_root / FLEET_SERVICES_DOC).read_text(encoding="utf-8")
+    except OSError:
+        return {}
+    found: dict[str, str] = {}
+    name: str | None = None
+    paragraph: list[str] = []
+
+    def _flush() -> None:
+        if name and paragraph:
+            found[name] = " ".join(paragraph)
+
+    for line in text.splitlines():
+        if line.startswith("## "):
+            _flush()
+            name = line[3:].strip()
+            paragraph = []
+        elif name is not None:
+            stripped = line.strip()
+            if not stripped:
+                if paragraph:
+                    _flush()
+                    name = None
+                    paragraph = []
+            elif not line.startswith("#"):
+                paragraph.append(stripped)
+    _flush()
+    return found
+
+
 def fleet_status(repo_root: Path, stores) -> dict[str, Any]:
     """Aggregate live fleet probes; every probe is fail-soft."""
+    explain = fleet_explain(repo_root)
+    dashboard: dict[str, Any] = {"up": True}
+    if explain.get("dashboard"):
+        dashboard["explain"] = explain["dashboard"]
+    ollama = fleet_ollama()
+    if explain.get("ollama"):
+        ollama["explain"] = explain["ollama"]
+    sleep = fleet_sleep(repo_root)
+    if explain.get("sleep guard"):
+        sleep["explain"] = explain["sleep guard"]
+    tasks = []
+    for row in fleet_tasks():
+        if explain.get(row["name"]):
+            row["explain"] = explain[row["name"]]
+        tasks.append(row)
     return {
-        "dashboard": {"up": True},
-        "ollama": fleet_ollama(),
-        "tasks": fleet_tasks(),
-        "sleep": fleet_sleep(repo_root),
+        "dashboard": dashboard,
+        "ollama": ollama,
+        "tasks": tasks,
+        "sleep": sleep,
         "runs": fleet_runs(stores),
     }
 

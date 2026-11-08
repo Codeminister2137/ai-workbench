@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import threading
 from http.server import ThreadingHTTPServer
+from pathlib import Path
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
@@ -14,6 +15,7 @@ from dashboard_web_app import (
     FLEET_TASKS,
     DashboardRequestHandler,
     LedgerSttMetering,
+    fleet_explain,
     fleet_ollama,
     fleet_sleep,
     fleet_tasks,
@@ -715,13 +717,41 @@ def test_fleet_shape_with_stubbed_probes(dashboard_server, monkeypatch) -> None:
         "dashboard_web_app.fleet_sleep",
         lambda repo_root: {"active": True, "status": "sleep_scheduled"},
     )
+    monkeypatch.setattr(
+        "dashboard_web_app.fleet_explain",
+        lambda repo_root: {
+            "dashboard": "dashboard here",
+            "ollama": "ollama here",
+            "sleep guard": "sleep here",
+            "WorkbenchDashboard": "task here",
+        },
+    )
     payload = get_json(dashboard_server, "/api/fleet")
     assert payload["ok"] is True
     assert set(payload["fleet"]) == {"dashboard", "ollama", "tasks", "sleep", "runs"}
-    assert payload["fleet"]["dashboard"] == {"up": True}
-    assert payload["fleet"]["ollama"] == {"up": True, "models": 2}
+    assert payload["fleet"]["dashboard"] == {"up": True, "explain": "dashboard here"}
+    assert payload["fleet"]["ollama"] == {"up": True, "models": 2, "explain": "ollama here"}
     assert payload["fleet"]["tasks"][0]["name"] == "WorkbenchDashboard"
+    assert payload["fleet"]["tasks"][0]["explain"] == "task here"
+    assert payload["fleet"]["sleep"]["explain"] == "sleep here"
     assert payload["fleet"]["runs"] == []
+
+
+def test_fleet_explain_covers_every_task_and_service() -> None:
+    repo_root = Path(__file__).resolve().parents[3]
+    explain = fleet_explain(repo_root)
+    for name in FLEET_TASKS:
+        assert explain.get(name), f"missing explanation for {name}"
+    for name in ("dashboard", "ollama", "sleep guard"):
+        assert explain.get(name), f"missing explanation for {name}"
+
+
+def test_fleet_explain_fail_soft_on_missing_doc(tmp_path: Path) -> None:
+    assert fleet_explain(tmp_path) == {}
+
+
+def test_fleet_watches_weekly_digest() -> None:
+    assert "WorkbenchWeeklyDigest" in FLEET_TASKS
 
 
 def test_fleet_tasks_parses_probe_output(monkeypatch) -> None:

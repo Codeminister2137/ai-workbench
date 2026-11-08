@@ -39,6 +39,14 @@ function esc(text) {
   ));
 }
 
+/* Readable local timestamps; falls back to the raw value when unparseable. */
+function fmtTime(value) {
+  if (!value) return "?";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return String(value);
+  return d.toLocaleString();
+}
+
 async function refreshBadge() {
   try {
     const status = await api("/api/status");
@@ -1116,9 +1124,9 @@ async function renderSchedule() {
       .sort((a, b) => (a.next_run < b.next_run ? -1 : 1));
     const recurring = f.tasks.filter((t) => t.present && !t.next_run);
     const upRows = upcoming.map((t) =>
-      `<li><strong>${esc(t.next_run)}</strong> — ${esc(t.name)} <span class="muted">${esc(t.state || "")}</span></li>`).join("");
+      `<li><strong>${esc(fmtTime(t.next_run))}</strong> — ${esc(t.name)} <span class="muted">${esc(t.state || "")}</span>${t.explain ? ` <span class="muted">— ${esc(t.explain)}</span>` : ""}</li>`).join("");
     const sleepRow = f.sleep.active
-      ? `<li><strong>${esc(f.sleep.due_utc || "?")}</strong> — sleep guard due <span class="muted">deadline ${esc(f.sleep.deadline_utc || "?")}</span></li>`
+      ? `<li><strong>${esc(fmtTime(f.sleep.due_utc))}</strong> — sleep guard due <span class="muted">deadline ${esc(fmtTime(f.sleep.deadline_utc))}</span>${f.sleep.explain ? ` <span class="muted">— ${esc(f.sleep.explain)}</span>` : ""}</li>`
       : "";
     const recRows = recurring.length
       ? recurring.map((t) => `<li><strong>${esc(t.name)}</strong> <span class="muted">recurring, no fixed next run · ${esc(t.state || "")}</span></li>`).join("")
@@ -1139,17 +1147,18 @@ async function renderFleet() {
     const taskRows = f.tasks.map((t) =>
       `<li><span class="pill st-${t.present ? esc((t.state || "unknown").replace(/\s+/g, "-")) : "missing"}">${t.present ? esc(t.state || "unknown") : "missing"}</span> <strong>${esc(t.name)}</strong>` +
       (t.present
-        ? ` <span class="muted">last ${esc(t.last_run || "?")} · next ${esc(t.next_run || "?")} · result ${esc(t.last_result ?? "?")}</span>`
+        ? ` <span class="muted">last ${esc(fmtTime(t.last_run))} · next ${esc(fmtTime(t.next_run))} · result ${esc(t.last_result ?? "?")}</span>` +
+      (t.explain ? ` <span class="muted">— ${esc(t.explain)}</span>` : "")
         : ` <span class="muted">${esc(t.detail || "")}</span>`) + `</li>`).join("");
     const runRows = f.runs.length
-      ? f.runs.map((r) => `<li><a href="#/runs/${esc(r.id)}">${esc(r.title || r.id)}</a> <span class="pill">${esc(r.status || "")}</span> <span class="muted">${esc(r.updated || "")}</span></li>`).join("")
+      ? f.runs.map((r) => `<li><a href="#/runs/${esc(r.id)}">${esc(r.title || r.id)}</a> <span class="pill">${esc(r.status || "")}</span> <span class="muted">${esc(fmtTime(r.updated))}</span></li>`).join("")
       : '<li class="muted">No active runs.</li>';
     const sleep = f.sleep.active
-      ? `Armed — due ${esc(f.sleep.due_utc || "?")}, deadline ${esc(f.sleep.deadline_utc || "?")} (PID ${esc(f.sleep.pid ?? "?")})`
+      ? `Armed — due ${esc(fmtTime(f.sleep.due_utc))}, deadline ${esc(fmtTime(f.sleep.deadline_utc))} (PID ${esc(f.sleep.pid ?? "?")})${f.sleep.explain ? ` — ${esc(f.sleep.explain)}` : ""}`
       : `Idle (${esc(f.sleep.status || "no receipt")})`;
     body = `<div class="card"><h2>Servers</h2><ul class="plain">
-      <li><span class="pill st-ready">up</span> <strong>dashboard</strong> <span class="muted">this server</span></li>
-      <li><span class="pill st-${f.ollama.up ? "ready" : "missing"}">${f.ollama.up ? "up" : "down"}</span> <strong>ollama</strong> <span class="muted">${f.ollama.up ? esc(f.ollama.models) + " model(s)" : esc(f.ollama.detail || "")}</span></li></ul></div>
+      <li><span class="pill st-ready">up</span> <strong>dashboard</strong> <span class="muted">${esc(f.dashboard.explain || "this server")}</span></li>
+      <li><span class="pill st-${f.ollama.up ? "ready" : "missing"}">${f.ollama.up ? "up" : "down"}</span> <strong>ollama</strong> <span class="muted">${f.ollama.up ? esc(f.ollama.models) + " model(s)" : esc(f.ollama.detail || "")}${f.ollama.explain ? ` — ${esc(f.ollama.explain)}` : ""}</span></li></ul></div>
       <div class="card"><h2>Watchdog tasks</h2><ul class="plain">${taskRows}</ul></div>
       <div class="card"><h2>Sleep guard</h2><p>${sleep}</p></div>
       <div class="card"><h2>Active runs</h2><ul class="plain">${runRows}</ul></div>`;

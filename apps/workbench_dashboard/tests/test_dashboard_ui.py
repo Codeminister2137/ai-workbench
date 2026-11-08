@@ -600,3 +600,16 @@ def test_providers_view_markers_present() -> None:
     assert "Log in / register at" in js
     html = _read("index.html")
     assert 'data-view="providers"' in html
+
+
+def test_schedule_and_fleet_use_readable_times_and_explanations() -> None:
+    """fmtTime helper exists and schedule/fleet render it plus explanations."""
+    js = _read("app.js")
+    assert "function fmtTime(value)" in js
+    assert "fmtTime(t.next_run)" in js
+    assert "fmtTime(f.sleep.due_utc)" in js
+    assert "fmtTime(t.last_run)" in js
+    assert "t.explain" in js
+    assert "f.sleep.explain" in js
+    assert "f.dashboard.explain" in js
+    assert "f.ollama.explain" in js
