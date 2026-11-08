@@ -1179,19 +1179,6 @@ or checkpoint is not task completion. Once the requested work is verified,
 finish with one ordinary visible assistant response; do not call
 `task_complete` before or after it.
 
-Owner mail cadence (owner, 2026-11-08): mail the owner when work
-finishes, when owner input is needed, and at most about once per hour
-as a progress heartbeat. Never mail per search, edit, test, or other
-small sub-step; a start notice that reports nothing done is noise.
-
-Mid-loop owner messages (owner, 2026-11-08): an owner message arriving
-during an unattended window folds into the active plan by default -
-incorporate it and continue healthy work without restarting, idling,
-or asking for re-authorization. Only an explicit stop, cancel, pivot,
-or new hard constraint interrupts the window. Acknowledge briefly in
-chat and keep the deadline. The owner never needs to repeat these
-words; this paragraph is the standing instruction.
-
 ### User-visible closeout and decision boundary
 
 For attended iterative coding, a repeated-blocker checkpoint may request one
