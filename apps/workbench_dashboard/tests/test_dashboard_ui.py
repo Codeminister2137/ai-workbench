@@ -57,7 +57,7 @@ def test_static_controls_have_titles() -> None:
     for tag in re.findall(r"<button\b[^>]*>", html):
         assert "title=" in tag, f"button without title: {tag}"
     nav_links = re.findall(r"<a\b[^>]*data-view[^>]*>", html)
-    assert len(nav_links) == 11  # +intake, +restrictions, +fleet
+    assert len(nav_links) == 12  # +intake, +restrictions, +fleet, +providers
     for tag in nav_links:
         assert "title=" in tag, f"nav link without title: {tag}"
 
@@ -67,8 +67,8 @@ def test_dynamic_buttons_have_titles() -> None:
     js = _read("app.js")
     buttons = re.findall(r"<button\b[^>]*>", js)
     assert (
-        len(buttons) == 19
-    )  # +report/rename/delete/submit/create/cancel/run-request/staged-approve/staged-reject/dictate/intake-approve/draft-plan/drain/reopen
+        len(buttons) == 20
+    )  # +report/rename/delete/submit/create/cancel/run-request/staged-approve/staged-reject/dictate/intake-approve/draft-plan/drain/reopen/providers-refresh
     for tag in buttons:
         assert "title=" in tag, f"button without title: {tag}"
 
@@ -586,3 +586,17 @@ def test_spend_card_renders_policy() -> None:
     assert "spend.policy" in js
     assert "prepaid-if-allowed" in js
     assert "Prepaid today" in js
+
+
+def test_providers_view_markers_present() -> None:
+    """Providers route, cards, refresh action, and nav link exist."""
+    js = _read("app.js")
+    assert "renderProviders" in js
+    assert "#/providers" not in js  # route dispatch uses the bare name
+    assert 'name === "providers"' in js
+    assert "/api/providers" in js
+    assert "/api/providers/refresh" in js
+    assert "providers-refresh" in js
+    assert "Log in / register at" in js
+    html = _read("index.html")
+    assert 'data-view="providers"' in html

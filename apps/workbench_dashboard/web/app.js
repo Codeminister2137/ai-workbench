@@ -1193,6 +1193,70 @@ function renderRestrictions() {
       <li>docs/capabilities.md — what each route can do today</li>
     </ul></div>`;
 }
+function providerStatusPill(p) {
+  if (p.reachable === null || p.reachable === undefined || p.checked_at === null) {
+    return '<span class="pill">not checked yet</span>';
+  }
+  if (p.account_required && !p.key_configured) {
+    return '<span class="pill st-missing">key missing</span>';
+  }
+  if (!p.reachable) return '<span class="pill st-down">unreachable</span>';
+  if (p.auth_ok === false) return '<span class="pill st-down">key rejected</span>';
+  const n = p.model_count === null || p.model_count === undefined ? "?" : p.model_count;
+  return `<span class="pill st-ok">ok &#183; ${esc(n)} models</span>`;
+}
+
+function providerCheckedAt(p) {
+  if (!p.checked_at) return "never checked";
+  const d = new Date(p.checked_at);
+  if (Number.isNaN(d.getTime())) return p.checked_at;
+  return d.toLocaleString();
+}
+
+function providerCardHtml(p) {
+  const samples = (p.sample_ids || []).map((s) => `<li>${esc(s)}</li>`).join("");
+  const sampleBlock = samples
+    ? `<p class="muted">Sample models:</p><ul class="plain">${samples}</ul>` : "";
+  const err = p.error ? `<p class="muted">Last error: ${esc(p.error)}</p>` : "";
+  const latency = p.latency_ms === null || p.latency_ms === undefined
+    ? "" : `<p class="muted">Latency: ${esc(p.latency_ms)} ms</p>`;
+  const site = p.site_url
+    ? `<p><a href="${esc(p.site_url)}" target="_blank" rel="noopener">` +
+      `Log in / register at ${esc(p.display)}</a></p>` : "";
+  const keyLine = !p.account_required
+    ? '<p class="muted">No account or key needed (local).</p>'
+    : (p.key_configured
+      ? '<p class="muted">API key is configured.</p>'
+      : '<p class="muted">No API key configured - add one to use this provider.</p>');
+  return `<div class="card"><h2>${esc(p.display)}</h2>
+    <p>${providerStatusPill(p)}</p>
+    <p class="muted">${esc(p.blurb || "")}</p>
+    ${keyLine}${site}${latency}${err}${sampleBlock}
+    <p class="muted">Checked: ${esc(providerCheckedAt(p))}</p></div>`;
+}
+
+async function renderProviders() {
+  const data = await api("/api/providers");
+  const cards = (data.providers || []).map(providerCardHtml).join("");
+  const note = data.cached
+    ? "Showing the last saved check."
+    : "Fresh check.";
+  view.innerHTML = `
+    <h1>Providers</h1>
+    <p class="muted">Connection status only - checks are free model-list probes, never inference. ${esc(note)}</p>
+    <p><button id="providers-refresh" title="Probe all providers now (free list checks)">Refresh now</button></p>
+    <div class="columns" id="providers-list">${cards}</div>`;
+  document.getElementById("providers-refresh").addEventListener("click", async () => {
+    try {
+      await api("/api/providers/refresh", {method: "POST", headers: {"Content-Type": "application/json"}, body: "{}"});
+      toast("Provider status refreshed", true);
+      await renderProviders();
+    } catch (err) {
+      toast(err.message, false);
+    }
+  });
+}
+
 async function render() {
   stopRunsPoll();
   stopRunDetailPoll();
@@ -1220,6 +1284,7 @@ async function render() {
     else if (name === "intake") await renderIntake();
     else if (name === "schedule") await renderSchedule();
     else if (name === "fleet") await renderFleet();
+    else if (name === "providers") await renderProviders();
     else if (name === "restrictions") renderRestrictions();
     else if (name === "create" && id) renderCreate(id);
     else view.innerHTML = "<h1>Not found</h1>";

@@ -63,6 +63,8 @@ from document_library import DocumentLibrary
 from drain_scheduler import DrainScheduler
 from owner_mail import mail_configured
 from p7_intake import approve_intake, list_intake
+from providers_view import provider_status as providers_status
+from providers_view import refresh_provider_status
 from window_status import load_window_status
 
 ROOT = Path(__file__).parent
@@ -493,6 +495,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 return self._send_json(
                     {"ok": True, "spend": spend_status(self.data_dir, self.spend_ledger)}
                 )
+            if path == "/api/providers":
+                return self._send_json(providers_status(self.data_dir))
             if path == "/api/fleet":
                 return self._send_json(
                     {"ok": True, "fleet": fleet_status(self.repo_root, self._stores())}
@@ -596,6 +600,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             if path.startswith("/api/chat/sessions/") and path.endswith("/draft-plan"):
                 session_id = path[len("/api/chat/sessions/") : -len("/draft-plan")]
                 return self._draft_plan_from_chat(config, session_id, payload)
+            if path == "/api/providers/refresh":
+                return self._send_json(refresh_provider_status(self.data_dir))
             if path == "/api/inbox":
                 return self._create_inbox_task(payload)
             if path == "/api/ideas":
