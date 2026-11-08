@@ -1,0 +1,21 @@
+# Example candidate profile — SYNTHETIC DATA ONLY.
+# Copy to data/profiles/candidate.toml (git-ignored, never committed)
+# and replace with real details. Unknown keys or statuses are rejected
+# on load so typos fail loud instead of corrupting matching.
+applicant_name = "Synthetic Applicant"
+applicant_location = "Warsaw, PL"
+applicant_summary = "Backend engineer."
+portfolio_url = "https://example.invalid"
+linkedin_url = "https://example.invalid"
+
+[[skills]]
+name = "Python"
+status = "demonstrated"
+notes = "Five years of backend work."
+sources = ["cv.pdf p.1"]
+source_kinds = ["cv", "github"]
+
+[[skills]]
+name = "Docker"
+status = "adjacent"
+source_kinds = ["cv"]
