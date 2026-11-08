@@ -47,12 +47,15 @@ def check_preferences(
         and vacancy.employment_type.value.casefold() not in wanted_types
     ):
         reasons.append("employment_type_excluded")
-    if vacancy.work_mode is WorkMode.REMOTE:
-        if not preferences.remote_ok:
-            reasons.append("remote_excluded")
-    elif vacancy.work_mode in (WorkMode.ONSITE, WorkMode.HYBRID):
-        places = _normalized(preferences.locations)
-        location = vacancy.location.strip().casefold()
-        if places and not any(place in location or location in place for place in places):
-            reasons.append("location_excluded")
+    if vacancy.work_mode is WorkMode.REMOTE and not preferences.remote_ok:
+        reasons.append("remote_excluded")
+    places = _normalized(preferences.locations)
+    location = vacancy.location.strip().casefold()
+    if (
+        places
+        and location
+        and vacancy.work_mode is not WorkMode.REMOTE
+        and not any(place in location or location in place for place in places)
+    ):
+        reasons.append("location_excluded")
     return (not reasons, tuple(reasons))
