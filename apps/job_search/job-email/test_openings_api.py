@@ -166,6 +166,18 @@ def test_non_numeric_or_non_loopback_hosts_rejected(host):
         OpeningsAPI(host=host, port=8000, token="synthetic-token")
 
 
+@pytest.mark.parametrize(
+    "token", ["\ufeffsynthetic-token", "tok\u2603en", "emoji-\U0001f600-token"]
+)
+def test_non_header_safe_tokens_rejected_before_io(token):
+    with pytest.raises(ValueError, match="header-safe"):
+        OpeningsAPI(host="127.0.0.1", port=8000, token=token)
+
+
+def test_latin1_token_accepted_at_construction():
+    OpeningsAPI(host="127.0.0.1", port=8000, token="t\u00f6ken")
+
+
 @pytest.mark.parametrize("kwargs", [{"limit": 0}, {"limit": 1001}, {"offset": -1}, {"limit": True}])
 def test_export_bounds_before_io(wire, kwargs):
     with pytest.raises(ValueError):

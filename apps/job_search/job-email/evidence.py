@@ -17,6 +17,24 @@ class ProhibitedClaimError(ValueError):
     """Raised when an application asserts qualifications not present in the candidate evidence."""
 
 
+VERDICT_FOR_STATUS = {
+    EvidenceStatus.DEMONSTRATED: "strong",
+    EvidenceStatus.ADJACENT: "partial",
+    EvidenceStatus.LEARNING: "uncertain",
+    EvidenceStatus.ABSENT: "missing",
+}
+
+
+@dataclass(frozen=True, slots=True)
+class RequirementVerdict:
+    """Per-requirement match verdict with evidence provenance."""
+
+    requirement: str
+    verdict: str
+    status: EvidenceStatus
+    source_kinds: tuple[str, ...] = ()
+
+
 @dataclass(frozen=True, slots=True)
 class VacancyMatchAnalysis:
     """Breakdown of how a candidate's evidence maps to a job vacancy's requirements."""
@@ -27,6 +45,8 @@ class VacancyMatchAnalysis:
     missing_requirements: tuple[str, ...]
     match_score: float
     required_skills: tuple[str, ...] = ()
+    verdicts: tuple[RequirementVerdict, ...] = ()
+    uncertainty_flags: tuple[str, ...] = ()
 
     @property
     def has_critical_gaps(self) -> bool:
@@ -66,6 +86,19 @@ def analyze_vacancy_fit(
             if skill.strip()
         }.values()
     )
+
+    def find_evidence(skill: str):
+        key = skill.strip().casefold()
+        for name, evidence in profile.skills.items():
+            if name.strip().casefold() == key:
+                return evidence
+        return None
+
+    flags: list[str] = []
+    if not all_reqs:
+        flags.append("no_explicit_skills")
+    if not vacancy.description.strip():
+        flags.append("empty_description")
     if not all_reqs:
         # If no explicit skills listed, fallback to a neutral baseline
         return VacancyMatchAnalysis(
@@ -74,10 +107,21 @@ def analyze_vacancy_fit(
             learning_skills=(),
             missing_requirements=(),
             match_score=1.0,
+            uncertainty_flags=tuple(flags),
         )
 
+    verdicts: list[RequirementVerdict] = []
     for skill in all_reqs:
         status = profile.get_skill_status(skill)
+        found = find_evidence(skill)
+        verdicts.append(
+            RequirementVerdict(
+                requirement=skill,
+                verdict=VERDICT_FOR_STATUS[status],
+                status=status,
+                source_kinds=found.source_kinds if found is not None else (),
+            )
+        )
         match status:
             case EvidenceStatus.DEMONSTRATED:
                 matched.append(skill)
@@ -97,6 +141,8 @@ def analyze_vacancy_fit(
         missing_requirements=tuple(missing),
         match_score=round(score, 3),
         required_skills=vacancy.required_skills,
+        verdicts=tuple(verdicts),
+        uncertainty_flags=tuple(flags),
     )
 
 
