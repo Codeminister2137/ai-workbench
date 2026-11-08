@@ -1,6 +1,9 @@
 # Ideas elaborations (owner answers 2026-11-08, brief e81561d8)
 
-## AI Trainer → personal local-only assistant ("Jarvis", idea 353b5957)
+## AI Trainer → personal local-only assistant (idea 353b5957)
+
+("Jarvis" was just a passing reference to the trend, to convey the
+shape of the idea — not the concept's name.)
 
 - Inputs: Xiaomi S4 smartwatch training data + own training notes +
   self-interview → a knowledge bank about the owner.
