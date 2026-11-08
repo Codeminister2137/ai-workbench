@@ -7,6 +7,7 @@ import json
 import pytest
 from ai_orchestrator.spend_ledger import (
     Allowance,
+    AllowanceKind,
     PolicyRule,
     SpendLedger,
     allowance_fingerprint,
@@ -283,7 +284,7 @@ class TestPolicyFiles:
             Allowance(
                 id="pp",
                 provider="meta",
-                kind="prepaid",
+                kind=AllowanceKind.PREPAID,
                 balance_cents=1000,
                 granted_cents=1000,
                 granted_at=1_600_000_000.0,
@@ -301,12 +302,14 @@ class TestPolicyFiles:
     def test_status_reports_policy_and_order(self):
         ledger = SpendLedger(clock=lambda: 1_700_000_000.0)
         view = ledger.status()
-        assert view["policy"]["spend_order"][0] == "free_daily"
-        assert view["policy"]["rules"] == [
+        policy = view["policy"]
+        assert isinstance(policy, dict)
+        assert policy["spend_order"][0] == "free_daily"
+        assert policy["rules"] == [
             {
                 "scope": "global",
                 "prepaid_allowed": False,
                 "max_prepaid_cents_per_day": None,
             }
         ]
-        assert view["policy"]["prepaid_spent_today_cents"] == 0
+        assert policy["prepaid_spent_today_cents"] == 0
