@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from types import SimpleNamespace
-
 import pytest
 from evidence import analyze_vacancy_fit
 from models import CandidateProfile, EvidenceStatus, JobVacancy, SkillEvidence
@@ -152,20 +150,39 @@ def test_routing_failure_raises_before_any_call(tmp_path):
         route_suggestion_task(catalog, "synthetic prompt")
 
 
+def make_plan(provider: str, model: str):
+    from ai_orchestrator import (
+        AccessMethod,
+        AuthMethod,
+        BillingSource,
+        CostPolicyTier,
+        ExecutionPlan,
+        ExecutionTarget,
+    )
+
+    return ExecutionPlan(
+        target=ExecutionTarget(
+            route_id=f"{provider}/{model}",
+            provider=provider,
+            product=provider,
+            model=model,
+            access_method=AccessMethod.LOCAL_RUNTIME,
+            auth_method=AuthMethod.NONE,
+            billing_source=BillingSource.LOCAL_FREE,
+            cost_policy_tier=CostPolicyTier.LOCAL_ONLY,
+        ),
+        reasons=("synthetic fixture",),
+    )
+
+
 def test_unsupported_executor_rejected():
-    plan = SimpleNamespace(target=SimpleNamespace(provider="requesty", model="x", base_url=None))
+    plan = make_plan("requesty", "synthetic-model")
     with pytest.raises(ValueError, match="unsupported suggestion executor"):
         execute_suggestion_plan(plan, "synthetic prompt")
 
 
 def test_record_carries_routing_and_parsed_lines():
-    target = SimpleNamespace(
-        route_id="ollama/qwen2.5-coder:14b",
-        provider="ollama",
-        model="qwen2.5-coder:14b",
-        cost_policy_tier=SimpleNamespace(value="local_only"),
-    )
-    plan = SimpleNamespace(target=target)
+    plan = make_plan("ollama", "qwen2.5-coder:14b")
     record = record_suggestions(plan, "prompt-text", "1. Do the thing.\n\n- Never lie.")
     assert record.route_id == "ollama/qwen2.5-coder:14b"
     assert record.suggestions == ("1. Do the thing.", "- Never lie.")
