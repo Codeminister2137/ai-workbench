@@ -17,7 +17,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from contacts import ContactProposal, ContactRegistry, ManualContactSource, is_generic_inbox
+from contacts import (
+    ContactProposal,
+    ContactRegistry,
+    ContactSource,
+    ManualContactSource,
+    is_generic_inbox,
+)
 from models import JobVacancy
 
 FREEMAIL_DOMAINS = frozenset(
@@ -236,7 +242,7 @@ def default_contact_registry() -> ContactRegistry:
     Dormant vendors (no key) are skipped; ``registry.source_names``
     shows what is active. Apollo stays dormant until its 403 clears.
     """
-    sources = [ManualContactSource()]
+    sources: list[ContactSource] = [ManualContactSource()]
     for cls in (ProspeoContactSource, ApolloContactSource):
         try:
             source = cls()
