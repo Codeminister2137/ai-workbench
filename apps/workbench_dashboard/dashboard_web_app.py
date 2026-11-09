@@ -61,6 +61,13 @@ from dashboard_projects import create_project, get_project, list_projects
 from dashboard_stores import DashboardStores, StoreError, effective_fanout_policy
 from document_library import DocumentLibrary
 from drain_scheduler import DrainScheduler
+from meeting_notes import (
+    MEETING_BODY_MAX_BYTES,
+    assemble_transcript,
+    parse_meeting_form,
+    split_wav_clips,
+    store_meeting,
+)
 from nl_tasks import ORDER_OPTIONS, SCHEDULE_ANSWER, propose_task, scheduled_run_record
 from owner_mail import mail_configured
 from p7_intake import approve_intake, list_intake
@@ -631,6 +638,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         if not path.startswith("/api/"):
             self.send_error(HTTPStatus.NOT_FOUND, "Unknown endpoint")
             return
+        if path == "/api/meetings/transcribe":
+            return self._transcribe_meeting()
         if path == "/api/stt/transcribe":
             return self._transcribe_audio()
         try:
@@ -1446,6 +1455,79 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         )
         self.end_headers()
         self.wfile.write(data)
+
+    def _transcribe_meeting(self) -> None:
+        """Slice 1: chunked meeting transcription with consent + retention."""
+        try:
+            body = self._read_body_bytes(MEETING_BODY_MAX_BYTES)
+        except InvalidRequest as exc:
+            self.close_connection = True
+            return self._send_json({"ok": False, "error": str(exc)}, status=exc.status)
+        content_type = self.headers.get("Content-Type", "")
+        try:
+            audio, language, consent, retention = parse_meeting_form(content_type, body)
+        except ValueError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=422)
+        if not consent:
+            return self._send_json(
+                {"ok": False, "error": "client consent attestation is required"},
+                status=409,
+            )
+        if self.stt_engine_factory is None or self.stt_metering is None:
+            return self._send_json(
+                {
+                    "ok": False,
+                    "error": "Transcription unavailable: no speech engine configured.",
+                },
+                status=409,
+            )
+        try:
+            clips = split_wav_clips(audio)
+        except ValueError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=422)
+        engine = self.stt_engine_factory()
+        segments: list[dict] = []
+        try:
+            for offset, clip in clips:
+                out = transcribe_audio(
+                    engine=engine,
+                    metering=self.stt_metering,
+                    audio_bytes=clip,
+                    content_type="audio/wav",
+                    language=language,
+                )
+                segments.append({"start_s": offset, "text": str(out.get("text", ""))})
+        except SttFailure as exc:
+            payload: dict = {
+                "ok": False,
+                "error": str(exc),
+                "clips_done": len(segments),
+            }
+            if exc.retry_after:
+                payload["retry_after"] = exc.retry_after
+            return self._send_json(payload, status=exc.http_status)
+        transcript = assemble_transcript(segments)
+        try:
+            meta = store_meeting(
+                self.data_dir,
+                transcript=transcript,
+                segments=segments,
+                consent=consent,
+                retention_days=retention,
+                engine_id=getattr(engine, "id", "unknown"),
+                source_name="upload.wav",
+            )
+        except ValueError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=409)
+        self._send_json(
+            {
+                "ok": True,
+                "id": meta["id"],
+                "clips": len(segments),
+                "transcript": transcript,
+                "purge_after_utc": meta["purge_after_utc"],
+            }
+        )
 
     def _transcribe_audio(self) -> None:
         try:
