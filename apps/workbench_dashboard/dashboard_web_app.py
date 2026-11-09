@@ -61,6 +61,7 @@ from dashboard_projects import create_project, get_project, list_projects
 from dashboard_stores import DashboardStores, StoreError, effective_fanout_policy
 from document_library import DocumentLibrary
 from drain_scheduler import DrainScheduler
+from nl_tasks import propose_task
 from owner_mail import mail_configured
 from p7_intake import approve_intake, list_intake
 from providers_view import provider_status as providers_status
@@ -664,6 +665,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 return self._create_inbox_task(payload)
             if path == "/api/ideas":
                 return self._create_idea(payload)
+            if path == "/api/tasks/propose":
+                return self._propose_task(payload)
             if path == "/api/projects":
                 return self._create_project(payload)
             if path == "/api/settings":
@@ -1167,6 +1170,30 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             code = 404 if "not found" in str(exc).lower() else 400
             return self._send_json({"ok": False, "error": str(exc)}, status=code)
         self._send_json({"ok": True, "id": record["id"], "status": record["status"]})
+
+    def _propose_task(self, payload: dict) -> None:
+        """File free text as an approval-gated scheduled-task proposal."""
+        text = payload.get("text", "")
+        if not isinstance(text, str):
+            return self._send_json({"ok": False, "error": "text must be a string"}, status=400)
+        try:
+            proposal = propose_task(text)
+        except ValueError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        try:
+            record = self._stores().create_inbox_task(
+                title=f"Scheduled task proposal: {proposal['task_id']}",
+                body=(
+                    f"Model: {proposal['model']}; budget: {proposal['required_seconds']}s.\n"
+                    f"Prompt: {proposal['prompt']}\n"
+                    "Approve to schedule; approval-to-execution wiring is a later slice."
+                ),
+                task_type="order",
+                options=["Schedule it", "Decline"],
+            )
+        except StoreError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        self._send_json({"ok": True, "id": record["id"], "proposal": proposal})
 
     def _send_project(self, project_id: str) -> None:
         try:
