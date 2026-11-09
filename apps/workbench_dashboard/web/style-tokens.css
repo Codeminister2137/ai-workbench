@@ -1,0 +1,70 @@
+/* Shared Workbench style tokens. Single source for dashboard values.
+ * web/app.css must reference these via var(--wb-*) and hold no raw
+ * color or length literals (checked by scripts/check_style_tokens.py).
+ * Media-query widths stay literal: var() is invalid there. */
+:root {
+  --wb-font-ui: system-ui, sans-serif;
+
+  --wb-color-hairline: #8884;
+  --wb-color-line: #888;
+  --wb-color-wash: #8881;
+  --wb-color-red: #c00;
+  --wb-color-white: #fff;
+  --wb-color-ok: #0a0;
+  --wb-color-surface: Canvas;
+  --wb-color-info-bg: rgba(138, 181, 255, .15);
+  --wb-color-info: #8ab5ff;
+  --wb-color-warn-bg: rgba(255, 212, 135, .15);
+  --wb-color-warn: #ffd487;
+  --wb-color-good-bg: rgba(138, 223, 160, .15);
+  --wb-color-good: #8adfa0;
+  --wb-color-idle-bg: rgba(181, 195, 218, .15);
+  --wb-color-idle: #b5c3da;
+  --wb-color-bad-bg: rgba(255, 138, 138, .15);
+  --wb-color-bad: #ff8a8a;
+
+  --wb-border-thin: 1px solid var(--wb-color-hairline);
+  --wb-border-plain: 1px solid var(--wb-color-line);
+  --wb-border-quote: 2px solid var(--wb-color-hairline);
+
+  --wb-space-1: .25rem;
+  --wb-space-2: .4rem;
+  --wb-space-3: .5rem;
+  --wb-space-4: .75rem;
+  --wb-space-5: 1rem;
+  --wb-space-item-y: .2rem;
+
+  --wb-pad-page: 0 1rem 3rem;
+  --wb-pad-header: .75rem 0;
+  --wb-pad-card: .75rem 1rem;
+  --wb-pad-menu: .5rem;
+  --wb-pad-toast: .5rem .75rem;
+  --wb-pad-badge: 0 .5rem;
+  --wb-pad-pill: 1px 8px;
+  --wb-pad-pre: .5rem;
+  --wb-pad-msg: .5rem 0;
+  --wb-pad-turn: .4rem 0;
+  --wb-pad-cell: .25rem .5rem;
+
+  --wb-radius-sm: .25rem;
+  --wb-radius: .5rem;
+  --wb-radius-badge: 1rem;
+  --wb-radius-pill: 999px;
+
+  --wb-font-badge: .8rem;
+  --wb-font-pill: .85rem;
+  --wb-font-card-h: 1.1rem;
+  --wb-font-staged-h: .95rem;
+  --wb-font-doc-h1: 1.35rem;
+  --wb-font-doc-h2: 1.15rem;
+  --wb-font-doc-h3: 1rem;
+
+  --wb-leading-doc: 1.55;
+  --wb-leading-doc-h: 1.25;
+
+  --wb-size-page: 960px;
+  --wb-size-toast: 24rem;
+  --wb-gap-grid: 1rem;
+  --wb-gap-flex: .5rem;
+  --wb-gap-menu: .25rem;
+}

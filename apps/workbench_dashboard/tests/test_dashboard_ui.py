@@ -519,7 +519,9 @@ def test_sticky_header_is_opaque() -> None:
     m = re.search(r"header\s*\{[^}]*\}", css, re.DOTALL)
     assert m, "header rule not found"
     rule = m.group(0)
-    assert "background: Canvas" in rule
+    assert "background: var(--wb-color-surface)" in rule
+    tokens = _read("style-tokens.css")
+    assert "--wb-color-surface: Canvas" in tokens
     assert "background: inherit" not in rule
     assert "z-index" in rule
 
