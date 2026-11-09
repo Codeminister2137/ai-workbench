@@ -57,7 +57,7 @@ def test_static_controls_have_titles() -> None:
     for tag in re.findall(r"<button\b[^>]*>", html):
         assert "title=" in tag, f"button without title: {tag}"
     nav_links = re.findall(r"<a\b[^>]*data-view[^>]*>", html)
-    assert len(nav_links) == 12  # +intake, +restrictions, +fleet, +providers
+    assert len(nav_links) == 13  # +intake, +restrictions, +fleet, +providers, +help
     for tag in nav_links:
         assert "title=" in tag, f"nav link without title: {tag}"
 
@@ -446,6 +446,17 @@ def test_plans_and_runs_archive_tabs() -> None:
     assert '<a href="#/runs">Active</a>' in js
     assert '<a href="#/runs?status=archive">Archive</a>' in js
     assert '["completed", "cancelled", "merged"]' in js
+
+
+def test_help_view_and_nav_link() -> None:
+    """Help view renders the runbook checklist + troubleshooting; nav links it."""
+    js = _read("app.js")
+    assert "function renderHelp()" in js
+    assert 'name === "help"' in js
+    assert "docs/company-run.md" in js
+    assert "Troubleshooting" in js
+    html = _read("index.html")
+    assert 'href="#/help"' in html
 
 
 def test_md_renderer_cases() -> None:

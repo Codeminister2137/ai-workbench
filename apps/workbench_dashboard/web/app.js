@@ -1063,6 +1063,28 @@ async function renderIntake() {
 function fieldRow(label, inner, hint) {
   return `<p><label><strong>${label}</strong><br>${inner}</label><br><span class="muted">${hint}</span></p>`;
 }
+function renderHelp() {
+  view.innerHTML = `<h1>Help</h1>
+    <div class="card"><h2>Run a client project</h2>
+    <p class="muted">Full checklist: <code>docs/company-run.md</code> in the repo.</p>
+    <ul class="plain">
+    <li>1. Intake: chatbot brief → <code>p7-projects/</code> → dashboard Intake approve → proposed plan.</li>
+    <li>2. Plan: review the phase checklist, approve in a review window.</li>
+    <li>3. Execute: <code>.\\scripts\\repo-assistant.ps1 "task" --execute</code> or an unattended loop.</li>
+    <li>4. Verify: focused pytest, <code>run-tests.py full</code>, ruff, pyright; green gate before push.</li>
+    <li>5. Report: run report + inbox close; merge needs per-merge approval.</li>
+    </ul></div>
+    <div class="card"><h2>Troubleshooting</h2>
+    <ul class="plain">
+    <li>Ollama down: <code>ollama list</code> must answer; restart the Ollama app.</li>
+    <li>Allowance exhausted: Home spend panel shows buckets; billable calls deny by default.</li>
+    <li>Token expiry: refresh the grant per <code>packages/ai_provider/docs/source-state.md</code>.</li>
+    <li>Push drops: retry <code>--no-verify</code> only after a green gate; verify with <code>ls-remote</code>.</li>
+    <li>Dashboard unreachable: <code>curl http://127.0.0.1:8766/api/status</code>.</li>
+    </ul></div>`;
+}
+
+
 function renderCreate(kind) {
   const defs = {
     chat: {heading: "New chat", fields: `
@@ -1321,6 +1343,7 @@ async function render() {
     else if (name === "fleet") await renderFleet();
     else if (name === "providers") await renderProviders();
     else if (name === "restrictions") await renderRestrictions();
+    else if (name === "help") renderHelp();
     else if (name === "create" && id) renderCreate(id);
     else view.innerHTML = "<h1>Not found</h1>";
   } catch (err) {
