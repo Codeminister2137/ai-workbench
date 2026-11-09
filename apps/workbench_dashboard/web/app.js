@@ -665,13 +665,16 @@ async function renderPlans(id) {
       <pre>${gtext(plan.body || "(empty plan)")}</pre>${linkedRuns}</div>`;
     return;
   }
+  const plansTab = new URLSearchParams((location.hash.split("?")[1] || "")).get("status") || "active";
   const payload = await api("/api/plans");
-  const items = payload.items.length
-    ? payload.items.map((p) =>
+  const shownPlans = payload.items.filter((p) => plansTab === "archive" ? p.status === "complete" : p.status !== "complete");
+  const items = shownPlans.length
+    ? shownPlans.map((p) =>
         `<li><a href="#/plans/${esc(p.id)}">${gtext(p.title || p.id)}</a>
          <span class="pill st-${esc((p.status || "none").replace(/\s+/g, "-"))}">${esc(p.status || "")}</span></li>`).join("")
     : '<li class="muted">No plans on file. Plans are created by Workbench flows.</li>';
   view.innerHTML = `<h1>Plans</h1>
+    <p><a href="#/plans">Active</a> · <a href="#/plans?status=archive">Archive</a></p>
     <p><input type="text" id="filter-plans" placeholder="Filter plans..." title="Filter plans by text"></p>
     <ul class="plain" id="plans-list">${items}</ul><p class="muted">${payload.total} total.</p>`;
   document.getElementById("filter-plans").addEventListener("input", (ev) => filterList("plans-list", ev.target.value));
@@ -740,9 +743,12 @@ async function renderRuns(id) {
   }
   const prevFilter = (document.getElementById("filter-runs") || {}).value || "";
   const runsUrl = runsProjectFilter ? "/api/runs?project_id=" + encodeURIComponent(runsProjectFilter) : "/api/runs";
+  const runsTab = new URLSearchParams((location.hash.split("?")[1] || "")).get("status") || "active";
   const payload = await api(runsUrl);
-  const items = payload.items.length
-    ? payload.items.map((r) =>
+  const terminalRuns = ["completed", "cancelled", "merged"];
+  const shownRuns = payload.items.filter((r) => runsTab === "archive" ? terminalRuns.includes(r.status) : !terminalRuns.includes(r.status));
+  const items = shownRuns.length
+    ? shownRuns.map((r) =>
         `<li><a href="#/runs/${esc(r.id)}">${gtext(r.title || r.id)}</a>
          <span class="pill st-${esc((r.status || "none").replace(/\s+/g, "-"))}">${esc(r.status || "")}</span>
          <span class="pill" title="Fan-out policy: whether this run may spawn subagent children">fan-out: ${esc(r.fanout_effective || r.fanout_policy || "unknown")}</span></li>`).join("")
@@ -760,6 +766,7 @@ async function renderRuns(id) {
     evidence = '<p class="muted">Evidence unavailable: ' + esc(err.message) + "</p>";
   }
   view.innerHTML = `<h1>Runs</h1>
+    <p><a href="#/runs">Active</a> · <a href="#/runs?status=archive">Archive</a></p>
     <p><input type="text" id="filter-runs" placeholder="Filter runs..." title="Filter runs by text">
     <select id="filter-runs-project" title="Show runs for one project">${await projectOptions(runsProjectFilter)}</select>
     <button id="drain-runs" title="Execute approved queued runs (one per click)">Drain now</button></p>

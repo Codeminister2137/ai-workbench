@@ -437,6 +437,17 @@ def test_documents_archive_tab_and_pill() -> None:
     assert ">archived</span>" in js
 
 
+def test_plans_and_runs_archive_tabs() -> None:
+    """Plans and Runs lists have Active/Archive tabs on terminal statuses."""
+    js = _read("app.js")
+    assert '<a href="#/plans">Active</a>' in js
+    assert '<a href="#/plans?status=archive">Archive</a>' in js
+    assert 'p.status === "complete"' in js
+    assert '<a href="#/runs">Active</a>' in js
+    assert '<a href="#/runs?status=archive">Archive</a>' in js
+    assert '["completed", "cancelled", "merged"]' in js
+
+
 def test_md_renderer_cases() -> None:
     """The doc markdown renderer covers blocks, inline code, links, and XSS."""
     node = shutil.which("node")
