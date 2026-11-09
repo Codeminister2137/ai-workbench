@@ -131,10 +131,10 @@ def test_skill_discovery_reports_sources_and_missing_prerequisites(tmp_path, mon
     source.write_text(f"---\nname: {name}\ndescription: review\n---\nRead the diff.")
     monkeypatch.setattr("ai_agent.skills.shutil.which", lambda executable: None)
 
-    skill = discover_development_skills(
+    found = discover_development_skills(
         [tmp_path], available_tools=frozenset(INSPECTION_PROFILE.tool_names)
-    )[0]
-    assert skill.name == name
+    )
+    skill = next(item for item in found if item.name == name)
     assert skill.source == source.resolve()
     assert not skill.available
     assert skill.required_tools == (
@@ -146,10 +146,11 @@ def test_skill_discovery_reports_sources_and_missing_prerequisites(tmp_path, mon
     )
     assert skill.reason == "Skill review-repo-change requires an installed Git executable"
 
-    blocked = discover_development_skills(
+    found_blocked = discover_development_skills(
         [tmp_path],
         available_tools=frozenset(INSPECTION_PROFILE.tool_names) - {"git_diff"},
-    )[0]
+    )
+    blocked = next(item for item in found_blocked if item.name == name)
     assert not blocked.available
     assert blocked.reason is not None
     assert "requires unavailable tools: git_diff" in blocked.reason
@@ -158,16 +159,41 @@ def test_skill_discovery_reports_sources_and_missing_prerequisites(tmp_path, mon
 def test_skill_discovery_reports_missing_and_ambiguous_sources(tmp_path):
     first = tmp_path / "first"
     second = tmp_path / "second"
-    assert not discover_development_skills([first], available_tools=frozenset())[0].available
+    missing = discover_development_skills([first], available_tools=frozenset())
+    assert missing and all(not item.available for item in missing)
 
     for directory in (first, second):
         source = directory / "review-repo-change" / "SKILL.md"
         source.parent.mkdir(parents=True)
         source.write_text("---\nname: review-repo-change\ndescription: review\n---\nRead the diff.")
-    ambiguous = discover_development_skills([first, second], available_tools=frozenset())[0]
+    ambiguous_all = discover_development_skills([first, second], available_tools=frozenset())
+    ambiguous = next(item for item in ambiguous_all if item.name == "review-repo-change")
     assert not ambiguous.available
     assert ambiguous.source is None
     assert ambiguous.reason == "multiple sources found: 2"
+
+
+def test_ported_skills_load_from_package_sources():
+    """git-safety + durable-test-collateral resolve with their contracts."""
+    skill_directory = Path(__file__).resolve().parents[1] / "packages/ai_agent/skills"
+    available = frozenset(
+        {"git_status", "git_diff", "read_file", "find_files", "grep_search", "python_runtime"}
+    )
+    selected = load_development_skills(
+        ["git-safety", "durable-test-collateral"],
+        [skill_directory],
+        available_tools=available,
+    )
+    assert [skill.name for skill in selected] == ["git-safety", "durable-test-collateral"]
+    prompt = skill_prompt(selected)
+    assert "without the user asking" in prompt
+    assert "failing test" in prompt
+    with pytest.raises(ValueError, match="unavailable tools"):
+        load_development_skills(
+            ["durable-test-collateral"],
+            [skill_directory],
+            available_tools=available - {"python_runtime"},
+        )
 
 
 def test_skill_selection_refuses_traversal_or_unknown_prerequisites(tmp_path):

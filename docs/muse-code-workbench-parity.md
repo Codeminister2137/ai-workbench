@@ -30,7 +30,7 @@ implement. It is a living reference: update it when either side gains features.
 | Web search/fetch | web_search, web_fetch | research tool files exist (depth not audited here) | Likely gap; verify before web-heavy work |
 | Image generation | image_generation | none | Gap (irrelevant to current roadmap) |
 | Subagents | native pool (up to 64) + workflow fan-out | one-level `delegate_task` | Gap: depth and scale |
-| Skills | ~25 (git, python-env, taste, plan, doctor, …) | framework + 1 (`review-repo-change`) | Gap: port the relevant few (below) |
+| Skills | ~25 (git, python-env, taste, plan, doctor, …) | framework + 3 (`review-repo-change`, `git-safety`, `durable-test-collateral`, 2026-11-09) | Narrowed: breadth still differs, top-leverage two ported |
 | Memory | memory files | transcripts, sessions, CURRENT_CONTEXT | Partial: workbench has more durable run records, less cross-day recall |
 | Asking the owner | request_user_input (live only) | inbox decisions/approvals (async, persists) | Advantage workbench for unattended |
 | Approvals/safety | approval modes + shell sandbox | TRUSTED_LOCAL/permissions/fan-out/allowlist + AGENTS.md | Parity with different trade-offs |
@@ -54,15 +54,16 @@ transport, anything needing the network while DNS is down.
 
 ## Missing features to implement (priority order)
 
-1. Port the relevant Muse Code skills into workbench skills/AGENTS.md:
-   git source-control safety, python-env placement, taste (dashboard),
-   durable-test-collateral. Small; highest leverage for agent quality.
-2. Drain driver (worker/endpoint/schedule) — owner-deferred; do not build
-   until the owner re-opens it.
+1. Port the relevant Muse Code skills — PARTLY DONE 2026-11-09: `git-safety` + `durable-test-collateral` landed with contracts + tests. Remaining: python-env placement, taste (dashboard).
+2. Drain driver — DONE (`DrainScheduler` + wiring + tests; periodic ticks, off unless the host starts it).
 3. Monitor/cron equivalent for long-running watches — only if a real
    unattended need appears; manual driving covers tonight.
 4. Deeper subagents — only if one level proves insufficient in practice.
-5. Audit research-tool depth before assigning web-heavy tasks.
+5. Research depth — VERIFIED 2026-11-09: searxng discovery + pinned-HTTPS fetch + evidence-tracked reports (`research.py`, `research_search.py`, `research_http.py`). Web-heavy work cleared.
+
+## Re-audit verdict (2026-11-09)
+
+Switch-ready for supervised and unattended repo work: inbox approvals, receipts, staged review, and provider fallback all exceed Muse Code. Remaining gaps before interactive-CLI parity: one-level `delegate_task` only (no deep fan-out), no live owner-prompt equivalent (inbox is async by design), skill breadth (~25 vs 3), and weaker cross-day recall. None blocks the switch for loop-driven work; interactive daily-driver use should wait for deeper delegation + live prompts.
 
 ## Operating rule during the switch
 

@@ -26,7 +26,11 @@ class SkillAvailability:
 SKILL_TOOLS = {
     "review-repo-change": frozenset(
         {"git_status", "git_diff", "read_file", "find_files", "grep_search"}
-    )
+    ),
+    "git-safety": frozenset({"git_status", "git_diff", "read_file"}),
+    "durable-test-collateral": frozenset(
+        {"read_file", "find_files", "grep_search", "python_runtime"}
+    ),
 }
 
 
