@@ -1168,8 +1168,15 @@ async function renderFleet() {
   view.innerHTML = `<h1>Fleet</h1><p class="muted">Probed live on open. Watchdogs, servers, sleep guard, active runs.</p>${body}`;
 }
 
-function renderRestrictions() {
-  // v1: static definitions only. No enforcement source of truth exists yet,
+async function renderRestrictions() {
+  let sub = null;
+  try {
+    sub = (await api("/api/restrictions")).subprocess;
+  } catch (err) { /* static fallback below */ }
+  const subLine = sub
+    ? `Status: ${esc(sub.run_requests)} run request(s) recorded (${esc(sub.approved)} approved, ${esc(sub.rejected)} rejected, ${esc(sub.pending)} pending). Fed by: run-request receipts.`
+    : "Status: not yet evaluated. Would be fed by: run-request receipts.";
+  // Remaining dimensions are static until their own feeders exist. No enforcement source of truth exists yet,
   // so every dimension is honestly "not yet evaluated" with its feeder named.
   view.innerHTML = `<h1>Agent restrictions</h1>
     <p class="muted">Read-only overview of what agents may and may not do. No live
@@ -1186,8 +1193,7 @@ function renderRestrictions() {
         never in prompts, logs, or the owner inbox. Status: not yet evaluated.
         Would be fed by: a secret-scan of run transcripts (not yet built).</li>
       <li><strong>Subprocess execution</strong> — shell commands run only through
-        approval-gated run requests. Status: not yet evaluated. Would be fed by:
-        run-request receipts (exist) plus an executor-side gate audit (not yet built).</li>
+        approval-gated run requests. ${subLine}</li>
       <li><strong>Delegation scope</strong> — subagents inherit the
         supervisor's authority, never more (ADR-074). Status: not yet
         evaluated. Would be fed by: delegation-scope records (exist in chat
@@ -1294,7 +1300,7 @@ async function render() {
     else if (name === "schedule") await renderSchedule();
     else if (name === "fleet") await renderFleet();
     else if (name === "providers") await renderProviders();
-    else if (name === "restrictions") renderRestrictions();
+    else if (name === "restrictions") await renderRestrictions();
     else if (name === "create" && id) renderCreate(id);
     else view.innerHTML = "<h1>Not found</h1>";
   } catch (err) {

@@ -65,6 +65,7 @@ from owner_mail import mail_configured
 from p7_intake import approve_intake, list_intake
 from providers_view import provider_status as providers_status
 from providers_view import refresh_provider_status
+from restrictions_view import restrictions_status
 from window_status import load_window_status
 
 ROOT = Path(__file__).parent
@@ -550,6 +551,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 return self._send_json(
                     {"ok": True, "spend": spend_status(self.data_dir, self.spend_ledger)}
                 )
+            if path == "/api/restrictions":
+                return self._send_json(restrictions_status(self._stores()))
             if path == "/api/providers":
                 return self._send_json(providers_status(self.data_dir))
             if path == "/api/fleet":

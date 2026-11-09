@@ -29,6 +29,12 @@ repos:
         pass_filenames: false
         stages: [pre-push]
 
+      - id: skill-registry
+        name: skill-registry
+        entry: .venv/Scripts/python.exe scripts/generate_skill_registry.py --check
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
       - id: pytest
         name: pytest
         entry: .venv/Scripts/python.exe scripts/run-tests.py full

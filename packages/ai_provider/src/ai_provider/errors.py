@@ -79,3 +79,19 @@ class ToolCallFormatError(ProviderError):
             category=ProviderErrorCategory.NON_RETRYABLE,
             provider=provider,
         )
+
+
+class TruncatedOutputError(ProviderError):
+    """Model stopped on length; the returned text is a partial prefix.
+
+    Retryable with a larger output budget (see thinker_output_budget),
+    never by reusing the partial text as complete.
+    """
+
+    def __init__(self, *, provider: str, budget: int | None = None) -> None:
+        detail = f" (budget was {budget} tokens)" if budget else ""
+        super().__init__(
+            f"Model output truncated on length{detail}; retry with a larger budget.",
+            category=ProviderErrorCategory.RETRYABLE,
+            provider=provider,
+        )

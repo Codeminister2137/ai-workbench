@@ -613,3 +613,12 @@ def test_schedule_and_fleet_use_readable_times_and_explanations() -> None:
     assert "f.sleep.explain" in js
     assert "f.dashboard.explain" in js
     assert "f.ollama.explain" in js
+
+
+def test_restrictions_renders_live_subprocess_counts() -> None:
+    """Restrictions tab fetches /api/restrictions for live run counts."""
+    js = _read("app.js")
+    assert "async function renderRestrictions()" in js
+    assert "/api/restrictions" in js
+    assert "run request(s) recorded" in js
+    assert "not yet evaluated" in js

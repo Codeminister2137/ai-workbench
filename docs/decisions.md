@@ -1,3 +1,41 @@
+## Vendor trial A: Prospeo + Apollo free, contact sources provider-agnostic - owner 2026-11-08
+
+**Status:** Accepted by the owner (inbox 8d325394=A; closed by loop10).
+
+Free-tier comparison in docs/plans/job-contact-sourcing-draft.md
+(section 2) recommended Prospeo + Apollo free; owner agreed with the
+rationale that contact sources follow the same multi-service approach
+as ai_provider. Trial blocked on account creation (follow-up inbox
+b275fe4d, open). ContactSource protocol + manual source implemented
+on feature/loop10; vendor adapters wait for keys.
+
+## Ideas elaborated: local-only assistant, fiction editor, test declined - owner 2026-11-08
+
+**Status:** Accepted by the owner (inbox e81561d8 answered; closed by
+loop10). Directions recorded in docs/ideas-elaborations-20261108.md;
+no build approved.
+
+AI Trainer (353b5957) = personal local-only assistant: Xiaomi S4
+watch data + training notes + self-interview feed a knowledge bank;
+voice diet logging, coach function, improvement plans. Hard boundary:
+local-only, no personal data to corporations. Overlaps job-search
+skills machinery (share it). Book-writing (3c100646) = fiction
+beta-reader/editor holding book knowledge (characters, ideas);
+discrepancy checks and scrutiny. Hard boundary: AI assists, never
+pushes generative writing; the owner writes. Test idea (637f52f2)
+declined as deletable.
+
+## MSI Center verified latest; Manual-service try approved post-gaming - owner 2026-11-08
+
+**Status:** Accepted by the owner (inbox 54cfab25 answered, follow-up
+0e8f668a=A; both closed by loop10). Action on hold until gaming ends.
+
+MSI Center 2.0.75.0 (Store) confirmed latest (Oct 2026): the update
+path is a no-op and the CentralServer UDP leak persists on it. Owner
+approved B (Manual service start) after gaming with an owner
+temp-watch; fans must keep working (RGB irrelevant). Revert plan:
+back to Automatic on any anomaly. Watchdog containment continues.
+
 ## Installer scope: full workspace install - owner 2026-11-07
 
 **Status:** Accepted by the owner (inbox 3dd129d7=A; closed by loop6).

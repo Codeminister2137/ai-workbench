@@ -25,6 +25,8 @@ from ai_provider.errors import ProviderError, ProviderErrorCategory
 META_BASE_URL = "https://api.meta.ai/v1"
 MUSE_MODEL_PREFIX = "muse-"
 CONTRIBUTOR_MODEL_SUFFIX = "-contributor"
+META_REASONING_EFFORT_KEY = "meta_reasoning_effort"
+META_REASONING_EFFORTS = ("minimal", "low", "medium", "high")
 
 
 @dataclass(slots=True)
@@ -56,6 +58,15 @@ class MetaResponsesChatClient(OpenAIResponsesChatClient):
         # not establish the provider's separate operational logging practices.
         payload["store"] = False
         payload["include"] = ["reasoning.encrypted_content"]
+        effort = request.metadata.get(META_REASONING_EFFORT_KEY)
+        if effort is not None:
+            if not isinstance(effort, str) or effort not in META_REASONING_EFFORTS:
+                raise ProviderError(
+                    f"meta_reasoning_effort must be one of {list(META_REASONING_EFFORTS)}; got {effort!r}.",
+                    category=ProviderErrorCategory.CONFIGURATION,
+                    provider=self.config.provider.value,
+                )
+            payload["reasoning"] = {"effort": effort}
         return payload
 
 
