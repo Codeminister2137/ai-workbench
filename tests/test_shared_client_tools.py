@@ -177,14 +177,27 @@ def test_ported_skills_load_from_package_sources():
     """git-safety + durable-test-collateral resolve with their contracts."""
     skill_directory = Path(__file__).resolve().parents[1] / "packages/ai_agent/skills"
     available = frozenset(
-        {"git_status", "git_diff", "read_file", "find_files", "grep_search", "python_runtime"}
+        {
+            "git_status",
+            "git_diff",
+            "read_file",
+            "find_files",
+            "grep_search",
+            "python_runtime",
+            "run_command",
+        }
     )
     selected = load_development_skills(
-        ["git-safety", "durable-test-collateral"],
+        ["git-safety", "durable-test-collateral", "python-env", "taste"],
         [skill_directory],
         available_tools=available,
     )
-    assert [skill.name for skill in selected] == ["git-safety", "durable-test-collateral"]
+    assert [skill.name for skill in selected] == [
+        "git-safety",
+        "durable-test-collateral",
+        "python-env",
+        "taste",
+    ]
     prompt = skill_prompt(selected)
     assert "without the user asking" in prompt
     assert "failing test" in prompt

@@ -30,7 +30,7 @@ implement. It is a living reference: update it when either side gains features.
 | Web search/fetch | web_search, web_fetch | research tool files exist (depth not audited here) | Likely gap; verify before web-heavy work |
 | Image generation | image_generation | none | Gap (irrelevant to current roadmap) |
 | Subagents | native pool (up to 64) + workflow fan-out | one-level `delegate_task` | Gap: depth and scale |
-| Skills | ~25 (git, python-env, taste, plan, doctor, …) | framework + 3 (`review-repo-change`, `git-safety`, `durable-test-collateral`, 2026-11-09) | Narrowed: breadth still differs, top-leverage two ported |
+| Skills | ~25 (git, python-env, taste, plan, doctor, …) | framework + 5 (review, git-safety, test-collateral, python-env, taste, 2026-11-09) | Parity item closed; residual breadth (plan, doctor, …) on demand |
 | Memory | memory files | transcripts, sessions, CURRENT_CONTEXT | Partial: workbench has more durable run records, less cross-day recall |
 | Asking the owner | request_user_input (live only) | inbox decisions/approvals (async, persists) | Advantage workbench for unattended |
 | Approvals/safety | approval modes + shell sandbox | TRUSTED_LOCAL/permissions/fan-out/allowlist + AGENTS.md | Parity with different trade-offs |
@@ -54,7 +54,7 @@ transport, anything needing the network while DNS is down.
 
 ## Missing features to implement (priority order)
 
-1. Port the relevant Muse Code skills — PARTLY DONE 2026-11-09: `git-safety` + `durable-test-collateral` landed with contracts + tests. Remaining: python-env placement, taste (dashboard).
+1. Port the relevant Muse Code skills — DONE 2026-11-09: `git-safety`, `durable-test-collateral`, `python-env`, `taste` landed with contracts + tests.
 2. Drain driver — DONE (`DrainScheduler` + wiring + tests; periodic ticks, off unless the host starts it).
 3. Monitor/cron equivalent for long-running watches — only if a real
    unattended need appears; manual driving covers tonight.

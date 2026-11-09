@@ -31,6 +31,8 @@ SKILL_TOOLS = {
     "durable-test-collateral": frozenset(
         {"read_file", "find_files", "grep_search", "python_runtime"}
     ),
+    "python-env": frozenset({"read_file", "find_files", "run_command"}),
+    "taste": frozenset({"read_file", "find_files"}),
 }
 
 
