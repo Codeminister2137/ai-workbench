@@ -1178,7 +1178,27 @@ async function renderSchedule() {
   } catch (err) {
     body = `<div class="card"><h2>Schedule</h2><p class="muted">Schedule unavailable: ${esc(err.message)}</p></div>`;
   }
-  view.innerHTML = `<h1>Schedule</h1><p class="muted">Read-only. Live from the fleet probe: scheduled tasks and the sleep guard.</p>${body}`;
+  view.innerHTML = `<h1>Schedule</h1>
+    <div class="card"><h2>Propose a task</h2>
+    <p class="muted">Type what you want done — a proposal (model + budget) lands in the inbox for approval. Nothing runs until you approve it.</p>
+    <form class="inline" id="propose-form"><input type="text" name="text" placeholder="Review the auth module, about 30 min..." title="Describe the task in free text"><button type="submit" title="File as an approval-gated proposal">Propose</button></form></div>
+    <p class="muted">Live from the fleet probe: scheduled tasks and the sleep guard.</p>${body}`;
+  document.getElementById("propose-form").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    try {
+      const res = await fetch("/api/tasks/propose", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({text: ev.target.text.value}),
+      });
+      const out = await res.json();
+      if (!res.ok || !out.ok) throw new Error((out && out.error) || res.status);
+      toast(`Proposed ${out.proposal.task_id} (${out.proposal.model}) — see inbox`, true);
+      ev.target.reset();
+    } catch (err) {
+      toast("Proposal failed: " + err.message, false);
+    }
+  });
 }
 
 async function renderFleet() {

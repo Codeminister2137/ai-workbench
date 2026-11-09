@@ -67,8 +67,8 @@ def test_dynamic_buttons_have_titles() -> None:
     js = _read("app.js")
     buttons = re.findall(r"<button\b[^>]*>", js)
     assert (
-        len(buttons) == 20
-    )  # +report/rename/delete/submit/create/cancel/run-request/staged-approve/staged-reject/dictate/intake-approve/draft-plan/drain/reopen/providers-refresh
+        len(buttons) == 21
+    )  # +report/rename/delete/submit/create/cancel/run-request/staged-approve/staged-reject/dictate/intake-approve/draft-plan/drain/reopen/providers-refresh/propose
     for tag in buttons:
         assert "title=" in tag, f"button without title: {tag}"
 
@@ -77,7 +77,7 @@ def test_dynamic_inputs_and_selects_have_titles() -> None:
     """Text inputs/selects in templates have titles (radios use labels)."""
     js = _read("app.js")
     inputs = [tag for tag in re.findall(r"<input\b[^>]*>", js) if 'type="radio"' not in tag]
-    assert len(inputs) == 15  # +rename/create-form inputs, +5 list filters, +idea plan link
+    assert len(inputs) == 16  # +rename/create-form inputs, +5 list filters, +idea plan link, +task propose
     for tag in inputs:
         assert "title=" in tag, f"input without title: {tag}"
     selects = re.findall(r"<select\b[^>]*>", js)
@@ -457,6 +457,14 @@ def test_help_view_and_nav_link() -> None:
     assert "Troubleshooting" in js
     html = _read("index.html")
     assert 'href="#/help"' in html
+
+
+def test_schedule_propose_form_posts_to_endpoint() -> None:
+    """Schedule view has a free-text propose form wired to /api/tasks/propose."""
+    js = _read("app.js")
+    assert 'id="propose-form"' in js
+    assert "/api/tasks/propose" in js
+    assert "Nothing runs until you approve it" in js
 
 
 def test_md_renderer_cases() -> None:

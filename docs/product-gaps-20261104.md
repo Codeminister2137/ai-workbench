@@ -4,8 +4,11 @@
 > landed), G7 RESOLVED (validator + adversarial secrets/PII + approve
 > flow + UI button all shipped), G8 RESOLVED (spend ledger with
 > reserve-before-dispatch + deny-by-default, grants docs, dashboard
-> panel). G1–G5, G9+ unchecked this sweep — verify
-> before citing; this doc is a point-in-time analysis.
+> panel). G9 RESOLVED (Schedule wired to fleet probe). G10/G11
+> BRIEFED (audience a96f576b, notify c801d2f6 — owner decides).
+> G12 DONE (company-run.md + Help view). G4/G5 verified still open
+> but not prioritized; G1–G3 unchecked — verify before citing;
+> this doc is a point-in-time analysis.
 
 Perspective: a developer who wants to RUN A COMPANY'S DEVELOPMENT through
 ai-workbench (client intake → plan → approve → execute → verify → report →
