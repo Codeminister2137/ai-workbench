@@ -147,6 +147,7 @@ class DashboardStores:
         task_id: str | None = None,
         context_refs: list[str] | None = None,
         options: list[str] | None = None,
+        metadata: dict | None = None,
         created_by: str = "supervisor",
         assignee: str = "owner",
     ) -> dict:
@@ -177,6 +178,7 @@ class DashboardStores:
             "options": list(options)
             if options is not None
             else (["Done"] if task_type == "task" else []),
+            "metadata": dict(metadata or {}),
             "status": "open",
             "created_by": created_by,
             "assignee": assignee,

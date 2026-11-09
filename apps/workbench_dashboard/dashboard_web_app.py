@@ -61,7 +61,7 @@ from dashboard_projects import create_project, get_project, list_projects
 from dashboard_stores import DashboardStores, StoreError, effective_fanout_policy
 from document_library import DocumentLibrary
 from drain_scheduler import DrainScheduler
-from nl_tasks import propose_task
+from nl_tasks import ORDER_OPTIONS, SCHEDULE_ANSWER, propose_task, scheduled_run_record
 from owner_mail import mail_configured
 from p7_intake import approve_intake, list_intake
 from providers_view import provider_status as providers_status
@@ -1038,7 +1038,41 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         except StoreError as exc:
             status = 404 if "not found" in str(exc).lower() else 400
             return self._send_json({"ok": False, "error": str(exc)}, status=status)
-        self._send_json({"ok": True, "id": record["id"], "status": record["status"]})
+        scheduled_run = self._maybe_schedule_nl_run(record)
+        self._send_json(
+            {
+                "ok": True,
+                "id": record["id"],
+                "status": record["status"],
+                "scheduled_run": scheduled_run,
+            }
+        )
+
+    def _maybe_schedule_nl_run(self, record: dict) -> str | None:
+        """Queue the run for an approved NL proposal order (sched A).
+
+        Returns the run id when a run was queued (or already existed),
+        else None. Scheduling never fails the recorded answer: a
+        malformed proposal is reported server-side and skipped.
+        """
+        metadata = record.get("metadata") or {}
+        proposal = metadata.get("nl_proposal")
+        if not isinstance(proposal, dict) or record.get("answer") != SCHEDULE_ANSWER:
+            return None
+        try:
+            run = scheduled_run_record(proposal, record["id"])
+        except ValueError as exc:
+            print(f"Workbench dashboard: skip NL scheduling: {exc}")
+            return None
+        stores = self._stores()
+        try:
+            if stores.runs.get(run["id"]) is not None:
+                return run["id"]
+            stores.runs.put(run["id"], run)
+        except StoreError as exc:
+            print(f"Workbench dashboard: skip NL scheduling: {exc}")
+            return None
+        return run["id"]
 
     def _close_inbox_task(self, item_id: str, payload: dict) -> None:
         resolution = payload.get("resolution", "")
@@ -1191,10 +1225,11 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 body=(
                     f"Model: {proposal['model']}; budget: {proposal['required_seconds']}s.\n"
                     f"Prompt: {proposal['prompt']}\n"
-                    "Approve to schedule; approval-to-execution wiring is a later slice."
+                    "Schedule it to queue the run; it executes on the next drain tick."
                 ),
                 task_type="order",
-                options=["Schedule it", "Decline"],
+                options=ORDER_OPTIONS,
+                metadata={"nl_proposal": proposal},
             )
         except StoreError as exc:
             return self._send_json({"ok": False, "error": str(exc)}, status=400)

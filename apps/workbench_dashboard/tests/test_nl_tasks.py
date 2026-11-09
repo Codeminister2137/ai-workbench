@@ -10,7 +10,7 @@ from urllib.error import HTTPError
 import pytest
 from dashboard_test_http import get_json, post_json
 from dashboard_web_app import DashboardRequestHandler
-from nl_tasks import propose_task
+from nl_tasks import ORDER_OPTIONS, propose_task, scheduled_run_record
 
 
 @pytest.fixture
@@ -73,3 +73,28 @@ def test_propose_endpoint_rejects_bad_input(nl_server) -> None:
     with pytest.raises(HTTPError) as exc:
         post_json(nl_server, "/api/tasks/propose", {"text": ""})
     assert exc.value.code == 400
+
+
+def test_order_options_match_drain_approval() -> None:
+    assert ORDER_OPTIONS == ["Schedule it", "Decline"]
+
+
+def test_scheduled_run_record_carries_cap_and_link() -> None:
+    proposal = propose_task("Review the auth module, about 30 min")
+    run = scheduled_run_record(proposal, "abc123def456")
+    assert run["id"] == f"nl-{proposal['task_id']}-abc123de"
+    assert run["status"] == "queued"
+    assert run["body"] == proposal["prompt"]
+    assert run["origin"] == "nl-schedule"
+    assert run["model"] == "qwen2.5-coder:14b"
+    assert run["budget_seconds"] == 1800.0
+    assert run["inbox_id"] == "abc123def456"
+
+
+def test_scheduled_run_record_rejects_malformed() -> None:
+    with pytest.raises(ValueError, match="malformed"):
+        scheduled_run_record({"task_id": "x"}, "abc123")
+    with pytest.raises(ValueError, match="malformed"):
+        scheduled_run_record(
+            {"task_id": "", "prompt": "p", "model": "m", "required_seconds": 60}, "abc123"
+        )

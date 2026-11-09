@@ -7,7 +7,8 @@ and execution is an injected callable. The real ``AgentLoop`` wiring is a
 later integration; this module never imports or calls loop execution.
 
 Approval rule (fail-closed): a queued run executes only when its linked
-inbox record carries a recorded ``Approve`` answer with status ``answered``
+inbox record carries a recorded approval answer (``Approve``, or
+``Schedule it`` for NL proposal orders) with status ``answered``
 or ``closed`` (close is archival and answers are immutable after close, so a
 close preceding the drain pass must not strand an approval). Open, rejected,
 closed-without-answer, missing, or unreadable approvals leave the run parked:
@@ -37,6 +38,7 @@ from ai_agent.run_tracking import (
 )
 
 APPROVAL_ANSWER = "Approve"
+APPROVAL_ANSWERS = frozenset({APPROVAL_ANSWER, "Schedule it"})
 CLAIM_SUFFIX = ".json.claim"
 TMP_SUFFIX = ".json.tmp"
 
@@ -143,7 +145,7 @@ class RunDrain:
             return False, "linked approval not found"
         status = record.get("status")
         answer = record.get("answer")
-        if answer == APPROVAL_ANSWER and status in ("answered", "closed"):
+        if answer in APPROVAL_ANSWERS and status in ("answered", "closed"):
             return True, "approved"
         if status == "open":
             return False, "awaiting owner approval"

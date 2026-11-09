@@ -22,6 +22,10 @@ THINKER_MODEL = "qwen3:14b"
 CODER_WORDS = ("code", "coding", "review", "refactor", "test", "debug", "implement", "fix")
 THINKER_WORDS = ("plan", "planning", "analy", "compare", "design", "decide", "investigat")
 
+SCHEDULE_ANSWER = "Schedule it"
+DECLINE_ANSWER = "Decline"
+ORDER_OPTIONS = [SCHEDULE_ANSWER, DECLINE_ANSWER]
+
 _DURATION_RE = re.compile(r"(\d+)\s*(h(?:ours?)?|m(?:in(?:utes?)?)?|s(?:ec(?:onds?)?)?)\b", re.I)
 _WORD_RE = re.compile(r"[a-z0-9]+")
 
@@ -69,4 +73,37 @@ def propose_task(text: str) -> dict:
         "prompt": cleaned,
         "model": _route_model(cleaned),
         "required_seconds": _parse_seconds(cleaned),
+    }
+
+
+def scheduled_run_record(proposal: dict, inbox_id: str) -> dict:
+    """Build the queued run record for an approved NL proposal order.
+
+    The run id derives from the proposal and inbox ids so re-answering
+    "Schedule it" maps to the same id (schedule-once). ``budget_seconds``
+    is the per-run allowance cap from the proposal; the executor
+    enforces it. Raises ``ValueError`` when the proposal is malformed.
+    """
+    try:
+        task_id = str(proposal["task_id"])
+        prompt = str(proposal["prompt"])
+        model = str(proposal["model"])
+        budget = float(proposal["required_seconds"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError(f"malformed NL proposal: {exc}") from None
+    if not task_id or not prompt or not model or not inbox_id:
+        raise ValueError("malformed NL proposal: missing task_id/prompt/model")
+    return {
+        "id": f"nl-{task_id}-{inbox_id[:8]}",
+        "title": f"Scheduled NL task: {task_id}",
+        "status": "queued",
+        "body": prompt,
+        "origin": "nl-schedule",
+        "model": model,
+        "budget_seconds": budget,
+        "fanout_policy": "restricted",
+        "fanout_effective": "restricted",
+        "inbox_id": inbox_id,
+        "project_id": None,
+        "plan_id": None,
     }
