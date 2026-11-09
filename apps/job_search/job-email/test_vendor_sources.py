@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+import urllib.error
 from typing import Any
 
+import pytest
+import vendor_sources
 from models import JobVacancy
 from vendor_sources import (
     ApolloContactSource,
     ProspeoContactSource,
     VendorError,
+    _post_json,
 )
 
 
@@ -105,8 +109,6 @@ def test_vendors_return_none_on_vendor_failure() -> None:
 def test_missing_key_leaves_source_dormant(monkeypatch) -> None:
     monkeypatch.delenv("APOLLO_API_KEY", raising=False)
     monkeypatch.delenv("PROSPEO_API_KEY", raising=False)
-    import vendor_sources
-
     monkeypatch.setattr(vendor_sources, "_read_env_or_dotenv", lambda name: None)
     apollo = ApolloContactSource()
     assert apollo.ready is False
@@ -114,3 +116,21 @@ def test_missing_key_leaves_source_dormant(monkeypatch) -> None:
     prospeo = ProspeoContactSource()
     assert prospeo.ready is False
     assert prospeo.resolve(_vacancy()) is None
+
+
+def test_post_json_reports_http_status(monkeypatch) -> None:
+    def forbidden(*args, **kwargs):
+        raise urllib.error.HTTPError("https://api.apollo.io/x", 403, "Forbidden", {}, None)
+
+    monkeypatch.setattr(vendor_sources.urllib.request, "urlopen", forbidden)
+    with pytest.raises(VendorError, match="returned HTTP 403"):
+        _post_json("https://api.apollo.io/x", {}, {}, 1)
+
+
+def test_post_json_reports_unreachable_without_status(monkeypatch) -> None:
+    def down(*args, **kwargs):
+        raise OSError("dns down")
+
+    monkeypatch.setattr(vendor_sources.urllib.request, "urlopen", down)
+    with pytest.raises(VendorError, match="unreachable: OSError"):
+        _post_json("https://api.apollo.io/x", {}, {}, 1)
