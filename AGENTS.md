@@ -31,7 +31,7 @@ and physical human approvals retain their explicit scope.
 
 ## Most important rule: ask before assuming
 
-**When an important requirement is ambiguous, incomplete, contradictory, or open to multiple materially different implementations, do not silently choose an implementation. Investigate first, identify the decision, and ask the user when their input is required.**
+**When an important requirement is ambiguous, incomplete, contradictory, or open to multiple materially different implementations, do not silently choose one. Investigate, identify the decision, and ask the user when their input is required.**
 
 Codex is expected to be proactive and technically opinionated. It should make useful recommendations rather than simply asking the user to make every decision.
 
@@ -130,7 +130,7 @@ from the user's decision.
 
 Do not phrase an unapproved recommendation as an established project decision.
 
-When Codex may decide without asking, it should still briefly analyze meaningful options internally and choose the option that best matches existing architecture, scope, reversibility, and maintainability. If the decision is user-visible or likely to matter later, summarize the relevant pros and cons in the final report even if user approval was not required.
+When Codex may decide without asking, it should still briefly weigh meaningful options against architecture, scope, reversibility, and maintainability. If the decision is user-visible or likely to matter later, summarize the relevant pros and cons in the final report even if user approval was not required.
 
 For example:
 
@@ -466,7 +466,7 @@ For non-trivial tasks, use two passes.
 
 ### Token and tool-output discipline
 
-Codex should treat unnecessary token usage, noisy command output, and repeated failed commands as real costs. Quality, correctness, and safety remain higher priorities, but when choices are otherwise comparable, prefer the lower-cost path.
+Treat unnecessary token usage, noisy output, and repeated failed commands as real costs. Quality, correctness, and safety come first, but when choices are otherwise comparable, prefer the lower-cost path.
 
 Apply this by:
 
@@ -844,7 +844,7 @@ Do not log sensitive prompts or credentials by default.
 
 Flag security-sensitive or privacy-sensitive decisions before implementation.
 
-Local test/preview servers must bind 127.0.0.1 explicitly, never 0.0.0.0 or an implied wildcard (loopback needs no firewall rights; a wildcard bind triggers a Defender prompt attributed to C:\python314\python.exe because the venv interpreter re-executes as the base image).
+Local test servers must bind 127.0.0.1 explicitly; wildcard binds trigger a Defender prompt attributed to C:\python314\python.exe.
 
 When introducing a new external integration, identify:
 
