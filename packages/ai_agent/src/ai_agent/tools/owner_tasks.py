@@ -72,3 +72,93 @@ class OwnerTaskTool(BaseTool):
             output=f"Owner task filed: {title.strip()}",
             metadata={"owner_task": {"title": title.strip(), "body": body.strip()}},
         )
+
+
+MAX_QUESTION_CHARS = 2000
+MAX_ANSWER_CHARS = 4000
+
+
+class AskOwnerTool(BaseTool):
+    """Ask the owner one question and wait for their live answer.
+
+    Only the top-level interactive turn carries an ``owner_prompt`` channel
+    (TTY-gated at context construction). Everywhere else — unattended runs,
+    MCP, delegated children — the channel is None and this tool fails closed
+    with guidance instead of blocking on input that will never arrive.
+    Child registries never include this tool; children use
+    ``request_owner_task`` to file async follow-ups.
+    """
+
+    @property
+    def definition(self) -> ToolDefinition:
+        return ToolDefinition(
+            name="ask_owner",
+            description=(
+                "Ask the human owner ONE question and wait for their live "
+                "answer. Use for decisions only the owner can make that block "
+                "this turn (scope choice, secret location confirmation, manual "
+                "observation). NEVER ask for secret VALUES — ask where the "
+                "secret was placed instead. Fails without a live owner "
+                "session; then file request_owner_task and finish."
+            ),
+            category=ToolCategory.CUSTOM,
+            parameters=(
+                ToolParameter(
+                    name="question",
+                    type_name="string",
+                    description="The single question for the owner.",
+                    required=True,
+                ),
+            ),
+        )
+
+    def execute(self, arguments: dict[str, Any], context: ToolContext) -> ToolResult:
+        question = arguments.get("question")
+        if (
+            not isinstance(question, str)
+            or not question.strip()
+            or len(question) > MAX_QUESTION_CHARS
+        ):
+            return ToolResult(
+                name="ask_owner",
+                output="Error: 'question' requires 1-2000 characters.",
+                is_error=True,
+            )
+        if getattr(context.delegation, "depth", 0) >= 1:
+            return ToolResult(
+                name="ask_owner",
+                output=(
+                    "Error: delegated children cannot prompt the owner live; "
+                    "file request_owner_task instead."
+                ),
+                is_error=True,
+            )
+        channel = context.owner_prompt
+        if channel is None:
+            return ToolResult(
+                name="ask_owner",
+                output=(
+                    "Error: no live owner session (unattended run?); file "
+                    "request_owner_task and finish the turn."
+                ),
+                is_error=True,
+            )
+        try:
+            answer = channel(question.strip())
+        except Exception as exc:
+            return ToolResult(
+                name="ask_owner",
+                output=f"Error: owner channel failed ({type(exc).__name__}); "
+                "file request_owner_task and finish the turn.",
+                is_error=True,
+            )
+        if not isinstance(answer, str):
+            return ToolResult(
+                name="ask_owner",
+                output="Error: owner channel returned a non-text answer.",
+                is_error=True,
+            )
+        return ToolResult(
+            name="ask_owner",
+            output=f"Owner answer: {answer.strip()[:MAX_ANSWER_CHARS]}",
+        )

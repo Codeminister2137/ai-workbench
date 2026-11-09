@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 import os
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -53,6 +54,10 @@ class ToolContext:
     # True is passed; see __post_init__ and command_environment.
     inherit_environment: bool = False
     credential_secrets: tuple[str, ...] = field(default=(), repr=False, compare=False)
+    # Live owner-question channel for the top-level interactive turn ONLY.
+    # None everywhere else (unattended runs, MCP, children): ask_owner then
+    # fails closed instead of blocking on input that will never arrive.
+    owner_prompt: Callable[[str], str] | None = field(default=None, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         # DelegateTaskTool builds children via replace(context, delegation=child),
@@ -62,6 +67,8 @@ class ToolContext:
         # base -> delegation_scope import cycle.
         if getattr(self.delegation, "depth", 0) >= 1 and self.inherit_environment:
             object.__setattr__(self, "inherit_environment", False)
+        if getattr(self.delegation, "depth", 0) >= 1 and self.owner_prompt is not None:
+            object.__setattr__(self, "owner_prompt", None)
 
     @classmethod
     def for_interactive_owner(
@@ -70,6 +77,7 @@ class ToolContext:
         *,
         delegation: DelegationScope | None = None,
         env: dict[str, str] | None = None,
+        owner_prompt: Callable[[str], str] | None = None,
     ) -> ToolContext:
         """Build the top-level interactive owner context with ambient env.
 
@@ -80,6 +88,7 @@ class ToolContext:
             workspace_root=workspace_root,
             env=dict(env) if env else {},
             delegation=delegation,
+            owner_prompt=owner_prompt,
             inherit_environment=True,
         )
 
