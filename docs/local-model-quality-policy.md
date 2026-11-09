@@ -45,6 +45,21 @@ effort behavior, 24-task dual-arm eval: local 13/24, grant 12/24).
 3. Tiny budgets on grant models return length+empty (Q2) — floor
    budgets per model, never squeeze.
 
+## gpt-oss:20b thinker finding (loop11 probe, 6 local calls)
+
+- 30-item list task: 400 AND 1600 budgets → LENGTH with ZERO
+  visible chars (1600 tokens all thinking, 6.1k trace chars).
+  4096 → completes (3530 eval, ~3× thinking overhead, DONE).
+- The 4× thinker multiplier is INSUFFICIENT for gpt-oss:20b on
+  list-structured tasks (~9× needed here). `think: false` is
+  NOT honored (Ollama 0.32.5, generate and chat APIs).
+- Consequences: route long structured outputs AWAY from
+  gpt-oss:20b; prefer qwen2.5-coder:14b (non-thinker) for
+  deterministic local work. The LENGTH→TruncatedOutputError
+  guard fires correctly on empty-on-length — that is its job,
+  not an adapter bug. No per-model multiplier change on one
+  sample; re-probe before tuning.
+
 ## Review triggers
 
 Re-run the 24-task harness when: new local weights land, a new
