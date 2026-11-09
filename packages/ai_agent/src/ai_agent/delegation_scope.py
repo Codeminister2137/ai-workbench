@@ -180,11 +180,14 @@ class DelegationScope:
         )
 
     def child_registry(self) -> ToolRegistry:
+        # Child depth is self.depth + 1; keep delegate_task while the child
+        # itself may still spawn. narrow() refuses past-cap spawns regardless.
+        at_cap = self.depth + 1 >= self.max_depth
         return ToolRegistry(
             tuple(
                 _GrantedTool(tool, self)
                 for item in self.registry.list_definitions()
-                if item.name != "delegate_task"
+                if (item.name != "delegate_task" or not at_cap)
                 and (self.tools is None or item.name in self.tools)
                 and (tool := self.registry.get(item.name)) is not None
             )
