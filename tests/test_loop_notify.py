@@ -375,3 +375,109 @@ def test_cli_without_state_keeps_freeform_subject(tmp_path, monkeypatch) -> None
     saved = list((tmp_path / "notifications").glob("legacy-*.json"))
     assert len(saved) == 1
     assert json.loads(saved[0].read_text(encoding="utf-8"))["state"] is None
+
+
+class _InboxResponse:
+    def __init__(self, payload):
+        self._body = json.dumps(payload).encode("utf-8")
+
+    def read(self):
+        return self._body
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return False
+
+
+def _stub_inbox(monkeypatch, payload):
+    monkeypatch.setattr(
+        notify.urllib.request, "urlopen", lambda *args, **kwargs: _InboxResponse(payload)
+    )
+
+
+def test_inbox_digest_lists_unanswered_only(monkeypatch) -> None:
+    _stub_inbox(
+        monkeypatch,
+        {
+            "items": [
+                {
+                    "id": "aaaabbbbccccdddd",
+                    "title": "Needs me",
+                    "status": "open",
+                    "answer": None,
+                },
+                {
+                    "id": "dddddddddddddddd",
+                    "title": "Empty answer counts too",
+                    "status": "open",
+                    "answer": "",
+                },
+                {
+                    "id": "eeeeeeeeeeeeeeee",
+                    "title": "Answered already",
+                    "status": "answered",
+                    "answer": "A",
+                },
+                {"id": "ffffffffffffffff", "title": "Old", "status": "closed", "answer": "A"},
+            ]
+        },
+    )
+    digest = notify.unanswered_inbox_digest()
+    assert "2 unanswered, 1 answered-awaiting-close" in digest
+    assert "- aaaabbbb Needs me" in digest
+    assert "- dddddddd Empty answer counts too" in digest
+    assert "Answered already" not in digest
+    assert "Old" not in digest
+
+
+def test_inbox_digest_empty(monkeypatch) -> None:
+    _stub_inbox(monkeypatch, {"items": []})
+    assert notify.unanswered_inbox_digest() == "Inbox: no open items."
+
+
+def test_inbox_digest_unreachable_is_soft(monkeypatch) -> None:
+    def _boom(*args, **kwargs):
+        raise OSError("dashboard down")
+
+    monkeypatch.setattr(notify.urllib.request, "urlopen", _boom)
+    assert notify.unanswered_inbox_digest() == "Inbox: unreachable (dashboard down?)."
+
+
+def test_cli_inbox_digest_appends_to_body(tmp_path, monkeypatch) -> None:
+    calls = _capture(monkeypatch, tmp_path, None)
+    _stub_inbox(
+        monkeypatch,
+        {
+            "items": [
+                {
+                    "id": "aaaabbbbccccdddd",
+                    "title": "Needs me",
+                    "status": "open",
+                    "answer": None,
+                }
+            ]
+        },
+    )
+    assert (
+        notify.main(
+            [
+                "--run-dir",
+                str(tmp_path),
+                "--event",
+                "heartbeat",
+                "--subject",
+                "still working",
+                "--body",
+                "plain body",
+                "--to",
+                "owner@example.com",
+                "--dry-run",
+                "--inbox-digest",
+            ]
+        )
+        == 0
+    )
+    assert "plain body\n\nInbox: 1 unanswered, 0 answered-awaiting-close." in calls[0]["body"]
+    assert "- aaaabbbb Needs me" in calls[0]["body"]
