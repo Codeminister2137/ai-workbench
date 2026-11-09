@@ -7,16 +7,24 @@ import pytest
 from ai_provider import (
     AIMessage,
     AIRequest,
+    AIResponse,
     AIStreamDelta,
     AIStreamFinal,
     AIToolCall,
+    BackendInfo,
     BackendLocation,
     FinishReason,
     MessageRole,
     OllamaChatClient,
     ProviderError,
     ProviderKind,
+    TruncatedOutputError,
     UsageSource,
+)
+from ai_provider.adapters.ollama import (
+    ensure_complete,
+    is_thinker_model,
+    thinker_output_budget,
 )
 from ai_provider.config import BackendConfig
 
@@ -452,3 +460,36 @@ def test_stream_preserves_earlier_tool_calls_when_final_chunk_only_reports_usage
     )
     assert response.message.tool_calls == response.tool_calls
     assert response.usage.output_tokens == 10
+
+
+def _response(finish: FinishReason) -> AIResponse:
+    return AIResponse(
+        message=AIMessage(MessageRole.ASSISTANT, "partial"),
+        backend=BackendInfo(provider="ollama", model="qwen3:14b", location=BackendLocation.LOCAL),
+        finish_reason=finish,
+    )
+
+
+def test_thinker_models_detected_by_family_prefix() -> None:
+    assert is_thinker_model("qwen3:14b")
+    assert is_thinker_model("gpt-oss:20b")
+    assert is_thinker_model("Qwen3-14B")
+    assert not is_thinker_model("qwen2.5-coder:14b")
+    assert not is_thinker_model("llama3.1:8b")
+    assert not is_thinker_model("my-qwen3-clone")
+
+
+def test_thinker_budget_is_4x_with_minimum() -> None:
+    assert thinker_output_budget("qwen3:14b", 200) == 800
+    assert thinker_output_budget("qwen3:14b", 50) == 512
+    assert thinker_output_budget("qwen2.5-coder:14b", 200) == 512
+    with pytest.raises(ValueError):
+        thinker_output_budget("qwen3:14b", 0)
+
+
+def test_ensure_complete_raises_only_on_length() -> None:
+    assert ensure_complete(_response(FinishReason.STOP)) is not None
+    with pytest.raises(TruncatedOutputError) as raised:
+        ensure_complete(_response(FinishReason.LENGTH), budget=64)
+    assert raised.value.category == "retryable"
+    assert "64" in str(raised.value)

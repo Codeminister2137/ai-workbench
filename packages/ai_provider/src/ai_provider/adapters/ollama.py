@@ -29,7 +29,12 @@ from ai_provider.contracts import (
     UsageSource,
     build_backend_info,
 )
-from ai_provider.errors import ProviderError, ProviderErrorCategory, ToolCallFormatError
+from ai_provider.errors import (
+    ProviderError,
+    ProviderErrorCategory,
+    ToolCallFormatError,
+    TruncatedOutputError,
+)
 from ai_provider.http_transport import read_bounded
 from ai_provider.privacy import enforce_privacy_policy
 from ai_provider.turn_usage import observe_completion, observe_stream, observe_usage
@@ -539,3 +544,44 @@ class OllamaChatClient:
         if done_reason == "length":
             return FinishReason.LENGTH
         return FinishReason.UNKNOWN
+
+
+THINKER_MODEL_PREFIXES = ("qwen3", "gpt-oss", "deepseek-r1", "qwq")
+THINKER_BUDGET_MULTIPLIER = 4
+THINKER_MINIMUM_BUDGET = 512
+
+
+def is_thinker_model(model: str) -> bool:
+    """True when the model id matches a known thinking-model family."""
+    name = model.strip().lower()
+    return any(
+        name == prefix
+        or name.startswith(prefix + ":")
+        or name.startswith(prefix + "-")
+        or name.startswith(prefix + ".")
+        or name.startswith(prefix + "_")
+        for prefix in THINKER_MODEL_PREFIXES
+    )
+
+
+def thinker_output_budget(
+    model: str, expected_tokens: int, *, minimum: int = THINKER_MINIMUM_BUDGET
+) -> int:
+    """max_output_tokens with headroom: 4x expected for thinkers (min 512).
+
+    Non-thinking models pass through unchanged (max with minimum).
+    """
+    if expected_tokens < 1:
+        raise ValueError("expected_tokens must be a positive integer")
+    if is_thinker_model(model):
+        return max(minimum, expected_tokens * THINKER_BUDGET_MULTIPLIER)
+    return max(minimum, expected_tokens)
+
+
+def ensure_complete(
+    response: AIResponse, *, provider: str = "ollama", budget: int | None = None
+) -> AIResponse:
+    """Return the response, or raise TruncatedOutputError on LENGTH."""
+    if response.finish_reason is FinishReason.LENGTH:
+        raise TruncatedOutputError(provider=provider, budget=budget)
+    return response
