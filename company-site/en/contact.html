@@ -15,7 +15,28 @@
 </nav></header>
 <h1>Contact</h1>
 <p>Tell us what your company does and which repetitive work eats the most time. We reply with a discovery proposal.</p>
-<p class="muted">E-mail address and form appear before publication. Contact data is processed only to reply (GDPR).</p>
+
+<h2>Request a quote</h2>
+<p class="muted" id="intake-steps"></p>
+<form id="intake-form">
+<p><label>Project title<br><input type="text" id="f-title" size="50"></label></p>
+<p><label>Your name<br><input type="text" id="f-name" size="50"></label></p>
+<p><label>E-mail<br><input type="text" id="f-email" size="50"></label></p>
+<p><label>Company<br><input type="text" id="f-company" size="50"></label></p>
+<p><label>What do you want to achieve?<br><textarea id="f-goal" rows="3" cols="50"></textarea></label></p>
+<p><label>Problem statement (optional)<br><textarea id="f-problem" rows="3" cols="50"></textarea></label></p>
+<p><label>Marketing goal (optional)<br><input type="text" id="f-goals" size="50"></label></p>
+<p><label>Budget range (EUR)<br><select id="f-budget"><option value="">— pick —</option></select></label></p>
+<p><button type="submit">Prepare request</button></p>
+</form>
+<div id="intake-errors"></div>
+<div id="intake-result" hidden>
+<p class="muted" id="intake-note"></p>
+<pre id="intake-json"></pre>
+<p><a id="intake-download" href="#" download="brief.json">Download JSON</a> <button type="button" id="intake-copy">Copy</button></p>
+</div>
+<script src="../form.js"></script>
+
 <footer class="muted"><a href="index.html">Home</a> · <a href="contact.html">Contact</a></footer>
 </body>
 </html>
