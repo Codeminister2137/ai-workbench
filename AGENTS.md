@@ -844,6 +844,8 @@ Do not log sensitive prompts or credentials by default.
 
 Flag security-sensitive or privacy-sensitive decisions before implementation.
 
+Local test/preview servers must bind 127.0.0.1 explicitly, never 0.0.0.0 or an implied wildcard (loopback needs no firewall rights; a wildcard bind triggers a Defender prompt attributed to C:\python314\python.exe because the venv interpreter re-executes as the base image).
+
 When introducing a new external integration, identify:
 
 * what data leaves the local environment;
