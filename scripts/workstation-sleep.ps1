@@ -26,10 +26,22 @@ if (-not $ControlDirectory) {
 $ControlDirectory = [IO.Path]::GetFullPath($ControlDirectory)
 $cancelAllPath = Join-Path $ControlDirectory 'cancel-all.txt'
 function Read-ControlText([string]$Path) {
-    $stream = [IO.File]::Open($Path, [IO.FileMode]::Open, [IO.FileAccess]::Read,
-        ([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete))
-    $reader = [IO.StreamReader]::new($stream)
-    try { return $reader.ReadToEnd() } finally { $reader.Dispose() }
+    # A racing writer (atomic Replace/Move) can hold the file exclusively for
+    # an instant; without a retry the CancelAll sweep dies on IOException
+    # under load instead of cancelling. Retry IO failures briefly, then throw.
+    $attempt = 0
+    while ($true) {
+        try {
+            $stream = [IO.File]::Open($Path, [IO.FileMode]::Open, [IO.FileAccess]::Read,
+                ([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete))
+            $reader = [IO.StreamReader]::new($stream)
+            try { return $reader.ReadToEnd() } finally { $reader.Dispose() }
+        } catch [IO.IOException] {
+            $attempt++
+            if ($attempt -ge 5) { throw }
+            Start-Sleep -Milliseconds 50
+        }
+    }
 }
 function Read-CancelGeneration {
     if (Test-Path -LiteralPath $cancelAllPath) {
