@@ -3,31 +3,40 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Kontakt — szkic</title>
+<title>Kontakt — zapytanie ofertowe (szkic)</title>
+<meta name="description" content="Opisz swój proces: czym zajmuje się firma i która powtarzalna praca zabiera najwięcej czasu. Odpowiadamy z pierwszymi pytaniami i propozycją rozpoznania.">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<p class="draft">SZKIC — strona nieopublikowana. Formularz i chatbot w przygotowaniu. <a href="en/contact.html">English</a></p>
-<header><nav>
+<p class="draft">SZKIC — strona nieopublikowana. Formularz zapisuje zapytanie lokalnie jako JSON. <span class="lang"><a href="en/contact.html">English</a></span></p>
+<header class="site-header"><div class="shell">
+<a class="brand" href="index.html">Firma IT · Skoczów</a>
+<nav class="site-nav" aria-label="Nawigacja">
 <a href="index.html">Start</a>
-<a href="uslugi.html">Uslugi</a>
-<a href="kontakt.html">Kontakt</a>
-</nav></header>
-<h1>Kontakt</h1>
-<p>Napisz, czym zajmuje sie Twoja firma i ktora powtarzalna praca zabiera najwiecej czasu. Odpowiadamy z propozycja rozpoznania.</p>
+<a href="uslugi.html">Usługi</a>
+<a href="kontakt.html" aria-current="page">Kontakt</a>
+</nav>
+</div></header>
+<main>
+<section class="hero"><div class="shell">
+<p class="kicker">Kontakt</p>
+<h1>Opisz swój proces — odezwę się z pytaniami</h1>
+<p class="lede">Nazywam się Jakub Jaworski i osobiście czytam każde zapytanie. Napisz, czym zajmuje się Twoja firma i która powtarzalna praca zabiera najwięcej czasu — odpowiem z pierwszymi pytaniami, a jeśli temat rokuje, z propozycją płatnego rozpoznania.</p>
+</div></section>
 
+<section class="section"><div class="shell">
 <h2>Zapytanie ofertowe</h2>
-<p class="muted" id="intake-steps"></p>
-<form id="intake-form">
-<p><label>Tytuł projektu<br><input type="text" id="f-title" size="50"></label></p>
-<p><label>Imię i nazwisko<br><input type="text" id="f-name" size="50"></label></p>
-<p><label>E-mail<br><input type="text" id="f-email" size="50"></label></p>
-<p><label>Firma<br><input type="text" id="f-company" size="50"></label></p>
-<p><label>Co chcesz osiągnąć?<br><textarea id="f-goal" rows="3" cols="50"></textarea></label></p>
-<p><label>Opis problemu (opcjonalnie)<br><textarea id="f-problem" rows="3" cols="50"></textarea></label></p>
-<p><label>Cel marketingowy (opcjonalnie)<br><input type="text" id="f-goals" size="50"></label></p>
-<p><label>Przedział budżetu (PLN)<br><select id="f-budget"><option value="">— wybierz —</option></select></label></p>
-<p><button type="submit">Przygotuj zapytanie</button></p>
+<p class="muted">Formularz nie wysyła danych na serwer: sprawdza je w przeglądarce i przygotowuje gotowe zapytanie (JSON) do załączenia do e-maila. <span id="intake-steps"></span></p>
+<form id="intake-form" class="intake">
+<p><label for="f-title">Tytuł projektu</label><input type="text" id="f-title" autocomplete="off"></p>
+<p><label for="f-name">Imię i nazwisko</label><input type="text" id="f-name" autocomplete="name"></p>
+<p><label for="f-email">E-mail</label><input type="email" id="f-email" autocomplete="email"></p>
+<p><label for="f-company">Firma</label><input type="text" id="f-company" autocomplete="organization"></p>
+<p><label for="f-goal">Co chcesz osiągnąć?</label><textarea id="f-goal"></textarea></p>
+<p><label for="f-problem">Opis problemu <span class="hint">(opcjonalnie — im konkretniej, tym lepsza odpowiedź)</span></label><textarea id="f-problem"></textarea></p>
+<p><label for="f-goals">Cel marketingowy <span class="hint">(opcjonalnie)</span></label><input type="text" id="f-goals" autocomplete="off"></p>
+<p><label for="f-budget">Przedział budżetu (PLN)</label><select id="f-budget"><option value="">— wybierz —</option></select></p>
+<p><button class="button" type="submit">Przygotuj zapytanie</button></p>
 </form>
 <div id="intake-errors"></div>
 <div id="intake-result" hidden>
@@ -36,7 +45,22 @@
 <p><a id="intake-download" href="#" download="zapytanie.json">Pobierz JSON</a> <button type="button" id="intake-copy">Kopiuj</button></p>
 </div>
 <script src="form.js"></script>
+</div></section>
 
-<footer class="muted"><a href="index.html">Start</a> · <a href="uslugi.html">Uslugi</a></footer>
+<section class="section wash"><div class="shell">
+<p class="kicker">Co dalej</p>
+<h2>Co się dzieje po wysłaniu zapytania</h2>
+<ol class="steps">
+<li><strong>Pierwsze pytania.</strong> Odpowiadam osobiście — zwykle z prośbą o doprecyzowanie procesu i systemów, których dotyczy.</li>
+<li><strong>Propozycja rozpoznania.</strong> Jeśli temat rokuje: płatny audyt na miejscu lub zdalnie, z pisemnym raportem albo uczciwym „nie róbcie tego”.</li>
+<li><strong>Wycena stała.</strong> Po rozpoznaniu: zakres, wyłączenia, kryteria akceptacji, cena i termin. Bez zobowiązań po drodze.</li>
+</ol>
+<p class="muted">Piszemy po polsku i po angielsku. Wizyty na miejscu: Bielsko-Biała, Cieszyn, Żywiec, Tychy, okolice Katowic.</p>
+</div></section>
+</main>
+<footer class="site-footer"><div class="shell">
+<p>Skoczów, Polska. Zdalnie: Polska i UE.</p>
+<p class="muted"><a href="index.html">Start</a> · <a href="uslugi.html">Usługi</a></p>
+</div></footer>
 </body>
 </html>

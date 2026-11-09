@@ -16,16 +16,16 @@
     step2: "2. Project",
     step3: "3. Budget & review"
   } : {
-    needTitle: "Nadaj projektowi krotki tytul.",
-    needName: "Podaj imie i nazwisko.",
-    needEmail: "Prawidlowy e-mail jest wymagany, aby odpowiedziec.",
-    needGoal: "Opisz, co chcesz osiagnac.",
-    needBudget: "Wybierz przedzial budzetu.",
-    secretWarn: "To wyglada na sekret — usun klucze/hasla przed wyslaniem.",
-    ready: "Zapytanie gotowe. Pobierz JSON i zalacz go do e-maila do nas.",
+    needTitle: "Nadaj projektowi krótki tytuł.",
+    needName: "Podaj imię i nazwisko.",
+    needEmail: "Prawidłowy e-mail jest wymagany, aby odpowiedzieć.",
+    needGoal: "Opisz, co chcesz osiągnąć.",
+    needBudget: "Wybierz przedział budżetu.",
+    secretWarn: "To wygląda na sekret — usuń klucze/hasła przed wysłaniem.",
+    ready: "Zapytanie gotowe. Pobierz JSON i załącz go do e-maila do nas.",
     step1: "1. Kontakt",
     step2: "2. Projekt",
-    step3: "3. Budzet i podsumowanie"
+    step3: "3. Budżet i podsumowanie"
   };
   var SECRET_RE = /(api[_-]?key|password|secret|token)\s*[:=]|-----BEGIN.*PRIVATE KEY-----|(sk-|ghp_)[A-Za-z0-9]{8,}/i;
   var EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;

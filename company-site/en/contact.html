@@ -3,40 +3,64 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Contact — draft</title>
+<title>Contact — project enquiry (draft)</title>
+<meta name="description" content="Describe your process: what your company does and which repetitive work costs the most time. We reply with first questions and a discovery proposal.">
 <link rel="stylesheet" href="../style.css">
 </head>
 <body>
-<p class="draft">DRAFT — unpublished site. Form and chatbot in progress. <a href="../kontakt.html">Polski</a></p>
-<header><nav>
+<p class="draft">DRAFT — unpublished site. The form saves your enquiry locally as JSON. <span class="lang"><a href="../kontakt.html">Polski</a></span></p>
+<header class="site-header"><div class="shell">
+<a class="brand" href="index.html">IT studio · Skoczów</a>
+<nav class="site-nav" aria-label="Navigation">
 <a href="index.html">Home</a>
 <a href="services.html">Services</a>
-<a href="contact.html">Contact</a>
-</nav></header>
-<h1>Contact</h1>
-<p>Tell us what your company does and which repetitive work eats the most time. We reply with a discovery proposal.</p>
+<a href="contact.html" aria-current="page">Contact</a>
+</nav>
+</div></header>
+<main>
+<section class="hero"><div class="shell">
+<p class="kicker">Contact</p>
+<h1>Describe your process — I'll reply with questions</h1>
+<p class="lede">My name is Jakub Jaworski and I personally read every enquiry. Write what your company does and which repetitive work costs the most time — I'll reply with first questions, and if the topic looks promising, with a paid-discovery proposal.</p>
+</div></section>
 
-<h2>Request a quote</h2>
-<p class="muted" id="intake-steps"></p>
-<form id="intake-form">
-<p><label>Project title<br><input type="text" id="f-title" size="50"></label></p>
-<p><label>Your name<br><input type="text" id="f-name" size="50"></label></p>
-<p><label>E-mail<br><input type="text" id="f-email" size="50"></label></p>
-<p><label>Company<br><input type="text" id="f-company" size="50"></label></p>
-<p><label>What do you want to achieve?<br><textarea id="f-goal" rows="3" cols="50"></textarea></label></p>
-<p><label>Problem statement (optional)<br><textarea id="f-problem" rows="3" cols="50"></textarea></label></p>
-<p><label>Marketing goal (optional)<br><input type="text" id="f-goals" size="50"></label></p>
-<p><label>Budget range (EUR)<br><select id="f-budget"><option value="">— pick —</option></select></label></p>
-<p><button type="submit">Prepare request</button></p>
+<section class="section"><div class="shell">
+<h2>Project enquiry</h2>
+<p class="muted">The form sends nothing to a server: it validates in your browser and prepares a ready enquiry (JSON) to attach to an email. <span id="intake-steps"></span></p>
+<form id="intake-form" class="intake">
+<p><label for="f-title">Project title</label><input type="text" id="f-title" autocomplete="off"></p>
+<p><label for="f-name">Full name</label><input type="text" id="f-name" autocomplete="name"></p>
+<p><label for="f-email">Email</label><input type="email" id="f-email" autocomplete="email"></p>
+<p><label for="f-company">Company</label><input type="text" id="f-company" autocomplete="organization"></p>
+<p><label for="f-goal">What do you want to achieve?</label><textarea id="f-goal"></textarea></p>
+<p><label for="f-problem">Problem description <span class="hint">(optional — the more concrete, the better the reply)</span></label><textarea id="f-problem"></textarea></p>
+<p><label for="f-goals">Marketing goal <span class="hint">(optional)</span></label><input type="text" id="f-goals" autocomplete="off"></p>
+<p><label for="f-budget">Budget range (EUR)</label><select id="f-budget"><option value="">— pick —</option></select></p>
+<p><button class="button" type="submit">Prepare enquiry</button></p>
 </form>
 <div id="intake-errors"></div>
 <div id="intake-result" hidden>
 <p class="muted" id="intake-note"></p>
 <pre id="intake-json"></pre>
-<p><a id="intake-download" href="#" download="brief.json">Download JSON</a> <button type="button" id="intake-copy">Copy</button></p>
+<p><a id="intake-download" href="#" download="enquiry.json">Download JSON</a> <button type="button" id="intake-copy">Copy</button></p>
 </div>
 <script src="../form.js"></script>
+</div></section>
 
-<footer class="muted"><a href="index.html">Home</a> · <a href="contact.html">Contact</a></footer>
+<section class="section wash"><div class="shell">
+<p class="kicker">What next</p>
+<h2>What happens after you send the enquiry</h2>
+<ol class="steps">
+<li><strong>First questions.</strong> I reply personally — usually asking to pin down the process and the systems involved.</li>
+<li><strong>Discovery proposal.</strong> If the topic looks promising: a paid on-site or remote audit with a written report — or an honest "don't do this".</li>
+<li><strong>Fixed quote.</strong> After discovery: scope, exclusions, acceptance criteria, price, and timeline. No commitments along the way.</li>
+</ol>
+<p class="muted">We write in Polish and English. On-site: Bielsko-Biała, Cieszyn, Żywiec, Tychy, Katowice area.</p>
+</div></section>
+</main>
+<footer class="site-footer"><div class="shell">
+<p>Skoczów, Poland. Remote: Poland and the EU.</p>
+<p class="muted"><a href="index.html">Home</a> · <a href="services.html">Services</a></p>
+</div></footer>
 </body>
 </html>
