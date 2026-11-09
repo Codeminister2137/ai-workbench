@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 from contacts import (
     ContactProposal,
@@ -12,8 +14,13 @@ from contacts import (
 from models import JobVacancy
 
 
-def _vacancy(**overrides) -> JobVacancy:
-    base = {"id": "v1", "company": "Example", "title": "Dev", "location": "Warsaw"}
+def _vacancy(**overrides: Any) -> JobVacancy:
+    base: dict[str, Any] = {
+        "id": "v1",
+        "company": "Example",
+        "title": "Dev",
+        "location": "Warsaw",
+    }
     base.update(overrides)
     return JobVacancy(**base)
 
