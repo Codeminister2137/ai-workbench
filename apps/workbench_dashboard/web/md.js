@@ -145,6 +145,12 @@ function mdToHtml(src) {
       flushList();
       continue;
     }
+    if (list) {
+      // Lazy continuation line: no blank line since the last item,
+      // so this text belongs to the open item, not a stray paragraph.
+      list.items[list.items.length - 1] += " " + line.trim();
+      continue;
+    }
     paragraph.push(line.trim());
   }
   if (fence !== null) {
