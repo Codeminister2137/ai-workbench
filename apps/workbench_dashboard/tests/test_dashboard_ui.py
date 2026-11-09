@@ -57,7 +57,7 @@ def test_static_controls_have_titles() -> None:
     for tag in re.findall(r"<button\b[^>]*>", html):
         assert "title=" in tag, f"button without title: {tag}"
     nav_links = re.findall(r"<a\b[^>]*data-view[^>]*>", html)
-    assert len(nav_links) == 12  # +intake, +restrictions, +fleet, +providers
+    assert len(nav_links) == 13  # +intake, +restrictions, +fleet, +providers, +help
     for tag in nav_links:
         assert "title=" in tag, f"nav link without title: {tag}"
 
@@ -67,8 +67,8 @@ def test_dynamic_buttons_have_titles() -> None:
     js = _read("app.js")
     buttons = re.findall(r"<button\b[^>]*>", js)
     assert (
-        len(buttons) == 20
-    )  # +report/rename/delete/submit/create/cancel/run-request/staged-approve/staged-reject/dictate/intake-approve/draft-plan/drain/reopen/providers-refresh
+        len(buttons) == 21
+    )  # +report/rename/delete/submit/create/cancel/run-request/staged-approve/staged-reject/dictate/intake-approve/draft-plan/drain/reopen/providers-refresh/propose
     for tag in buttons:
         assert "title=" in tag, f"button without title: {tag}"
 
@@ -77,7 +77,7 @@ def test_dynamic_inputs_and_selects_have_titles() -> None:
     """Text inputs/selects in templates have titles (radios use labels)."""
     js = _read("app.js")
     inputs = [tag for tag in re.findall(r"<input\b[^>]*>", js) if 'type="radio"' not in tag]
-    assert len(inputs) == 14  # +rename/create-form inputs, +5 list filters
+    assert len(inputs) == 16  # +rename/create-form inputs, +5 list filters, +idea plan link, +task propose
     for tag in inputs:
         assert "title=" in tag, f"input without title: {tag}"
     selects = re.findall(r"<select\b[^>]*>", js)
@@ -417,6 +417,56 @@ def test_document_preview_renders_markdown() -> None:
     assert "overflow-wrap" in css
 
 
+def test_ideas_archive_tab_and_backlog_markers() -> None:
+    """Ideas list has Active/Archive tabs; archive shows plan links or archive-only."""
+    js = _read("app.js")
+    assert '<a href="#/ideas">Active</a>' in js
+    assert '<a href="#/ideas?status=archive">Archive</a>' in js
+    assert '["adopted", "parked", "declined"]' in js
+    assert "archive-only" in js
+    assert 'name="plan"' in js
+    assert "plan_id: ev.target.plan.value || null" in js
+
+
+def test_documents_archive_tab_and_pill() -> None:
+    """Documents list has Active/Archive tabs on the archived flag."""
+    js = _read("app.js")
+    assert '<a href="#/documents">Active</a>' in js
+    assert '<a href="#/documents?status=archive">Archive</a>' in js
+    assert "d.archived" in js
+    assert ">archived</span>" in js
+
+
+def test_plans_and_runs_archive_tabs() -> None:
+    """Plans and Runs lists have Active/Archive tabs on terminal statuses."""
+    js = _read("app.js")
+    assert '<a href="#/plans">Active</a>' in js
+    assert '<a href="#/plans?status=archive">Archive</a>' in js
+    assert 'p.status === "complete"' in js
+    assert '<a href="#/runs">Active</a>' in js
+    assert '<a href="#/runs?status=archive">Archive</a>' in js
+    assert '["completed", "cancelled", "merged"]' in js
+
+
+def test_help_view_and_nav_link() -> None:
+    """Help view renders the runbook checklist + troubleshooting; nav links it."""
+    js = _read("app.js")
+    assert "function renderHelp()" in js
+    assert 'name === "help"' in js
+    assert "docs/company-run.md" in js
+    assert "Troubleshooting" in js
+    html = _read("index.html")
+    assert 'href="#/help"' in html
+
+
+def test_schedule_propose_form_posts_to_endpoint() -> None:
+    """Schedule view has a free-text propose form wired to /api/tasks/propose."""
+    js = _read("app.js")
+    assert 'id="propose-form"' in js
+    assert "/api/tasks/propose" in js
+    assert "Nothing runs until you approve it" in js
+
+
 def test_md_renderer_cases() -> None:
     """The doc markdown renderer covers blocks, inline code, links, and XSS."""
     node = shutil.which("node")
@@ -519,7 +569,9 @@ def test_sticky_header_is_opaque() -> None:
     m = re.search(r"header\s*\{[^}]*\}", css, re.DOTALL)
     assert m, "header rule not found"
     rule = m.group(0)
-    assert "background: Canvas" in rule
+    assert "background: var(--wb-color-surface)" in rule
+    tokens = _read("style-tokens.css")
+    assert "--wb-color-surface: Canvas" in tokens
     assert "background: inherit" not in rule
     assert "z-index" in rule
 

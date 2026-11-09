@@ -665,13 +665,16 @@ async function renderPlans(id) {
       <pre>${gtext(plan.body || "(empty plan)")}</pre>${linkedRuns}</div>`;
     return;
   }
+  const plansTab = new URLSearchParams((location.hash.split("?")[1] || "")).get("status") || "active";
   const payload = await api("/api/plans");
-  const items = payload.items.length
-    ? payload.items.map((p) =>
+  const shownPlans = payload.items.filter((p) => plansTab === "archive" ? p.status === "complete" : p.status !== "complete");
+  const items = shownPlans.length
+    ? shownPlans.map((p) =>
         `<li><a href="#/plans/${esc(p.id)}">${gtext(p.title || p.id)}</a>
          <span class="pill st-${esc((p.status || "none").replace(/\s+/g, "-"))}">${esc(p.status || "")}</span></li>`).join("")
     : '<li class="muted">No plans on file. Plans are created by Workbench flows.</li>';
   view.innerHTML = `<h1>Plans</h1>
+    <p><a href="#/plans">Active</a> · <a href="#/plans?status=archive">Archive</a></p>
     <p><input type="text" id="filter-plans" placeholder="Filter plans..." title="Filter plans by text"></p>
     <ul class="plain" id="plans-list">${items}</ul><p class="muted">${payload.total} total.</p>`;
   document.getElementById("filter-plans").addEventListener("input", (ev) => filterList("plans-list", ev.target.value));
@@ -740,9 +743,12 @@ async function renderRuns(id) {
   }
   const prevFilter = (document.getElementById("filter-runs") || {}).value || "";
   const runsUrl = runsProjectFilter ? "/api/runs?project_id=" + encodeURIComponent(runsProjectFilter) : "/api/runs";
+  const runsTab = new URLSearchParams((location.hash.split("?")[1] || "")).get("status") || "active";
   const payload = await api(runsUrl);
-  const items = payload.items.length
-    ? payload.items.map((r) =>
+  const terminalRuns = ["completed", "cancelled", "merged"];
+  const shownRuns = payload.items.filter((r) => runsTab === "archive" ? terminalRuns.includes(r.status) : !terminalRuns.includes(r.status));
+  const items = shownRuns.length
+    ? shownRuns.map((r) =>
         `<li><a href="#/runs/${esc(r.id)}">${gtext(r.title || r.id)}</a>
          <span class="pill st-${esc((r.status || "none").replace(/\s+/g, "-"))}">${esc(r.status || "")}</span>
          <span class="pill" title="Fan-out policy: whether this run may spawn subagent children">fan-out: ${esc(r.fanout_effective || r.fanout_policy || "unknown")}</span></li>`).join("")
@@ -760,6 +766,7 @@ async function renderRuns(id) {
     evidence = '<p class="muted">Evidence unavailable: ' + esc(err.message) + "</p>";
   }
   view.innerHTML = `<h1>Runs</h1>
+    <p><a href="#/runs">Active</a> · <a href="#/runs?status=archive">Archive</a></p>
     <p><input type="text" id="filter-runs" placeholder="Filter runs..." title="Filter runs by text">
     <select id="filter-runs-project" title="Show runs for one project">${await projectOptions(runsProjectFilter)}</select>
     <button id="drain-runs" title="Execute approved queued runs (one per click)">Drain now</button></p>
@@ -931,10 +938,12 @@ async function renderIdeas(id) {
       <p class="muted">${esc(item.source)}${item.contact ? " · " + esc(item.contact) : ""} · ${esc(item.status)}</p>
       <p class="inbox-body">${gtext(item.body || "")}</p>
       ${item.decision ? `<p><strong>Decision:</strong> ${esc(item.decision)}</p>` : ""}
+      ${item.plan_id ? `<p><a href="#/plans/${esc(item.plan_id)}" title="Linked backlog plan">Linked plan: ${esc(item.plan_id)}</a></p>` : ""}
       ${item.status === "new" ? `<p><button id="mark-seen-btn" title="Mark this idea seen (moves it out of new)">Mark seen</button></p>` : ""}
       <form id="review-form" class="inline">
         <select name="status" title="Triage status">${opts}</select>
         <input type="text" name="decision" placeholder="Decision note..." title="Decision note (optional)" value="${esc(item.decision || "")}">
+        <input type="text" name="plan" placeholder="Plan id (optional)..." title="Link a backlog plan id (optional)" value="${esc(item.plan_id || "")}">
         <button type="submit" title="Save triage status and note">Save triage</button>
       </form></div>`;
     document.getElementById("review-form").addEventListener("submit", async (ev) => {
@@ -943,7 +952,7 @@ async function renderIdeas(id) {
         await api("/api/ideas/" + encodeURIComponent(id) + "/review", {
           method: "POST",
           headers: {"Content-Type": "application/json"},
-          body: JSON.stringify({status: ev.target.status.value, decision: ev.target.decision.value}),
+          body: JSON.stringify({status: ev.target.status.value, decision: ev.target.decision.value, plan_id: ev.target.plan.value || null}),
         });
         toast("Triage saved", true);
         render();
@@ -958,14 +967,21 @@ async function renderIdeas(id) {
     });
     return;
   }
+  const ideasTab = new URLSearchParams((location.hash.split("?")[1] || "")).get("status") || "active";
   const payload = await api("/api/ideas");
-  const items = payload.items.length
-    ? payload.items.map((t) =>
+  const archivedIdeas = ["adopted", "parked", "declined"];
+  const shownIdeas = payload.items.filter((t) => ideasTab === "archive" ? archivedIdeas.includes(t.status) : !archivedIdeas.includes(t.status));
+  const backlogMark = (t) => t.plan_id
+    ? ` <a href="#/plans/${esc(t.plan_id)}" title="Linked backlog plan">→ plan</a>`
+    : (ideasTab === "archive" ? ` <span class="muted" title="No backlog link">archive-only</span>` : "");
+  const items = shownIdeas.length
+    ? shownIdeas.map((t) =>
         `<li><a href="#/ideas/${esc(t.id)}">${gtext(t.title)}</a>
          <span class="muted">${esc(t.source)} · ${esc((t.created_at || "").slice(0, 10))}</span>
-         <span class="pill st-${esc((t.status || "none").replace(/\s+/g, "-"))}">${esc(t.status)}</span></li>`).join("")
+         <span class="pill st-${esc((t.status || "none").replace(/\s+/g, "-"))}">${esc(t.status)}</span>${backlogMark(t)}</li>`).join("")
     : '<li class="muted">No ideas captured yet — use + New.</li>';
   view.innerHTML = `<h1>Ideas</h1>
+    <p><a href="#/ideas">Active</a> · <a href="#/ideas?status=archive">Archive</a></p>
     <p class="muted">Capture inbox for brain-dumps and third-party wishes. Triage in planning sessions.</p>
     <p><input type="text" id="filter-ideas" placeholder="Filter ideas..." title="Filter ideas by text"></p>
     <ul class="plain" id="ideas-list">${items}</ul>`;
@@ -993,18 +1009,22 @@ async function renderDocuments(id) {
       <p class="muted">${esc(item.root)} · ${esc(item.sensitivity)} · ${esc((item.modified_utc || "").slice(0, 10))} · ${item.size} bytes</p>
       ${(item.tags || []).length ? `<p>${item.tags.map((t) => `<span class="pill">${esc(t)}</span>`).join(" ")}</p>` : ""}
       ${item.project ? `<p><strong>Project:</strong> ${esc(item.project)}</p>` : ""}
+      ${item.archived ? `<p><span class="pill" title="Archived document">archived</span></p>` : ""}
       ${body}</div>`;
     return;
   }
+  const docsTab = new URLSearchParams((location.hash.split("?")[1] || "")).get("status") || "active";
   const payload = await api("/api/documents");
-  const items = payload.documents.length
-    ? payload.documents.map((d) =>
+  const shownDocs = payload.documents.filter((d) => docsTab === "archive" ? d.archived : !d.archived);
+  const items = shownDocs.length
+    ? shownDocs.map((d) =>
         `<li><a href="#/documents/${encodeURIComponent(d.id)}">${esc(d.title)}</a>
          <span class="muted">${esc(d.root)} · ${esc((d.modified_utc || "").slice(0, 10))}</span>
          <span class="pill st-${esc(d.sensitivity)}">${esc(d.sensitivity)}</span>
          ${d.project ? `<span class="pill" title="Linked project">${esc(d.project)}</span>` : ""}</li>`).join("")
     : '<li class="muted">No documents yet.</li>';
   view.innerHTML = `<h1>Documents</h1>
+    <p><a href="#/documents">Active</a> · <a href="#/documents?status=archive">Archive</a></p>
     <p class="muted">Company knowledge: public library, private research, and existing plans. Private files never leave this PC.</p>
     <p><input type="text" id="filter-documents" placeholder="Filter documents..." title="Filter documents by text"></p>
     <ul class="plain" id="documents-list">${items}</ul>`;
@@ -1043,6 +1063,28 @@ async function renderIntake() {
 function fieldRow(label, inner, hint) {
   return `<p><label><strong>${label}</strong><br>${inner}</label><br><span class="muted">${hint}</span></p>`;
 }
+function renderHelp() {
+  view.innerHTML = `<h1>Help</h1>
+    <div class="card"><h2>Run a client project</h2>
+    <p class="muted">Full checklist: <code>docs/company-run.md</code> in the repo.</p>
+    <ul class="plain">
+    <li>1. Intake: chatbot brief → <code>p7-projects/</code> → dashboard Intake approve → proposed plan.</li>
+    <li>2. Plan: review the phase checklist, approve in a review window.</li>
+    <li>3. Execute: <code>.\\scripts\\repo-assistant.ps1 "task" --execute</code> or an unattended loop.</li>
+    <li>4. Verify: focused pytest, <code>run-tests.py full</code>, ruff, pyright; green gate before push.</li>
+    <li>5. Report: run report + inbox close; merge needs per-merge approval.</li>
+    </ul></div>
+    <div class="card"><h2>Troubleshooting</h2>
+    <ul class="plain">
+    <li>Ollama down: <code>ollama list</code> must answer; restart the Ollama app.</li>
+    <li>Allowance exhausted: Home spend panel shows buckets; billable calls deny by default.</li>
+    <li>Token expiry: refresh the grant per <code>packages/ai_provider/docs/source-state.md</code>.</li>
+    <li>Push drops: retry <code>--no-verify</code> only after a green gate; verify with <code>ls-remote</code>.</li>
+    <li>Dashboard unreachable: <code>curl http://127.0.0.1:8766/api/status</code>.</li>
+    </ul></div>`;
+}
+
+
 function renderCreate(kind) {
   const defs = {
     chat: {heading: "New chat", fields: `
@@ -1136,7 +1178,27 @@ async function renderSchedule() {
   } catch (err) {
     body = `<div class="card"><h2>Schedule</h2><p class="muted">Schedule unavailable: ${esc(err.message)}</p></div>`;
   }
-  view.innerHTML = `<h1>Schedule</h1><p class="muted">Read-only. Live from the fleet probe: scheduled tasks and the sleep guard.</p>${body}`;
+  view.innerHTML = `<h1>Schedule</h1>
+    <div class="card"><h2>Propose a task</h2>
+    <p class="muted">Type what you want done — a proposal (model + budget) lands in the inbox for approval. Nothing runs until you approve it.</p>
+    <form class="inline" id="propose-form"><input type="text" name="text" placeholder="Review the auth module, about 30 min..." title="Describe the task in free text"><button type="submit" title="File as an approval-gated proposal">Propose</button></form></div>
+    <p class="muted">Live from the fleet probe: scheduled tasks and the sleep guard.</p>${body}`;
+  document.getElementById("propose-form").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    try {
+      const res = await fetch("/api/tasks/propose", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({text: ev.target.text.value}),
+      });
+      const out = await res.json();
+      if (!res.ok || !out.ok) throw new Error((out && out.error) || res.status);
+      toast(`Proposed ${out.proposal.task_id} (${out.proposal.model}) — see inbox`, true);
+      ev.target.reset();
+    } catch (err) {
+      toast("Proposal failed: " + err.message, false);
+    }
+  });
 }
 
 async function renderFleet() {
@@ -1301,6 +1363,7 @@ async function render() {
     else if (name === "fleet") await renderFleet();
     else if (name === "providers") await renderProviders();
     else if (name === "restrictions") await renderRestrictions();
+    else if (name === "help") renderHelp();
     else if (name === "create" && id) renderCreate(id);
     else view.innerHTML = "<h1>Not found</h1>";
   } catch (err) {

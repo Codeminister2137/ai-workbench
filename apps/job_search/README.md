@@ -63,7 +63,7 @@ Openings instance has been started or contacted.
 | `approval.py` | Enforces explicit human approval workflow; mutating an approved package revokes approval, requiring fresh review |
 | `sender.py` | Delivery abstractions: `DryRunEmailTransport` and `YagmailEmailTransport`; raises `UnapprovedApplicationError` if an unapproved package is delivered |
 | `records.py` | Append-only local JSONL ledger for application records; the strict reader rejects malformed lines with line numbers |
-| `outreach_cli.py` | Terminal preview/review and reusable `run_outreach`; sends explicit recipients through guarded delivery |
+| `outreach_cli.py` | Terminal preview/review and reusable `run_outreach`; sends explicit recipients, or a `--vacancies` JSONL batch resolved through the contact registry (manual first, then ready vendors, capped by `--max-enriches`), through guarded delivery |
 | `main.py` | Thin compatibility entry point for the guarded outreach workflow |
 
 `main.py` previews by default, without SMTP or credentials. It uses the shared

@@ -35,6 +35,12 @@ repos:
         language: system
         pass_filenames: false
         stages: [pre-push]
+      - id: style-tokens
+        name: style-tokens
+        entry: .venv/Scripts/python.exe scripts/check_style_tokens.py --check
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
       - id: pytest
         name: pytest
         entry: .venv/Scripts/python.exe scripts/run-tests.py full

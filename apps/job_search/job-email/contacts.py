@@ -103,8 +103,15 @@ class ContactRegistry:
         return tuple(s.name for s in self._sources)
 
     def resolve(self, vacancy: JobVacancy) -> ContactProposal | None:
+        proposal, _tried = self.resolve_trace(vacancy)
+        return proposal
+
+    def resolve_trace(self, vacancy: JobVacancy) -> tuple[ContactProposal | None, tuple[str, ...]]:
+        """Resolve plus the tried source names in order (for spend caps)."""
+        tried: list[str] = []
         for source in self._sources:
+            tried.append(source.name)
             proposal = source.resolve(vacancy)
             if proposal is not None:
-                return proposal
-        return None
+                return proposal, tuple(tried)
+        return None, tuple(tried)

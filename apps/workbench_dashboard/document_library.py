@@ -43,6 +43,7 @@ class DocumentEntry:
     modified_utc: str
     sensitivity: str
     renderable: bool
+    archived: bool
 
 
 def parse_front_matter(text: str) -> tuple[dict[str, str], str]:
@@ -146,6 +147,7 @@ class DocumentLibrary:
         title = path.stem
         tags: tuple[str, ...] = ()
         project = None
+        archived = False
         if path.suffix.lower() == ".md":
             try:
                 fields, _body = parse_front_matter(
@@ -157,6 +159,7 @@ class DocumentLibrary:
             if "tags" in fields:
                 tags = _split_tags(fields["tags"])
             project = fields.get("project")
+            archived = fields.get("archived", "").strip().lower() in ("true", "yes", "1")
         modified = datetime.fromtimestamp(path.stat().st_mtime, UTC).isoformat()
         return DocumentEntry(
             id=f"{root}/{relpath}",
@@ -169,6 +172,7 @@ class DocumentLibrary:
             modified_utc=modified,
             sensitivity=self._roots[root][1],
             renderable=path.suffix.lower() == ".md",
+            archived=archived,
         )
 
     @staticmethod
@@ -184,6 +188,7 @@ class DocumentLibrary:
             "modified_utc": entry.modified_utc,
             "sensitivity": entry.sensitivity,
             "renderable": entry.renderable,
+            "archived": entry.archived,
         }
 
 

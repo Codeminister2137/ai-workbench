@@ -1,4 +1,15 @@
-# AI-first-developer product-gap analysis — 2026-11-04
+# AI-first-developer product-gap analysis — 2026-11-04 (status swept 2026-11-09)
+
+> Status sweep 2026-11-09: G6 RESOLVED (ADR-082 centralized, filters
+> landed), G7 RESOLVED (validator + adversarial secrets/PII + approve
+> flow + UI button all shipped), G8 RESOLVED (spend ledger with
+> reserve-before-dispatch + deny-by-default, grants docs, dashboard
+> panel). G9 RESOLVED (Schedule wired to fleet probe). G10/G11
+> BRIEFED (audience a96f576b, notify c801d2f6 — owner decides).
+> G12 DONE (company-run.md + Help view). G1/G2 RESOLVED (guided
+> installer; plan↔run↔report record linking shipped). G4/G5
+> verified still open but not prioritized; G3 needs P4 owner
+> answers — verify before citing; this doc is point-in-time.
 
 Perspective: a developer who wants to RUN A COMPANY'S DEVELOPMENT through
 ai-workbench (client intake → plan → approve → execute → verify → report →

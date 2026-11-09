@@ -61,6 +61,7 @@ from dashboard_projects import create_project, get_project, list_projects
 from dashboard_stores import DashboardStores, StoreError, effective_fanout_policy
 from document_library import DocumentLibrary
 from drain_scheduler import DrainScheduler
+from nl_tasks import ORDER_OPTIONS, SCHEDULE_ANSWER, propose_task, scheduled_run_record
 from owner_mail import mail_configured
 from p7_intake import approve_intake, list_intake
 from providers_view import provider_status as providers_status
@@ -664,6 +665,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 return self._create_inbox_task(payload)
             if path == "/api/ideas":
                 return self._create_idea(payload)
+            if path == "/api/tasks/propose":
+                return self._propose_task(payload)
             if path == "/api/projects":
                 return self._create_project(payload)
             if path == "/api/settings":
@@ -1035,7 +1038,41 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         except StoreError as exc:
             status = 404 if "not found" in str(exc).lower() else 400
             return self._send_json({"ok": False, "error": str(exc)}, status=status)
-        self._send_json({"ok": True, "id": record["id"], "status": record["status"]})
+        scheduled_run = self._maybe_schedule_nl_run(record)
+        self._send_json(
+            {
+                "ok": True,
+                "id": record["id"],
+                "status": record["status"],
+                "scheduled_run": scheduled_run,
+            }
+        )
+
+    def _maybe_schedule_nl_run(self, record: dict) -> str | None:
+        """Queue the run for an approved NL proposal order (sched A).
+
+        Returns the run id when a run was queued (or already existed),
+        else None. Scheduling never fails the recorded answer: a
+        malformed proposal is reported server-side and skipped.
+        """
+        metadata = record.get("metadata") or {}
+        proposal = metadata.get("nl_proposal")
+        if not isinstance(proposal, dict) or record.get("answer") != SCHEDULE_ANSWER:
+            return None
+        try:
+            run = scheduled_run_record(proposal, record["id"])
+        except ValueError as exc:
+            print(f"Workbench dashboard: skip NL scheduling: {exc}")
+            return None
+        stores = self._stores()
+        try:
+            if stores.runs.get(run["id"]) is not None:
+                return run["id"]
+            stores.runs.put(run["id"], run)
+        except StoreError as exc:
+            print(f"Workbench dashboard: skip NL scheduling: {exc}")
+            return None
+        return run["id"]
 
     def _close_inbox_task(self, item_id: str, payload: dict) -> None:
         resolution = payload.get("resolution", "")
@@ -1159,14 +1196,44 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
     def _review_idea(self, item_id: str, payload: dict) -> None:
         status = payload.get("status", "")
         decision = payload.get("decision", "")
+        plan_id = payload.get("plan_id")
         if not isinstance(status, str) or not isinstance(decision, str):
             return self._send_json({"ok": False, "error": "Invalid review payload"}, status=400)
+        if plan_id is not None and not isinstance(plan_id, str):
+            return self._send_json({"ok": False, "error": "plan_id must be a string"}, status=400)
         try:
-            record = self._stores().set_idea_status(item_id, status=status, decision=decision)
+            record = self._stores().set_idea_status(
+                item_id, status=status, decision=decision, plan_id=plan_id
+            )
         except StoreError as exc:
             code = 404 if "not found" in str(exc).lower() else 400
             return self._send_json({"ok": False, "error": str(exc)}, status=code)
         self._send_json({"ok": True, "id": record["id"], "status": record["status"]})
+
+    def _propose_task(self, payload: dict) -> None:
+        """File free text as an approval-gated scheduled-task proposal."""
+        text = payload.get("text", "")
+        if not isinstance(text, str):
+            return self._send_json({"ok": False, "error": "text must be a string"}, status=400)
+        try:
+            proposal = propose_task(text)
+        except ValueError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        try:
+            record = self._stores().create_inbox_task(
+                title=f"Scheduled task proposal: {proposal['task_id']}",
+                body=(
+                    f"Model: {proposal['model']}; budget: {proposal['required_seconds']}s.\n"
+                    f"Prompt: {proposal['prompt']}\n"
+                    "Schedule it to queue the run; it executes on the next drain tick."
+                ),
+                task_type="order",
+                options=ORDER_OPTIONS,
+                metadata={"nl_proposal": proposal},
+            )
+        except StoreError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        self._send_json({"ok": True, "id": record["id"], "proposal": proposal})
 
     def _send_project(self, project_id: str) -> None:
         try:

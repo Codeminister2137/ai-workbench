@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kontakt — szkic</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<p class="draft">SZKIC — strona nieopublikowana. Formularz i chatbot w przygotowaniu. <a href="en/contact.html">English</a></p>
+<header><nav>
+<a href="index.html">Start</a>
+<a href="uslugi.html">Uslugi</a>
+<a href="kontakt.html">Kontakt</a>
+</nav></header>
+<h1>Kontakt</h1>
+<p>Napisz, czym zajmuje sie Twoja firma i ktora powtarzalna praca zabiera najwiecej czasu. Odpowiadamy z propozycja rozpoznania.</p>
+
+<h2>Zapytanie ofertowe</h2>
+<p class="muted" id="intake-steps"></p>
+<form id="intake-form">
+<p><label>Tytuł projektu<br><input type="text" id="f-title" size="50"></label></p>
+<p><label>Imię i nazwisko<br><input type="text" id="f-name" size="50"></label></p>
+<p><label>E-mail<br><input type="text" id="f-email" size="50"></label></p>
+<p><label>Firma<br><input type="text" id="f-company" size="50"></label></p>
+<p><label>Co chcesz osiągnąć?<br><textarea id="f-goal" rows="3" cols="50"></textarea></label></p>
+<p><label>Opis problemu (opcjonalnie)<br><textarea id="f-problem" rows="3" cols="50"></textarea></label></p>
+<p><label>Cel marketingowy (opcjonalnie)<br><input type="text" id="f-goals" size="50"></label></p>
+<p><label>Przedział budżetu (PLN)<br><select id="f-budget"><option value="">— wybierz —</option></select></label></p>
+<p><button type="submit">Przygotuj zapytanie</button></p>
+</form>
+<div id="intake-errors"></div>
+<div id="intake-result" hidden>
+<p class="muted" id="intake-note"></p>
+<pre id="intake-json"></pre>
+<p><a id="intake-download" href="#" download="zapytanie.json">Pobierz JSON</a> <button type="button" id="intake-copy">Kopiuj</button></p>
+</div>
+<script src="form.js"></script>
+
+<footer class="muted"><a href="index.html">Start</a> · <a href="uslugi.html">Uslugi</a></footer>
+</body>
+</html>

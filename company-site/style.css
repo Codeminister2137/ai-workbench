@@ -1,0 +1,10 @@
+/* Company site draft styles. Standalone; not the dashboard. */
+:root { color-scheme: light dark; }
+body { font-family: system-ui, sans-serif; margin: 0 auto; max-width: 56rem; padding: 0 1rem 3rem; line-height: 1.6; }
+.draft { background: #ffd487; color: #222; padding: .5rem 1rem; font-size: .9rem; }
+header nav a { margin-right: 1rem; }
+h1 { font-size: 1.6rem; }
+h2 { font-size: 1.2rem; margin-top: 2rem; }
+.card { border: 1px solid #8884; border-radius: .5rem; padding: .75rem 1rem; margin-bottom: 1rem; }
+.muted { opacity: .7; }
+footer { margin-top: 3rem; border-top: 1px solid #8884; padding-top: 1rem; font-size: .9rem; }

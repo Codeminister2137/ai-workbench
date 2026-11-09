@@ -3,6 +3,9 @@
 Owner automation (zero tokens): renders a run record plus its last receipt
 into stable markdown. Defensive by design -- missing or wrong-typed keys
 render as ``(none)`` or are skipped, and rendering never raises.
+
+Two flavors (report B): ``full`` keeps everything; ``shareable`` drops
+iterations, tool calls, owner-task ids, and error details.
 """
 
 from __future__ import annotations
@@ -119,22 +122,31 @@ def _owner_task_ids(receipt: dict | None) -> list[str] | None:
     return ids or None
 
 
+def _run_id(run: dict) -> str:
+    try:
+        raw_id = run.get("id")
+    except AttributeError:
+        raw_id = None
+    if isinstance(raw_id, str):
+        return _text(raw_id) or "unknown"
+    if isinstance(raw_id, int) and not isinstance(raw_id, bool):
+        return str(raw_id)
+    return "unknown"
+
+
+def _receipt_summary(receipt: dict | None) -> str | None:
+    if not isinstance(receipt, dict):
+        return None
+    return _text(receipt.get("summary"))
+
+
 def render_run_report(run: dict) -> str:
     """Render a deterministic markdown report for ``run``; never raises."""
     try:
         if not isinstance(run, dict):
             run = {}
         title = _first_text(run, ("title",)) or "untitled"
-        try:
-            raw_id = run.get("id")
-        except AttributeError:
-            raw_id = None
-        if isinstance(raw_id, str):
-            run_id = _text(raw_id) or "unknown"
-        elif isinstance(raw_id, int) and not isinstance(raw_id, bool):
-            run_id = str(raw_id)
-        else:
-            run_id = "unknown"
+        run_id = _run_id(run)
         status = _first_text(run, ("status",)) or "(none)"
         started = _first_text(run, ("started_at_utc", "started_at", "created_at_utc"))
         finished = _first_text(run, ("finished_at_utc", "finished_at", "completed_at_utc"))
@@ -148,9 +160,7 @@ def render_run_report(run: dict) -> str:
         staged = _staged_paths(run)
         owner_tasks = _owner_task_ids(receipt)
         error = _first_text(run, ("error",))
-        summary: str | None = None
-        if isinstance(receipt, dict):
-            summary = _text(receipt.get("summary"))
+        summary = _receipt_summary(receipt)
         lines: list[str] = [f"# {title} ({run_id})", f"Status: {status}"]
         if started is not None:
             lines.append(f"Started (UTC): {started}")
@@ -199,3 +209,57 @@ def render_run_report(run: dict) -> str:
             "## Owner tasks filed\n"
             "(none)"
         )
+
+
+REPORT_FLAVORS = ("full", "shareable")
+
+
+def render_shareable_report(run: dict) -> str:
+    """Render the sanitized client-shareable flavor; never raises.
+
+    Same run, minus internals: no iterations, tool calls, owner-task
+    ids, or error details. Staged files (deliverables) and the summary
+    stay.
+    """
+    try:
+        if not isinstance(run, dict):
+            run = {}
+        title = _first_text(run, ("title",)) or "untitled"
+        run_id = _run_id(run)
+        status = _first_text(run, ("status",)) or "(none)"
+        started = _first_text(run, ("started_at_utc", "started_at", "created_at_utc"))
+        finished = _first_text(run, ("finished_at_utc", "finished_at", "completed_at_utc"))
+        staged = _staged_paths(run)
+        summary = _receipt_summary(_last_receipt(run))
+        lines: list[str] = [f"# {title} ({run_id})", f"Status: {status}"]
+        if started is not None:
+            lines.append(f"Started (UTC): {started}")
+        if finished is not None:
+            lines.append(f"Finished (UTC): {finished}")
+        lines.append("")
+        lines.append("## Staged files")
+        if staged is None:
+            lines.append("(none)")
+        else:
+            lines.extend(f"- {path}" for path in staged)
+        if summary is not None:
+            lines.append("")
+            lines.append("## Summary")
+            lines.append(summary)
+        return "\n".join(lines)
+    except Exception:
+        return "# untitled (unknown)\nStatus: (none)\n\n## Staged files\n(none)"
+
+
+def render_report(run: dict, flavor: str = "full") -> str:
+    """Render ``flavor`` of the run report; unknown flavors raise.
+
+    ``ValueError`` (unlike the flavor renderers, which never raise).
+    """
+    if flavor == "full":
+        return render_run_report(run)
+    if flavor == "shareable":
+        return render_shareable_report(run)
+    raise ValueError(
+        f"unknown report flavor: {flavor!r} (expected one of {', '.join(REPORT_FLAVORS)})"
+    )

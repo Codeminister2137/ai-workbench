@@ -201,6 +201,21 @@ def test_ideas_capture_filter_and_triage(dashboard_server) -> None:
     assert [item["id"] for item in remaining["items"]] == [mine["id"]]
 
 
+def test_review_refuses_dangling_plan_link(dashboard_server) -> None:
+    """Review with a ghost plan_id fails; stores tests cover the link itself."""
+    made = post_json(
+        dashboard_server,
+        "/api/ideas",
+        {"title": "t", "body": "b", "source": "owner"},
+    )
+    with pytest.raises(HTTPError):
+        post_json(
+            dashboard_server,
+            f"/api/ideas/{made['id']}/review",
+            {"status": "adopted", "decision": "d", "plan_id": "ghost"},
+        )
+
+
 def test_trusted_host_allowlist_accepts_tailnet_origin(dashboard_server, tmp_path) -> None:
     config_path = tmp_path / "dashboard.json"
     payload = json.loads(config_path.read_text(encoding="utf-8"))

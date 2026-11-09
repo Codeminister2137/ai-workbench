@@ -86,6 +86,37 @@ def test_actionability_rejections() -> None:
     assert any("expired" in err for err in validate_p7(old)["errors"])
 
 
+def test_adversarial_secrets_rejected() -> None:
+    """Secrets hidden in any field (key blocks, tokens, assignments) fail."""
+    cases = [
+        _brief(goal_summary="Site.\n-----BEGIN RSA PRIVATE KEY-----\nabc"),
+        _brief(problem_statement="Broken since deploy ghp_abcdefgh12345678 ok"),
+        _brief(goal_summary="Login broken, password=supersecret123 here"),
+        _brief(goal_summary="Use token: [REDACTED] for staging"),
+        _brief(marketing_goals=["Rank fast", "api-key=[REDACTED]"]),
+    ]
+    for leaky in cases:
+        verdict = validate_p7(leaky)
+        assert verdict["valid"] is False
+        assert any("secret" in err for err in verdict["errors"])
+    clean = _brief(goal_summary="Marketing site with a contact form and map")
+    assert validate_p7(clean)["valid"] is True
+
+
+def test_q4_q7_language_and_marketing_goals() -> None:
+    """Q4: PL+EN v1 (hu/de rejected, pl default). Q7: marketing_goals field."""
+    assert validate_p7(_brief(preferred_language="pl"))["valid"] is True
+    assert validate_p7(_brief(preferred_language="hu"))["valid"] is False
+    assert validate_p7(_brief(preferred_language="de"))["valid"] is False
+    no_lang = _brief()
+    del no_lang["preferred_language"]
+    assert validate_p7(no_lang)["valid"] is True
+    goals = _brief(marketing_goals=["Rank for automation Gdansk", "10 demo calls/mo"])
+    assert validate_p7(goals)["valid"] is True
+    assert validate_p7(_brief(marketing_goals=["ok"] * 6))["valid"] is False
+    assert validate_p7(_brief(marketing_goals="rank"))["valid"] is False
+
+
 def test_warnings_not_rejections() -> None:
     vague = _brief(success_criteria=["Everything feels nice and smooth"])
     verdict = validate_p7(vague)

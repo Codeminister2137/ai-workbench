@@ -8,6 +8,11 @@ foundation, not an installed skill registry or a capability manifest.
 using read/search and bounded Git tools. It does not grant shell, write or network
 access. Client-specific tool prefixes must resolve to the same implementations.
 
+Companion sources: `git-safety` (history-write rules), `durable-test-collateral`
+(failing-test-first bugfix workflow), `python-env` (environment placement),
+`taste` (frontend anti-slop constraints). Each names its prerequisite tools in
+`SKILL_TOOLS`; loading refuses missing tools, missing git, and duplicate sources.
+
 Clients discover skills from different directories. Until a common distribution
 contract is selected, copy a source only into an explicitly selected test fixture
 or installation location; do not change user-wide configuration automatically.

@@ -129,6 +129,42 @@ def write_last_ip(path: Path, address: str) -> None:
         return
 
 
+INBOX_URL_DEFAULT = "http://127.0.0.1:8766"
+
+
+def unanswered_inbox_digest(base_url: str = INBOX_URL_DEFAULT, *, timeout: float = 10) -> str:
+    """Render unanswered inbox items for the hourly heartbeat (notify B).
+
+    Fail-soft by contract: any dashboard/transport failure yields a short
+    note instead of raising, so the digest can never break a ping.
+    """
+    try:
+        with urllib.request.urlopen(f"{base_url}/api/inbox", timeout=timeout) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        items = payload.get("items", [])
+        if not isinstance(items, list):
+            raise ValueError("unexpected inbox shape")
+        unanswered = [
+            item
+            for item in items
+            if isinstance(item, dict) and item.get("status") != "closed" and not item.get("answer")
+        ]
+        awaiting_close = sum(
+            1
+            for item in items
+            if isinstance(item, dict) and item.get("status") != "closed" and item.get("answer")
+        )
+    except Exception:  # noqa: BLE001 - digest must fail soft
+        return "Inbox: unreachable (dashboard down?)."
+    if not unanswered and not awaiting_close:
+        return "Inbox: no open items."
+    lines = [f"Inbox: {len(unanswered)} unanswered, {awaiting_close} answered-awaiting-close."]
+    for item in unanswered:
+        item_id = str(item.get("id", "?"))[:8]
+        lines.append(f"- {item_id} {item.get('title', '(untitled)')}")
+    return "\n".join(lines)
+
+
 MAIL_STATES = ("WORKING", "WAITING_FOR_OWNER", "BLOCKED", "DONE")
 
 
@@ -327,6 +363,12 @@ def main(argv=None) -> int:
     group.add_argument("--body-file", type=Path, default=None)
     parser.add_argument("--to", default=None)
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--inbox-digest",
+        action="store_true",
+        help="Append unanswered-inbox digest to the body (notify B heartbeat).",
+    )
+    parser.add_argument("--inbox-url", default=INBOX_URL_DEFAULT)
     args = parser.parse_args(argv)
     if args.state is None and (args.done or args.remaining or args.waiting_on or args.sleep_note):
         parser.error("--done/--remaining/--waiting-on/--sleep-note require --state")
@@ -344,6 +386,8 @@ def main(argv=None) -> int:
             sleep=args.sleep_note,
             details=body,
         )
+    if args.inbox_digest:
+        body = f"{body}\n\n{unanswered_inbox_digest(args.inbox_url)}"
     receipt = send_ping(
         subject=subject,
         body=body,
