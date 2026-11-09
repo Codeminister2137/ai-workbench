@@ -146,6 +146,7 @@ GROUPS = {
         "tests/test_find_duplication.py",
         "tests/test_clone_scan_scheduled.py",
         "tests/test_wake_self_test.py",
+        "tests/test_company_site.py",
     ),
     "research": (
         "tests/test_research_*.py",
