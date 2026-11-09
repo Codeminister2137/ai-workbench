@@ -31,3 +31,66 @@ def test_intake_form_wiring_matches_script() -> None:
         assert "form.js" in text, page
         for element_id in touched:
             assert f'id="{element_id}"' in text, (page, element_id)
+
+
+PL_PAGES = ["index.html", "uslugi.html", "kontakt.html"]
+EN_PAGES = ["en/index.html", "en/services.html", "en/contact.html"]
+
+
+def test_pages_have_lang_structure_and_current_nav() -> None:
+    for rel in PL_PAGES:
+        text = (ROOT / rel).read_text(encoding="utf-8")
+        assert '<html lang="pl">' in text, rel
+        assert text.count("<h1") == 1, rel
+        assert 'aria-current="page"' in text, rel
+    for rel in EN_PAGES:
+        text = (ROOT / rel).read_text(encoding="utf-8")
+        assert '<html lang="en">' in text, rel
+        assert text.count("<h1") == 1, rel
+        assert 'aria-current="page"' in text, rel
+
+
+def test_polish_pages_use_diacritics() -> None:
+    must = {
+        "index.html": ["Bielsko-Biała", "Żywiec", "najbardziej boli", "księgowość"],
+        "uslugi.html": ["Łączenie", "wyłączeniami", "Czego nie robimy"],
+        "kontakt.html": ["Imię i nazwisko", "Przedział budżetu"],
+    }
+    for rel, words in must.items():
+        text = (ROOT / rel).read_text(encoding="utf-8")
+        for word in words:
+            assert word in text, (rel, word)
+
+
+def test_no_placeholders_or_invented_team() -> None:
+    banned = ["lorem", "TODO", "TBD", "our team", "nasz zespół", "Hungar", "HUF"]
+    for page in sorted(ROOT.rglob("*.html")):
+        lowered = page.read_text(encoding="utf-8").lower()
+        for word in banned:
+            assert word.lower() not in lowered, (page, word)
+
+
+def test_offer_content_present() -> None:
+    index = (ROOT / "index.html").read_text(encoding="utf-8")
+    for needle in ["rozpoznanie", "stałej cenie", "Skoczów", "founding client"]:
+        assert needle in index, needle
+    services = (ROOT / "uslugi.html").read_text(encoding="utf-8")
+    for needle in ["Czego nie robimy", "SOW", "RODO", "30–50%"]:
+        assert needle in services, needle
+    en_index = (ROOT / "en" / "index.html").read_text(encoding="utf-8")
+    for needle in ["fixed price", "founding-client", "Skoczów"]:
+        assert needle in en_index, needle
+
+
+def test_stylesheet_defines_system() -> None:
+    css = (ROOT / "style.css").read_text(encoding="utf-8")
+    for needle in ["--accent", ".hero", ".lines", ".steps", ".faq", "@media", "focus-visible"]:
+        assert needle in css, needle
+    assert "#faf8f4" not in css  # no cream wash (taste rule)
+
+
+def test_form_script_has_diacritics_and_budgets() -> None:
+    script = (ROOT / "form.js").read_text(encoding="utf-8")
+    assert "krótki tytuł" in script
+    assert "Budżet i podsumowanie" in script
+    assert "10–30k" in script  # grounding §9 PLN buckets
