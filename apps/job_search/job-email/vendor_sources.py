@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+import urllib.error
 import urllib.request
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -108,6 +109,8 @@ def _post_json(
         with urllib.request.urlopen(request, timeout=timeout) as response:
             body = response.read().decode("utf-8", errors="replace")
             status = response.status
+    except urllib.error.HTTPError as exc:
+        raise VendorError(f"{url} returned HTTP {exc.code}") from None
     except Exception as exc:
         raise VendorError(f"{url} unreachable: {type(exc).__name__}") from None
     if status != 200:
