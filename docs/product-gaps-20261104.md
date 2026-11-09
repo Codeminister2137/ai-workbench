@@ -1,4 +1,11 @@
-# AI-first-developer product-gap analysis — 2026-11-04
+# AI-first-developer product-gap analysis — 2026-11-04 (status swept 2026-11-09)
+
+> Status sweep 2026-11-09: G6 RESOLVED (ADR-082 centralized, filters
+> landed), G7 RESOLVED (validator + adversarial secrets/PII + approve
+> flow + UI button all shipped), G8 RESOLVED (spend ledger with
+> reserve-before-dispatch + deny-by-default, grants docs, dashboard
+> panel). G1–G5, G9+ unchecked this sweep — verify
+> before citing; this doc is a point-in-time analysis.
 
 Perspective: a developer who wants to RUN A COMPANY'S DEVELOPMENT through
 ai-workbench (client intake → plan → approve → execute → verify → report →
