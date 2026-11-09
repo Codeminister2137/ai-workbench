@@ -61,6 +61,15 @@ very fresh), Meta Virtual Monitor display hook, Hyper-V + S3
 interplay, MSI services. Wake-armed devices are normal (NIC for
 owner WoL, keyboard, mouse); no OS wake timers.
 
+Driver chase, step 1 (loop10 research): installed AMD 32.0.21045.16010
+= Adrenalin 26.10.1 (Oct 20, 2026); 26.10.2 (Oct 30, store
+32.0.21045.20006) is 10 days newer. No documented sleep fix, but
+update-first is the standard chase order. Hyper-V (launchtype Auto)
+is a known S3-suspend conflict area (0x9F class) — step 2 if the
+update doesn't fix it (temporarily off + reboot, disruptive).
+Meta Virtual Monitor display hook is step 3. Each step needs
+owner approval (reboots). Hibernate stays the fallback.
+
 Mitigation options went to the owner as an inbox decision (loop10):
 hibernate instead of S3 (recommended), pause AI sleep, chase the
 driver, or keep S3 (not recommended).
