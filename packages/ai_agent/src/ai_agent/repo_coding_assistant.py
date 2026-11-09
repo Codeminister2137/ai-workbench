@@ -4100,10 +4100,21 @@ def _run_native_agent(
             request_timeout_seconds=config.timeout_seconds,
             fanout=fanout_policy,
         )
+    # Live owner questions only when a human sits at this terminal. piped /
+    # redirected / unattended runs keep owner_prompt=None so ask_owner fails
+    # closed (file request_owner_task) instead of blocking on stdin.
+    owner_channel = None
+    if sys.stdin.isatty():
+
+        def owner_channel(question: str) -> str:
+            return input(f"\n[agent asks the owner] {question}\nYou> ")
+
     agent = AgentLoop(
         client,
         registry,
-        ToolContext.for_interactive_owner(repo_root, delegation=granted),
+        ToolContext.for_interactive_owner(
+            repo_root, delegation=granted, owner_prompt=owner_channel
+        ),
         permissions=manager,
         max_iterations=args.max_action_rounds,
         deadline=getattr(getattr(args, "fallback_session", None), "deadline", None),

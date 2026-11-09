@@ -180,11 +180,17 @@ class DelegationScope:
         )
 
     def child_registry(self) -> ToolRegistry:
+        # Child depth is self.depth + 1; keep delegate_task while the child
+        # itself may still spawn. ask_owner never passes to children (a sync
+        # owner prompt from a child would hang unattended runs or interrupt
+        # the owner without context). narrow() refuses past-cap spawns.
+        at_cap = self.depth + 1 >= self.max_depth
         return ToolRegistry(
             tuple(
                 _GrantedTool(tool, self)
                 for item in self.registry.list_definitions()
-                if item.name != "delegate_task"
+                if item.name != "ask_owner"
+                and (item.name != "delegate_task" or not at_cap)
                 and (self.tools is None or item.name in self.tools)
                 and (tool := self.registry.get(item.name)) is not None
             )

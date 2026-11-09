@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ai_agent.tools import (
+    AskOwnerTool,
     CreateFileTool,
     EditFileTool,
     FindFilesTool,
@@ -11,6 +12,7 @@ from ai_agent.tools import (
     GitStatusTool,
     GrepSearchTool,
     ListDirTool,
+    OwnerTaskTool,
     PythonNavigateTool,
     PythonRuntimeTool,
     ReadFileTool,
@@ -49,6 +51,8 @@ CODING_PROFILE = SharedToolProfile(
         "rename_preview",
         "rename_apply",
         "delegate_task",
+        "ask_owner",
+        "request_owner_task",
     ),
 )
 
@@ -94,6 +98,8 @@ def shared_tool_registry(
         registry.register(RenamePreviewTool(plans))
         registry.register(RenameApplyTool(plans))
         registry.register(DelegateTaskTool(delegation_runner or unavailable_delegation))
+        registry.register(AskOwnerTool())
+        registry.register(OwnerTaskTool())
     if workspace is not None:
         from ai_agent.ide_bridge import add_ide_tools
 

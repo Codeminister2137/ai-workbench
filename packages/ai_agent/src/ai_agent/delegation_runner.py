@@ -3,9 +3,10 @@
 ``build_child_runner`` adapts a narrowed ``DelegationScope`` to a fresh
 ``AgentLoop``: the child inherits the scope's narrowed registry (as
 granted wrappers), permissions, workspace, fan-out, and the shared
-reply/tool budget, and runs the subtask to a result. Children never
-re-delegate (``child_registry`` drops the delegate tool), so delegation
-is exactly one level deep. Budget exhaustion, iteration limits, and
+reply/tool budget, and runs the subtask to a result. Re-delegation is
+depth-bounded (``child_registry`` keeps the delegate tool while the
+child itself is below ``max_depth``, default 2 levels total).
+Budget exhaustion, iteration limits, and
 provider failures return error results instead of raising, so the
 parent can adapt; a missing host scope refuses outright.
 """
