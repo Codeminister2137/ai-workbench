@@ -27,7 +27,7 @@ CAPTURE_METHODS = {"chatbot", "human", "import"}
 URGENCIES = {"flexible", "dated", "urgent"}
 BUDGET_RANGES = {"<2k", "2-5k", "5-15k", "15k+", "undisclosed"}
 BILLING_MODELS = {"fixed", "time_materials", "retainer", "unsure"}
-LANGUAGES = {"en", "hu", "de", "other"}
+LANGUAGES = {"pl", "en", "other"}
 
 REQUIRED_TOP = {
     "format_version",
@@ -52,6 +52,7 @@ OPTIONAL_TOP = {
     "non_functional",
     "billing_model",
     "preferred_language",
+    "marketing_goals",
 }
 
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -232,7 +233,7 @@ def validate_p7(payload: object, *, raw_bytes: int = 0) -> dict[str, Any]:
             errors.append("timeline deadline is sooner than created_at + 48h")
         if urgency == "urgent" and delta_hours > 90 * 24:
             errors.append("urgent timeline contradicts a >90d deadline")
-    for key, hi in (("tech_constraints", 5), ("non_functional", 5)):
+    for key, hi in (("tech_constraints", 5), ("non_functional", 5), ("marketing_goals", 5)):
         items = payload.get(key, [])
         if (
             not isinstance(items, list)
@@ -264,7 +265,7 @@ def validate_p7(payload: object, *, raw_bytes: int = 0) -> dict[str, Any]:
         phone = contact.get("phone", "")
         if not isinstance(phone, str) or (phone != "" and not E164_RE.match(phone)):
             errors.append("client_contact.phone must be E.164 or empty")
-    language = payload.get("preferred_language", "en")
+    language = payload.get("preferred_language", "pl")
     if language not in LANGUAGES:
         errors.append("preferred_language is not a known language")
     problem = payload.get("problem_statement", "")
@@ -361,6 +362,9 @@ def render_brief(payload: dict) -> str:
         "",
         "## Success criteria",
         *[f"- {item}" for item in payload.get("success_criteria", [])],
+        "",
+        "## Marketing goals",
+        *[f"- {item}" for item in payload.get("marketing_goals", [])],
         "",
         "## Integrations",
         *[
