@@ -211,3 +211,60 @@ def test_meta_client_refuses_local_only_privacy_class(monkeypatch):
                 privacy_class=PrivacyClass.LOCAL_ONLY,
             )
         )
+
+
+def test_meta_reasoning_effort_passthrough(monkeypatch):
+    captured = {}
+
+    def send(request, *, timeout):
+        captured["payload"] = json.loads(request.data.decode())
+        return Response(_completed())
+
+    monkeypatch.setattr("ai_provider.adapters._responses_base.urlopen", send)
+    client = MetaResponsesChatClient(
+        BackendConfig(provider=ProviderKind.META, model="muse-spark-1.3", api_key="k")
+    )
+    client.complete(
+        AIRequest(
+            messages=(AIMessage(MessageRole.USER, "Hi"),),
+            privacy_class=PrivacyClass.EXTERNAL_ALLOWED,
+            max_output_tokens=64,
+            metadata={"meta_reasoning_effort": "low"},
+        )
+    )
+    assert captured["payload"]["reasoning"] == {"effort": "low"}
+
+
+def test_meta_reasoning_effort_absent_by_default(monkeypatch):
+    captured = {}
+
+    def send(request, *, timeout):
+        captured["payload"] = json.loads(request.data.decode())
+        return Response(_completed())
+
+    monkeypatch.setattr("ai_provider.adapters._responses_base.urlopen", send)
+    client = MetaResponsesChatClient(
+        BackendConfig(provider=ProviderKind.META, model="muse-spark-1.3", api_key="k")
+    )
+    client.complete(
+        AIRequest(
+            messages=(AIMessage(MessageRole.USER, "Hi"),),
+            privacy_class=PrivacyClass.EXTERNAL_ALLOWED,
+            max_output_tokens=64,
+        )
+    )
+    assert "reasoning" not in captured["payload"]
+
+
+def test_meta_reasoning_effort_rejects_unknown_level():
+    client = MetaResponsesChatClient(
+        BackendConfig(provider=ProviderKind.META, model="muse-spark-1.3", api_key="k")
+    )
+    with pytest.raises(ProviderError):
+        client.complete(
+            AIRequest(
+                messages=(AIMessage(MessageRole.USER, "Hi"),),
+                privacy_class=PrivacyClass.EXTERNAL_ALLOWED,
+                metadata={"meta_reasoning_effort": "ultra"},
+            )
+        )
