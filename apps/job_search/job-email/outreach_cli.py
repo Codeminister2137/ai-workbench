@@ -1,9 +1,10 @@
 """Reusable terminal review workflow for explicitly addressed recruiter outreach."""
 
 import argparse
+import json
 import os
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from email.utils import parseaddr
 from pathlib import Path
 
@@ -12,6 +13,7 @@ from approval import approve_package
 from models import ApplicationPackage, ApplicationStatus, CandidateProfile, CVVariant, JobVacancy
 from preparation import prepare_application
 from sender import UnapprovedApplicationError, YagmailEmailTransport, deliver_application
+from vendor_sources import default_contact_registry
 
 
 @dataclass(frozen=True)
@@ -32,7 +34,11 @@ class Config:
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("recipients", nargs="+", help="Explicit recipient email addresses")
+    parser.add_argument(
+        "recipients",
+        nargs="*",
+        help="Explicit recipient email addresses (or use --vacancies)",
+    )
     parser.add_argument(
         "--send", action="store_true", help="Ask for approval and send each package"
     )
@@ -46,13 +52,28 @@ def main(argv: Sequence[str] | None = None) -> int:
         default=None,
         help="Explicit CV variant id; unknown ids fail without fallback",
     )
+    parser.add_argument(
+        "--vacancies",
+        default=None,
+        help="JSONL vacancy batch; each line resolves to one recipient",
+    )
+    parser.add_argument(
+        "--max-enriches",
+        type=int,
+        default=25,
+        help="Cap on vendor consults for --vacancies (default 25)",
+    )
     args = parser.parse_args(argv)
+    if not args.recipients and not args.vacancies:
+        parser.error("need recipients or --vacancies")
     return run_outreach(
         _load_config(),
         args.recipients,
         send=args.send,
         message_variant_id=args.message_variant,
         cv_variant_id=args.cv_variant,
+        vacancies_path=args.vacancies,
+        max_enriches=args.max_enriches,
     )
 
 
@@ -63,13 +84,37 @@ def run_outreach(
     send: bool = False,
     message_variant_id: str | None = None,
     cv_variant_id: str | None = None,
+    vacancies_path: str | None = None,
+    max_enriches: int = 25,
 ) -> int:
-    """Review explicit contacts and record only successful guarded deliveries."""
+    """Review explicit contacts and record only successful guarded deliveries.
+
+    ``vacancies_path`` resolves a JSONL vacancy batch to recipients
+    through the contact registry before the same review loop.
+    """
+    jobs: list[JobVacancy] = [
+        JobVacancy(
+            id=f"outreach:{email}",
+            company="",
+            title="Python Developer",
+            location="",
+            contact_email=email,
+            source="manual-outreach",
+        )
+        for email in recipients
+    ]
+    if vacancies_path:
+        try:
+            jobs.extend(_resolve_vacancy_file(vacancies_path, max_enriches))
+        except OSError as exc:
+            print(f"Cannot read vacancies file {vacancies_path}: {exc}")
+            return 1
     sent_emails = _load_sent_emails(config.SENT_FILE)
     seen = set(sent_emails)
     profile = _candidate_profile(config)
     failed = False
-    for email in recipients:
+    for job in jobs:
+        email = job.contact_email or ""
         if parseaddr(email)[1] != email or "@" not in email or any(c.isspace() for c in email):
             print(f"Invalid recipient: {email!r}")
             failed = True
@@ -81,14 +126,7 @@ def run_outreach(
         try:
             package = prepare_application(
                 profile,
-                JobVacancy(
-                    id=f"outreach:{email}",
-                    company="",
-                    title="Python Developer",
-                    location="",
-                    contact_email=email,
-                    source="manual-outreach",
-                ),
+                job,
                 message_variant_id=message_variant_id,
                 cv_variant_id=cv_variant_id,
             )
@@ -153,6 +191,65 @@ def run_outreach(
             return 1
         print(f"Sent to {email}")
     return int(failed)
+
+
+def _resolve_vacancy_file(path: str, max_enriches: int) -> list[JobVacancy]:
+    """Resolve a JSONL vacancy batch to recipient vacancies.
+
+    Each line needs ``id`` and ``company``; optional ``title``,
+    ``location``, ``contact_email``, ``recruiter_name``, ``source``.
+    Resolution goes through the default registry (manual first, then
+    ready vendors); vendor consults stop at ``max_enriches``. Every
+    vacancy is reported: queued, unresolved, malformed, or skipped
+    on budget.
+    """
+    lines = Path(path).read_text(encoding="utf-8").splitlines()
+    registry = default_contact_registry()
+    queued: list[JobVacancy] = []
+    spent = 0
+    total = queued_count = unresolved = malformed = skipped_budget = 0
+    for lineno, line in enumerate(lines, start=1):
+        if not line.strip():
+            continue
+        total += 1
+        try:
+            raw = json.loads(line)
+        except ValueError:
+            malformed += 1
+            print(f"vacancies:{lineno}: malformed JSON; skipped.")
+            continue
+        if not isinstance(raw, dict) or not raw.get("id") or not raw.get("company"):
+            malformed += 1
+            print(f"vacancies:{lineno}: needs 'id' and 'company'; skipped.")
+            continue
+        if spent >= max_enriches:
+            skipped_budget += 1
+            continue
+        vacancy = JobVacancy(
+            id=str(raw["id"]),
+            company=str(raw["company"]),
+            title=str(raw.get("title") or "Python Developer"),
+            location=str(raw.get("location") or ""),
+            contact_email=str(raw.get("contact_email") or "") or None,
+            source=str(raw.get("source") or "vacancies-file"),
+            recruiter_name=str(raw.get("recruiter_name") or "") or None,
+        )
+        proposal, tried = registry.resolve_trace(vacancy)
+        spent += sum(1 for name in tried if name != "manual")
+        if proposal is None:
+            unresolved += 1
+            print(f"vac:{vacancy.id}: unresolved (tried: {', '.join(tried)}).")
+            continue
+        queued_count += 1
+        via = "manual (free)" if proposal.source.startswith("manual:") else proposal.source
+        print(f"vac:{vacancy.id} -> {proposal.email} (via {via}).")
+        queued.append(replace(vacancy, contact_email=proposal.email))
+    print(
+        f"vacancies: {total} total, {queued_count} queued, {unresolved} unresolved, "
+        f"{malformed} malformed, {skipped_budget} skipped on budget, "
+        f"{spent}/{max_enriches} vendor consults."
+    )
+    return queued
 
 
 def _load_config() -> Config:

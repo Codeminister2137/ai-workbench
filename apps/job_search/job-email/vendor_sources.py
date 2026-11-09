@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from contacts import ContactProposal, is_generic_inbox
+from contacts import ContactProposal, ContactRegistry, ManualContactSource, is_generic_inbox
 from models import JobVacancy
 
 FREEMAIL_DOMAINS = frozenset(
@@ -228,3 +228,20 @@ class ProspeoContactSource(_VendorSourceBase):
             generic_inbox=is_generic_inbox(email),
             evidence=("prospeo:enrich-person", f"verified:{str(verified).lower()}"),
         )
+
+
+def default_contact_registry() -> ContactRegistry:
+    """Manual first (free, already-known), then ready vendors in order.
+
+    Dormant vendors (no key) are skipped; ``registry.source_names``
+    shows what is active. Apollo stays dormant until its 403 clears.
+    """
+    sources = [ManualContactSource()]
+    for cls in (ProspeoContactSource, ApolloContactSource):
+        try:
+            source = cls()
+        except Exception:
+            continue
+        if source.ready:
+            sources.append(source)
+    return ContactRegistry(sources)
