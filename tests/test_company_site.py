@@ -94,3 +94,24 @@ def test_form_script_has_diacritics_and_budgets() -> None:
     assert "krótki tytuł" in script
     assert "Budżet i podsumowanie" in script
     assert "10–30k" in script  # grounding §9 PLN buckets
+
+
+def test_pricing_copy_matches_intake_buckets() -> None:
+    """FAQ ladder mirrors the form.js buckets; quotes stay confidential by default."""
+    script = (ROOT / "form.js").read_text(encoding="utf-8")
+    assert "10\u201330k" in script and "30\u201380k" in script  # PLN buckets, grounding \u00a79
+    pl = (ROOT / "index.html").read_text(encoding="utf-8")
+    for needle in [
+        "10 tys. z\u0142",
+        "10\u201330 tys. z\u0142",
+        "30\u201380 tys. z\u0142",
+        "nie publikujemy cennika",
+    ]:
+        assert needle in pl, needle
+    en = (ROOT / "en" / "index.html").read_text(encoding="utf-8")
+    for needle in ["\u20ac2k", "\u20ac2\u20135k", "\u20ac5\u201315k", "no price list"]:
+        assert needle in en, needle
+    pl_terms = (ROOT / "uslugi.html").read_text(encoding="utf-8")
+    assert "poufna z zasady" in pl_terms
+    en_terms = (ROOT / "en" / "services.html").read_text(encoding="utf-8")
+    assert "confidential by default" in en_terms
