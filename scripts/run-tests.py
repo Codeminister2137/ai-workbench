@@ -148,6 +148,7 @@ GROUPS = {
         "tests/test_wake_self_test.py",
         "tests/test_company_site.py",
         "tests/test_invoice_draft.py",
+        "tests/test_document_status.py",
     ),
     "research": (
         "tests/test_research_*.py",
