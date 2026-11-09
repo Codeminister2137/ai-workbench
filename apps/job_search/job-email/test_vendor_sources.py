@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import urllib.error
+from email.message import Message
 from typing import Any
 
 import pytest
@@ -120,7 +121,7 @@ def test_missing_key_leaves_source_dormant(monkeypatch) -> None:
 
 def test_post_json_reports_http_status(monkeypatch) -> None:
     def forbidden(*args, **kwargs):
-        raise urllib.error.HTTPError("https://api.apollo.io/x", 403, "Forbidden", {}, None)
+        raise urllib.error.HTTPError("https://api.apollo.io/x", 403, "Forbidden", Message(), None)
 
     monkeypatch.setattr(vendor_sources.urllib.request, "urlopen", forbidden)
     with pytest.raises(VendorError, match="returned HTTP 403"):
