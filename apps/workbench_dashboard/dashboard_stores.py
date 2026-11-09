@@ -314,15 +314,38 @@ class DashboardStores:
         self.ideas.put(record["id"], record)
         return record
 
-    def set_idea_status(self, item_id: str, *, status: str, decision: str | None = None) -> dict:
-        """Move one idea through triage; the record stays as the audit trail."""
+    def set_idea_status(
+        self,
+        item_id: str,
+        *,
+        status: str,
+        decision: str | None = None,
+        plan_id: str | None = None,
+    ) -> dict:
+        """Move one idea through triage; the record stays as the audit trail.
+
+        ``plan_id`` optionally links the idea to backlog work; it must
+        reference an existing plan. A linked idea influences the backlog;
+        an unlinked archived idea is archive-only.
+        """
         record = self.ideas.get(item_id)
         if record is None:
             raise StoreError("Idea not found")
         if status not in IDEA_STATUSES:
             raise StoreError(f"Idea status must be one of {IDEA_STATUSES}")
+        if plan_id is not None:
+            plan_id = plan_id.strip()
+            if not plan_id or len(plan_id) > 80:
+                raise StoreError("Idea plan link must be 1-80 characters")
+            try:
+                exists = self.plans.get(plan_id)
+            except StoreError:
+                raise StoreError("Idea plan link must reference an existing plan") from None
+            if exists is None:
+                raise StoreError("Idea plan link must reference an existing plan")
         record["status"] = status
         record["decision"] = (decision or "").strip() or None
+        record["plan_id"] = plan_id
         record["reviewed_at"] = _utc_now()
         self.ideas.put(item_id, record)
         return record

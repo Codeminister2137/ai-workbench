@@ -931,10 +931,12 @@ async function renderIdeas(id) {
       <p class="muted">${esc(item.source)}${item.contact ? " · " + esc(item.contact) : ""} · ${esc(item.status)}</p>
       <p class="inbox-body">${gtext(item.body || "")}</p>
       ${item.decision ? `<p><strong>Decision:</strong> ${esc(item.decision)}</p>` : ""}
+      ${item.plan_id ? `<p><a href="#/plans/${esc(item.plan_id)}" title="Linked backlog plan">Linked plan: ${esc(item.plan_id)}</a></p>` : ""}
       ${item.status === "new" ? `<p><button id="mark-seen-btn" title="Mark this idea seen (moves it out of new)">Mark seen</button></p>` : ""}
       <form id="review-form" class="inline">
         <select name="status" title="Triage status">${opts}</select>
         <input type="text" name="decision" placeholder="Decision note..." title="Decision note (optional)" value="${esc(item.decision || "")}">
+        <input type="text" name="plan" placeholder="Plan id (optional)..." title="Link a backlog plan id (optional)" value="${esc(item.plan_id || "")}">
         <button type="submit" title="Save triage status and note">Save triage</button>
       </form></div>`;
     document.getElementById("review-form").addEventListener("submit", async (ev) => {
@@ -943,7 +945,7 @@ async function renderIdeas(id) {
         await api("/api/ideas/" + encodeURIComponent(id) + "/review", {
           method: "POST",
           headers: {"Content-Type": "application/json"},
-          body: JSON.stringify({status: ev.target.status.value, decision: ev.target.decision.value}),
+          body: JSON.stringify({status: ev.target.status.value, decision: ev.target.decision.value, plan_id: ev.target.plan.value || null}),
         });
         toast("Triage saved", true);
         render();
@@ -958,14 +960,21 @@ async function renderIdeas(id) {
     });
     return;
   }
+  const ideasTab = new URLSearchParams((location.hash.split("?")[1] || "")).get("status") || "active";
   const payload = await api("/api/ideas");
-  const items = payload.items.length
-    ? payload.items.map((t) =>
+  const archivedIdeas = ["adopted", "parked", "declined"];
+  const shownIdeas = payload.items.filter((t) => ideasTab === "archive" ? archivedIdeas.includes(t.status) : !archivedIdeas.includes(t.status));
+  const backlogMark = (t) => t.plan_id
+    ? ` <a href="#/plans/${esc(t.plan_id)}" title="Linked backlog plan">→ plan</a>`
+    : (ideasTab === "archive" ? ` <span class="muted" title="No backlog link">archive-only</span>` : "");
+  const items = shownIdeas.length
+    ? shownIdeas.map((t) =>
         `<li><a href="#/ideas/${esc(t.id)}">${gtext(t.title)}</a>
          <span class="muted">${esc(t.source)} · ${esc((t.created_at || "").slice(0, 10))}</span>
-         <span class="pill st-${esc((t.status || "none").replace(/\s+/g, "-"))}">${esc(t.status)}</span></li>`).join("")
+         <span class="pill st-${esc((t.status || "none").replace(/\s+/g, "-"))}">${esc(t.status)}</span>${backlogMark(t)}</li>`).join("")
     : '<li class="muted">No ideas captured yet — use + New.</li>';
   view.innerHTML = `<h1>Ideas</h1>
+    <p><a href="#/ideas">Active</a> · <a href="#/ideas?status=archive">Archive</a></p>
     <p class="muted">Capture inbox for brain-dumps and third-party wishes. Triage in planning sessions.</p>
     <p><input type="text" id="filter-ideas" placeholder="Filter ideas..." title="Filter ideas by text"></p>
     <ul class="plain" id="ideas-list">${items}</ul>`;
@@ -993,18 +1002,22 @@ async function renderDocuments(id) {
       <p class="muted">${esc(item.root)} · ${esc(item.sensitivity)} · ${esc((item.modified_utc || "").slice(0, 10))} · ${item.size} bytes</p>
       ${(item.tags || []).length ? `<p>${item.tags.map((t) => `<span class="pill">${esc(t)}</span>`).join(" ")}</p>` : ""}
       ${item.project ? `<p><strong>Project:</strong> ${esc(item.project)}</p>` : ""}
+      ${item.archived ? `<p><span class="pill" title="Archived document">archived</span></p>` : ""}
       ${body}</div>`;
     return;
   }
+  const docsTab = new URLSearchParams((location.hash.split("?")[1] || "")).get("status") || "active";
   const payload = await api("/api/documents");
-  const items = payload.documents.length
-    ? payload.documents.map((d) =>
+  const shownDocs = payload.documents.filter((d) => docsTab === "archive" ? d.archived : !d.archived);
+  const items = shownDocs.length
+    ? shownDocs.map((d) =>
         `<li><a href="#/documents/${encodeURIComponent(d.id)}">${esc(d.title)}</a>
          <span class="muted">${esc(d.root)} · ${esc((d.modified_utc || "").slice(0, 10))}</span>
          <span class="pill st-${esc(d.sensitivity)}">${esc(d.sensitivity)}</span>
          ${d.project ? `<span class="pill" title="Linked project">${esc(d.project)}</span>` : ""}</li>`).join("")
     : '<li class="muted">No documents yet.</li>';
   view.innerHTML = `<h1>Documents</h1>
+    <p><a href="#/documents">Active</a> · <a href="#/documents?status=archive">Archive</a></p>
     <p class="muted">Company knowledge: public library, private research, and existing plans. Private files never leave this PC.</p>
     <p><input type="text" id="filter-documents" placeholder="Filter documents..." title="Filter documents by text"></p>
     <ul class="plain" id="documents-list">${items}</ul>`;

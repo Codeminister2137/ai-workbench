@@ -1162,10 +1162,15 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
     def _review_idea(self, item_id: str, payload: dict) -> None:
         status = payload.get("status", "")
         decision = payload.get("decision", "")
+        plan_id = payload.get("plan_id")
         if not isinstance(status, str) or not isinstance(decision, str):
             return self._send_json({"ok": False, "error": "Invalid review payload"}, status=400)
+        if plan_id is not None and not isinstance(plan_id, str):
+            return self._send_json({"ok": False, "error": "plan_id must be a string"}, status=400)
         try:
-            record = self._stores().set_idea_status(item_id, status=status, decision=decision)
+            record = self._stores().set_idea_status(
+                item_id, status=status, decision=decision, plan_id=plan_id
+            )
         except StoreError as exc:
             code = 404 if "not found" in str(exc).lower() else 400
             return self._send_json({"ok": False, "error": str(exc)}, status=code)

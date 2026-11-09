@@ -77,7 +77,7 @@ def test_dynamic_inputs_and_selects_have_titles() -> None:
     """Text inputs/selects in templates have titles (radios use labels)."""
     js = _read("app.js")
     inputs = [tag for tag in re.findall(r"<input\b[^>]*>", js) if 'type="radio"' not in tag]
-    assert len(inputs) == 14  # +rename/create-form inputs, +5 list filters
+    assert len(inputs) == 15  # +rename/create-form inputs, +5 list filters, +idea plan link
     for tag in inputs:
         assert "title=" in tag, f"input without title: {tag}"
     selects = re.findall(r"<select\b[^>]*>", js)
@@ -415,6 +415,26 @@ def test_document_preview_renders_markdown() -> None:
     assert ".doc-body" in css
     assert "pre-wrap" in css
     assert "overflow-wrap" in css
+
+
+def test_ideas_archive_tab_and_backlog_markers() -> None:
+    """Ideas list has Active/Archive tabs; archive shows plan links or archive-only."""
+    js = _read("app.js")
+    assert '<a href="#/ideas">Active</a>' in js
+    assert '<a href="#/ideas?status=archive">Archive</a>' in js
+    assert '["adopted", "parked", "declined"]' in js
+    assert "archive-only" in js
+    assert 'name="plan"' in js
+    assert "plan_id: ev.target.plan.value || null" in js
+
+
+def test_documents_archive_tab_and_pill() -> None:
+    """Documents list has Active/Archive tabs on the archived flag."""
+    js = _read("app.js")
+    assert '<a href="#/documents">Active</a>' in js
+    assert '<a href="#/documents?status=archive">Archive</a>' in js
+    assert "d.archived" in js
+    assert ">archived</span>" in js
 
 
 def test_md_renderer_cases() -> None:

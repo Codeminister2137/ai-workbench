@@ -87,6 +87,20 @@ def test_idea_create_validates_source_and_title(stores) -> None:
         stores.set_idea_status("missing", status="adopted")
 
 
+def test_idea_plan_link_marks_backlog_influence(stores) -> None:
+    """Adopted ideas link a plan; missing plans are refused."""
+    stores.plans.put("plan-1", {"id": "plan-1", "title": "First", "status": "active"})
+    idea = stores.create_idea(title="t", body="b", source="owner")
+    linked = stores.set_idea_status(idea["id"], status="adopted", plan_id="plan-1")
+    assert linked["plan_id"] == "plan-1"
+    cleared = stores.set_idea_status(idea["id"], status="adopted")
+    assert cleared["plan_id"] is None
+    with pytest.raises(StoreError, match="existing plan"):
+        stores.set_idea_status(idea["id"], status="adopted", plan_id="ghost")
+    with pytest.raises(StoreError, match="existing plan"):
+        stores.set_idea_status(idea["id"], status="adopted", plan_id="../evil")
+
+
 def test_answer_and_note_are_independent(stores) -> None:
     record = stores.create_inbox_task(
         title="Pick one",

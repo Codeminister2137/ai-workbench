@@ -46,6 +46,19 @@ def test_lists_all_roots_newest_first(library_roots) -> None:
     assert by_id["library/plain.md"]["title"] == "plain"
 
 
+def test_archived_flag_flows_to_entries(library_roots) -> None:
+    """Front-matter archived:true marks archive-tab documents."""
+    public = library_roots / "docs" / "library"
+    (public / "old.md").write_text(
+        "---\ntitle: Old\narchived: true\n---\nStale.\n", encoding="utf-8"
+    )
+    docs = DocumentLibrary(library_roots).list_documents()
+    by_id = {doc["id"]: doc for doc in docs}
+    assert by_id["library/old.md"]["archived"] is True
+    assert by_id["library/hello.md"]["archived"] is False
+    assert by_id["library/plain.md"]["archived"] is False
+
+
 def test_missing_roots_scan_empty(tmp_path) -> None:
     assert DocumentLibrary(tmp_path / "empty").list_documents() == []
 
