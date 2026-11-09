@@ -30,7 +30,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
-from ai_agent.run_reports import render_run_report
+from ai_agent.run_reports import render_run_report, render_shareable_report
 from ai_agent.run_tracking import (
     TERMINAL_RUN_STATUSES,
     append_run_event,
@@ -364,6 +364,7 @@ class RunDrain:
                 },
             )
         run.setdefault("report", render_run_report(run))
+        run.setdefault("shareable_report", render_shareable_report(run))
         append_run_event(run, "run_finished", {"status": status})
         self._publish(path, claim, run)
         self._notify_terminal(run, status)
