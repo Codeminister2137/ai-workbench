@@ -307,3 +307,57 @@ def test_summarize_truncated_is_an_error():
     client = _FakeClient("", finish="length")
     with pytest.raises(digest.DigestError, match="summary-truncated"):
         digest.summarize_digest([{"subject": "s", "snippet": "b"}], client=client)
+
+
+def test_read_manual_items_from_markdown(tmp_path):
+    manual = tmp_path / "digest-manual"
+    manual.mkdir()
+    (manual / "ad.md").write_text(
+        "# Cool new linter\nInvestigate whether it fits our gate.\n", encoding="utf-8"
+    )
+    (manual / "empty.md").write_text("\n\n", encoding="utf-8")
+    (manual / "skip.txt").write_text("not markdown", encoding="utf-8")
+    items = digest.read_manual_items(manual)
+    assert items == [
+        {
+            "subject": "Cool new linter",
+            "snippet": "Investigate whether it fits our gate.",
+            "source": "manual",
+        }
+    ]
+    assert digest.read_manual_items(tmp_path / "missing") == []
+
+
+def test_fetch_accepts_imap_query(fake_imap):
+    seen = {}
+    orig_search = FakeIMAP4.search
+
+    def spy_search(self, charset, *criteria):
+        seen["criteria"] = criteria
+        return orig_search(self, charset, *criteria)
+
+    FakeIMAP4.search = spy_search
+    try:
+        fake_imap.mailbox = [_plain_raw()]
+        digest.fetch_latest(5, '(FROM "news@example.com")')
+    finally:
+        FakeIMAP4.search = orig_search
+    assert seen["criteria"] == ('(FROM "news@example.com")',)
+
+
+def test_summarize_with_proposals_includes_manual_and_section():
+    client = _FakeClient("ok")
+    result = digest.summarize_with_proposals(
+        [{"subject": "s", "snippet": "b"}],
+        [{"subject": "Ad", "snippet": "look at this"}],
+        client=client,
+    )
+    assert result["summary"] == "ok"
+    (request,) = client.requests
+    system = request.messages[0].content
+    user = request.messages[1].content
+    assert "Worth trying" in system
+    assert "Manually added by the owner:" in user
+    assert "Ad | look at this" in user
+    with pytest.raises(digest.DigestError, match="empty-digest"):
+        digest.summarize_with_proposals([], [], client=_FakeClient())

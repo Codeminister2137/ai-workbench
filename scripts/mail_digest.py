@@ -157,9 +157,10 @@ def extract_message(raw: bytes) -> dict:
     }
 
 
-def fetch_latest(count: int) -> list[dict]:
-    """Fetch the latest ``count`` INBOX mails, newest first.
+def fetch_latest(count: int, query: str = "ALL") -> list[dict]:
+    """Fetch the latest ``count`` INBOX mails matching ``query``, newest first.
 
+    ``query`` is a raw IMAP SEARCH criteria string, e.g. ``'(FROM "news@example.com")'``.
     Raises :class:`DigestError` with a coarse reason on any failure.
     """
     config = read_gmail_config()
@@ -175,7 +176,7 @@ def fetch_latest(count: int) -> list[dict]:
         typ, _ = client.select("INBOX", readonly=True)
         if typ != "OK":
             raise DigestError("mailbox")
-        typ, data = client.search(None, "ALL")
+        typ, data = client.search(None, query)
         if typ != "OK" or not data or not data[0]:
             return []
         nums = data[0].split()
@@ -194,6 +195,34 @@ def fetch_latest(count: int) -> list[dict]:
     finally:
         with contextlib.suppress(Exception):
             client.logout()
+
+
+MANUAL_SNIPPET_LEN = 500
+MAX_MANUAL_ITEMS = 20
+
+
+def read_manual_items(manual_dir: Path) -> list[dict]:
+    """Read owner-added ``*.md`` items (title line + note) for the digest.
+
+    Missing directory reads as empty. Each file becomes one digest item
+    with ``source: "manual"``; the first non-empty line (``# ``-stripped)
+    is the subject, the rest is the note.
+    """
+    if not manual_dir.is_dir():
+        return []
+    items = []
+    for path in sorted(manual_dir.glob("*.md"))[:MAX_MANUAL_ITEMS]:
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        lines = [line.strip() for line in text.splitlines() if line.strip()]
+        if not lines:
+            continue
+        subject = lines[0].removeprefix("# ").strip() or path.stem
+        note = re.sub(r"\s+", " ", " ".join(lines[1:])).strip()[:MANUAL_SNIPPET_LEN]
+        items.append({"subject": subject, "snippet": note, "source": "manual"})
+    return items
 
 
 def _meta_api_key() -> str | None:
@@ -234,7 +263,16 @@ def summarize_digest(messages: list, *, client=None) -> dict:
     lines = []
     for item in messages:
         lines.append(f"- {item.get('subject', '')} | {item.get('snippet', '')}")
-    body = "\n".join(lines)
+    return _complete_summary(
+        "Summarize these mail items as short bullets: what each needs, "
+        "if anything. Skip newsletters and noise in one line.",
+        "\n".join(lines),
+        client,
+    )
+
+
+def _complete_summary(system_text: str, body: str, client=None) -> dict:
+    """Run one summary completion with shared caps/usage accounting."""
     if len(body) > MAX_SUMMARY_CHARS:
         raise DigestError("digest-too-large")
     sys.path.insert(0, str(HERE.parent / "packages" / "ai_provider" / "src"))
@@ -248,11 +286,7 @@ def summarize_digest(messages: list, *, client=None) -> dict:
     actor = client or _summary_client()
     request = AIRequest(
         messages=(
-            AIMessage(
-                MessageRole.SYSTEM,
-                "Summarize these mail items as short bullets: what each needs, "
-                "if anything. Skip newsletters and noise in one line.",
-            ),
+            AIMessage(MessageRole.SYSTEM, system_text),
             AIMessage(MessageRole.USER, body),
         ),
         model=SUMMARY_MODEL,
@@ -282,11 +316,33 @@ def summarize_digest(messages: list, *, client=None) -> dict:
     }
 
 
+def summarize_with_proposals(messages: list, manual: list, *, client=None) -> dict:
+    """Summarize mail plus manual adds, ending with product/dev proposals.
+
+    ``manual`` items carry ``{"subject", "snippet"}`` (see
+    :func:`read_manual_items`). At least one mail or manual item is required.
+    """
+    if not messages and not manual:
+        raise DigestError("empty-digest")
+    lines = [f"- {item.get('subject', '')} | {item.get('snippet', '')}" for item in messages]
+    if manual:
+        lines.append("Manually added by the owner:")
+        lines.extend(f"- {item.get('subject', '')} | {item.get('snippet', '')}" for item in manual)
+    return _complete_summary(
+        "Summarize these items as short bullets: what each needs, if anything. "
+        "Then add a 'Worth trying' section with concrete proposals for our "
+        "software products or development workflow drawn from the items.",
+        "\n".join(lines),
+        client,
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--probe", action="store_true", help="verify IMAP SSL login")
     group.add_argument("--fetch", type=int, metavar="N", help="fetch latest N INBOX mails")
+    parser.add_argument("--query", default="ALL", help="IMAP SEARCH criteria for --fetch")
     group.add_argument(
         "--summarize", type=Path, metavar="DIGEST", help="summarize a digest JSON via hosted model"
     )
@@ -315,7 +371,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.out is None:
         parser.error("--fetch requires --out <json>")
     try:
-        messages = fetch_latest(args.fetch)
+        messages = fetch_latest(args.fetch, args.query)
     except DigestError as error:
         print(f"FETCH_FAIL {error.reason}")
         return 1
