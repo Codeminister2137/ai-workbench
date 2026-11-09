@@ -10,14 +10,17 @@
 # and fires on the Tcpip 4266 event itself.
 #
 # Incident record: <repo>/.tmp/msi-watchdog/incidents.log (gitignored).
-# Scheduled task 'MsiUdpWatchdog' runs this every 5 minutes, elevated.
-# Disable: Unregister-ScheduledTask -TaskName MsiUdpWatchdog -Confirm:$false
+# Scheduled task 'MsiUdpWatchdog' runs this daily (morning), elevated.
+# Game guard: disruptive action is deferred while a game process runs.
+# Disable: schtasks /change /tn MsiUdpWatchdog /disable
 
 $ErrorActionPreference = 'Continue'
 $THRESHOLD = 2000
 $WATCH = 500
 $SERVICE = 'MSI_Center_Service'
 $PROCESS = 'MSI.CentralServer'
+# Game guard: skip disruptive action while any of these run (extend freely).
+$GAME_PROCESSES = @('deadlock')
 $repo = 'C:\Users\Jakub\PycharmProjects\ai-workbench'
 $dir = Join-Path $repo '.tmp\msi-watchdog'
 New-Item -ItemType Directory -Force -Path $dir | Out-Null
@@ -35,6 +38,15 @@ function Get-MsiUdpCount {
         $top += ("{0}={1}" -f $name, $group.Count)
     }
     return @{ msi = $msi; total = $total; top = ($top -join ', ') }
+}
+
+function Test-GameRunning {
+    try {
+        $running = @(Get-Process -ErrorAction Stop | Where-Object { $GAME_PROCESSES -contains $_.ProcessName })
+        return ($running.Count -gt 0), (($running | Select-Object -ExpandProperty ProcessName) -join ',')
+    } catch {
+        return $false, ''
+    }
 }
 
 $stamp = (Get-Date).ToString('o')
@@ -59,24 +71,40 @@ if ($snap.msi -le $THRESHOLD) {
 }
 
 $before = $snap.msi
+$gaming, $games = Test-GameRunning
+if ($gaming) {
+    $line = "$stamp DEFERRED (game running: $games): msi udp=$before; retry at next run"
+    $line | Out-File -FilePath $log -Append -Encoding utf8
+    Write-Output $line
+    exit 0
+}
 $action = ''
 try {
     Restart-Service -Name $SERVICE -Force -ErrorAction Stop
     $action = "restarted service $SERVICE"
 } catch {
-    $action = "service restart failed ($($_.Exception.Message)); killing $PROCESS"
-    try {
-        Get-Process -Name $PROCESS -ErrorAction Stop | Stop-Process -Force
-        $action += ' (kill sent)'
-    } catch {
-        $action += ' (kill failed: ' + $_.Exception.Message + ')'
-    }
+    $action = "service restart failed ($($_.Exception.Message))"
 }
 Start-Sleep -Seconds 10
 try {
     $after = (Get-MsiUdpCount).msi
 } catch {
     $after = -1
+}
+if ($after -ge 0 -and $after -ge $before) {
+    # Restart did not free ports: they belong to MSI.CentralServer itself.
+    try {
+        Get-Process -Name $PROCESS -ErrorAction Stop | Stop-Process -Force
+        $action += "; restart ineffective, killed $PROCESS"
+    } catch {
+        $action += '; restart ineffective, kill failed: ' + $_.Exception.Message
+    }
+    Start-Sleep -Seconds 10
+    try {
+        $after = (Get-MsiUdpCount).msi
+    } catch {
+        $after = -1
+    }
 }
 $line = "$stamp LEAK ACTION: msi udp before=$before; $action; msi udp after=$after"
 $line | Out-File -FilePath $log -Append -Encoding utf8
