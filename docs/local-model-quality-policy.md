@@ -55,7 +55,8 @@ effort behavior, 24-task dual-arm eval: local 13/24, grant 12/24).
   NOT honored (Ollama 0.32.5, generate and chat APIs).
 - Consequences: route long structured outputs AWAY from
   gpt-oss:20b; prefer qwen2.5-coder:14b (non-thinker) for
-  deterministic local work. The LENGTH→TruncatedOutputError
+  deterministic local work — confirmed same task in 547 tokens
+  (6.4× cheaper than gpt-oss's 3530). The LENGTH→TruncatedOutputError
   guard fires correctly on empty-on-length — that is its job,
   not an adapter bug. No per-model multiplier change on one
   sample; re-probe before tuning.
