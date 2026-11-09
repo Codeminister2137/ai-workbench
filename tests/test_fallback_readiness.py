@@ -63,9 +63,18 @@ def test_offline_report_preserves_approval_exclusions_without_side_effects(
 
 
 def test_list_skills_reports_offline_discovery_and_prerequisites(monkeypatch, tmp_path, capsys):
+    names = [
+        "review-repo-change",
+        "git-safety",
+        "durable-test-collateral",
+        "python-env",
+        "taste",
+    ]
+    for name in names:
+        skill = tmp_path / f"skills/{name}/SKILL.md"
+        skill.parent.mkdir(parents=True)
+        skill.write_text(f"---\nname: {name}\ndescription: x\n---\nBody.")
     skill = tmp_path / "skills/review-repo-change/SKILL.md"
-    skill.parent.mkdir(parents=True)
-    skill.write_text("---\nname: review-repo-change\ndescription: review\n---\nRead the diff.")
     monkeypatch.setattr("ai_agent.skills.shutil.which", lambda executable: "git")
     monkeypatch.setattr("urllib.request.urlopen", lambda *args, **kwargs: pytest.fail("network"))
     assert (
@@ -75,6 +84,8 @@ def test_list_skills_reports_offline_discovery_and_prerequisites(monkeypatch, tm
                 str(tmp_path),
                 "--skill-dir",
                 str(skill.parents[1]),
+                "--shared-tools",
+                "coding",
                 "--list-skills",
             ]
         )
@@ -82,17 +93,24 @@ def test_list_skills_reports_offline_discovery_and_prerequisites(monkeypatch, tm
     )
     report = json.loads(capsys.readouterr().out)
     assert report["status"] == "ready"
-    assert report["shared_tool_profile"] == "inspection"
+    assert report["shared_tool_profile"] == "coding"
     assert report["execution"].startswith("offline;")
-    assert report["skills"] == [
-        {
-            "name": "review-repo-change",
-            "available": True,
-            "source": str(skill.relative_to(tmp_path)),
-            "required_tools": ["find_files", "git_diff", "git_status", "grep_search", "read_file"],
-            "reason": None,
-        }
+    by_name = {row["name"]: row for row in report["skills"]}
+    assert by_name["review-repo-change"] == {
+        "name": "review-repo-change",
+        "available": True,
+        "source": str(skill.relative_to(tmp_path)),
+        "required_tools": ["find_files", "git_diff", "git_status", "grep_search", "read_file"],
+        "reason": None,
+    }
+    assert sorted(by_name) == [
+        "durable-test-collateral",
+        "git-safety",
+        "python-env",
+        "review-repo-change",
+        "taste",
     ]
+    assert all(row["available"] for row in by_name.values())
 
 
 def test_list_skills_reports_unavailable_prerequisites(tmp_path, capsys, monkeypatch):
@@ -114,7 +132,8 @@ def test_list_skills_reports_unavailable_prerequisites(tmp_path, capsys, monkeyp
     )
     report = json.loads(capsys.readouterr().out)
     assert report["status"] == "blocked"
-    assert "requires an installed Git executable" in report["skills"][0]["reason"]
+    by_name = {row["name"]: row for row in report["skills"]}
+    assert "requires an installed Git executable" in by_name["review-repo-change"]["reason"]
 
 
 def test_compatible_offline_routes_do_not_claim_authenticated_or_connected(
