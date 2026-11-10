@@ -34,6 +34,7 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/logging-artifact-inventory.md | KNOWLEDGE | Artifact inventory. |
 | docs/mail-digest.md | KNOWLEDGE | Mail digest reference. |
 | docs/muse-code-workbench-parity.md | KNOWLEDGE | Parity verdict (kept). |
+| docs/overlap-analysis-20261110.md | KNOWLEDGE | Measured package graph (read-only); AGENTS.md diagram contradiction noted. |
 | docs/parallel-pilot-20261101.md | KNOWLEDGE | Two-worker pilot record. |
 | docs/pivot-20261106-redundancy-automation.md | ACTED | Both briefs closed (11878f14, 98ea222c). |
 | docs/power-loss-20261108.md | KNOWLEDGE | Read-only shutdown findings. |
@@ -69,7 +70,9 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/plans/company-backlog-20261102.md | ACTED | R1/R2/R3/E/J all produced. |
 | docs/plans/company-name-r2-draft.md | KNOWLEDGE | PL legality orientation; name eval superseded by R3/R4. |
 | docs/plans/company-naming-r3.md | ACTED | Fed R4 (Bench verdict revised there). |
-| docs/plans/company-naming-r4.md | PENDING | Owner picks D1/D2, then clearance. |
+| docs/plans/company-naming-r4.md | ACTED | Fed R5 (owner D2 answered there). |
+| docs/plans/company-naming-r5.md | ACTED | Owner verdict recorded in R6 (none good enough). |
+| docs/plans/company-naming-r6.md | PENDING | Founder research delivered; panel round (R7) + decision open. |
 | docs/plans/company-offering-draft.md | PENDING | Proposal with open questions; pricing partly re-anchored by grounding §2. |
 | docs/plans/deferred-baseline-work-20261022.md | PENDING | Bounded offline backlog; item 1 ties to in-progress conformance plan. |
 | docs/plans/deliberation-pack-20261110.md | PENDING | Tomorrow's decisions D1-D9. |
@@ -99,6 +102,7 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/plans/p7-discovery-checklist.md | KNOWLEDGE | On-site discovery tool v1. |
 | docs/plans/p7-grounding-20261109.md | KNOWLEDGE | Pricing/positioning ground truth §§1-9. |
 | docs/plans/p7-knowledge-bank.md | KNOWLEDGE | Chatbot can/cannot bank. |
+| docs/plans/p7-paperwork-checklist.md | PENDING | OPEN checklist; phases filed as backlog, owner/accountant steps pending. |
 | docs/plans/p7-project-file-format-proposal.md | PENDING | Proposed; owner review (overlaps D5). |
 | docs/plans/p8-templates-scouting.md | KNOWLEDGE | Greenfield note, correctly ordered after P7. |
 | docs/plans/product-roadmap-20261031.md | KNOWLEDGE | P1-P9 direction; schedule section stale (hackathon windows passed). |
