@@ -83,6 +83,7 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/plans/local-model-quality-policy.md | IGNORE | Superseded by docs/local-model-quality-policy.md v1. |
 | docs/plans/local-model-queue.md | ACTED | Q1-Q4 all consumed into quality-policy v1. |
 | docs/plans/loop-20261102-evening.md | ACTED | Consumed run plan. |
+| docs/plans/mai-dashboard-wiring-plan.md | TRIAGE | Wiring execution plan; awaits verdict-A. |
 | docs/plans/marketing-r3-draft.md | PENDING | Compliance boundary binding; pilot proposal unapproved. |
 | docs/plans/merge-inventory-20261105.md | ACTED | Nov-5 merge DONE. |
 | docs/plans/model-capability-data-plan.md | KNOWLEDGE | Program reference; L1/L2 live per roadmap, L3 ladder pending. |
