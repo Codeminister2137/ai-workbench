@@ -238,15 +238,29 @@ class DashboardStores:
         self.inbox.put(item_id, record)
         return record
 
-    def close_inbox_task(self, item_id: str, *, resolution: str | None = None) -> dict:
-        """Close one inbox task; it stays in the audit trail."""
+    def close_inbox_task(
+        self,
+        item_id: str,
+        *,
+        resolution: str | None = None,
+        resolution_kind: str = "final",
+    ) -> dict:
+        """Close one inbox task; it stays in the audit trail.
+
+        ``resolution_kind`` is "final" (answered/decided/implemented) or
+        "followup" (closed with no final answer: elaboration, investigation
+        or deferral still pending). Follow-up closes stay out of the archive.
+        """
         record = self.inbox.get(item_id)
         if record is None:
             raise StoreError("Inbox task not found")
         if resolution is None or not resolution.strip():
             raise StoreError("Closing needs a resolution note")
+        if resolution_kind not in ("final", "followup"):
+            raise StoreError("Unknown resolution kind")
         resolution = resolution.strip()
         record["resolution"] = resolution
+        record["resolution_kind"] = resolution_kind
         record["resolved_at"] = _utc_now()
         record["status"] = "closed"
         self.inbox.put(item_id, record)

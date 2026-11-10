@@ -828,7 +828,7 @@ async function renderInbox(id) {
       : '<p class="muted">No answer recorded yet.</p>';
     view.innerHTML = `<h1>Inbox task</h1><p><a href="#/inbox">All tasks</a></p>
       <div class="card"><h2>${gtext(item.title)}</h2>
-      <p class="muted">${esc(item.type)} · ${esc(item.status)} · from ${esc(item.created_by || "")} · opened ${stamp(item.created_at)}</p>
+      <p class="muted">${esc(item.type)} · ${esc(item.status)}${(item.resolution_kind || "final") !== "final" ? " · needs follow-up" : ""} · from ${esc(item.created_by || "")} · opened ${stamp(item.created_at)}</p>
       <h3>Request</h3>
       <p class="inbox-body">${gtext(item.body || "")}</p>
       ${item.type === "task" ? '<p class="muted">Do the steps above, then answer Done with a note. Never paste secrets here — put keys in .env / User env.</p>' : ""}
@@ -850,6 +850,7 @@ async function renderInbox(id) {
       </form>
       <h3>Actions</h3>
       <form id="close-form">
+        <div><select name="resolution_kind" title="Final outcome, or closed pending follow-up"><option value="final">Final outcome \u2014 archive</option><option value="followup">No final answer \u2014 needs follow-up</option></select></div>
         <div><textarea name="resolution" rows="3" placeholder="Outcome note (required) — what was implemented, with technical details..." title="Implementation outcome, stored with the archived task"></textarea></div>
         <p><button type="submit" title="Record the outcome and archive this task">Close with outcome</button></p>
       </form>`}</div>`;
@@ -879,9 +880,9 @@ async function renderInbox(id) {
         await api("/api/inbox/" + encodeURIComponent(id) + "/close", {
           method: "POST",
           headers: {"Content-Type": "application/json"},
-          body: JSON.stringify({resolution: ev.target.resolution.value}),
+          body: JSON.stringify({resolution: ev.target.resolution.value, resolution_kind: ev.target.resolution_kind.value}),
         });
-        toast("Outcome recorded, task archived", true);
+        toast(ev.target.resolution_kind.value === "followup" ? "Marked for follow-up, kept in Active" : "Outcome recorded, task archived", true);
         render();
       } catch (err) {
         toast(err.message, false);
@@ -906,11 +907,12 @@ async function renderInbox(id) {
   const tab = new URLSearchParams((location.hash.split("?")[1] || "")).get("status") || "active";
   const inboxUrl = inboxProjectFilter ? "/api/inbox?project_id=" + encodeURIComponent(inboxProjectFilter) : "/api/inbox";
   const payload = await api(inboxUrl);
-  const shown = payload.items.filter((t) => tab === "archive" ? t.status === "closed" : tab === "queue" ? (t.assignee === "agent" && t.status === "open") : t.status !== "closed");
+  const isFollowup = (t) => (t.resolution_kind || "final") !== "final";
+  const shown = payload.items.filter((t) => tab === "archive" ? (t.status === "closed" && !isFollowup(t)) : tab === "queue" ? (t.assignee === "agent" && t.status === "open") : (t.status !== "closed" || isFollowup(t)));
   const items = shown.length
     ? shown.map((t) =>
         `<li><a href="#/inbox/${esc(t.id)}">${gtext(t.title)}</a>
-         <span class="pill st-${esc((t.status || "none").replace(/\s+/g, "-"))}">${esc(t.type)} · ${esc(t.status)}${t.assignee === "agent" ? " · for AI" : ""}</span></li>`).join("")
+         <span class="pill st-${esc((t.status || "none").replace(/\s+/g, "-"))}">${esc(t.type)} · ${esc(t.status)}${t.assignee === "agent" ? " · for AI" : ""}${isFollowup(t) ? " · needs follow-up" : ""}</span></li>`).join("")
     : '<li class="muted">Nothing here. The supervisor assigns decisions and tasks to the inbox.</li>';
   view.innerHTML = `<h1>Inbox</h1>
     <p><a href="#/inbox">Active</a> · <a href="#/inbox?status=queue">AI queue</a> · <a href="#/inbox?status=archive">Archive</a></p>
