@@ -67,3 +67,41 @@ def test_build_brief_assembles_contact_and_fit() -> None:
     assert "Anna" in brief.opener
     with pytest.raises(ValueError, match="name and domain"):
         build_brief(_lead(name=" "), OFFER, author_name="Jan K")
+
+
+def test_size_band_mapping() -> None:
+    from client_search import size_band_from_count, size_band_from_range
+
+    assert size_band_from_range("51-200") == "smb"
+    assert size_band_from_range("1001-5000") == "enterprise"
+    assert size_band_from_range("10000+") == "enterprise"
+    assert size_band_from_range(None) == ""
+    assert size_band_from_range("lots") == ""
+    assert size_band_from_count(1) == "solo"
+    assert size_band_from_count(8) == "micro"
+    assert size_band_from_count(500) == "mid"
+    assert size_band_from_count(0) == ""
+    assert size_band_from_count(None) == ""
+
+
+def test_company_lead_from_prospeo() -> None:
+    from types import SimpleNamespace
+
+    from client_search import company_lead_from_prospeo, fit_score
+
+    company = SimpleNamespace(
+        name="Acme Metal",
+        domain="acme.example.pl",
+        industry="produkcja",
+        employee_range="51-200",
+        employee_count=120,
+        keywords=("faktury",),
+        description="Metal parts maker.",
+    )
+    lead = company_lead_from_prospeo(company)
+    assert lead.source == "prospeo:search-company"
+    assert lead.size_band == "smb"
+    assert "faktury" in lead.notes
+    assert fit_score(lead, OFFER).score == 100
+    with pytest.raises(ValueError, match="name and domain"):
+        company_lead_from_prospeo(SimpleNamespace(name="", domain=""))

@@ -49,6 +49,7 @@ FREEMAIL_DOMAINS = frozenset(
 
 APOLLO_MATCH_URL = "https://api.apollo.io/api/v1/people/match"
 PROSPEO_ENRICH_URL = "https://api.prospeo.io/enrich-person"
+PROSPEO_SEARCH_COMPANY_URL = "https://api.prospeo.io/search-company"
 TIMEOUT_SECONDS = 30
 
 
@@ -237,6 +238,122 @@ class ProspeoContactSource(_VendorSourceBase):
             generic_inbox=is_generic_inbox(email),
             evidence=("prospeo:enrich-person", f"verified:{str(verified).lower()}"),
         )
+
+
+@dataclass(frozen=True, slots=True)
+class ProspeoCompany:
+    """One company row from Prospeo search (any field may be null upstream)."""
+
+    company_id: str | None
+    name: str
+    domain: str | None
+    industry: str | None
+    employee_count: int | None
+    employee_range: str | None
+    hq_country: str | None
+    hq_city: str | None
+    keywords: tuple[str, ...]
+    description: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class ProspeoCompanyPage:
+    """One 25-row search page with pagination totals."""
+
+    companies: tuple[ProspeoCompany, ...]
+    current_page: int
+    total_pages: int
+    total_count: int
+    served_free_dedup: bool
+
+
+def _prospeo_company_from_raw(raw: Any) -> ProspeoCompany | None:
+    if not isinstance(raw, dict):
+        return None
+    company = raw.get("company", raw)
+    if not isinstance(company, dict):
+        return None
+    name = company.get("name") or ""
+    if not isinstance(name, str) or not name.strip():
+        return None
+    location = company.get("location")
+    location = location if isinstance(location, dict) else {}
+    keywords = company.get("keywords")
+    keywords = (
+        tuple(k for k in keywords if isinstance(k, str)) if isinstance(keywords, list) else ()
+    )
+    description = (
+        company.get("description_ai")
+        or company.get("description")
+        or company.get("description_seo")
+    )
+    count = company.get("employee_count")
+    return ProspeoCompany(
+        company_id=company.get("company_id")
+        if isinstance(company.get("company_id"), str)
+        else None,
+        name=name.strip(),
+        domain=company.get("domain") if isinstance(company.get("domain"), str) else None,
+        industry=company.get("industry") if isinstance(company.get("industry"), str) else None,
+        employee_count=count if isinstance(count, int) else None,
+        employee_range=company.get("employee_range")
+        if isinstance(company.get("employee_range"), str)
+        else None,
+        hq_country=location.get("country") if isinstance(location.get("country"), str) else None,
+        hq_city=location.get("city") if isinstance(location.get("city"), str) else None,
+        keywords=keywords,
+        description=description if isinstance(description, str) else None,
+    )
+
+
+def search_prospeo_companies(
+    *,
+    api_key: str,
+    filters: dict[str, Any],
+    page: int = 1,
+    timeout: float = TIMEOUT_SECONDS,
+    post: PostTransport = _post_json,
+) -> ProspeoCompanyPage:
+    """Run one Prospeo company-search page (1 credit per non-empty page).
+
+    ``filters`` must carry at least one positive filter (the API rejects
+    exclude-only searches). Raises VendorError on transport, protocol, or
+    vendor errors; never logs the key.
+    """
+    if not api_key:
+        raise VendorError("Prospeo search needs an API key")
+    if not isinstance(filters, dict) or not filters:
+        raise VendorError("Prospeo search needs at least one filter")
+    if not isinstance(page, int) or page < 1:
+        raise VendorError("Prospeo search page must be >= 1")
+    decoded = post(
+        PROSPEO_SEARCH_COMPANY_URL,
+        {"X-KEY": api_key},
+        {"filters": filters, "page": page},
+        timeout,
+    )
+    if decoded.get("error") is True:
+        code = decoded.get("error_code", "unknown")
+        raise VendorError(f"Prospeo search failed: {code}")
+    rows = decoded.get("companies", [])
+    if not isinstance(rows, list):
+        raise VendorError("Prospeo search returned a non-list")
+    companies = tuple(
+        parsed for raw in rows if (parsed := _prospeo_company_from_raw(raw)) is not None
+    )
+    return ProspeoCompanyPage(
+        companies=companies,
+        current_page=decoded.get("current_page", page)
+        if isinstance(decoded.get("current_page"), int)
+        else page,
+        total_pages=decoded.get("total_page", 0)
+        if isinstance(decoded.get("total_page"), int)
+        else 0,
+        total_count=decoded.get("total_count", 0)
+        if isinstance(decoded.get("total_count"), int)
+        else 0,
+        served_free_dedup=decoded.get("free") is True,
+    )
 
 
 def default_contact_registry() -> ContactRegistry:

@@ -101,6 +101,55 @@ def draft_opener(
     )
 
 
+def size_band_from_range(employee_range: str | None) -> str:
+    """Map a Prospeo 'A-B'/'A+' range onto our size bands ('' when unknown)."""
+    if not employee_range or not isinstance(employee_range, str):
+        return ""
+    head = employee_range.strip().split("-", 1)[0].rstrip("+").strip()
+    if not head.isdigit():
+        return ""
+    return size_band_from_count(int(head))
+
+
+def size_band_from_count(count: int | None) -> str:
+    """Map a headcount onto solo/micro/smb/mid/enterprise ('' when unknown)."""
+    if not isinstance(count, int) or count < 1:
+        return ""
+    if count == 1:
+        return "solo"
+    if count <= 10:
+        return "micro"
+    if count <= 200:
+        return "smb"
+    if count <= 1000:
+        return "mid"
+    return "enterprise"
+
+
+def company_lead_from_prospeo(company: object) -> CompanyLead:
+    """Map a ProspeoCompany (duck-typed) onto a CompanyLead for scoring."""
+    name = str(getattr(company, "name", "") or "").strip()
+    domain = str(getattr(company, "domain", "") or "").strip()
+    if not name or not domain:
+        raise ValueError("Prospeo company needs a name and domain")
+    industry = str(getattr(company, "industry", "") or "").strip()
+    size = size_band_from_range(getattr(company, "employee_range", None))
+    if not size:
+        size = size_band_from_count(getattr(company, "employee_count", None))
+    keywords = getattr(company, "keywords", ()) or ()
+    bits = [str(getattr(company, "description", "") or "").strip()]
+    bits.extend(str(k).strip() for k in keywords if str(k).strip())
+    notes = "; ".join(bit for bit in bits if bit)
+    return CompanyLead(
+        name=name,
+        domain=domain,
+        sector=industry,
+        size_band=size,
+        notes=notes,
+        source="prospeo:search-company",
+    )
+
+
 def build_brief(
     lead: CompanyLead,
     offer: OfferProfile,
