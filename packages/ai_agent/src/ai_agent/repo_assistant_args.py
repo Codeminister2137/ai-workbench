@@ -22,6 +22,7 @@ from ai_agent.fanout import FanoutPolicy
 from ai_agent.permissions import ApprovalPolicyPreset
 
 DEFAULT_DELEGATION_CONTEXT_BUDGET_CHARS = 6_000
+DEFAULT_LOOP_CONTEXT_BUDGET_CHARS = 100_000
 DEFAULT_CHAT_HISTORY_BUDGET_CHARS = 12_000
 DEFAULT_CHAT_RECENT_MESSAGE_COUNT = 8
 DEFAULT_VALIDATION_COMMAND = "python -m pytest -q"
@@ -719,6 +720,17 @@ def build_argument_parser() -> argparse.ArgumentParser:
         type=int,
         default=25,
         help="Maximum provider/action follow-up rounds when --apply-actions is set.",
+    )
+    parser.add_argument(
+        "--loop-context-budget-chars",
+        action=UserDefaultAction,
+        type=int,
+        default=DEFAULT_LOOP_CONTEXT_BUDGET_CHARS,
+        help=(
+            "Loop transcript budget in characters; older turns compact into a "
+            "summary past it (system instructions stay verbatim). "
+            "Use 0 to disable compaction and refuse on overflow instead."
+        ),
     )
     parser.add_argument(
         "--command-timeout-seconds",

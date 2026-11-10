@@ -4170,6 +4170,11 @@ def _run_native_agent(
         ),
         permissions=manager,
         max_iterations=args.max_action_rounds,
+        loop_context_budget_chars=(
+            None
+            if getattr(args, "loop_context_budget_chars", 0) == 0
+            else getattr(args, "loop_context_budget_chars", None)
+        ),
         deadline=getattr(getattr(args, "fallback_session", None), "deadline", None),
         diagnostic=progress_callback,
         completion_requirements=completion_requirements,
