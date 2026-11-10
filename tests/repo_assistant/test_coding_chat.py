@@ -385,7 +385,9 @@ def test_saved_chat_retains_host_fallback_routes_across_turns_and_restart(
         return first_returncode if first else 0
 
     run_coding_chat(
-        arguments(tmp_path, "--coding-session-db", str(database)), build_argument_parser(), execute
+        arguments(tmp_path, "--coding-session-db", str(database), "--privacy", "local_only"),
+        build_argument_parser(),
+        execute,
     )
     restarted = CodingChatController(
         SQLiteChatTranscriptStore(database), sessions[0], tmp_path, "local_only"
@@ -1120,6 +1122,8 @@ def test_actual_coding_chat_uses_real_tools_and_requires_fresh_approval(tmp_path
             "ollama",
             "--model",
             "gpt-oss:20b",
+            "--privacy",
+            "local_only",
             "--skip-prompt-review",
             "--approval-policy",
             "interactive",

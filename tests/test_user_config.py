@@ -266,6 +266,30 @@ def test_shared_inspection_retains_read_only_despite_configured_authority(
         )
         == 0
     )
+    out = capsys.readouterr().out
+    assert "approval_policy: read_only" in out
+    assert "external_agent_sandbox: read-only" in out
+
+
+def test_shared_inspection_native_path_stays_read_only(tmp_path, monkeypatch, capsys):
+    from ai_agent import repo_coding_assistant as cli
+
+    config_file(tmp_path, 'approval_policy = "trusted_local"')
+    assert (
+        cli.main(
+            [
+                "--repo-root",
+                str(tmp_path),
+                "--shared-tools",
+                "inspection",
+                "--skip-prompt-review",
+                "--privacy",
+                "local_only",
+                "Inspect",
+            ]
+        )
+        == 0
+    )
     assert "provider_native_approval_policy: read_only" in capsys.readouterr().out
 
 

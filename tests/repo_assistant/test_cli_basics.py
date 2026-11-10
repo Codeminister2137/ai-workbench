@@ -480,10 +480,10 @@ def test_dev_floor_respects_explicit_config_and_other_modes() -> None:
     assert override.quality == "standard"
 
     configured = _parse_dev_args("--mode", "implement")
-    configured.quality = "low"
+    configured.quality = "standard"
     configured._configured_user_defaults = frozenset({"quality"})
     _configure_dev_quality_floor(configured, ["task", "--mode", "implement"])
-    assert configured.quality == "low"
+    assert configured.quality == "high"
 
 
 def test_implement_fails_closed_before_inference_without_explicit_quality(tmp_path, capsys) -> None:
@@ -501,6 +501,8 @@ def test_implement_fails_closed_before_inference_without_explicit_quality(tmp_pa
             "task",
             "--mode",
             "plan",
+            "--privacy",
+            "local_only",
             "--repo-root",
             str(tmp_path),
             "--catalog",
@@ -516,6 +518,8 @@ def test_implement_fails_closed_before_inference_without_explicit_quality(tmp_pa
             "--mode",
             "implement",
             "--execute",
+            "--privacy",
+            "local_only",
             "--repo-root",
             str(tmp_path),
             "--catalog",

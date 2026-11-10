@@ -309,7 +309,7 @@ def build_argument_parser() -> argparse.ArgumentParser:
         "--privacy",
         action=UserDefaultAction,
         choices=[item.value for item in OrchestratorPrivacyClass],
-        default=OrchestratorPrivacyClass.LOCAL_ONLY.value,
+        default=OrchestratorPrivacyClass.EXTERNAL_ALLOWED.value,
         help="Privacy class for the request.",
     )
     parser.add_argument(
