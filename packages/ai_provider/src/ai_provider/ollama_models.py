@@ -109,6 +109,28 @@ class OllamaPullLogStatus:
     installed_model: LocalOllamaModel | None = None
 
 
+def _list_models_from_endpoint(
+    endpoint: str,
+    error_message: str,
+    parse: Callable[[dict[str, Any]], Any],
+    base_url: str | None = None,
+    *,
+    timeout_seconds: float = 10.0,
+    start_ollama: bool = False,
+) -> tuple[Any, ...]:
+    if start_ollama:
+        ensure_ollama_server(base_url)
+    payload = _request_json(
+        "GET",
+        f"{_base_url(base_url)}{endpoint}",
+        timeout_seconds=timeout_seconds,
+    )
+    raw_models = payload.get("models", [])
+    if not isinstance(raw_models, list):
+        raise _unexpected_response(error_message, payload)
+    return tuple(parse(item) for item in raw_models if isinstance(item, dict))
+
+
 def list_local_ollama_models(
     base_url: str | None = None,
     *,
@@ -116,19 +138,14 @@ def list_local_ollama_models(
     start_ollama: bool = False,
 ) -> tuple[LocalOllamaModel, ...]:
     """Return models currently installed in the local Ollama library."""
-
-    if start_ollama:
-        ensure_ollama_server(base_url)
-    payload = _request_json(
-        "GET",
-        f"{_base_url(base_url)}/api/tags",
+    return _list_models_from_endpoint(
+        "/api/tags",
+        "Ollama model list did not include a models array.",
+        _local_model_from_raw,
+        base_url,
         timeout_seconds=timeout_seconds,
+        start_ollama=start_ollama,
     )
-    raw_models = payload.get("models", [])
-    if not isinstance(raw_models, list):
-        raise _unexpected_response("Ollama model list did not include a models array.", payload)
-
-    return tuple(_local_model_from_raw(item) for item in raw_models if isinstance(item, dict))
 
 
 def list_running_ollama_models(
@@ -138,21 +155,14 @@ def list_running_ollama_models(
     start_ollama: bool = False,
 ) -> tuple[RunningOllamaModel, ...]:
     """Return models currently loaded by the local Ollama runtime."""
-
-    if start_ollama:
-        ensure_ollama_server(base_url)
-    payload = _request_json(
-        "GET",
-        f"{_base_url(base_url)}/api/ps",
+    return _list_models_from_endpoint(
+        "/api/ps",
+        "Ollama running model list did not include a models array.",
+        _running_model_from_raw,
+        base_url,
         timeout_seconds=timeout_seconds,
+        start_ollama=start_ollama,
     )
-    raw_models = payload.get("models", [])
-    if not isinstance(raw_models, list):
-        raise _unexpected_response(
-            "Ollama running model list did not include a models array.", payload
-        )
-
-    return tuple(_running_model_from_raw(item) for item in raw_models if isinstance(item, dict))
 
 
 def summarize_ollama_pull_logs(
