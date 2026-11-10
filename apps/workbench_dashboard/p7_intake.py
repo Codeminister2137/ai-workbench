@@ -25,7 +25,12 @@ FORMAT_VERSION = "1.0.0"
 DELIVERABLE_TYPES = {"website", "web_app", "landing_page", "ecommerce", "other"}
 CAPTURE_METHODS = {"chatbot", "human", "import"}
 URGENCIES = {"flexible", "dated", "urgent"}
-BUDGET_RANGES = {"<2k", "2-5k", "5-15k", "15k+", "undisclosed"}
+# Currency sets mirror company-site/form.js exactly (EUR uses hyphen ranges,
+# PLN uses en-dash ranges). The validator accepts the union; each site form
+# only offers its own set. Grounding §9.
+BUDGET_RANGES_EUR = {"<2k", "2-5k", "5-15k", "15k+", "undisclosed"}
+BUDGET_RANGES_PLN = {"<10k", "10–30k", "30–80k", "80k+", "undisclosed"}
+BUDGET_RANGES = BUDGET_RANGES_EUR | BUDGET_RANGES_PLN
 BILLING_MODELS = {"fixed", "time_materials", "retainer", "unsure"}
 LANGUAGES = {"pl", "en", "other"}
 

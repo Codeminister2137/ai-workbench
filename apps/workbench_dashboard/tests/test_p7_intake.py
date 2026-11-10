@@ -117,6 +117,16 @@ def test_q4_q7_language_and_marketing_goals() -> None:
     assert validate_p7(_brief(marketing_goals="rank"))["valid"] is False
 
 
+def test_q2_pln_and_eur_buckets() -> None:
+    """D5: §9 PLN buckets validate; EUR buckets keep working."""
+    for bucket in ("<10k", "10–30k", "30–80k", "80k+", "undisclosed"):
+        assert validate_p7(_brief(budget_range=bucket, preferred_language="pl"))["valid"] is True
+    for bucket in ("<2k", "2-5k", "5-15k", "15k+"):
+        assert validate_p7(_brief(budget_range=bucket, preferred_language="en"))["valid"] is True
+    assert validate_p7(_brief(budget_range="10-30k"))["valid"] is False  # hyphen, not en-dash
+    assert validate_p7(_brief(budget_range="1M"))["valid"] is False
+
+
 def test_warnings_not_rejections() -> None:
     vague = _brief(success_criteria=["Everything feels nice and smooth"])
     verdict = validate_p7(vague)
