@@ -115,6 +115,7 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/plans/unattended-work-plan.md | ACTED | Loop11 plan; superseded by tonight's work. |
 | docs/plans/weekly-digest-design.md | ACTED | Digest 2.0 shipped (loop10). |
 | docs/plans/workbench-remote-development-integration-20261027.md | ACTED | Decided 2026-10-27 (C now, B target, A rejected). |
+| docs/plans/workflow-builder-exploration.md | TRIAGE | Exploration note; adoption decision open. |
 | docs/plans/00_MASTER_CHECKLIST_AI_Job_Search_IT_Business.docx | IGNORE | Superseded working copy; archival format only. |
 | docs/plans/01_AI_Provider_Agnostic_Infrastructure_Plan.docx | IGNORE | Superseded working copy; archival format only. |
 | docs/plans/02_AI_Council_Project_Plan.docx | IGNORE | Superseded working copy; archival format only. |
