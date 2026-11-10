@@ -596,6 +596,22 @@ def _print_cli_closeout(
                 inference_observation=observed_inference(),
             )
         )
+    from ai_agent.groundedness import check_groundedness
+
+    verdict = check_groundedness(
+        response_text or "",
+        tuple(getattr(args, "_groundedness_tool_results", ()) or ()),
+    )
+    if not verdict.supported and not verdict.unsupported:
+        print("groundedness: no_claims")
+    elif verdict.ok:
+        print(f"groundedness: ok claims={len(verdict.supported)}")
+    else:
+        print(
+            "groundedness: unsupported="
+            + ",".join(sorted({claim.claim_class for claim in verdict.unsupported}))
+            + f" claims={len(verdict.supported) + len(verdict.unsupported)}"
+        )
     print(
         format_cli_closeout(
             response_text=response_text,
@@ -4170,6 +4186,7 @@ def _run_native_agent(
         ),
         permissions=manager,
         max_iterations=args.max_action_rounds,
+        require_grounded_reports=True,
         loop_context_budget_chars=(
             None
             if getattr(args, "loop_context_budget_chars", 0) == 0
@@ -4265,6 +4282,7 @@ def _run_native_agent(
         )
         error.partial_messages = result.messages
         raise error
+    args._groundedness_tool_results = result.tool_results
     return result
 
 

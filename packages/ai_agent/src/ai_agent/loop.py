@@ -30,6 +30,7 @@ from ai_provider.closeout import safe_diagnostic_label
 from ai_agent.chat_context import messages_total_chars
 from ai_agent.completion import CompletionRequirement, missing_requirements
 from ai_agent.contracts import ToolCall, ToolResult
+from ai_agent.groundedness import check_groundedness
 from ai_agent.model_output_recovery import ModelOutputRecovery
 from ai_agent.permissions import PermissionManager
 from ai_agent.tools.base import ToolContext, ToolRegistry
@@ -101,6 +102,7 @@ class AgentLoop:
         loop_context_budget_chars: int | None = None,
         compaction_tail_messages: int = 8,
         max_compactions: int = 3,
+        require_grounded_reports: bool = False,
     ) -> None:
         if max_iterations < 1:
             raise ValueError("max_iterations must be at least 1")
@@ -127,6 +129,7 @@ class AgentLoop:
         self.loop_context_budget_chars = loop_context_budget_chars
         self.compaction_tail_messages = compaction_tail_messages
         self.max_compactions = max_compactions
+        self.require_grounded_reports = require_grounded_reports
         self._tool_schema_chars: int | None = None
         self._pending: dict[str, ToolCall] = {}
         if (
@@ -515,6 +518,56 @@ class AgentLoop:
                                 "effects and observations remain above; do not replay them. "
                                 "The original task, permissions and remaining allowance "
                                 "still apply; this feedback grants no new actions or time.",
+                            )
+                        )
+                        continue
+                if (
+                    self.require_grounded_reports
+                    and response.finish_reason not in {FinishReason.LENGTH, FinishReason.ERROR}
+                    and response.message.content.strip()
+                ):
+                    verdict = check_groundedness(response.message.content, tuple(tool_results))
+                    if verdict.unsupported:
+                        completion_failures += 1
+                        classes = sorted({claim.claim_class for claim in verdict.unsupported})
+                        key = (("groundedness", *classes), recovery.observed_state())
+                        self._check_deadline(messages)
+                        incomplete_states[key] += 1
+                        allowed = iteration < self.max_iterations and incomplete_states[key] < 2
+                        if self.diagnostic:
+                            self.diagnostic("groundedness_check: unsupported=" + ",".join(classes))
+                            self.diagnostic(
+                                f"groundedness_recovery: errors={completion_failures} "
+                                f"action={'feedback' if allowed else 'stop'}"
+                            )
+                        if not allowed:
+                            error = ProviderError(
+                                "Report claims verification without observed tool "
+                                "evidence: "
+                                + ",".join(classes)
+                                + ". The same blocker recurred without observed "
+                                "progress, or the original turn allowance ended. "
+                                "Inspect earlier effects and continue only "
+                                "unfinished work in a new turn.",
+                                category=ProviderErrorCategory.NON_RETRYABLE,
+                                provider=self.client.backend.provider,
+                            )
+                            error.partial_messages = tuple(messages)
+                            raise error
+                        messages.append(
+                            AIMessage(
+                                MessageRole.USER,
+                                "Host groundedness feedback: the preceding report "
+                                "claims completed verification ("
+                                + ",".join(classes)
+                                + ") but no supporting tool evidence was observed "
+                                "in this run. Perform the checks with authorized "
+                                "tools and then author a corrected factual final "
+                                "report, or downgrade the report to an explicitly "
+                                "unverified summary with no verification claims. "
+                                "Earlier tool effects remain above; do not replay "
+                                "them. The original task, permissions and "
+                                "remaining allowance still apply.",
                             )
                         )
                         continue
