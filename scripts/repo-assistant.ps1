@@ -84,5 +84,10 @@ Set-Location -LiteralPath $repoRoot
 
 $effectiveCliArgs = Add-DefaultLogFile -Args $CliArgs -RepoRoot $repoRoot
 
+# Native stderr (uv build progress) must not trip $ErrorActionPreference='Stop'.
+$previousErrorActionPreference = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
 & python -m uv run ai-assistant @effectiveCliArgs
-exit $LASTEXITCODE
+$assistantExitCode = $LASTEXITCODE
+$ErrorActionPreference = $previousErrorActionPreference
+exit $assistantExitCode

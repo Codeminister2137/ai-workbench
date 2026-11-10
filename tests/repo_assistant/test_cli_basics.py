@@ -103,6 +103,10 @@ def test_repo_assistant_script_uses_stable_package_entrypoint() -> None:
     assert '"--ollama-log-file"' in text
     assert '--codex-login"' in text
     assert '--codex-login-device"' in text
+    assert "$previousErrorActionPreference = $ErrorActionPreference" in text
+    assert '$ErrorActionPreference = "Continue"' in text
+    assert "$assistantExitCode = $LASTEXITCODE" in text
+    assert "exit $assistantExitCode" in text
 
 
 def test_broad_analysis_script_keeps_canonical_manual_workflow() -> None:
