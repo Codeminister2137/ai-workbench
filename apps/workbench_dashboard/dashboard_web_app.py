@@ -697,6 +697,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             if path.startswith("/api/inbox/") and path.endswith("/reopen"):
                 item_id = path[len("/api/inbox/") : -len("/reopen")]
                 return self._reopen_inbox_task(item_id)
+            if path == "/api/inbox/bridge-runs":
+                return self._bridge_inbox_runs()
             if path.startswith("/api/plans/") and path.endswith("/approve"):
                 plan_id = path[len("/api/plans/") : -len("/approve")]
                 return self._decide_plan(plan_id, payload)
@@ -1321,6 +1323,15 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             return self._send_json({"ok": False, "error": str(exc)}, status=400)
         self._send_json({"ok": True, "toggles": describe_toggles(toggles)})
 
+    def _bridge_inbox_runs(self) -> None:
+        from inbox_bridge import bridge_agent_queue
+
+        try:
+            receipts = bridge_agent_queue(self._stores())
+        except Exception as exc:  # noqa: BLE001 - report, never 500 blindly
+            return self._send_json({"ok": False, "error": str(exc)}, status=500)
+        self._send_json({"ok": True, "bridged": receipts})
+
     def _propose_task(self, payload: dict) -> None:
         """File free text as an approval-gated scheduled-task proposal."""
         text = payload.get("text", "")
@@ -1780,6 +1791,15 @@ def maybe_start_drain_scheduler(config_path: Path, data_dir: Path) -> DrainSched
     stores = DashboardStores(data_dir)
 
     def tick() -> None:
+        from inbox_bridge import bridge_agent_queue
+
+        try:
+            bridged = bridge_agent_queue(stores)
+        except Exception as exc:  # noqa: BLE001 - tick failures are never fatal
+            print(f"Workbench dashboard: inbox bridge failed: {exc}")
+            bridged = []
+        if bridged:
+            print(f"Workbench dashboard: bridged {len(bridged)} inbox tasks to runs")
         drain = build_run_drain(config, data_dir, REPO_ROOT, stores)
         outcomes = drain.drain(max_runs=SCHEDULER_DRAIN_MAX_RUNS)
         print(f"Workbench dashboard: scheduled drain: {outcomes}")
