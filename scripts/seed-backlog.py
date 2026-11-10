@@ -67,6 +67,42 @@ SEEDS: tuple[tuple[str, str, str, str], ...] = (
         "agent",
         "docs/plans/job-search-execution-plan.md",
     ),
+    (
+        "P7 paperwork: CEIDG registration guide-pack",
+        "Field-by-field CEIDG notes (firma = name + extras), NIP/REGON, VAT decision links. Owner files; agent prepares the pack.",
+        "agent",
+        "docs/plans/p7-paperwork-checklist.md",
+    ),
+    (
+        "P7 paperwork: bank + invoice-tool comparison",
+        "Compare JDG-friendly business accounts and KSeF-ready invoice tools for phase 2.",
+        "agent",
+        "docs/plans/p7-paperwork-checklist.md",
+    ),
+    (
+        "P7 paperwork: SOW/NDA/contract/discovery/invoice templates",
+        "Draft the five phase-3 templates for owner approval (orientation only, not legal advice).",
+        "agent",
+        "docs/plans/p7-paperwork-checklist.md",
+    ),
+    (
+        "P7 paperwork: OC + RODO starter pack",
+        "Liability-insurance pointers + site privacy notice, processing register, DPA template.",
+        "agent",
+        "docs/plans/p7-paperwork-checklist.md",
+    ),
+    (
+        "P7 paperwork: ZUS/tax calendar entries",
+        "Turn the D6 primer into dated calendar/schedule entries (ulga, preferential, KSeF, PIT).",
+        "agent",
+        "docs/plans/p7-paperwork-checklist.md",
+    ),
+    (
+        "P7 paperwork: company-name gate",
+        "Block print/merch/site-brand-final until the R5 pick + registry clearance land.",
+        "agent",
+        "docs/plans/p7-paperwork-checklist.md",
+    ),
 )
 
 
