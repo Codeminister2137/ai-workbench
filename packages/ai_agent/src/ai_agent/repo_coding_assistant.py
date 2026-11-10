@@ -380,6 +380,8 @@ from ai_agent.validation import (
 )
 
 _TIMEOUT_OPTION_NAMES = ("--timeout-seconds",)
+_QUALITY_OPTION_NAMES = ("--quality",)
+_DEV_QUALITY_MODES = ("implement", "coding-chat")
 
 
 def _capability_report(snapshot: Any) -> dict[str, Any]:
@@ -443,6 +445,31 @@ def _configure_away_mode(
     )
     if not timeout_selected and not _argv_has_option(argv, _TIMEOUT_OPTION_NAMES):
         args.timeout_seconds = args.away_minutes * 60
+
+
+def _configure_dev_quality_floor(
+    args: argparse.Namespace,
+    argv: Sequence[str] | None,
+) -> None:
+    """Default development modes to HIGH quality unless explicitly configured.
+
+    Pilot 2026-11-10 (gpt-oss:20b review): a STANDARD local route presented
+    unverified claims as verified fact. Development work must auto-route to
+    better models instead of silently settling on local ones. Explicit
+    --quality, a user-config quality default, or an explicit route/model
+    choice (deliberate local testing) keeps working unchanged.
+    """
+
+    if args.mode not in _DEV_QUALITY_MODES:
+        return
+    if args.route_id or args.provider or args.model or args.access_method:
+        return
+    quality_selected = "quality" in (
+        getattr(args, "_provided_user_defaults", frozenset())
+        | getattr(args, "_configured_user_defaults", frozenset())
+    )
+    if not quality_selected and not _argv_has_option(argv, _QUALITY_OPTION_NAMES):
+        args.quality = QualityThreshold.HIGH.value
 
 
 def _argv_has_option(argv: Sequence[str] | None, option_names: Sequence[str]) -> bool:
@@ -1225,6 +1252,7 @@ def _execute_request(
     if args.mode == "plan":
         args.execute = False
     _configure_away_mode(args, argv, parser)
+    _configure_dev_quality_floor(args, argv)
     execution_deadline = _configure_execution_deadline(args)
     if execution_deadline is not None and time.perf_counter() >= execution_deadline:
         _print_cli_closeout(

@@ -442,3 +442,87 @@ def test_tee_output_writes_to_terminal_and_transcript() -> None:
 
     assert terminal.getvalue() == "assistant output\n"
     assert transcript.getvalue() == "assistant output\n"
+
+
+def _parse_dev_args(*extra: str):
+    from ai_agent.repo_assistant_args import build_argument_parser
+
+    return build_argument_parser().parse_args(["task", *extra])
+
+
+def test_dev_modes_default_to_high_quality() -> None:
+    """Implement/coding-chat auto-route to better models; pilot 2026-11-10."""
+    from ai_agent.repo_coding_assistant import _configure_dev_quality_floor
+
+    for mode in ("implement", "coding-chat"):
+        args = _parse_dev_args("--mode", mode)
+        assert args.quality == "standard"
+        _configure_dev_quality_floor(args, ["task", "--mode", mode])
+        assert args.quality == "high"
+
+
+def test_dev_floor_respects_explicit_config_and_other_modes() -> None:
+    from ai_agent.repo_coding_assistant import _configure_dev_quality_floor
+
+    for mode in ("ask", "review", "plan", "chat", "diagnose"):
+        args = _parse_dev_args("--mode", mode)
+        _configure_dev_quality_floor(args, ["task", "--mode", mode])
+        assert args.quality == "standard"
+
+    explicit = _parse_dev_args("--mode", "implement", "--quality", "standard")
+    _configure_dev_quality_floor(explicit, ["task", "--mode", "implement", "--quality", "standard"])
+    assert explicit.quality == "standard"
+
+    override = _parse_dev_args("--mode", "implement", "--model", "gpt-oss:20b")
+    _configure_dev_quality_floor(
+        override, ["task", "--mode", "implement", "--model", "gpt-oss:20b"]
+    )
+    assert override.quality == "standard"
+
+    configured = _parse_dev_args("--mode", "implement")
+    configured.quality = "low"
+    configured._configured_user_defaults = frozenset({"quality"})
+    _configure_dev_quality_floor(configured, ["task", "--mode", "implement"])
+    assert configured.quality == "low"
+
+
+def test_implement_fails_closed_before_inference_without_explicit_quality(tmp_path, capsys) -> None:
+    """Local STANDARD routes cannot take dev work by silent default."""
+    (tmp_path / "AGENTS.md").write_text("required rules" * 10)
+    catalog = (
+        Path(__file__).resolve().parents[2]
+        / "packages"
+        / "ai_orchestrator"
+        / "examples"
+        / "model_catalog.toml"
+    )
+    main(
+        [
+            "task",
+            "--mode",
+            "plan",
+            "--repo-root",
+            str(tmp_path),
+            "--catalog",
+            str(catalog),
+        ]
+    )
+    out = capsys.readouterr().out
+    assert "route_id: ollama/" in out
+
+    main(
+        [
+            "task",
+            "--mode",
+            "implement",
+            "--execute",
+            "--repo-root",
+            str(tmp_path),
+            "--catalog",
+            str(catalog),
+        ]
+    )
+    out = capsys.readouterr().out
+    assert "No model candidate satisfied" in out
+    assert "quality threshold" in out
+    assert "0 attempts" in out
