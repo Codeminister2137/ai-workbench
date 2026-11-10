@@ -615,6 +615,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 return self._send_inbox(parsed.query)
             if path == "/api/ideas":
                 return self._send_ideas(parsed.query)
+            if path == "/api/backlog":
+                return self._send_backlog(parsed.query)
             if path == "/api/projects":
                 try:
                     projects = list_projects(self.data_dir)
@@ -627,6 +629,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 return self._send_item(self._stores().inbox, path[len("/api/inbox/") :])
             if path.startswith("/api/ideas/"):
                 return self._send_item(self._stores().ideas, path[len("/api/ideas/") :])
+            if path.startswith("/api/backlog/"):
+                return self._send_item(self._stores().backlog, path[len("/api/backlog/") :])
         except (StoreError, ValueError) as exc:
             return self._send_json({"ok": False, "error": str(exc)}, status=400)
         return self._send_json({"ok": False, "error": "Unknown endpoint"}, status=404)
@@ -674,6 +678,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 return self._create_inbox_task(payload)
             if path == "/api/ideas":
                 return self._create_idea(payload)
+            if path == "/api/backlog":
+                return self._create_backlog_item(payload)
             if path == "/api/tasks/propose":
                 return self._propose_task(payload)
             if path == "/api/projects":
@@ -695,6 +701,12 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             if path.startswith("/api/ideas/") and path.endswith("/review"):
                 item_id = path[len("/api/ideas/") : -len("/review")]
                 return self._review_idea(item_id, payload)
+            if path.startswith("/api/backlog/") and path.endswith("/review"):
+                item_id = path[len("/api/backlog/") : -len("/review")]
+                return self._review_backlog_item(item_id, payload)
+            if path.startswith("/api/backlog/") and path.endswith("/promote"):
+                item_id = path[len("/api/backlog/") : -len("/promote")]
+                return self._promote_backlog_item(item_id, payload)
             if path.startswith("/api/runs/") and path.endswith("/report-request"):
                 run_id = path[len("/api/runs/") : -len("/report-request")]
                 return self._request_run_report(run_id)
@@ -753,6 +765,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             "model": config.model,
             "open_inbox": stores.open_inbox_count(),
             "new_ideas": stores.new_idea_count(),
+            "open_backlog": stores.open_backlog_count(),
             "plan_total": plan_total,
             "current_plan": (
                 {"id": current_plan.get("id"), "title": current_plan.get("title")}
@@ -1201,6 +1214,65 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         except StoreError as exc:
             return self._send_json({"ok": False, "error": str(exc)}, status=400)
         self._send_json({"ok": True, "id": record["id"]})
+
+    def _send_backlog(self, query: str) -> None:
+        from dashboard_stores import BACKLOG_SOURCES, BACKLOG_STATUSES
+
+        params = parse_qs(query)
+        wanted_status = params.get("status", [None])[0]
+        wanted_source = params.get("source", [None])[0]
+        if wanted_status is not None and wanted_status not in BACKLOG_STATUSES:
+            return self._send_json({"ok": False, "error": "Invalid status filter"}, status=400)
+        if wanted_source is not None and wanted_source not in BACKLOG_SOURCES:
+            return self._send_json({"ok": False, "error": "Invalid source filter"}, status=400)
+        items, _total = self._stores().backlog.list(limit=100)
+        if wanted_status is not None:
+            items = [item for item in items if item.get("status") == wanted_status]
+        if wanted_source is not None:
+            items = [item for item in items if item.get("source") == wanted_source]
+        self._send_json({"ok": True, "items": items, "total": len(items)})
+
+    def _create_backlog_item(self, payload: dict) -> None:
+        title = payload.get("title", "")
+        body = payload.get("body", "")
+        source = payload.get("source", "owner")
+        ref = payload.get("ref")
+        if not all(isinstance(value, str) for value in (title, body, source)):
+            return self._send_json(
+                {"ok": False, "error": "title, body, and source must be strings"}, status=400
+            )
+        if ref is not None and not isinstance(ref, str):
+            return self._send_json({"ok": False, "error": "ref must be a string"}, status=400)
+        try:
+            record = self._stores().create_backlog_item(
+                title=title, body=body, source=source, ref=ref
+            )
+        except StoreError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        self._send_json({"ok": True, "id": record["id"]})
+
+    def _review_backlog_item(self, item_id: str, payload: dict) -> None:
+        status = payload.get("status", "")
+        decision = payload.get("decision", "")
+        if not isinstance(status, str) or not isinstance(decision, str):
+            return self._send_json({"ok": False, "error": "Invalid review payload"}, status=400)
+        try:
+            record = self._stores().set_backlog_status(item_id, status=status, decision=decision)
+        except StoreError as exc:
+            code = 404 if "not found" in str(exc).lower() else 400
+            return self._send_json({"ok": False, "error": str(exc)}, status=code)
+        self._send_json({"ok": True, "id": record["id"], "status": record["status"]})
+
+    def _promote_backlog_item(self, item_id: str, payload: dict) -> None:
+        created_by = payload.get("created_by", "supervisor")
+        if not isinstance(created_by, str):
+            return self._send_json({"ok": False, "error": "Invalid promote payload"}, status=400)
+        try:
+            result = self._stores().promote_backlog_item(item_id, created_by=created_by)
+        except StoreError as exc:
+            code = 404 if "not found" in str(exc).lower() else 400
+            return self._send_json({"ok": False, "error": str(exc)}, status=code)
+        self._send_json({"ok": True, "id": result["item"]["id"], "inbox_id": result["inbox"]["id"]})
 
     def _review_idea(self, item_id: str, payload: dict) -> None:
         status = payload.get("status", "")

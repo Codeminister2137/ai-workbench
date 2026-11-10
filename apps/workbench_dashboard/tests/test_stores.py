@@ -136,3 +136,49 @@ def test_effective_fanout_policy_falls_back_to_policy() -> None:
 def test_effective_fanout_policy_unknown_for_legacy_record() -> None:
     assert effective_fanout_policy({"id": "w4", "status": "merged"}) == "unknown"
     assert effective_fanout_policy({"fanout_effective": "  ", "fanout_policy": None}) == "unknown"
+
+
+def test_backlog_capture_groom_and_promote(stores) -> None:
+    item = stores.create_backlog_item(
+        title="Replicate fixture onto Go harness",
+        body="Deferred item 3 leftover.",
+        source="agent",
+        ref="docs/plans/deferred-baseline-work-20261022.md §3",
+    )
+    assert item["status"] == "proposed"
+    assert item["inbox_id"] is None
+    assert stores.open_backlog_count() == 1
+
+    groomed = stores.set_backlog_status(item["id"], status="ready", decision="Small slice")
+    assert groomed["status"] == "ready"
+
+    result = stores.promote_backlog_item(item["id"])
+    assert result["inbox"]["type"] == "decision"
+    assert result["inbox"]["options"] == ["A: Take into next run", "B: Hold"]
+    assert "Deferred item 3" in result["inbox"]["body"]
+    assert result["item"]["inbox_id"] == result["inbox"]["id"]
+
+
+def test_backlog_create_validates_title_source_ref(stores) -> None:
+    with pytest.raises(StoreError, match="title"):
+        stores.create_backlog_item(title="  ", body="b")
+    with pytest.raises(StoreError, match="source"):
+        stores.create_backlog_item(title="t", body="b", source="stranger")
+    with pytest.raises(StoreError, match="ref"):
+        stores.create_backlog_item(title="t", body="b", ref="x" * 201)
+    with pytest.raises(StoreError, match="not found"):
+        stores.set_backlog_status("missing", status="ready")
+    with pytest.raises(StoreError, match="status"):
+        stores.set_backlog_status(
+            stores.create_backlog_item(title="t", body="b")["id"], status="vibing"
+        )
+
+
+def test_promote_refuses_second_open_brief(stores) -> None:
+    item = stores.create_backlog_item(title="t", body="b")
+    first = stores.promote_backlog_item(item["id"])
+    with pytest.raises(StoreError, match="already has an open inbox brief"):
+        stores.promote_backlog_item(item["id"])
+    stores.close_inbox_task(first["inbox"]["id"], resolution="Held.")
+    second = stores.promote_backlog_item(item["id"])
+    assert second["inbox"]["id"] != first["inbox"]["id"]

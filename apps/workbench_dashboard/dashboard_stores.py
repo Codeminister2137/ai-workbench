@@ -23,6 +23,9 @@ FANOUT_POLICIES = ("allowed", "restricted", "denied")
 FANOUT_UNKNOWN = "unknown"
 IDEA_SOURCES = ("owner", "third-party")
 IDEA_STATUSES = ("new", "reviewing", "adopted", "parked", "declined")
+BACKLOG_SOURCES = ("owner", "agent")
+BACKLOG_STATUSES = ("proposed", "ready", "doing", "blocked", "done", "dropped")
+BACKLOG_OPEN = ("proposed", "ready", "doing", "blocked")
 
 
 class StoreError(ValueError):
@@ -116,6 +119,7 @@ class DashboardStores:
         self.runs = JsonCollection(data_dir / "runs")
         self.inbox = JsonCollection(data_dir / "inbox")
         self.ideas = JsonCollection(data_dir / "ideas")
+        self.backlog = JsonCollection(data_dir / "backlog")
 
     @property
     def token_path(self) -> Path:
@@ -356,3 +360,82 @@ class DashboardStores:
         """Count untriaged ideas for the Home badge."""
         items, _total = self.ideas.list(limit=1000)
         return sum(1 for item in items if item.get("status") == "new")
+
+    def open_backlog_count(self) -> int:
+        """Count groomed-but-unfinished backlog items for the Home badge."""
+        items, _total = self.backlog.list(limit=1000)
+        return sum(1 for item in items if item.get("status") in BACKLOG_OPEN)
+
+    def create_backlog_item(
+        self,
+        *,
+        title: str,
+        body: str,
+        source: str = "owner",
+        ref: str | None = None,
+    ) -> dict:
+        """Capture one backlog item; ``ref`` cites the origin (ledger doc, idea id)."""
+        title = title.strip()
+        if not title:
+            raise StoreError("Backlog item needs a title")
+        if source not in BACKLOG_SOURCES:
+            raise StoreError(f"Backlog source must be one of {BACKLOG_SOURCES}")
+        ref = (ref or "").strip() or None
+        if ref is not None and len(ref) > 200:
+            raise StoreError("Backlog ref must be 1-200 characters")
+        now = _utc_now()
+        record = {
+            "id": uuid.uuid4().hex,
+            "title": title,
+            "body": body,
+            "source": source,
+            "ref": ref,
+            "status": "proposed",
+            "inbox_id": None,
+            "created_at": now,
+            "reviewed_at": None,
+            "decision": None,
+        }
+        self.backlog.put(record["id"], record)
+        return record
+
+    def set_backlog_status(self, item_id: str, *, status: str, decision: str | None = None) -> dict:
+        """Groom one backlog item; the record stays as the audit trail."""
+        record = self.backlog.get(item_id)
+        if record is None:
+            raise StoreError("Backlog item not found")
+        if status not in BACKLOG_STATUSES:
+            raise StoreError(f"Backlog status must be one of {BACKLOG_STATUSES}")
+        record["status"] = status
+        record["decision"] = (decision or "").strip() or None
+        record["reviewed_at"] = _utc_now()
+        self.backlog.put(item_id, record)
+        return record
+
+    def promote_backlog_item(self, item_id: str, *, created_by: str = "supervisor") -> dict:
+        """File one backlog item as an inbox decision (take into run, or hold).
+
+        Refuses while a previous promotion is still undecided so one item
+        cannot spam the inbox; a closed brief may be re-proposed.
+        """
+        record = self.backlog.get(item_id)
+        if record is None:
+            raise StoreError("Backlog item not found")
+        if record.get("inbox_id") is not None:
+            brief = self.inbox.get(record["inbox_id"])
+            if brief is not None and brief.get("status") != "closed":
+                raise StoreError("Backlog item already has an open inbox brief")
+        body = record.get("body") or ""
+        if record.get("ref"):
+            body = f"{body}\n\nRef: {record['ref']}".strip()
+        brief = self.create_inbox_task(
+            title=f"Take into run: {record['title']}",
+            body=body,
+            task_type="decision",
+            options=["A: Take into next run", "B: Hold"],
+            created_by=created_by,
+        )
+        record["inbox_id"] = brief["id"]
+        record["reviewed_at"] = _utc_now()
+        self.backlog.put(item_id, record)
+        return {"item": record, "inbox": brief}
