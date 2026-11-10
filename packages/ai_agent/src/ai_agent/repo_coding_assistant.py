@@ -4437,6 +4437,22 @@ def _resolve_complexity(args: argparse.Namespace) -> str:
     return "unknown"
 
 
+def _route_outcomes_path(args: argparse.Namespace) -> Path:
+    """Locate the routing-outcomes file for this invocation.
+
+    Outcomes are host evidence (like run logs), not workspace effects: they
+    live under the invocation repo so target workspaces (fixtures, customer
+    checkouts) are never polluted. Tests pin ``args.route_outcomes_path``.
+    """
+    from ai_orchestrator.route_outcomes import OUTCOMES_FILENAME
+    from ai_provider.repo_context import find_repo_root
+
+    override = getattr(args, "route_outcomes_path", None)
+    if override is not None:
+        return Path(override)
+    return find_repo_root(Path.cwd()) / "artifacts" / OUTCOMES_FILENAME
+
+
 def _quality_adjustments_for_run(args: argparse.Namespace) -> dict[str, int]:
     """Load outcome demotions once per invocation; failures yield none."""
     cached = getattr(args, "_quality_adjustments_cache", None)
@@ -4444,13 +4460,9 @@ def _quality_adjustments_for_run(args: argparse.Namespace) -> dict[str, int]:
         return cached
     adjustments: dict[str, int] = {}
     try:
-        from ai_orchestrator.route_outcomes import (
-            OUTCOMES_FILENAME,
-            load_quality_adjustments,
-        )
+        from ai_orchestrator.route_outcomes import load_quality_adjustments
 
-        repo_root = Path(getattr(args, "repo_root", ".") or ".")
-        adjustments = dict(load_quality_adjustments(repo_root / "artifacts" / OUTCOMES_FILENAME))
+        adjustments = dict(load_quality_adjustments(_route_outcomes_path(args)))
     except OSError:
         adjustments = {}
     args._quality_adjustments_cache = adjustments
@@ -4471,7 +4483,7 @@ def _record_route_outcome(
     try:
         import time
 
-        from ai_orchestrator.route_outcomes import OUTCOMES_FILENAME, RouteOutcome, append_outcome
+        from ai_orchestrator.route_outcomes import RouteOutcome, append_outcome
 
         tool_results = getattr(args, "_groundedness_tool_results", None) or ()
         outcome = RouteOutcome(
@@ -4482,8 +4494,7 @@ def _record_route_outcome(
             iterations=int(getattr(args, "_native_iterations", 1)),
             finished_at=time.time(),
         )
-        repo_root = Path(getattr(args, "repo_root", ".") or ".")
-        append_outcome(repo_root / "artifacts" / OUTCOMES_FILENAME, outcome)
+        append_outcome(_route_outcomes_path(args), outcome)
     except OSError:
         pass
 
