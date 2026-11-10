@@ -115,7 +115,9 @@ def test_valid_receipts_distinguish_support_from_quality():
 
 def test_automatic_catalog_prefers_tested_local_tools_preserving_explicit_choices():
     catalog = load_model_catalog(CATALOG)
-    profile = coding_task_profile()
+    # Default privacy is external_allowed since ADR-085; the tested-local
+    # preference applies to explicitly local requests.
+    profile = coding_task_profile(privacy_class=PrivacyClass.LOCAL_ONLY)
     eligible = native_coding_catalog(catalog, profile)
     assert recommend_model(profile, eligible).selected.backend.model == "gpt-oss:20b"
     for profile in (

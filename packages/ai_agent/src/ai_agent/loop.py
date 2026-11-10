@@ -87,7 +87,7 @@ class AgentLoop:
         context: ToolContext,
         *,
         permissions: PermissionManager | None = None,
-        max_iterations: int = 10,
+        max_iterations: int = 50,
         deadline: float | None = None,
         temperature: float | None = None,
         top_p: float | None = None,
@@ -152,6 +152,29 @@ class AgentLoop:
         if self.on_event is not None:
             self.on_event(event)
 
+    def resume(
+        self,
+        messages: tuple[AIMessage, ...],
+        *,
+        model: str | None = None,
+        privacy_class: PrivacyClass = PrivacyClass.LOCAL_ONLY,
+        prior_iterations: int = 0,
+    ) -> AgentResult:
+        """Continue an exhausted run from saved messages under a fresh allowance.
+
+        ``messages`` is normally ``ProviderError.partial_messages`` from a run
+        that raised with ``AgentIterationLimitExceeded``. The loop budget
+        restarts at zero local iterations; ``prior_iterations`` seeds the
+        cumulative count reported on the result.
+        """
+        return self.run(
+            "",
+            model=model,
+            privacy_class=privacy_class,
+            resume_messages=messages,
+            prior_iterations=prior_iterations,
+        )
+
     def run(
         self,
         prompt: str,
@@ -159,8 +182,23 @@ class AgentLoop:
         system_prompt: str | None = None,
         model: str | None = None,
         privacy_class: PrivacyClass = PrivacyClass.LOCAL_ONLY,
+        resume_messages: tuple[AIMessage, ...] | None = None,
+        prior_iterations: int = 0,
     ) -> AgentResult:
-        """Execute a prompt and any requested tools until a final answer is returned."""
+        """Execute a prompt and any requested tools until a final answer is returned.
+
+        ``resume_messages`` continues an exhausted run from saved messages
+        (e.g. ``ProviderError.partial_messages``); ``prompt``/``system_prompt``
+        are ignored then and ``prior_iterations`` seeds cumulative reporting.
+        Prefer :meth:`resume` for that path.
+        """
+        if prior_iterations < 0:
+            raise ValueError("prior_iterations must be non-negative")
+        if resume_messages is not None:
+            if not resume_messages or any(
+                not isinstance(item, AIMessage) for item in resume_messages
+            ):
+                raise ValueError("resume_messages must be a non-empty AIMessage tuple")
         from ai_provider.credential_guard import (
             contains_credentials,
             credential_values,
@@ -209,9 +247,12 @@ class AgentLoop:
                 ),
             )
         messages: list[AIMessage] = []
-        if system_prompt:
-            messages.append(AIMessage(MessageRole.SYSTEM, system_prompt))
-        messages.append(AIMessage(MessageRole.USER, prompt))
+        if resume_messages is not None:
+            messages.extend(resume_messages)
+        else:
+            if system_prompt:
+                messages.append(AIMessage(MessageRole.SYSTEM, system_prompt))
+            messages.append(AIMessage(MessageRole.USER, prompt))
         tool_results: list[ToolResult] = []
         recovery = ModelOutputRecovery(self.context.workspace_root)
         model_output_errors = 0
@@ -347,7 +388,7 @@ class AgentLoop:
                 return AgentResult(
                     response=response,
                     tool_results=tuple(tool_results),
-                    iterations=iteration,
+                    iterations=prior_iterations + iteration,
                     messages=tuple(messages),
                     model_output_errors=model_output_errors,
                     completion_failures=completion_failures,
@@ -491,7 +532,8 @@ class AgentLoop:
 
         error = ProviderError(
             f"Agent loop exceeded max_iterations={self.max_iterations}; "
-            "earlier tool effects remain and must be inspected before continuing.",
+            "earlier tool effects remain and must be inspected before continuing. "
+            "Resume under a fresh allowance with AgentLoop.resume(partial_messages).",
             category=ProviderErrorCategory.NON_RETRYABLE,
             provider=self.client.backend.provider,
             raw_error=AgentIterationLimitExceeded(),

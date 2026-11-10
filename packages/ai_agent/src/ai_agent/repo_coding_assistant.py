@@ -1452,7 +1452,7 @@ def _execute_request(
                     catalog_snapshot=catalog,
                     parent_profile=profile,
                     timeout_seconds=args.timeout_seconds,
-                    max_iterations=min(args.max_action_rounds, 8),
+                    max_iterations=min(args.max_action_rounds, 15),
                     is_active=active,
                     deadline=deadline,
                 )

@@ -717,7 +717,7 @@ def build_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--max-action-rounds",
         type=int,
-        default=3,
+        default=25,
         help="Maximum provider/action follow-up rounds when --apply-actions is set.",
     )
     parser.add_argument(
