@@ -4169,6 +4169,9 @@ def _run_native_agent(
             request_timeout_seconds=config.timeout_seconds,
             fanout=fanout_policy,
         )
+    guidance = _delegation_guidance(registry)
+    if guidance and "delegate_task" not in system_prompt:
+        system_prompt += guidance
     # Live owner questions only when a human sits at this terminal. piped /
     # redirected / unattended runs keep owner_prompt=None so ask_owner fails
     # closed (file request_owner_task) instead of blocking on stdin.
@@ -4318,6 +4321,25 @@ def _delegated_failure_result(
         output=f"Error: delegated subtask failed: {kind}",
         is_error=True,
     )
+
+
+DELEGATION_GUIDANCE = (
+    "\n\nDelegation: a delegate_task tool is available for separable subtasks "
+    "(independent files, parallelizable inspection or validation). Prefer it "
+    "over doing everything inline when subtasks are independent: the child "
+    "runs in an isolated context and returns only a summary, keeping this "
+    "thread lean. Keep subtasks focused with explicit files and expected "
+    "outputs; parent and child share one iteration budget and authority, and "
+    "nested delegation is disabled. Check the child's summary against its "
+    "reported tool results before relying on it."
+)
+
+
+def _delegation_guidance(registry: Any) -> str:
+    """Advise the model to delegate when the tool is actually registered."""
+    if registry.get("delegate_task") is None:
+        return ""
+    return DELEGATION_GUIDANCE
 
 
 def _format_delegated_task_output(

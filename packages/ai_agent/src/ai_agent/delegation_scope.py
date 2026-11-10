@@ -133,6 +133,8 @@ class DelegationScope:
             )
         if not self.active() or self.depth >= self.max_depth:
             raise ValueError("Delegation scope expired or maximum depth reached")
+        if profile == "default":
+            profile = "inherit"
         if profile != "inherit":
             PermissionPolicy.from_approval_preset(profile)
         selected_tools = frozenset(tools) if tools is not None else self.tools
