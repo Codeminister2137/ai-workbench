@@ -73,6 +73,7 @@ GROUPS = {
     ),
     "orchestrator": (
         "tests/test_orchestrator_*.py",
+        "tests/test_routing_evidence.py",
         "tests/test_review_policy.py",
         "tests/test_task_admission.py",
         "tests/test_task_scheduler*.py",
@@ -101,6 +102,11 @@ GROUPS = {
         "tests/test_operator_bridge.py",
         "tests/test_wb_env_narrow.py",
         "tests/test_run_reports.py",
+        "tests/test_loop_compaction.py",
+        "tests/test_groundedness.py",
+        "tests/test_native_delegation.py",
+        "tests/test_governance_tiers.py",
+        "tests/test_agent_acceptance.py",
     ),
     "cli": (
         "tests/repo_assistant/test_*.py",

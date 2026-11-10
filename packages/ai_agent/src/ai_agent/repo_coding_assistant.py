@@ -4426,7 +4426,7 @@ def _quality_adjustments_for_run(args: argparse.Namespace) -> dict[str, int]:
             load_quality_adjustments,
         )
 
-        repo_root = Path(getattr(args, "repo_root", "."))
+        repo_root = Path(getattr(args, "repo_root", ".") or ".")
         adjustments = dict(load_quality_adjustments(repo_root / "artifacts" / OUTCOMES_FILENAME))
     except OSError:
         adjustments = {}
@@ -4459,7 +4459,7 @@ def _record_route_outcome(
             iterations=int(getattr(args, "_native_iterations", 1)),
             finished_at=time.time(),
         )
-        repo_root = Path(getattr(args, "repo_root", "."))
+        repo_root = Path(getattr(args, "repo_root", ".") or ".")
         append_outcome(repo_root / "artifacts" / OUTCOMES_FILENAME, outcome)
     except OSError:
         pass

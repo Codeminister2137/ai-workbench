@@ -39,15 +39,16 @@ external durable state**. Fixed iteration caps exist only as backstops.
 
 ## Recommendation (phased)
 
-- Phase 0 (now, no architecture): raise the effective round budget for
-  real tasks via explicit `--max-action-rounds 8` per run. Do NOT raise
-  the shipped default without owner approval (more flailing spend).
-- Phase 1 (the real fix): loop compaction at a context-% threshold —
-  summarize-then-continue preserving decisions/file states, steerable
-  instructions, summary persisted to the run record. Needs owner
-  approval as a slice (new behavior + spend profile).
-- Phase 2: wire subagent delegation into CLI runs for heavy subtasks
-  (main thread stays lean, Meta-style). Needs owner approval.
+- Phase 0 (SHIPPED 2026-11-10, owner-approved): `--max-action-rounds`
+  default 3→25, AgentLoop 10→50, messenger 4→25, plus partial+resume.
+- Phase 1 (SHIPPED 2026-11-10, owner-approved): loop compaction at a
+  char-budget threshold (`--loop-context-budget-chars`, default 100k) —
+  summarize-then-continue with immune system instructions, rolling
+  summaries, verbatim tail, and an anti-thrash cap.
+- Phase 2 (SHIPPED 2026-11-10, owner-approved): delegation was already
+  registered but unusable (validation rejected the model's `default`
+  profile); fixed with a `default`=inherit alias plus system-prompt
+  guidance. Proven live with a real child run.
 - Standing rule: durable state (decisions, handoff, inbox) stays in
   files/DB, never only in the loop transcript.
 
