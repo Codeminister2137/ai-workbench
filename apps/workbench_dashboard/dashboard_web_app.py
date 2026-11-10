@@ -562,7 +562,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             if path == "/api/restrictions":
                 return self._send_json(self._restrictions_with_toggles())
             if path == "/api/providers":
-                return self._send_json(providers_status(self.data_dir))
+                return self._send_json(providers_status(self.data_dir, self.repo_root))
             if path == "/api/fleet":
                 return self._send_json(
                     {"ok": True, "fleet": fleet_status(self.repo_root, self._stores())}
@@ -673,7 +673,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 session_id = path[len("/api/chat/sessions/") : -len("/draft-plan")]
                 return self._draft_plan_from_chat(config, session_id, payload)
             if path == "/api/providers/refresh":
-                return self._send_json(refresh_provider_status(self.data_dir))
+                return self._send_json(refresh_provider_status(self.data_dir, self.repo_root))
             if path == "/api/inbox":
                 return self._create_inbox_task(payload)
             if path == "/api/ideas":
