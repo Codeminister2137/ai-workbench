@@ -135,3 +135,89 @@ def test_post_json_reports_unreachable_without_status(monkeypatch) -> None:
     monkeypatch.setattr(vendor_sources.urllib.request, "urlopen", down)
     with pytest.raises(VendorError, match="unreachable: OSError"):
         _post_json("https://api.apollo.io/x", {}, {}, 1)
+
+
+PAGE_FIXTURE = {
+    "error": False,
+    "free": False,
+    "companies": [
+        {
+            "company": {
+                "company_id": "c1",
+                "name": "Acme Metal",
+                "website": "https://acme.example.pl",
+                "domain": "acme.example.pl",
+                "industry": "Mechanical Engineering",
+                "employee_count": 120,
+                "employee_range": "51-200",
+                "location": {"country": "Poland", "city": "Bielsko"},
+                "keywords": ["cnc", "automation"],
+                "description_ai": "Metal parts maker.",
+            }
+        },
+        {"company": {"name": "  ", "domain": None}},
+        {"company": None},
+        "not-a-dict",
+    ],
+    "current_page": 1,
+    "per_page": 25,
+    "total_page": 4,
+    "total_count": 87,
+}
+
+
+def _stub_post_factory(captured: dict, payload: dict):
+    def _stub(url: str, headers: dict, body: dict, timeout: float) -> dict:
+        captured["url"] = url
+        captured["headers"] = headers
+        captured["body"] = body
+        return payload
+
+    return _stub
+
+
+def test_search_prospeo_companies_parses_page() -> None:
+    from vendor_sources import PROSPEO_SEARCH_COMPANY_URL, search_prospeo_companies
+
+    captured: dict = {}
+    page = search_prospeo_companies(
+        api_key="k",
+        filters={"company_location_search": {"include": ["Poland"]}},
+        page=2,
+        post=_stub_post_factory(captured, PAGE_FIXTURE),
+    )
+    assert captured["url"] == PROSPEO_SEARCH_COMPANY_URL
+    assert captured["headers"] == {"X-KEY": "k"}
+    assert captured["body"] == {
+        "filters": {"company_location_search": {"include": ["Poland"]}},
+        "page": 2,
+    }
+    assert page.total_count == 87 and page.total_pages == 4 and page.current_page == 1
+    assert page.served_free_dedup is False
+    assert len(page.companies) == 1
+    company = page.companies[0]
+    assert company.name == "Acme Metal"
+    assert company.domain == "acme.example.pl"
+    assert company.hq_country == "Poland" and company.hq_city == "Bielsko"
+    assert company.keywords == ("cnc", "automation")
+
+
+def test_search_prospeo_companies_validates_and_maps_errors() -> None:
+    from vendor_sources import VendorError, search_prospeo_companies
+
+    with pytest.raises(VendorError, match="API key"):
+        search_prospeo_companies(api_key="", filters={"a": 1}, post=lambda *a: {})
+    with pytest.raises(VendorError, match="at least one filter"):
+        search_prospeo_companies(api_key="k", filters={}, post=lambda *a: {})
+    with pytest.raises(VendorError, match="page"):
+        search_prospeo_companies(api_key="k", filters={"a": 1}, page=0, post=lambda *a: {})
+    with pytest.raises(VendorError, match="INVALID_FILTERS"):
+        search_prospeo_companies(
+            api_key="k",
+            filters={"a": 1},
+            post=lambda *a: {"error": True, "error_code": "INVALID_FILTERS"},
+        )
+    with pytest.raises(VendorError, match="non-list"):
+        search_prospeo_companies(
+            api_key="k", filters={"a": 1}, post=lambda *a: {"error": False, "companies": {}}
+        )
