@@ -84,8 +84,8 @@ def test_dynamic_inputs_and_selects_have_titles() -> None:
         assert "title=" in tag, f"input without title: {tag}"
     selects = re.findall(r"<select\b[^>]*>", js)
     assert (
-        len(selects) == 10
-    )  # +create selects, +run-request pickers, +runs/inbox project filters, +agent-queue assignee, +backlog groom/create-source
+        len(selects) == 11
+    )  # +create selects, +run-request pickers, +runs/inbox project filters, +agent-queue assignee, +backlog groom/create-source, +inbox close kind
     for tag in selects:
         assert "title=" in tag, f"select without title: {tag}"
 
@@ -698,3 +698,15 @@ def test_restrictions_renders_live_subprocess_counts() -> None:
     assert "/api/restrictions" in js
     assert "run request(s) recorded" in js
     assert "not yet evaluated" in js
+
+
+def test_inbox_followup_mark_stays_out_of_archive() -> None:
+    """Follow-up closes are marked and excluded from the archive tab."""
+    js = _read("app.js")
+    assert 'name="resolution_kind"' in js
+    assert "No final answer" in js
+    assert "const isFollowup = (t)" in js
+    assert 't.status === "closed" && !isFollowup(t)' in js
+    assert '(t.status !== "closed" || isFollowup(t))' in js
+    assert "needs follow-up" in js
+    assert "Marked for follow-up, kept in Active" in js

@@ -1100,8 +1100,13 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         resolution = payload.get("resolution", "")
         if not isinstance(resolution, str):
             return self._send_json({"ok": False, "error": "Invalid resolution payload"}, status=400)
+        kind = payload.get("resolution_kind", "final")
+        if not isinstance(kind, str):
+            return self._send_json({"ok": False, "error": "Invalid resolution kind"}, status=400)
         try:
-            record = self._stores().close_inbox_task(item_id, resolution=resolution)
+            record = self._stores().close_inbox_task(
+                item_id, resolution=resolution, resolution_kind=kind
+            )
         except StoreError as exc:
             status = 404 if "not found" in str(exc).lower() else 400
             return self._send_json({"ok": False, "error": str(exc)}, status=status)

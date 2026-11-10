@@ -182,3 +182,27 @@ def test_promote_refuses_second_open_brief(stores) -> None:
     stores.close_inbox_task(first["inbox"]["id"], resolution="Held.")
     second = stores.promote_backlog_item(item["id"])
     assert second["inbox"]["id"] != first["inbox"]["id"]
+
+
+def test_close_marks_followup_kind_and_defaults_final(stores) -> None:
+    record = stores.create_inbox_task(
+        title="Need more info",
+        body="Elaborate?",
+        task_type="clarification",
+    )
+    marked = stores.close_inbox_task(
+        record["id"], resolution="Waiting on elaboration.", resolution_kind="followup"
+    )
+    assert marked["status"] == "closed"
+    assert marked["resolution_kind"] == "followup"
+
+    other = stores.create_inbox_task(
+        title="Done deal",
+        body="Decided.",
+        task_type="decision",
+    )
+    final = stores.close_inbox_task(other["id"], resolution="Implemented.")
+    assert final["resolution_kind"] == "final"
+
+    with pytest.raises(StoreError, match="resolution kind"):
+        stores.close_inbox_task(other["id"], resolution="Again.", resolution_kind="bogus")

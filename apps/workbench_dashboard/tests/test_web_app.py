@@ -874,3 +874,34 @@ def test_fleet_sleep_idle_and_armed(tmp_path) -> None:
     assert summary["active"] is True
     assert summary["pid"] == 1234
     assert summary["receipt"] == "sleep-startup.json"
+
+
+def test_inbox_close_accepts_followup_kind(dashboard_server) -> None:
+    created = post_json(
+        dashboard_server,
+        "/api/inbox",
+        {"title": "t", "body": "b", "type": "clarification"},
+    )
+    item_id = created["id"]
+    closed = post_json(
+        dashboard_server,
+        f"/api/inbox/{item_id}/close",
+        {"resolution": "Needs elaboration.", "resolution_kind": "followup"},
+    )
+    assert closed["status"] == "closed"
+    item = get_json(dashboard_server, f"/api/inbox/{item_id}")
+    assert item["item"]["resolution_kind"] == "followup"
+
+    bad = post_json(
+        dashboard_server,
+        "/api/inbox",
+        {"title": "t2", "body": "b2", "type": "clarification"},
+    )
+    with pytest.raises(HTTPError) as raised:
+        post_json(
+            dashboard_server,
+            f"/api/inbox/{bad['id']}/close",
+            {"resolution": "x", "resolution_kind": "bogus"},
+        )
+    assert raised.value.code == 400
+    raised.value.close()
