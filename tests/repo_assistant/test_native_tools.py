@@ -294,6 +294,7 @@ def test_native_agent_mode_executes_provider_tool_calls(
     )
 
     assert result.response.message.content == "native complete"
+    from ai_agent.repo_coding_assistant import DELEGATION_GUIDANCE
     from ai_provider.closeout import FINAL_RESPONSE_INSTRUCTION
     from ai_provider.repo_context import NATIVE_TOOL_SYSTEM_PROMPT
 
@@ -305,6 +306,7 @@ def test_native_agent_mode_executes_provider_tool_calls(
         "(including the final report).\n"
         "Reserve replies for validation, correction and the final report.\n"
         "Other guards may stop earlier; this ceiling grants no new actions or time."
+        + DELEGATION_GUIDANCE
     )
     assert requests[0].tools
     assert all(request.temperature == sampling.get("temperature") for request in requests)

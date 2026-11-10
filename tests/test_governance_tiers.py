@@ -168,3 +168,40 @@ def test_sandbox_pins_shell_to_workspace_root(tmp_path) -> None:
     result = RunCommandTool().execute({"command": "(Get-Location).Path", "cwd": "inner"}, context)
     assert result.is_error is False
     assert result.output.strip().rstrip("\\/") == str(tmp_path).rstrip("\\/")
+
+
+def test_plan_read_only_forces_silent_default_only() -> None:
+    from argparse import Namespace
+
+    from ai_agent.repo_coding_assistant import _enforce_plan_read_only
+
+    silent = Namespace(mode="plan", approval_policy="interactive")
+    _enforce_plan_read_only(silent)
+    assert silent.approval_policy == "read_only"
+
+    explicit_cli = Namespace(
+        mode="plan",
+        approval_policy="trusted_local",
+        _provided_user_defaults=frozenset({"approval_policy"}),
+    )
+    _enforce_plan_read_only(explicit_cli)
+    assert explicit_cli.approval_policy == "trusted_local"
+
+    configured = Namespace(
+        mode="plan",
+        approval_policy="workspace_write",
+        _configured_user_defaults=frozenset({"approval_policy"}),
+    )
+    _enforce_plan_read_only(configured)
+    assert configured.approval_policy == "workspace_write"
+
+
+def test_auto_config_kill_switch(tmp_path, monkeypatch) -> None:
+    from ai_provider.user_config import auto_config_disabled, load_user_config
+
+    config = tmp_path / "user-config.toml"
+    config.write_text('[defaults]\napproval_policy = "trusted_local"\n', encoding="utf-8")
+    assert load_user_config(config).approval_policy == "trusted_local"
+    monkeypatch.setenv("AI_WORKBENCH_NO_USER_CONFIG", "1")
+    assert auto_config_disabled() is True
+    assert load_user_config(config, skip_auto_load=True).approval_policy == "interactive"
