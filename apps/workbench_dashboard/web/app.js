@@ -1325,11 +1325,33 @@ async function renderFleet() {
   view.innerHTML = `<h1>Fleet</h1><p class="muted">Probed live on open. Watchdogs, servers, sleep guard, active runs.</p>${body}`;
 }
 
+async function flipToggle(checkbox) {
+  try {
+    await api("/api/restrictions/toggles", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({name: checkbox.dataset.toggle, enabled: checkbox.checked}),
+    });
+    toast("Restriction updated", true);
+    render();
+  } catch (err) {
+    toast(err.message, false);
+    render();
+  }
+}
 async function renderRestrictions() {
   let sub = null;
+  let toggles = [];
   try {
-    sub = (await api("/api/restrictions")).subprocess;
+    const status = await api("/api/restrictions");
+    sub = status.subprocess;
+    toggles = status.toggles || [];
   } catch (err) { /* static fallback below */ }
+  const toggleRows = toggles.map((t) => `
+      <li><label><input type="checkbox" data-toggle="${esc(t.name)}"
+        title="${esc(t.description)}"
+        ${t.enabled ? "checked" : ""} onchange="flipToggle(this)">
+        <strong>${esc(t.name)}</strong></label> — ${esc(t.description)}</li>`).join("");
   const subLine = sub
     ? `Status: ${esc(sub.run_requests)} run request(s) recorded (${esc(sub.approved)} approved, ${esc(sub.rejected)} rejected, ${esc(sub.pending)} pending). Fed by: run-request receipts.`
     : "Status: not yet evaluated. Would be fed by: run-request receipts.";
@@ -1339,6 +1361,9 @@ async function renderRestrictions() {
     <p class="muted">Read-only overview of what agents may and may not do. No live
     enforcement data feeds this page yet — each dimension shows its definition, an
     honest <strong>not yet evaluated</strong> status, and what would feed it.</p>
+    <div class="card"><h2>Run toggles</h2><ul class="plain">
+      ${toggleRows || "<li>Not yet evaluated.</li>"}
+    </ul><p class="muted">Enforced on the next drained run.</p></div>
     <div class="card"><h2>Dimensions</h2><ul class="plain">
       <li><strong>Outbound network</strong> — which hosts an agent may call.
         Status: not yet evaluated. Would be fed by: an egress allowlist in

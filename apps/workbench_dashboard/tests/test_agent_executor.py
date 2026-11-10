@@ -502,3 +502,63 @@ def test_auto_routing_falls_back_to_configured(tmp_path) -> None:
     receipt = execute({"id": "r1", "title": "t", "body": "b"})
     assert seen[-1].model == "fallback"
     assert receipt["route_id"] == "ollama/fallback"
+
+
+def test_shell_toggle_denies_execution_tools(harness) -> None:
+    from ai_agent.contracts import PermissionAction
+    from ai_agent.staged_edits import ProjectRoots
+    from ai_agent.tools.shell import RunCommandTool
+
+    FakeLoop.instances = []
+    execute, _seen, project = harness
+    config = DashboardConfig(provider="ollama", model="fake")
+    execute = build_executor(
+        config,
+        ProjectRoots((str(project),)),
+        project,
+        client_factory=lambda backend: object(),
+        loop_factory=FakeLoop,
+        restrictions={"shell_tools": False},
+    )
+    execute({"id": "r1", "title": "t", "body": "b"})
+    permissions = FakeLoop.instances[-1].kwargs["permissions"]
+    assert (
+        permissions.policy.action_for_tool("run_command", RunCommandTool().definition.category)
+        is PermissionAction.DENY
+    )
+
+
+def test_sandbox_toggle_pins_context(harness) -> None:
+    from ai_agent.staged_edits import ProjectRoots
+
+    FakeLoop.instances = []
+    _execute, _seen, project = harness
+    config = DashboardConfig(provider="ollama", model="fake")
+    execute = build_executor(
+        config,
+        ProjectRoots((str(project),)),
+        project,
+        client_factory=lambda backend: object(),
+        loop_factory=FakeLoop,
+        restrictions={"sandbox": True},
+    )
+    execute({"id": "r1", "title": "t", "body": "b"})
+    assert FakeLoop.instances[-1].context.sandbox is True
+
+
+def test_delegation_toggle_sets_default_fanout(harness) -> None:
+    from ai_agent.staged_edits import ProjectRoots
+
+    FakeLoop.instances = []
+    _execute, _seen, project = harness
+    config = DashboardConfig(provider="ollama", model="fake")
+    execute = build_executor(
+        config,
+        ProjectRoots((str(project),)),
+        project,
+        client_factory=lambda backend: object(),
+        loop_factory=FakeLoop,
+        restrictions={"delegation": True},
+    )
+    execute({"id": "r1", "title": "t", "body": "b"})
+    assert FakeLoop.instances[-1].kwargs["fanout_policy"] == "allowed"

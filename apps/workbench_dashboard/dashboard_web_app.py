@@ -560,7 +560,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                     {"ok": True, "spend": spend_status(self.data_dir, self.spend_ledger)}
                 )
             if path == "/api/restrictions":
-                return self._send_json(restrictions_status(self._stores()))
+                return self._send_json(self._restrictions_with_toggles())
             if path == "/api/providers":
                 return self._send_json(providers_status(self.data_dir))
             if path == "/api/fleet":
@@ -686,6 +686,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 return self._create_project(payload)
             if path == "/api/settings":
                 return self._save_settings(payload)
+            if path == "/api/restrictions/toggles":
+                return self._set_restriction_toggle(payload)
             if path.startswith("/api/inbox/") and path.endswith("/answer"):
                 item_id = path[len("/api/inbox/") : -len("/answer")]
                 return self._answer_inbox_task(item_id, payload)
@@ -1296,6 +1298,29 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             return self._send_json({"ok": False, "error": str(exc)}, status=code)
         self._send_json({"ok": True, "id": record["id"], "status": record["status"]})
 
+    def _restrictions_with_toggles(self) -> None:
+        from restrictions import describe_toggles, load_toggles
+
+        status = restrictions_status(self._stores())
+        status["toggles"] = describe_toggles(load_toggles(self.data_dir))
+        self._send_json(status)
+
+    def _set_restriction_toggle(self, payload: dict) -> None:
+        from restrictions import describe_toggles, save_toggle
+
+        name = payload.get("name")
+        enabled = payload.get("enabled")
+        if not isinstance(name, str) or not isinstance(enabled, bool):
+            return self._send_json(
+                {"ok": False, "error": "name must be a string and enabled a boolean"},
+                status=400,
+            )
+        try:
+            toggles = save_toggle(self.data_dir, name, enabled)
+        except ValueError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        self._send_json({"ok": True, "toggles": describe_toggles(toggles)})
+
     def _propose_task(self, payload: dict) -> None:
         """File free text as an approval-gated scheduled-task proposal."""
         text = payload.get("text", "")
@@ -1727,7 +1752,15 @@ def build_run_drain(
     if executor_factory is not None:
         executor = executor_factory()
     else:
-        executor = build_executor(config, roots, repo_root, inbox_create=stores.create_inbox_task)
+        from restrictions import load_toggles
+
+        executor = build_executor(
+            config,
+            roots,
+            repo_root,
+            inbox_create=stores.create_inbox_task,
+            restrictions=load_toggles(data_dir),
+        )
     return RunDrain(
         runs_dir=data_dir / "runs",
         get_inbox=lambda inbox_id: stores.inbox.get(inbox_id),

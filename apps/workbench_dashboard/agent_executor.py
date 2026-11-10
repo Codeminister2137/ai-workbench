@@ -13,7 +13,8 @@ approved per run-level approval (no per-command gate).
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -195,11 +196,14 @@ def build_executor(
     loop_factory: Callable[..., Any] = AgentLoop,
     inbox_create: Callable[..., dict] | None = None,
     max_iterations: int | None = None,
+    restrictions: Mapping[str, bool] | None = None,
 ) -> Executor:
     """Build a drain ``Executor`` running each approved run through AgentLoop.
 
     ``inbox_create`` files owner tasks (dashboard inbox); without it, a run
     that files human tasks fails closed instead of dropping them.
+    ``restrictions`` carries owner toggles (auto_routing, shell_tools,
+    sandbox, delegation); missing keys fall back to safe defaults.
     """
     budget = config.max_iterations if max_iterations is None else max_iterations
     try:
@@ -216,14 +220,35 @@ def build_executor(
         privacy_class=runner_privacy,
         loop_factory=loop_factory,
     )
-    permissions = PermissionManager(
-        PermissionPolicy.from_approval_preset(ApprovalPolicyPreset.TRUSTED_LOCAL)
-    )
+    toggles: dict[str, bool] = {
+        "auto_routing": False,
+        "shell_tools": True,
+        "sandbox": False,
+        "delegation": False,
+    }
+    if restrictions:
+        for key in toggles:
+            if isinstance(restrictions.get(key), bool):
+                toggles[key] = restrictions[key]
+    base_policy = PermissionPolicy.from_approval_preset(ApprovalPolicyPreset.TRUSTED_LOCAL)
+    if not toggles["shell_tools"]:
+        from ai_agent.contracts import PermissionAction
+
+        base_policy = replace(
+            base_policy,
+            tool_rules=(
+                *base_policy.tool_rules,
+                ("run_command", PermissionAction.DENY),
+                ("python_runtime", PermissionAction.DENY),
+            ),
+        )
+    permissions = PermissionManager(base_policy)
+    effective_config = replace(config, route_policy="auto") if toggles["auto_routing"] else config
 
     def _execute(run: dict) -> dict[str, Any]:
         run_id = str(run.get("id", "?"))
         backend, privacy, route_id = _resolve_backend(
-            config, repo_root, str(run.get("title") or "(untitled)")
+            effective_config, repo_root, str(run.get("title") or "(untitled)")
         )
         if backend is None:
             return {"status": "failed", "error": f"Unknown provider {config.provider!r}."}
@@ -236,8 +261,12 @@ def build_executor(
                 workspace = Path(repo_root)
         except StagedEditError as exc:
             return {"status": "failed", "error": f"Project scope refused: {exc}"}
-        fanout = run.get("fanout_effective") or run.get("fanout_policy") or "restricted"
-        context = ToolContext(workspace_root=workspace)
+        fanout = (
+            run.get("fanout_effective")
+            or run.get("fanout_policy")
+            or ("allowed" if toggles["delegation"] else "restricted")
+        )
+        context = ToolContext(workspace_root=workspace, sandbox=toggles["sandbox"])
         try:
             registry = build_executor_registry(runner=runner, fanout=str(fanout))
             loop = loop_factory(
