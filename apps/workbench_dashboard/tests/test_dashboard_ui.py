@@ -57,7 +57,7 @@ def test_static_controls_have_titles() -> None:
     for tag in re.findall(r"<button\b[^>]*>", html):
         assert "title=" in tag, f"button without title: {tag}"
     nav_links = re.findall(r"<a\b[^>]*data-view[^>]*>", html)
-    assert len(nav_links) == 13  # +intake, +restrictions, +fleet, +providers, +help
+    assert len(nav_links) == 14  # +intake, +restrictions, +fleet, +providers, +help, +backlog
     for tag in nav_links:
         assert "title=" in tag, f"nav link without title: {tag}"
 
@@ -67,8 +67,8 @@ def test_dynamic_buttons_have_titles() -> None:
     js = _read("app.js")
     buttons = re.findall(r"<button\b[^>]*>", js)
     assert (
-        len(buttons) == 21
-    )  # +report/rename/delete/submit/create/cancel/run-request/staged-approve/staged-reject/dictate/intake-approve/draft-plan/drain/reopen/providers-refresh/propose
+        len(buttons) == 23
+    )  # +report/rename/delete/submit/create/cancel/run-request/staged-approve/staged-reject/dictate/intake-approve/draft-plan/drain/reopen/providers-refresh/propose/backlog-groom/backlog-promote
     for tag in buttons:
         assert "title=" in tag, f"button without title: {tag}"
 
@@ -77,13 +77,15 @@ def test_dynamic_inputs_and_selects_have_titles() -> None:
     """Text inputs/selects in templates have titles (radios use labels)."""
     js = _read("app.js")
     inputs = [tag for tag in re.findall(r"<input\b[^>]*>", js) if 'type="radio"' not in tag]
-    assert len(inputs) == 16  # +rename/create-form inputs, +5 list filters, +idea plan link, +task propose
+    assert (
+        len(inputs) == 20
+    )  # +rename/create-form inputs, +5 list filters, +idea plan link, +task propose, +backlog filter/decision/create-title/create-ref
     for tag in inputs:
         assert "title=" in tag, f"input without title: {tag}"
     selects = re.findall(r"<select\b[^>]*>", js)
     assert (
-        len(selects) == 8
-    )  # +create selects, +run-request pickers, +runs/inbox project filters, +agent-queue assignee
+        len(selects) == 10
+    )  # +create selects, +run-request pickers, +runs/inbox project filters, +agent-queue assignee, +backlog groom/create-source
     for tag in selects:
         assert "title=" in tag, f"select without title: {tag}"
 
@@ -102,6 +104,20 @@ def test_run_detail_has_report_section_and_button() -> None:
     assert 'id="report-btn"' in js
     assert 'title="Ask for a completion report for this run"' in js
     assert "/report-request" in js
+
+
+def test_backlog_tab_grooms_and_promotes() -> None:
+    """Backlog list/detail groom items and file inbox briefs on demand."""
+    js = _read("app.js")
+    html = _read("index.html")
+    assert 'data-view="backlog"' in html
+    assert 'id="backlog-badge"' in html
+    assert 'data-create="backlog"' in html
+    assert "renderBacklog" in js
+    assert "/api/backlog" in js
+    assert 'id="promote-btn"' in js
+    assert "/promote" in js
+    assert "open_backlog" in js
 
 
 def test_ideas_label_explains_triage() -> None:

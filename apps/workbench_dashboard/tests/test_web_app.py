@@ -201,6 +201,37 @@ def test_ideas_capture_filter_and_triage(dashboard_server) -> None:
     assert [item["id"] for item in remaining["items"]] == [mine["id"]]
 
 
+def test_backlog_capture_filter_groom_promote(dashboard_server) -> None:
+    made = post_json(
+        dashboard_server,
+        "/api/backlog",
+        {"title": "Conformance groups 2-4", "body": "Owner call first.", "source": "agent"},
+    )
+    assert made["ok"] is True
+
+    status = get_json(dashboard_server, "/api/status")
+    assert status["open_backlog"] == 1
+
+    detail = get_json(dashboard_server, f"/api/backlog/{made['id']}")
+    assert detail["item"]["status"] == "proposed"
+
+    groomed = post_json(
+        dashboard_server,
+        f"/api/backlog/{made['id']}/review",
+        {"status": "ready", "decision": "Briefed"},
+    )
+    assert groomed["status"] == "ready"
+
+    promoted = post_json(dashboard_server, f"/api/backlog/{made['id']}/promote", {})
+    assert promoted["inbox_id"]
+
+    remaining = get_json(dashboard_server, "/api/backlog?status=proposed")
+    assert remaining["items"] == []
+
+    with pytest.raises(HTTPError):
+        post_json(dashboard_server, f"/api/backlog/{made['id']}/promote", {})
+
+
 def test_review_refuses_dangling_plan_link(dashboard_server) -> None:
     """Review with a ghost plan_id fails; stores tests cover the link itself."""
     made = post_json(

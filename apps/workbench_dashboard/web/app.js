@@ -5,6 +5,7 @@ const view = document.getElementById("view");
 const toasts = document.getElementById("toasts");
 const badge = document.getElementById("inbox-badge");
 const ideasBadge = document.getElementById("ideas-badge");
+const backlogBadge = document.getElementById("backlog-badge");
 
 function toast(message, ok) {
   const el = document.createElement("div");
@@ -62,9 +63,16 @@ async function refreshBadge() {
     } else {
       ideasBadge.hidden = true;
     }
+    if (status.open_backlog > 0) {
+      backlogBadge.textContent = status.open_backlog;
+      backlogBadge.hidden = false;
+    } else {
+      backlogBadge.hidden = true;
+    }
   } catch (err) {
     badge.hidden = true;
     ideasBadge.hidden = true;
+    backlogBadge.hidden = true;
   }
 }
 
@@ -389,6 +397,8 @@ async function renderHome() {
         <div class="card"><h2>Spend</h2>${spend}</div>
         <div class="card"><h2>Ideas</h2>
           <p>${status.new_ideas} new — triage each in Ideas (adopt, park, or decline). <a href="#/ideas">Open ideas</a></p></div>
+        <div class="card"><h2>Backlog</h2>
+          <p>${status.open_backlog} open — groom in Backlog (propose, ready, promote to inbox). <a href="#/backlog">Open backlog</a></p></div>
         <div class="card"><h2>Chat</h2>
           <form class="inline" id="quick-chat"><input type="text" name="text" placeholder="Ask the supervisor..." title="Ask the supervisor (starts a new chat)" required>
           <button type="submit" title="Start a chat with this question">Send</button></form></div>
@@ -988,6 +998,71 @@ async function renderIdeas(id) {
   document.getElementById("filter-ideas").addEventListener("input", (ev) => filterList("ideas-list", ev.target.value));
 }
 
+async function renderBacklog(id) {
+  if (id) {
+    const payload = await api("/api/backlog/" + encodeURIComponent(id));
+    const item = payload.item;
+    const opts = ["proposed", "ready", "doing", "blocked", "done", "dropped"].map((s) =>
+      `<option value="${s}"${item.status === s ? " selected" : ""}>${s}</option>`).join("");
+    view.innerHTML = `<h1>Backlog item</h1><p><a href="#/backlog">All backlog</a></p>
+      <div class="card"><h2>${gtext(item.title)}</h2>
+      <p class="muted">${esc(item.source)}${item.ref ? " · " + esc(item.ref) : ""} · ${esc(item.status)}</p>
+      <p class="inbox-body">${gtext(item.body || "")}</p>
+      ${item.decision ? `<p><strong>Decision:</strong> ${esc(item.decision)}</p>` : ""}
+      ${item.inbox_id ? `<p><a href="#/inbox/${esc(item.inbox_id)}" title="Open the inbox brief for this item">Inbox brief: ${esc(item.inbox_id)}</a></p>` : ""}
+      <form id="review-form" class="inline">
+        <select name="status" title="Grooming status">${opts}</select>
+        <input type="text" name="decision" placeholder="Decision note..." title="Decision note (optional)" value="${esc(item.decision || "")}">
+        <button type="submit" title="Save grooming status and note">Save grooming</button>
+      </form>
+      <p><button id="promote-btn" title="File this item as an inbox decision (take into run, or hold)">Propose inbox brief</button></p></div>`;
+    document.getElementById("review-form").addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      try {
+        await api("/api/backlog/" + encodeURIComponent(id) + "/review", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({status: ev.target.status.value, decision: ev.target.decision.value}),
+        });
+        toast("Grooming saved", true);
+        render();
+      } catch (err) {
+        toast(err.message, false);
+      }
+    });
+    document.getElementById("promote-btn").addEventListener("click", async () => {
+      try {
+        const out = await api("/api/backlog/" + encodeURIComponent(id) + "/promote", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: "{}",
+        });
+        toast("Inbox brief filed", true);
+        location.hash = "#/inbox/" + out.inbox_id;
+      } catch (err) {
+        toast(err.message, false);
+      }
+    });
+    return;
+  }
+  const backlogTab = new URLSearchParams((location.hash.split("?")[1] || "")).get("status") || "active";
+  const payload = await api("/api/backlog");
+  const archivedBacklog = ["done", "dropped"];
+  const shownBacklog = payload.items.filter((t) => backlogTab === "archive" ? archivedBacklog.includes(t.status) : !archivedBacklog.includes(t.status));
+  const items = shownBacklog.length
+    ? shownBacklog.map((t) =>
+        `<li><a href="#/backlog/${esc(t.id)}">${gtext(t.title)}</a>
+         <span class="muted">${esc(t.source)} · ${esc((t.created_at || "").slice(0, 10))}</span>
+         <span class="pill st-${esc((t.status || "none").replace(/\s+/g, "-"))}">${esc(t.status)}</span></li>`).join("")
+    : '<li class="muted">No backlog items yet — use + New.</li>';
+  view.innerHTML = `<h1>Backlog</h1>
+    <p><a href="#/backlog">Active</a> · <a href="#/backlog?status=archive">Archive</a></p>
+    <p class="muted">Groomed work before inbox briefs. Groom in planning sessions; promote to file a decision.</p>
+    <p><input type="text" id="filter-backlog" placeholder="Filter backlog..." title="Filter backlog by text"></p>
+    <ul class="plain" id="backlog-list">${items}</ul>`;
+  document.getElementById("filter-backlog").addEventListener("input", (ev) => filterList("backlog-list", ev.target.value));
+}
+
 async function renderDocuments(id) {
   if (id) {
     const payload = await api("/api/documents/" + id.split("/").map(encodeURIComponent).join("/"));
@@ -1099,6 +1174,11 @@ function renderCreate(kind) {
       ${fieldRow("Description", '<textarea id="f-body" rows="3" title="Description (optional)"></textarea>', "optional")}
       ${fieldRow("Origin *", `<select id="f-source" title="Whose idea (required)"><option value="owner">mine</option><option value="third-party">someone else's</option></select>`, "required")}
       ${fieldRow("Contact", '<input type="text" id="f-contact" title="Name or contact (only for third-party ideas)">', "only for third-party ideas")}`},
+    backlog: {heading: "New backlog item", fields: `
+      ${fieldRow("Title *", '<input type="text" id="f-title" title="Backlog item title (required)">', "required")}
+      ${fieldRow("Description", '<textarea id="f-body" rows="3" title="Description (optional)"></textarea>', "optional")}
+      ${fieldRow("Origin *", `<select id="f-source" title="Who filed it (required)"><option value="owner">me</option><option value="agent">AI agent</option></select>`, "required")}
+      ${fieldRow("Ref", '<input type="text" id="f-ref" title="Origin reference: ledger doc, idea id (optional)">', "optional")}`},
   };
   const def = defs[kind];
   if (!def) { view.innerHTML = "<h1>Not found</h1>"; return; }
@@ -1148,6 +1228,19 @@ function renderCreate(kind) {
         });
         toast("Idea captured", true);
         location.hash = "#/ideas/" + out.id;
+      } else if (kind === "backlog") {
+        const out = await api("/api/backlog", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({
+            title,
+            body: document.getElementById("f-body").value,
+            source: document.getElementById("f-source").value,
+            ref: document.getElementById("f-ref").value,
+          }),
+        });
+        toast("Backlog item filed", true);
+        location.hash = "#/backlog/" + out.id;
       }
     } catch (err) {
       createBtn.disabled = false;
@@ -1357,6 +1450,7 @@ async function render() {
     else if (name === "runs") await renderRuns(id);
     else if (name === "inbox") await renderInbox(id);
     else if (name === "ideas") await renderIdeas(id);
+    else if (name === "backlog") await renderBacklog(id);
     else if (name === "documents") await renderDocuments(id);
     else if (name === "intake") await renderIntake();
     else if (name === "schedule") await renderSchedule();
