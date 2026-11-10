@@ -27,8 +27,15 @@ _QUALITY_RANK = {
 def recommend_model(
     profile: TaskProfile,
     catalog: tuple[ModelCatalogEntry, ...],
+    *,
+    cost_exemptions: frozenset[str] = frozenset(),
 ) -> ModelRecommendation:
-    """Select the best catalog candidate for a task profile."""
+    """Select the best catalog candidate for a task profile.
+
+    ``cost_exemptions`` holds billing-source values the owner explicitly
+    admitted despite the task cost tier (finite free grants). Quality,
+    privacy, capability and latency gates still apply to exempted routes.
+    """
 
     if not catalog:
         raise ValueError("Model catalog must not be empty.")
@@ -42,7 +49,7 @@ def recommend_model(
     rejected: list[CandidateRejection] = []
 
     for candidate in catalog:
-        reason = _rejection_reason(profile, candidate)
+        reason = _rejection_reason(profile, candidate, cost_exemptions)
         if reason:
             rejected.append(CandidateRejection(candidate=candidate, reason=reason))
         else:
@@ -64,6 +71,10 @@ def recommend_model(
         ),
         "Candidates were filtered by route, privacy, cost policy, capability, and quality.",
     ]
+    if not cost_policy_allows(selected.backend.cost_policy_tier, profile.cost_policy_tier):
+        reasons.append(
+            f"Selected via a user spending exemption for {selected.backend.billing_source.value}."
+        )
     estimate_reason = _estimate_reason(selected.backend.estimate)
     if estimate_reason:
         reasons.append(estimate_reason)
@@ -78,7 +89,11 @@ def recommend_model(
     )
 
 
-def _rejection_reason(profile: TaskProfile, candidate: ModelCatalogEntry) -> str | None:
+def _rejection_reason(
+    profile: TaskProfile,
+    candidate: ModelCatalogEntry,
+    cost_exemptions: frozenset[str] = frozenset(),
+) -> str | None:
     if (
         profile.user_route_id_override
         and candidate.backend.route_id != profile.user_route_id_override
@@ -108,7 +123,10 @@ def _rejection_reason(profile: TaskProfile, candidate: ModelCatalogEntry) -> str
     ):
         return "Rejected because sensitive external processing requires review."
 
-    if not cost_policy_allows(candidate.backend.cost_policy_tier, profile.cost_policy_tier):
+    if (
+        not cost_policy_allows(candidate.backend.cost_policy_tier, profile.cost_policy_tier)
+        and candidate.backend.billing_source.value not in cost_exemptions
+    ):
         return (
             "Rejected because route requires cost policy "
             f"{candidate.backend.cost_policy_tier.value}, but task allows "

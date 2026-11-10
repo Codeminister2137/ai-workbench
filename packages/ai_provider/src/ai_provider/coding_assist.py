@@ -135,6 +135,7 @@ def run_coding_prompt(
     client_factory: Callable[[BackendConfig], ChatClient] = create_chat_client,
     progress_callback: Callable[[str], None] | None = None,
     progress_prefix: str = "local_agent_activity",
+    cost_exemptions: frozenset[str] = frozenset(),
 ) -> CodingAssistResult:
     """Prepare and optionally execute one coding-oriented AI request."""
 
@@ -145,6 +146,7 @@ def run_coding_prompt(
         review_prompt=review_prompt,
         prompt_for_review=prompt_for_review,
         timeout_seconds=timeout_seconds,
+        cost_exemptions=cost_exemptions,
     )
     if not orchestration.is_ready or orchestration.execution_plan is None:
         if progress_callback is not None:

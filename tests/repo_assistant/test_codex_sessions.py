@@ -57,6 +57,8 @@ def test_cli_can_plan_codex_resume_last(capsys, monkeypatch) -> None:
                 "--model",
                 "gpt-5.5",
                 "--skip-prompt-review",
+                "--approval-policy",
+                "interactive",
                 "--codex-resume",
                 "last",
             ]

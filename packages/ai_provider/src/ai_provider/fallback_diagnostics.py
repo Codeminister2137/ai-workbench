@@ -27,6 +27,7 @@ def fallback_readiness_report(
     priority: tuple[str, ...] = (),
     excluded_route_ids: frozenset[str] = frozenset(),
     allow_cost_escalation: bool = False,
+    cost_exemptions: frozenset[str] = frozenset(),
 ) -> dict[str, Any]:
     """Explain policy/adapter exclusions without performing runtime or account probes.
 
@@ -46,6 +47,7 @@ def fallback_readiness_report(
         priority=priority,
         excluded_route_ids=excluded_route_ids,
         allow_cost_escalation=allow_cost_escalation,
+        cost_exemptions=cost_exemptions,
     )
     candidates = []
     preservation_candidates = []
@@ -58,6 +60,7 @@ def fallback_readiness_report(
         priority=priority,
         excluded_route_ids=excluded_route_ids,
         allow_cost_escalation=allow_cost_escalation,
+        cost_exemptions=cost_exemptions,
     )
     for entry in eligible + preservation:
         preserving = entry in preservation

@@ -48,9 +48,10 @@ python -m uv run pyright
 
 Development modes (`implement`, `coding-chat`) default to `--quality high`,
 so unscoped runs auto-route to better models instead of silently settling on
-local ones (pilot 2026-11-10). Deliberate local runs keep working: pass an
-explicit `--quality standard` (or lower), set a `defaults.quality` user-config
-value, or name the route with `--provider`/`--model`.
+local ones (pilot 2026-11-10). User-config holds defaults only: a
+configured quality does not override this dev-mode need. Deliberate local
+runs keep working: pass an explicit `--quality standard` (or lower), or
+name the route with `--provider`/`--model`.
 
 Use the Codex route when you want the native Codex execution workflow:
 
@@ -267,6 +268,16 @@ Notes:
 - Hosted providers are allowed by default; pass `--privacy local_only` to keep a run on the machine.
 - `--cost-policy billing_allowed` is required for OpenAI direct API routes in
   the sample catalog because they can incur metered API billing.
+- Finite free grants (expiry enforced, balances informational until
+  settlement wiring lands) can admit one billing source despite the tier:
+
+```toml
+[[spending.exemptions]]
+billing_source = "meta_api_billing"
+balance_cents = 11200
+expires_at = "2026-11-16T23:59:00+01:00"
+note = "hackathon credits, owner-reported"
+```
 - Do not commit API keys.
 - The wrapper script loads `.env` for the run.
 

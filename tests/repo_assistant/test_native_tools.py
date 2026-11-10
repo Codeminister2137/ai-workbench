@@ -605,6 +605,8 @@ def test_implement_mode_defaults_to_native_tools(capsys, monkeypatch) -> None:
                 "ollama",
                 "--model",
                 "qwen2.5-coder:14b",
+                "--approval-policy",
+                "interactive",
                 "--execute",
             ]
         )

@@ -530,3 +530,40 @@ def test_implement_fails_closed_before_inference_without_explicit_quality(tmp_pa
     assert "No model candidate satisfied" in out
     assert "quality threshold" in out
     assert "0 attempts" in out
+
+
+def test_explicit_route_uses_spending_exemption(tmp_path, capsys) -> None:
+    """User-set spending rules admit a billing source despite the tier."""
+    (tmp_path / "AGENTS.md").write_text("required rules" * 10)
+    (tmp_path / "user-config.toml").write_text(
+        """
+[[spending.exemptions]]
+billing_source = "meta_api_billing"
+balance_cents = 11200
+note = "test grant"
+""",
+        encoding="utf-8",
+    )
+    catalog = (
+        Path(__file__).resolve().parents[2]
+        / "packages"
+        / "ai_orchestrator"
+        / "examples"
+        / "model_catalog.toml"
+    )
+    main(
+        [
+            "task",
+            "--mode",
+            "plan",
+            "--route-id",
+            "meta/muse-spark-1.3",
+            "--cost-policy",
+            "allowances_allowed",
+            "--repo-root",
+            str(tmp_path),
+            "--catalog",
+            str(catalog),
+        ]
+    )
+    assert "route_id: meta/muse-spark-1.3" in capsys.readouterr().out
