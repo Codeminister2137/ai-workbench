@@ -905,3 +905,27 @@ def test_inbox_close_accepts_followup_kind(dashboard_server) -> None:
         )
     assert raised.value.code == 400
     raised.value.close()
+
+
+def test_restriction_toggles_round_trip(dashboard_server) -> None:
+    status = get_json(dashboard_server, "/api/restrictions")
+    assert status["ok"] is True
+    assert {item["name"] for item in status["toggles"]} == {
+        "auto_routing",
+        "shell_tools",
+        "sandbox",
+        "delegation",
+    }
+    updated = post_json(
+        dashboard_server,
+        "/api/restrictions/toggles",
+        {"name": "sandbox", "enabled": True},
+    )
+    assert updated["ok"] is True
+    sandbox = next(item for item in updated["toggles"] if item["name"] == "sandbox")
+    assert sandbox["enabled"] is True
+    reread = get_json(dashboard_server, "/api/restrictions")
+    sandbox = next(item for item in reread["toggles"] if item["name"] == "sandbox")
+    assert sandbox["enabled"] is True
+    with pytest.raises(HTTPError):
+        post_json(dashboard_server, "/api/restrictions/toggles", {"name": "nope", "enabled": True})

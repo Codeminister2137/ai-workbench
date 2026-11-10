@@ -78,8 +78,8 @@ def test_dynamic_inputs_and_selects_have_titles() -> None:
     js = _read("app.js")
     inputs = [tag for tag in re.findall(r"<input\b[^>]*>", js) if 'type="radio"' not in tag]
     assert (
-        len(inputs) == 20
-    )  # +rename/create-form inputs, +5 list filters, +idea plan link, +task propose, +backlog filter/decision/create-title/create-ref
+        len(inputs) == 21
+    )  # +rename/create-form inputs, +5 list filters, +idea plan link, +task propose, +backlog filter/decision/create-title/create-ref, +restriction toggle
     for tag in inputs:
         assert "title=" in tag, f"input without title: {tag}"
     selects = re.findall(r"<select\b[^>]*>", js)

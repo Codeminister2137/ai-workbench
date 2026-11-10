@@ -26,6 +26,11 @@ class DashboardConfig:
     supervision: str = "attended"
     trusted_hosts: tuple[str, ...] = ()
     drain_interval_seconds: int = 0
+    max_iterations: int = 50
+    loop_context_budget_chars: int = 100000
+    require_grounded_reports: bool = True
+    route_policy: str = "configured"
+    catalog_path: str | None = None
 
 
 def load_config(path: Path = DEFAULT_CONFIG_PATH) -> DashboardConfig:
@@ -49,14 +54,17 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> DashboardConfig:
         "supervision": str,
         "trusted_hosts": list,
         "drain_interval_seconds": int,
+        "max_iterations": int,
+        "loop_context_budget_chars": int,
+        "require_grounded_reports": bool,
+        "route_policy": str,
+        "catalog_path": (str, type(None)),
     }
     values: dict[str, object] = {}
     for key, types in known.items():
-        if key not in payload or payload[key] is None and key == "base_url":
+        if key not in payload or payload[key] is None:
             continue
         value = payload[key]
-        if key == "base_url" and value is None:
-            continue
         if not isinstance(value, types):
             raise ValueError(f"Dashboard config key {key!r} has the wrong type")
         values[key] = value

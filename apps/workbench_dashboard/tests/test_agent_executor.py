@@ -361,3 +361,204 @@ def test_blank_summary_falls_back_to_receipt(tmp_path) -> None:
     assert receipt["summary"].strip() != ""
     assert "read_file" in receipt["summary"]
     assert "a.py" in receipt["summary"]
+
+
+def test_reconstruction_budgets_flow_to_loop(harness) -> None:
+    execute, _factory, _project = harness
+    execute({"id": "r1", "title": "t", "body": "b"})
+    kwargs = FakeLoop.instances[-1].kwargs
+    assert kwargs["max_iterations"] == 50
+    assert kwargs["loop_context_budget_chars"] == 100000
+    assert kwargs["require_grounded_reports"] is True
+
+
+def test_executor_config_overrides_budgets(tmp_path) -> None:
+    from ai_agent.staged_edits import ProjectRoots
+
+    FakeLoop.instances = []
+    config = DashboardConfig(
+        provider="ollama",
+        model="fake",
+        max_iterations=7,
+        loop_context_budget_chars=0,
+        require_grounded_reports=False,
+    )
+    execute = build_executor(
+        config,
+        ProjectRoots((str(tmp_path),)),
+        tmp_path,
+        client_factory=lambda backend: object(),
+        loop_factory=FakeLoop,
+    )
+    execute({"id": "r1", "title": "t", "body": "b"})
+    kwargs = FakeLoop.instances[-1].kwargs
+    assert kwargs["max_iterations"] == 7
+    assert kwargs["loop_context_budget_chars"] is None
+    assert kwargs["require_grounded_reports"] is False
+
+
+def test_receipt_carries_compactions(tmp_path) -> None:
+    from ai_agent.staged_edits import ProjectRoots
+
+    FakeLoop.instances = []
+
+    def factory_loop(client, registry, context, **kwargs):
+        loop = FakeLoop(client, registry, context, **kwargs)
+        loop.result = AgentResult(response=_response("done"), compactions=2)
+        return loop
+
+    config = DashboardConfig(provider="ollama", model="fake")
+    execute = build_executor(
+        config,
+        ProjectRoots((str(tmp_path),)),
+        tmp_path,
+        client_factory=lambda backend: object(),
+        loop_factory=factory_loop,
+    )
+    receipt = execute({"id": "r1", "title": "t", "body": "b"})
+    assert receipt["compactions"] == 2
+
+
+CATALOG_TOML = """[[models]]
+route_id = "ollama/fake-local"
+provider = "ollama"
+product = "ollama"
+model = "fake-local"
+location = "local"
+access_method = "local_runtime"
+auth_method = "none"
+billing_source = "local_free"
+cost_policy_tier = "local_only"
+quality = "standard"
+latency = "interactive"
+
+[models.capabilities]
+chat = true
+streaming = true
+tools = true
+structured_output = false
+multimodal_input = false
+embeddings = false
+
+[models.context_limits]
+context_window_tokens = 32768
+runtime_context_tokens = 4096
+
+[models.estimate]
+typical_latency_seconds = 1.0
+input_cost_per_million_tokens = 0
+output_cost_per_million_tokens = 0
+"""
+
+
+def test_configured_routing_uses_dashboard_model(harness) -> None:
+    FakeLoop.instances = []
+    execute, seen, project = harness
+    receipt = execute({"id": "r1", "title": "t", "body": "b"})
+    assert seen[-1].model == "fake"
+    assert receipt["route_id"] == "ollama/fake"
+
+
+def test_auto_routing_selects_from_catalog(tmp_path) -> None:
+    from ai_agent.staged_edits import ProjectRoots
+
+    FakeLoop.instances = []
+    catalog = tmp_path / "catalog.toml"
+    catalog.write_text(CATALOG_TOML, encoding="utf-8")
+    seen: list = []
+    config = DashboardConfig(
+        provider="ollama", model="fallback", route_policy="auto", catalog_path=str(catalog)
+    )
+    execute = build_executor(
+        config,
+        ProjectRoots((str(tmp_path),)),
+        tmp_path,
+        client_factory=lambda backend: seen.append(backend) or object(),
+        loop_factory=FakeLoop,
+    )
+    receipt = execute({"id": "r1", "title": "t", "body": "b"})
+    assert seen[-1].model == "fake-local"
+    assert receipt["route_id"] == "ollama/fake-local"
+
+
+def test_auto_routing_falls_back_to_configured(tmp_path) -> None:
+    from ai_agent.staged_edits import ProjectRoots
+
+    FakeLoop.instances = []
+    seen: list = []
+    config = DashboardConfig(
+        provider="ollama",
+        model="fallback",
+        route_policy="auto",
+        catalog_path=str(tmp_path / "absent.toml"),
+    )
+    execute = build_executor(
+        config,
+        ProjectRoots((str(tmp_path),)),
+        tmp_path,
+        client_factory=lambda backend: seen.append(backend) or object(),
+        loop_factory=FakeLoop,
+    )
+    receipt = execute({"id": "r1", "title": "t", "body": "b"})
+    assert seen[-1].model == "fallback"
+    assert receipt["route_id"] == "ollama/fallback"
+
+
+def test_shell_toggle_denies_execution_tools(harness) -> None:
+    from ai_agent.contracts import PermissionAction
+    from ai_agent.staged_edits import ProjectRoots
+    from ai_agent.tools.shell import RunCommandTool
+
+    FakeLoop.instances = []
+    execute, _seen, project = harness
+    config = DashboardConfig(provider="ollama", model="fake")
+    execute = build_executor(
+        config,
+        ProjectRoots((str(project),)),
+        project,
+        client_factory=lambda backend: object(),
+        loop_factory=FakeLoop,
+        restrictions={"shell_tools": False},
+    )
+    execute({"id": "r1", "title": "t", "body": "b"})
+    permissions = FakeLoop.instances[-1].kwargs["permissions"]
+    assert (
+        permissions.policy.action_for_tool("run_command", RunCommandTool().definition.category)
+        is PermissionAction.DENY
+    )
+
+
+def test_sandbox_toggle_pins_context(harness) -> None:
+    from ai_agent.staged_edits import ProjectRoots
+
+    FakeLoop.instances = []
+    _execute, _seen, project = harness
+    config = DashboardConfig(provider="ollama", model="fake")
+    execute = build_executor(
+        config,
+        ProjectRoots((str(project),)),
+        project,
+        client_factory=lambda backend: object(),
+        loop_factory=FakeLoop,
+        restrictions={"sandbox": True},
+    )
+    execute({"id": "r1", "title": "t", "body": "b"})
+    assert FakeLoop.instances[-1].context.sandbox is True
+
+
+def test_delegation_toggle_sets_default_fanout(harness) -> None:
+    from ai_agent.staged_edits import ProjectRoots
+
+    FakeLoop.instances = []
+    _execute, _seen, project = harness
+    config = DashboardConfig(provider="ollama", model="fake")
+    execute = build_executor(
+        config,
+        ProjectRoots((str(project),)),
+        project,
+        client_factory=lambda backend: object(),
+        loop_factory=FakeLoop,
+        restrictions={"delegation": True},
+    )
+    execute({"id": "r1", "title": "t", "body": "b"})
+    assert FakeLoop.instances[-1].kwargs["fanout_policy"] == "allowed"
