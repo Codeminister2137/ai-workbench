@@ -150,6 +150,7 @@ GROUPS = {
         "tests/test_invoice_draft.py",
         "tests/test_document_status.py",
         "tests/test_package_layering.py",
+        "tests/test_go_acceptance_wiring.py",
     ),
     "research": (
         "tests/test_research_*.py",
