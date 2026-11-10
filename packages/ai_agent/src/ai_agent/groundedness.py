@@ -106,10 +106,12 @@ _CLAIM_PATTERNS: tuple[tuple[ClaimClass, re.Pattern[str]], ...] = (
         ),
     ),
     (
+        # Strong verbs only: weak conversational verbs (reviewed, checked,
+        # inspected) also describe legitimate in-context chat work and caused
+        # false refusals. Fabrication that matters uses verified/confirmed.
         "inspection",
         re.compile(
-            r"\b(verified|confirmed|checked|validated|inspected|reviewed|"
-            r"double-checked|re-checked)\b",
+            r"\b(verified|confirmed|validated|double-checked|re-checked)\b",
             re.IGNORECASE,
         ),
     ),

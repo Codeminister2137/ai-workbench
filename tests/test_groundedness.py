@@ -93,7 +93,7 @@ def test_wrong_class_or_failed_tool_does_not_support() -> None:
 
 
 def test_unknown_tool_backs_inspection_only() -> None:
-    verdict = check_groundedness("I checked the system.", (_result("custom_probe"),))
+    verdict = check_groundedness("I verified the system.", (_result("custom_probe"),))
     assert verdict.ok
     verdict = check_groundedness("All tests passed.", (_result("custom_probe"),))
     assert not verdict.ok
