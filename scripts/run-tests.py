@@ -107,6 +107,7 @@ GROUPS = {
         "tests/test_native_delegation.py",
         "tests/test_governance_tiers.py",
         "tests/test_agent_acceptance.py",
+        "tests/test_knowme_bank.py",
     ),
     "cli": (
         "tests/repo_assistant/test_*.py",
