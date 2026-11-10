@@ -622,3 +622,29 @@ def test_offline_report_honours_priority_and_exclusions(monkeypatch, tmp_path, c
     assert candidates[0] == "github/copilot-cli-auto"
     reasons = {row["route_id"]: row["reason"] for row in report["policy_exclusions"]}
     assert reasons["google/antigravity-gemini-3.1-pro-high"] == "excluded by fallback.exclude"
+
+
+def test_offline_report_lists_exempted_route_without_crash(tmp_path, capsys) -> None:
+    (tmp_path / "user-config.toml").write_text(
+        """
+[[spending.exemptions]]
+billing_source = "meta_api_billing"
+note = "test grant"
+""",
+        encoding="utf-8",
+    )
+    assert (
+        cli.main(
+            offline_args(
+                tmp_path,
+                "--fallback-quality-policy",
+                "prefer_quality",
+                "--fallback-priority",
+                "meta/muse-spark-1.3",
+            )
+        )
+        == 0
+    )
+    report = json.loads(capsys.readouterr().out)
+    route_ids = [row["route_id"] for row in report["fallback_candidates"]]
+    assert "meta/muse-spark-1.3" in route_ids
