@@ -321,6 +321,17 @@ def build_argument_parser() -> argparse.ArgumentParser:
         help="Minimum quality threshold.",
     )
     parser.add_argument(
+        "--complexity",
+        action=UserDefaultAction,
+        choices=("auto", "simple", "complex"),
+        default="auto",
+        help=(
+            "Task complexity for routing. simple prefers the cheapest sufficient "
+            "route; auto treats short ask-mode prompts as simple; complex keeps "
+            "quality-first routing."
+        ),
+    )
+    parser.add_argument(
         "--provider",
         help=(
             "Hard provider override. Valid values are the providers declared by "

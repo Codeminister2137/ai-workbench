@@ -598,6 +598,11 @@ def _print_cli_closeout(
         )
     from ai_agent.groundedness import check_groundedness
 
+    _record_route_outcome(
+        args=args,
+        route_id=route_id if isinstance(route_id, str) else None,
+        execution_status=execution_status,
+    )
     verdict = check_groundedness(
         response_text or "",
         tuple(getattr(args, "_groundedness_tool_results", ()) or ()),
@@ -1449,6 +1454,7 @@ def _execute_request(
         ),
         provider_override=args.provider,
         model_override=args.model,
+        complexity=_resolve_complexity(args),
     )
     if args.native_tools and args.execute:
         # A tool-enabled turn must be routed to a model that can actually call tools.
@@ -1514,6 +1520,7 @@ def _execute_request(
         prompt_for_review=args.prompt,
         timeout_seconds=args.timeout_seconds,
         cost_exemptions=args.cost_exemptions,
+        quality_adjustments=_quality_adjustments_for_run(args),
     )
     if (
         sampling_kwargs(args)
@@ -2654,6 +2661,7 @@ def _run_coding_prompt_with_fallback(
         catalog,
         review_prompt=False,
         cost_exemptions=getattr(args, "cost_exemptions", frozenset()),
+        quality_adjustments=_quality_adjustments_for_run(args),
     )
     orchestration = replace(
         orchestration,
@@ -2959,6 +2967,7 @@ def _print_fallback_readiness(args: argparse.Namespace, repo_root: Path) -> int:
         access_method_override=AccessMethod(args.access_method) if args.access_method else None,
         provider_override=args.provider,
         model_override=args.model,
+        complexity=_resolve_complexity(args),
     )
     if args.tool_profile == "research":
         profile = replace(
@@ -2985,6 +2994,7 @@ def _print_fallback_readiness(args: argparse.Namespace, repo_root: Path) -> int:
         review_prompt=False,
         timeout_seconds=args.timeout_seconds,
         cost_exemptions=getattr(args, "cost_exemptions", frozenset()),
+        quality_adjustments=_quality_adjustments_for_run(args),
     )
     if result.execution_plan is None:
         print(json.dumps({"status": "blocked", "reason": result.failure_reason}))
@@ -3938,6 +3948,7 @@ def _run_native_agent(
                 review_prompt=False,
                 timeout_seconds=getattr(args, "timeout_seconds", 180.0),
                 cost_exemptions=getattr(args, "cost_exemptions", frozenset()),
+                quality_adjustments=_quality_adjustments_for_run(args),
             )
             if not child_orchestration.is_ready or child_orchestration.execution_plan is None:
                 reason = child_orchestration.failure_reason or child_orchestration.status.value
@@ -4297,6 +4308,7 @@ def _run_native_agent(
         error.partial_messages = result.messages
         raise error
     args._groundedness_tool_results = result.tool_results
+    args._native_iterations = result.iterations
     return result
 
 
@@ -4385,6 +4397,72 @@ def _policy_with_tool_rules(base: Any, args: argparse.Namespace) -> Any:
     if not rules:
         return base
     return replace(base, tool_rules=base.tool_rules + tuple(rules))
+
+
+COMPLEXITY_AUTO_ASK_CHARS = 400
+
+
+def _resolve_complexity(args: argparse.Namespace) -> str:
+    """Map --complexity to a profile value; auto sniffs short ask prompts."""
+    setting = getattr(args, "complexity", "auto")
+    if setting in {"simple", "complex"}:
+        return setting
+    if getattr(args, "mode", None) == "ask" and len(getattr(args, "prompt", "") or "") < (
+        COMPLEXITY_AUTO_ASK_CHARS
+    ):
+        return "simple"
+    return "unknown"
+
+
+def _quality_adjustments_for_run(args: argparse.Namespace) -> dict[str, int]:
+    """Load outcome demotions once per invocation; failures yield none."""
+    cached = getattr(args, "_quality_adjustments_cache", None)
+    if cached is not None:
+        return cached
+    adjustments: dict[str, int] = {}
+    try:
+        from ai_orchestrator.route_outcomes import (
+            OUTCOMES_FILENAME,
+            load_quality_adjustments,
+        )
+
+        repo_root = Path(getattr(args, "repo_root", "."))
+        adjustments = dict(load_quality_adjustments(repo_root / "artifacts" / OUTCOMES_FILENAME))
+    except OSError:
+        adjustments = {}
+    args._quality_adjustments_cache = adjustments
+    return adjustments
+
+
+def _record_route_outcome(
+    *,
+    args: argparse.Namespace,
+    route_id: str | None,
+    execution_status: str,
+) -> None:
+    """Append one routing outcome; recording must never break a run."""
+    if route_id is None or getattr(args, "mode", None) not in {"ask", "review", "implement"}:
+        return
+    if execution_status not in {"completed", "failed"}:
+        return
+    try:
+        import time
+
+        from ai_orchestrator.route_outcomes import OUTCOMES_FILENAME, RouteOutcome, append_outcome
+
+        tool_results = getattr(args, "_groundedness_tool_results", None) or ()
+        outcome = RouteOutcome(
+            route_id=route_id,
+            mode=args.mode,
+            success=execution_status == "completed",
+            tool_calls=len(tool_results),
+            iterations=int(getattr(args, "_native_iterations", 1)),
+            finished_at=time.time(),
+        )
+        repo_root = Path(getattr(args, "repo_root", "."))
+        append_outcome(repo_root / "artifacts" / OUTCOMES_FILENAME, outcome)
+    except OSError:
+        pass
 
 
 def _format_delegated_task_output(

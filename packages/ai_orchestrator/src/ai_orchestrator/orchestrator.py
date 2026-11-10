@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -53,6 +54,7 @@ def prepare_execution(
     prompt_for_review: str | None = None,
     timeout_seconds: float = 60.0,
     cost_exemptions: frozenset[str] = frozenset(),
+    quality_adjustments: Mapping[str, int] | None = None,
 ) -> OrchestrationResult:
     """Review a prompt, recommend a model, and prepare a neutral execution plan.
 
@@ -77,7 +79,12 @@ def prepare_execution(
         )
 
     try:
-        recommendation = recommend_model(profile, catalog, cost_exemptions=cost_exemptions)
+        recommendation = recommend_model(
+            profile,
+            catalog,
+            cost_exemptions=cost_exemptions,
+            quality_adjustments=quality_adjustments,
+        )
     except ValueError as exc:
         return OrchestrationResult(
             original_prompt=prompt,
