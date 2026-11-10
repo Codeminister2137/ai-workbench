@@ -70,8 +70,9 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/plans/company-backlog-20261102.md | ACTED | R1/R2/R3/E/J all produced. |
 | docs/plans/company-name-r2-draft.md | KNOWLEDGE | PL legality orientation; name eval superseded by R3/R4. |
 | docs/plans/company-naming-r3.md | ACTED | Fed R4 (Bench verdict revised there). |
-| docs/plans/company-naming-r4.md | PENDING | Owner picks D1/D2, then clearance. |
-| docs/plans/company-offering-draft.md | PENDING | Proposal with open questions; pricing partly re-anchored by grounding §2. |
+| docs/plans/company-naming-r4.md | ACTED | Agent pick decided (Majster/Mai); company round moved to R5. |
+| docs/plans/company-naming-r5.md | PENDING | Preference-weighted round; public pick brief open. |
+| docs/plans/company-offering-draft.md | KNOWLEDGE | Direction approved (D9a-A); details resolve in discovery. |
 | docs/plans/deferred-baseline-work-20261022.md | PENDING | Bounded offline backlog; item 1 ties to in-progress conformance plan. |
 | docs/plans/deliberation-pack-20261110.md | PENDING | Tomorrow's decisions D1-D9. |
 | docs/plans/edge-round1-operator.md | TRIAGE | E research produced; fix-state unverified. |
@@ -84,7 +85,7 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/plans/local-model-quality-policy.md | IGNORE | Superseded by docs/local-model-quality-policy.md v1. |
 | docs/plans/local-model-queue.md | ACTED | Q1-Q4 all consumed into quality-policy v1. |
 | docs/plans/loop-20261102-evening.md | ACTED | Consumed run plan. |
-| docs/plans/marketing-r3-draft.md | PENDING | Compliance boundary binding; pilot proposal unapproved. |
+| docs/plans/marketing-r3-draft.md | KNOWLEDGE | Boundary binding; pilot held (D9b-B) until naming lands. |
 | docs/plans/merge-inventory-20261105.md | ACTED | Nov-5 merge DONE. |
 | docs/plans/model-capability-data-plan.md | KNOWLEDGE | Program reference; L1/L2 live per roadmap, L3 ladder pending. |
 | docs/plans/morning-20261104.md | ACTED | Consumed run plan. |
@@ -96,11 +97,12 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/plans/p6-dashboard-proposal.md | ACTED | Dashboard built; proposals consumed. |
 | docs/plans/p6-dashboard-scouting.md | ACTED | Dashboard built; scouting consumed. |
 | docs/plans/p7-capability-analysis.md | KNOWLEDGE | P7 working reference. |
-| docs/plans/p7-company-scouting.md | PENDING | Social bots TBD/cut; paperwork inventory open. |
+| docs/plans/p7-company-scouting.md | KNOWLEDGE | Bots kept exploring (D9c-B); paperwork answered (checklist filed). |
 | docs/plans/p7-discovery-checklist.md | KNOWLEDGE | On-site discovery tool v1. |
 | docs/plans/p7-grounding-20261109.md | KNOWLEDGE | Pricing/positioning ground truth §§1-9. |
 | docs/plans/p7-knowledge-bank.md | KNOWLEDGE | Chatbot can/cannot bank. |
-| docs/plans/p7-project-file-format-proposal.md | PENDING | Proposed; owner review (overlaps D5). |
+| docs/plans/p7-project-file-format-proposal.md | ACTED | Approved (D9e-A); intake enum shipped. |
+| docs/plans/p7-paperwork-checklist.md | KNOWLEDGE | Active checklist; 6 backlog items filed. |
 | docs/plans/p8-templates-scouting.md | KNOWLEDGE | Greenfield note, correctly ordered after P7. |
 | docs/plans/product-roadmap-20261031.md | KNOWLEDGE | P1-P9 direction; schedule section stale (hackathon windows passed). |
 | docs/plans/repo-assistant-cli-parity-plan.md | ACTED | Consumed into CLI/ADRs (one narrow Oct-19 PENDING likely moot). |
