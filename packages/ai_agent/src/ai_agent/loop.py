@@ -307,13 +307,15 @@ class AgentLoop:
         model: str | None = None,
         privacy_class: PrivacyClass = PrivacyClass.LOCAL_ONLY,
         prior_iterations: int = 0,
+        prior_tool_results: tuple[ToolResult, ...] = (),
     ) -> AgentResult:
         """Continue an exhausted run from saved messages under a fresh allowance.
 
         ``messages`` is normally ``ProviderError.partial_messages`` from a run
-        that raised with ``AgentIterationLimitExceeded``. The loop budget
-        restarts at zero local iterations; ``prior_iterations`` seeds the
-        cumulative count reported on the result.
+        that raised with ``AgentIterationLimitExceeded``, and
+        ``prior_tool_results`` the matching ``ProviderError.tool_results``.
+        The loop budget restarts at zero local iterations; priors seed the
+        cumulative counts reported on the result.
         """
         return self.run(
             "",
@@ -321,6 +323,7 @@ class AgentLoop:
             privacy_class=privacy_class,
             resume_messages=messages,
             prior_iterations=prior_iterations,
+            prior_tool_results=prior_tool_results,
         )
 
     def run(
@@ -332,13 +335,15 @@ class AgentLoop:
         privacy_class: PrivacyClass = PrivacyClass.LOCAL_ONLY,
         resume_messages: tuple[AIMessage, ...] | None = None,
         prior_iterations: int = 0,
+        prior_tool_results: tuple[ToolResult, ...] = (),
     ) -> AgentResult:
         """Execute a prompt and any requested tools until a final answer is returned.
 
         ``resume_messages`` continues an exhausted run from saved messages
         (e.g. ``ProviderError.partial_messages``); ``prompt``/``system_prompt``
         are ignored then and ``prior_iterations`` seeds cumulative reporting.
-        Prefer :meth:`resume` for that path.
+        ``prior_tool_results`` restores earlier evidence for groundedness
+        checks and cumulative reporting. Prefer :meth:`resume` for that path.
         """
         if prior_iterations < 0:
             raise ValueError("prior_iterations must be non-negative")
@@ -401,7 +406,7 @@ class AgentLoop:
             if system_prompt:
                 messages.append(AIMessage(MessageRole.SYSTEM, system_prompt))
             messages.append(AIMessage(MessageRole.USER, prompt))
-        tool_results: list[ToolResult] = []
+        tool_results: list[ToolResult] = list(prior_tool_results)
         recovery = ModelOutputRecovery(self.context.workspace_root)
         model_output_errors = 0
         completion_failures = 0
@@ -738,6 +743,8 @@ class AgentLoop:
             raw_error=AgentIterationLimitExceeded(),
         )
         error.partial_messages = tuple(messages)
+        # Dynamic: ProviderError lives below ai_agent and cannot import ToolResult.
+        error.tool_results = tuple(tool_results)
         raise error
 
 
