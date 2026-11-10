@@ -1298,6 +1298,11 @@ def _execute_request(
             parser.error("--shared-tools inspection cannot be combined with research tools")
         if args.shared_tools == "inspection":
             args.approval_policy = "read_only"
+    if args.mode == "plan":
+        args.approval_policy = "read_only"
+    if getattr(args, "sandbox", False) and args.allow_outside_files:
+        parser.error("--sandbox cannot be combined with --allow-outside-files")
+    _warn_unknown_tool_rules(args)
     use_native_tools = (
         args.native_tools
         or bool(args.shared_tools)
@@ -1874,6 +1879,7 @@ def _execute_request(
         _print_provider_native_policy_diagnostics(
             args.approval_policy,
             delegation_enabled=_native_delegation_available(args),
+            sandbox=getattr(args, "sandbox", False),
         )
     if args.orchestrated:
         assert orchestrated_tracker is not None
@@ -3830,7 +3836,9 @@ def _run_native_agent(
     approval_policy = ApprovalPolicyPreset(
         getattr(args, "approval_policy", ApprovalPolicyPreset.INTERACTIVE.value)
     )
-    permission_policy = PermissionPolicy.from_approval_preset(approval_policy)
+    permission_policy = _policy_with_tool_rules(
+        PermissionPolicy.from_approval_preset(approval_policy), args
+    )
     asks_user = any(
         permission_policy.action_for_category(category).value == "ask_user"
         for category in ToolCategory
@@ -4185,7 +4193,10 @@ def _run_native_agent(
         client,
         registry,
         ToolContext.for_interactive_owner(
-            repo_root, delegation=granted, owner_prompt=owner_channel
+            repo_root,
+            delegation=granted,
+            owner_prompt=owner_channel,
+            sandbox=getattr(args, "sandbox", False),
         ),
         permissions=manager,
         max_iterations=args.max_action_rounds,
@@ -4342,6 +4353,40 @@ def _delegation_guidance(registry: Any) -> str:
     return DELEGATION_GUIDANCE
 
 
+def _warn_unknown_tool_rules(args: argparse.Namespace) -> None:
+    """Warn when a per-tool rule names no tool the host can offer."""
+    from ai_agent.tools.delegation import coding_tools_with_delegation
+
+    names = {tool.name for tool in coding_tools_with_delegation(_deny_stub).list_definitions()}
+    names.update({"process_start", "process_status", "process_stop"})
+    flagged = [
+        *(getattr(args, "allow_tool", None) or ()),
+        *(getattr(args, "ask_tool", None) or ()),
+        *(getattr(args, "deny_tool", None) or ()),
+    ]
+    for name in flagged:
+        if name not in names:
+            print(f"warning: --tool rule {name!r} matches no known tool")
+
+
+def _deny_stub(task: str, context: Any) -> Any:
+    raise AssertionError("rule-name probe must not execute")
+
+
+def _policy_with_tool_rules(base: Any, args: argparse.Namespace) -> Any:
+    """Apply CLI per-tool allow/ask/deny rules onto a preset policy."""
+    from ai_agent.contracts import PermissionAction
+
+    rules = (
+        *((name, PermissionAction.ALLOW) for name in (getattr(args, "allow_tool", None) or ())),
+        *((name, PermissionAction.ASK_USER) for name in (getattr(args, "ask_tool", None) or ())),
+        *((name, PermissionAction.DENY) for name in (getattr(args, "deny_tool", None) or ())),
+    )
+    if not rules:
+        return base
+    return replace(base, tool_rules=base.tool_rules + tuple(rules))
+
+
 def _format_delegated_task_output(
     *,
     task: str,
@@ -4420,6 +4465,7 @@ def _print_provider_native_policy_diagnostics(
     approval_policy: str,
     *,
     delegation_enabled: bool,
+    sandbox: bool = False,
 ) -> None:
     """Print secret-free provider-native tool policy diagnostics."""
 
@@ -4436,6 +4482,7 @@ def _print_provider_native_policy_diagnostics(
         "provider_native_delegation: "
         + ("enabled: primary agent may call delegate_task" if delegation_enabled else "disabled")
     )
+    print("provider_native_sandbox: " + ("strict-cwd" if sandbox else "off"))
 
 
 def _run_action_loop(

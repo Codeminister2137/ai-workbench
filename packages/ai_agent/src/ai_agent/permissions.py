@@ -23,13 +23,18 @@ class ApprovalPolicyPreset(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class PermissionPolicy:
-    """Policy mapping each tool category to an approval requirement."""
+    """Policy mapping each tool category to an approval requirement.
+
+    ``tool_rules`` overrides categories per tool name: deny always wins,
+    otherwise the last matching rule wins.
+    """
 
     read_action: PermissionAction = PermissionAction.ALLOW
     search_action: PermissionAction = PermissionAction.ALLOW
     write_action: PermissionAction = PermissionAction.ASK_USER
     shell_action: PermissionAction = PermissionAction.ASK_USER
     custom_action: PermissionAction = PermissionAction.ASK_USER
+    tool_rules: tuple[tuple[str, PermissionAction], ...] = ()
 
     @classmethod
     def permissive(cls) -> PermissionPolicy:
@@ -75,6 +80,15 @@ class PermissionPolicy:
             custom_action=PermissionAction.ASK_USER,
         )
 
+    def action_for_tool(self, name: str, category: ToolCategory) -> PermissionAction:
+        """Return the effective action for one tool; per-tool rules win."""
+        matches = [action for tool, action in self.tool_rules if tool == name]
+        if PermissionAction.DENY in matches:
+            return PermissionAction.DENY
+        if matches:
+            return matches[-1]
+        return self.action_for_category(category)
+
     def action_for_category(self, category: ToolCategory) -> PermissionAction:
         """Return the policy action for a given tool category."""
         match category:
@@ -118,7 +132,7 @@ class PermissionManager:
         except (ValueError, OverflowError):
             return False
         category = tool.definition.category
-        action = self.policy.action_for_category(category)
+        action = self.policy.action_for_tool(tool.definition.name, category)
 
         if action is PermissionAction.ALLOW:
             return True
@@ -128,6 +142,13 @@ class PermissionManager:
         # ASK_USER
         if self.approval_callback is not None:
             approval_call = tool.approval_call(call)
-            return approval_call is not None and self.approval_callback(approval_call, category)
+            if approval_call is None:
+                return False
+            try:
+                return bool(self.approval_callback(approval_call, category))
+            except Exception:
+                # Approval infrastructure failed (timeout, transport, state
+                # mismatch): fail closed on this call without killing the run.
+                return False
         # If no approval callback is registered, deny by default for safety
         return False

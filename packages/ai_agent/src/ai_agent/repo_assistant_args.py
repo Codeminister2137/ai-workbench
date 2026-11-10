@@ -376,6 +376,39 @@ def build_argument_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--allow-tool",
+        action="append",
+        default=[],
+        metavar="NAME",
+        help="Allow one tool without asking; repeatable. Per-tool deny wins.",
+    )
+    parser.add_argument(
+        "--ask-tool",
+        action="append",
+        default=[],
+        metavar="NAME",
+        help="Ask before one tool runs; repeatable. Per-tool deny wins.",
+    )
+    parser.add_argument(
+        "--deny-tool",
+        action="append",
+        default=[],
+        metavar="NAME",
+        help=(
+            "Deny one tool and hide it from the model; repeatable. "
+            "Deny wins over allow/ask and the preset."
+        ),
+    )
+    parser.add_argument(
+        "--sandbox",
+        action="store_true",
+        help=(
+            "Strict project-dir confinement: shell commands run at the workspace "
+            "root and outside-workspace files are refused. Command text itself "
+            "is still governed by the approval policy, not filtered."
+        ),
+    )
+    parser.add_argument(
         "--operator-base-url",
         action=UserDefaultAction,
         help=(

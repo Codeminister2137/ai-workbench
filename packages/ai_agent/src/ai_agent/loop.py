@@ -29,7 +29,7 @@ from ai_provider.closeout import safe_diagnostic_label
 
 from ai_agent.chat_context import messages_total_chars
 from ai_agent.completion import CompletionRequirement, missing_requirements
-from ai_agent.contracts import ToolCall, ToolResult
+from ai_agent.contracts import PermissionAction, ToolCall, ToolResult
 from ai_agent.groundedness import check_groundedness
 from ai_agent.model_output_recovery import ModelOutputRecovery
 from ai_agent.permissions import PermissionManager
@@ -185,6 +185,20 @@ class AgentLoop:
                 total += len(rendered)
             self._tool_schema_chars = total
         return messages_total_chars(messages) + self._tool_schema_chars
+
+    def _visible_tool_definitions(self) -> list[AIToolDefinition]:
+        """Export registry tools minus policy-denied ones.
+
+        A denied tool is hidden from the model's context (deny wins); the
+        permission check at dispatch still enforces the policy.
+        """
+        visible: list[AIToolDefinition] = []
+        for tool in self.registry.list_definitions():
+            action = self.permissions.policy.action_for_tool(tool.name, tool.category)
+            if action is PermissionAction.DENY:
+                continue
+            visible.append(_tool_definition(tool))
+        return visible
 
     def _maybe_compact(
         self,
@@ -411,9 +425,7 @@ class AgentLoop:
                     temperature=self.temperature,
                     top_p=self.top_p,
                     privacy_class=privacy_class,
-                    tools=tuple(
-                        _tool_definition(tool) for tool in self.registry.list_definitions()
-                    ),
+                    tools=tuple(self._visible_tool_definitions()),
                     metadata=dict(self.request_metadata),
                 )
                 enforce_credential_policy(request, extra=self.context.credential_secrets)
