@@ -1039,7 +1039,13 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     config_path = parsed.user_config or root / "user-config.toml"
     try:
-        user_config = load_user_config(config_path, required=parsed.user_config is not None)
+        from ai_provider.user_config import auto_config_disabled
+
+        user_config = load_user_config(
+            config_path,
+            required=parsed.user_config is not None,
+            skip_auto_load=auto_config_disabled() and parsed.user_config is None,
+        )
     except (OSError, ValueError, TypeError) as exc:
         parser.error(f"Invalid user config {config_path}: {exc}")
     apply_user_defaults(parsed, user_config)
@@ -1129,8 +1135,12 @@ def _execute_request(
 
     config_path = args.user_config or repo_root / "user-config.toml"
     try:
+        from ai_provider.user_config import auto_config_disabled
+
         user_config = user_config_override or load_user_config(
-            config_path, required=args.user_config is not None
+            config_path,
+            required=args.user_config is not None,
+            skip_auto_load=auto_config_disabled() and args.user_config is None,
         )
     except (OSError, ValueError, TypeError) as exc:
         parser.error(f"Invalid user config {config_path}: {exc}")
@@ -1304,7 +1314,7 @@ def _execute_request(
         if args.shared_tools == "inspection":
             args.approval_policy = "read_only"
     if args.mode == "plan":
-        args.approval_policy = "read_only"
+        _enforce_plan_read_only(args)
     if getattr(args, "sandbox", False) and args.allow_outside_files:
         parser.error("--sandbox cannot be combined with --allow-outside-files")
     _warn_unknown_tool_rules(args)
@@ -4363,6 +4373,19 @@ def _delegation_guidance(registry: Any) -> str:
     if registry.get("delegate_task") is None:
         return ""
     return DELEGATION_GUIDANCE
+
+
+def _enforce_plan_read_only(args: argparse.Namespace) -> None:
+    """Force read_only plan runs unless the policy was explicitly chosen.
+
+    An explicit CLI flag or user-config value wins (precedence); only the
+    silent default is forced, so plan mode cannot accidentally write.
+    """
+    chosen = getattr(args, "_provided_user_defaults", frozenset()) | getattr(
+        args, "_configured_user_defaults", frozenset()
+    )
+    if "approval_policy" not in chosen:
+        args.approval_policy = "read_only"
 
 
 def _warn_unknown_tool_rules(args: argparse.Namespace) -> None:

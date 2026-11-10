@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import math
+import os
 import time
 import tomllib
 from dataclasses import dataclass
@@ -20,6 +21,19 @@ from ai_provider.repo_context import (
     DEFAULT_CONTEXT_FILE_BUDGET_CHARS,
     DEFAULT_INSTRUCTION_BUDGET_CHARS,
 )
+
+NO_USER_CONFIG_ENV_VAR = "AI_WORKBENCH_NO_USER_CONFIG"
+
+
+def auto_config_disabled() -> bool:
+    """True when the environment forbids implicit user-config auto-load.
+
+    Explicit `--user-config` still loads; only the silent repo-root lookup
+    is skipped. The test suite sets this so runs never inherit the owner's
+    live preferences.
+    """
+    return os.environ.get(NO_USER_CONFIG_ENV_VAR) == "1"
+
 
 EXECUTION_DEFAULT_KEYS = frozenset(
     {
@@ -162,10 +176,12 @@ def _route_id_list(fallback: dict[str, object], key: str) -> tuple[str, ...]:
     return tuple(value)
 
 
-def load_user_config(path: Path, *, required: bool = False) -> UserConfig:
+def load_user_config(
+    path: Path, *, required: bool = False, skip_auto_load: bool = False
+) -> UserConfig:
     """Load TOML preferences, rejecting invalid values and misspelled settings."""
 
-    if not path.exists() and not required:
+    if (skip_auto_load or not path.exists()) and not required:
         return UserConfig()
     with path.open("rb") as source:
         data = tomllib.load(source)
