@@ -63,6 +63,7 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/plans/03_Job_Search_Automation_Project_Plan.txt | KNOWLEDGE | Founder source plan (R3-owned content). |
 | docs/plans/04_IT_Services_Business_Start_Plan_PL.txt | KNOWLEDGE | Founder source plan (primary R1 input). |
 | docs/plans/05_AI_Orchestrator_Project_Plan.txt | KNOWLEDGE | Founder source plan (capability evidence). |
+| docs/plans/ai-trainer-framing.md | TRIAGE | Trainer vs assistant framing; scope decision open. |
 | docs/plans/accountant-investigation.md | PENDING | Owner action: paid hour before first invoice (D6). |
 | docs/plans/backlog.md | ACTED | All items DONE (fan-out, merge). |
 | docs/plans/branch-consolidation-checklist.md | PENDING | DO NOT EXECUTE — owner review gate (Nov-9 prune was develop-local only). |
