@@ -264,7 +264,7 @@ Run:
 
 Notes:
 
-- `--privacy external_allowed` is required for hosted providers.
+- Hosted providers are allowed by default; pass `--privacy local_only` to keep a run on the machine.
 - `--cost-policy billing_allowed` is required for OpenAI direct API routes in
   the sample catalog because they can incur metered API billing.
 - Do not commit API keys.

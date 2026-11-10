@@ -1,3 +1,14 @@
+## Default privacy external_allowed; user-config holds defaults only - owner 2026-11-10
+
+**Status:** Accepted by the owner (directed in chat 2026-11-10).
+
+Shipped privacy default is `external_allowed` so development auto-routes
+to Codex/OpenCode allowances + Meta free credits ([ADR-085](decisions/ADR-085-default-privacy-external-allowed.md)).
+`--privacy local_only` is now the explicit opt-out. User-config values are
+defaults: case-specific needs (dev-mode HIGH floor) win over them; only
+explicit CLI flags and route/model choice opt out. Secrets, credential
+guards, approval gates and cost tiers unchanged.
+
 ## Vendor trial A: Prospeo + Apollo free, contact sources provider-agnostic - owner 2026-11-08
 
 **Status:** Accepted by the owner (inbox 8d325394=A; closed by loop10).

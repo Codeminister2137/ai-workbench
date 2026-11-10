@@ -45,7 +45,7 @@ class UserConfig:
     fallback_exclude: tuple[str, ...] = ()
     fallback_allow_cost_escalation: bool = False
     quality: QualityThreshold = QualityThreshold.STANDARD
-    privacy: PrivacyClass = PrivacyClass.LOCAL_ONLY
+    privacy: PrivacyClass = PrivacyClass.EXTERNAL_ALLOWED
     approval_policy: ApprovalPolicyPreset = ApprovalPolicyPreset.INTERACTIVE
     context_budget_chars: int = DEFAULT_CONTEXT_BUDGET_CHARS
     context_file_budget_chars: int = DEFAULT_CONTEXT_FILE_BUDGET_CHARS

@@ -201,6 +201,8 @@ tools = true
             "ollama",
             "--model",
             "primary",
+            "--privacy",
+            "local_only",
             "--skip-prompt-review",
             "Inspect this synthetic workspace.",
         ]

@@ -18,10 +18,13 @@ selects a local transcript directory and invokes the stable `ai-assistant` comma
 The wrapper may create log directories even when the underlying request is planned.
 
 Provider execution requires `--execute`. Model availability, client sign-in and
-billing entitlement are separate checks. The default task privacy is `local_only`;
-the shipped cost ceiling is `prepaid_credits_allowed`. Private preferences and
-explicit CLI flags can narrow that ceiling. Do not assume that an available API
-key authorizes transmitting repository contents or spending credits.
+billing entitlement are separate checks. The default task privacy is
+`external_allowed` ([ADR-085](decisions/ADR-085-default-privacy-external-allowed.md)):
+development routes to allowance/free-credit models automatically. Pass
+`--privacy local_only` to keep a run on the machine. The shipped cost ceiling
+is `prepaid_credits_allowed`. Private preferences and explicit CLI flags can
+narrow that ceiling. Do not assume that an available API key authorizes
+transmitting repository contents or spending credits.
 
 ## Guides by workflow
 

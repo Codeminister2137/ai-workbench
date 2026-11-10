@@ -208,7 +208,7 @@ def run_coding_prompt(
 
 def coding_task_profile(
     *,
-    privacy_class: OrchestratorPrivacyClass = OrchestratorPrivacyClass.LOCAL_ONLY,
+    privacy_class: OrchestratorPrivacyClass = OrchestratorPrivacyClass.EXTERNAL_ALLOWED,
     quality_threshold: QualityThreshold = QualityThreshold.STANDARD,
     latency_target: LatencyTarget = LatencyTarget.INTERACTIVE,
     max_expected_latency_seconds: float | None = None,
