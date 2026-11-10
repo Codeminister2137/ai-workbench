@@ -33,6 +33,7 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/logging-and-artifact-structure-plan.md | ACTED | Oct-19 working notes, consumed. |
 | docs/logging-artifact-inventory.md | KNOWLEDGE | Artifact inventory. |
 | docs/mail-digest.md | KNOWLEDGE | Mail digest reference. |
+| docs/overlap-analysis-20261110.md | KNOWLEDGE | Package graph + clone dispositions; layering decision open. |
 | docs/muse-code-workbench-parity.md | KNOWLEDGE | Parity verdict (kept). |
 | docs/parallel-pilot-20261101.md | KNOWLEDGE | Two-worker pilot record. |
 | docs/pivot-20261106-redundancy-automation.md | ACTED | Both briefs closed (11878f14, 98ea222c). |
