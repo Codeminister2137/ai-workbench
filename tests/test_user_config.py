@@ -253,6 +253,7 @@ def test_shared_inspection_retains_read_only_despite_configured_authority(
     from ai_agent import repo_coding_assistant as cli
 
     config_file(tmp_path, 'approval_policy = "trusted_local"')
+    monkeypatch.setenv("CODEX_COMMAND", "codex-test")
     assert (
         cli.main(
             [
@@ -261,6 +262,14 @@ def test_shared_inspection_retains_read_only_despite_configured_authority(
                 "--shared-tools",
                 "inspection",
                 "--skip-prompt-review",
+                "--privacy",
+                "external_allowed",
+                "--route-id",
+                "openai/codex-gpt-5.5",
+                "--provider",
+                "openai",
+                "--model",
+                "gpt-5.5",
                 "Inspect",
             ]
         )
