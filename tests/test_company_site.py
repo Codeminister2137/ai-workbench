@@ -115,3 +115,13 @@ def test_pricing_copy_matches_intake_buckets() -> None:
     assert "poufna z zasady" in pl_terms
     en_terms = (ROOT / "en" / "services.html").read_text(encoding="utf-8")
     assert "confidential by default" in en_terms
+
+
+def test_discovery_floor_pl_only() -> None:
+    """D4 followup (owner B): PL publishes the remote-discovery floor; EN silent."""
+    pl = (ROOT / "uslugi.html").read_text(encoding="utf-8")
+    for needle in ["od 1 tys. z\u0142", "rozmowa wideo", "wyceniana osobno"]:
+        assert needle in pl, needle
+    en = (ROOT / "en" / "services.html").read_text(encoding="utf-8")
+    for token in ["tys", "z\u0142", "PLN", "\u20ac", "EUR", "1,000", "1 000"]:
+        assert token not in en, token
