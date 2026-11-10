@@ -28,6 +28,10 @@ class OperatorBridgeError(Exception):
     """The operator bridge could not complete an approval round trip."""
 
 
+class OperatorBridgeTimeoutError(OperatorBridgeError):
+    """Approval timed out; safe to deny this call and continue the run."""
+
+
 def _sha256(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
@@ -103,7 +107,7 @@ class OperatorApprovalBridge:
         def remaining() -> float:
             seconds = deadline - time.perf_counter()
             if seconds <= 0:
-                raise OperatorBridgeError("External action approval timed out")
+                raise OperatorBridgeTimeoutError("External action approval timed out")
             return seconds
 
         remaining()

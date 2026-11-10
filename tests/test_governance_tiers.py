@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 from ai_agent import (
     AgentLoop,
     PermissionManager,
@@ -75,17 +76,32 @@ def test_manager_enforces_tool_rules_without_callback(tmp_path) -> None:
     assert manager.check_and_authorize(ReadFileTool(), ToolCall("read_file", {"path": "x"})) is True
 
 
-def test_approval_callback_failure_denies_without_raising(tmp_path) -> None:
-    def broken(call, category):
-        raise TimeoutError("approval transport exploded")
+def test_approval_timeout_denies_without_raising(tmp_path) -> None:
+    from ai_agent.operator_bridge import OperatorBridgeTimeoutError
 
-    manager = PermissionManager(policy=PermissionPolicy.interactive(), approval_callback=broken)
+    def expired(call, category):
+        raise OperatorBridgeTimeoutError("External action approval timed out")
+
+    manager = PermissionManager(policy=PermissionPolicy.interactive(), approval_callback=expired)
     assert (
         manager.check_and_authorize(
             CreateFileTool(), ToolCall("create_file", {"path": "x", "content": "y"})
         )
         is False
     )
+
+
+def test_approval_integrity_errors_still_propagate(tmp_path) -> None:
+    from ai_agent.operator_bridge import OperatorBridgeError
+
+    def corrupted(call, category):
+        raise OperatorBridgeError("File state changed")
+
+    manager = PermissionManager(policy=PermissionPolicy.interactive(), approval_callback=corrupted)
+    with pytest.raises(OperatorBridgeError, match="File state changed"):
+        manager.check_and_authorize(
+            CreateFileTool(), ToolCall("create_file", {"path": "x", "content": "y"})
+        )
 
 
 class _Client:
