@@ -114,6 +114,78 @@ def _collect_owner_tasks(result: AgentResult) -> list[dict]:
     return tasks
 
 
+def _resolve_backend(
+    config: DashboardConfig, repo_root: Path, run_title: str
+) -> tuple[BackendConfig | None, PrivacyClass, str]:
+    """Resolve the model backend for one run.
+
+    ``configured`` (default) uses the dashboard provider/model exactly as
+    before. ``auto`` routes through the orchestrator (local posture, free and
+    allowance tiers plus owner exemptions, outcome demotions) and falls back
+    to the configured backend when routing is unavailable.
+    """
+    try:
+        provider = ProviderKind(config.provider)
+    except ValueError:
+        provider = None
+    privacy = (
+        PrivacyClass.LOCAL_ONLY
+        if provider is ProviderKind.OLLAMA
+        else PrivacyClass.EXTERNAL_ALLOWED
+    )
+    configured = (
+        BackendConfig(provider=provider, model=config.model, base_url=config.base_url)
+        if provider is not None
+        else None
+    )
+    configured_id = f"{config.provider}/{config.model}" if provider is not None else "unknown"
+    if config.route_policy != "auto":
+        return configured, privacy, configured_id
+    try:
+        from ai_orchestrator import CostPolicyTier, load_model_catalog, prepare_execution
+        from ai_orchestrator.models import PrivacyClass as OrchestratorPrivacy
+        from ai_orchestrator.route_outcomes import (
+            OUTCOMES_FILENAME,
+            load_quality_adjustments,
+        )
+        from ai_provider.coding_assist import coding_task_profile
+        from ai_provider.user_config import active_cost_exemptions, load_user_config
+
+        catalog_path = (
+            Path(config.catalog_path)
+            if config.catalog_path
+            else repo_root / "packages/ai_orchestrator/examples/model_catalog.toml"
+        )
+        catalog = load_model_catalog(catalog_path)
+        user_config = load_user_config(repo_root / "user-config.toml")
+        profile = coding_task_profile(
+            privacy_class=(
+                OrchestratorPrivacy.LOCAL_ONLY
+                if privacy is PrivacyClass.LOCAL_ONLY
+                else OrchestratorPrivacy.EXTERNAL_ALLOWED
+            ),
+            cost_policy_tier=CostPolicyTier.ALLOWANCES_ALLOWED,
+        )
+        result = prepare_execution(
+            run_title,
+            profile,
+            catalog,
+            review_prompt=False,
+            cost_exemptions=active_cost_exemptions(user_config),
+            quality_adjustments=load_quality_adjustments(
+                repo_root / "artifacts" / OUTCOMES_FILENAME
+            ),
+        )
+        if result.execution_plan is None:
+            raise ValueError(result.failure_reason or "no execution plan")
+        target = result.execution_plan.target
+        backend = BackendConfig(provider=ProviderKind(target.provider), model=target.model)
+        return backend, privacy, target.route_id
+    except Exception as exc:  # noqa: BLE001 - routing must never break a run
+        logger.warning("auto routing unavailable, using configured backend: %s", exc)
+        return configured, privacy, configured_id
+
+
 def build_executor(
     config: DashboardConfig,
     roots: ProjectRoots,
@@ -122,31 +194,27 @@ def build_executor(
     client_factory: Callable[[BackendConfig], Any] = create_chat_client,
     loop_factory: Callable[..., Any] = AgentLoop,
     inbox_create: Callable[..., dict] | None = None,
-    max_iterations: int = 10,
+    max_iterations: int | None = None,
 ) -> Executor:
     """Build a drain ``Executor`` running each approved run through AgentLoop.
 
     ``inbox_create`` files owner tasks (dashboard inbox); without it, a run
     that files human tasks fails closed instead of dropping them.
     """
+    budget = config.max_iterations if max_iterations is None else max_iterations
     try:
-        provider = ProviderKind(config.provider)
+        runner_provider = ProviderKind(config.provider)
     except ValueError:
-        provider = None
-    client = (
-        client_factory(
-            BackendConfig(provider=provider, model=config.model, base_url=config.base_url)
-        )
-        if provider is not None
-        else None
-    )
-    privacy = (
+        runner_provider = None
+    runner_privacy = (
         PrivacyClass.LOCAL_ONLY
-        if provider is ProviderKind.OLLAMA
+        if runner_provider is ProviderKind.OLLAMA
         else PrivacyClass.EXTERNAL_ALLOWED
     )
     runner = build_child_runner(
-        max_iterations=max_iterations, privacy_class=privacy, loop_factory=loop_factory
+        max_iterations=min(budget, 15),
+        privacy_class=runner_privacy,
+        loop_factory=loop_factory,
     )
     permissions = PermissionManager(
         PermissionPolicy.from_approval_preset(ApprovalPolicyPreset.TRUSTED_LOCAL)
@@ -154,8 +222,12 @@ def build_executor(
 
     def _execute(run: dict) -> dict[str, Any]:
         run_id = str(run.get("id", "?"))
-        if client is None:
+        backend, privacy, route_id = _resolve_backend(
+            config, repo_root, str(run.get("title") or "(untitled)")
+        )
+        if backend is None:
             return {"status": "failed", "error": f"Unknown provider {config.provider!r}."}
+        client = client_factory(backend)
         project_id = run.get("project_id")
         try:
             if isinstance(project_id, str) and project_id:
@@ -173,7 +245,9 @@ def build_executor(
                 registry,
                 context,
                 permissions=permissions,
-                max_iterations=max_iterations,
+                max_iterations=budget,
+                loop_context_budget_chars=config.loop_context_budget_chars or None,
+                require_grounded_reports=config.require_grounded_reports,
                 fanout_policy=fanout,
                 request_metadata={"ollama_context_length": EXECUTOR_CONTEXT_TOKENS},
             )
@@ -227,10 +301,12 @@ def build_executor(
         receipt: dict[str, Any] = {
             "status": "completed",
             "summary": summary[:MAX_SUMMARY_CHARS],
+            "route_id": route_id,
             "iterations": iterations,
             "tool_calls": tool_calls,
             "staged": staged,
             "owner_tasks": filed,
+            "compactions": getattr(result, "compactions", 0),
         }
         logger.info("run %s completed in %d iterations", run_id, result.iterations)
         return receipt
