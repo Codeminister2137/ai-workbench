@@ -110,3 +110,37 @@ def test_handler_routes_registered() -> None:
 
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-q"]))
+
+
+def test_dotenv_keys_count_as_configured(tmp_path: Path, monkeypatch) -> None:
+    from providers_view import key_presence, load_dotenv_values
+
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    (tmp_path / ".env").write_text(
+        '# comment\n\nOPENROUTER_API_KEY="sk-test"\nREQUESTY_API_KEY=\n',
+        encoding="utf-8",
+    )
+    values = load_dotenv_values(tmp_path)
+    assert values == {"OPENROUTER_API_KEY": "sk-test", "REQUESTY_API_KEY": ""}
+    presence = key_presence(tmp_path)
+    assert presence["OPENROUTER_API_KEY"] is True
+    assert presence["REQUESTY_API_KEY"] is False
+    assert key_presence(tmp_path / "absent-dir")["OPENROUTER_API_KEY"] is False
+
+
+def test_env_wins_over_dotenv_for_probe_values(tmp_path: Path, monkeypatch) -> None:
+    from providers_view import _credentials  # noqa: SLF001 - behavior lives here
+
+    (tmp_path / ".env").write_text("META_API_KEY=file-key\n", encoding="utf-8")
+    monkeypatch.setenv("META_API_KEY", "env-key")
+    assert _credentials(tmp_path)["META_API_KEY"] == "env-key"
+    monkeypatch.delenv("META_API_KEY")
+    assert _credentials(tmp_path)["META_API_KEY"] == "file-key"
+
+
+def test_status_uses_repo_dotenv(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    (tmp_path / ".env").write_text("OPENROUTER_API_KEY=sk-test\n", encoding="utf-8")
+    view = provider_status(tmp_path / "data", tmp_path)
+    row = next(p for p in view["providers"] if p["route"] == "openrouter")
+    assert row["key_configured"] is True

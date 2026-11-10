@@ -137,23 +137,54 @@ def _cache_path(data_dir: Path) -> Path:
     return data_dir / CACHE_FILENAME
 
 
-def key_presence() -> dict[str, bool]:
-    """Which provider env keys are set (booleans only; values never leave)."""
+def load_dotenv_values(repo_root: Path | None) -> dict[str, str]:
+    """Parse repo .env the way scripts/repo-assistant.ps1 Import-DotEnv does.
+
+    Skips blanks and #-comments, splits on the first '=', strips matching
+    quotes. Missing/unreadable files yield {}. Values stay in-process.
+    """
+    values: dict[str, str] = {}
+    if repo_root is None:
+        return values
+    try:
+        lines = (Path(repo_root) / ".env").read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return values
+    for line in lines:
+        trimmed = line.strip()
+        if not trimmed or trimmed.startswith("#") or "=" not in trimmed:
+            continue
+        name, _, value = trimmed.partition("=")
+        name = name.strip()
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+            value = value[1:-1]
+        if name:
+            values[name] = value
+    return values
+
+
+def key_presence(repo_root: Path | None = None) -> dict[str, bool]:
+    """Which provider keys exist in process env or repo .env (booleans only)."""
+    dotenv = load_dotenv_values(repo_root)
     found: dict[str, bool] = {}
     for _route, _url, env_name in ROUTES:
         if env_name:
-            found[env_name] = bool(os.environ.get(env_name))
+            found[env_name] = bool(os.environ.get(env_name) or dotenv.get(env_name))
     return found
 
 
-def _credentials() -> dict[str, str | None]:
+def _credentials(repo_root: Path | None = None) -> dict[str, str | None]:
+    dotenv = load_dotenv_values(repo_root)
     return {
-        env_name: os.environ.get(env_name) or None for _route, _url, env_name in ROUTES if env_name
+        env_name: os.environ.get(env_name) or dotenv.get(env_name) or None
+        for _route, _url, env_name in ROUTES
+        if env_name
     }
 
 
-def _serialize(probes: list[RouteProbe]) -> dict[str, Any]:
-    presence = key_presence()
+def _serialize(probes: list[RouteProbe], repo_root: Path | None = None) -> dict[str, Any]:
+    presence = key_presence(repo_root)
     rows = []
     for probe in probes:
         env_name = next((env for route, _url, env in ROUTES if route == probe.route), None)
@@ -176,12 +207,12 @@ def load_cached(data_dir: Path) -> dict[str, Any] | None:
     return raw
 
 
-def provider_status(data_dir: Path) -> dict[str, Any]:
+def provider_status(data_dir: Path, repo_root: Path | None = None) -> dict[str, Any]:
     """Serve the cached snapshot; never probes (safe for every page load)."""
     cached = load_cached(data_dir)
     if cached is not None:
         return {"ok": True, **cached, "cached": True}
-    presence = key_presence()
+    presence = key_presence(repo_root)
     rows = []
     for route, _url, env_name in ROUTES:
         rows.append(
@@ -194,6 +225,7 @@ def provider_status(data_dir: Path) -> dict[str, Any]:
 
 def refresh_provider_status(
     data_dir: Path,
+    repo_root: Path | None = None,
     *,
     probe: Callable[[Mapping[str, str | None]], list[RouteProbe]] | None = None,
 ) -> dict[str, Any]:
@@ -201,7 +233,7 @@ def refresh_provider_status(
     from ai_provider.route_probe import probe_all
 
     sweep = probe or probe_all
-    snapshot = _serialize(list(sweep(_credentials())))
+    snapshot = _serialize(list(sweep(_credentials(repo_root))), repo_root)
     path = _cache_path(data_dir)
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp_name = tempfile.mkstemp(dir=str(path.parent), prefix=path.name)
