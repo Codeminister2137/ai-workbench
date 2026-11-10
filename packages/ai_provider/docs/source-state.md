@@ -21,6 +21,17 @@ routing configuration. The [model catalog](../../ai_orchestrator/examples/model_
 contains declared route capabilities; native readers report supported account
 observations. Neither establishes coding quality by itself.
 
+## Meta hackathon free-credit balance — 2026-11-10 (owner-reported)
+
+Scope: owner's hackathon Meta account only (private runtime evidence, not a
+durable pricing fact). Balance **$112 left**, reported by the owner in inbox
+notes (166a7b62, 033dbe05) after two agent closes wrongly claimed no figures
+arrived — the notes were missed because only the answer field was read.
+Expiry **unknown**: owner guesses the Nov16 judging-leg end, or never.
+Recorded conservatively with a Nov16 cutoff in the user spending exemption;
+**re-confirm balance and expiry on or before 2026-11-16**, and never assume
+spend past the balance stays free (overage would bill the key).
+
 ## Full L3 ladder (T0–T3) — 2026-11-02
 
 `scripts/l3_ladder.py` now resolves candidates through the orchestrator
