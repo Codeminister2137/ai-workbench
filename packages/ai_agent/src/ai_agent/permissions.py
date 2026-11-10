@@ -141,14 +141,17 @@ class PermissionManager:
 
         # ASK_USER
         if self.approval_callback is not None:
+            from ai_agent.operator_bridge import OperatorBridgeTimeoutError
+
             approval_call = tool.approval_call(call)
             if approval_call is None:
                 return False
             try:
                 return bool(self.approval_callback(approval_call, category))
-            except Exception:
-                # Approval infrastructure failed (timeout, transport, state
-                # mismatch): fail closed on this call without killing the run.
+            except OperatorBridgeTimeoutError:
+                # One approval timed out: deny this call without killing the
+                # run. Integrity errors (file-state changes, mismatched
+                # actions) still propagate so the run stops loudly.
                 return False
         # If no approval callback is registered, deny by default for safety
         return False
