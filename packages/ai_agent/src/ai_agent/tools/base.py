@@ -58,6 +58,9 @@ class ToolContext:
     # None everywhere else (unattended runs, MCP, children): ask_owner then
     # fails closed instead of blocking on input that will never arrive.
     owner_prompt: Callable[[str], str] | None = field(default=None, repr=False, compare=False)
+    # Strict project-dir confinement (--sandbox). Unlike inherit_environment it
+    # is never narrowed away: children keep the sandbox via replace().
+    sandbox: bool = False
 
     def __post_init__(self) -> None:
         # DelegateTaskTool builds children via replace(context, delegation=child),
@@ -78,6 +81,7 @@ class ToolContext:
         delegation: DelegationScope | None = None,
         env: dict[str, str] | None = None,
         owner_prompt: Callable[[str], str] | None = None,
+        sandbox: bool = False,
     ) -> ToolContext:
         """Build the top-level interactive owner context with ambient env.
 
@@ -90,6 +94,7 @@ class ToolContext:
             delegation=delegation,
             owner_prompt=owner_prompt,
             inherit_environment=True,
+            sandbox=sandbox,
         )
 
     def command_environment(self) -> dict[str, str]:

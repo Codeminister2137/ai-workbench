@@ -152,11 +152,12 @@ def _delegate_through_mcp(
     """Call the MCP delegate_task tool with a synthetic child run."""
 
     class FakeAgentLoop:
-        def __init__(self, client, registry, context, *, max_iterations):
+        def __init__(self, client, registry, context, *, max_iterations, require_grounded_reports):
             self.client = client
             self.registry = registry
             self.context = context
             self.max_iterations = max_iterations
+            self.require_grounded_reports = require_grounded_reports
 
         def run(self, prompt, *, model, privacy_class):
             return SimpleNamespace(

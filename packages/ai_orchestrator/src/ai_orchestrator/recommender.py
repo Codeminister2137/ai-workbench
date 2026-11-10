@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 
 from ai_orchestrator.models import (
     CandidateRejection,
@@ -13,6 +14,7 @@ from ai_orchestrator.models import (
     QualityThreshold,
     TaskProfile,
     cost_policy_allows,
+    cost_policy_rank,
     is_external_backend,
     supports_capability,
 )
@@ -29,12 +31,15 @@ def recommend_model(
     catalog: tuple[ModelCatalogEntry, ...],
     *,
     cost_exemptions: frozenset[str] = frozenset(),
+    quality_adjustments: Mapping[str, int] | None = None,
 ) -> ModelRecommendation:
     """Select the best catalog candidate for a task profile.
 
     ``cost_exemptions`` holds billing-source values the owner explicitly
     admitted despite the task cost tier (finite free grants). Quality,
     privacy, capability and latency gates still apply to exempted routes.
+    ``quality_adjustments`` maps route ids to quality-step changes from
+    observed outcomes (demotions only); unknown routes are ignored.
     """
 
     if not catalog:
@@ -44,6 +49,9 @@ def recommend_model(
         profile.max_expected_latency_seconds
     ):
         raise ValueError("Maximum expected latency must be a finite nonnegative number.")
+    if profile.complexity not in {"unknown", "simple", "complex"}:
+        raise ValueError("Task complexity must be unknown, simple, or complex.")
+    adjustments = dict(quality_adjustments or {})
 
     accepted: list[ModelCatalogEntry] = []
     rejected: list[CandidateRejection] = []
@@ -59,7 +67,10 @@ def recommend_model(
         reasons = tuple(rejection.reason for rejection in rejected)
         raise ValueError(f"No model candidate satisfied the task profile: {reasons}")
 
-    accepted.sort(key=lambda candidate: _candidate_score(profile, candidate), reverse=True)
+    accepted.sort(
+        key=lambda candidate: _candidate_score(profile, candidate, adjustments),
+        reverse=True,
+    )
     selected = accepted[0]
     alternatives = tuple(accepted[1:4])
 
@@ -71,6 +82,14 @@ def recommend_model(
         ),
         "Candidates were filtered by route, privacy, cost policy, capability, and quality.",
     ]
+    adjusted = sorted(
+        {route for route in adjustments if adjustments[route] != 0}
+        & {entry.backend.route_id for entry in accepted}
+    )
+    if adjusted:
+        reasons.append("Quality demoted by recent outcomes for: " + ", ".join(adjusted) + ".")
+    if profile.complexity == "simple":
+        reasons.append("Simple task: cheapest sufficient route preferred.")
     if not cost_policy_allows(selected.backend.cost_policy_tier, profile.cost_policy_tier):
         reasons.append(
             f"Selected via a user spending exemption for {selected.backend.billing_source.value}."
@@ -165,11 +184,26 @@ def _valid_latency(value: object) -> bool:
         return False
 
 
-def _candidate_score(profile: TaskProfile, candidate: ModelCatalogEntry) -> tuple[int, int, int]:
+def _candidate_score(
+    profile: TaskProfile,
+    candidate: ModelCatalogEntry,
+    adjustments: Mapping[str, int] | None = None,
+) -> tuple[int, int, int, int]:
     quality = _QUALITY_RANK[candidate.quality]
+    if adjustments:
+        quality += adjustments.get(candidate.backend.route_id, 0)
     latency = 1 if candidate.latency is profile.latency_target else 0
     locality = 1 if not is_external_backend(candidate) else 0
-    return quality, latency, locality
+    if profile.complexity == "simple":
+        # Cheap-first: cap quality at standard, then prefer cheaper tiers.
+        # The sort is descending, so the cost rank is negated.
+        return (
+            min(quality, 1),
+            -cost_policy_rank(candidate.backend.cost_policy_tier),
+            latency,
+            locality,
+        )
+    return quality, latency, locality, 0
 
 
 def _estimate_reason(estimate: ModelPerformanceEstimate) -> str | None:

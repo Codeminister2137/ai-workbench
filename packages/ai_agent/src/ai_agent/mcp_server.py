@@ -285,6 +285,7 @@ def _local_read_only_delegated_task_runner(
             registry,
             context,
             max_iterations=max_iterations,
+            require_grounded_reports=True,
             **(
                 {
                     "deadline": effective_deadline,

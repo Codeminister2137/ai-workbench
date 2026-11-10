@@ -27,8 +27,10 @@ from ai_provider import (
 )
 from ai_provider.closeout import safe_diagnostic_label
 
+from ai_agent.chat_context import messages_total_chars
 from ai_agent.completion import CompletionRequirement, missing_requirements
-from ai_agent.contracts import ToolCall, ToolResult
+from ai_agent.contracts import PermissionAction, ToolCall, ToolResult
+from ai_agent.groundedness import check_groundedness
 from ai_agent.model_output_recovery import ModelOutputRecovery
 from ai_agent.permissions import PermissionManager
 from ai_agent.tools.base import ToolContext, ToolRegistry
@@ -67,6 +69,7 @@ class AgentResult:
     messages: tuple[AIMessage, ...] = field(default=(), repr=False, compare=False)
     model_output_errors: int = 0
     completion_failures: int = 0
+    compactions: int = 0
 
 
 class AgentLoop:
@@ -87,7 +90,7 @@ class AgentLoop:
         context: ToolContext,
         *,
         permissions: PermissionManager | None = None,
-        max_iterations: int = 10,
+        max_iterations: int = 50,
         deadline: float | None = None,
         temperature: float | None = None,
         top_p: float | None = None,
@@ -96,9 +99,19 @@ class AgentLoop:
         fanout_policy: FanoutPolicy | str = "allowed",
         on_event: Callable[[ToolExecutionEvent], None] | None = None,
         request_metadata: Mapping[str, object] | None = None,
+        loop_context_budget_chars: int | None = None,
+        compaction_tail_messages: int = 8,
+        max_compactions: int = 3,
+        require_grounded_reports: bool = False,
     ) -> None:
         if max_iterations < 1:
             raise ValueError("max_iterations must be at least 1")
+        if loop_context_budget_chars is not None and loop_context_budget_chars < 1:
+            raise ValueError("loop_context_budget_chars must be positive or None")
+        if compaction_tail_messages < 1:
+            raise ValueError("compaction_tail_messages must be at least 1")
+        if max_compactions < 0:
+            raise ValueError("max_compactions must be non-negative")
         if deadline is not None and not math.isfinite(deadline):
             raise ValueError("deadline must be finite")
         self.client = client
@@ -113,6 +126,11 @@ class AgentLoop:
         self.diagnostic = diagnostic
         self.on_event = on_event
         self.request_metadata = dict(request_metadata or {})
+        self.loop_context_budget_chars = loop_context_budget_chars
+        self.compaction_tail_messages = compaction_tail_messages
+        self.max_compactions = max_compactions
+        self.require_grounded_reports = require_grounded_reports
+        self._tool_schema_chars: int | None = None
         self._pending: dict[str, ToolCall] = {}
         if (
             not isinstance(completion_requirements, tuple)
@@ -152,6 +170,162 @@ class AgentLoop:
         if self.on_event is not None:
             self.on_event(event)
 
+    def _measured_context_chars(self, messages: list[AIMessage]) -> int:
+        """Transcript chars plus the tool schemas sent with every request."""
+        if self._tool_schema_chars is None:
+            total = 0
+            for definition in self.registry.list_definitions():
+                try:
+                    rendered = json.dumps(
+                        _tool_definition(definition).to_json_schema(),
+                        ensure_ascii=False,
+                    )
+                except (TypeError, ValueError):
+                    rendered = definition.name
+                total += len(rendered)
+            self._tool_schema_chars = total
+        return messages_total_chars(messages) + self._tool_schema_chars
+
+    def _visible_tool_definitions(self) -> list[AIToolDefinition]:
+        """Export registry tools minus policy-denied ones.
+
+        A denied tool is hidden from the model's context (deny wins); the
+        permission check at dispatch still enforces the policy.
+        """
+        visible: list[AIToolDefinition] = []
+        for tool in self.registry.list_definitions():
+            action = self.permissions.policy.action_for_tool(tool.name, tool.category)
+            if action is PermissionAction.DENY:
+                continue
+            visible.append(_tool_definition(tool))
+        return visible
+
+    def _maybe_compact(
+        self,
+        messages: list[AIMessage],
+        compactions: int,
+        model: str | None,
+        privacy_class: PrivacyClass,
+    ) -> int:
+        """Summarize older turns when the loop context budget is exceeded.
+
+        Original system messages (required instructions) are immune and always
+        kept verbatim. Older non-system turns plus any prior compaction summary
+        are folded into a fresh rolling summary; the newest tail stays verbatim.
+        Returns the updated compaction count.
+        """
+        budget = self.loop_context_budget_chars
+        if budget is None or self._measured_context_chars(messages) <= budget:
+            return compactions
+        if compactions >= self.max_compactions:
+            raise ProviderError(
+                f"loop context still exceeds its budget after {compactions} "
+                "compactions; one large output likely refills the window. "
+                "Inspect earlier effects and continue only unfinished work.",
+                category=ProviderErrorCategory.NON_RETRYABLE,
+                provider=self.client.backend.provider,
+            )
+        systems = [item for item in messages if item.role is MessageRole.SYSTEM]
+        immune = [item for item in systems if not _is_compaction_summary(item)]
+        prior_summaries = [item for item in systems if _is_compaction_summary(item)]
+        conversation = [item for item in messages if item.role is not MessageRole.SYSTEM]
+        if not conversation and not prior_summaries:
+            raise ProviderError(
+                "loop instructions alone exceed the loop context budget; "
+                "raise the budget instead of compacting them away.",
+                category=ProviderErrorCategory.NON_RETRYABLE,
+                provider=self.client.backend.provider,
+            )
+        tail = conversation[-self.compaction_tail_messages :]
+        while tail and self._measured_context_chars([*immune, *tail]) > budget:
+            tail = tail[1:]
+        if conversation and not tail:
+            raise ProviderError(
+                "loop instructions plus the latest message exceed the loop "
+                "context budget; nothing older remains to summarize.",
+                category=ProviderErrorCategory.NON_RETRYABLE,
+                provider=self.client.backend.provider,
+            )
+        older = conversation[: len(conversation) - len(tail)] if tail else list(conversation)
+        foldable: list[AIMessage] = [*prior_summaries, *older]
+        if not foldable:
+            raise ProviderError(
+                "loop context exceeds its budget but every turn is inside the "
+                "protected tail; raise the budget or narrow the task.",
+                category=ProviderErrorCategory.NON_RETRYABLE,
+                provider=self.client.backend.provider,
+            )
+        self._check_deadline(messages)
+        from ai_provider.credential_guard import enforce_credential_policy
+
+        summary_request = AIRequest(
+            messages=(
+                AIMessage(
+                    MessageRole.SYSTEM,
+                    "Summarize an in-progress coding-agent transcript so the run "
+                    "can continue. A prior summary may be included; fold it in "
+                    "and supersede it. Preserve the original objective, owner "
+                    "decisions, files created/modified with their states, "
+                    "commands run with outcomes, validation results, open "
+                    "questions, and remaining work. Do not invent facts. "
+                    "Return only the summary.",
+                ),
+                AIMessage(MessageRole.USER, _render_compaction_source(foldable, budget)),
+            ),
+            model=model,
+            privacy_class=privacy_class,
+            metadata={**self.request_metadata, "task_type": "loop_compaction"},
+        )
+        enforce_credential_policy(summary_request, extra=self.context.credential_secrets)
+        summary_text = self.client.complete(summary_request).message.content.strip()
+        if not summary_text:
+            raise ProviderError(
+                "loop compaction summarizer returned an empty summary",
+                category=ProviderErrorCategory.NON_RETRYABLE,
+                provider=self.client.backend.provider,
+            )
+        messages[:] = [
+            *immune,
+            AIMessage(
+                MessageRole.SYSTEM,
+                "Compacted summary of earlier turns. Use this as compressed "
+                "context; the following messages are the recent raw tail.\n\n"
+                f"{summary_text}",
+            ),
+            *tail,
+        ]
+        if self.diagnostic:
+            self.diagnostic(
+                f"loop_compaction: n={compactions + 1} summarized={len(foldable)} tail={len(tail)}"
+            )
+        return compactions + 1
+
+    def resume(
+        self,
+        messages: tuple[AIMessage, ...],
+        *,
+        model: str | None = None,
+        privacy_class: PrivacyClass = PrivacyClass.LOCAL_ONLY,
+        prior_iterations: int = 0,
+        prior_tool_results: tuple[ToolResult, ...] = (),
+    ) -> AgentResult:
+        """Continue an exhausted run from saved messages under a fresh allowance.
+
+        ``messages`` is normally ``ProviderError.partial_messages`` from a run
+        that raised with ``AgentIterationLimitExceeded``, and
+        ``prior_tool_results`` the matching ``ProviderError.tool_results``.
+        The loop budget restarts at zero local iterations; priors seed the
+        cumulative counts reported on the result.
+        """
+        return self.run(
+            "",
+            model=model,
+            privacy_class=privacy_class,
+            resume_messages=messages,
+            prior_iterations=prior_iterations,
+            prior_tool_results=prior_tool_results,
+        )
+
     def run(
         self,
         prompt: str,
@@ -159,8 +333,25 @@ class AgentLoop:
         system_prompt: str | None = None,
         model: str | None = None,
         privacy_class: PrivacyClass = PrivacyClass.LOCAL_ONLY,
+        resume_messages: tuple[AIMessage, ...] | None = None,
+        prior_iterations: int = 0,
+        prior_tool_results: tuple[ToolResult, ...] = (),
     ) -> AgentResult:
-        """Execute a prompt and any requested tools until a final answer is returned."""
+        """Execute a prompt and any requested tools until a final answer is returned.
+
+        ``resume_messages`` continues an exhausted run from saved messages
+        (e.g. ``ProviderError.partial_messages``); ``prompt``/``system_prompt``
+        are ignored then and ``prior_iterations`` seeds cumulative reporting.
+        ``prior_tool_results`` restores earlier evidence for groundedness
+        checks and cumulative reporting. Prefer :meth:`resume` for that path.
+        """
+        if prior_iterations < 0:
+            raise ValueError("prior_iterations must be non-negative")
+        if resume_messages is not None:
+            if not resume_messages or any(
+                not isinstance(item, AIMessage) for item in resume_messages
+            ):
+                raise ValueError("resume_messages must be a non-empty AIMessage tuple")
         from ai_provider.credential_guard import (
             contains_credentials,
             credential_values,
@@ -209,13 +400,17 @@ class AgentLoop:
                 ),
             )
         messages: list[AIMessage] = []
-        if system_prompt:
-            messages.append(AIMessage(MessageRole.SYSTEM, system_prompt))
-        messages.append(AIMessage(MessageRole.USER, prompt))
-        tool_results: list[ToolResult] = []
+        if resume_messages is not None:
+            messages.extend(resume_messages)
+        else:
+            if system_prompt:
+                messages.append(AIMessage(MessageRole.SYSTEM, system_prompt))
+            messages.append(AIMessage(MessageRole.USER, prompt))
+        tool_results: list[ToolResult] = list(prior_tool_results)
         recovery = ModelOutputRecovery(self.context.workspace_root)
         model_output_errors = 0
         completion_failures = 0
+        compactions = 0
         incomplete_states: Counter[tuple[tuple[str, ...], tuple[tuple[str, str], ...]]] = Counter()
 
         for iteration in range(1, self.max_iterations + 1):
@@ -227,6 +422,7 @@ class AgentLoop:
                         category=ProviderErrorCategory.NON_RETRYABLE,
                     )
                 self.context.delegation.budget.consume()
+            compactions = self._maybe_compact(messages, compactions, model, privacy_class)
             try:
                 request = AIRequest(
                     messages=tuple(messages),
@@ -234,9 +430,7 @@ class AgentLoop:
                     temperature=self.temperature,
                     top_p=self.top_p,
                     privacy_class=privacy_class,
-                    tools=tuple(
-                        _tool_definition(tool) for tool in self.registry.list_definitions()
-                    ),
+                    tools=tuple(self._visible_tool_definitions()),
                     metadata=dict(self.request_metadata),
                 )
                 enforce_credential_policy(request, extra=self.context.credential_secrets)
@@ -344,13 +538,64 @@ class AgentLoop:
                             )
                         )
                         continue
+                if (
+                    self.require_grounded_reports
+                    and response.finish_reason not in {FinishReason.LENGTH, FinishReason.ERROR}
+                    and response.message.content.strip()
+                ):
+                    verdict = check_groundedness(response.message.content, tuple(tool_results))
+                    if verdict.unsupported:
+                        completion_failures += 1
+                        classes = sorted({claim.claim_class for claim in verdict.unsupported})
+                        key = (("groundedness", *classes), recovery.observed_state())
+                        self._check_deadline(messages)
+                        incomplete_states[key] += 1
+                        allowed = iteration < self.max_iterations and incomplete_states[key] < 2
+                        if self.diagnostic:
+                            self.diagnostic("groundedness_check: unsupported=" + ",".join(classes))
+                            self.diagnostic(
+                                f"groundedness_recovery: errors={completion_failures} "
+                                f"action={'feedback' if allowed else 'stop'}"
+                            )
+                        if not allowed:
+                            error = ProviderError(
+                                "Report claims verification without observed tool "
+                                "evidence: "
+                                + ",".join(classes)
+                                + ". The same blocker recurred without observed "
+                                "progress, or the original turn allowance ended. "
+                                "Inspect earlier effects and continue only "
+                                "unfinished work in a new turn.",
+                                category=ProviderErrorCategory.NON_RETRYABLE,
+                                provider=self.client.backend.provider,
+                            )
+                            error.partial_messages = tuple(messages)
+                            raise error
+                        messages.append(
+                            AIMessage(
+                                MessageRole.USER,
+                                "Host groundedness feedback: the preceding report "
+                                "claims completed verification ("
+                                + ",".join(classes)
+                                + ") but no supporting tool evidence was observed "
+                                "in this run. Perform the checks with authorized "
+                                "tools and then author a corrected factual final "
+                                "report, or downgrade the report to an explicitly "
+                                "unverified summary with no verification claims. "
+                                "Earlier tool effects remain above; do not replay "
+                                "them. The original task, permissions and "
+                                "remaining allowance still apply.",
+                            )
+                        )
+                        continue
                 return AgentResult(
                     response=response,
                     tool_results=tuple(tool_results),
-                    iterations=iteration,
+                    iterations=prior_iterations + iteration,
                     messages=tuple(messages),
                     model_output_errors=model_output_errors,
                     completion_failures=completion_failures,
+                    compactions=compactions,
                 )
 
             seen_in_batch: set[tuple[str, str, str]] = set()
@@ -491,13 +736,48 @@ class AgentLoop:
 
         error = ProviderError(
             f"Agent loop exceeded max_iterations={self.max_iterations}; "
-            "earlier tool effects remain and must be inspected before continuing.",
+            "earlier tool effects remain and must be inspected before continuing. "
+            "Resume under a fresh allowance with AgentLoop.resume(partial_messages).",
             category=ProviderErrorCategory.NON_RETRYABLE,
             provider=self.client.backend.provider,
             raw_error=AgentIterationLimitExceeded(),
         )
         error.partial_messages = tuple(messages)
+        # Dynamic: ProviderError lives below ai_agent and cannot import ToolResult.
+        error.tool_results = tuple(tool_results)
         raise error
+
+
+COMPACTION_SUMMARY_PREFIX = "Compacted summary of earlier turns."
+
+
+def _is_compaction_summary(message: AIMessage) -> bool:
+    return message.content.startswith(COMPACTION_SUMMARY_PREFIX)
+
+
+def _render_compaction_source(messages: list[AIMessage], cap_chars: int) -> str:
+    """Render older turns for the summarizer, newest first under a char cap."""
+    parts: list[str] = []
+    used = 0
+    omitted = 0
+    for message in reversed(messages):
+        rendered = (
+            f"[{message.role.value}]"
+            + (f" tool={message.name}" if message.name else "")
+            + f":\n{message.content}"
+        )
+        if used + len(rendered) > cap_chars and parts:
+            omitted += 1
+            continue
+        parts.append(rendered)
+        used += len(rendered)
+    parts.reverse()
+    header = (
+        f"# Earlier transcript ({len(messages)} turns"
+        + (f", {omitted} oldest omitted over the cap" if omitted else "")
+        + ")\n"
+    )
+    return header + "\n\n".join(parts)
 
 
 def _replay_key(call: AIToolCall) -> tuple[str, str, str] | None:

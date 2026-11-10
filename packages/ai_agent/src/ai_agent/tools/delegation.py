@@ -57,12 +57,14 @@ class DelegateTaskTool(BaseTool):
                     name="permission_profile",
                     type_name="string",
                     description=(
-                        "Inherit actual parent permissions or request a narrower "
-                        "profile; never escalates parent authority."
+                        "Optional child permission profile; omit or use 'default' "
+                        "to inherit actual parent permissions, or request a "
+                        "narrower profile; never escalates parent authority."
                     ),
                     required=False,
                     enum_values=(
                         "inherit",
+                        "default",
                         "read_only",
                         "interactive",
                         "workspace_write",
@@ -130,6 +132,8 @@ class DelegateTaskTool(BaseTool):
             for name in ("allowed_tools", "allowed_paths", "allowed_commands")
         }
         profile = arguments.get("permission_profile", "inherit")
+        if profile == "default":
+            profile = "inherit"
         model = arguments.get("model")
         if scope is None:
             if (

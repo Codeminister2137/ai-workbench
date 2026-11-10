@@ -136,6 +136,11 @@ _COST_POLICY_RANK = {
 }
 
 
+def cost_policy_rank(tier: CostPolicyTier) -> int:
+    """Rank cost tiers cheapest-first for simple-task routing."""
+    return _COST_POLICY_RANK[tier]
+
+
 class PromptIssueSeverity(StrEnum):
     """Severity levels produced by prompt judging."""
 
@@ -154,6 +159,7 @@ class TaskProfile:
         default_factory=lambda: frozenset({TaskCapability.CHAT})
     )
     quality_threshold: QualityThreshold = QualityThreshold.STANDARD
+    complexity: str = "unknown"
     latency_target: LatencyTarget = LatencyTarget.INTERACTIVE
     max_expected_latency_seconds: float | None = None
     cost_policy_tier: CostPolicyTier = CostPolicyTier.PREPAID_CREDITS_ALLOWED

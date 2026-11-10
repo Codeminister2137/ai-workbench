@@ -596,6 +596,27 @@ def _print_cli_closeout(
                 inference_observation=observed_inference(),
             )
         )
+    from ai_agent.groundedness import check_groundedness
+
+    _record_route_outcome(
+        args=args,
+        route_id=route_id if isinstance(route_id, str) else None,
+        execution_status=execution_status,
+    )
+    verdict = check_groundedness(
+        response_text or "",
+        tuple(getattr(args, "_groundedness_tool_results", ()) or ()),
+    )
+    if not verdict.supported and not verdict.unsupported:
+        print("groundedness: no_claims")
+    elif verdict.ok:
+        print(f"groundedness: ok claims={len(verdict.supported)}")
+    else:
+        print(
+            "groundedness: unsupported="
+            + ",".join(sorted({claim.claim_class for claim in verdict.unsupported}))
+            + f" claims={len(verdict.supported) + len(verdict.unsupported)}"
+        )
     print(
         format_cli_closeout(
             response_text=response_text,
@@ -1282,6 +1303,11 @@ def _execute_request(
             parser.error("--shared-tools inspection cannot be combined with research tools")
         if args.shared_tools == "inspection":
             args.approval_policy = "read_only"
+    if args.mode == "plan":
+        args.approval_policy = "read_only"
+    if getattr(args, "sandbox", False) and args.allow_outside_files:
+        parser.error("--sandbox cannot be combined with --allow-outside-files")
+    _warn_unknown_tool_rules(args)
     use_native_tools = (
         args.native_tools
         or bool(args.shared_tools)
@@ -1428,6 +1454,7 @@ def _execute_request(
         ),
         provider_override=args.provider,
         model_override=args.model,
+        complexity=_resolve_complexity(args),
     )
     if args.native_tools and args.execute:
         # A tool-enabled turn must be routed to a model that can actually call tools.
@@ -1452,7 +1479,7 @@ def _execute_request(
                     catalog_snapshot=catalog,
                     parent_profile=profile,
                     timeout_seconds=args.timeout_seconds,
-                    max_iterations=min(args.max_action_rounds, 8),
+                    max_iterations=min(args.max_action_rounds, 15),
                     is_active=active,
                     deadline=deadline,
                 )
@@ -1493,6 +1520,7 @@ def _execute_request(
         prompt_for_review=args.prompt,
         timeout_seconds=args.timeout_seconds,
         cost_exemptions=args.cost_exemptions,
+        quality_adjustments=_quality_adjustments_for_run(args),
     )
     if (
         sampling_kwargs(args)
@@ -1858,6 +1886,7 @@ def _execute_request(
         _print_provider_native_policy_diagnostics(
             args.approval_policy,
             delegation_enabled=_native_delegation_available(args),
+            sandbox=getattr(args, "sandbox", False),
         )
     if args.orchestrated:
         assert orchestrated_tracker is not None
@@ -2632,6 +2661,7 @@ def _run_coding_prompt_with_fallback(
         catalog,
         review_prompt=False,
         cost_exemptions=getattr(args, "cost_exemptions", frozenset()),
+        quality_adjustments=_quality_adjustments_for_run(args),
     )
     orchestration = replace(
         orchestration,
@@ -2937,6 +2967,7 @@ def _print_fallback_readiness(args: argparse.Namespace, repo_root: Path) -> int:
         access_method_override=AccessMethod(args.access_method) if args.access_method else None,
         provider_override=args.provider,
         model_override=args.model,
+        complexity=_resolve_complexity(args),
     )
     if args.tool_profile == "research":
         profile = replace(
@@ -2963,6 +2994,7 @@ def _print_fallback_readiness(args: argparse.Namespace, repo_root: Path) -> int:
         review_prompt=False,
         timeout_seconds=args.timeout_seconds,
         cost_exemptions=getattr(args, "cost_exemptions", frozenset()),
+        quality_adjustments=_quality_adjustments_for_run(args),
     )
     if result.execution_plan is None:
         print(json.dumps({"status": "blocked", "reason": result.failure_reason}))
@@ -3814,7 +3846,9 @@ def _run_native_agent(
     approval_policy = ApprovalPolicyPreset(
         getattr(args, "approval_policy", ApprovalPolicyPreset.INTERACTIVE.value)
     )
-    permission_policy = PermissionPolicy.from_approval_preset(approval_policy)
+    permission_policy = _policy_with_tool_rules(
+        PermissionPolicy.from_approval_preset(approval_policy), args
+    )
     asks_user = any(
         permission_policy.action_for_category(category).value == "ask_user"
         for category in ToolCategory
@@ -3914,6 +3948,7 @@ def _run_native_agent(
                 review_prompt=False,
                 timeout_seconds=getattr(args, "timeout_seconds", 180.0),
                 cost_exemptions=getattr(args, "cost_exemptions", frozenset()),
+                quality_adjustments=_quality_adjustments_for_run(args),
             )
             if not child_orchestration.is_ready or child_orchestration.execution_plan is None:
                 reason = child_orchestration.failure_reason or child_orchestration.status.value
@@ -4153,6 +4188,9 @@ def _run_native_agent(
             request_timeout_seconds=config.timeout_seconds,
             fanout=fanout_policy,
         )
+    guidance = _delegation_guidance(registry)
+    if guidance and "delegate_task" not in system_prompt:
+        system_prompt += guidance
     # Live owner questions only when a human sits at this terminal. piped /
     # redirected / unattended runs keep owner_prompt=None so ask_owner fails
     # closed (file request_owner_task) instead of blocking on stdin.
@@ -4166,10 +4204,19 @@ def _run_native_agent(
         client,
         registry,
         ToolContext.for_interactive_owner(
-            repo_root, delegation=granted, owner_prompt=owner_channel
+            repo_root,
+            delegation=granted,
+            owner_prompt=owner_channel,
+            sandbox=getattr(args, "sandbox", False),
         ),
         permissions=manager,
         max_iterations=args.max_action_rounds,
+        require_grounded_reports=True,
+        loop_context_budget_chars=(
+            None
+            if getattr(args, "loop_context_budget_chars", 0) == 0
+            else getattr(args, "loop_context_budget_chars", None)
+        ),
         deadline=getattr(getattr(args, "fallback_session", None), "deadline", None),
         diagnostic=progress_callback,
         completion_requirements=completion_requirements,
@@ -4260,6 +4307,8 @@ def _run_native_agent(
         )
         error.partial_messages = result.messages
         raise error
+    args._groundedness_tool_results = result.tool_results
+    args._native_iterations = result.iterations
     return result
 
 
@@ -4295,6 +4344,125 @@ def _delegated_failure_result(
         output=f"Error: delegated subtask failed: {kind}",
         is_error=True,
     )
+
+
+DELEGATION_GUIDANCE = (
+    "\n\nDelegation: a delegate_task tool is available for separable subtasks "
+    "(independent files, parallelizable inspection or validation). Prefer it "
+    "over doing everything inline when subtasks are independent: the child "
+    "runs in an isolated context and returns only a summary, keeping this "
+    "thread lean. Keep subtasks focused with explicit files and expected "
+    "outputs; parent and child share one iteration budget and authority, and "
+    "nested delegation is disabled. Check the child's summary against its "
+    "reported tool results before relying on it."
+)
+
+
+def _delegation_guidance(registry: Any) -> str:
+    """Advise the model to delegate when the tool is actually registered."""
+    if registry.get("delegate_task") is None:
+        return ""
+    return DELEGATION_GUIDANCE
+
+
+def _warn_unknown_tool_rules(args: argparse.Namespace) -> None:
+    """Warn when a per-tool rule names no tool the host can offer."""
+    from ai_agent.tools.delegation import coding_tools_with_delegation
+
+    names = {tool.name for tool in coding_tools_with_delegation(_deny_stub).list_definitions()}
+    names.update({"process_start", "process_status", "process_stop"})
+    flagged = [
+        *(getattr(args, "allow_tool", None) or ()),
+        *(getattr(args, "ask_tool", None) or ()),
+        *(getattr(args, "deny_tool", None) or ()),
+    ]
+    for name in flagged:
+        if name not in names:
+            print(f"warning: --tool rule {name!r} matches no known tool")
+
+
+def _deny_stub(task: str, context: Any) -> Any:
+    raise AssertionError("rule-name probe must not execute")
+
+
+def _policy_with_tool_rules(base: Any, args: argparse.Namespace) -> Any:
+    """Apply CLI per-tool allow/ask/deny rules onto a preset policy."""
+    from ai_agent.contracts import PermissionAction
+
+    rules = (
+        *((name, PermissionAction.ALLOW) for name in (getattr(args, "allow_tool", None) or ())),
+        *((name, PermissionAction.ASK_USER) for name in (getattr(args, "ask_tool", None) or ())),
+        *((name, PermissionAction.DENY) for name in (getattr(args, "deny_tool", None) or ())),
+    )
+    if not rules:
+        return base
+    return replace(base, tool_rules=base.tool_rules + tuple(rules))
+
+
+COMPLEXITY_AUTO_ASK_CHARS = 400
+
+
+def _resolve_complexity(args: argparse.Namespace) -> str:
+    """Map --complexity to a profile value; auto sniffs short ask prompts."""
+    setting = getattr(args, "complexity", "auto")
+    if setting in {"simple", "complex"}:
+        return setting
+    if getattr(args, "mode", None) == "ask" and len(getattr(args, "prompt", "") or "") < (
+        COMPLEXITY_AUTO_ASK_CHARS
+    ):
+        return "simple"
+    return "unknown"
+
+
+def _quality_adjustments_for_run(args: argparse.Namespace) -> dict[str, int]:
+    """Load outcome demotions once per invocation; failures yield none."""
+    cached = getattr(args, "_quality_adjustments_cache", None)
+    if cached is not None:
+        return cached
+    adjustments: dict[str, int] = {}
+    try:
+        from ai_orchestrator.route_outcomes import (
+            OUTCOMES_FILENAME,
+            load_quality_adjustments,
+        )
+
+        repo_root = Path(getattr(args, "repo_root", ".") or ".")
+        adjustments = dict(load_quality_adjustments(repo_root / "artifacts" / OUTCOMES_FILENAME))
+    except OSError:
+        adjustments = {}
+    args._quality_adjustments_cache = adjustments
+    return adjustments
+
+
+def _record_route_outcome(
+    *,
+    args: argparse.Namespace,
+    route_id: str | None,
+    execution_status: str,
+) -> None:
+    """Append one routing outcome; recording must never break a run."""
+    if route_id is None or getattr(args, "mode", None) not in {"ask", "review", "implement"}:
+        return
+    if execution_status not in {"completed", "failed"}:
+        return
+    try:
+        import time
+
+        from ai_orchestrator.route_outcomes import OUTCOMES_FILENAME, RouteOutcome, append_outcome
+
+        tool_results = getattr(args, "_groundedness_tool_results", None) or ()
+        outcome = RouteOutcome(
+            route_id=route_id,
+            mode=args.mode,
+            success=execution_status == "completed",
+            tool_calls=len(tool_results),
+            iterations=int(getattr(args, "_native_iterations", 1)),
+            finished_at=time.time(),
+        )
+        repo_root = Path(getattr(args, "repo_root", ".") or ".")
+        append_outcome(repo_root / "artifacts" / OUTCOMES_FILENAME, outcome)
+    except OSError:
+        pass
 
 
 def _format_delegated_task_output(
@@ -4375,6 +4543,7 @@ def _print_provider_native_policy_diagnostics(
     approval_policy: str,
     *,
     delegation_enabled: bool,
+    sandbox: bool = False,
 ) -> None:
     """Print secret-free provider-native tool policy diagnostics."""
 
@@ -4391,6 +4560,7 @@ def _print_provider_native_policy_diagnostics(
         "provider_native_delegation: "
         + ("enabled: primary agent may call delegate_task" if delegation_enabled else "disabled")
     )
+    print("provider_native_sandbox: " + ("strict-cwd" if sandbox else "off"))
 
 
 def _run_action_loop(

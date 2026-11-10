@@ -65,7 +65,7 @@ def run_messenger_turn(
     history_text: str,
     prompt: str,
     system_prompt: str,
-    max_iterations: int = 4,
+    max_iterations: int = 25,
     deadline: float | None = None,
     privacy_class: PrivacyClass = PrivacyClass.LOCAL_ONLY,
     extra_tools: tuple[BaseTool, ...] | None = None,

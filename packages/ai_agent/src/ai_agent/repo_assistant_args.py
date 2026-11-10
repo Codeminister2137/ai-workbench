@@ -22,6 +22,7 @@ from ai_agent.fanout import FanoutPolicy
 from ai_agent.permissions import ApprovalPolicyPreset
 
 DEFAULT_DELEGATION_CONTEXT_BUDGET_CHARS = 6_000
+DEFAULT_LOOP_CONTEXT_BUDGET_CHARS = 100_000
 DEFAULT_CHAT_HISTORY_BUDGET_CHARS = 12_000
 DEFAULT_CHAT_RECENT_MESSAGE_COUNT = 8
 DEFAULT_VALIDATION_COMMAND = "python -m pytest -q"
@@ -320,6 +321,17 @@ def build_argument_parser() -> argparse.ArgumentParser:
         help="Minimum quality threshold.",
     )
     parser.add_argument(
+        "--complexity",
+        action=UserDefaultAction,
+        choices=("auto", "simple", "complex"),
+        default="auto",
+        help=(
+            "Task complexity for routing. simple prefers the cheapest sufficient "
+            "route; auto treats short ask-mode prompts as simple; complex keeps "
+            "quality-first routing."
+        ),
+    )
+    parser.add_argument(
         "--provider",
         help=(
             "Hard provider override. Valid values are the providers declared by "
@@ -372,6 +384,39 @@ def build_argument_parser() -> argparse.ArgumentParser:
         help=(
             "Run-level subagent fan-out policy. restricted and denied both refuse "
             "child spawns; denied records an explicit owner prohibition."
+        ),
+    )
+    parser.add_argument(
+        "--allow-tool",
+        action="append",
+        default=[],
+        metavar="NAME",
+        help="Allow one tool without asking; repeatable. Per-tool deny wins.",
+    )
+    parser.add_argument(
+        "--ask-tool",
+        action="append",
+        default=[],
+        metavar="NAME",
+        help="Ask before one tool runs; repeatable. Per-tool deny wins.",
+    )
+    parser.add_argument(
+        "--deny-tool",
+        action="append",
+        default=[],
+        metavar="NAME",
+        help=(
+            "Deny one tool and hide it from the model; repeatable. "
+            "Deny wins over allow/ask and the preset."
+        ),
+    )
+    parser.add_argument(
+        "--sandbox",
+        action="store_true",
+        help=(
+            "Strict project-dir confinement: shell commands run at the workspace "
+            "root and outside-workspace files are refused. Command text itself "
+            "is still governed by the approval policy, not filtered."
         ),
     )
     parser.add_argument(
@@ -717,8 +762,19 @@ def build_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--max-action-rounds",
         type=int,
-        default=3,
+        default=25,
         help="Maximum provider/action follow-up rounds when --apply-actions is set.",
+    )
+    parser.add_argument(
+        "--loop-context-budget-chars",
+        action=UserDefaultAction,
+        type=int,
+        default=DEFAULT_LOOP_CONTEXT_BUDGET_CHARS,
+        help=(
+            "Loop transcript budget in characters; older turns compact into a "
+            "summary past it (system instructions stay verbatim). "
+            "Use 0 to disable compaction and refuse on overflow instead."
+        ),
     )
     parser.add_argument(
         "--command-timeout-seconds",

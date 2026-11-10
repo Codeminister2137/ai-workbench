@@ -179,6 +179,7 @@ class FallbackSession:
                 (entry,),
                 review_prompt=False,
                 timeout_seconds=initial.timeout_seconds,
+                cost_exemptions=self.cost_exemptions,
             ).execution_plan
             assert plan is not None
             target = plan.target

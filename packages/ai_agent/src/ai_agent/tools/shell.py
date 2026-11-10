@@ -58,6 +58,8 @@ class RunCommandTool(BaseTool):
                 is_error=True,
             )
 
+        if getattr(context, "sandbox", False):
+            raw_cwd = "."
         target_cwd = context.resolve_path(raw_cwd)
         if not context.is_within_workspace(target_cwd):
             return ToolResult(

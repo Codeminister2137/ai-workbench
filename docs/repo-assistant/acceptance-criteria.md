@@ -170,3 +170,20 @@ for read-only work with no changed-file excerpts. Omitted or truncated receipt
 content remains unverified; this is evidence delivery, not a truth guarantee.
 The closeout owns its summary heading and adjusts a leading duplicate heading
 for display while retaining the original agent response in saved conversation.
+
+## Harness acceptance gate (reconstruction S7, 2026-11-10)
+
+`tests/test_agent_acceptance.py` is the deterministic ship-blocker for
+routing, grade, budget, and governance changes. It runs composed scenarios
+over the real loop, real tools, and a real workspace with scripted providers:
+a deep multi-round task (budgets hold, compaction fires, claims grounded),
+exhaustion with resume to cumulative completion, fabricated-claim refusal
+until downgraded, bounded delegation summaries, denied-tool hiding, outcome
+demotions flipping routing, and cheap-first simple-task routing. It also pins
+that the deep task dies under the pre-reconstruction 3-round budget, so the
+gate is capable of going red.
+
+The gate guards the harness, not model quality: live pilots with real models
+remain the quality evidence, recorded separately with tool-call counts, burn,
+and effects. A green gate plus a passing live pilot on the changed path is
+required before routing/grade changes ship.

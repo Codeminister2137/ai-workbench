@@ -510,3 +510,87 @@ def test_loop_metadata_defaults_empty(tmp_path):
         permissions=PermissionManager(policy=PermissionPolicy.permissive()),
     ).run("Say something")
     assert client.requests[0].metadata == {}
+
+
+def test_shipped_budgets_match_vendor_depth(tmp_path) -> None:
+    import inspect
+
+    from ai_agent.messenger import run_messenger_turn
+    from ai_agent.repo_assistant_args import build_argument_parser
+
+    loop = AgentLoop(
+        FakeClient(),
+        default_coding_tools(),
+        ToolContext(tmp_path),
+        permissions=PermissionManager(policy=PermissionPolicy.permissive()),
+    )
+    assert loop.max_iterations == 50
+    assert inspect.signature(run_messenger_turn).parameters["max_iterations"].default == 25
+    assert build_argument_parser().parse_args([]).max_action_rounds == 25
+
+
+def test_iteration_limit_resume_completes_with_cumulative_count(tmp_path) -> None:
+    from ai_agent.loop import AgentIterationLimitExceeded
+
+    client = FakeClient()
+    loop = AgentLoop(
+        client,
+        default_coding_tools(),
+        ToolContext(tmp_path),
+        permissions=PermissionManager(policy=PermissionPolicy.permissive()),
+        max_iterations=1,
+    )
+    with pytest.raises(ProviderError) as captured:
+        loop.run("Create the file", privacy_class=PrivacyClass.LOCAL_ONLY)
+    assert isinstance(captured.value.raw_error, AgentIterationLimitExceeded)
+    saved = captured.value.partial_messages
+    assert saved[-1].role is MessageRole.TOOL
+
+    resumed = AgentLoop(
+        client,
+        default_coding_tools(),
+        ToolContext(tmp_path),
+        permissions=PermissionManager(policy=PermissionPolicy.permissive()),
+        max_iterations=2,
+    ).resume(saved, privacy_class=PrivacyClass.LOCAL_ONLY, prior_iterations=1)
+    assert resumed.response.message.content == "Finished"
+    assert resumed.iterations == 2
+    # Resumed run continues the saved history instead of restarting it.
+    assert client.requests[1].messages[: len(saved)] == saved
+
+
+def test_resume_rejects_empty_or_foreign_messages(tmp_path) -> None:
+    loop = AgentLoop(
+        FakeClient(),
+        default_coding_tools(),
+        ToolContext(tmp_path),
+        permissions=PermissionManager(policy=PermissionPolicy.permissive()),
+    )
+    with pytest.raises(ValueError, match="non-empty AIMessage tuple"):
+        loop.resume(())
+    with pytest.raises(ValueError, match="non-empty AIMessage tuple"):
+        loop.resume(("not-a-message",))
+    with pytest.raises(ValueError, match="prior_iterations"):
+        loop.resume(
+            (AIMessage(MessageRole.USER, "hi"),),
+            prior_iterations=-1,
+        )
+
+
+def test_approval_round_trip_consumes_no_iteration(tmp_path) -> None:
+    approvals: list = []
+    client = FakeClient()
+    result = AgentLoop(
+        client,
+        default_coding_tools(),
+        ToolContext(tmp_path),
+        permissions=PermissionManager(
+            policy=PermissionPolicy.interactive(),
+            approval_callback=lambda call, category: approvals.append(call) or True,
+        ),
+        max_iterations=2,
+    ).run("Create the file", privacy_class=PrivacyClass.LOCAL_ONLY)
+    assert result.response.message.content == "Finished"
+    assert len(approvals) == 1
+    assert result.iterations == 2
+    assert (tmp_path / "out.txt").read_text() == "done"
