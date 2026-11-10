@@ -84,6 +84,7 @@ def fallback_readiness_report(
             (entry,),
             review_prompt=False,
             timeout_seconds=primary.timeout_seconds,
+            cost_exemptions=cost_exemptions,
         ).execution_plan
         assert plan is not None
         reason = (
