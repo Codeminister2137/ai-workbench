@@ -46,6 +46,12 @@ python -m uv run ruff format --check .
 python -m uv run pyright
 ```
 
+Development modes (`implement`, `coding-chat`) default to `--quality high`,
+so unscoped runs auto-route to better models instead of silently settling on
+local ones (pilot 2026-11-10). Deliberate local runs keep working: pass an
+explicit `--quality standard` (or lower), set a `defaults.quality` user-config
+value, or name the route with `--provider`/`--model`.
+
 Use the Codex route when you want the native Codex execution workflow:
 
 ```powershell
