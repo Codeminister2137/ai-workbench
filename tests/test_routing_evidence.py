@@ -190,7 +190,10 @@ def test_resolve_complexity_auto_and_explicit() -> None:
 def test_record_outcome_appends_and_skips(tmp_path) -> None:
     from ai_agent.repo_coding_assistant import _record_route_outcome
 
-    args = Namespace(mode="implement", repo_root=str(tmp_path))
+    args = Namespace(
+        mode="implement",
+        route_outcomes_path=str(tmp_path / "artifacts" / "route-outcomes.jsonl"),
+    )
     _record_route_outcome(args=args, route_id="ollama/x", execution_status="completed")
     lines = (tmp_path / "artifacts" / "route-outcomes.jsonl").read_text(encoding="utf-8")
     assert '"route_id": "ollama/x"' in lines and '"success": true' in lines
