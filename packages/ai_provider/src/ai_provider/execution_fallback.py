@@ -91,6 +91,7 @@ class FallbackSession:
         priority: tuple[str, ...] = (),
         excluded_route_ids: frozenset[str] = frozenset(),
         allow_cost_escalation: bool = False,
+        cost_exemptions: frozenset[str] = frozenset(),
     ) -> None:
         self.profile = profile
         self.catalog = catalog
@@ -106,6 +107,7 @@ class FallbackSession:
         self.priority = priority
         self.excluded_route_ids = excluded_route_ids
         self.allow_cost_escalation = allow_cost_escalation
+        self.cost_exemptions = cost_exemptions
         self.allowance_observations: dict[str, dict[str, Any]] = {}
         self.exhausted: set[str] = set()
         self.overloaded: set[str] = set()
@@ -136,6 +138,7 @@ class FallbackSession:
             priority=self.priority,
             excluded_route_ids=self.excluded_route_ids,
             allow_cost_escalation=self.allow_cost_escalation,
+            cost_exemptions=self.cost_exemptions,
         )
         preservation = (
             fallback_candidates(
@@ -148,6 +151,7 @@ class FallbackSession:
                 priority=self.priority,
                 excluded_route_ids=self.excluded_route_ids,
                 allow_cost_escalation=self.allow_cost_escalation,
+                cost_exemptions=self.cost_exemptions,
             )
             if preservation_compatible is not None
             else ()

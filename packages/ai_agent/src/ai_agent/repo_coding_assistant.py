@@ -1146,6 +1146,9 @@ def _execute_request(
     args.fallback_priority = tuple(args.fallback_priority or user_config.fallback_priority)
     args.fallback_exclude = tuple(args.fallback_exclude or user_config.fallback_exclude)
     args.fallback_allow_cost_escalation = user_config.fallback_allow_cost_escalation
+    from ai_provider.user_config import active_cost_exemptions
+
+    args.cost_exemptions = active_cost_exemptions(user_config)
     if args.list_skills:
         if any(
             (
@@ -1489,6 +1492,7 @@ def _execute_request(
         review_prompt=not args.skip_prompt_review,
         prompt_for_review=args.prompt,
         timeout_seconds=args.timeout_seconds,
+        cost_exemptions=args.cost_exemptions,
     )
     if (
         sampling_kwargs(args)
@@ -1550,6 +1554,7 @@ def _execute_request(
                 priority=args.fallback_priority,
                 excluded_route_ids=frozenset(args.fallback_exclude),
                 allow_cost_escalation=args.fallback_allow_cost_escalation,
+                cost_exemptions=args.cost_exemptions,
                 save_handoff=lambda summary: _save_fallback_handoff(
                     repo_root, {"objective": args.prompt or "", **summary}
                 ),
@@ -2567,11 +2572,23 @@ def _run_coding_prompt_with_fallback(
     kwargs = {**kwargs, **sampling_kwargs(args)}
     session = getattr(args, "fallback_session", None)
     if not kwargs.get("execute") or session is None or not session.enabled:
-        return run_coding_prompt(prompt, profile, catalog, **kwargs)
+        return run_coding_prompt(
+            prompt,
+            profile,
+            catalog,
+            cost_exemptions=getattr(args, "cost_exemptions", frozenset()),
+            **kwargs,
+        )
 
     def execute(target: Any, payload: str) -> Any:
         if target.route_id == session.initial.route_id:
-            return run_coding_prompt(payload, profile, catalog, **kwargs)
+            return run_coding_prompt(
+                payload,
+                profile,
+                catalog,
+                cost_exemptions=getattr(args, "cost_exemptions", frozenset()),
+                **kwargs,
+            )
         return _execute_fallback_route(
             target,
             payload,
@@ -2609,7 +2626,13 @@ def _run_coding_prompt_with_fallback(
         user_backend_override=None,
         user_model_override=None,
     )
-    orchestration = prepare_execution(prompt, effective_profile, catalog, review_prompt=False)
+    orchestration = prepare_execution(
+        prompt,
+        effective_profile,
+        catalog,
+        review_prompt=False,
+        cost_exemptions=getattr(args, "cost_exemptions", frozenset()),
+    )
     orchestration = replace(
         orchestration,
         execution_plan=ExecutionPlan(
@@ -2939,6 +2962,7 @@ def _print_fallback_readiness(args: argparse.Namespace, repo_root: Path) -> int:
         catalog,
         review_prompt=False,
         timeout_seconds=args.timeout_seconds,
+        cost_exemptions=getattr(args, "cost_exemptions", frozenset()),
     )
     if result.execution_plan is None:
         print(json.dumps({"status": "blocked", "reason": result.failure_reason}))
@@ -2979,6 +3003,7 @@ def _print_fallback_readiness(args: argparse.Namespace, repo_root: Path) -> int:
         priority=args.fallback_priority,
         excluded_route_ids=frozenset(args.fallback_exclude),
         allow_cost_escalation=args.fallback_allow_cost_escalation,
+        cost_exemptions=getattr(args, "cost_exemptions", frozenset()),
     )
     report["requirements"] = {
         "shared_tool_profile": args.shared_tools,
@@ -3888,6 +3913,7 @@ def _run_native_agent(
                 child_catalog,
                 review_prompt=False,
                 timeout_seconds=getattr(args, "timeout_seconds", 180.0),
+                cost_exemptions=getattr(args, "cost_exemptions", frozenset()),
             )
             if not child_orchestration.is_ready or child_orchestration.execution_plan is None:
                 reason = child_orchestration.failure_reason or child_orchestration.status.value
@@ -4407,6 +4433,7 @@ def _run_action_loop(
             review_prompt=not args.skip_prompt_review,
             prompt_for_review=original_prompt,
             timeout_seconds=args.timeout_seconds,
+            cost_exemptions=getattr(args, "cost_exemptions", frozenset()),
             execute=True,
             system_prompt=build_default_system_prompt(args.system, actions_enabled=True),
             start_ollama=args.start_ollama,

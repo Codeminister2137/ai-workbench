@@ -70,10 +70,14 @@ def fallback_profile(
     )
 
 
-def _accepts(profile: TaskProfile, entry: ModelCatalogEntry) -> bool:
+def _accepts(
+    profile: TaskProfile,
+    entry: ModelCatalogEntry,
+    cost_exemptions: frozenset[str] = frozenset(),
+) -> bool:
     """Reuse the recommender's acceptance rules so ordering cannot relax them."""
     try:
-        recommend_model(profile, (entry,))
+        recommend_model(profile, (entry,), cost_exemptions=cost_exemptions)
     except ValueError:
         return False
     return True
@@ -92,6 +96,7 @@ def fallback_candidates(
     priority: tuple[str, ...] = (),
     excluded_route_ids: frozenset[str] = frozenset(),
     allow_cost_escalation: bool = False,
+    cost_exemptions: frozenset[str] = frozenset(),
 ) -> tuple[ModelCatalogEntry, ...]:
     """Rank same-tier alternatives meeting the original task constraints.
 
@@ -150,6 +155,7 @@ def fallback_candidates(
         and (
             cost_policy_allows(entry.backend.cost_policy_tier, initial.cost_policy_tier)
             or (allow_cost_escalation and entry.backend.route_id in priority)
+            or entry.backend.billing_source.value in cost_exemptions
         )
         and entry.backend.route_id not in excluded_route_ids
         and entry.backend.billing_source.value not in exhausted_billing_sources
@@ -165,7 +171,8 @@ def fallback_candidates(
         ranked = [
             entry
             for route_id in priority
-            if (entry := by_route.get(route_id)) is not None and _accepts(candidate_profile, entry)
+            if (entry := by_route.get(route_id)) is not None
+            and _accepts(candidate_profile, entry, cost_exemptions)
         ]
         remaining = tuple(entry for entry in eligible if entry.backend.route_id not in listed)
     else:
@@ -173,7 +180,9 @@ def fallback_candidates(
         remaining = eligible
     while remaining:
         try:
-            chosen = recommend_model(candidate_profile, remaining).selected
+            chosen = recommend_model(
+                candidate_profile, remaining, cost_exemptions=cost_exemptions
+            ).selected
         except ValueError:
             break
         ranked.append(chosen)

@@ -415,3 +415,62 @@ def test_free_tier_route_is_admitted_and_prioritised_from_allowance_initial(task
         priority=("free",),
     )
     assert ordered[0].backend.route_id == "free"
+
+
+def _prepaid_entry(route: str) -> ModelCatalogEntry:
+    return ModelCatalogEntry(
+        backend=ModelBackend(
+            route=AccessRoute(
+                route_id=route,
+                provider="meta",
+                product="meta",
+                model=route,
+                location=BackendLocation.EXTERNAL,
+                access_method=AccessMethod.PROVIDER_API,
+                auth_method=AuthMethod.API_KEY,
+                billing_source=BillingSource.META_API_BILLING,
+                cost_policy_tier=CostPolicyTier.PREPAID_CREDITS_ALLOWED,
+            ),
+            capabilities=ModelCapabilities(chat=True, tools=True),
+        ),
+        quality=QualityThreshold.STANDARD,
+    )
+
+
+def test_cost_exemption_walks_to_exempted_prepaid_route(task_and_routes) -> None:
+    from ai_orchestrator.planner import ExecutionTarget
+
+    task, catalog, _initial = task_and_routes
+    meta_like = _prepaid_entry("meta-like")
+    catalog = catalog + (meta_like,)
+    primary = [entry for entry in catalog if entry.backend.route_id == "primary"][0]
+    backend = primary.backend
+    initial = ExecutionTarget(
+        route_id=backend.route_id,
+        provider=backend.provider,
+        model=backend.model,
+        product=backend.product,
+        access_method=backend.access_method,
+        cost_policy_tier=backend.cost_policy_tier,
+        billing_source=backend.billing_source,
+        auth_method=backend.auth_method,
+    )
+
+    without = fallback_candidates(
+        task,
+        catalog,
+        initial,
+        quality_policy=FallbackQualityPolicy.PREFER_QUALITY,
+        priority=("meta-like",),
+    )
+    assert [entry.backend.route_id for entry in without][0] != "meta-like"
+
+    walked = fallback_candidates(
+        task,
+        catalog,
+        initial,
+        quality_policy=FallbackQualityPolicy.PREFER_QUALITY,
+        priority=("meta-like",),
+        cost_exemptions=frozenset({"meta_api_billing"}),
+    )
+    assert [entry.backend.route_id for entry in walked][0] == "meta-like"

@@ -52,6 +52,7 @@ def prepare_execution(
     review_prompt: bool = True,
     prompt_for_review: str | None = None,
     timeout_seconds: float = 60.0,
+    cost_exemptions: frozenset[str] = frozenset(),
 ) -> OrchestrationResult:
     """Review a prompt, recommend a model, and prepare a neutral execution plan.
 
@@ -76,7 +77,7 @@ def prepare_execution(
         )
 
     try:
-        recommendation = recommend_model(profile, catalog)
+        recommendation = recommend_model(profile, catalog, cost_exemptions=cost_exemptions)
     except ValueError as exc:
         return OrchestrationResult(
             original_prompt=prompt,

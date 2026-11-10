@@ -290,3 +290,42 @@ def test_recommender_applies_route_override_as_hard_constraint() -> None:
 
     assert recommendation.selected is second
     assert recommendation.rejected[0].candidate is first
+
+
+def test_cost_exemption_admits_billing_source_despite_tier() -> None:
+    paid = _candidate("openai", "paid-model", BackendLocation.EXTERNAL)
+
+    with pytest.raises(ValueError, match="cost policy"):
+        recommend_model(
+            TaskProfile(privacy_class=PrivacyClass.EXTERNAL_ALLOWED),
+            (paid,),
+        )
+
+    recommendation = recommend_model(
+        TaskProfile(privacy_class=PrivacyClass.EXTERNAL_ALLOWED),
+        (paid,),
+        cost_exemptions=frozenset({"openai_api_billing"}),
+    )
+    assert recommendation.selected is paid
+    assert any("spending exemption" in reason for reason in recommendation.reasons)
+
+
+def test_cost_exemption_leaves_other_gates_intact() -> None:
+    paid = _candidate("openai", "paid-model", BackendLocation.EXTERNAL)
+
+    with pytest.raises(ValueError, match="quality threshold"):
+        recommend_model(
+            TaskProfile(
+                privacy_class=PrivacyClass.EXTERNAL_ALLOWED,
+                quality_threshold=QualityThreshold.HIGH,
+            ),
+            (paid,),
+            cost_exemptions=frozenset({"openai_api_billing"}),
+        )
+
+    with pytest.raises(ValueError, match="local-only"):
+        recommend_model(
+            TaskProfile(privacy_class=PrivacyClass.LOCAL_ONLY),
+            (paid,),
+            cost_exemptions=frozenset({"openai_api_billing"}),
+        )

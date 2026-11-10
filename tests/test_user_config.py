@@ -332,3 +332,74 @@ def test_fallback_ordering_defaults_stay_closed(tmp_path):
 def test_fallback_ordering_rejects_invalid_settings(tmp_path, settings):
     with pytest.raises(ValueError):
         load_user_config(fallback_config(tmp_path, settings))
+
+
+def test_spending_exemptions_parse_and_filter_expired(tmp_path) -> None:
+    from ai_provider.user_config import active_cost_exemptions, load_user_config
+
+    config = load_user_config(
+        spending_config(
+            tmp_path,
+            """
+[[spending.exemptions]]
+billing_source = "meta_api_billing"
+balance_cents = 11200
+expires_at = "2026-11-16T23:59:00+01:00"
+note = "hackathon credits"
+
+[[spending.exemptions]]
+billing_source = "requesty_billing"
+""",
+        )
+    )
+    assert len(config.spending_exemptions) == 2
+    meta = config.spending_exemptions[0]
+    assert meta.balance_cents == 11200
+    assert meta.expires_at is not None
+    assert config.spending_exemptions[1].expires_at is None
+
+    assert active_cost_exemptions(config, now=0.0) == frozenset(
+        {"meta_api_billing", "requesty_billing"}
+    )
+    assert active_cost_exemptions(config, now=meta.expires_at + 1.0) == frozenset(
+        {"requesty_billing"}
+    )
+
+
+def test_spending_exemptions_reject_bad_rules(tmp_path) -> None:
+    from ai_provider.user_config import load_user_config
+
+    with pytest.raises(ValueError, match="billing_source"):
+        load_user_config(
+            spending_config(
+                tmp_path,
+                '[[spending.exemptions]]\nbilling_source = "nope_billing"\n',
+            )
+        )
+    with pytest.raises(ValueError, match="balance_cents"):
+        load_user_config(
+            spending_config(
+                tmp_path,
+                '[[spending.exemptions]]\nbilling_source = "meta_api_billing"\nbalance_cents = -5\n',
+            )
+        )
+    with pytest.raises(ValueError, match="timezone"):
+        load_user_config(
+            spending_config(
+                tmp_path,
+                '[[spending.exemptions]]\nbilling_source = "meta_api_billing"\nexpires_at = "2026-11-16"\n',
+            )
+        )
+    with pytest.raises(ValueError, match="unknown keys"):
+        load_user_config(
+            spending_config(
+                tmp_path,
+                '[[spending.exemptions]]\nbilling_source = "meta_api_billing"\nbogus = 1\n',
+            )
+        )
+
+
+def spending_config(tmp_path: Path, settings: str) -> Path:
+    path = tmp_path / "user-config.toml"
+    path.write_text(settings, encoding="utf-8")
+    return path
