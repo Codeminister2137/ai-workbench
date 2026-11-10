@@ -213,3 +213,16 @@ routing, privacy, persistence or dependency change follows.
 Host review additionally corrected streamed usage accumulation: preserve input
 counts from `message_start` while updating cumulative counts from `message_delta`.
 The streaming regression now checks both counts and the `stop_sequence` mapping.
+Conformance Group 2, slice 1 (2026-11-10): the shared OpenAI-compatible
+streaming path never requested usage. OpenAI's [API reference](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create)
+and Requesty's [streaming guide](https://docs.requesty.ai/features/streaming)
+both state streams carry no `usage` unless `stream_options: {"include_usage":
+true}` is sent (final chunk, empty `choices`) — so streamed token accounting
+was silently zero on those routes while the reader already handled exactly
+that chunk shape. The adapter now sends the flag for OpenAI and Requesty
+streams only (`STREAM_USAGE_FLAG_PROVIDERS`, regression
+`test_stream_usage_flag_only_where_documented`). Recorded departures, not
+defects: Google is excluded on conflicting third-party evidence (one report
+of a 400 on this field with default usage); OpenRouter and OpenCode Go Chat
+are unverified and keep prior behavior. Verifying either is a bounded
+follow-up requiring primary-doc or live evidence.

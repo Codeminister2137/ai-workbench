@@ -77,6 +77,12 @@ def strip_reasoning_metadata(value: Any) -> Any:
     return value
 
 
+# Providers whose official docs confirm stream_options.include_usage.
+# Google: conflicting third-party evidence (possible 400). OpenRouter and
+# OpenCode Go: unverified. See the conformance plan.
+STREAM_USAGE_FLAG_PROVIDERS = frozenset({ProviderKind.OPENAI, ProviderKind.REQUESTY})
+
+
 @dataclass(slots=True)
 class OpenAICompatibleChatClient:
     """Chat client for OpenAI-compatible hosted Chat Completions APIs."""
@@ -231,6 +237,14 @@ class OpenAICompatibleChatClient:
             payload["max_tokens"] = request.max_output_tokens
         if request.tools:
             payload["tools"] = [tool.to_json_schema() for tool in request.tools]
+        # OpenAI and Requesty document stream_options.include_usage as the only
+        # way to receive usage on streams (final chunk, empty choices); without
+        # it streamed token accounting is silently zero. Other providers are
+        # excluded: Gemini has conflicting third-party evidence (one report of a
+        # 400 on this field with default usage), OpenRouter/OpenCode-Go are
+        # unverified — see the conformance plan.
+        if stream and self.config.provider in STREAM_USAGE_FLAG_PROVIDERS:
+            payload["stream_options"] = {"include_usage": True}
         return payload
 
     def _message_payload(self, message: AIMessage, model: str) -> dict[str, Any]:

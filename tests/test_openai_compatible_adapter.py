@@ -170,6 +170,34 @@ def test_openai_compatible_adapter_enforces_external_privacy_before_http(
     assert error.value.category is ProviderErrorCategory.PRIVACY_POLICY
 
 
+@pytest.mark.parametrize(
+    ("provider", "want_flag"),
+    [
+        (ProviderKind.OPENAI, True),
+        (ProviderKind.REQUESTY, True),
+        (ProviderKind.GOOGLE, False),
+    ],
+)
+def test_stream_usage_flag_only_where_documented(provider: ProviderKind, want_flag: bool) -> None:
+    """Conformance Group 2: include_usage only for OpenAI/Requesty streams."""
+    client = OpenAICompatibleChatClient(BackendConfig(provider=provider, model="m", api_key="key"))
+    request = AIRequest(
+        messages=(AIMessage(MessageRole.USER, "Hello"),),
+        privacy_class=PrivacyClass.EXTERNAL_ALLOWED,
+    )
+    streamed = client._chat_payload(request, stream=True)
+    assert ("stream_options" in streamed) is want_flag
+    if want_flag:
+        assert streamed["stream_options"] == {"include_usage": True}
+    assert "stream_options" not in client._chat_payload(request, stream=False)
+
+
+def test_stream_usage_flag_set_excludes_unverified() -> None:
+    from ai_provider.adapters.openai_compatible import STREAM_USAGE_FLAG_PROVIDERS
+
+    assert STREAM_USAGE_FLAG_PROVIDERS == {ProviderKind.OPENAI, ProviderKind.REQUESTY}
+
+
 def test_openai_compatible_adapter_requires_api_key() -> None:
     client = OpenAICompatibleChatClient(
         BackendConfig(provider=ProviderKind.OPENAI, model="gpt-5.1")
