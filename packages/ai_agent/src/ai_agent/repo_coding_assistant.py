@@ -455,19 +455,18 @@ def _configure_dev_quality_floor(
 
     Pilot 2026-11-10 (gpt-oss:20b review): a STANDARD local route presented
     unverified claims as verified fact. Development work must auto-route to
-    better models instead of silently settling on local ones. Explicit
-    --quality, a user-config quality default, or an explicit route/model
-    choice (deliberate local testing) keeps working unchanged.
+    better models instead of silently settling on local ones. User-config
+    values are defaults: they apply when nothing case-specific was asked,
+    so a configured quality default does not override this dev-mode need.
+    Explicit --quality or an explicit route/model choice (deliberate local
+    testing) keeps working unchanged.
     """
 
     if args.mode not in _DEV_QUALITY_MODES:
         return
     if args.route_id or args.provider or args.model or args.access_method:
         return
-    quality_selected = "quality" in (
-        getattr(args, "_provided_user_defaults", frozenset())
-        | getattr(args, "_configured_user_defaults", frozenset())
-    )
+    quality_selected = "quality" in getattr(args, "_provided_user_defaults", frozenset())
     if not quality_selected and not _argv_has_option(argv, _QUALITY_OPTION_NAMES):
         args.quality = QualityThreshold.HIGH.value
 
