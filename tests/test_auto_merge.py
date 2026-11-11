@@ -41,3 +41,15 @@ def test_gate_commands_scoped() -> None:
     assert any("tests/test_x.py" in " ".join(cmd) for cmd in tests)
     fix = gate_commands("small-fix", ["pkg/a.py"])
     assert any("pkg/a.py" in " ".join(cmd) for cmd in fix)
+
+
+def test_lint_covers_changed_files_only() -> None:
+    """Whole-tree ruff fails on untouched mirrors; the gate stays scoped."""
+    for kind, files in (
+        ("docs-only", ["docs/a.md"]),
+        ("test-only", ["tests/test_x.py"]),
+        ("small-fix", ["pkg/a.py"]),
+    ):
+        lint = gate_commands(kind, files)[0]
+        assert lint[:3] == [lint[0], "check", "--quiet"]
+        assert lint[3:] == files
