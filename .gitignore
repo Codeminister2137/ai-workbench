@@ -29,6 +29,9 @@ docs/library-private/
 docs/api-reference/
 docs/pycharm-ai-prompt-library.md
 
+# Local agent scratch (probes, receipts, run dirs); never committed.
+.tmp/
+
 # Python
 __pycache__/
 *.py[cod]

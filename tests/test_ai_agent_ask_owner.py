@@ -1,6 +1,8 @@
 """ask_owner: live owner questions on interactive turns, fail-closed elsewhere."""
 
+from collections.abc import Callable
 from dataclasses import replace
+from typing import Any, cast
 
 import pytest
 from ai_agent.delegation_scope import DelegationBudget, DelegationScope
@@ -12,7 +14,7 @@ from ai_agent.tools.owner_tasks import AskOwnerTool, OwnerTaskTool
 
 
 def _scope(tmp_path, **overrides):
-    base = dict(
+    base: dict[str, Any] = dict(
         registry=ToolRegistry(tools=(ReadFileTool(),)),
         permissions=PermissionManager(),
         workspace=tmp_path,
@@ -65,7 +67,9 @@ def test_channel_failure_is_an_error_result(tmp_path) -> None:
 
 
 def test_non_text_answer_is_an_error_result(tmp_path) -> None:
-    context = ToolContext(workspace_root=tmp_path, owner_prompt=lambda _q: None)
+    # Intentionally mistyped channel: the tool must fail closed on non-text.
+    mistyped = cast(Callable[[str], str], lambda _q: None)
+    context = ToolContext(workspace_root=tmp_path, owner_prompt=mistyped)
     result = AskOwnerTool().execute({"question": "Which store?"}, context)
     assert result.is_error is True
     assert "non-text" in result.output

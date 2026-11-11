@@ -58,12 +58,15 @@ def test_bridges_open_agent_task_into_queued_run(tmp_path) -> None:
     assert receipt["inbox_id"] == item["id"]
     assert receipt["status"] == "proposed"
     run = stores.runs.get(receipt["run_id"])
+    assert run is not None
     assert run["status"] == "queued"
     assert run["origin"] == "inbox"
     assert run["inbox_id"] == receipt["approval_id"]
     approval = stores.inbox.get(receipt["approval_id"])
+    assert approval is not None
     assert approval["options"] == ["Approve", "Reject"]
     marked = stores.inbox.get(item["id"])
+    assert marked is not None
     assert marked["metadata"]["bridge_run_id"] == receipt["run_id"]
     # Second pass proposes nothing new.
     assert bridge_agent_queue(stores) == []

@@ -306,7 +306,7 @@ def _local_read_only_delegated_task_runner(
             )
             if scope is not None
             else _delegated_task_prompt(task),
-            **({"system_prompt": scope.instructions} if scope is not None else {}),
+            system_prompt=scope.instructions if scope is not None else None,
             model=config.model,
             privacy_class=PrivacyClass(profile.privacy_class.value),
         )

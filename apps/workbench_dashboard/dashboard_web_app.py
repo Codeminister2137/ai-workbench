@@ -572,7 +572,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                     {"ok": True, "spend": spend_status(self.data_dir, self.spend_ledger)}
                 )
             if path == "/api/restrictions":
-                return self._send_json(self._restrictions_with_toggles())
+                return self._restrictions_with_toggles()
             if path == "/api/knowme":
                 return self._send_knowme(parsed.query)
             if path == "/api/providers":
