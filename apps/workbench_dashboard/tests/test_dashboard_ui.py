@@ -58,8 +58,8 @@ def test_static_controls_have_titles() -> None:
         assert "title=" in tag, f"button without title: {tag}"
     nav_links = re.findall(r"<a\b[^>]*data-view[^>]*>", html)
     assert (
-        len(nav_links) == 15
-    )  # +intake, +restrictions, +fleet, +providers, +help, +backlog, +knowme
+        len(nav_links) == 16
+    )  # +intake, +restrictions, +fleet, +providers, +help, +backlog, +knowme, +workflows
     for tag in nav_links:
         assert "title=" in tag, f"nav link without title: {tag}"
 
@@ -69,8 +69,8 @@ def test_dynamic_buttons_have_titles() -> None:
     js = _read("app.js")
     buttons = re.findall(r"<button\b[^>]*>", js)
     assert (
-        len(buttons) == 23
-    )  # +report/rename/delete/submit/create/cancel/run-request/staged-approve/staged-reject/dictate/intake-approve/draft-plan/drain/reopen/providers-refresh/propose/backlog-groom/backlog-promote
+        len(buttons) == 31
+    )  # +report/rename/delete/submit/create/cancel/run-request/staged-approve/staged-reject/dictate/intake-approve/draft-plan/drain/reopen/providers-refresh/propose/backlog-groom/backlog-promote +8 workflow composer
     for tag in buttons:
         assert "title=" in tag, f"button without title: {tag}"
 
@@ -80,14 +80,14 @@ def test_dynamic_inputs_and_selects_have_titles() -> None:
     js = _read("app.js")
     inputs = [tag for tag in re.findall(r"<input\b[^>]*>", js) if 'type="radio"' not in tag]
     assert (
-        len(inputs) == 21
-    )  # +rename/create-form inputs, +5 list filters, +idea plan link, +task propose, +backlog filter/decision/create-title/create-ref, +restriction toggle
+        len(inputs) == 29
+    )  # +rename/create-form inputs, +5 list filters, +idea plan link, +task propose, +backlog filter/decision/create-title/create-ref, +restriction toggle, +8 workflow composer
     for tag in inputs:
         assert "title=" in tag, f"input without title: {tag}"
     selects = re.findall(r"<select\b[^>]*>", js)
     assert (
-        len(selects) == 11
-    )  # +create selects, +run-request pickers, +runs/inbox project filters, +agent-queue assignee, +backlog groom/create-source, +inbox close kind
+        len(selects) == 15
+    )  # +create selects, +run-request pickers, +runs/inbox project filters, +agent-queue assignee, +backlog groom/create-source, +inbox close kind, +4 workflow composer
     for tag in selects:
         assert "title=" in tag, f"select without title: {tag}"
 
@@ -120,6 +120,18 @@ def test_backlog_tab_grooms_and_promotes() -> None:
     assert 'id="promote-btn"' in js
     assert "/promote" in js
     assert "open_backlog" in js
+
+
+def test_workflows_tab_composes_and_validates() -> None:
+    """Workflows list links a composer that validates and saves new copies."""
+    js = _read("app.js")
+    html = _read("index.html")
+    assert 'data-view="workflows"' in html
+    assert "renderWorkflows" in js
+    assert "/api/workflows/options" in js
+    assert "/api/workflows/validate" in js
+    assert 'id="wf-save"' in js
+    assert "Save new copy" in js
 
 
 def test_ideas_label_explains_triage() -> None:

@@ -26,6 +26,7 @@ IDEA_STATUSES = ("new", "reviewing", "adopted", "parked", "declined")
 BACKLOG_SOURCES = ("owner", "agent")
 BACKLOG_STATUSES = ("proposed", "ready", "doing", "blocked", "done", "dropped")
 BACKLOG_OPEN = ("proposed", "ready", "doing", "blocked")
+WORKFLOW_STATUSES = ("active", "archived")
 
 
 class StoreError(ValueError):
@@ -120,6 +121,7 @@ class DashboardStores:
         self.inbox = JsonCollection(data_dir / "inbox")
         self.ideas = JsonCollection(data_dir / "ideas")
         self.backlog = JsonCollection(data_dir / "backlog")
+        self.workflows = JsonCollection(data_dir / "workflows")
 
     @property
     def token_path(self) -> Path:
@@ -368,6 +370,43 @@ class DashboardStores:
         record["plan_id"] = plan_id
         record["reviewed_at"] = _utc_now()
         self.ideas.put(item_id, record)
+        return record
+
+    def create_workflow(
+        self,
+        *,
+        name: str,
+        description: str = "",
+        nodes: list | None = None,
+    ) -> dict:
+        """Save one workflow graph; the schema accepts or refuses the nodes."""
+        from ai_agent.workflow_graph import graph_from_dict, graph_to_dict
+
+        try:
+            graph = graph_from_dict(
+                {"name": name, "description": description, "nodes": nodes or []}
+            )
+        except ValueError as exc:
+            raise StoreError(str(exc)) from None
+        now = _utc_now()
+        record = {
+            "id": uuid.uuid4().hex,
+            "status": "active",
+            "created_at": now,
+            **graph_to_dict(graph),
+        }
+        self.workflows.put(record["id"], record)
+        return record
+
+    def set_workflow_status(self, item_id: str, *, status: str) -> dict:
+        """Archive or reactivate one workflow; the graph stays as the record."""
+        record = self.workflows.get(item_id)
+        if record is None:
+            raise StoreError("Workflow not found")
+        if status not in WORKFLOW_STATUSES:
+            raise StoreError(f"Workflow status must be one of {WORKFLOW_STATUSES}")
+        record["status"] = status
+        self.workflows.put(item_id, record)
         return record
 
     def new_idea_count(self) -> int:

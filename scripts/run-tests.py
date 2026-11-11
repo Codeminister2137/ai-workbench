@@ -106,6 +106,7 @@ GROUPS = {
         "tests/test_groundedness.py",
         "tests/test_native_delegation.py",
         "tests/test_subagent_profiles.py",
+        "tests/test_workflow_graph.py",
         "tests/test_governance_tiers.py",
         "tests/test_agent_acceptance.py",
         "tests/test_knowme_bank.py",

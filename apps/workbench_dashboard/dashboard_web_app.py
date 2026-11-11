@@ -631,6 +631,10 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 return self._send_ideas(parsed.query)
             if path == "/api/backlog":
                 return self._send_backlog(parsed.query)
+            if path == "/api/workflows":
+                return self._send_workflows(parsed.query)
+            if path == "/api/workflows/options":
+                return self._send_workflow_options()
             if path == "/api/projects":
                 try:
                     projects = list_projects(self.data_dir)
@@ -645,6 +649,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 return self._send_item(self._stores().ideas, path[len("/api/ideas/") :])
             if path.startswith("/api/backlog/"):
                 return self._send_item(self._stores().backlog, path[len("/api/backlog/") :])
+            if path.startswith("/api/workflows/"):
+                return self._send_item(self._stores().workflows, path[len("/api/workflows/") :])
         except (StoreError, ValueError) as exc:
             return self._send_json({"ok": False, "error": str(exc)}, status=400)
         return self._send_json({"ok": False, "error": "Unknown endpoint"}, status=404)
@@ -694,6 +700,10 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 return self._create_idea(payload)
             if path == "/api/backlog":
                 return self._create_backlog_item(payload)
+            if path == "/api/workflows":
+                return self._create_workflow(payload)
+            if path == "/api/workflows/validate":
+                return self._validate_workflow(payload)
             if path == "/api/tasks/propose":
                 return self._propose_task(payload)
             if path == "/api/projects":
@@ -725,6 +735,9 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             if path.startswith("/api/backlog/") and path.endswith("/promote"):
                 item_id = path[len("/api/backlog/") : -len("/promote")]
                 return self._promote_backlog_item(item_id, payload)
+            if path.startswith("/api/workflows/") and path.endswith("/status"):
+                item_id = path[len("/api/workflows/") : -len("/status")]
+                return self._set_workflow_status(item_id, payload)
             if path.startswith("/api/runs/") and path.endswith("/report-request"):
                 run_id = path[len("/api/runs/") : -len("/report-request")]
                 return self._request_run_report(run_id)
@@ -1273,6 +1286,66 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         except StoreError as exc:
             return self._send_json({"ok": False, "error": str(exc)}, status=400)
         self._send_json({"ok": True, "id": record["id"]})
+
+    def _send_workflow_options(self) -> None:
+        from ai_agent.skills import SKILL_TOOLS
+        from ai_agent.workflow_graph import AGENT_RUN_MODES, NODE_TYPES
+
+        self._send_json(
+            {
+                "ok": True,
+                "node_types": list(NODE_TYPES),
+                "skills": sorted(SKILL_TOOLS),
+                "modes": list(AGENT_RUN_MODES),
+            }
+        )
+
+    def _send_workflows(self, query: str) -> None:
+        from dashboard_stores import WORKFLOW_STATUSES
+
+        params = parse_qs(query)
+        wanted_status = params.get("status", [None])[0]
+        if wanted_status is not None and wanted_status not in WORKFLOW_STATUSES:
+            return self._send_json({"ok": False, "error": "Invalid status filter"}, status=400)
+        items, _total = self._stores().workflows.list(limit=100)
+        if wanted_status is not None:
+            items = [item for item in items if item.get("status") == wanted_status]
+        self._send_json({"ok": True, "items": items, "total": len(items)})
+
+    def _create_workflow(self, payload: dict) -> None:
+        name = payload.get("name", "")
+        description = payload.get("description", "")
+        nodes = payload.get("nodes", [])
+        if not all(isinstance(value, str) for value in (name, description)):
+            return self._send_json(
+                {"ok": False, "error": "name and description must be strings"}, status=400
+            )
+        if not isinstance(nodes, list):
+            return self._send_json({"ok": False, "error": "nodes must be a list"}, status=400)
+        try:
+            record = self._stores().create_workflow(name=name, description=description, nodes=nodes)
+        except StoreError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        self._send_json({"ok": True, "id": record["id"]})
+
+    def _validate_workflow(self, payload: dict) -> None:
+        from ai_agent.workflow_graph import graph_from_dict, plan_graph
+
+        try:
+            plan = plan_graph(graph_from_dict(payload.get("graph", payload)))
+        except ValueError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        self._send_json({"ok": True, "plan": plan})
+
+    def _set_workflow_status(self, item_id: str, payload: dict) -> None:
+        status = payload.get("status", "")
+        if not isinstance(status, str):
+            return self._send_json({"ok": False, "error": "status must be a string"}, status=400)
+        try:
+            record = self._stores().set_workflow_status(item_id, status=status)
+        except StoreError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        self._send_json({"ok": True, "status": record["status"]})
 
     def _review_backlog_item(self, item_id: str, payload: dict) -> None:
         status = payload.get("status", "")
