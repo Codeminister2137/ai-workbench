@@ -79,4 +79,7 @@ extraPaths = [
     "apps/ai_council",
     "apps/job_search/job-email",
     "apps/workbench_dashboard",
+    # Test-only sys.path roots (tests insert these at runtime).
+    "scripts",
+    "company-site",
 ]

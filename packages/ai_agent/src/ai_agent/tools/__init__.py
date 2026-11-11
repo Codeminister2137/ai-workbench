@@ -19,9 +19,19 @@ from ai_agent.tools.refactor import (
     RenamePlanStore,
     RenamePreviewTool,
 )
+from ai_agent.tools.research_search import SearchSession, SearchWebTool
 from ai_agent.tools.search import FindFilesTool, GrepSearchTool
 from ai_agent.tools.shell import RunCommandTool
 from ai_agent.tools.staged import StageFileTool
+
+
+def null_search_session() -> SearchSession:
+    """Provider-keyed web search with receipts discarded (coding use).
+
+    Keys and endpoint come from process env; anonymous discovery needs a
+    working SEARXNG_ENDPOINT. Queries are public topics by contract.
+    """
+    return SearchSession.from_environment(lambda _event, _receipt: None)
 
 
 def default_coding_tools(*, rename_plans: RenamePlanStore | None = None) -> ToolRegistry:
@@ -42,6 +52,7 @@ def default_coding_tools(*, rename_plans: RenamePlanStore | None = None) -> Tool
             PythonNavigateTool(),
             RenamePreviewTool(plans),
             RenameApplyTool(plans),
+            SearchWebTool(null_search_session()),
         )
     )
 

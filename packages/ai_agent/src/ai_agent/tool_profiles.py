@@ -50,6 +50,7 @@ CODING_PROFILE = SharedToolProfile(
         "python_navigate",
         "rename_preview",
         "rename_apply",
+        "search_web",
         "delegate_task",
         "ask_owner",
         "request_owner_task",
@@ -86,6 +87,7 @@ def shared_tool_registry(
     )
     if name == "coding":
         from ai_agent.tools.research import FetchURLTool
+        from ai_agent.tools.research_search import SearchSession, SearchWebTool
 
         for tool in (CreateFileTool(), EditFileTool(), RunCommandTool()):
             registry.register(tool)
@@ -97,6 +99,10 @@ def shared_tool_registry(
         plans = rename_plans or RenamePlanStore(workspace)
         registry.register(RenamePreviewTool(plans))
         registry.register(RenameApplyTool(plans))
+        # Registration order follows CODING_PROFILE.tool_names (parity-tested).
+        registry.register(
+            SearchWebTool(SearchSession.from_environment(lambda _event, _receipt: None))
+        )
         registry.register(DelegateTaskTool(delegation_runner or unavailable_delegation))
         registry.register(AskOwnerTool())
         registry.register(OwnerTaskTool())
