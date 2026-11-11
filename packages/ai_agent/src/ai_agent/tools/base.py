@@ -26,6 +26,7 @@ HOST_ENV_ALLOWLIST = frozenset(
         "PATH",
         "PATHEXT",
         "SYSTEMROOT",
+        "SYSTEMDRIVE",
         "WINDIR",
         "COMSPEC",
         "TEMP",

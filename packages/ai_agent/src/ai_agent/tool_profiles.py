@@ -45,6 +45,9 @@ CODING_PROFILE = SharedToolProfile(
         "create_file",
         "edit_file",
         "run_command",
+        "run_command_background",
+        "poll_command",
+        "stop_command",
         "fetch_url",
         "python_runtime",
         "python_navigate",
@@ -86,10 +89,22 @@ def shared_tool_registry(
         )
     )
     if name == "coding":
+        from ai_agent.tools.background import (
+            PollCommandTool,
+            RunCommandBackgroundTool,
+            StopCommandTool,
+        )
         from ai_agent.tools.research import FetchURLTool
         from ai_agent.tools.research_search import SearchSession, SearchWebTool
 
-        for tool in (CreateFileTool(), EditFileTool(), RunCommandTool()):
+        for tool in (
+            CreateFileTool(),
+            EditFileTool(),
+            RunCommandTool(),
+            RunCommandBackgroundTool(),
+            PollCommandTool(),
+            StopCommandTool(),
+        ):
             registry.register(tool)
         # Provenance is returned to the caller. Coding-session storage keeps the
         # ordinary hashed tool receipt, not fetched text or a separate research log.

@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+from ai_agent.tools.background import (
+    PollCommandTool,
+    RunCommandBackgroundTool,
+    StopCommandTool,
+)
 from ai_agent.tools.base import BaseTool, ToolContext, ToolRegistry
 from ai_agent.tools.delegation import DelegateTaskTool, coding_tools_with_delegation
 from ai_agent.tools.filesystem import (
@@ -48,6 +53,9 @@ def default_coding_tools(*, rename_plans: RenamePlanStore | None = None) -> Tool
             GitStatusTool(),
             GitDiffTool(),
             RunCommandTool(),
+            RunCommandBackgroundTool(),
+            PollCommandTool(),
+            StopCommandTool(),
             PythonRuntimeTool(),
             PythonNavigateTool(),
             RenamePreviewTool(plans),
@@ -76,6 +84,9 @@ __all__ = [
     "RenamePlanStore",
     "RenamePreviewTool",
     "RunCommandTool",
+    "RunCommandBackgroundTool",
+    "PollCommandTool",
+    "StopCommandTool",
     "StageFileTool",
     "ToolContext",
     "ToolRegistry",
