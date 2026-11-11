@@ -929,3 +929,26 @@ def test_restriction_toggles_round_trip(dashboard_server) -> None:
     assert sandbox["enabled"] is True
     with pytest.raises(HTTPError):
         post_json(dashboard_server, "/api/restrictions/toggles", {"name": "nope", "enabled": True})
+
+
+def test_knowme_empty_bank_is_honest(dashboard_server) -> None:
+    payload = get_json(dashboard_server, "/api/knowme")
+    assert payload["ok"] is True
+    assert payload["entries"] == [] and payload["count"] == 0
+    assert payload["bank"] == "missing"
+
+
+def test_knowme_lists_banked_entries(dashboard_server, tmp_path) -> None:
+    from knowme_bank import KnowMeStore
+
+    store = KnowMeStore(tmp_path / "data" / "knowme.sqlite3")
+    store.add("training", "Runs 3x/week.", "interview")
+    store.add("diet", "Oats.", "note")
+    payload = get_json(dashboard_server, "/api/knowme")
+    assert payload["count"] == 2
+    assert payload["bank"] == "ready"
+    assert {entry["category"] for entry in payload["entries"]} == {"training", "diet"}
+    filtered = get_json(dashboard_server, "/api/knowme?category=training")
+    assert [entry["text"] for entry in filtered["entries"]] == ["Runs 3x/week."]
+    with pytest.raises(HTTPError):
+        get_json(dashboard_server, "/api/knowme?category=nope")

@@ -1339,6 +1339,29 @@ async function flipToggle(checkbox) {
     render();
   }
 }
+async function renderKnowme() {
+  const category = new URLSearchParams((location.hash.split("?")[1] || "")).get("category") || "";
+  const query = category ? ("?category=" + encodeURIComponent(category)) : "";
+  let payload = null;
+  try {
+    payload = await api("/api/knowme" + query);
+  } catch (err) {
+    view.innerHTML = `<h1>KnowMe</h1><p class="muted">Bank unavailable: ${esc(err.message)}</p>`;
+    return;
+  }
+  const cats = ["", "training", "diet", "preference", "health", "note"];
+  const tabs = cats.map((c) =>
+    `<a href="#/knowme${c ? ("?category=" + c) : ""}">${c || "all"}</a>`).join(" · ");
+  const items = (payload.entries || []).length
+    ? payload.entries.map((e) =>
+        `<li><span class="pill">${esc(e.category)}</span>
+         <span class="muted">[${esc(e.source)}]</span> ${esc(e.text)}</li>`).join("")
+    : '<li class="muted">No entries yet — run the know-me interview to bank facts.</li>';
+  view.innerHTML = `<h1>KnowMe</h1>
+    <p class="muted">${esc(payload.count)} entr${payload.count === 1 ? "y" : "ies"} banked.</p>
+    <p>${tabs}</p>
+    <div class="card"><ul class="plain">${items}</ul></div>`;
+}
 async function renderRestrictions() {
   let sub = null;
   let toggles = [];
@@ -1484,6 +1507,7 @@ async function render() {
     else if (name === "fleet") await renderFleet();
     else if (name === "providers") await renderProviders();
     else if (name === "restrictions") await renderRestrictions();
+    else if (name === "knowme") await renderKnowme();
     else if (name === "help") renderHelp();
     else if (name === "create" && id) renderCreate(id);
     else view.innerHTML = "<h1>Not found</h1>";

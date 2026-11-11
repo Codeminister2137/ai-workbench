@@ -561,6 +561,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 )
             if path == "/api/restrictions":
                 return self._send_json(self._restrictions_with_toggles())
+            if path == "/api/knowme":
+                return self._send_knowme(parsed.query)
             if path == "/api/providers":
                 return self._send_json(providers_status(self.data_dir, self.repo_root))
             if path == "/api/fleet":
@@ -1331,6 +1333,42 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         except Exception as exc:  # noqa: BLE001 - report, never 500 blindly
             return self._send_json({"ok": False, "error": str(exc)}, status=500)
         self._send_json({"ok": True, "bridged": receipts})
+
+    def _send_knowme(self, query: str) -> None:
+        from knowme_bank import CATEGORIES, KnowMeStore
+
+        params = parse_qs(query)
+        category = params.get("category", [None])[0]
+        if category is not None and category not in CATEGORIES:
+            return self._send_json(
+                {"ok": False, "error": f"Unknown category (one of {', '.join(CATEGORIES)})"},
+                status=400,
+            )
+        try:
+            limit = min(max(int(params.get("limit", ["50"])[0]), 1), 200)
+        except ValueError:
+            return self._send_json({"ok": False, "error": "Invalid limit"}, status=400)
+        db_path = self.data_dir / "knowme.sqlite3"
+        if not db_path.exists():
+            return self._send_json({"ok": True, "entries": [], "count": 0, "bank": "missing"})
+        store = KnowMeStore(db_path)
+        entries = store.find(category=category, limit=limit)
+        self._send_json(
+            {
+                "ok": True,
+                "entries": [
+                    {
+                        "id": entry.id,
+                        "category": entry.category,
+                        "text": entry.text,
+                        "source": entry.source,
+                    }
+                    for entry in entries
+                ],
+                "count": store.count(),
+                "bank": "ready",
+            }
+        )
 
     def _propose_task(self, payload: dict) -> None:
         """File free text as an approval-gated scheduled-task proposal."""
