@@ -110,6 +110,7 @@ GROUPS = {
         "tests/test_knowme_bank.py",
         "tests/test_web_search_wiring.py",
         "tests/test_spend_ledger_durable.py",
+        "tests/test_parallel_delegation.py",
         "tests/test_auto_merge.py",
     ),
     "cli": (
