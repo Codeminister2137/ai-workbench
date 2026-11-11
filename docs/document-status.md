@@ -57,6 +57,7 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/wake-runbook.md | KNOWLEDGE | Wake runbook. |
 | docs/workflow-builder-note.md | KNOWLEDGE | Decomposition note for idea 9b22ac09 (open). |
 | docs/workflow.md | KNOWLEDGE | Workflow rules. |
+| docs/xiaomi-health-connect-runbook.md | PENDING | Owner chose path B (inbox 173cb000); backfill + sync + first export pending. |
 | docs/plans/00_MASTER_CHECKLIST_AI_Job_Search_IT_Business.txt | KNOWLEDGE | Founder source plan (constraints input). |
 | docs/plans/01_AI_Provider_Agnostic_Infrastructure_Plan.txt | KNOWLEDGE | Founder source plan (capability evidence). |
 | docs/plans/02_AI_Council_Project_Plan.txt | KNOWLEDGE | Founder source plan (minor evidence). |
