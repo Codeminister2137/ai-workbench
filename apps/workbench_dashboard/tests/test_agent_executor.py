@@ -587,6 +587,47 @@ def test_closeout_settles_run_to_ledger(tmp_path) -> None:
     assert (records[0].task_id, records[0].provider) == ("r1", "ollama")
 
 
+def test_closeout_records_measured_tokens(tmp_path) -> None:
+    from dataclasses import replace
+
+    from ai_agent.staged_edits import ProjectRoots
+    from ai_orchestrator.spend_ledger import SpendLedger
+    from ai_provider import UsageMetadata, UsageSource
+
+    FakeLoop.instances = []
+    ledger = SpendLedger(tmp_path / "spend.sqlite3")
+    config = DashboardConfig(provider="ollama", model="fake")
+    execute = build_executor(
+        config,
+        ProjectRoots((str(tmp_path),)),
+        tmp_path,
+        client_factory=lambda backend: object(),
+        loop_factory=FakeLoop,
+        spend_ledger=ledger,
+    )
+    FakeLoop.instances.clear()
+
+    original_init = FakeLoop.__init__
+
+    def metered_init(self, *args, **kwargs):
+        original_init(self, *args, **kwargs)
+        self.result = replace(
+            self.result,
+            usage=UsageMetadata(
+                source=UsageSource.PROVIDER_REPORTED, input_tokens=100, output_tokens=10
+            ),
+        )
+
+    FakeLoop.__init__ = metered_init
+    try:
+        execute({"id": "r1", "title": "t", "body": "b"})
+    finally:
+        FakeLoop.__init__ = original_init
+    (record,) = SpendLedger(tmp_path / "spend.sqlite3").records()
+    assert (record.input_tokens, record.output_tokens) == (100, 10)
+    assert record.usage_source == "provider_reported"
+
+
 def test_closeout_without_ledger_skips_settle(tmp_path) -> None:
     from ai_agent.staged_edits import ProjectRoots
 

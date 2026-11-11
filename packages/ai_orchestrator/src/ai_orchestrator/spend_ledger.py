@@ -115,6 +115,9 @@ class TaskSpendRecord:
     actual_cents: int
     duration_ms: int
     timestamp: float
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    usage_source: str = "unavailable"
 
 
 @dataclass(slots=True)
@@ -288,9 +291,21 @@ class SpendLedger:
                 task_class TEXT NOT NULL, model_id TEXT NOT NULL, provider TEXT NOT NULL,
                 allowance_id TEXT, estimated_cents INTEGER NOT NULL,
                 actual_cents INTEGER NOT NULL, duration_ms INTEGER NOT NULL,
-                timestamp REAL NOT NULL)
+                timestamp REAL NOT NULL, input_tokens INTEGER,
+                output_tokens INTEGER,
+                usage_source TEXT NOT NULL DEFAULT 'unavailable')
             """
         )
+        # Pre-token ledgers predate the metering columns; backfill in place.
+        columns = {row[1] for row in connection.execute("PRAGMA table_info(records)").fetchall()}
+        if "input_tokens" not in columns:
+            connection.execute("ALTER TABLE records ADD COLUMN input_tokens INTEGER")
+        if "output_tokens" not in columns:
+            connection.execute("ALTER TABLE records ADD COLUMN output_tokens INTEGER")
+        if "usage_source" not in columns:
+            connection.execute(
+                "ALTER TABLE records ADD COLUMN usage_source TEXT NOT NULL DEFAULT 'unavailable'"
+            )
         connection.execute(
             "CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)"
         )
@@ -340,7 +355,8 @@ class SpendLedger:
             connection.executemany(
                 "INSERT INTO records (task_id, task_class, model_id, provider,"
                 " allowance_id, estimated_cents, actual_cents, duration_ms,"
-                " timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                " timestamp, input_tokens, output_tokens, usage_source)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 [
                     (
                         record.task_id,
@@ -352,6 +368,9 @@ class SpendLedger:
                         record.actual_cents,
                         record.duration_ms,
                         record.timestamp,
+                        record.input_tokens,
+                        record.output_tokens,
+                        record.usage_source,
                     )
                     for record in self._records
                 ],
@@ -404,7 +423,8 @@ class SpendLedger:
                 self._reservations[item.id] = item
             for row in connection.execute(
                 "SELECT task_id, task_class, model_id, provider, allowance_id,"
-                " estimated_cents, actual_cents, duration_ms, timestamp"
+                " estimated_cents, actual_cents, duration_ms, timestamp,"
+                " input_tokens, output_tokens, usage_source"
                 " FROM records ORDER BY rowid ASC"
             ):
                 self._records.append(TaskSpendRecord(*row))
@@ -554,6 +574,9 @@ class SpendLedger:
         actual_cents: int,
         model_id: str = "",
         duration_ms: int = 0,
+        input_tokens: int | None = None,
+        output_tokens: int | None = None,
+        usage_source: str = "unavailable",
     ) -> TaskSpendRecord:
         """Commit one reservation: refund the estimate-actual delta, append the record."""
         if actual_cents < 0:
@@ -589,6 +612,9 @@ class SpendLedger:
             actual_cents=actual_cents,
             duration_ms=duration_ms,
             timestamp=self._clock(),
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            usage_source=usage_source,
         )
         self._records.append(record)
         self._save()
@@ -610,12 +636,20 @@ class SpendLedger:
         return reservation
 
     def settle_local(
-        self, *, task_id: str, task_class: str, model_id: str = "", provider: str = "local"
+        self,
+        *,
+        task_id: str,
+        task_class: str,
+        model_id: str = "",
+        provider: str = "local",
+        input_tokens: int | None = None,
+        output_tokens: int | None = None,
+        usage_source: str = "unavailable",
     ) -> TaskSpendRecord:
         """Record one zero-marginal-cost call that admitted without a grant.
 
         ``model_id``/``provider`` attribute the record (free/allowance routes);
-        adapter-level metering of paid spend is a later step.
+        measured token usage rides along when the caller has it.
         """
         record = TaskSpendRecord(
             task_id=task_id,
@@ -627,6 +661,9 @@ class SpendLedger:
             actual_cents=0,
             duration_ms=0,
             timestamp=self._clock(),
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            usage_source=usage_source,
         )
         self._records.append(record)
         self._save()

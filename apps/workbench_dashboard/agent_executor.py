@@ -117,6 +117,19 @@ def _collect_owner_tasks(result: AgentResult) -> list[dict]:
     return tasks
 
 
+def _measured_usage(result: AgentResult) -> dict:
+    """Ledger kwargs from the run's accumulated usage; gaps stay explicit."""
+    usage = getattr(result, "usage", None)
+    if usage is None:
+        return {}
+    source = getattr(getattr(usage, "source", None), "value", None) or "unavailable"
+    return {
+        "input_tokens": getattr(usage, "input_tokens", None),
+        "output_tokens": getattr(usage, "output_tokens", None),
+        "usage_source": source,
+    }
+
+
 def _resolve_backend(
     config: DashboardConfig, repo_root: Path, run_title: str
 ) -> tuple[BackendConfig | None, PrivacyClass, str]:
@@ -348,6 +361,7 @@ def build_executor(
                     task_class="drain_run",
                     model_id=model,
                     provider=provider or "local",
+                    **_measured_usage(result),
                 )
             except Exception as exc:  # noqa: BLE001 - metering never breaks runs
                 logger.warning("run %s spend settle failed: %s", run_id, exc)
