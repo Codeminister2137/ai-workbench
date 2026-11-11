@@ -166,6 +166,24 @@ def test_unsafe_or_exhausted_tavily_account_never_receives_query(field, value):
     assert "tavily" in session.disabled
 
 
+def test_null_caps_mean_no_paygo_and_no_key_limit():
+    """Live Tavily shape: null paygo_limit/key limit must not block free use."""
+    calls = []
+    usage = free_usage()
+    usage["account"]["paygo_limit"] = None
+    usage["key"]["limit"] = None
+
+    def transport(*args):
+        calls.append(args)
+        return response(usage if args[0].endswith("usage") else source_data())
+
+    session = SearchSession(lambda kind, value: None, tavily_key="secret", transport=transport)
+    output = session.search("public topic")
+    assert session.current == "tavily"
+    assert output["results"][0]["url"] == "https://docs.python.org/3/"
+    assert any(c[0] == "https://api.tavily.com/search" for c in calls)
+
+
 @pytest.mark.parametrize("free,storage", [(False, False), (True, False), (False, True)])
 def test_brave_gated_by_cost_and_storage_rights(free, storage):
     calls = []
