@@ -91,9 +91,6 @@ def shared_tool_registry(
 
         for tool in (CreateFileTool(), EditFileTool(), RunCommandTool()):
             registry.register(tool)
-        registry.register(
-            SearchWebTool(SearchSession.from_environment(lambda _event, _receipt: None))
-        )
         # Provenance is returned to the caller. Coding-session storage keeps the
         # ordinary hashed tool receipt, not fetched text or a separate research log.
         registry.register(FetchURLTool(lambda _event, _receipt: None))
@@ -102,6 +99,10 @@ def shared_tool_registry(
         plans = rename_plans or RenamePlanStore(workspace)
         registry.register(RenamePreviewTool(plans))
         registry.register(RenameApplyTool(plans))
+        # Registration order follows CODING_PROFILE.tool_names (parity-tested).
+        registry.register(
+            SearchWebTool(SearchSession.from_environment(lambda _event, _receipt: None))
+        )
         registry.register(DelegateTaskTool(delegation_runner or unavailable_delegation))
         registry.register(AskOwnerTool())
         registry.register(OwnerTaskTool())

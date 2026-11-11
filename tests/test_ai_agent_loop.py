@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import cast
 
 import pytest
 from ai_agent import (
@@ -569,7 +570,8 @@ def test_resume_rejects_empty_or_foreign_messages(tmp_path) -> None:
     with pytest.raises(ValueError, match="non-empty AIMessage tuple"):
         loop.resume(())
     with pytest.raises(ValueError, match="non-empty AIMessage tuple"):
-        loop.resume(("not-a-message",))
+        # Intentionally mistyped: resume must reject foreign messages.
+        loop.resume(cast("tuple[AIMessage, ...]", ("not-a-message",)))
     with pytest.raises(ValueError, match="prior_iterations"):
         loop.resume(
             (AIMessage(MessageRole.USER, "hi"),),

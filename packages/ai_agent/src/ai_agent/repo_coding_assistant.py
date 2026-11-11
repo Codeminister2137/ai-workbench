@@ -4204,11 +4204,13 @@ def _run_native_agent(
     # Live owner questions only when a human sits at this terminal. piped /
     # redirected / unattended runs keep owner_prompt=None so ask_owner fails
     # closed (file request_owner_task) instead of blocking on stdin.
-    owner_channel = None
+    owner_channel: Callable[[str], str] | None = None
     if sys.stdin.isatty():
 
-        def owner_channel(question: str) -> str:
+        def _live_owner_channel(question: str) -> str:
             return input(f"\n[agent asks the owner] {question}\nYou> ")
+
+        owner_channel = _live_owner_channel
 
     agent = AgentLoop(
         client,
