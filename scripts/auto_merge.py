@@ -142,16 +142,30 @@ def run_gate(commands: list[list[str]]) -> tuple[bool, str]:
     return True, "gate green"
 
 
+# Full pre-push gate takes ~7 minutes; anything shorter times out the gate.
+PUSH_TIMEOUT_SECONDS = 900
+
+
 def push_with_retries(branch: str, attempts: int = 3) -> str:
+    """Push with hook-running retries; never bypasses an unknown gate.
+
+    Retries always run the hooks. Falling back to --no-verify after a
+    failure would bypass a gate whose result is unknown (a timeout kills
+    it mid-run, a red gate must stop the merge), so transport flakes pay
+    for a fresh gate instead of skipping verification.
+    """
     last_error = ""
-    for attempt in range(1, attempts + 1):
-        flags = [] if attempt == 1 else ["--no-verify"]
-        completed = subprocess.run(
-            ["git", "push", *flags, "origin", branch],
-            capture_output=True,
-            text=True,
-            timeout=300,
-        )
+    for _attempt in range(1, attempts + 1):
+        try:
+            completed = subprocess.run(
+                ["git", "push", "origin", branch],
+                capture_output=True,
+                text=True,
+                timeout=PUSH_TIMEOUT_SECONDS,
+            )
+        except subprocess.TimeoutExpired:
+            last_error = "push timed out (gate or transport)"
+            continue
         if completed.returncode == 0:
             ahead = subprocess.run(
                 ["git", "rev-list", "--count", f"{branch}", "--not", f"origin/{branch}"],

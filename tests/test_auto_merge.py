@@ -5,10 +5,12 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 from auto_merge import classify as classify_fn
-from auto_merge import gate_commands  # noqa: E402
+from auto_merge import gate_commands, push_with_retries  # noqa: E402
 
 
 def test_docs_only_eligible() -> None:
@@ -53,3 +55,50 @@ def test_lint_covers_changed_files_only() -> None:
         lint = gate_commands(kind, files)[0]
         assert lint[:3] == [lint[0], "check", "--quiet"]
         assert lint[3:] == files
+
+
+def test_push_retries_run_hooks_and_never_bypass(monkeypatch) -> None:
+    """Timeouts retry with hooks; a red gate stops the merge, never skips it."""
+    import subprocess
+
+    calls = []
+    script = iter(
+        [
+            subprocess.TimeoutExpired(cmd=["git", "push"], timeout=900),
+            subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr=""),
+            subprocess.CompletedProcess(args=[], returncode=0, stdout="0\n", stderr=""),
+            subprocess.CompletedProcess(
+                args=[], returncode=0, stdout="abc\trefs/heads/auto/x\n", stderr=""
+            ),
+        ]
+    )
+
+    def fake_run(command, **kwargs):
+        calls.append((command, kwargs.get("timeout")))
+        outcome = next(script)
+        if isinstance(outcome, BaseException):
+            raise outcome
+        return outcome
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    assert push_with_retries("auto/x", attempts=3) == "abc\trefs/heads/auto/x"
+    pushes = [command for command, _ in calls if command[:2] == ["git", "push"]]
+    assert len(pushes) == 2
+    assert all("--no-verify" not in command for command in pushes)
+    assert all(timeout == 900 for _, timeout in calls if _[:2] == ["git", "push"])
+
+
+def test_push_gives_up_after_red_gate(monkeypatch) -> None:
+    import subprocess
+
+    calls = []
+
+    def fake_run(command, **kwargs):
+        calls.append(command)
+        return subprocess.CompletedProcess(args=[], returncode=128, stdout="", stderr="hook failed")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    with pytest.raises(RuntimeError, match="push failed after 2 attempts"):
+        push_with_retries("auto/x", attempts=2)
+    assert len([c for c in calls if c[:2] == ["git", "push"]]) == 2
+    assert all("--no-verify" not in c for c in calls)
