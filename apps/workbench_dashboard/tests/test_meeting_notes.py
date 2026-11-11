@@ -236,7 +236,7 @@ def meeting_server(tmp_path, monkeypatch):
     TestHandler.repo_root = tmp_path
     engine = _CountingEngine()
     metering = _CountingMetering()
-    TestHandler.stt_engine_factory = staticmethod(lambda: engine)
+    TestHandler.stt_engine_factory = staticmethod(lambda: engine)  # pyright: ignore[reportAttributeAccessIssue]
     TestHandler.stt_metering = metering
     server = ThreadingHTTPServer(("127.0.0.1", 0), TestHandler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
