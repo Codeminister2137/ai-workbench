@@ -93,11 +93,19 @@ def has_conflicts(branch: str, target: str = TARGET) -> bool:
 
 
 def gate_commands(kind: str, files: list[str]) -> list[list[str]]:
-    """Scoped verification per class (fast, deterministic)."""
-    lint = [PYTHON.replace("python.exe", "ruff.exe"), "check"]
+    """Scoped verification per class (fast, deterministic).
+
+    Lint covers only the branch's changed files: a whole-tree ``ruff
+    check`` fails on pre-existing violations in untouched areas (notably
+    the sibling-tree mirrors under patches/, which the repo's own
+    pre-commit config excludes). The pre-push gate still runs whole-tree
+    checks with the configured excludes before anything lands.
+    """
+    ruff = PYTHON.replace("python.exe", "ruff.exe")
+    lint = [ruff, "check", "--quiet", *files]
     if kind == "docs-only":
         return [
-            lint + ["--quiet"],
+            lint,
             [
                 PYTHON,
                 "-m",
@@ -110,12 +118,12 @@ def gate_commands(kind: str, files: list[str]) -> list[list[str]]:
         ]
     if kind == "test-only":
         return [
-            lint + ["--quiet"],
+            lint,
             [PYTHON, "-m", "pytest", *files, "-q", "-p", "no:cacheprovider"],
         ]
     touched = [path for path in files if path.endswith(".py")]
     return [
-        lint + ["--quiet"],
+        lint,
         [PYTHON, "-m", "pytest", *touched, "-q", "-p", "no:cacheprovider"]
         if touched
         else [PYTHON, "-m", "pytest", "tests/test_test_suites.py", "-q", "-p", "no:cacheprovider"],
