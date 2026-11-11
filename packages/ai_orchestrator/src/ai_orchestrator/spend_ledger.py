@@ -20,6 +20,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import sqlite3
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -236,10 +237,15 @@ def policy_from_file(path: str | Path) -> list[PolicyRule]:
 
 
 class SpendLedger:
-    """Single-writer P5 spend enforcement for one orchestrator process."""
+    """Single-writer P5 spend enforcement for one orchestrator process.
+
+    ``path`` enables SQLite durability: state loads on open and persists
+    after every mutation. ``None`` keeps the original in-memory behavior.
+    """
 
     def __init__(
         self,
+        path: str | Path | None = None,
         *,
         rules: list[PolicyRule] | None = None,
         clock: Callable[[], float] = time.time,
@@ -251,6 +257,165 @@ class SpendLedger:
         self._records: list[TaskSpendRecord] = []
         self._reservation_seq = 0
         self._prepaid_spent_by_day: dict[str, int] = {}
+        self._path = Path(path) if path is not None else None
+        if self._path is not None:
+            self._path.parent.mkdir(parents=True, exist_ok=True)
+            self._load()
+
+    def _connect(self) -> sqlite3.Connection:
+        assert self._path is not None
+        # Concurrent readers/writers (server ledger + per-drain ledgers)
+        # serialize here; only the server STT ledger mutates balances.
+        connection = sqlite3.connect(self._path, timeout=30.0)
+        connection.execute(
+            """CREATE TABLE IF NOT EXISTS allowances (
+                id TEXT PRIMARY KEY, provider TEXT NOT NULL, kind TEXT NOT NULL,
+                balance_cents INTEGER NOT NULL, granted_cents INTEGER NOT NULL,
+                granted_at REAL NOT NULL, expires_at REAL)
+            """
+        )
+        connection.execute(
+            """CREATE TABLE IF NOT EXISTS reservations (
+                id TEXT PRIMARY KEY, task_id TEXT NOT NULL, task_class TEXT NOT NULL,
+                allowance_id TEXT NOT NULL, allowance_fingerprint TEXT NOT NULL,
+                estimated_cents INTEGER NOT NULL, actual_cents INTEGER,
+                state TEXT NOT NULL, created_at REAL NOT NULL, settled_at REAL)
+            """
+        )
+        connection.execute(
+            """CREATE TABLE IF NOT EXISTS records (
+                rowid INTEGER PRIMARY KEY AUTOINCREMENT, task_id TEXT NOT NULL,
+                task_class TEXT NOT NULL, model_id TEXT NOT NULL, provider TEXT NOT NULL,
+                allowance_id TEXT, estimated_cents INTEGER NOT NULL,
+                actual_cents INTEGER NOT NULL, duration_ms INTEGER NOT NULL,
+                timestamp REAL NOT NULL)
+            """
+        )
+        connection.execute(
+            "CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)"
+        )
+        return connection
+
+    def _save(self) -> None:
+        if self._path is None:
+            return
+        connection = self._connect()
+        with connection:
+            connection.execute("DELETE FROM allowances")
+            connection.executemany(
+                "INSERT INTO allowances VALUES (?, ?, ?, ?, ?, ?, ?)",
+                [
+                    (
+                        row.id,
+                        row.provider,
+                        row.kind.value,
+                        row.balance_cents,
+                        row.granted_cents,
+                        row.granted_at,
+                        row.expires_at,
+                    )
+                    for row in self._allowances.values()
+                ],
+            )
+            connection.execute("DELETE FROM reservations")
+            connection.executemany(
+                "INSERT INTO reservations VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                [
+                    (
+                        item.id,
+                        item.task_id,
+                        item.task_class,
+                        item.allowance_id,
+                        item.allowance_fingerprint,
+                        item.estimated_cents,
+                        item.actual_cents,
+                        item.state.value,
+                        item.created_at,
+                        item.settled_at,
+                    )
+                    for item in self._reservations.values()
+                ],
+            )
+            connection.execute("DELETE FROM records")
+            connection.executemany(
+                "INSERT INTO records (task_id, task_class, model_id, provider,"
+                " allowance_id, estimated_cents, actual_cents, duration_ms,"
+                " timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                [
+                    (
+                        record.task_id,
+                        record.task_class,
+                        record.model_id,
+                        record.provider,
+                        record.allowance_id,
+                        record.estimated_cents,
+                        record.actual_cents,
+                        record.duration_ms,
+                        record.timestamp,
+                    )
+                    for record in self._records
+                ],
+            )
+            connection.execute(
+                "INSERT OR REPLACE INTO meta VALUES "
+                "('reservation_seq', ?), ('prepaid_spent_by_day', ?)",
+                (
+                    str(self._reservation_seq),
+                    json.dumps(self._prepaid_spent_by_day, sort_keys=True),
+                ),
+            )
+        connection.close()
+
+    def _load(self) -> None:
+        assert self._path is not None
+        connection = self._connect()
+        try:
+            for row in connection.execute(
+                "SELECT id, provider, kind, balance_cents, granted_cents,"
+                " granted_at, expires_at FROM allowances"
+            ):
+                allowance = Allowance(
+                    id=row[0],
+                    provider=row[1],
+                    kind=row[2],
+                    balance_cents=row[3],
+                    granted_cents=row[4],
+                    granted_at=row[5],
+                    expires_at=row[6],
+                )
+                self._allowances[allowance.id] = allowance
+            for row in connection.execute(
+                "SELECT id, task_id, task_class, allowance_id,"
+                " allowance_fingerprint, estimated_cents, actual_cents, state,"
+                " created_at, settled_at FROM reservations"
+            ):
+                item = Reservation(
+                    id=row[0],
+                    task_id=row[1],
+                    task_class=row[2],
+                    allowance_id=row[3],
+                    allowance_fingerprint=row[4],
+                    estimated_cents=row[5],
+                    actual_cents=row[6],
+                    state=ReservationState(row[7]),
+                    created_at=row[8],
+                    settled_at=row[9],
+                )
+                self._reservations[item.id] = item
+            for row in connection.execute(
+                "SELECT task_id, task_class, model_id, provider, allowance_id,"
+                " estimated_cents, actual_cents, duration_ms, timestamp"
+                " FROM records ORDER BY rowid ASC"
+            ):
+                self._records.append(TaskSpendRecord(*row))
+            meta = dict(connection.execute("SELECT key, value FROM meta").fetchall())
+            self._reservation_seq = int(meta.get("reservation_seq", "0"))
+            self._prepaid_spent_by_day = {
+                day: int(cents)
+                for day, cents in json.loads(meta.get("prepaid_spent_by_day", "{}")).items()
+            }
+        finally:
+            connection.close()
 
     def add_allowance(self, allowance: Allowance) -> None:
         """Register one grant bucket; invariants fail closed."""
@@ -261,6 +426,7 @@ class SpendLedger:
         if allowance.balance_cents > allowance.granted_cents:
             raise ValueError("Allowance balance cannot exceed granted amount")
         self._allowances[allowance.id] = allowance
+        self._save()
 
     def get_allowance(self, allowance_id: str) -> Allowance:
         """Return one live allowance row (the single-writer mutation point)."""
@@ -316,6 +482,7 @@ class SpendLedger:
             created_at=self._clock(),
         )
         self._reservations[reservation.id] = reservation
+        self._save()
         return reservation
 
     def admit(
@@ -424,6 +591,7 @@ class SpendLedger:
             timestamp=self._clock(),
         )
         self._records.append(record)
+        self._save()
         return record
 
     def refund(self, reservation_id: str) -> Reservation:
@@ -438,15 +606,22 @@ class SpendLedger:
             )
         reservation.state = ReservationState.REFUNDED
         reservation.settled_at = self._clock()
+        self._save()
         return reservation
 
-    def settle_local(self, *, task_id: str, task_class: str) -> TaskSpendRecord:
-        """Record one zero-cost local call that admitted without a grant."""
+    def settle_local(
+        self, *, task_id: str, task_class: str, model_id: str = "", provider: str = "local"
+    ) -> TaskSpendRecord:
+        """Record one zero-marginal-cost call that admitted without a grant.
+
+        ``model_id``/``provider`` attribute the record (free/allowance routes);
+        adapter-level metering of paid spend is a later step.
+        """
         record = TaskSpendRecord(
             task_id=task_id,
             task_class=task_class,
-            model_id="",
-            provider="local",
+            model_id=model_id,
+            provider=provider,
             allowance_id=None,
             estimated_cents=0,
             actual_cents=0,
@@ -454,6 +629,7 @@ class SpendLedger:
             timestamp=self._clock(),
         )
         self._records.append(record)
+        self._save()
         return record
 
     def status(self) -> dict[str, object]:
