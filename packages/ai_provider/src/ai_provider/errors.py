@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from ai_provider.contracts import AIMessage
@@ -41,6 +41,9 @@ class ProviderError(RuntimeError):
         self.provider = provider
         self.raw_error = raw_error
         self.partial_messages: tuple[AIMessage, ...] = ()
+        # Partial tool effects captured before the failure. Any-typed:
+        # the provider layer cannot import ai_agent's ToolResult.
+        self.tool_results: tuple[Any, ...] = ()
 
 
 def http_error_to_provider_error(exc, *, provider: str, api_label: str) -> ProviderError:

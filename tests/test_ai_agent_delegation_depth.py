@@ -1,5 +1,7 @@
 """Delegation depth bound: two levels by default, cap enforced twice."""
 
+from typing import Any
+
 import pytest
 from ai_agent.delegation_runner import build_child_runner
 from ai_agent.delegation_scope import DelegationBudget, DelegationScope
@@ -21,7 +23,7 @@ class FakeLoop:
 def _parent_scope(tmp_path, **overrides):
     runner = build_child_runner(loop_factory=FakeLoop)
     registry = ToolRegistry(tools=(ReadFileTool(), DelegateTaskTool(runner=runner)))
-    base = dict(
+    base: dict[str, Any] = dict(
         registry=registry,
         permissions=PermissionManager(),
         workspace=tmp_path,

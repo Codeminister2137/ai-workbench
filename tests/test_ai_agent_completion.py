@@ -111,7 +111,8 @@ def test_missing_diff_corrected_in_same_history_with_actual_git_effects(tmp_path
     assert client.requests[1].messages[-1].role is MessageRole.USER
     assert "Host completion feedback" in client.requests[1].messages[-1].content
     assert client.requests[1].messages[2].continuation is continuation
-    assert all(len(request.tools) == 13 for request in client.requests)
+    # Default coding tools (14 since search_web was wired 2026-11-11).
+    assert all(len(request.tools) == 14 for request in client.requests)
     assert "completion_recovery: errors=1 action=feedback" in events
     assert all("PRIVATE" not in event for event in events)
 
