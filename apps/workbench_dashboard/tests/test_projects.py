@@ -94,7 +94,9 @@ def test_book_type_and_manuscript(tmp_path) -> None:
         set_project_manuscript(data_dir, record["id"], "../escape.md")
     updated = set_project_manuscript(data_dir, record["id"], "draft.md")
     assert updated["manuscript"] == "draft.md"
-    assert get_project(data_dir, record["id"])["manuscript"] == "draft.md"
+    reread = get_project(data_dir, record["id"])
+    assert reread is not None
+    assert reread["manuscript"] == "draft.md"
     shop = tmp_path / "shop"
     shop.mkdir()
     general = create_project(data_dir, name="Shop", root=str(shop))
@@ -111,7 +113,9 @@ def test_legacy_record_without_type_reads_general(tmp_path) -> None:
     (data_dir / "projects.json").write_text(
         json.dumps({"abc": {"id": "abc", "name": "Old", "root": str(root)}}), encoding="utf-8"
     )
-    assert get_project(data_dir, "abc")["type"] == "general"
+    legacy = get_project(data_dir, "abc")
+    assert legacy is not None
+    assert legacy["type"] == "general"
 
 
 def test_book_check_task_framing(tmp_path) -> None:
