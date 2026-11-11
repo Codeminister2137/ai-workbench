@@ -57,7 +57,9 @@ def test_static_controls_have_titles() -> None:
     for tag in re.findall(r"<button\b[^>]*>", html):
         assert "title=" in tag, f"button without title: {tag}"
     nav_links = re.findall(r"<a\b[^>]*data-view[^>]*>", html)
-    assert len(nav_links) == 14  # +intake, +restrictions, +fleet, +providers, +help, +backlog
+    assert (
+        len(nav_links) == 15
+    )  # +intake, +restrictions, +fleet, +providers, +help, +backlog, +knowme
     for tag in nav_links:
         assert "title=" in tag, f"nav link without title: {tag}"
 
