@@ -82,6 +82,7 @@ def test_registry_has_full_staged_toolset() -> None:
         "stage_file",
         "request_owner_task",
         "delegate_task",
+        "search_web",
     }
 
 

@@ -35,6 +35,7 @@ from ai_agent.tools.git import GitDiffTool, GitStatusTool
 from ai_agent.tools.owner_tasks import OwnerTaskTool
 from ai_agent.tools.python_runtime import PythonRuntimeTool
 from ai_agent.tools.refactor import PythonNavigateTool, RenamePlanStore, RenamePreviewTool
+from ai_agent.tools.research_search import SearchSession, SearchWebTool
 from ai_agent.tools.search import FindFilesTool, GrepSearchTool
 from ai_agent.tools.shell import RunCommandTool
 from ai_agent.tools.staged import StageFileTool
@@ -80,6 +81,7 @@ def build_executor_registry(*, runner=None, fanout: str = "restricted") -> ToolR
             RenamePreviewTool(plans),
             StageFileTool(),
             OwnerTaskTool(),
+            SearchWebTool(SearchSession.from_environment(lambda _event, _receipt: None)),
             DelegateTaskTool(
                 runner=runner or unavailable_delegation,
                 fanout=FanoutPolicy.coerce(fanout),

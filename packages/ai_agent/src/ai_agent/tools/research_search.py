@@ -181,6 +181,7 @@ class SearchSession:
 
     @classmethod
     def from_environment(cls, record: Recorder, **options: Any) -> SearchSession:
+        options.setdefault("endpoint", os.getenv("SEARXNG_ENDPOINT", DEFAULT_SEARXNG_ENDPOINT))
         return cls(
             record,
             tavily_key=os.getenv("TAVILY_API_KEY", ""),
