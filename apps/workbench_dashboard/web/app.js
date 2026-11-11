@@ -690,6 +690,107 @@ async function renderPlans(id) {
   document.getElementById("filter-plans").addEventListener("input", (ev) => filterList("plans-list", ev.target.value));
 }
 
+async function renderProjects(id) {
+  if (id) {
+    const payload = await api("/api/projects/" + encodeURIComponent(id));
+    const p = payload.project;
+    const isBook = (p.type || "general") === "book";
+    view.innerHTML = `<h1>Project</h1><p><a href="#/projects">All projects</a></p>
+      <div class="card"><h2>${gtext(p.name)}</h2>
+      <p><span class="pill st-${esc(p.type || "general")}">${esc(p.type || "general")}</span></p>
+      <p class="muted">${esc(p.root || "")}</p>
+      ${p.description ? `<p class="inbox-body">${gtext(p.description)}</p>` : ""}
+      ${isBook ? `<p>Manuscript: <strong>${esc(p.manuscript || "not set")}</strong></p>
+      <form id="ms-form" class="inline">
+        <input type="text" name="path" placeholder="draft.md (root-relative)..." title="Manuscript path, relative to the project root" value="${esc(p.manuscript || "")}">
+        <button type="submit" title="Point this book at its manuscript file">Set manuscript</button>
+      </form>
+      <form id="check-form" class="inline">
+        <select name="check" title="Check kind: discrepancy findings or editor scrutiny">
+          <option value="discrepancy">Discrepancy check</option>
+          <option value="scrutiny">Scrutiny on demand</option>
+        </select>
+        <input type="text" name="focus" placeholder="Focus (optional)..." title="Check focus (optional)" value="">
+        <button type="submit" title="File an owner-to-agent manuscript check task">Request check</button>
+      </form>
+      <div id="check-result"></div>` : ""}</div>`;
+    const msForm = document.getElementById("ms-form");
+    if (msForm) msForm.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      try {
+        await api("/api/projects/" + encodeURIComponent(id) + "/manuscript", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({path: ev.target.path.value}),
+        });
+        toast("Manuscript set", true);
+        render();
+      } catch (err) {
+        toast(err.message, false);
+      }
+    });
+    const checkForm = document.getElementById("check-form");
+    if (checkForm) checkForm.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      try {
+        const out = await api("/api/projects/" + encodeURIComponent(id) + "/check", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({check: ev.target.check.value, focus: ev.target.focus.value}),
+        });
+        document.getElementById("check-result").innerHTML =
+          `<p><a href="#/inbox/${esc(out.inbox_id)}" title="Open the filed check task">Check filed: ${esc(out.inbox_id)}</a></p>`;
+        toast("Check filed to the agent queue", true);
+      } catch (err) {
+        toast(err.message, false);
+      }
+    });
+    return;
+  }
+  const payload = await api("/api/projects");
+  const items = payload.projects.length
+    ? payload.projects.map((p) =>
+        `<li><a href="#/projects/${esc(p.id)}">${gtext(p.name)}</a>
+         <span class="muted">${esc(p.root || "")}</span>
+         <span class="pill st-${esc(p.type || "general")}">${esc(p.type || "general")}</span></li>`).join("")
+    : '<li class="muted">No projects registered yet.</li>';
+  view.innerHTML = `<h1>Projects</h1>
+    <p class="muted">Named work roots. Book projects carry a manuscript plus ask-to-check actions.</p>
+    <p><input type="text" id="filter-projects" placeholder="Filter projects..." title="Filter projects by text"></p>
+    <ul class="plain" id="projects-list">${items}</ul>
+    <div class="card"><h2>New project</h2>
+    <form id="project-form" class="inline">
+      <input type="text" name="name" placeholder="Name..." title="Project name (required)" value="">
+      <input type="text" name="root" placeholder="Root directory..." title="Project root directory (must exist)" value="">
+      <input type="text" name="description" placeholder="Description (optional)..." title="Project description (optional)" value="">
+      <select name="ptype" title="Project type: general work root or book manuscript">
+        <option value="general">general</option>
+        <option value="book">book</option>
+      </select>
+      <button type="submit" title="Register this project root">Create project</button>
+    </form></div>`;
+  document.getElementById("filter-projects").addEventListener("input", (ev) => filterList("projects-list", ev.target.value));
+  document.getElementById("project-form").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    try {
+      const out = await api("/api/projects", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+          name: ev.target.name.value,
+          root: ev.target.root.value,
+          description: ev.target.description.value,
+          type: ev.target.ptype.value,
+        }),
+      });
+      toast("Project registered", true);
+      location.hash = "#/projects/" + out.project.id;
+    } catch (err) {
+      toast(err.message, false);
+    }
+  });
+}
+
 async function renderRuns(id) {
   if (id) {
     stopRunsPoll();
@@ -1695,6 +1796,7 @@ async function render() {
     else if (name === "ideas") await renderIdeas(id);
     else if (name === "backlog") await renderBacklog(id);
     else if (name === "workflows") await renderWorkflows(id);
+    else if (name === "projects") await renderProjects(id);
     else if (name === "documents") await renderDocuments(id);
     else if (name === "intake") await renderIntake();
     else if (name === "schedule") await renderSchedule();

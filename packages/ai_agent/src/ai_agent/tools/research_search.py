@@ -351,29 +351,35 @@ class SearchSession:
             raise SearchFailure("paid_plan_rejected")
         if str(account.get("current_plan", "")).lower() not in {"researcher", "free"}:
             raise SearchFailure("paid_plan_rejected")
-        fields = ("plan_usage", "plan_limit", "paygo_usage", "paygo_limit")
+        fields = ("plan_usage", "plan_limit", "paygo_usage")
         if any(
             type(account.get(f)) not in {int, float} or not math.isfinite(account[f])
             for f in fields
         ):
             raise SearchFailure("paid_plan_rejected")
-        if account["paygo_limit"] != 0 or account["paygo_usage"] != 0:
+        # Tavily reports a null paygo_limit when no pay-as-you-go allowance
+        # exists at all; that is at least as safe as a zero cap.
+        paygo_limit = account.get("paygo_limit")
+        if paygo_limit is not None and paygo_limit != 0:
+            raise SearchFailure("paid_plan_rejected")
+        if account["paygo_usage"] != 0:
             raise SearchFailure("paid_plan_rejected")
         if not 0 < account["plan_limit"] <= 1000 or account["plan_usage"] < 0:
             raise SearchFailure("paid_plan_rejected")
         if account["plan_usage"] + 1 > account["plan_limit"]:
             raise SearchFailure("quota")
         usage, limit = key.get("usage"), key.get("limit")
-        if (
-            not isinstance(usage, (int, float))
-            or isinstance(usage, bool)
-            or not isinstance(limit, (int, float))
-            or isinstance(limit, bool)
-        ):
+        if not isinstance(usage, (int, float)) or isinstance(usage, bool):
             raise SearchFailure("paid_plan_rejected")
-        if not math.isfinite(usage) or not math.isfinite(limit) or usage < 0 or limit < 0:
+        # A null per-key limit means no key-level cap; the account-level
+        # quota above stays the binding constraint.
+        if limit is not None and (not isinstance(limit, (int, float)) or isinstance(limit, bool)):
             raise SearchFailure("paid_plan_rejected")
-        if limit > 0 and usage + 1 > limit:
+        if not math.isfinite(usage) or usage < 0:
+            raise SearchFailure("paid_plan_rejected")
+        if limit is not None and (not math.isfinite(limit) or limit < 0):
+            raise SearchFailure("paid_plan_rejected")
+        if limit is not None and limit > 0 and usage + 1 > limit:
             raise SearchFailure("quota")
 
 

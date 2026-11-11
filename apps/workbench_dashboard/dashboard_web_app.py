@@ -57,7 +57,13 @@ from dashboard_config import (
     load_config,
     save_supervision,
 )
-from dashboard_projects import create_project, get_project, list_projects
+from dashboard_projects import (
+    book_check_task,
+    create_project,
+    get_project,
+    list_projects,
+    set_project_manuscript,
+)
 from dashboard_stores import DashboardStores, StoreError, effective_fanout_policy
 from document_library import DocumentLibrary
 from drain_scheduler import DrainScheduler
@@ -708,6 +714,12 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 return self._propose_task(payload)
             if path == "/api/projects":
                 return self._create_project(payload)
+            if path.startswith("/api/projects/") and path.endswith("/manuscript"):
+                project_id = path[len("/api/projects/") : -len("/manuscript")]
+                return self._set_project_manuscript(project_id, payload)
+            if path.startswith("/api/projects/") and path.endswith("/check"):
+                project_id = path[len("/api/projects/") : -len("/check")]
+                return self._request_book_check(project_id, payload)
             if path == "/api/settings":
                 return self._save_settings(payload)
             if path == "/api/restrictions/toggles":
@@ -1493,19 +1505,63 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         name = payload.get("name")
         root = payload.get("root")
         description = payload.get("description", "")
+        project_type = payload.get("type", "general")
         if not isinstance(name, str) or not isinstance(root, str):
             return self._send_json(
                 {"ok": False, "error": "name and root must be strings"}, status=400
             )
-        if not isinstance(description, str):
+        if not isinstance(description, str) or not isinstance(project_type, str):
             return self._send_json(
-                {"ok": False, "error": "description must be a string"}, status=400
+                {"ok": False, "error": "description and type must be strings"}, status=400
             )
         try:
-            project = create_project(self.data_dir, name=name, root=root, description=description)
+            project = create_project(
+                self.data_dir,
+                name=name,
+                root=root,
+                description=description,
+                project_type=project_type,
+            )
         except StagedEditError as exc:
             return self._send_json({"ok": False, "error": str(exc)}, status=400)
         self._send_json({"ok": True, "project": project})
+
+    def _set_project_manuscript(self, project_id: str, payload: dict) -> None:
+        path = payload.get("path", "")
+        if not isinstance(path, str):
+            return self._send_json({"ok": False, "error": "path must be a string"}, status=400)
+        try:
+            project = set_project_manuscript(self.data_dir, project_id, path)
+        except StagedEditError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        self._send_json({"ok": True, "manuscript": project["manuscript"]})
+
+    def _request_book_check(self, project_id: str, payload: dict) -> None:
+        check = payload.get("check", "")
+        focus = payload.get("focus", "")
+        if not isinstance(check, str) or not isinstance(focus, str):
+            return self._send_json(
+                {"ok": False, "error": "check and focus must be strings"}, status=400
+            )
+        try:
+            project = get_project(self.data_dir, project_id)
+        except StagedEditError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=500)
+        if project is None:
+            return self._send_json({"ok": False, "error": "Not found"}, status=404)
+        try:
+            title, body = book_check_task(project, check, focus)
+            task = self._stores().create_inbox_task(
+                title=title,
+                body=body,
+                task_type="task",
+                created_by="owner",
+                assignee="agent",
+                metadata={"project_id": project_id, "check": check},
+            )
+        except (StagedEditError, StoreError) as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        self._send_json({"ok": True, "inbox_id": task["id"]})
 
     def _approve_intake(self, name: str) -> None:
         try:
