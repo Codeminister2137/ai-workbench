@@ -295,6 +295,12 @@ def _local_read_only_delegated_task_runner(
                 else {}
             ),
         )
+        # Conditional kwargs: test doubles for the loop accept only the
+        # baseline (prompt/model/privacy) surface, so system_prompt must be
+        # absent — not None — outside a granted scope.
+        run_kwargs: dict[str, Any] = (
+            {"system_prompt": scope.instructions} if scope is not None else {}
+        )
         result = agent.run(
             (
                 "Original parent objective:\n"
@@ -306,7 +312,7 @@ def _local_read_only_delegated_task_runner(
             )
             if scope is not None
             else _delegated_task_prompt(task),
-            system_prompt=scope.instructions if scope is not None else None,
+            **run_kwargs,
             model=config.model,
             privacy_class=PrivacyClass(profile.privacy_class.value),
         )
