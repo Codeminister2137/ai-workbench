@@ -181,14 +181,26 @@ def load_spend_ledger(data_dir: Path) -> SpendLedger:
             rules = policy_from_file(policy_path)
         except ValueError as exc:
             raise ValueError(f"spend policy {policy_path.name}: {exc}") from exc
-    ledger = SpendLedger(rules=rules)
+    ledger = SpendLedger(data_dir / "spend_ledger.sqlite3", rules=rules)
     grants_dir = data_dir / "spend" / "grants"
     if grants_dir.is_dir():
+        from ai_orchestrator.spend_ledger import allowance_fingerprint
+
         for path in sorted(grants_dir.glob("*.json")):
             try:
-                ledger.add_allowance(allowance_from_file(path))
+                grant = allowance_from_file(path)
             except ValueError as exc:
                 raise ValueError(f"spend grant {path.name}: {exc}") from exc
+            try:
+                existing = ledger.get_allowance(grant.id)
+            except KeyError:
+                ledger.add_allowance(grant)
+                continue
+            if allowance_fingerprint(existing) != allowance_fingerprint(grant):
+                raise ValueError(
+                    f"spend grant {path.name}: file changed since bootstrap; "
+                    "delete spend_ledger.sqlite3 to re-bootstrap deliberately"
+                )
     return ledger
 
 
@@ -1803,12 +1815,17 @@ def build_run_drain(
     else:
         from restrictions import load_toggles
 
+        try:
+            spend_ledger: SpendLedger | None = load_spend_ledger(data_dir)
+        except (ValueError, OSError):
+            spend_ledger = None
         executor = build_executor(
             config,
             roots,
             repo_root,
             inbox_create=stores.create_inbox_task,
             restrictions=load_toggles(data_dir),
+            spend_ledger=spend_ledger,
         )
     return RunDrain(
         runs_dir=data_dir / "runs",

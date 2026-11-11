@@ -563,3 +563,85 @@ def test_delegation_toggle_sets_default_fanout(harness) -> None:
     )
     execute({"id": "r1", "title": "t", "body": "b"})
     assert FakeLoop.instances[-1].kwargs["fanout_policy"] == "allowed"
+
+
+def test_closeout_settles_run_to_ledger(tmp_path) -> None:
+    from ai_agent.staged_edits import ProjectRoots
+    from ai_orchestrator.spend_ledger import SpendLedger
+
+    FakeLoop.instances = []
+    ledger = SpendLedger(tmp_path / "spend.sqlite3")
+    config = DashboardConfig(provider="ollama", model="fake")
+    execute = build_executor(
+        config,
+        ProjectRoots((str(tmp_path),)),
+        tmp_path,
+        client_factory=lambda backend: object(),
+        loop_factory=FakeLoop,
+        spend_ledger=ledger,
+    )
+    receipt = execute({"id": "r1", "title": "t", "body": "b"})
+    assert receipt["status"] == "completed"
+    records = SpendLedger(tmp_path / "spend.sqlite3").records()
+    assert len(records) == 1
+    assert (records[0].task_id, records[0].provider) == ("r1", "ollama")
+
+
+def test_closeout_without_ledger_skips_settle(tmp_path) -> None:
+    from ai_agent.staged_edits import ProjectRoots
+
+    FakeLoop.instances = []
+    config = DashboardConfig(provider="ollama", model="fake")
+    execute = build_executor(
+        config,
+        ProjectRoots((str(tmp_path),)),
+        tmp_path,
+        client_factory=lambda backend: object(),
+        loop_factory=FakeLoop,
+    )
+    assert execute({"id": "r1", "title": "t", "body": "b"})["status"] == "completed"
+
+
+def test_grant_bootstrap_is_sticky_and_guarded(tmp_path) -> None:
+    import json
+
+    import pytest
+    from dashboard_web_app import load_spend_ledger
+
+    grants = tmp_path / "spend" / "grants"
+    grants.mkdir(parents=True)
+    grant_file = grants / "g.json"
+    grant_file.write_text(
+        json.dumps(
+            {
+                "allowance_id": "nov-evals",
+                "provider": "meta",
+                "kind": "allowance_expiring",
+                "granted_cents": 15000,
+                "expires_at": 1_800_000_000.0,
+                "local_spending_limit_accepted": True,
+            }
+        ),
+        encoding="utf-8",
+    )
+    first = load_spend_ledger(tmp_path)
+    assert first.get_allowance("nov-evals").balance_cents == 15000
+    # Second open keeps DB state (bootstrap skips known ids).
+    second = load_spend_ledger(tmp_path)
+    assert second.get_allowance("nov-evals").balance_cents == 15000
+    # Changed grant file fails loud instead of silently forking balances.
+    grant_file.write_text(
+        json.dumps(
+            {
+                "allowance_id": "nov-evals",
+                "provider": "meta",
+                "kind": "allowance_expiring",
+                "granted_cents": 99999,
+                "expires_at": 1_800_000_000.0,
+                "local_spending_limit_accepted": True,
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="re-bootstrap"):
+        load_spend_ledger(tmp_path)

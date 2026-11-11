@@ -199,6 +199,7 @@ def build_executor(
     inbox_create: Callable[..., dict] | None = None,
     max_iterations: int | None = None,
     restrictions: Mapping[str, bool] | None = None,
+    spend_ledger: Any | None = None,
 ) -> Executor:
     """Build a drain ``Executor`` running each approved run through AgentLoop.
 
@@ -339,6 +340,17 @@ def build_executor(
             "owner_tasks": filed,
             "compactions": getattr(result, "compactions", 0),
         }
+        if spend_ledger is not None:
+            provider, _, model = route_id.partition("/")
+            try:
+                spend_ledger.settle_local(
+                    task_id=run_id,
+                    task_class="drain_run",
+                    model_id=model,
+                    provider=provider or "local",
+                )
+            except Exception as exc:  # noqa: BLE001 - metering never breaks runs
+                logger.warning("run %s spend settle failed: %s", run_id, exc)
         logger.info("run %s completed in %d iterations", run_id, result.iterations)
         return receipt
 
