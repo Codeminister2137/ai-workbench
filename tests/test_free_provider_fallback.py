@@ -149,7 +149,8 @@ context_window_tokens = 262144
         assert payload["temperature"] == 1.0 and payload["top_p"] == 0.95
         messages = "\n".join(message.get("content", "") or "" for message in payload["messages"])
         assert instructions.strip() in messages
-        assert len(payload["tools"]) == 20  # +ask_owner, +request_owner_task
+        # Coding tools +ask_owner, +request_owner_task, +search_web (wired 2026-11-11).
+        assert len(payload["tools"]) == 21
         assert payload["model"] == (
             "google/gemma-4-31b-it:free" if host == "openrouter.ai" else "google/gemma-4-31b-it"
         )

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 import pytest
 from restrictions import describe_toggles, load_toggles, save_toggle
 
@@ -25,7 +27,8 @@ def test_round_trip_and_validation(tmp_path) -> None:
     with pytest.raises(ValueError, match="Unknown restriction toggle"):
         save_toggle(tmp_path, "nope", True)
     with pytest.raises(ValueError, match="boolean"):
-        save_toggle(tmp_path, "sandbox", "yes")
+        # Intentionally mistyped: validation must reject non-booleans.
+        save_toggle(tmp_path, "sandbox", cast(bool, "yes"))
 
 
 def test_describe_lists_all_with_text(tmp_path) -> None:
