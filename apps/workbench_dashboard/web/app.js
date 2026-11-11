@@ -1065,6 +1065,199 @@ async function renderBacklog(id) {
   document.getElementById("filter-backlog").addEventListener("input", (ev) => filterList("backlog-list", ev.target.value));
 }
 
+function wfNodeRow(node, index, options) {
+  const typeOpts = options.node_types.map((t) =>
+    `<option value="${t}"${node.type === t ? " selected" : ""}>${t}</option>`).join("");
+  let config = "";
+  if (node.type === "skill") {
+    const skillOpts = options.skills.map((s) =>
+      `<option value="${s}"${node.config.skill === s ? " selected" : ""}>${s}</option>`).join("");
+    config = `<select name="node-choice" title="Skill reference">${skillOpts}</select>`;
+  } else if (node.type === "agent_run") {
+    const modeOpts = options.modes.map((m) =>
+      `<option value="${m}"${node.config.mode === m ? " selected" : ""}>${m}</option>`).join("");
+    config = `<select name="node-choice" title="Assistant mode">${modeOpts}</select>
+      <input type="text" name="node-text" placeholder="Route policy (optional)..." title="Route policy (optional)" value="${esc(node.config.route_policy || "")}">`;
+  } else if (node.type === "scrutiny") {
+    config = `<input type="text" name="node-text" placeholder="Focus (optional)..." title="Scrutiny focus (optional)" value="${esc(node.config.focus || "")}">`;
+  } else {
+    config = `<input type="text" name="node-text" placeholder="Question..." title="Owner question (required)" value="${esc(node.config.question || "")}">`;
+  }
+  return `<div class="card" data-node="${index}">
+    <div class="inline">
+      <select name="node-type" title="Node type: skill, scrutiny, agent run, or owner checkpoint">${typeOpts}</select>
+      <input type="text" name="node-id" placeholder="id..." title="Unique node id" value="${esc(node.id)}">
+      <input type="text" name="node-label" placeholder="Label (optional)..." title="Node label (optional)" value="${esc(node.label || "")}">
+      ${config}
+    </div>
+    <div class="inline">
+      <button data-act="up" title="Move this node earlier">Up</button>
+      <button data-act="down" title="Move this node later">Down</button>
+      <button data-act="remove" title="Remove this node">Remove</button>
+    </div>
+  </div>`;
+}
+
+function wfReadNodes(root) {
+  return Array.from(root.querySelectorAll("[data-node]")).map((row) => {
+    const type = row.querySelector('[name="node-type"]').value;
+    const choice = row.querySelector('[name="node-choice"]');
+    const text = row.querySelector('[name="node-text"]');
+    const config = {};
+    if (type === "skill") config.skill = choice.value;
+    else if (type === "agent_run") { config.mode = choice.value; config.route_policy = text.value; }
+    else if (type === "scrutiny") config.focus = text.value;
+    else config.question = text.value;
+    return {
+      id: row.querySelector('[name="node-id"]').value,
+      type,
+      label: row.querySelector('[name="node-label"]').value,
+      config,
+    };
+  });
+}
+
+async function renderWorkflows(id) {
+  const options = await api("/api/workflows/options");
+  if (!id) {
+    const tab = new URLSearchParams((location.hash.split("?")[1] || "")).get("status") || "active";
+    const payload = await api("/api/workflows");
+    const shown = payload.items.filter((t) => tab === "archive" ? t.status === "archived" : t.status === "active");
+    const items = shown.length
+      ? shown.map((t) =>
+          `<li><a href="#/workflows/${esc(t.id)}">${esc(t.name)}</a>
+           <span class="muted">${(t.nodes || []).length} nodes</span>
+           <span class="pill st-${esc(t.status)}">${esc(t.status)}</span></li>`).join("")
+      : '<li class="muted">No workflows yet — compose one below.</li>';
+    view.innerHTML = `<h1>Workflows</h1>
+      <p><a href="#/workflows">Active</a> · <a href="#/workflows?status=archive">Archive</a></p>
+      <p class="muted">Named node lists over existing runners. Validate maps each node; execution arrives later.</p>
+      <p><button id="wf-new" title="Compose a new workflow graph">New workflow</button></p>
+      <p><input type="text" id="filter-workflows" placeholder="Filter workflows..." title="Filter workflows by text"></p>
+      <ul class="plain" id="workflows-list">${items}</ul>`;
+    document.getElementById("wf-new").addEventListener("click", () => { location.hash = "#/workflows/new"; });
+    document.getElementById("filter-workflows").addEventListener("input", (ev) => filterList("workflows-list", ev.target.value));
+    return;
+  }
+  let graph = {name: "", description: "", nodes: []};
+  let savedId = null;
+  let savedStatus = "active";
+  if (id !== "new") {
+    const payload = await api("/api/workflows/" + encodeURIComponent(id));
+    graph = payload.item;
+    savedId = id;
+    savedStatus = payload.item.status;
+  }
+  const saved = await api("/api/workflows?status=active");
+  const loadOpts = saved.items.map((t) =>
+    `<option value="${esc(t.id)}">${esc(t.name)} (${(t.nodes || []).length})</option>`).join("");
+  const renderRows = () => {
+    document.getElementById("wf-nodes").innerHTML =
+      graph.nodes.map((node, i) => wfNodeRow(node, i, options)).join("") ||
+      '<p class="muted">No nodes yet — add one below.</p>';
+  };
+  view.innerHTML = `<h1>Workflow composer</h1><p><a href="#/workflows">All workflows</a></p>
+    <div class="card">
+      <p><input type="text" id="wf-name" placeholder="Name..." title="Workflow name (required)" value="${esc(graph.name)}"></p>
+      <p><input type="text" id="wf-desc" placeholder="Description (optional)..." title="Workflow description (optional)" value="${esc(graph.description || "")}"></p>
+      <p><select id="wf-load" title="Load a saved graph into the composer (saving stores a new copy)">
+        <option value="">Reuse a saved graph...</option>${loadOpts}</select></p>
+      <div id="wf-nodes"></div>
+      <div class="inline">
+        <button id="wf-add" title="Append a node to the list">Add node</button>
+        <button id="wf-validate" title="Check the graph and map each node to its runner">Validate</button>
+        <button id="wf-save" title="Save as a new stored graph">Save new copy</button>
+        ${savedId ? `<button id="wf-archive" title="Archive or reactivate this stored graph">${savedStatus === "active" ? "Archive" : "Reactivate"}</button>` : ""}
+      </div>
+      <div id="wf-plan"></div>
+    </div>`;
+  renderRows();
+  const syncGraph = () => { graph.nodes = wfReadNodes(document.getElementById("wf-nodes")); };
+  document.getElementById("wf-load").addEventListener("change", async (ev) => {
+    if (!ev.target.value) return;
+    try {
+      const payload = await api("/api/workflows/" + encodeURIComponent(ev.target.value));
+      graph = {name: payload.item.name + " (copy)", description: payload.item.description || "", nodes: payload.item.nodes};
+      document.getElementById("wf-name").value = graph.name;
+      document.getElementById("wf-desc").value = graph.description;
+      renderRows();
+    } catch (err) {
+      toast(err.message, false);
+    }
+  });
+  document.getElementById("wf-nodes").addEventListener("click", (ev) => {
+    const act = ev.target.dataset ? ev.target.dataset.act : null;
+    if (!act) return;
+    syncGraph();
+    const row = ev.target.closest("[data-node]");
+    const index = Number(row.dataset.node);
+    if (act === "remove") graph.nodes.splice(index, 1);
+    else if (act === "up" && index > 0) graph.nodes.splice(index - 1, 0, ...graph.nodes.splice(index, 1));
+    else if (act === "down" && index < graph.nodes.length - 1) graph.nodes.splice(index + 1, 0, ...graph.nodes.splice(index, 1));
+    renderRows();
+  });
+  document.getElementById("wf-nodes").addEventListener("change", (ev) => {
+    if (ev.target.name !== "node-type") return;
+    syncGraph();
+    renderRows();
+  });
+  document.getElementById("wf-add").addEventListener("click", () => {
+    syncGraph();
+    graph.nodes.push({id: "node-" + (graph.nodes.length + 1), type: "scrutiny", label: "", config: {}});
+    renderRows();
+  });
+  document.getElementById("wf-validate").addEventListener("click", async () => {
+    syncGraph();
+    try {
+      const out = await api("/api/workflows/validate", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({name: document.getElementById("wf-name").value, nodes: graph.nodes}),
+      });
+      document.getElementById("wf-plan").innerHTML = out.plan.length
+        ? "<ul class=\"plain\">" + out.plan.map((s) =>
+            `<li><strong>${esc(s.node_id)}</strong> <span class="muted">${esc(s.runner)} — ${esc(s.detail)}</span></li>`).join("") + "</ul>"
+        : '<p class="muted">Valid graph, no nodes.</p>';
+      toast("Graph valid: " + out.plan.length + " node(s) mapped", true);
+    } catch (err) {
+      document.getElementById("wf-plan").innerHTML = "";
+      toast(err.message, false);
+    }
+  });
+  document.getElementById("wf-save").addEventListener("click", async () => {
+    syncGraph();
+    try {
+      const out = await api("/api/workflows", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+          name: document.getElementById("wf-name").value,
+          description: document.getElementById("wf-desc").value,
+          nodes: graph.nodes,
+        }),
+      });
+      toast("Workflow saved", true);
+      location.hash = "#/workflows/" + out.id;
+    } catch (err) {
+      toast(err.message, false);
+    }
+  });
+  const archiveBtn = document.getElementById("wf-archive");
+  if (archiveBtn) archiveBtn.addEventListener("click", async () => {
+    try {
+      await api("/api/workflows/" + encodeURIComponent(savedId) + "/status", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({status: savedStatus === "active" ? "archived" : "active"}),
+      });
+      toast("Status updated", true);
+      render();
+    } catch (err) {
+      toast(err.message, false);
+    }
+  });
+}
+
 async function renderDocuments(id) {
   if (id) {
     const payload = await api("/api/documents/" + id.split("/").map(encodeURIComponent).join("/"));
@@ -1501,6 +1694,7 @@ async function render() {
     else if (name === "inbox") await renderInbox(id);
     else if (name === "ideas") await renderIdeas(id);
     else if (name === "backlog") await renderBacklog(id);
+    else if (name === "workflows") await renderWorkflows(id);
     else if (name === "documents") await renderDocuments(id);
     else if (name === "intake") await renderIntake();
     else if (name === "schedule") await renderSchedule();
