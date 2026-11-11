@@ -7,6 +7,7 @@ import math
 import time
 from collections import Counter
 from collections.abc import Callable, Mapping
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -37,6 +38,7 @@ from ai_agent.tools.base import ToolContext, ToolRegistry
 
 if TYPE_CHECKING:
     from ai_agent.fanout import FanoutPolicy
+    from ai_agent.tools.base import BaseTool
 
 
 class AgentIterationLimitExceeded(RuntimeError):
@@ -103,6 +105,7 @@ class AgentLoop:
         compaction_tail_messages: int = 8,
         max_compactions: int = 3,
         require_grounded_reports: bool = False,
+        delegation_max_workers: int = 4,
     ) -> None:
         if max_iterations < 1:
             raise ValueError("max_iterations must be at least 1")
@@ -112,6 +115,8 @@ class AgentLoop:
             raise ValueError("compaction_tail_messages must be at least 1")
         if max_compactions < 0:
             raise ValueError("max_compactions must be non-negative")
+        if delegation_max_workers < 1:
+            raise ValueError("delegation_max_workers must be at least 1")
         if deadline is not None and not math.isfinite(deadline):
             raise ValueError("deadline must be finite")
         self.client = client
@@ -130,6 +135,7 @@ class AgentLoop:
         self.compaction_tail_messages = compaction_tail_messages
         self.max_compactions = max_compactions
         self.require_grounded_reports = require_grounded_reports
+        self.delegation_max_workers = delegation_max_workers
         self._tool_schema_chars: int | None = None
         self._pending: dict[str, ToolCall] = {}
         if (
@@ -199,6 +205,119 @@ class AgentLoop:
                 continue
             visible.append(_tool_definition(tool))
         return visible
+
+    def _run_authorized_call(self, tool: BaseTool, agent_call: ToolCall) -> ToolResult:
+        """Execute one authorized call; converts bugs to results, reraises protocol."""
+        from ai_provider.credential_guard import contains_credentials
+
+        try:
+            return tool.run(agent_call, self.context)
+        except ProviderError:
+            raise
+        except Exception as exc:  # noqa: BLE001 - recovery-as-result
+            output = f"Error executing tool {agent_call.name}: {exc}"
+            if contains_credentials(output, extra=self.context.credential_secrets):
+                output = (
+                    "Credential-bearing tool output withheld. Effects may already "
+                    "have occurred; inspect locally before continuing."
+                )
+            return ToolResult(
+                name=agent_call.name,
+                output=output,
+                call_id=agent_call.call_id,
+                is_error=True,
+            )
+
+    def _dispatch_sequential(self, tool, agent_call, pending_key, call, messages) -> ToolResult:
+        """Run one call inline with pending/event bookkeeping on this thread."""
+        self._check_deadline(messages)
+        self._pending[pending_key] = agent_call
+        self._emit_event(ToolExecutionEvent("tool_started", call.name, call.id or None))
+        try:
+            result = self._run_authorized_call(tool, agent_call)
+        except ProviderError as exc:
+            if not exc.partial_messages:
+                exc.partial_messages = tuple(messages)
+            raise
+        self._pending.pop(pending_key, None)
+        self._emit_event(
+            ToolExecutionEvent(
+                "tool_completed",
+                call.name,
+                call.id or None,
+                is_error=result.is_error,
+            )
+        )
+        return result
+
+    def _fanout_delegates(self, delegates, messages):
+        """Run sibling delegate_task calls concurrently; ordered results.
+
+        ``delegates`` is ``[(position, call, tool, agent_call, pending_key,
+        replay_key), ...]``. Started events fire on this thread before the
+        spawn, completed events after the join, both in position order. The
+        first ProviderError aborts the batch (fail-loud, like sequential).
+        Returns ``{position: (call, result, replay_key)}``.
+        """
+        self._check_deadline(messages)
+        workers = min(self.delegation_max_workers, len(delegates))
+        if self.diagnostic:
+            self.diagnostic(f"delegation_fanout: n={len(delegates)} workers={workers}")
+        for _position, call, _tool, agent_call, pending_key, _replay in delegates:
+            self._pending[pending_key] = agent_call
+            self._emit_event(ToolExecutionEvent("tool_started", call.name, call.id or None))
+        import concurrent.futures as _futures
+
+        with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="delegate") as pool:
+            future_map = {
+                pool.submit(self._run_authorized_call, tool, agent_call): (
+                    position,
+                    call,
+                    pending_key,
+                    replay,
+                )
+                for position, call, tool, agent_call, pending_key, replay in delegates
+            }
+            done: dict = {}
+            failure = None
+            for future in _futures.as_completed(future_map):
+                position, call, pending_key, replay = future_map[future]
+                try:
+                    done[position] = (call, future.result(), replay, pending_key)
+                except ProviderError as exc:
+                    if failure is None:
+                        failure = (position, exc)
+                except Exception as exc:  # noqa: BLE001 - defensive; helper converts
+                    done[position] = (
+                        call,
+                        ToolResult(
+                            name=call.name,
+                            output=f"Error executing tool {call.name}: {exc}",
+                            call_id=call.id,
+                            is_error=True,
+                        ),
+                        replay,
+                        pending_key,
+                    )
+            outcomes: dict = {}
+            for position in sorted(done):
+                call, result, replay, pending_key = done[position]
+                self._pending.pop(pending_key, None)
+                self._emit_event(
+                    ToolExecutionEvent(
+                        "tool_completed",
+                        call.name,
+                        call.id or None,
+                        is_error=result.is_error,
+                    )
+                )
+                outcomes[position] = (call, result, replay)
+            if failure is not None:
+                _position, exc = failure
+                if not exc.partial_messages:
+                    exc.partial_messages = tuple(messages)
+                raise exc
+            return outcomes
 
     def _maybe_compact(
         self,
@@ -353,7 +472,6 @@ class AgentLoop:
             ):
                 raise ValueError("resume_messages must be a non-empty AIMessage tuple")
         from ai_provider.credential_guard import (
-            contains_credentials,
             credential_values,
             enforce_credential_policy,
         )
@@ -599,6 +717,7 @@ class AgentLoop:
                 )
 
             seen_in_batch: set[tuple[str, str, str]] = set()
+            planned: list[tuple[int, str, tuple, AIToolCall]] = []
             for position, call in enumerate(tool_calls):
                 self._check_deadline(messages)
                 if self.context.delegation is not None:
@@ -618,17 +737,7 @@ class AgentLoop:
                         call_id=call.id,
                         is_error=True,
                     )
-                    tool_results.append(result)
-                    recovery.observe(result)
-                    messages.append(
-                        AIMessage(
-                            role=MessageRole.TOOL,
-                            content=result.output,
-                            tool_call_id=call.id,
-                            name=call.name,
-                        )
-                    )
-                    self._check_deadline(messages)
+                    planned.append((position, "result", (result, replay_key), call))
                     continue
                 agent_call = ToolCall(name=call.name, arguments=call.arguments, call_id=call.id)
                 tool = self.registry.get(call.name)
@@ -649,6 +758,8 @@ class AgentLoop:
                         call_id=call.id,
                         is_error=True,
                     )
+                    planned.append((position, "result", (result, replay_key), call))
+                    continue
                 elif not self.permissions.check_and_authorize(tool, agent_call):
                     try:
                         tool.validate_arguments(agent_call.arguments)
@@ -675,50 +786,42 @@ class AgentLoop:
                         call_id=call.id,
                         is_error=True,
                     )
+                    planned.append((position, "result", (result, replay_key), call))
+                    continue
+                pending_key = call.id if call.id else f"anonymous:{iteration}:{position}"
+                planned.append(
+                    (
+                        position,
+                        "dispatch",
+                        (tool, agent_call, pending_key, replay_key),
+                        call,
+                    )
+                )
+            delegate_entries = []
+            for position, kind, payload, call in planned:
+                if kind == "dispatch" and call.name == "delegate_task":
+                    tool, agent_call, pending_key, replay = payload
+                    delegate_entries.append((position, call, tool, agent_call, pending_key, replay))
+            parallel = (
+                len(delegate_entries) >= 2
+                and self.delegation_max_workers > 1
+                and self.permissions.approval_callback is None
+            )
+            fanout_results: dict[int, tuple] = {}
+            fanout_done = False
+            for position, kind, payload, call in planned:
+                if kind == "result":
+                    result, replay_key = payload
                 else:
-                    pending_key = call.id if call.id else f"anonymous:{iteration}:{position}"
-                    self._check_deadline(messages)
-                    self._pending[pending_key] = agent_call
-                    self._emit_event(ToolExecutionEvent("tool_started", call.name, call.id or None))
-                    try:
-                        result = tool.run(agent_call, self.context)
-                    except ProviderError as exc:
-                        # Protocol failure: the effect is uncertain, so the call
-                        # stays pending for reconciliation instead of becoming
-                        # model feedback.
-                        if not exc.partial_messages:
-                            exc.partial_messages = tuple(messages)
-                        raise
-                    except Exception as exc:  # noqa: BLE001 - recovery-as-result
-                        # A tool bug escaping BaseTool.run still returns as a
-                        # result so the model can adapt; it never crashes the run.
-                        output = f"Error executing tool {call.name}: {exc}"
-                        if contains_credentials(output, extra=self.context.credential_secrets):
-                            output = (
-                                "Credential-bearing tool output withheld. Effects may already "
-                                "have occurred; inspect locally before continuing."
-                            )
-                        result = ToolResult(
-                            name=call.name,
-                            output=output,
-                            call_id=call.id,
-                            is_error=True,
-                        )
-                        self._pending.pop(pending_key, None)
-                        self._emit_event(
-                            ToolExecutionEvent(
-                                "tool_completed", call.name, call.id or None, is_error=True
-                            )
-                        )
+                    tool, agent_call, pending_key, replay_key = payload
+                    if parallel and call.name == "delegate_task":
+                        if not fanout_done:
+                            fanout_results = self._fanout_delegates(delegate_entries, messages)
+                            fanout_done = True
+                        _call, result, replay_key = fanout_results[position]
                     else:
-                        self._pending.pop(pending_key, None)
-                        self._emit_event(
-                            ToolExecutionEvent(
-                                "tool_completed",
-                                call.name,
-                                call.id or None,
-                                is_error=result.is_error,
-                            )
+                        result = self._dispatch_sequential(
+                            tool, agent_call, pending_key, call, messages
                         )
                 if replay_key is not None:
                     seen_in_batch.add(replay_key)

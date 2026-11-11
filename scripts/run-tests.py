@@ -108,6 +108,7 @@ GROUPS = {
         "tests/test_governance_tiers.py",
         "tests/test_agent_acceptance.py",
         "tests/test_knowme_bank.py",
+        "tests/test_parallel_delegation.py",
         "tests/test_auto_merge.py",
     ),
     "cli": (
