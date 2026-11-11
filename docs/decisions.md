@@ -1,3 +1,21 @@
+## Auto-merge B: docs/tests/small-fixes auto on green, opt-in auto/ - owner 2026-11-11
+
+**Status:** Accepted by the owner (inbox ea83de78=B).
+
+Branches named `auto/*` may merge to develop without a per-merge brief when:
+docs-only, test-only, or small-fix (<=3 files, no dependency manifests, no
+migration/schema/decision signals); no conflicts; scoped gate green (ruff +
+scoped pytest). Anything else keeps per-merge briefs. Implemented as
+scripts/auto_merge.py; the calling agent mails the receipt.
+
+## Secrets stay on .env; dashboard reads presence from it - owner 2026-11-11
+
+**Status:** Accepted by the owner (inbox 8cf28745=A).
+
+No vault migration. Provider tab presence/probes consult repo `.env` (CLI
+semantics) plus process env, booleans only, values never leave. OS-vault and
+encrypted-file options parked until multi-user/sharing needs arise.
+
 ## Default privacy external_allowed; user-config holds defaults only - owner 2026-11-10
 
 **Status:** Accepted by the owner (directed in chat 2026-11-10).
