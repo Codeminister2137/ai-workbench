@@ -739,6 +739,10 @@ class AgentLoop:
                     )
                     planned.append((position, "result", (result, replay_key), call))
                     continue
+                # Record the key at plan time: later duplicates in the same
+                # batch must see it during planning, before anything executes.
+                if replay_key is not None:
+                    seen_in_batch.add(replay_key)
                 agent_call = ToolCall(name=call.name, arguments=call.arguments, call_id=call.id)
                 tool = self.registry.get(call.name)
                 if tool is None:
@@ -823,8 +827,8 @@ class AgentLoop:
                         result = self._dispatch_sequential(
                             tool, agent_call, pending_key, call, messages
                         )
-                if replay_key is not None:
-                    seen_in_batch.add(replay_key)
+                # seen_in_batch was populated at plan time (above); every
+                # duplicate in this batch was already refused there.
                 tool_results.append(result)
                 recovery.observe(result)
                 messages.append(

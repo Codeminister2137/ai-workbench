@@ -220,3 +220,40 @@ def test_mixed_batch_keeps_positional_transcript(tmp_path) -> None:
         "delegate_task",
     ]
     assert (tmp_path / "a.txt").read_text() == "a"
+
+
+def test_fanout_batch_still_dedupes_replayed_calls(tmp_path) -> None:
+    """Plan/execute split must not lose same-batch dedup under fan-out."""
+    calls: list[str] = []
+
+    def runner(task, context):
+        calls.append(task)
+        return ToolResult("delegate_task", f"summary of {task}")
+
+    client = ScriptedClient(
+        [
+            (
+                [
+                    _call("d1", "one"),
+                    AIToolCall("c1", "create_file", {"path": "a.txt", "content": "a"}),
+                    _call("d2", "two"),
+                    AIToolCall("c1", "create_file", {"path": "a.txt", "content": "a"}),
+                ],
+                "",
+            ),
+            ([], "Done"),
+        ]
+    )
+    notes: list[str] = []
+    result = AgentLoop(
+        client,
+        ToolRegistry((DelegateTaskTool(runner), CreateFileTool())),
+        ToolContext(tmp_path),
+        permissions=PermissionManager(PermissionPolicy.permissive()),
+        max_iterations=4,
+        diagnostic=notes.append,
+    ).run("Go", privacy_class=PrivacyClass.LOCAL_ONLY)
+    assert any("delegation_fanout" in line for line in notes)
+    assert sorted(calls) == ["one", "two"]
+    assert "not replayed" in result.tool_results[3].output
+    assert (tmp_path / "a.txt").read_text() == "a"
