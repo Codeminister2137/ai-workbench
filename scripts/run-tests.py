@@ -117,6 +117,7 @@ GROUPS = {
     ),
     "cli": (
         "tests/repo_assistant/test_*.py",
+        "tests/test_doctor.py",
         "tests/test_external_agents.py",
         "tests/test_native_diagnostic_ownership.py",
         "tests/test_gemini_cli.py",
