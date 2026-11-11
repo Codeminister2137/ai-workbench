@@ -263,8 +263,18 @@ def test_native_agent_mode_executes_provider_tool_calls(
     complete = client.complete
 
     def capture_request(request):
+        from dataclasses import replace
+
+        from ai_provider import UsageMetadata, UsageSource
+
         requests.append(request)
-        return complete(request)
+        response = complete(request)
+        return replace(
+            response,
+            usage=UsageMetadata(
+                source=UsageSource.PROVIDER_REPORTED, input_tokens=100, output_tokens=10
+            ),
+        )
 
     monkeypatch.setattr(client, "complete", capture_request)
     monkeypatch.setattr(_EXAMPLE, "create_chat_client", lambda config: client)
@@ -314,7 +324,10 @@ def test_native_agent_mode_executes_provider_tool_calls(
     assert (tmp_path / "native.txt").read_text(encoding="utf-8") == "native"
     assert result.tool_results[0].is_error is False
     assert events[0] == "local_agent_activity: model_request - provider=ollama model=test"
-    assert "local_agent_activity: completed - iterations=2 tool_results=1" in events
+    assert (
+        "local_agent_activity: completed - iterations=2 tool_results=1 "
+        "usage=in=200 out=20 (provider_reported)" in events
+    )
     assert any(event.startswith("local_tool_activity: ok - create_file:") for event in events)
 
 

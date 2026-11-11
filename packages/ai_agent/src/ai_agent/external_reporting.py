@@ -46,6 +46,23 @@ def _diagnostic_line(text: str) -> str:
     return text[: MAX_DIAGNOSTIC_LINE_CHARS - len(suffix)].rstrip() + suffix
 
 
+def usage_summary(usage: Any | None) -> str:
+    """One-line measured usage for activity lines; honest about gaps.
+
+    Returns ``in=X out=Y (source)`` with unknown fields as ``?``. A
+    missing record (older result shapes) renders ``unavailable``.
+    """
+    if usage is None:
+        return "unavailable"
+    source = getattr(getattr(usage, "source", None), "value", None) or "unavailable"
+
+    def field(name: str) -> str:
+        value = getattr(usage, name, None)
+        return str(value) if isinstance(value, int) and value >= 0 else "?"
+
+    return f"in={field('input_tokens')} out={field('output_tokens')} ({source})"
+
+
 def print_external_agent_event_summary(events: ExternalAgentEventSummary) -> None:
     """Print structured external-agent execution metadata."""
 

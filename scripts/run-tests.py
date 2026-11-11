@@ -103,6 +103,7 @@ GROUPS = {
         "tests/test_wb_env_narrow.py",
         "tests/test_run_reports.py",
         "tests/test_loop_compaction.py",
+        "tests/test_loop_usage.py",
         "tests/test_groundedness.py",
         "tests/test_native_delegation.py",
         "tests/test_subagent_profiles.py",

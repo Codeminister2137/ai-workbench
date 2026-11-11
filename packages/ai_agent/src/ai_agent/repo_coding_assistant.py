@@ -266,6 +266,9 @@ from ai_agent.external_reporting import (
     timeout_output_to_text as _timeout_output_to_text,  # noqa: F401 - compatibility export
 )
 from ai_agent.external_reporting import (
+    usage_summary as _usage_summary,
+)
+from ai_agent.external_reporting import (
     write_external_agent_stderr as _write_external_agent_stderr,  # noqa: F401 - compatibility export
 )
 from ai_agent.repair_workflow import (
@@ -2096,6 +2099,7 @@ def _execute_request(
                     "tool_results": len(native_result.tool_results),
                     "tool_errors": sum(1 for item in native_result.tool_results if item.is_error),
                     "model_output_errors": getattr(native_result, "model_output_errors", None),
+                    "usage": _usage_summary(getattr(native_result, "usage", None)),
                     **_fallback_details(args),
                 },
             )
@@ -4268,7 +4272,8 @@ def _run_native_agent(
         progress_callback(
             f"local_agent_activity: {activity_status} "
             f"- iterations={result.iterations} "
-            f"tool_results={len(result.tool_results)}"
+            f"tool_results={len(result.tool_results)} "
+            f"usage={_usage_summary(getattr(result, 'usage', None))}"
         )
         if result.model_output_errors:
             progress_callback(f"model_output_errors: {result.model_output_errors}")
