@@ -81,6 +81,74 @@ class DelegationBudget:
 
 
 @dataclass(frozen=True, slots=True)
+class SubagentProfile:
+    """Named child preset: a permission profile plus a default tool surface.
+
+    Presets only narrow relative to the parent grant: :meth:`DelegationScope.narrow`
+    still intersects tools with it, and the inherited permission chain keeps
+    its narrowest-wins combination. An explicit ``permission_profile``
+    replaces the preset default (still bounded by parent authority); explicit
+    ``allowed_tools`` intersect the preset surface.
+    """
+
+    name: str
+    permission: str
+    tools: tuple[str, ...]
+
+
+_INSPECTION_TOOLS = (
+    "read_file",
+    "list_dir",
+    "find_files",
+    "grep_search",
+    "git_status",
+    "git_diff",
+)
+
+SUBAGENT_PROFILES: dict[str, SubagentProfile] = {
+    profile.name: profile
+    for profile in (
+        SubagentProfile(
+            name="researcher",
+            permission="read_only",
+            # No fetch_url: the native coding surface carries search_web only.
+            tools=(*_INSPECTION_TOOLS, "search_web", "python_navigate"),
+        ),
+        SubagentProfile(
+            name="coder",
+            permission="workspace_write",
+            tools=(
+                *_INSPECTION_TOOLS,
+                "create_file",
+                "edit_file",
+                "run_command",
+                "search_web",
+                "python_runtime",
+                "python_navigate",
+                "rename_preview",
+                "rename_apply",
+                "delegate_task",
+            ),
+        ),
+        SubagentProfile(
+            name="reviewer",
+            permission="read_only",
+            tools=_INSPECTION_TOOLS,
+        ),
+    )
+}
+
+
+def resolve_subagent_profile(name: str) -> SubagentProfile:
+    """Return the named preset, refusing unknown names instead of guessing."""
+    try:
+        return SUBAGENT_PROFILES[name]
+    except KeyError:
+        known = ", ".join(sorted(SUBAGENT_PROFILES))
+        raise ValueError(f"Unknown subagent profile: {name!r} (known: {known})") from None
+
+
+@dataclass(frozen=True, slots=True)
 class DelegationScope:
     """Only host code supplies this context; model arguments can only narrow it."""
 
