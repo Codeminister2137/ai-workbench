@@ -54,6 +54,18 @@ class DelegateTaskTool(BaseTool):
                     required=True,
                 ),
                 ToolParameter(
+                    name="profile",
+                    type_name="string",
+                    description=(
+                        "Optional named subagent preset (researcher/coder/reviewer): "
+                        "a permission profile plus a default tool surface. An explicit "
+                        "permission_profile replaces the default; allowed_tools "
+                        "intersect the preset surface."
+                    ),
+                    required=False,
+                    enum_values=("researcher", "coder", "reviewer"),
+                ),
+                ToolParameter(
                     name="permission_profile",
                     type_name="string",
                     description=(
@@ -134,10 +146,12 @@ class DelegateTaskTool(BaseTool):
         profile = arguments.get("permission_profile", "inherit")
         if profile == "default":
             profile = "inherit"
+        preset_name = arguments.get("profile")
         model = arguments.get("model")
         if scope is None:
             if (
                 profile != "inherit"
+                or preset_name is not None
                 or model is not None
                 or any(value is not None for value in overrides.values())
             ):
@@ -148,11 +162,22 @@ class DelegateTaskTool(BaseTool):
                 )
             return self.runner(task.strip(), context)
         try:
+            preset_tools: tuple[str, ...] | None = None
+            if preset_name is not None:
+                from ai_agent.delegation_scope import resolve_subagent_profile
+
+                preset = resolve_subagent_profile(preset_name)
+                if profile == "inherit":
+                    profile = preset.permission
+                preset_tools = preset.tools
+            requested_tools = overrides["allowed_tools"]
+            if preset_tools is not None and requested_tools is not None:
+                requested_tools = tuple(set(preset_tools) & set(requested_tools))
+            elif preset_tools is not None:
+                requested_tools = preset_tools
             child = scope.narrow(
                 profile=profile,
-                tools=tuple(overrides["allowed_tools"])
-                if overrides["allowed_tools"] is not None
-                else None,
+                tools=tuple(requested_tools) if requested_tools is not None else None,
                 paths=tuple(overrides["allowed_paths"])
                 if overrides["allowed_paths"] is not None
                 else None,
