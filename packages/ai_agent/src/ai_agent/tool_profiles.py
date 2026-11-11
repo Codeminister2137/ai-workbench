@@ -50,6 +50,7 @@ CODING_PROFILE = SharedToolProfile(
         "python_navigate",
         "rename_preview",
         "rename_apply",
+        "search_web",
         "delegate_task",
         "ask_owner",
         "request_owner_task",
@@ -86,9 +87,13 @@ def shared_tool_registry(
     )
     if name == "coding":
         from ai_agent.tools.research import FetchURLTool
+        from ai_agent.tools.research_search import SearchSession, SearchWebTool
 
         for tool in (CreateFileTool(), EditFileTool(), RunCommandTool()):
             registry.register(tool)
+        registry.register(
+            SearchWebTool(SearchSession.from_environment(lambda _event, _receipt: None))
+        )
         # Provenance is returned to the caller. Coding-session storage keeps the
         # ordinary hashed tool receipt, not fetched text or a separate research log.
         registry.register(FetchURLTool(lambda _event, _receipt: None))
