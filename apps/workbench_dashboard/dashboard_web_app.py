@@ -1821,6 +1821,11 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main() -> None:
     args = build_parser().parse_args()
+    from ai_provider.secrets import load_dotenv
+
+    loaded = load_dotenv(REPO_ROOT)
+    if loaded:
+        print(f"Workbench dashboard: secret store loaded ({len(loaded)} keys by name)")
     DashboardRequestHandler.config_path = args.config
     DashboardRequestHandler.data_dir = args.data_dir
     try:

@@ -115,7 +115,13 @@ if __name__ == "__main__":
 def test_dotenv_keys_count_as_configured(tmp_path: Path, monkeypatch) -> None:
     from providers_view import key_presence, load_dotenv_values
 
-    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    for name in (
+        "OPENROUTER_API_KEY",
+        "REQUESTY_API_KEY",
+        "META_API_KEY",
+        "OPENCODE_API_KEY",
+    ):
+        monkeypatch.delenv(name, raising=False)
     (tmp_path / ".env").write_text(
         '# comment\n\nOPENROUTER_API_KEY="sk-test"\nREQUESTY_API_KEY=\n',
         encoding="utf-8",

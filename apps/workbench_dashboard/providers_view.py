@@ -138,30 +138,16 @@ def _cache_path(data_dir: Path) -> Path:
 
 
 def load_dotenv_values(repo_root: Path | None) -> dict[str, str]:
-    """Parse repo .env the way scripts/repo-assistant.ps1 Import-DotEnv does.
+    """Read repo .env via the canonical secret-store parser (values in-process)."""
+    from ai_provider.secrets import STORE_FILENAME, parse_dotenv_lines
 
-    Skips blanks and #-comments, splits on the first '=', strips matching
-    quotes. Missing/unreadable files yield {}. Values stay in-process.
-    """
-    values: dict[str, str] = {}
     if repo_root is None:
-        return values
+        return {}
     try:
-        lines = (Path(repo_root) / ".env").read_text(encoding="utf-8").splitlines()
+        text = (Path(repo_root) / STORE_FILENAME).read_text(encoding="utf-8")
     except OSError:
-        return values
-    for line in lines:
-        trimmed = line.strip()
-        if not trimmed or trimmed.startswith("#") or "=" not in trimmed:
-            continue
-        name, _, value = trimmed.partition("=")
-        name = name.strip()
-        value = value.strip()
-        if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
-            value = value[1:-1]
-        if name:
-            values[name] = value
-    return values
+        return {}
+    return parse_dotenv_lines(text)
 
 
 def key_presence(repo_root: Path | None = None) -> dict[str, bool]:
