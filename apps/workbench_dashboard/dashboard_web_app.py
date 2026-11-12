@@ -76,6 +76,7 @@ from meeting_notes import (
 )
 from nl_tasks import ORDER_OPTIONS, SCHEDULE_ANSWER, propose_task, scheduled_run_record
 from owner_mail import mail_configured
+from owner_sleep import cancel_owner_sleep, schedule_owner_sleep, timer_state
 from p7_intake import approve_intake, list_intake
 from providers_view import provider_status as providers_status
 from providers_view import refresh_provider_status
@@ -492,6 +493,9 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
     # engine, metering, and translator. Tests inject fakes here.
     stt_engine_factory: Callable[[], TranscribeEngine] | None = None
     stt_metering: MeteringHook | None = None
+    # Owner-sleep launcher seam. None means the real hidden helper spawn;
+    # tests inject a fake that writes a receipt instead.
+    sleep_launcher = None
     spend_ledger: ClassVar[SpendLedger | None] = None
     chat_translator: Translator | None = None
     drain_executor_factory: ClassVar[Callable[[], Executor] | None] = None
@@ -657,6 +661,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 return self._send_item(self._stores().backlog, path[len("/api/backlog/") :])
             if path.startswith("/api/workflows/"):
                 return self._send_item(self._stores().workflows, path[len("/api/workflows/") :])
+            if path == "/api/sleep":
+                return self._send_json({"ok": True, **timer_state(self.repo_root)})
         except (StoreError, ValueError) as exc:
             return self._send_json({"ok": False, "error": str(exc)}, status=400)
         return self._send_json({"ok": False, "error": "Unknown endpoint"}, status=404)
@@ -681,6 +687,10 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         except ValueError as exc:
             return self._send_json({"ok": False, "error": str(exc)}, status=500)
         try:
+            if path == "/api/sleep":
+                return self._schedule_sleep(payload)
+            if path == "/api/sleep/cancel":
+                return self._send_json({"ok": True, **cancel_owner_sleep(self.repo_root)})
             if path == "/api/chat/sessions":
                 return self._create_chat_session(config, payload)
             if path.startswith("/api/chat/sessions/") and path.endswith("/messages"):
@@ -1820,6 +1830,19 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 "purge_after_utc": meta["purge_after_utc"],
             }
         )
+
+    def _schedule_sleep(self, payload: dict) -> None:
+        minutes = payload.get("delay_minutes", 10)
+        if isinstance(minutes, bool) or not isinstance(minutes, int):
+            return self._send_json(
+                {"ok": False, "error": "delay_minutes must be an integer"}, status=400
+            )
+        try:
+            outcome = schedule_owner_sleep(self.repo_root, minutes, launcher=self.sleep_launcher)
+        except ValueError as exc:
+            status = 400 if str(exc).startswith("delay must be") else 409
+            return self._send_json({"ok": False, "error": str(exc)}, status=status)
+        self._send_json({"ok": True, **outcome})
 
     def _transcribe_audio(self) -> None:
         try:
