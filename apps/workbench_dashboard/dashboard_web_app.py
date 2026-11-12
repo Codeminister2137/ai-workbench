@@ -698,6 +698,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 return self._send_ideas(parsed.query)
             if path == "/api/backlog":
                 return self._send_backlog(parsed.query)
+            if path == "/api/invoices":
+                return self._list_invoices()
             if path == "/api/workflows":
                 return self._send_workflows(parsed.query)
             if path == "/api/workflows/options":
@@ -716,6 +718,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 return self._send_item(self._stores().ideas, path[len("/api/ideas/") :])
             if path.startswith("/api/backlog/"):
                 return self._send_item(self._stores().backlog, path[len("/api/backlog/") :])
+            if path.startswith("/api/invoices/"):
+                return self._get_invoice(path[len("/api/invoices/") :])
             if path.startswith("/api/workflows/"):
                 return self._send_item(self._stores().workflows, path[len("/api/workflows/") :])
             if path == "/api/sleep":
@@ -780,6 +784,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 return self._create_idea(payload)
             if path == "/api/backlog":
                 return self._create_backlog_item(payload)
+            if path == "/api/invoices":
+                return self._create_invoice(config, payload)
             if path == "/api/workflows":
                 return self._create_workflow(payload)
             if path == "/api/workflows/validate":
@@ -821,6 +827,12 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             if path.startswith("/api/backlog/") and path.endswith("/promote"):
                 item_id = path[len("/api/backlog/") : -len("/promote")]
                 return self._promote_backlog_item(item_id, payload)
+            if path.startswith("/api/invoices/") and path.endswith("/review"):
+                item_id = path[len("/api/invoices/") : -len("/review")]
+                return self._review_invoice(item_id, payload)
+            if path.startswith("/api/invoices/"):
+                item_id = path[len("/api/invoices/") :]
+                return self._revise_invoice(item_id, payload)
             if path.startswith("/api/workflows/") and path.endswith("/status"):
                 item_id = path[len("/api/workflows/") : -len("/status")]
                 return self._set_workflow_status(item_id, payload)
@@ -1372,6 +1384,56 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         except StoreError as exc:
             return self._send_json({"ok": False, "error": str(exc)}, status=400)
         self._send_json({"ok": True, "id": record["id"]})
+
+    def _list_invoices(self) -> None:
+        from invoices import list_invoices
+
+        self._send_json({"ok": True, "items": list_invoices(self._stores())})
+
+    def _get_invoice(self, item_id: str) -> None:
+        from invoices import get_invoice
+
+        try:
+            record = get_invoice(self._stores(), item_id)
+        except StoreError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        if record is None:
+            return self._send_json({"ok": False, "error": "Not found"}, status=404)
+        self._send_json({"ok": True, "item": record})
+
+    def _create_invoice(self, config, payload: dict) -> None:
+        from invoices import create_draft
+
+        try:
+            record = create_draft(
+                self._stores(), payload, seller_defaults=getattr(config, "seller", None)
+            )
+        except (ValueError, StoreError) as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        self._send_json({"ok": True, "id": record["id"], "item": record}, status=201)
+
+    def _revise_invoice(self, item_id: str, payload: dict) -> None:
+        from invoices import update_draft
+
+        try:
+            record = update_draft(self._stores(), item_id, payload)
+        except KeyError:
+            return self._send_json({"ok": False, "error": "Not found"}, status=404)
+        except (ValueError, StoreError) as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        self._send_json({"ok": True, "item": record})
+
+    def _review_invoice(self, item_id: str, payload: dict) -> None:
+        from invoices import review_draft
+
+        reviewer = payload.get("reviewer", "")
+        try:
+            record = review_draft(self._stores(), item_id, reviewer)
+        except KeyError:
+            return self._send_json({"ok": False, "error": "Not found"}, status=404)
+        except (ValueError, StoreError) as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        self._send_json({"ok": True, "item": record})
 
     def _send_workflow_options(self) -> None:
         from ai_agent.skills import SKILL_TOOLS

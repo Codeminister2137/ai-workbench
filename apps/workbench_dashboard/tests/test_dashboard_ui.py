@@ -58,8 +58,8 @@ def test_static_controls_have_titles() -> None:
         assert "title=" in tag, f"button without title: {tag}"
     nav_links = re.findall(r"<a\b[^>]*data-view[^>]*>", html)
     assert (
-        len(nav_links) == 18
-    )  # +intake, +restrictions, +fleet, +providers, +help, +backlog, +knowme, +workflows, +projects, +meetings
+        len(nav_links) == 19
+    )  # +intake, +restrictions, +fleet, +providers, +help, +backlog, +knowme, +workflows, +projects, +meetings, +invoices
     for tag in nav_links:
         assert "title=" in tag, f"nav link without title: {tag}"
 
@@ -69,8 +69,8 @@ def test_dynamic_buttons_have_titles() -> None:
     js = _read("app.js")
     buttons = re.findall(r"<button\b[^>]*>", js)
     assert (
-        len(buttons) == 38
-    )  # +report/rename/delete/submit/create/cancel/run-request/staged-approve/staged-reject/dictate/intake-approve/draft-plan/drain/reopen/providers-refresh/propose/backlog-groom/backlog-promote +8 workflow composer +3 projects tab +2 sleep card +2 meetings tab
+        len(buttons) == 40
+    )  # +report/rename/delete/submit/create/cancel/run-request/staged-approve/staged-reject/dictate/intake-approve/draft-plan/drain/reopen/providers-refresh/propose/backlog-groom/backlog-promote +8 workflow composer +3 projects tab +2 sleep card +2 meetings tab +2 invoices tab
     for tag in buttons:
         assert "title=" in tag, f"button without title: {tag}"
 
@@ -80,14 +80,14 @@ def test_dynamic_inputs_and_selects_have_titles() -> None:
     js = _read("app.js")
     inputs = [tag for tag in re.findall(r"<input\b[^>]*>", js) if 'type="radio"' not in tag]
     assert (
-        len(inputs) == 42
-    )  # +rename/create-form inputs, +5 list filters, +idea plan link, +task propose, +backlog filter/decision/create-title/create-ref, +restriction toggle, +8 workflow composer, +6 projects tab +1 sleep delay, +6 meetings tab
+        len(inputs) == 53
+    )  # +rename/create-form inputs, +5 list filters, +idea plan link, +task propose, +backlog filter/decision/create-title/create-ref, +restriction toggle, +8 workflow composer, +6 projects tab +1 sleep delay, +6 meetings tab, +11 invoices tab
     for tag in inputs:
         assert "title=" in tag, f"input without title: {tag}"
     selects = re.findall(r"<select\b[^>]*>", js)
     assert (
-        len(selects) == 17
-    )  # +create selects, +run-request pickers, +runs/inbox project filters, +agent-queue assignee, +backlog groom/create-source, +inbox close kind, +4 workflow composer, +2 projects tab
+        len(selects) == 18
+    )  # +create selects, +run-request pickers, +runs/inbox project filters, +agent-queue assignee, +backlog groom/create-source, +inbox close kind, +4 workflow composer, +2 projects tab, +1 invoices VAT
     for tag in selects:
         assert "title=" in tag, f"select without title: {tag}"
 

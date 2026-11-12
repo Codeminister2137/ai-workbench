@@ -122,6 +122,7 @@ class DashboardStores:
         self.ideas = JsonCollection(data_dir / "ideas")
         self.backlog = JsonCollection(data_dir / "backlog")
         self.workflows = JsonCollection(data_dir / "workflows")
+        self.invoices = JsonCollection(data_dir / "invoices")
 
     @property
     def token_path(self) -> Path:

@@ -31,6 +31,7 @@ class DashboardConfig:
     require_grounded_reports: bool = True
     route_policy: str = "configured"
     catalog_path: str | None = None
+    seller: dict | None = None
 
 
 def load_config(path: Path = DEFAULT_CONFIG_PATH) -> DashboardConfig:
@@ -59,6 +60,7 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> DashboardConfig:
         "require_grounded_reports": bool,
         "route_policy": str,
         "catalog_path": (str, type(None)),
+        "seller": (dict, type(None)),
     }
     values: dict[str, object] = {}
     for key, types in known.items():
