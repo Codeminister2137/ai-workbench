@@ -59,6 +59,18 @@ def test_parse_mai_facts_pulls_session_and_route() -> None:
     assert parse_mai_facts("nothing here") == {}
 
 
+def test_facts_survive_tail_truncation() -> None:
+    def runner(argv):
+        print("coding_session_id: s1")
+        print("x" * 5000)
+        return 0
+
+    outcome = run_mai_session(["prompt"], runner=runner)
+    assert "coding_session_id" not in outcome.stdout_tail
+    assert outcome.facts == {"coding_session_id": "s1"}
+    assert mai_receipt(outcome, ["prompt"])["mai_session_id"] == "s1"
+
+
 def test_session_captures_output_and_exit_code() -> None:
     def runner(argv):
         print("routing: fake/route")

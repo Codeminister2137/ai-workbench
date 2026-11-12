@@ -35,6 +35,7 @@ class MaiRunOutcome:
     stdout_tail: str
     stderr_tail: str
     error: str | None = None
+    facts: dict[str, str] | None = None  # parsed from full stdout (session id, route)
 
 
 def build_mai_argv(
@@ -118,11 +119,13 @@ def run_mai_session(
             stdout_tail=stdout.getvalue()[-TAIL_CHARS:],
             stderr_tail=stderr.getvalue()[-TAIL_CHARS:],
             error=f"{type(exc).__name__}: {exc}",
+            facts=parse_mai_facts(stdout.getvalue()),
         )
     return MaiRunOutcome(
         exit_code=exit_code,
         stdout_tail=stdout.getvalue()[-TAIL_CHARS:],
         stderr_tail=stderr.getvalue()[-TAIL_CHARS:],
+        facts=parse_mai_facts(stdout.getvalue()),
     )
 
 
@@ -138,7 +141,7 @@ def classify_failure(*texts: str) -> str:
 
 def mai_receipt(outcome: MaiRunOutcome, argv: Sequence[str]) -> dict:
     """Drain receipt for a Mai outcome; transcripts stay in the tails."""
-    facts = parse_mai_facts(outcome.stdout_tail)
+    facts = outcome.facts or parse_mai_facts(outcome.stdout_tail)
     if outcome.error is None and outcome.exit_code == 0:
         return {
             "status": "completed",
