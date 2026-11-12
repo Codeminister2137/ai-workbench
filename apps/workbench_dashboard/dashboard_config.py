@@ -31,6 +31,7 @@ class DashboardConfig:
     require_grounded_reports: bool = True
     route_policy: str = "configured"
     catalog_path: str | None = None
+    mai_backend: str = "in-process"
 
 
 def load_config(path: Path = DEFAULT_CONFIG_PATH) -> DashboardConfig:
@@ -59,6 +60,7 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> DashboardConfig:
         "require_grounded_reports": bool,
         "route_policy": str,
         "catalog_path": (str, type(None)),
+        "mai_backend": str,
     }
     values: dict[str, object] = {}
     for key, types in known.items():
@@ -93,6 +95,9 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> DashboardConfig:
     supervision = values.get("supervision", "attended")
     if supervision not in ("attended", "unattended"):
         raise ValueError("Dashboard config key 'supervision' must be attended or unattended")
+    backend = values.get("mai_backend", "in-process")
+    if backend not in ("in-process", "subprocess"):
+        raise ValueError("Dashboard config key 'mai_backend' must be in-process or subprocess")
     return DashboardConfig(**values)  # type: ignore[arg-type]
 
 

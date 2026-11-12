@@ -89,6 +89,7 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/plans/local-model-queue.md | ACTED | Q1-Q4 all consumed into quality-policy v1. |
 | docs/plans/loop-20261102-evening.md | ACTED | Consumed run plan. |
 | docs/plans/mai-supervision-design.md | PENDING | Draft 2026-11-12; owner decision on placement/authority/paging open. |
+| docs/plans/p4-agent-ux-research.md | KNOWLEDGE | P4 loop-UX research 2026-11-12 (R1-R5 queued, no implementation). |
 | docs/plans/unattended-work-plan.md | PENDING | Active 2026-11-12 afternoon window plan; flip to ACTED at closeout. |
 | docs/plans/mai-dashboard-wiring-plan.md | TRIAGE | Wiring execution plan; awaits verdict-A. |
 | docs/plans/marketing-r3-draft.md | PENDING | Compliance boundary binding; pilot proposal unapproved. |

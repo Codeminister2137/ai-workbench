@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import contextlib
 import io
+import os
 import re
 import sys
 from collections.abc import Callable, Sequence
@@ -166,17 +167,89 @@ def mai_receipt(outcome: MaiRunOutcome, argv: Sequence[str]) -> dict:
     }
 
 
+SUBPROCESS_TIMEOUT_SECONDS = 1800.0
+
+
+def _mai_console_script() -> list[str]:
+    """Console entry for out-of-process Mai (editable installs provide it)."""
+    name = "ai-assistant.exe" if os.name == "nt" else "ai-assistant"
+    return [str(Path(sys.executable).parent / name)]
+
+
+def run_mai_subprocess(
+    argv: Sequence[str],
+    *,
+    cmd_prefix: list[str] | None = None,
+    timeout_seconds: float = SUBPROCESS_TIMEOUT_SECONDS,
+    cwd: Path | str | None = None,
+) -> MaiRunOutcome:
+    """Invoke Mai as a supervised subprocess; kill on timeout; never raises."""
+    import subprocess
+
+    try:
+        proc = subprocess.Popen(
+            [*(cmd_prefix or _mai_console_script()), *argv],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            stdin=subprocess.DEVNULL,
+            text=True,
+            cwd=str(cwd) if cwd is not None else None,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+    except OSError as exc:
+        return MaiRunOutcome(
+            exit_code=3, stdout_tail="", stderr_tail="", error=f"spawn failed: {exc}"
+        )
+    try:
+        stdout, stderr = proc.communicate(timeout=timeout_seconds)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        try:
+            stdout, stderr = proc.communicate(timeout=10)
+        except subprocess.TimeoutExpired:
+            stdout, stderr = "", ""
+        return MaiRunOutcome(
+            exit_code=3,
+            stdout_tail=(stdout or "")[-TAIL_CHARS:],
+            stderr_tail=(stderr or "")[-TAIL_CHARS:],
+            error=f"Mai session timed out after {timeout_seconds:.0f}s (killed)",
+            facts=parse_mai_facts(stdout or ""),
+        )
+    return MaiRunOutcome(
+        exit_code=int(proc.returncode or 0),
+        stdout_tail=(stdout or "")[-TAIL_CHARS:],
+        stderr_tail=(stderr or "")[-TAIL_CHARS:],
+        facts=parse_mai_facts(stdout or ""),
+    )
+
+
 def build_mai_executor(
     repo_root: Path | str,
     user_config: Path | str,
     *,
     catalog: Path | str | None = None,
     runner: Callable[[Sequence[str]], int] | None = None,
+    backend: str = "in-process",
+    subprocess_timeout_seconds: float = SUBPROCESS_TIMEOUT_SECONDS,
+    mai_cmd_prefix: list[str] | None = None,
 ) -> Callable[[dict], dict]:
-    """Build a drain ``Executor`` handing runs to Mai sessions."""
+    """Build a drain ``Executor`` handing runs to Mai sessions.
+
+    ``backend="subprocess"`` isolates Mai in a supervised child process
+    with timeout recovery; anything else runs in-process (default).
+    """
 
     def execute(run: dict) -> dict:
         argv = build_mai_argv(run, repo_root=repo_root, user_config=user_config, catalog=catalog)
-        return mai_receipt(run_mai_session(argv, runner=runner), argv)
+        if backend == "subprocess":
+            outcome = run_mai_subprocess(
+                argv,
+                cmd_prefix=mai_cmd_prefix,
+                timeout_seconds=subprocess_timeout_seconds,
+                cwd=repo_root,
+            )
+        else:
+            outcome = run_mai_session(argv, runner=runner)
+        return mai_receipt(outcome, argv)
 
     return execute
