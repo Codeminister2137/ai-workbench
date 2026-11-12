@@ -37,7 +37,11 @@ class MaiRunOutcome:
 
 
 def build_mai_argv(run: dict, *, repo_root: Path | str, user_config: Path | str) -> list[str]:
-    """Argv handing a run to Mai; never pins a model (orchestrator decides)."""
+    """Argv handing a run to Mai; never pins a model (orchestrator decides).
+
+    Each attempt opens a fresh coding session (``new``); the assigned
+    session id and effective route are parsed back from Mai's stdout.
+    """
     run_id = str(run.get("id", "?"))
     title = run.get("title") or "(untitled)"
     body = run.get("body") or ""
@@ -48,12 +52,22 @@ def build_mai_argv(run: dict, *, repo_root: Path | str, user_config: Path | str)
         "implement",
         "--execute",
         "--coding-session",
-        run_id,
+        "new",
         "--repo-root",
         str(repo_root),
         "--user-config",
         str(user_config),
     ]
+
+
+def parse_mai_facts(stdout: str) -> dict[str, str]:
+    """Pull Mai-printed facts (session id, effective route) from stdout."""
+    facts: dict[str, str] = {}
+    for line in stdout.splitlines():
+        for key in ("coding_session_id", "effective_route_id"):
+            if line.startswith(f"{key}:"):
+                facts[key] = line.split(":", 1)[1].strip()
+    return facts
 
 
 def run_mai_session(
@@ -95,12 +109,15 @@ def classify_failure(*texts: str) -> str:
 
 def mai_receipt(outcome: MaiRunOutcome, argv: Sequence[str]) -> dict:
     """Drain receipt for a Mai outcome; transcripts stay in the tails."""
+    facts = parse_mai_facts(outcome.stdout_tail)
     if outcome.error is None and outcome.exit_code == 0:
         return {
             "status": "completed",
             "stdout_tail": outcome.stdout_tail,
             "stderr_tail": outcome.stderr_tail,
             "mai_argv": list(argv),
+            "mai_session_id": facts.get("coding_session_id"),
+            "route_id": facts.get("effective_route_id"),
             "source": "mai-session",
         }
     error = outcome.error or f"Mai session exited with code {outcome.exit_code}"
@@ -111,6 +128,8 @@ def mai_receipt(outcome: MaiRunOutcome, argv: Sequence[str]) -> dict:
         "stdout_tail": outcome.stdout_tail,
         "stderr_tail": outcome.stderr_tail,
         "mai_argv": list(argv),
+        "mai_session_id": facts.get("coding_session_id"),
+        "route_id": facts.get("effective_route_id"),
         "source": "mai-session",
     }
 

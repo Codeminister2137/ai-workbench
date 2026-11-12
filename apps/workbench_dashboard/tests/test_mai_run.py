@@ -24,8 +24,16 @@ def test_argv_hands_task_to_mai_without_model_override(tmp_path) -> None:
     assert "--model" not in argv  # orchestrator decides inside Mai
     assert argv[argv.index("--mode") + 1] == "implement"
     assert "--execute" in argv
-    assert argv[argv.index("--coding-session") + 1] == "r1"
+    assert argv[argv.index("--coding-session") + 1] == "new"
     assert argv[argv.index("--repo-root") + 1] == str(tmp_path)
+
+
+def test_parse_mai_facts_pulls_session_and_route() -> None:
+    from mai_run import parse_mai_facts
+
+    facts = parse_mai_facts("noise\ncoding_session_id: abc123\neffective_route_id: ollama/q\n")
+    assert facts == {"coding_session_id": "abc123", "effective_route_id": "ollama/q"}
+    assert parse_mai_facts("nothing here") == {}
 
 
 def test_session_captures_output_and_exit_code() -> None:
