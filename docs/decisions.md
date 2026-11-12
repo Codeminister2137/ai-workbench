@@ -1,3 +1,14 @@
+## Dashboard navigation and activation first - owner 2026-11-12
+
+**Status:** Accepted (inbox adcec2af=A; implementation task c5d5a2b2).
+
+Group navigation, provide an available/installed/activated module catalogue,
+make Home an optional actionable Overview, and allow a chosen landing page.
+Activation gates specialist dashboard endpoints while preserving data; installed
+code remains on disk. Existing installation remains full-workspace. Optional
+packaging was the broader alternative; A was selected as smaller and reversible.
+See [ADR-086](decisions/ADR-086-dashboard-module-activation.md).
+
 ## Auto-merge B: docs/tests/small-fixes auto on green, opt-in auto/ - owner 2026-11-11
 
 **Status:** Accepted by the owner (inbox ea83de78=B).

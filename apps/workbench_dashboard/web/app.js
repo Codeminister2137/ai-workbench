@@ -389,11 +389,59 @@ function phaseChecklistHtml(plan) {
   return `<ul class="plain checklist" id="phase-checklist">${rows}</ul>`;
 }
 
-async function renderHome() {
-  const status = await api("/api/status");
-  const plan = status.current_plan
-    ? `<a href="#/plans/${esc(status.current_plan.id)}">${esc(status.current_plan.title || status.current_plan.id)}</a>`
-    : '<span class="muted">No plan yet</span>';
+let moduleSettings = null;
+
+function moduleActive(id) {
+  return moduleSettings && moduleSettings.modules.some((m) => m.id === id && m.activated);
+}
+
+async function loadModules() {
+  moduleSettings = await api("/api/modules");
+  document.querySelectorAll("nav a[data-view]").forEach((link) => {
+    const owner = moduleSettings.modules.find((m) => m.views.includes(link.dataset.view));
+    link.hidden = !!owner && !owner.activated;
+  });
+  document.querySelectorAll(".nav-group").forEach((group) => {
+    group.hidden = !Array.from(group.querySelectorAll("a")).some((link) => !link.hidden);
+  });
+}
+
+async function renderModules() {
+  const modules = moduleSettings.modules;
+  view.innerHTML = `<h1>Modules</h1>
+    <p>Activation controls dashboard features. Installed code and existing data stay on disk.
+    Deactivation does not cancel previously approved runs.</p>
+    <form id="modules-form">
+    ${modules.map((m) => `<div class="card"><label><input type="checkbox" name="module" value="${esc(m.id)}" title="Activate ${esc(m.title)}" ${m.activated ? "checked" : ""} ${m.installed ? "" : "disabled"}> ${esc(m.title)}</label>
+      <span class="muted">Available &middot; ${m.installed ? "Installed" : "Not installed"} &middot; ${m.activated ? "Activated" : "Inactive"}</span></div>`).join("")}
+    <label>Landing page <select id="landing-page" title="View opened when visiting the dashboard without a deep link"></select></label>
+    <button type="submit" title="Save module activation and landing page">Save preferences</button></form>`;
+  const form = document.getElementById("modules-form");
+  const select = document.getElementById("landing-page");
+  const updateLanding = () => {
+    const previous = select.value || moduleSettings.landing_page;
+    const enabled = Array.from(form.querySelectorAll('input[name="module"]:checked')).map((el) => el.value);
+    const pages = [...moduleSettings.core_views, ...modules.filter((m) => enabled.includes(m.id)).flatMap((m) => m.views)];
+    select.innerHTML = pages.map((page) => `<option value="${esc(page)}">${esc(page === "home" ? "Overview" : page)}</option>`).join("");
+    select.value = pages.includes(previous) ? previous : "chat";
+  };
+  form.addEventListener("change", (event) => { if (event.target.name === "module") updateLanding(); });
+  updateLanding();
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      await api("/api/modules", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({
+        activated_modules: Array.from(form.querySelectorAll('input[name="module"]:checked')).map((el) => el.value),
+        landing_page: select.value,
+      })});
+      await loadModules();
+      toast("Module preferences saved");
+      await renderModules();
+    } catch (err) { toast(err.message, false); }
+  });
+}
+
+async function renderSpend() {
   let spend = "";
   try {
     const sp = await api("/api/spend");
@@ -410,58 +458,39 @@ async function renderHome() {
   } catch (err) {
     spend = '<p class="muted">Spend unavailable: ' + esc(err.message) + "</p>";
   }
-  const runs = status.recent_runs.length
-    ? status.recent_runs.map((r) =>
-        `<li><a href="#/runs/${esc(r.id)}">${esc(r.title || r.id)}</a> <span class="muted">${esc(r.status || "")}</span></li>`).join("")
-    : '<li class="muted">No runs recorded</li>';
-  const sched = status.drain_scheduler || {};
-  const schedLine = sched.started
-    ? `Drain every ${esc(sched.interval_seconds)}s — ${esc(sched.ticks)} ticks, ${esc(sched.errors)} errors. <a href="#/schedule">Schedule view</a>`
-    : `Scheduler off. <a href="#/schedule">Schedule view</a>`;
-  view.innerHTML = `
-    <h1>${esc(status.title)}</h1>
-    <p class="muted">Backend: ${esc(status.provider)} / ${esc(status.model)}</p>
-    <div class="columns">
-      <div>
-        <div class="card"><h2>Active plan</h2><p>${plan}</p>
-          <p class="muted">${esc(status.plan_total)} plan(s) on file. <a href="#/plans">All plans</a></p></div>
-        <div class="card"><h2>Recent runs</h2><ul class="plain">${runs}</ul></div>
-        <div class="card"><h2>Evidence</h2>
-          <p>${status.evidence.available
-            ? `${esc(status.evidence.passed)} passed / ${esc(status.evidence.routes)} routes. <a href="#/runs">Details in Runs</a>`
-            : 'No route snapshots yet. Run the provider probe/eval CLIs to populate.'}</p></div>
-      </div>
-      <div>
-        <div class="card"><h2>Inbox</h2>
-          <p>${status.open_inbox} open task(s). <a href="#/inbox">Open inbox</a></p></div>
-        <div class="card"><h2>Spend</h2>${spend}</div>
-        <div class="card"><h2>Ideas</h2>
-          <p>${status.new_ideas} new — triage each in Ideas (adopt, park, or decline). <a href="#/ideas">Open ideas</a></p></div>
-        <div class="card"><h2>Backlog</h2>
-          <p>${status.open_backlog} open — groom in Backlog (propose, ready, promote to inbox). <a href="#/backlog">Open backlog</a></p></div>
-        <div class="card"><h2>Chat</h2>
-          <form class="inline" id="quick-chat"><input type="text" name="text" placeholder="Ask the supervisor..." title="Ask the supervisor (starts a new chat)" required>
-          <button type="submit" title="Start a chat with this question">Send</button></form></div>
-        <div class="card"><h2>Scheduled</h2>
-          <p class="muted">${schedLine}</p></div>
-      </div>
-    </div>`;
-  document.getElementById("quick-chat").addEventListener("submit", async (ev) => {
-    ev.preventDefault();
-    const text = ev.target.text.value.trim();
-    if (!text) return;
-    try {
-      const session = await api("/api/chat/sessions", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({title: text.slice(0, 60)}),
-      });
-      toast("Chat started", true);
-      location.hash = "#/chat/" + session.id + "?q=" + encodeURIComponent(text);
-    } catch (err) {
-      toast(err.message, false);
-    }
-  });
+  view.innerHTML = `<h1>Spend</h1><div class="card"><h2>Spend</h2>${spend}</div>`;
+}
+
+async function renderHome() {
+  const results = await Promise.allSettled([api("/api/overview"), api("/api/fleet"), api("/api/status")]);
+  const warnings = [];
+  const read = (index, label) => {
+    if (results[index].status === "fulfilled") return results[index].value;
+    warnings.push(label + ": " + results[index].reason.message);
+    return {};
+  };
+  const overview = read(0, "Work snapshot");
+  const fleet = read(1, "Schedule").fleet || {};
+  const status = read(2, "Status");
+  if (status.drain_scheduler && status.drain_scheduler.errors) warnings.push("Drain scheduler errors: " + status.drain_scheduler.errors);
+  if (fleet.ollama && fleet.ollama.up === false) warnings.push("Local Ollama unavailable: " + (fleet.ollama.detail || "No detail reported"));
+  if (fleet.agents && fleet.agents.attention) warnings.push("Agent supervision needs attention; inspect Fleet.");
+  for (const task of fleet.tasks || []) {
+    if (task.detail || task.error) warnings.push(task.name + ": " + (task.detail || task.error));
+  }
+  const links = (items, page) => items.map((item) => `<li><a href="#/${page}/${encodeURIComponent(item.id)}">${esc(item.title || item.id)}</a> ${esc(item.status || "")}</li>`).join("") || '<li class="muted">None in this snapshot.</li>';
+  const pending = overview.pending || [];
+  const active = overview.active || [];
+  const failed = overview.failed || [];
+  const upcoming = (fleet.tasks || []).filter((item) => item.present && item.next_run).sort((a, b) => a.next_run.localeCompare(b.next_run));
+  view.innerHTML = `<h1>Overview</h1><p class="muted">Current work snapshot. Open each list for full history.</p>
+    <div class="columns"><div>
+    <div class="card"><h2>Pending decisions</h2><ul>${links(pending, "inbox")}</ul><a href="#/inbox">All inbox items (${esc(overview.pending_total ?? "?")})</a></div>
+    <div class="card"><h2>Active runs</h2><ul>${links(active, "runs")}</ul></div>
+    <div class="card"><h2>Failed runs</h2><ul>${links(failed, "runs")}</ul><a href="#/runs">All runs (${esc(overview.active_total ?? "?")} active, ${esc(overview.failed_total ?? "?")} failed)</a></div>
+    </div><div><div class="card"><h2>Upcoming work</h2><ul>${upcoming.map((item) => `<li>${esc(fmtTime(item.next_run))} - ${esc(item.name)}</li>`).join("") || '<li>No upcoming tasks reported.</li>'}
+    ${fleet.sleep && fleet.sleep.active ? `<li>Sleep due ${esc(fmtTime(fleet.sleep.due_utc))}</li>` : ""}</ul><a href="#/schedule">Schedule</a></div>
+    <div class="card"><h2>Warnings</h2><ul>${warnings.map((warning) => `<li>${esc(warning)}</li>`).join("") || '<li>No warnings reported by these checks.</li>'}</ul><a href="#/fleet">System status</a></div></div></div>`;
 }
 
 async function renderChatList() {
@@ -734,7 +763,7 @@ async function renderProjects(id) {
   if (id) {
     const payload = await api("/api/projects/" + encodeURIComponent(id));
     const p = payload.project;
-    const isBook = (p.type || "general") === "book";
+    const isBook = moduleActive("books") && (p.type || "general") === "book";
     view.innerHTML = `<h1>Project</h1><p><a href="#/projects">All projects</a></p>
       <div class="card"><h2>${gtext(p.name)}</h2>
       <p><span class="pill st-${esc(p.type || "general")}">${esc(p.type || "general")}</span></p>
@@ -805,7 +834,7 @@ async function renderProjects(id) {
       <input type="text" name="description" placeholder="Description (optional)..." title="Project description (optional)" value="">
       <select name="ptype" title="Project type: general work root or book manuscript">
         <option value="general">general</option>
-        <option value="book">book</option>
+        ${moduleActive("books") ? '<option value="book">book</option>' : ""}
       </select>
       <button type="submit" title="Register this project root">Create project</button>
     </form></div>`;
@@ -2032,7 +2061,9 @@ async function render() {
   stopRunsPoll();
   stopRunDetailPoll();
   document.querySelectorAll("nav a").forEach((a) => a.classList.remove("active"));
-  const raw = (location.hash || "#/home").slice(2);
+  try { await loadModules(); }
+  catch (err) { view.innerHTML = `<h1>Settings unavailable</h1><p>${esc(err.message)}</p>`; return; }
+  const raw = (location.hash || "#/" + moduleSettings.landing_page).slice(2);
   const [path, query] = raw.split("?");
   // Document ids are multi-segment (root/relpath); single-segment ids behave as before.
   const [name, ...rest] = path.split("/");
@@ -2040,7 +2071,14 @@ async function render() {
   const active = document.querySelector(`nav a[data-view="${name}"]`);
   if (active) active.classList.add("active");
   try {
-    if (name === "home") await renderHome();
+    const owner = moduleSettings.modules.find((m) => m.views.includes(name));
+    if (owner && !owner.activated) {
+      view.innerHTML = '<h1>Module inactive</h1><p>Activate this feature in <a href="#/modules">Modules</a>.</p>';
+      return;
+    }
+    if (name === "modules") await renderModules();
+    else if (name === "spend") await renderSpend();
+    else if (name === "home") await renderHome();
     else if (name === "chat" && id) {
       const q = new URLSearchParams(query || "").get("q");
       if (q) history.replaceState(null, "", "#/chat/" + id);

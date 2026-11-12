@@ -3,6 +3,7 @@
  * color or length literals (checked by scripts/check_style_tokens.py).
  * Media-query widths stay literal: var() is invalid there. */
 :root {
+  --wb-nav-menu-width: 10rem;
   --wb-font-ui: system-ui, sans-serif;
 
   --wb-color-hairline: #8884;

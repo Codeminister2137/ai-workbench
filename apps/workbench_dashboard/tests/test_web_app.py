@@ -968,3 +968,102 @@ def test_knowme_lists_banked_entries(dashboard_server, tmp_path) -> None:
     assert [entry["text"] for entry in filtered["entries"]] == ["Runs 3x/week."]
     with pytest.raises(HTTPError):
         get_json(dashboard_server, "/api/knowme?category=nope")
+
+
+def test_module_activation_roundtrip_and_route_gates(dashboard_server, tmp_path):
+    from knowme_bank import KnowMeStore
+
+    store = KnowMeStore(tmp_path / "data" / "knowme.sqlite3")
+    store.add("training", "Preserved entry", "note")
+    base = dashboard_server
+    original = get_json(base, "/api/modules")
+    assert original["landing_page"] == "home"
+    assert any(m["id"] == "trainer" and not m["installed"] for m in original["modules"])
+    before = get_json(base, "/api/settings")
+    saved = post_json(base, "/api/modules", {"activated_modules": [], "landing_page": "chat"})
+    assert saved["landing_page"] == "chat"
+    assert not any(m["activated"] for m in get_json(base, "/api/modules")["modules"])
+    assert get_json(base, "/api/settings")["supervision"] == before["supervision"]
+    for path in (
+        "/api/knowme",
+        "/api/meetings",
+        "/api/meetings/old",
+        "/api/intake",
+        "/api/overview",
+    ):
+        with pytest.raises(HTTPError) as error:
+            get_json(base, path)
+        assert error.value.code == 409
+    for path in (
+        "/api/meetings/transcribe",
+        "/api/meetings/old/analyze",
+        "/api/intake/example/approve",
+        "/api/projects/example/check",
+        "/api/projects/example/manuscript",
+    ):
+        with pytest.raises(HTTPError) as error:
+            post_json(base, path, {})
+        assert error.value.code == 409
+    post_json(
+        base, "/api/modules", {"activated_modules": ["overview", "knowme"], "landing_page": "home"}
+    )
+    assert get_json(base, "/api/knowme")["entries"][0]["text"] == "Preserved entry"
+    assert get_json(base, "/api/overview")["ok"]
+
+
+@pytest.mark.parametrize(
+    "modules,landing",
+    [
+        (["trainer"], "chat"),
+        (["unknown"], "chat"),
+        ([], "home"),
+        ([], "unknown"),
+        ("meetings", "chat"),
+    ],
+)
+def test_module_preferences_reject_invalid_without_writes(dashboard_server, modules, landing):
+    before = get_json(dashboard_server, "/api/modules")
+    with pytest.raises(HTTPError) as error:
+        post_json(
+            dashboard_server,
+            "/api/modules",
+            {"activated_modules": modules, "landing_page": landing},
+        )
+    assert error.value.code == 400
+    assert get_json(dashboard_server, "/api/modules") == before
+
+
+def test_overview_finds_older_actionable_records(dashboard_server, tmp_path):
+    from dashboard_stores import DashboardStores
+
+    stores = DashboardStores(tmp_path / "data")
+    stores.runs.put("old-failed", {"id": "old-failed", "status": "failed", "title": "Failed"})
+    stores.runs.put("old-active", {"id": "old-active", "status": "running", "title": "Active"})
+    stores.inbox.put("decision", {"id": "decision", "status": "open", "body": "private body"})
+    for index in range(25):
+        stores.runs.put(f"done-{index}", {"id": f"done-{index}", "status": "completed"})
+    snapshot = get_json(dashboard_server, "/api/overview")
+    assert snapshot["failed_total"] == snapshot["active_total"] == snapshot["pending_total"] == 1
+    assert snapshot["active"][0]["id"] == "old-active"
+    assert snapshot["failed"][0]["id"] == "old-failed"
+    assert "body" not in snapshot["pending"][0]
+
+
+def test_disabled_features_do_not_import_implementations(dashboard_server, monkeypatch):
+    import builtins
+
+    post_json(dashboard_server, "/api/modules", {"activated_modules": [], "landing_page": "chat"})
+    original_import = builtins.__import__
+    observed = []
+
+    def track_import(name, *args, **kwargs):
+        if name in {"meeting_notes", "p7_intake", "knowme_bank"}:
+            observed.append(name)
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", track_import)
+    for path in ("/api/meetings", "/api/intake", "/api/knowme"):
+        with pytest.raises(HTTPError) as error:
+            get_json(dashboard_server, path)
+        assert error.value.code == 409
+    assert observed == []

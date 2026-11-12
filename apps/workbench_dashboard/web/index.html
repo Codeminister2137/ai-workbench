@@ -10,24 +10,46 @@
 <body>
 <header>
   <nav id="nav">
-    <a href="#/home" data-view="home" title="Status overview">Home</a>
+    <a href="#/home" data-view="home" title="Status overview">Overview</a>
     <a href="#/chat" data-view="chat" title="Supervisor chat sessions">Chat</a>
-    <a href="#/plans" data-view="plans" title="Plans on file">Plans</a>
-    <a href="#/runs" data-view="runs" title="Runs and route evidence">Runs</a>
     <a href="#/inbox" data-view="inbox" title="Owner inbox tasks">Inbox <span id="inbox-badge" class="badge" hidden></span></a>
-    <a href="#/ideas" data-view="ideas" title="Captured ideas to triage">Ideas <span id="ideas-badge" class="badge" hidden></span></a>
-    <a href="#/backlog" data-view="backlog" title="Groomed backlog before inbox briefs">Backlog <span id="backlog-badge" class="badge" hidden></span></a>
-    <a href="#/invoices" data-view="invoices" title="Invoice drafts: create, review, approve">Invoices</a>
-    <a href="#/workflows" data-view="workflows" title="Workflows: compose node lists over existing runners">Workflows</a>
     <a href="#/projects" data-view="projects" title="Projects: work roots, book manuscripts, manuscript checks">Projects</a>
-    <a href="#/meetings" data-view="meetings" title="Meetings: transcripts plus confirmed AI action items">Meetings</a>
-    <a href="#/documents" data-view="documents" title="Company documents and research library">Documents</a>
-    <a href="#/intake" data-view="intake" title="Client briefs awaiting review">Intake</a>
-    <a href="#/schedule" data-view="schedule" title="Schedule: upcoming runs, live from the fleet probe">Schedule</a>
-    <a href="#/fleet" data-view="fleet" title="Fleet: watchdogs, servers, sleep guard, active runs">Fleet</a>
-    <a href="#/providers" data-view="providers" title="Providers: connection status, keys, model catalogue">Providers</a>
-    <a href="#/restrictions" data-view="restrictions" title="Agent restriction dimensions (read-only overview)">Restrictions</a>
-    <a href="#/knowme" data-view="knowme" title="Know-me bank: personal entries by category">KnowMe</a>
+    <details class="nav-group">
+      <summary>Work</summary>
+      <div>
+        <a href="#/plans" data-view="plans" title="Plans on file">Plans</a>
+        <a href="#/runs" data-view="runs" title="Runs and route evidence">Runs</a>
+        <a href="#/schedule" data-view="schedule" title="Schedule: upcoming runs, live from the fleet probe">Schedule</a>
+        <a href="#/workflows" data-view="workflows" title="Workflows: compose node lists over existing runners">Workflows</a>
+      </div>
+    </details>
+    <details class="nav-group">
+      <summary>Library</summary>
+      <div>
+        <a href="#/documents" data-view="documents" title="Company documents and research library">Documents</a>
+        <a href="#/ideas" data-view="ideas" title="Captured ideas to triage">Ideas <span id="ideas-badge" class="badge" hidden></span></a>
+        <a href="#/backlog" data-view="backlog" title="Groomed backlog before inbox briefs">Backlog <span id="backlog-badge" class="badge" hidden></span></a>
+      </div>
+    </details>
+    <details class="nav-group">
+      <summary>System</summary>
+      <div>
+        <a href="#/spend" data-view="spend" title="Allowances and spending policy">Spend</a>
+        <a href="#/fleet" data-view="fleet" title="Fleet: watchdogs, servers, sleep guard, active runs">Fleet</a>
+        <a href="#/providers" data-view="providers" title="Providers: connection status, keys, model catalogue">Providers</a>
+        <a href="#/restrictions" data-view="restrictions" title="Agent restriction dimensions (read-only overview)">Restrictions</a>
+      </div>
+    </details>
+    <details class="nav-group">
+      <summary>Specialist</summary>
+      <div>
+        <a href="#/knowme" data-view="knowme" title="Know-me bank: personal entries by category">KnowMe</a>
+        <a href="#/meetings" data-view="meetings" title="Meetings: transcripts plus confirmed AI action items">Meetings</a>
+        <a href="#/intake" data-view="intake" title="Client briefs awaiting review">Intake</a>
+        <a href="#/invoices" data-view="invoices" title="Invoice drafts: create, review, approve">Invoices</a>
+      </div>
+    </details>
+    <a href="#/modules" data-view="modules" title="Available modules and activation preferences">Modules</a>
     <a href="#/help" data-view="help" title="Help: runbook and troubleshooting">Help</a>
   </nav>
   <span id="version-pill" class="muted" title="Served branch and commit"></span>

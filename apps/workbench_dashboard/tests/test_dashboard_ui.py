@@ -57,9 +57,7 @@ def test_static_controls_have_titles() -> None:
     for tag in re.findall(r"<button\b[^>]*>", html):
         assert "title=" in tag, f"button without title: {tag}"
     nav_links = re.findall(r"<a\b[^>]*data-view[^>]*>", html)
-    assert (
-        len(nav_links) == 19
-    )  # +intake, +restrictions, +fleet, +providers, +help, +backlog, +knowme, +workflows, +projects, +meetings, +invoices
+    assert len(nav_links) == 21  # 19 + modules tab + spend tab (was Home card)
     for tag in nav_links:
         assert "title=" in tag, f"nav link without title: {tag}"
 
@@ -68,9 +66,7 @@ def test_dynamic_buttons_have_titles() -> None:
     """Every button rendered by app.js templates carries a tooltip title."""
     js = _read("app.js")
     buttons = re.findall(r"<button\b[^>]*>", js)
-    assert (
-        len(buttons) == 40
-    )  # +report/rename/delete/submit/create/cancel/run-request/staged-approve/staged-reject/dictate/intake-approve/draft-plan/drain/reopen/providers-refresh/propose/backlog-groom/backlog-promote +8 workflow composer +3 projects tab +2 sleep card +2 meetings tab +2 invoices tab
+    assert len(buttons) == 40  # -quick-chat send +modules save (net zero)
     for tag in buttons:
         assert "title=" in tag, f"button without title: {tag}"
 
@@ -79,15 +75,11 @@ def test_dynamic_inputs_and_selects_have_titles() -> None:
     """Text inputs/selects in templates have titles (radios use labels)."""
     js = _read("app.js")
     inputs = [tag for tag in re.findall(r"<input\b[^>]*>", js) if 'type="radio"' not in tag]
-    assert (
-        len(inputs) == 53
-    )  # +rename/create-form inputs, +5 list filters, +idea plan link, +task propose, +backlog filter/decision/create-title/create-ref, +restriction toggle, +8 workflow composer, +6 projects tab +1 sleep delay, +6 meetings tab, +11 invoices tab
+    assert len(inputs) == 53  # -quick-chat text +1 checkbox template (loop renders 5)
     for tag in inputs:
         assert "title=" in tag, f"input without title: {tag}"
     selects = re.findall(r"<select\b[^>]*>", js)
-    assert (
-        len(selects) == 18
-    )  # +create selects, +run-request pickers, +runs/inbox project filters, +agent-queue assignee, +backlog groom/create-source, +inbox close kind, +4 workflow composer, +2 projects tab, +1 invoices VAT
+    assert len(selects) == 19  # +landing-page select
     for tag in selects:
         assert "title=" in tag, f"select without title: {tag}"
 
@@ -156,11 +148,11 @@ def test_meetings_tab_uploads_and_confirms_analysis() -> None:
     assert "external model providers" in js
 
 
-def test_ideas_label_explains_triage() -> None:
-    """The status card tells the owner what triage means."""
+def test_ideas_remains_accessible_in_library() -> None:
+    """Ideas remains reachable after the Home status card is replaced."""
     js = _read("app.js")
     assert "untriaged." not in js
-    assert "adopt, park, or decline" in js
+    assert 'data-view="ideas"' in _read("index.html")
 
 
 def test_inbox_form_keeps_note_and_submit_below_choices() -> None:
@@ -640,8 +632,8 @@ def test_inbox_close_form_and_reopen_markers() -> None:
     assert "#/inbox?status=archive" in js
 
 
-def test_home_shows_spend_card() -> None:
-    """Home renders a Spend card backed by /api/spend with an empty state."""
+def test_system_retains_spend_card() -> None:
+    """System retains the Spend card and its empty state."""
     js = _read("app.js")
     assert "<h2>Spend</h2>" in js
     assert 'await api("/api/spend")' in js
@@ -664,7 +656,8 @@ def test_home_scheduled_card_uses_live_state() -> None:
     js = _read("app.js")
     assert "No scheduler yet" not in js
     assert "status.drain_scheduler" in js
-    assert "Scheduler off." in js
+    assert "<h2>Upcoming work</h2>" in js
+    assert 'api("/api/fleet")' in js
 
 
 def test_schedule_tab_markers() -> None:
@@ -770,3 +763,42 @@ def test_mobile_media_query_keeps_single_scrollable_tab_row() -> None:
     assert "@media (max-width: 700px)" in css
     assert "header { flex-wrap: wrap;" in css
     assert "nav { flex: 1 1 100%; overflow-x: auto; white-space: nowrap;" in css
+
+
+def test_module_routing_executes_landing_and_disabled_deep_links():
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node is required for router execution")
+    js = _read("app.js")
+    router = js[
+        js.index("async function render() {") : js.index(
+            'document.getElementById("create-btn").addEventListener'
+        )
+    ]
+    driver = r"""
+const assert = require('assert');
+const fs = require('fs');
+const source = fs.readFileSync(process.argv[1], 'utf8');
+const router = source.slice(source.indexOf('async function render() {'), source.indexOf('document.getElementById("create-btn").addEventListener'));
+const view = {innerHTML: ''};
+const document = {querySelectorAll: () => [], querySelector: () => null};
+let moduleSettings = {landing_page: 'runs', modules: [{id: 'overview', views: ['home'], activated: false}]};
+const location = {hash: ''};
+const stopRunsPoll = () => {}, stopRunDetailPoll = () => {}, loadModules = async () => {};
+const refreshBadge = () => {}, toast = () => {}, esc = String;
+let rendered = '';
+const renderRuns = async (id) => {rendered = 'runs:' + (id || '');};
+const renderChatList = async () => {rendered = 'chat';};
+eval(router);
+(async () => {
+ await render(); assert.equal(rendered, 'runs:');
+ location.hash = '#/chat'; await render(); assert.equal(rendered, 'chat');
+ location.hash = '#/runs/example'; await render(); assert.equal(rendered, 'runs:example');
+ location.hash = '#/home'; await render(); assert(view.innerHTML.includes('Module inactive'));
+})().catch(error => {console.error(error); process.exitCode = 1;});
+"""
+    assert "moduleSettings.landing_page" in router
+    result = subprocess.run(
+        [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
+    )
+    assert result.returncode == 0, result.stderr

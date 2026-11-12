@@ -21,8 +21,23 @@ inspect the owned process only.
 
 ## What v1 does
 
-- Home: backend, active plan, recent runs, evidence counts, inbox count,
-  chat quick-entry. Every list is one click away; items cross-link.
+- Navigation groups Work (Plans, Runs, Schedule, Workflows), Library
+  (Documents, Ideas, Backlog), System (Fleet, Providers, Restrictions, Spend),
+  and specialist views. Existing hash links remain valid.
+- Modules: catalogue distinguishes available, installed, and activated features.
+  Toggle Overview, KnowMe, Meetings, Intake, and book tools; Trainer is listed
+  as planned and cannot be activated. Save a landing page here; explicit deep
+  links take precedence. Disabled views point to Modules and their feature APIs
+  return 409. Existing data and installed code remain; prior approved runs are
+  not cancelled. This is feature activation, not an authorization boundary.
+- Overview (the former Home): pending decisions, active/failed runs (up to 20
+  per category, with totals), live upcoming tasks and system warnings. Failed
+  data sources are reported separately. Spend remains under System.
+- Preferences persist in existing `dashboard.json`: `activated_modules` (IDs)
+  and `landing_page` (view ID). Omitted preferences preserve the previous
+  feature availability and Home landing. Disabling a selected landing view
+  offers Chat as the replacement before saving; invalid API combinations are
+  rejected without writing. No optional packaging is introduced.
 - Chat: supervisor answers with full local transcripts
   (`data/chats.sqlite3`). Turns stay tool-less, but any message can be
   queued as an agent run (Request run, optional project scope): the run
