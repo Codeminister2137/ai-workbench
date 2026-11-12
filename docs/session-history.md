@@ -4286,6 +4286,33 @@ main merge.
 - Prior-work survey: services/pricing PARTIAL (offering R1+§7, 04 plan),
   advertising was NOT STARTED (R3 backlog only) — now covered.
 
+## 2026-11-12 evening - Unattended window 15:34-20:00 Warsaw (closeout 19:50)
+
+Merges to develop (owner A from mobile): docs/product-tiers c22bd1a,
+fix/supervisor-task-wrapper 42c9dfe; pushed + rev-list/ls-remote verified;
+briefs 922df3ea/bb429636 closed. Serve worktree auto-synced; server
+restarted via supervisor --force, serving 42c9dfe healthy.
+
+Pushed + briefed (await owner A): empty-output 4bcc3cb (1b10b1d0),
+ask-minimal bab96b5 (93494b8c, 66.5KB->2.6KB proven), fallback 70a5591
+(7a5c918e), topbar fd2c419 (87f66352), scheduler-root 6c067f9
+(c9b4e687), subprocess-default ef747d0 (d8fdc5b4). All conflict-free
+vs develop; all tips re-verified.
+
+Owner mobile task (topbar vertical) done directly after Mai run
+e84ef642 went silent 25 min (no conn/CPU/writes/children) and wedged
+the single drain thread (in-process backend has no timeout). Run
+marked failed atomically, server restarted, scheduler proven alive
+via fresh bridges.
+
+Inbox: owner answers executed (ask-A, fallback-A implemented;
+meeting-B verified already merged; modules-A queued f756ddfe; SO
+parked); 8 stale run-approvals closed; answered=0 at closeout.
+
+Bugs filed: f4014078 (scheduled drains used REPO_ROOT=serve tree;
+root fixed, full isolation queued). Timer lesson: `-Rolling` without
+`-Sleep` is a NO-OP; renew with `-Renew -ReceiptPath <startup>`.
+
 ## Standing notes
 
 - Old handoff archived to `docs/session-history.md` (2026-11-05).
