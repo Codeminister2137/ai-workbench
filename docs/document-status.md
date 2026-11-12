@@ -90,6 +90,7 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/plans/loop-20261102-evening.md | ACTED | Consumed run plan. |
 | docs/plans/mai-supervision-design.md | PENDING | Draft 2026-11-12; owner decision on placement/authority/paging open. |
 | docs/plans/p4-agent-ux-research.md | KNOWLEDGE | P4 loop-UX research 2026-11-12 (R1-R5 queued, no implementation). |
+| docs/plans/local-model-pilot-20261112.md | KNOWLEDGE | Local model micro-pilot + tool eval + ask-bloat findings 2026-11-12. |
 | docs/plans/mai-dashboard-wiring-plan.md | TRIAGE | Wiring execution plan; awaits verdict-A. |
 | docs/plans/marketing-r3-draft.md | PENDING | Compliance boundary binding; pilot proposal unapproved. |
 | docs/plans/merge-inventory-20261105.md | ACTED | Nov-5 merge DONE. |
