@@ -125,6 +125,23 @@ skills, coding style, job-search profile, and mentor-style growth suggestions.
 This must remain local/private by default and should not be implemented until a
 separate privacy, persistence, and product-scope decision is made.
 
+## Product tiers (adopted 2026-11-12)
+
+Reliability policy per project, orthogonal to lifecycle (dev vs
+post-v1.0). Redeploy policy = f(tier, lifecycle): commercial +
+post-v1.0 gets scheduled windows; everything else anytime-bannered
+until the dashboard goes public.
+
+- Special: externally-committed work with outside deadlines (client
+  work, demos, collabs). Highest stability bar when active.
+- Commercial: revenue-facing products. company-site (dev).
+- Tooling: daily drivers the owner depends on. Workbench dashboard
+  (dev), job-search, ai_provider, ai_orchestrator, ai_agent.
+- Hobby: aspirational, breakage-tolerant. AI Council, knowme-bank.
+
+Me-oriented work splits by dependence (tooling vs hobby), not
+authorship. `product_tier` config carries the tier per deployment.
+
 ## Placement rule
 If a new component does not clearly fit:
 1. define its responsibility;
