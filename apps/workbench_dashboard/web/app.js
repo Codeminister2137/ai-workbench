@@ -1595,6 +1595,12 @@ async function renderFleet() {
   try {
     const payload = await api("/api/fleet");
     const f = payload.fleet;
+    let ownerSleep = {active: false};
+    try {
+      ownerSleep = await api("/api/sleep");
+    } catch (err) {
+      ownerSleep = {active: false, status: "unavailable: " + err.message};
+    }
     const taskRows = f.tasks.map((t) =>
       `<li><span class="pill st-${t.present ? esc((t.state || "unknown").replace(/\s+/g, "-")) : "missing"}">${t.present ? esc(t.state || "unknown") : "missing"}</span> <strong>${esc(t.name)}</strong>` +
       (t.present
@@ -1607,12 +1613,51 @@ async function renderFleet() {
     const sleep = f.sleep.active
       ? `Armed — due ${esc(fmtTime(f.sleep.due_utc))}, deadline ${esc(fmtTime(f.sleep.deadline_utc))} (PID ${esc(f.sleep.pid ?? "?")})${f.sleep.explain ? ` — ${esc(f.sleep.explain)}` : ""}`
       : `Idle (${esc(f.sleep.status || "no receipt")})`;
+    const ownerLine = ownerSleep.active
+      ? `<span class="pill st-ready">scheduled</span> <strong>due ${esc(ownerSleep.due_warsaw || "?")} Warsaw</strong>`
+      : `<span class="pill">none</span> <span class="muted">${esc(ownerSleep.status || "no owner timer")}</span>`;
     body = `<div class="card"><h2>Servers</h2><ul class="plain">
       <li><span class="pill st-ready">up</span> <strong>dashboard</strong> <span class="muted">${esc(f.dashboard.explain || "this server")}</span></li>
       <li><span class="pill st-${f.ollama.up ? "ready" : "missing"}">${f.ollama.up ? "up" : "down"}</span> <strong>ollama</strong> <span class="muted">${f.ollama.up ? esc(f.ollama.models) + " model(s)" : esc(f.ollama.detail || "")}${f.ollama.explain ? ` — ${esc(f.ollama.explain)}` : ""}</span></li></ul></div>
       <div class="card"><h2>Watchdog tasks</h2><ul class="plain">${taskRows}</ul></div>
       <div class="card"><h2>Sleep guard</h2><p>${sleep}</p></div>
+      <div class="card"><h2>Sleep button</h2><p>${ownerLine}</p>
+      <form id="sleep-form" class="inline">
+        <input type="number" name="delay" placeholder="Minutes (1-1440)..." title="Sleep delay in minutes (1-1440)" value="">
+        <button type="submit" title="Schedule PC sleep after this delay">Schedule sleep</button>
+        <button type="button" id="sleep-cancel" title="Cancel your scheduled sleep (agent timers untouched)">Cancel sleep</button>
+      </form></div>
       <div class="card"><h2>Active runs</h2><ul class="plain">${runRows}</ul></div>`;
+    view.innerHTML = `<h1>Fleet</h1><p class="muted">Probed live on open. Watchdogs, servers, sleep guard, active runs.</p>${body}`;
+    document.getElementById("sleep-form").addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const minutes = Number(ev.target.delay.value);
+      if (!Number.isInteger(minutes) || minutes < 1 || minutes > 1440) {
+        toast("Delay must be 1-1440 minutes", false);
+        return;
+      }
+      try {
+        const out = await api("/api/sleep", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({delay_minutes: minutes}),
+        });
+        toast("Sleep scheduled for " + (out.due_warsaw || "?"), true);
+        render();
+      } catch (err) {
+        toast(err.message, false);
+      }
+    });
+    document.getElementById("sleep-cancel").addEventListener("click", async () => {
+      try {
+        const out = await api("/api/sleep/cancel", {method: "POST"});
+        toast(out.cancelled ? "Sleep cancelled" : ("Not cancelled: " + out.status), out.cancelled);
+        render();
+      } catch (err) {
+        toast(err.message, false);
+      }
+    });
+    return;
   } catch (err) {
     body = `<div class="card"><h2>Fleet</h2><p class="muted">Fleet unavailable: ${esc(err.message)}</p></div>`;
   }
