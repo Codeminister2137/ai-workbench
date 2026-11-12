@@ -119,6 +119,7 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/plans/track-b-20261104.md | ACTED | Consumed run plan. |
 | docs/plans/unattended-codex-prompt-20261029.md | ACTED | Oct-29 window passed. |
 | docs/plans/unattended-work-plan-20261101.md | ACTED | Consumed run plan. |
+| docs/plans/mai-supervision-design.md | PENDING | Draft 2026-11-12; owner decision on placement/authority/paging open. |
 | docs/plans/unattended-work-plan.md | ACTED | Loop11 plan; superseded by tonight's work. |
 | docs/plans/weekly-digest-design.md | ACTED | Digest 2.0 shipped (loop10). |
 | docs/plans/workbench-remote-development-integration-20261027.md | ACTED | Decided 2026-10-27 (C now, B target, A rejected). |
