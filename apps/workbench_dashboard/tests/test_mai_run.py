@@ -59,6 +59,70 @@ def test_parse_mai_facts_pulls_session_and_route() -> None:
     assert parse_mai_facts("nothing here") == {}
 
 
+def test_subprocess_backend_captures_and_times_out(tmp_path) -> None:
+    import sys
+
+    from mai_run import mai_receipt, run_mai_subprocess
+
+    echo = [sys.executable, "-c", "print('coding_session_id: s9')"]
+    ok = run_mai_subprocess(["ignored"], cmd_prefix=echo, timeout_seconds=30)
+    assert ok.exit_code == 0 and ok.facts == {"coding_session_id": "s9"}
+    assert mai_receipt(ok, ["x"])["status"] == "completed"
+    sleepy = [sys.executable, "-c", "import time; time.sleep(30)"]
+    slow = run_mai_subprocess(["ignored"], cmd_prefix=sleepy, timeout_seconds=1)
+    assert slow.exit_code == 3 and "timed out" in (slow.error or "")
+    assert mai_receipt(slow, ["x"])["status"] == "failed"
+    missing = run_mai_subprocess(["ignored"], cmd_prefix=["definitely-not-a-binary-xyz"])
+    assert missing.exit_code == 3 and "spawn failed" in (missing.error or "")
+
+
+def test_executor_backend_dispatch() -> None:
+    seen: dict = {}
+
+    def fake_session(argv, runner=None):
+        seen["in_process"] = True
+        from mai_run import MaiRunOutcome
+
+        return MaiRunOutcome(exit_code=0, stdout_tail="", stderr_tail="")
+
+    import mai_run
+
+    real_session, real_subprocess = mai_run.run_mai_session, mai_run.run_mai_subprocess
+    try:
+        mai_run.run_mai_session = fake_session
+        build_mai_executor(".", "u")(_run())
+        assert seen == {"in_process": True}
+        seen.clear()
+
+        def fake_subprocess(argv, cmd_prefix=None, timeout_seconds=0, cwd=None):
+            seen["subprocess"] = True
+            from mai_run import MaiRunOutcome
+
+            return MaiRunOutcome(exit_code=0, stdout_tail="", stderr_tail="")
+
+        mai_run.run_mai_subprocess = fake_subprocess
+        build_mai_executor(".", "u", backend="subprocess")(_run())
+        assert seen == {"subprocess": True}
+    finally:
+        mai_run.run_mai_session = real_session
+        mai_run.run_mai_subprocess = real_subprocess
+
+
+def test_config_validates_mai_backend(tmp_path) -> None:
+    import json
+
+    import pytest
+    from dashboard_config import load_config
+
+    path = tmp_path / "dashboard.json"
+    assert load_config(path).mai_backend == "in-process"
+    path.write_text(json.dumps({"mai_backend": "subprocess"}), encoding="utf-8")
+    assert load_config(path).mai_backend == "subprocess"
+    path.write_text(json.dumps({"mai_backend": "telepathy"}), encoding="utf-8")
+    with pytest.raises(ValueError, match="mai_backend"):
+        load_config(path)
+
+
 def test_facts_survive_tail_truncation() -> None:
     def runner(argv):
         print("coding_session_id: s1")
