@@ -268,6 +268,9 @@ never leave duplicate active timers. Rolling renewal is owner-approved: use
 time and preserve the hard deadline. Show `.\cancel-sleep.cmd` as the fixed owner
 command cancelling all repository sleep timers. Follow the procedure's bounded
 work/headroom and cancellation rules; never rearm after cancellation silently.
+At window start also run `scripts/monitors-off.ps1` (screens off for the
+unattended run; any mouse/keyboard input wakes them, nothing locks or sleeps).
+Record the run in the plan; re-run at closeout if the screens woke mid-window.
 
 Time checkpoints are required after every completed or blocked step, before a
 long operation, and at least every thirty minutes during ongoing work. Read the

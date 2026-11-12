@@ -15,6 +15,7 @@ inference, external access, dependencies, infrastructure or expanded task scope.
 - Live/resource/privacy/approval limits and independently available offline work:
 - Closeout reserve and work-admission cutoff; increase reserve for expected cleanup:
 - Sleep: DEFAULT, ten minutes after finishing; record any explicit owner override:
+- Monitors: run scripts/monitors-off.ps1 at startup; record time (safe: any input wakes):
 - Startup fallback: fixed deadline due time, fresh receipt/cancel paths, PID,
   verified sleep_scheduled receipt and owner-visible exact cancellation command:
   Follow docs/unattended-sleep.md before implementation. At closeout replace the
