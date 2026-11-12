@@ -396,13 +396,34 @@ class AgentLoop:
             metadata={**self.request_metadata, "task_type": "loop_compaction"},
         )
         enforce_credential_policy(summary_request, extra=self.context.credential_secrets)
-        summary_text = self.client.complete(summary_request).message.content.strip()
+        summary_text = ""
+        failure_reason = ""
+        for _attempt in (1, 2):
+            try:
+                summary_text = self.client.complete(summary_request).message.content.strip()
+            except ProviderError as exc:
+                # Transport/auth/outage on the summarizer alone must not kill
+                # the run: a real outage surfaces at the next main call, while
+                # a transient one must not lose the whole turn.
+                failure_reason = f"summarizer failed: {exc}"
+                summary_text = ""
+                continue
+            if summary_text:
+                break
+            failure_reason = "empty model summary"
         if not summary_text:
-            raise ProviderError(
-                "loop compaction summarizer returned an empty summary",
-                category=ProviderErrorCategory.NON_RETRYABLE,
-                provider=self.client.backend.provider,
+            # Mechanical fallback: drop the foldable turns with an explicit
+            # marker instead of dying. The next compaction folds the marker
+            # as a prior summary, preserving the chain.
+            marker = (
+                f"{COMPACTION_SUMMARY_PREFIX} (mechanical fallback: {failure_reason}; "
+                f"dropped {len(foldable)} oldest turns to fit budget. Do not claim "
+                "effects from dropped turns; re-inspect files as needed.)"
             )
+            messages[:] = [*immune, AIMessage(MessageRole.SYSTEM, marker), *tail]
+            if self.diagnostic:
+                self.diagnostic(f"loop_compaction: n={compactions + 1} fallback={failure_reason}")
+            return compactions + 1
         messages[:] = [
             *immune,
             AIMessage(
@@ -834,7 +855,7 @@ class AgentLoop:
                 messages.append(
                     AIMessage(
                         role=MessageRole.TOOL,
-                        content=result.output,
+                        content=_cap_tool_content(result.output),
                         tool_call_id=call.id,
                         name=call.name,
                     )
@@ -856,6 +877,25 @@ class AgentLoop:
 
 
 COMPACTION_SUMMARY_PREFIX = "Compacted summary of earlier turns."
+
+TOOL_MESSAGE_MAX_CHARS = 32_768
+
+
+def _cap_tool_content(output: str) -> str:
+    """Cap one tool message so a single dump cannot break the context budget.
+
+    The full output stays in the tool receipt; the message carries an
+    explicit marker, so groundedness ("earlier effects remain") is never
+    quietly violated by truncation.
+    """
+    if len(output) <= TOOL_MESSAGE_MAX_CHARS:
+        return output
+    return (
+        output[:TOOL_MESSAGE_MAX_CHARS]
+        + f"\n\n[Output truncated: showing first {TOOL_MESSAGE_MAX_CHARS} of "
+        f"{len(output)} chars. Full output remains in the tool receipt; "
+        "re-read with narrower ranges if needed.]"
+    )
 
 
 def _is_compaction_summary(message: AIMessage) -> bool:
