@@ -1099,14 +1099,15 @@ async function renderInbox(id) {
   const inboxUrl = inboxProjectFilter ? "/api/inbox?project_id=" + encodeURIComponent(inboxProjectFilter) : "/api/inbox";
   const payload = await api(inboxUrl);
   const isFollowup = (t) => (t.resolution_kind || "final") !== "final";
-  const shown = payload.items.filter((t) => tab === "archive" ? (t.status === "closed" && !isFollowup(t)) : tab === "queue" ? (t.assignee === "agent" && t.status === "open") : (t.status !== "closed" || isFollowup(t)));
+  const needsHuman = (t) => t.assignee !== "agent" && t.status === "open";
+  const shown = payload.items.filter((t) => tab === "archive" ? (t.status === "closed" && !isFollowup(t)) : tab === "queue" ? (t.assignee === "agent" && t.status === "open") : tab === "human" ? needsHuman(t) : tab === "attention" ? (needsHuman(t) || isFollowup(t)) : (t.status !== "closed" || isFollowup(t)));
   const items = shown.length
     ? shown.map((t) =>
         `<li><a href="#/inbox/${esc(t.id)}">${gtext(t.title)}</a>
          <span class="pill st-${esc((t.status || "none").replace(/\s+/g, "-"))}">${esc(t.type)} · ${esc(t.status)}${t.assignee === "agent" ? " · for AI" : ""}${isFollowup(t) ? " · needs follow-up" : ""}</span></li>`).join("")
     : '<li class="muted">Nothing here. The supervisor assigns decisions and tasks to the inbox.</li>';
   view.innerHTML = `<h1>Inbox</h1>
-    <p><a href="#/inbox">Active</a> · <a href="#/inbox?status=queue">AI queue</a> · <a href="#/inbox?status=archive">Archive</a></p>
+    <p><a href="#/inbox">Active</a> · <a href="#/inbox?status=queue">AI queue</a> · <a href="#/inbox?status=human">Human</a> · <a href="#/inbox?status=attention">Needs attention</a> · <a href="#/inbox?status=archive">Archive</a></p>
     <p><input type="text" id="filter-inbox" placeholder="Filter tasks..." title="Filter inbox by text">
     <select id="filter-inbox-project" title="Show inbox tasks for one project">${await projectOptions(inboxProjectFilter)}</select></p>
     <ul class="plain" id="inbox-list">${items}</ul>`;
