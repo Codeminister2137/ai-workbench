@@ -1,9 +1,10 @@
-"""Meeting transcription slice 1: chunked WAV upload to stored transcript.
+"""Meeting transcription + slice-2 allowance-routed AI analysis.
 
 The founder records externally with client consent, uploads the file,
 and gets a timestamped transcript stored locally with a retention
-sidecar. AI analysis (action items, summary) is slice 2 with a model.
-WAV-only in slice 1: splitting needs PCM frame access.
+sidecar. Action-item analysis runs on explicit per-call confirmation
+through the orchestrator's allowance routes (owner inbox decision).
+WAV-only: splitting needs PCM frame access.
 """
 
 from __future__ import annotations
@@ -23,6 +24,14 @@ MEETING_MAX_SECONDS = 3 * 3600
 CLIP_MAX_SECONDS = 60.0
 DEFAULT_RETENTION_DAYS = 90
 CONSENT_VALUES = frozenset({"1", "true", "yes"})
+ANALYSIS_INPUT_MAX_CHARS = 60_000
+TRANSCRIPT_RESPONSE_MAX_CHARS = 200_000
+ANALYSIS_SYSTEM_PROMPT = (
+    "Extract action items from the meeting transcript below. "
+    "Output one `- [ ] item` line per commitment, naming the owner when "
+    "stated and quoting the supporting line. If the transcript supports "
+    "no action items, say so explicitly instead of inventing any."
+)
 
 
 def split_wav_clips(
@@ -205,10 +214,132 @@ def expired_meetings(data_dir: Path, now: datetime | None = None) -> list[str]:
 
 def purge_meeting(data_dir: Path, meeting_id: str) -> bool:
     """Delete one stored meeting; False when the id is invalid/missing."""
-    if not meeting_id.replace("-", "").replace("_", "").isalnum():
+    if not _valid_id(meeting_id):
         return False
     target = Path(data_dir) / "meetings" / meeting_id
     if not target.is_dir():
         return False
     shutil.rmtree(target)
     return True
+
+
+def _valid_id(meeting_id: str) -> bool:
+    return bool(meeting_id) and meeting_id.replace("-", "").replace("_", "").isalnum()
+
+
+def list_meetings(data_dir: Path) -> list[dict]:
+    """Newest-first meeting metas; malformed records are skipped."""
+    root = Path(data_dir) / "meetings"
+    if not root.is_dir():
+        return []
+    metas: list[dict] = []
+    for meta_path in sorted(root.glob("*/meta.json"), reverse=True):
+        try:
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if not isinstance(meta, dict) or "id" not in meta:
+            continue
+        meta["has_analysis"] = (meta_path.parent / "analysis.md").is_file()
+        metas.append(meta)
+    metas.sort(key=lambda item: str(item.get("recorded_at_utc", "")), reverse=True)
+    return metas
+
+
+def get_meeting(data_dir: Path, meeting_id: str) -> dict | None:
+    """Meta + transcript (+ analysis when present); None when missing.
+
+    The transcript is capped for responses; the stored file keeps everything.
+    """
+    if not _valid_id(meeting_id):
+        return None
+    target = Path(data_dir) / "meetings" / meeting_id
+    meta_path = target / "meta.json"
+    transcript_path = target / "transcript.md"
+    try:
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        transcript = transcript_path.read_text(encoding="utf-8")
+    except (OSError, ValueError):
+        return None
+    if not isinstance(meta, dict):
+        return None
+    truncated = len(transcript) > TRANSCRIPT_RESPONSE_MAX_CHARS
+    if truncated:
+        transcript = (
+            transcript[:TRANSCRIPT_RESPONSE_MAX_CHARS]
+            + "\n\n[Transcript truncated for display; full text stays stored.]"
+        )
+    analysis_path = target / "analysis.md"
+    try:
+        analysis = analysis_path.read_text(encoding="utf-8") if analysis_path.is_file() else None
+    except OSError:
+        analysis = None
+    return {
+        "meta": meta,
+        "transcript": transcript,
+        "transcript_truncated": truncated,
+        "analysis": analysis,
+    }
+
+
+def analyze_meeting(
+    data_dir: Path,
+    meeting_id: str,
+    *,
+    client,
+    model_id: str,
+    route_id: str,
+    confirm_external: bool,
+) -> dict:
+    """Extract action items via the given (allowance-routed) client.
+
+    Requires explicit per-call external confirmation; records the model,
+    route, and confirmation in the meeting meta next to the analysis.
+    Raises KeyError (missing meeting), ValueError (refusals), and
+    propagates model-call failures to the caller.
+    """
+    from ai_provider import AIMessage, AIRequest, MessageRole, PrivacyClass
+
+    if not confirm_external:
+        raise ValueError("external analysis requires explicit confirmation")
+    if not _valid_id(meeting_id):
+        raise KeyError(meeting_id)
+    target = Path(data_dir) / "meetings" / meeting_id
+    try:
+        transcript = (target / "transcript.md").read_text(encoding="utf-8")
+        meta = json.loads((target / "meta.json").read_text(encoding="utf-8"))
+    except OSError:
+        raise KeyError(meeting_id) from None
+    if not isinstance(meta, dict):
+        raise KeyError(meeting_id)
+    truncated = len(transcript) > ANALYSIS_INPUT_MAX_CHARS
+    model_input = transcript
+    if truncated:
+        model_input = (
+            transcript[:ANALYSIS_INPUT_MAX_CHARS]
+            + "\n\n[Transcript truncated to fit the analysis window; "
+            "items below may miss the tail end.]"
+        )
+    request = AIRequest(
+        messages=(
+            AIMessage(MessageRole.SYSTEM, ANALYSIS_SYSTEM_PROMPT),
+            AIMessage(MessageRole.USER, model_input),
+        ),
+        privacy_class=PrivacyClass.EXTERNAL_ALLOWED,
+    )
+    response = client.complete(request)
+    analysis = (response.message.content or "").strip()
+    if not analysis:
+        raise ValueError("analysis model returned no content")
+    (target / "analysis.md").write_text(analysis, encoding="utf-8")
+    meta.update(
+        {
+            "analyzed_at_utc": datetime.now(UTC).isoformat(),
+            "analysis_model": model_id,
+            "analysis_route": route_id,
+            "external_confirmed": True,
+            "analysis_input_truncated": truncated,
+        }
+    )
+    (target / "meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
+    return {"analysis": analysis, "truncated": truncated, "model": model_id, "route": route_id}

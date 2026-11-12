@@ -791,6 +791,96 @@ async function renderProjects(id) {
   });
 }
 
+async function renderMeetings(id) {
+  if (id) {
+    const payload = await api("/api/meetings/" + encodeURIComponent(id));
+    const meta = payload.meta;
+    const analyzed = payload.analysis ? "analyzed" : "transcript-only";
+    view.innerHTML = `<h1>Meeting</h1><p><a href="#/meetings">All meetings</a></p>
+      <div class="card"><h2>${esc(meta.id)}</h2>
+      <p><span class="pill st-${analyzed}">${analyzed}</span>
+      <span class="muted">${esc(meta.recorded_at_utc || "")} · ${esc(String(meta.clips || 0))} clips · ${esc(meta.engine_id || "")}</span></p>
+      <p class="muted">Retention purges after ${esc(meta.purge_after_utc || "")}.</p>
+      <h3>Transcript</h3><p class="inbox-body">${gtext(payload.transcript || "")}</p>
+      ${payload.transcript_truncated ? '<p class="muted">Transcript truncated for display.</p>' : ""}
+      <h3>Action items</h3>
+      ${payload.analysis ? `<p class="inbox-body">${gtext(payload.analysis)}</p>
+      <p class="muted">Model ${esc(meta.analysis_model || "")} via ${esc(meta.analysis_route || "")} · ${esc(meta.analyzed_at_utc || "")}</p>` : `
+      <form id="analyze-form" class="inline">
+        <input type="checkbox" name="confirm" title="Confirm this transcript may be sent to external model providers for action-item analysis">
+        <span class="muted">I confirm this transcript may be sent to external model providers for action-item analysis.</span>
+        <button type="submit" title="Extract action items through allowance-routed analysis">Analyze</button>
+      </form>`}</div>`;
+    const form = document.getElementById("analyze-form");
+    if (form) form.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      if (!ev.target.confirm.checked) {
+        toast("Tick the confirmation box to allow external analysis", false);
+        return;
+      }
+      try {
+        await api("/api/meetings/" + encodeURIComponent(id) + "/analyze", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({confirm_external: true}),
+        });
+        toast("Analysis stored", true);
+        render();
+      } catch (err) {
+        toast(err.message, false);
+      }
+    });
+    return;
+  }
+  const payload = await api("/api/meetings");
+  const items = payload.items.length
+    ? payload.items.map((t) =>
+        `<li><a href="#/meetings/${esc(t.id)}">${esc(t.id)}</a>
+         <span class="muted">${esc(t.recorded_at_utc || "")} · ${esc(String(t.clips || 0))} clips</span>
+         <span class="pill st-${t.has_analysis ? "analyzed" : "transcript-only"}">${t.has_analysis ? "analyzed" : "transcript-only"}</span></li>`).join("")
+    : '<li class="muted">No meetings stored yet.</li>';
+  view.innerHTML = `<h1>Meetings</h1>
+    <p class="muted">Recorded meetings with local transcripts. Analysis runs only on explicit confirmation.</p>
+    <p><input type="text" id="filter-meetings" placeholder="Filter meetings..." title="Filter meetings by text"></p>
+    <ul class="plain" id="meetings-list">${items}</ul>
+    <div class="card"><h2>Upload meeting audio</h2>
+    <form id="meeting-form" class="inline">
+      <input type="file" name="audio" accept="audio/wav" title="Meeting recording (WAV only)">
+      <input type="text" name="language" placeholder="Language (en/pl)..." title="Spoken language code" value="">
+      <input type="number" name="retention" placeholder="Retention days..." title="Retention days before auto-purge" value="">
+      <input type="checkbox" name="consent" title="Client consented to recording, local storage, and optional AI action-item analysis via external model providers">
+      <span class="muted">Client consented to recording, local storage, and optional AI action-item analysis via external model providers.</span>
+      <button type="submit" title="Transcribe and store this meeting">Upload meeting</button>
+    </form></div>`;
+  document.getElementById("filter-meetings").addEventListener("input", (ev) => filterList("meetings-list", ev.target.value));
+  document.getElementById("meeting-form").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const file = ev.target.audio.files[0];
+    if (!file) {
+      toast("Choose a WAV file first", false);
+      return;
+    }
+    if (!ev.target.consent.checked) {
+      toast("Client consent attestation is required", false);
+      return;
+    }
+    try {
+      const data = new FormData();
+      data.append("audio", file);
+      data.append("language", ev.target.language.value || "en");
+      if (ev.target.retention.value) data.append("retention_days", ev.target.retention.value);
+      data.append("consent", "yes");
+      const res = await fetch("/api/meetings/transcribe", {method: "POST", body: data});
+      const out = await res.json();
+      if (!out.ok) throw new Error(out.error || "Upload failed");
+      toast("Meeting transcribed", true);
+      location.hash = "#/meetings/" + out.id;
+    } catch (err) {
+      toast(err.message, false);
+    }
+  });
+}
+
 async function renderRuns(id) {
   if (id) {
     stopRunsPoll();
@@ -1842,6 +1932,7 @@ async function render() {
     else if (name === "backlog") await renderBacklog(id);
     else if (name === "workflows") await renderWorkflows(id);
     else if (name === "projects") await renderProjects(id);
+    else if (name === "meetings") await renderMeetings(id);
     else if (name === "documents") await renderDocuments(id);
     else if (name === "intake") await renderIntake();
     else if (name === "schedule") await renderSchedule();

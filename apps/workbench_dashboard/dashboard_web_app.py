@@ -38,6 +38,7 @@ from ai_orchestrator.spend_ledger import (
 )
 from ai_provider.adapters.meta_asr import MetaAsrEngine
 from ai_provider.chat_transcripts import SQLiteChatTranscriptStore
+from ai_provider.errors import ProviderError
 from ai_provider.secrets import read_secret_key
 from ai_provider.stt import (
     STT_BODY_MAX_BYTES,
@@ -69,7 +70,10 @@ from document_library import DocumentLibrary
 from drain_scheduler import DrainScheduler
 from meeting_notes import (
     MEETING_BODY_MAX_BYTES,
+    analyze_meeting,
     assemble_transcript,
+    get_meeting,
+    list_meetings,
     parse_meeting_form,
     split_wav_clips,
     store_meeting,
@@ -442,6 +446,55 @@ def fleet_explain(repo_root: Path) -> dict[str, str]:
     return found
 
 
+def _resolve_analysis_client(config, repo_root: Path):
+    """Forced auto-route client for meeting analysis (owner inbox decision B).
+
+    Always routes through the orchestrator with EXTERNAL_ALLOWED privacy and
+    the allowances tier; never silently falls back to local. Raises
+    ValueError with the reason when no allowance route is available.
+    """
+    from ai_orchestrator import CostPolicyTier, load_model_catalog, prepare_execution
+    from ai_orchestrator.models import PrivacyClass as OrchestratorPrivacy
+    from ai_orchestrator.models import TaskProfile, TaskType
+    from ai_orchestrator.route_outcomes import OUTCOMES_FILENAME, load_quality_adjustments
+    from ai_provider.config import BackendConfig, ProviderKind
+    from ai_provider.factory import create_chat_client
+    from ai_provider.user_config import active_cost_exemptions, load_user_config
+
+    try:
+        catalog_path = (
+            Path(config.catalog_path)
+            if config.catalog_path
+            else repo_root / "packages/ai_orchestrator/examples/model_catalog.toml"
+        )
+        catalog = load_model_catalog(catalog_path)
+        user_config = load_user_config(repo_root / "user-config.toml")
+        profile = TaskProfile(
+            task_type=TaskType.EXTRACTION,
+            privacy_class=OrchestratorPrivacy.EXTERNAL_ALLOWED,
+            cost_policy_tier=CostPolicyTier.ALLOWANCES_ALLOWED,
+        )
+        result = prepare_execution(
+            "meeting action-item analysis",
+            profile,
+            catalog,
+            review_prompt=False,
+            cost_exemptions=active_cost_exemptions(user_config),
+            quality_adjustments=load_quality_adjustments(
+                repo_root / "artifacts" / OUTCOMES_FILENAME
+            ),
+        )
+        if result.execution_plan is None:
+            raise ValueError(result.failure_reason or "no execution plan")
+        target = result.execution_plan.target
+        client = create_chat_client(
+            BackendConfig(provider=ProviderKind(target.provider), model=target.model)
+        )
+    except (ValueError, ProviderError) as exc:
+        raise ValueError(f"allowance route unavailable: {exc}") from exc
+    return client, target.model, target.route_id
+
+
 def fleet_status(repo_root: Path, stores) -> dict[str, Any]:
     """Aggregate live fleet probes; every probe is fail-soft."""
     explain = fleet_explain(repo_root)
@@ -496,6 +549,10 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
     # Owner-sleep launcher seam. None means the real hidden helper spawn;
     # tests inject a fake that writes a receipt instead.
     sleep_launcher = None
+    # Meeting-analysis client seam. None means production auto-route
+    # resolution per request; tests inject a fake returning
+    # (client, model_id, route_id).
+    analysis_client_factory: Callable[[], tuple[Any, str, str]] | None = None
     spend_ledger: ClassVar[SpendLedger | None] = None
     chat_translator: Translator | None = None
     drain_executor_factory: ClassVar[Callable[[], Executor] | None] = None
@@ -663,6 +720,10 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 return self._send_item(self._stores().workflows, path[len("/api/workflows/") :])
             if path == "/api/sleep":
                 return self._send_json({"ok": True, **timer_state(self.repo_root)})
+            if path == "/api/meetings":
+                return self._send_json({"ok": True, "items": list_meetings(self.data_dir)})
+            if path.startswith("/api/meetings/"):
+                return self._send_meeting(path[len("/api/meetings/") :])
         except (StoreError, ValueError) as exc:
             return self._send_json({"ok": False, "error": str(exc)}, status=400)
         return self._send_json({"ok": False, "error": "Unknown endpoint"}, status=404)
@@ -691,6 +752,9 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 return self._schedule_sleep(payload)
             if path == "/api/sleep/cancel":
                 return self._send_json({"ok": True, **cancel_owner_sleep(self.repo_root)})
+            if path.startswith("/api/meetings/") and path.endswith("/analyze"):
+                meeting_id = path[len("/api/meetings/") : -len("/analyze")]
+                return self._analyze_meeting_endpoint(config, meeting_id, payload)
             if path == "/api/chat/sessions":
                 return self._create_chat_session(config, payload)
             if path.startswith("/api/chat/sessions/") and path.endswith("/messages"):
@@ -1842,6 +1906,45 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         except ValueError as exc:
             status = 400 if str(exc).startswith("delay must be") else 409
             return self._send_json({"ok": False, "error": str(exc)}, status=status)
+        self._send_json({"ok": True, **outcome})
+
+    def _send_meeting(self, meeting_id: str) -> None:
+        record = get_meeting(self.data_dir, meeting_id)
+        if record is None:
+            return self._send_json({"ok": False, "error": "Not found"}, status=404)
+        self._send_json({"ok": True, **record})
+
+    def _analyze_meeting_endpoint(self, config, meeting_id: str, payload: dict) -> None:
+        confirm = payload.get("confirm_external", False)
+        if confirm is not True:
+            return self._send_json(
+                {"ok": False, "error": "external analysis requires explicit confirmation"},
+                status=409,
+            )
+        try:
+            if self.analysis_client_factory is not None:
+                client, model_id, route_id = self.analysis_client_factory()
+            else:
+                client, model_id, route_id = _resolve_analysis_client(config, self.repo_root)
+        except ValueError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=503)
+        try:
+            outcome = analyze_meeting(
+                self.data_dir,
+                meeting_id,
+                client=client,
+                model_id=model_id,
+                route_id=route_id,
+                confirm_external=True,
+            )
+        except KeyError:
+            return self._send_json({"ok": False, "error": "Not found"}, status=404)
+        except ValueError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=502)
+        except ProviderError as exc:
+            return self._send_json(
+                {"ok": False, "error": f"analysis model failed: {exc}"}, status=502
+            )
         self._send_json({"ok": True, **outcome})
 
     def _transcribe_audio(self) -> None:

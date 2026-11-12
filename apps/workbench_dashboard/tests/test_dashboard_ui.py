@@ -58,8 +58,8 @@ def test_static_controls_have_titles() -> None:
         assert "title=" in tag, f"button without title: {tag}"
     nav_links = re.findall(r"<a\b[^>]*data-view[^>]*>", html)
     assert (
-        len(nav_links) == 17
-    )  # +intake, +restrictions, +fleet, +providers, +help, +backlog, +knowme, +workflows, +projects
+        len(nav_links) == 18
+    )  # +intake, +restrictions, +fleet, +providers, +help, +backlog, +knowme, +workflows, +projects, +meetings
     for tag in nav_links:
         assert "title=" in tag, f"nav link without title: {tag}"
 
@@ -69,8 +69,8 @@ def test_dynamic_buttons_have_titles() -> None:
     js = _read("app.js")
     buttons = re.findall(r"<button\b[^>]*>", js)
     assert (
-        len(buttons) == 36
-    )  # +report/rename/delete/submit/create/cancel/run-request/staged-approve/staged-reject/dictate/intake-approve/draft-plan/drain/reopen/providers-refresh/propose/backlog-groom/backlog-promote +8 workflow composer +3 projects tab +2 sleep card
+        len(buttons) == 38
+    )  # +report/rename/delete/submit/create/cancel/run-request/staged-approve/staged-reject/dictate/intake-approve/draft-plan/drain/reopen/providers-refresh/propose/backlog-groom/backlog-promote +8 workflow composer +3 projects tab +2 sleep card +2 meetings tab
     for tag in buttons:
         assert "title=" in tag, f"button without title: {tag}"
 
@@ -80,8 +80,8 @@ def test_dynamic_inputs_and_selects_have_titles() -> None:
     js = _read("app.js")
     inputs = [tag for tag in re.findall(r"<input\b[^>]*>", js) if 'type="radio"' not in tag]
     assert (
-        len(inputs) == 36
-    )  # +rename/create-form inputs, +5 list filters, +idea plan link, +task propose, +backlog filter/decision/create-title/create-ref, +restriction toggle, +8 workflow composer, +6 projects tab +1 sleep delay
+        len(inputs) == 42
+    )  # +rename/create-form inputs, +5 list filters, +idea plan link, +task propose, +backlog filter/decision/create-title/create-ref, +restriction toggle, +8 workflow composer, +6 projects tab +1 sleep delay, +6 meetings tab
     for tag in inputs:
         assert "title=" in tag, f"input without title: {tag}"
     selects = re.findall(r"<select\b[^>]*>", js)
@@ -143,6 +143,17 @@ def test_projects_tab_manages_books() -> None:
     assert "/manuscript" in js
     assert "Request check" in js
     assert "do not rewrite prose" not in js  # framing lives server-side
+
+
+def test_meetings_tab_uploads_and_confirms_analysis() -> None:
+    """Meetings list/detail uploads audio and gates analysis on confirmation."""
+    js = _read("app.js")
+    html = _read("index.html")
+    assert 'data-view="meetings"' in html
+    assert "renderMeetings" in js
+    assert "/api/meetings/transcribe" in js
+    assert "/analyze" in js
+    assert "external model providers" in js
 
 
 def test_ideas_label_explains_triage() -> None:
