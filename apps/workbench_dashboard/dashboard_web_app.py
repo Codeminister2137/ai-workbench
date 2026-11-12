@@ -2324,7 +2324,9 @@ def build_run_drain(
     )
 
 
-def maybe_start_drain_scheduler(config_path: Path, data_dir: Path) -> DrainScheduler | None:
+def maybe_start_drain_scheduler(
+    config_path: Path, data_dir: Path, *, repo_root: Path | None = None
+) -> DrainScheduler | None:
     """Start periodic drains when configured; never raises."""
     try:
         config = load_config(config_path)
@@ -2334,6 +2336,7 @@ def maybe_start_drain_scheduler(config_path: Path, data_dir: Path) -> DrainSched
     if not should_start_drain_scheduler(config):
         return None
     stores = DashboardStores(data_dir)
+    drain_root = repo_root or REPO_ROOT
 
     def tick() -> None:
         from inbox_bridge import bridge_agent_queue
@@ -2345,7 +2348,7 @@ def maybe_start_drain_scheduler(config_path: Path, data_dir: Path) -> DrainSched
             bridged = []
         if bridged:
             print(f"Workbench dashboard: bridged {len(bridged)} inbox tasks to runs")
-        drain = build_run_drain(config, data_dir, REPO_ROOT, stores)
+        drain = build_run_drain(config, data_dir, drain_root, stores)
         outcomes = drain.drain(max_runs=SCHEDULER_DRAIN_MAX_RUNS)
         print(f"Workbench dashboard: scheduled drain: {outcomes}")
 
@@ -2400,7 +2403,7 @@ def main() -> None:
         print(f"Workbench dashboard: pidfile unwritable, supervisor restarts unavailable: {exc}")
     try:
         DashboardRequestHandler.drain_scheduler = maybe_start_drain_scheduler(
-            args.config, args.data_dir
+            args.config, args.data_dir, repo_root=state_root
         )
     except Exception as exc:  # noqa: BLE001 - scheduler must never block serving
         print(f"Workbench dashboard: drain scheduler failed to start: {exc}")
