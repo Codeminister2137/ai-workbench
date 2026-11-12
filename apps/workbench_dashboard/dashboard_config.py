@@ -33,6 +33,8 @@ class DashboardConfig:
     catalog_path: str | None = None
     mai_backend: str = "in-process"
     seller: dict | None = None
+    product_tier: str = "tooling"
+    serve_branch: str = "develop"
 
 
 def load_config(path: Path = DEFAULT_CONFIG_PATH) -> DashboardConfig:
@@ -63,6 +65,8 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> DashboardConfig:
         "catalog_path": (str, type(None)),
         "mai_backend": str,
         "seller": (dict, type(None)),
+        "product_tier": str,
+        "serve_branch": str,
     }
     values: dict[str, object] = {}
     for key, types in known.items():
@@ -100,6 +104,14 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> DashboardConfig:
     backend = values.get("mai_backend", "in-process")
     if backend not in ("in-process", "subprocess"):
         raise ValueError("Dashboard config key 'mai_backend' must be in-process or subprocess")
+    tier = values.get("product_tier", "tooling")
+    if tier not in ("special", "commercial", "tooling", "hobby"):
+        raise ValueError(
+            "Dashboard config key 'product_tier' must be special, commercial, tooling, or hobby"
+        )
+    branch = values.get("serve_branch", "develop")
+    if not isinstance(branch, str) or not branch.strip():
+        raise ValueError("Dashboard config key 'serve_branch' must be a non-empty string")
     return DashboardConfig(**values)  # type: ignore[arg-type]
 
 

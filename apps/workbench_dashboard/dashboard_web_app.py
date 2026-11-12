@@ -276,6 +276,7 @@ def meta_stt_key() -> str | None:
 
 FLEET_TASKS = (
     "WorkbenchDashboard",
+    "WorkbenchDashboardSupervisor",
     "MsiUdpWatchdog",
     "UDPPortExhaustionTrap",
     "CloneScan",
@@ -284,6 +285,97 @@ FLEET_TASKS = (
     "WorkbenchWeeklyDigest",
 )
 FLEET_TERMINAL_RUN_STATUSES = frozenset({"completed", "failed", "cancelled", "canceled", "merged"})
+MAINTENANCE_FILENAME = "maintenance.json"
+
+
+SERVE_VERSION_FILENAME = "serve-version.json"
+
+
+def _with_tier(info: dict[str, Any], config_path: Path | None) -> dict[str, Any]:
+    if config_path is not None:
+        try:
+            config = load_config(config_path)
+        except (ValueError, OSError):
+            pass
+        else:
+            info["tier"] = config.product_tier
+            info["serve_branch"] = config.serve_branch
+    try:
+        import ai_agent
+
+        info["packages_root"] = str(Path(ai_agent.__file__).resolve().parent.parent)
+    except (ImportError, AttributeError, TypeError, OSError):
+        pass
+    return info
+
+
+def capture_server_version(
+    repo_root: Path, *, config_path: Path | None = None, data_dir: Path | None = None
+) -> dict[str, Any]:
+    """Best-effort served-commit snapshot for /api/version (never raises).
+
+    Prefers the supervisor-written version file; falls back to git on the
+    code checkout (detached serve worktrees report their commit with an
+    unknown branch, corrected by the file when present).
+    """
+    info: dict[str, Any] = {
+        "branch": "unknown",
+        "commit": "unknown",
+        "started_utc": datetime.now(UTC).isoformat(),
+        "tier": "tooling",
+        "serve_branch": "develop",
+    }
+    if data_dir is not None:
+        try:
+            filed = json.loads(
+                (Path(data_dir) / SERVE_VERSION_FILENAME).read_text(encoding="utf-8")
+            )
+        except (OSError, ValueError):
+            filed = None
+        if isinstance(filed, dict):
+            if isinstance(filed.get("branch"), str) and filed["branch"]:
+                info["branch"] = filed["branch"]
+            if isinstance(filed.get("commit"), str) and filed["commit"]:
+                info["commit"] = filed["commit"]
+            return _with_tier(info, config_path)
+    try:
+        branch = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        commit = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.SubprocessError):
+        pass
+    else:
+        if branch.returncode == 0 and branch.stdout.strip():
+            info["branch"] = branch.stdout.strip()
+        if commit.returncode == 0 and commit.stdout.strip():
+            info["commit"] = commit.stdout.strip()
+    return _with_tier(info, config_path)
+
+
+def read_maintenance(data_dir: Path) -> dict[str, Any]:
+    """Maintenance banner state written by the supervisor (fail-soft)."""
+    try:
+        payload = json.loads((Path(data_dir) / MAINTENANCE_FILENAME).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {"active": False}
+    if not isinstance(payload, dict):
+        return {"active": False}
+    return {
+        "active": bool(payload.get("active")),
+        "message": str(payload.get("message") or ""),
+        "since_utc": payload.get("since_utc"),
+    }
 
 
 def _fleet_task_script() -> str:
@@ -638,6 +730,9 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
     drain_executor_factory: ClassVar[Callable[[], Executor] | None] = None
     # Live scheduler handle (None when off). Set once in main(); read by _status.
     drain_scheduler: ClassVar[DrainScheduler | None] = None
+    # Served-commit snapshot. Set once in main(); tests inject directly.
+    # Named served_* to avoid BaseHTTPRequestHandler.server_version.
+    served_version: ClassVar[dict[str, Any] | None] = None
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(STATIC_ROOT), **kwargs)
@@ -804,6 +899,13 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 return self._send_item(self._stores().workflows, path[len("/api/workflows/") :])
             if path == "/api/sleep":
                 return self._send_json({"ok": True, **timer_state(self.repo_root)})
+            if path == "/api/version":
+                version = dict(type(self).served_version or {})
+                version.setdefault("branch", "unknown")
+                version.setdefault("commit", "unknown")
+                return self._send_json({"ok": True, **version})
+            if path == "/api/maintenance":
+                return self._send_json({"ok": True, **read_maintenance(self.data_dir)})
             if path == "/api/meetings":
                 return self._send_json({"ok": True, "items": list_meetings(self.data_dir)})
             if path.startswith("/api/meetings/"):
@@ -2259,6 +2361,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
     parser.add_argument("--data-dir", type=Path, default=DEFAULT_DATA_DIR)
+    parser.add_argument(
+        "--repo-root",
+        type=Path,
+        default=None,
+        help="State root for receipts/docs (.env, .tmp, window status). Defaults to the code checkout; the serve worktree points it at the main checkout.",
+    )
     return parser
 
 
@@ -2266,11 +2374,30 @@ def main() -> None:
     args = build_parser().parse_args()
     from ai_provider.secrets import load_dotenv
 
-    loaded = load_dotenv(REPO_ROOT)
+    loaded = load_dotenv(args.repo_root or REPO_ROOT)
     if loaded:
         print(f"Workbench dashboard: secret store loaded ({len(loaded)} keys by name)")
     DashboardRequestHandler.config_path = args.config
     DashboardRequestHandler.data_dir = args.data_dir
+    state_root = args.repo_root or REPO_ROOT
+    DashboardRequestHandler.repo_root = state_root
+    DashboardRequestHandler.served_version = capture_server_version(
+        REPO_ROOT, config_path=args.config, data_dir=args.data_dir
+    )
+    try:
+        (args.data_dir / "dashboard.pid").write_text(
+            json.dumps(
+                {
+                    "pid": os.getpid(),
+                    "argv": [sys.executable, *sys.argv],
+                    "cwd": os.getcwd(),
+                    "started_utc": datetime.now(UTC).isoformat(),
+                }
+            ),
+            encoding="utf-8",
+        )
+    except OSError as exc:
+        print(f"Workbench dashboard: pidfile unwritable, supervisor restarts unavailable: {exc}")
     try:
         DashboardRequestHandler.drain_scheduler = maybe_start_drain_scheduler(
             args.config, args.data_dir
