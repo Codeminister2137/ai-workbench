@@ -132,3 +132,54 @@ def test_shared_builder_drains_seeded_run(tmp_path: Path) -> None:
     outcomes = drain.drain(max_runs=1)
     assert calls == ["r1"]
     assert outcomes[0]["status"] == "completed"
+
+
+def _capture_tick(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, **kwargs):
+    import dashboard_web_app as webapp
+
+    config_path = tmp_path / "dashboard.json"
+    config_path.write_text(json.dumps({"drain_interval_seconds": 300}), encoding="utf-8")
+    data_dir = tmp_path / "data"
+    seen: dict = {}
+    ticks: list = []
+
+    class FakeScheduler:
+        def __init__(self, tick, interval: float) -> None:
+            ticks.append(tick)
+            self.interval = interval
+
+        def start(self) -> bool:
+            return True
+
+    def fake_build(config, data, root, stores):
+        seen["repo_root"] = root
+
+        class FakeDrain:
+            def drain(self, max_runs: int = 1):
+                return []
+
+        return FakeDrain()
+
+    monkeypatch.setattr(webapp, "DrainScheduler", FakeScheduler)
+    monkeypatch.setattr(webapp, "build_run_drain", fake_build)
+    scheduler = webapp.maybe_start_drain_scheduler(config_path, data_dir, **kwargs)
+    assert scheduler is not None
+    assert len(ticks) == 1
+    ticks[0]()
+    return seen["repo_root"]
+
+
+def test_scheduled_tick_drains_with_configured_repo_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sentinel = tmp_path / "main-tree"
+    sentinel.mkdir()
+    assert _capture_tick(monkeypatch, tmp_path, repo_root=sentinel) == sentinel
+
+
+def test_scheduled_tick_defaults_to_module_repo_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import dashboard_web_app as webapp
+
+    assert _capture_tick(monkeypatch, tmp_path) == webapp.REPO_ROOT
