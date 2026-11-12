@@ -19,6 +19,7 @@ from ai_provider import (
     MessageRole,
     PrivacyClass,
     ProviderError,
+    ProviderErrorCategory,
     UsageMetadata,
 )
 
@@ -133,20 +134,131 @@ def test_compaction_thrash_limit_refuses_instead_of_looping(tmp_path) -> None:
         )
 
 
-def test_compaction_rejects_empty_summary(tmp_path) -> None:
+def test_compaction_falls_back_on_empty_summary(tmp_path) -> None:
     client = CompactingClient(summary_text="   ")
-    with pytest.raises(ProviderError, match="empty summary"):
-        _loop(
-            client,
-            tmp_path,
-            max_iterations=5,
-            loop_context_budget_chars=950,
-            compaction_tail_messages=2,
-        ).run(
-            system_prompt="SYS",
-            prompt="Create the output file, then report completion. " + "x" * 350,
-            privacy_class=PrivacyClass.LOCAL_ONLY,
-        )
+    result = _loop(
+        client,
+        tmp_path,
+        max_iterations=5,
+        loop_context_budget_chars=950,
+        compaction_tail_messages=2,
+    ).run(
+        system_prompt="SYS",
+        prompt="Create the output file, then report completion. " + "x" * 350,
+        privacy_class=PrivacyClass.LOCAL_ONLY,
+    )
+    assert result.compactions == 1
+    markers = [
+        message.content
+        for message in result.messages
+        if message.role is MessageRole.SYSTEM and "mechanical fallback" in message.content
+    ]
+    assert len(markers) == 1
+    assert "empty model summary" in markers[0] and "Do not claim" in markers[0]
+
+
+def test_compaction_retries_empty_summary_once(tmp_path) -> None:
+    class FlakyClient(CompactingClient):
+        def __init__(self) -> None:
+            super().__init__(summary_text="SUMMARY: recovered")
+            self.compaction_calls = 0
+
+        def complete(self, request):
+            if request.metadata.get("task_type") == "loop_compaction":
+                self.compaction_calls += 1
+                if self.compaction_calls == 1:
+                    return AIResponse(
+                        message=AIMessage(MessageRole.ASSISTANT, "  "),
+                        backend=self.backend,
+                    )
+            return super().complete(request)
+
+    result = _loop(
+        FlakyClient(),
+        tmp_path,
+        max_iterations=5,
+        loop_context_budget_chars=950,
+        compaction_tail_messages=2,
+    ).run(
+        system_prompt="SYS",
+        prompt="Create the output file, then report completion. " + "x" * 350,
+        privacy_class=PrivacyClass.LOCAL_ONLY,
+    )
+    assert result.compactions == 1
+    assert not any("mechanical fallback" in m.content for m in result.messages)
+    assert any("SUMMARY: recovered" in m.content for m in result.messages)
+
+
+def test_compaction_falls_back_on_summarizer_error(tmp_path) -> None:
+    class FailingClient(CompactingClient):
+        def complete(self, request):
+            if request.metadata.get("task_type") == "loop_compaction":
+                raise ProviderError(
+                    "boom",
+                    category=ProviderErrorCategory.TIMEOUT,
+                    provider=self.backend.provider,
+                )
+            return super().complete(request)
+
+    result = _loop(
+        FailingClient(),
+        tmp_path,
+        max_iterations=5,
+        loop_context_budget_chars=950,
+        compaction_tail_messages=2,
+    ).run(
+        system_prompt="SYS",
+        prompt="Create the output file, then report completion. " + "x" * 350,
+        privacy_class=PrivacyClass.LOCAL_ONLY,
+    )
+    assert result.compactions == 1
+    assert any(
+        "mechanical fallback" in m.content and "summarizer failed" in m.content
+        for m in result.messages
+    )
+
+
+def test_tool_message_content_is_capped_with_marker(tmp_path) -> None:
+    from ai_agent.loop import TOOL_MESSAGE_MAX_CHARS
+
+    class LoudClient(CompactingClient):
+        def complete(self, request):
+            self.requests.append(request)
+            if request.metadata.get("task_type") == "loop_compaction":
+                return super().complete(request)
+            self.task_calls += 1
+            if self.task_calls == 1:
+                message = AIMessage(
+                    MessageRole.ASSISTANT,
+                    "",
+                    tool_calls=(AIToolCall("call-1", "read_file", {"path": "big.txt"}),),
+                )
+            else:
+                message = AIMessage(MessageRole.ASSISTANT, "Finished")
+            return AIResponse(
+                message=message,
+                backend=self.backend,
+                finish_reason=FinishReason.STOP,
+                usage=UsageMetadata(),
+            )
+
+    (tmp_path / "big.txt").write_text("y" * (TOOL_MESSAGE_MAX_CHARS + 5000), encoding="utf-8")
+    from ai_agent.tools.base import ToolRegistry
+    from ai_agent.tools.filesystem import ReadFileTool
+
+    loop = AgentLoop(
+        LoudClient(),
+        ToolRegistry((ReadFileTool(),)),
+        ToolContext(tmp_path),
+        permissions=PermissionManager(policy=PermissionPolicy.permissive()),
+        max_iterations=5,
+    )
+    result = loop.run("Read it.", privacy_class=PrivacyClass.LOCAL_ONLY)
+    tool_messages = [m for m in result.messages if m.role is MessageRole.TOOL]
+    assert len(tool_messages) == 1
+    assert len(tool_messages[0].content) < TOOL_MESSAGE_MAX_CHARS + 500
+    assert "Output truncated" in tool_messages[0].content
+    assert len(result.tool_results[0].output) > TOOL_MESSAGE_MAX_CHARS + 5000
 
 
 def test_compaction_validates_budgets(tmp_path) -> None:

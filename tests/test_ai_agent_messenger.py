@@ -146,6 +146,49 @@ def test_messenger_empty_answer_falls_back_to_receipts(tmp_path: Path) -> None:
     assert result.tool_receipts == ("read_file",)
 
 
+def test_messenger_salvages_empty_answer_from_evidence(tmp_path: Path) -> None:
+    (tmp_path / "notes.txt").write_text("hello workspace", encoding="utf-8")
+    client = FakeClient(
+        [
+            _tool_message("read_file", {"path": "notes.txt"}),
+            AIMessage(MessageRole.ASSISTANT, ""),
+            AIMessage(MessageRole.ASSISTANT, "Composed from evidence."),
+        ]
+    )
+    result = run_messenger_turn(
+        client=client,
+        workspace_root=tmp_path,
+        history_text="",
+        prompt="What is in notes.txt?",
+        system_prompt="Be brief.",
+    )
+    assert result.answer == "Composed from evidence."
+    assert result.tool_receipts == ("read_file",)
+    assert result.iterations == 3
+    assert result.hit_iteration_limit is False
+
+
+def test_messenger_salvages_iteration_limit_with_receipts(tmp_path: Path) -> None:
+    client = FakeClient(
+        [
+            _tool_message("list_dir", {"path": "."}),
+            AIMessage(MessageRole.ASSISTANT, "Composed after limit."),
+        ]
+    )
+    result = run_messenger_turn(
+        client=client,
+        workspace_root=tmp_path,
+        history_text="",
+        prompt="Keep listing.",
+        system_prompt="Be brief.",
+        max_iterations=1,
+    )
+    assert result.answer == "Composed after limit."
+    assert result.tool_receipts == ("list_dir",)
+    assert result.hit_iteration_limit is True
+    assert result.iterations == 2
+
+
 def test_messenger_empty_answer_without_receipts(tmp_path: Path) -> None:
     client = FakeClient([AIMessage(MessageRole.ASSISTANT, "   ")])
     result = run_messenger_turn(
