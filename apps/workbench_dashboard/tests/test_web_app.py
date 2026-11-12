@@ -200,6 +200,13 @@ def test_ideas_capture_filter_and_triage(dashboard_server) -> None:
     remaining = get_json(dashboard_server, "/api/ideas?status=new")
     assert [item["id"] for item in remaining["items"]] == [mine["id"]]
 
+    done = post_json(
+        dashboard_server,
+        f"/api/ideas/{theirs['id']}/review",
+        {"status": "implemented", "decision": "Shipped"},
+    )
+    assert done["status"] == "implemented"
+
 
 def test_backlog_capture_filter_groom_promote(dashboard_server) -> None:
     made = post_json(

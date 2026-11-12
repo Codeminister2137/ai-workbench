@@ -474,7 +474,7 @@ def test_ideas_archive_tab_and_backlog_markers() -> None:
     js = _read("app.js")
     assert '<a href="#/ideas">Active</a>' in js
     assert '<a href="#/ideas?status=archive">Archive</a>' in js
-    assert '["adopted", "parked", "declined"]' in js
+    assert '["adopted", "parked", "declined", "implemented"]' in js
     assert "archive-only" in js
     assert 'name="plan"' in js
     assert "plan_id: ev.target.plan.value || null" in js
