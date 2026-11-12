@@ -244,25 +244,52 @@ def build_mai_executor(
     backend: str = "subprocess",
     subprocess_timeout_seconds: float = SUBPROCESS_TIMEOUT_SECONDS,
     mai_cmd_prefix: list[str] | None = None,
+    isolate: bool = False,
 ) -> Callable[[dict], dict]:
     """Build a drain ``Executor`` handing runs to Mai sessions.
 
     ``backend="subprocess"`` (default) isolates Mai in a supervised child
     process with timeout recovery; ``backend="in-process"`` runs inline
-    with no timeout (tests and fully trusted setups only).
+    with no timeout (tests and fully trusted setups only). ``isolate``
+    runs Mai in a per-run scratch worktree (``run/<id>``) instead of the
+    shared checkout; setup failures fail the run instead of falling back.
     """
 
     def execute(run: dict) -> dict:
-        argv = build_mai_argv(run, repo_root=repo_root, user_config=user_config, catalog=catalog)
+        root = Path(repo_root)
+        isolated = None
+        if isolate:
+            from run_isolation import IsolationError, create_run_worktree
+
+            try:
+                isolated = create_run_worktree(root, str(run.get("id", "?")))
+            except IsolationError as exc:
+                return {
+                    "status": "failed",
+                    "error": f"run isolation failed: {exc}",
+                    "failure_class": "unknown",
+                    "source": "mai-session",
+                }
+            root = isolated.path
+        argv = build_mai_argv(
+            run,
+            repo_root=root,
+            user_config=(root / "user-config.toml" if isolated else user_config),
+            catalog=catalog,
+        )
         if backend == "subprocess":
             outcome = run_mai_subprocess(
                 argv,
                 cmd_prefix=mai_cmd_prefix,
                 timeout_seconds=subprocess_timeout_seconds,
-                cwd=repo_root,
+                cwd=root,
             )
         else:
             outcome = run_mai_session(argv, runner=runner)
-        return mai_receipt(outcome, argv)
+        receipt = mai_receipt(outcome, argv)
+        if isolated is not None:
+            receipt["worktree"] = str(isolated.path)
+            receipt["branch"] = isolated.branch
+        return receipt
 
     return execute

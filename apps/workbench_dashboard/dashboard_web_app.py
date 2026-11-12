@@ -2395,7 +2395,8 @@ def build_run_drain(
     """Build the approved-runs drain shared by manual and scheduled drains.
 
     The default executor hands each run to a Mai session (Mai routes the
-    model through the orchestrator by criteria); ``executor_factory``
+    model through the orchestrator by criteria) inside a per-run scratch
+    worktree, so agent edits never touch shared checkouts; ``executor_factory``
     overrides it in tests.
     """
     if executor_factory is not None:
@@ -2408,6 +2409,7 @@ def build_run_drain(
             repo_root / "user-config.toml",
             catalog=config.catalog_path or None,
             backend=getattr(config, "mai_backend", "subprocess"),
+            isolate=True,
         )
     return RunDrain(
         runs_dir=data_dir / "runs",
