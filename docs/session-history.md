@@ -4313,6 +4313,29 @@ Bugs filed: f4014078 (scheduled drains used REPO_ROOT=serve tree;
 root fixed, full isolation queued). Timer lesson: `-Rolling` without
 `-Sleep` is a NO-OP; renew with `-Renew -ReceiptPath <startup>`.
 
+## 2026-11-12 gaming session 22:26-1:00 Warsaw (no sleep, light work)
+
+Owner bulk-answered 9 inbox items, then 5 more. Merged 9 branches total:
+7-wave to 1eedc53 (empty-output, ask-minimal, fallback, topbar,
+scheduler-root, subprocess-default, history), then modules-A + keepalive
+to fe05ca2; all pushed + verified + briefs closed; server redeployed.
+
+Mai modules run c5d5a2b2 (orphaned by restart) committed e8d88ec on
+feature/dashboard-modules-a without pushing; adopted after review
+(pin restore + ADR-link fix, df1966a/46bc7a1), pushed + briefed + merged.
+Post-reboot server had run dev-checkout branch code (boot gap); keepalive
+now recovers via supervisor (merged). Chat run-requests pre-approved
+(no self-approval, 144b8e8+brief). Isolation A implemented (381d05f+brief,
+task+decision closed). Redeploy incident: supervisor SIGINT never lands on
+console-less server (banner stuck 22:39); fixed with identity-checked
+SIGTERM escalation (e0bf0af+brief), remediated live via taskkill + tick.
+
+Multi-choice still reported missing (3x); server side doubly proven
+(mine + independent Mai run b9a7a8f6); needs owner browser info.
+Power: monitors-off born 11/11 00:19; tonight first known use + first
+failure (correlation only); resume-path failure stands; controlled test
+queued post-gaming. JS null-safety + API coverage audits clean, no gaps.
+
 ## Standing notes
 
 - Old handoff archived to `docs/session-history.md` (2026-11-05).
