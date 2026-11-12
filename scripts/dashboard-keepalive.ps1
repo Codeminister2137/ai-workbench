@@ -1,8 +1,11 @@
 # Workbench dashboard + Ollama keep-alive.
 #
 # Probes http://127.0.0.1:8766/api/status and http://127.0.0.1:11434/api/tags;
-# starts whichever does not answer. Never stops, kills, or reconfigures
-# anything. Safe to run manually for a status check.
+# recovers whichever does not answer. The dashboard is recovered through the
+# redeploy supervisor (pinned serve-branch worktree + main data/root), never
+# by launching the dev checkout directly: a direct launch serves whatever
+# branch happens to be checked out (proven 2026-11-12: an unmerged feature
+# branch went live after a reboot). Safe to run manually for a status check.
 #
 # Log: <repo>/.tmp/dashboard-keepalive/keepalive.log (gitignored scratch).
 # Scheduled task 'WorkbenchDashboard' runs this every 5 minutes at user logon.
@@ -29,15 +32,10 @@ $failures = @()
 if (Test-Endpoint 'http://127.0.0.1:8766/api/status') {
     'dashboard up at ' + $stamp
 } else {
-    Start-Process -WindowStyle Hidden `
-        -FilePath (Join-Path $repo '.venv\Scripts\python.exe') `
-        -ArgumentList 'dashboard_web_app.py', '--host', '127.0.0.1', '--port', '8766' `
-        -WorkingDirectory (Join-Path $repo 'apps\workbench_dashboard') `
-        -RedirectStandardOutput (Join-Path $env:TEMP 'dashboard-8766.log') `
-        -RedirectStandardError (Join-Path $env:TEMP 'dashboard-8766.err.log')
+    $superviseOut = & (Join-Path $repo 'scripts\dashboard-supervise.cmd') 2>&1 | Out-String
     Start-Sleep -Seconds 5
     $recovered = Test-Endpoint 'http://127.0.0.1:8766/api/status'
-    $line = "$stamp dashboard was down; restart attempted; up_after_restart=$recovered"
+    $line = "$stamp dashboard was down; supervisor tick attempted; up_after_restart=$recovered; tick=$($superviseOut.Trim())"
     $line | Out-File -FilePath $log -Append -Encoding utf8
     $line
     if (-not $recovered) { $failures += 'dashboard' }
