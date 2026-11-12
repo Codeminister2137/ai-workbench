@@ -7,6 +7,7 @@ make Home an optional actionable Overview, and allow a chosen landing page.
 Activation gates specialist dashboard endpoints while preserving data; installed
 code remains on disk. Existing installation remains full-workspace. Optional
 packaging was the broader alternative; A was selected as smaller and reversible.
+See [ADR-086](decisions/ADR-086-dashboard-module-activation.md).
 
 ## Auto-merge B: docs/tests/small-fixes auto on green, opt-in auto/ - owner 2026-11-11
 
