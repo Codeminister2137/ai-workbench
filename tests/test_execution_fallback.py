@@ -392,6 +392,51 @@ def test_overload_can_switch_same_bucket_without_exhausting_account(monkeypatch,
     assert run.overloaded == {"codex"} and not run.exhausted
 
 
+def test_capability_reroute_fails_over_without_exhausting_account(monkeypatch, routes):
+    run = session(monkeypatch, routes)
+    calls = []
+
+    def execute(target, prompt):
+        calls.append(target.route_id)
+        if target.route_id == "codex":
+            raise ProviderError(
+                "Ollama model does not support tools; route to a tool-capable model.",
+                category=ProviderErrorCategory.RETRYABLE,
+            )
+        return "done"
+
+    assert (
+        run.run(
+            "Continue work",
+            execute,
+            lambda value: False,
+            observe=str,
+        )
+        == "done"
+    )
+    assert calls == ["codex", "copilot"]
+    assert run.incapable == {"codex"}
+    assert not run.exhausted and not run.overloaded
+    assert run.attempts[0] == {"route_id": "codex", "status": "capability"}
+
+
+def test_generic_retryable_without_capability_marker_does_not_fail_over(monkeypatch, routes):
+    run = session(monkeypatch, routes)
+    calls = []
+
+    def execute(target, prompt):
+        calls.append(target.route_id)
+        raise ProviderError(
+            "Ollama returned HTTP 500.",
+            category=ProviderErrorCategory.RETRYABLE,
+        )
+
+    with pytest.raises(ProviderError, match="HTTP 500"):
+        run.run("Continue work", execute, lambda value: False, observe=str)
+    assert calls == ["codex"]
+    assert not run.incapable and not run.exhausted and not run.overloaded
+
+
 def test_fallback_continuation_preserves_selected_skill_instructions(monkeypatch, routes):
     run = session(monkeypatch, routes)
     skill = (

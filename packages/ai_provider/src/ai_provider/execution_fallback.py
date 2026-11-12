@@ -69,6 +69,18 @@ def external_model_overload(result: ExternalAgentResult) -> bool:
     return explicit_model_overload((failure or "") + "\n" + result.stderr)
 
 
+_CAPABILITY_REROUTE_MARKERS = (
+    "route to a tool-capable model",
+    "route to a longer-context model",
+)
+
+
+def explicit_capability_reroute(text: str) -> bool:
+    """Recognize known capability reroute messages; never generic retryables."""
+    normalized = text.lower()
+    return any(marker in normalized for marker in _CAPABILITY_REROUTE_MARKERS)
+
+
 class FallbackSession:
     """Bound attempts to preflighted routes and preserve exhaustion across repairs."""
 
@@ -111,6 +123,7 @@ class FallbackSession:
         self.allowance_observations: dict[str, dict[str, Any]] = {}
         self.exhausted: set[str] = set()
         self.overloaded: set[str] = set()
+        self.incapable: set[str] = set()
         self.handoff: dict[str, Any] | None = None
         self.attempts: list[dict[str, str]] = []
         self.ready: dict[str, ExecutionTarget] = {}
@@ -276,7 +289,7 @@ class FallbackSession:
         observe: Callable[[Any], str],
         preserve: Callable[[ExecutionTarget, str], str] | None = None,
     ) -> Any:
-        """Continue comparable work after usage/availability failure; never replay effects."""
+        """Continue comparable work after usage/availability/capability failure; never replay effects."""
 
         current_prompt = prompt
         self.continuation_messages = ()
@@ -289,6 +302,7 @@ class FallbackSession:
         if self.enabled and (
             self.current.billing_source.value in self.exhausted
             or self.current.route_id in self.overloaded
+            or self.current.route_id in self.incapable
         ):
             self._report_progress(
                 "fallback_exhausted: no ready route remains; partial work preserved"
@@ -298,6 +312,7 @@ class FallbackSession:
                 "Partial work and handoff preserved.",
                 category=ProviderErrorCategory.RETRYABLE
                 if self.current.route_id in self.overloaded
+                or self.current.route_id in self.incapable
                 else ProviderErrorCategory.USAGE_LIMIT,
             )
         while True:
@@ -333,19 +348,30 @@ class FallbackSession:
                     and isinstance(result, ExternalAgentResult)
                     and external_model_overload(result)
                 )
+                capability = False
                 observed = observe(result) if limited or overload else ""
             except ProviderError as exc:
                 overload = explicit_model_overload(str(exc)) and exc.category in {
                     ProviderErrorCategory.RETRYABLE,
                     ProviderErrorCategory.UNKNOWN,
                 }
-                if not overload and exc.category not in {
-                    ProviderErrorCategory.RATE_LIMIT,
-                    ProviderErrorCategory.USAGE_LIMIT,
-                }:
+                capability = (
+                    not overload
+                    and exc.category == ProviderErrorCategory.RETRYABLE
+                    and explicit_capability_reroute(str(exc))
+                )
+                if (
+                    not overload
+                    and not capability
+                    and exc.category
+                    not in {
+                        ProviderErrorCategory.RATE_LIMIT,
+                        ProviderErrorCategory.USAGE_LIMIT,
+                    }
+                ):
                     raise
                 error = exc
-                limited = not overload
+                limited = not overload and not capability
                 messages = exc.partial_messages
                 self.continuation_messages += tuple(
                     replace(message, continuation=None) for message in messages
@@ -358,8 +384,8 @@ class FallbackSession:
                     "inspect the current working tree before continuing."
                 )
                 result = None
-            if not (limited or overload) or not self.enabled:
-                if not (limited or overload) and self.deadline is not None:
+            if not (limited or overload or capability) or not self.enabled:
+                if not (limited or overload or capability) and self.deadline is not None:
                     if time.perf_counter() >= self.deadline:
                         raise ProviderError(
                             "Continuation deadline expired after execution; "
@@ -371,11 +397,15 @@ class FallbackSession:
                     raise error
                 return result
             failed = self.current
-            reason = "model_overload" if overload else "usage_limit"
+            reason = (
+                "model_overload" if overload else ("capability" if capability else "usage_limit")
+            )
             self.attempts.append({"route_id": failed.route_id, "status": reason})
             observed_history.append(f"Route {failed.route_id}:\n{observed}")
             if overload:
                 self.overloaded.add(failed.route_id)
+            elif capability:
+                self.incapable.add(failed.route_id)
             else:
                 self.exhausted.add(failed.billing_source.value)
             candidates = fallback_candidates(
@@ -383,8 +413,8 @@ class FallbackSession:
                 self.catalog,
                 self.initial,
                 exhausted_billing_sources=frozenset(self.exhausted),
-                unavailable_route_ids=frozenset(self.overloaded),
-                allow_initial_billing_source=bool(self.overloaded),
+                unavailable_route_ids=frozenset(self.overloaded | self.incapable),
+                allow_initial_billing_source=bool(self.overloaded or self.incapable),
                 quality_policy=self.quality_policy,
                 priority=self.priority,
                 excluded_route_ids=self.excluded_route_ids,
