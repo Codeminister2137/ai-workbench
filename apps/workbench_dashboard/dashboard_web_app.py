@@ -2066,7 +2066,11 @@ def build_run_drain(
     else:
         from mai_run import build_mai_executor
 
-        executor = build_mai_executor(repo_root, repo_root / "user-config.toml")
+        executor = build_mai_executor(
+            repo_root,
+            repo_root / "user-config.toml",
+            catalog=config.catalog_path or None,
+        )
     return RunDrain(
         runs_dir=data_dir / "runs",
         get_inbox=lambda inbox_id: stores.inbox.get(inbox_id),

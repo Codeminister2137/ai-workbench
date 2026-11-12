@@ -26,6 +26,12 @@ def test_argv_hands_task_to_mai_without_model_override(tmp_path) -> None:
     assert "--execute" in argv
     assert argv[argv.index("--coding-session") + 1] == "new"
     assert argv[argv.index("--repo-root") + 1] == str(tmp_path)
+    assert argv[argv.index("--catalog") + 1].endswith("model_catalog.toml")
+
+
+def test_argv_honors_explicit_catalog(tmp_path) -> None:
+    argv = build_mai_argv(_run(), repo_root=tmp_path, user_config="u", catalog="c.toml")
+    assert argv[argv.index("--catalog") + 1] == "c.toml"
 
 
 def test_parse_mai_facts_pulls_session_and_route() -> None:

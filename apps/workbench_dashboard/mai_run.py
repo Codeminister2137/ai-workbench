@@ -36,16 +36,29 @@ class MaiRunOutcome:
     error: str | None = None
 
 
-def build_mai_argv(run: dict, *, repo_root: Path | str, user_config: Path | str) -> list[str]:
+def build_mai_argv(
+    run: dict,
+    *,
+    repo_root: Path | str,
+    user_config: Path | str,
+    catalog: Path | str | None = None,
+) -> list[str]:
     """Argv handing a run to Mai; never pins a model (orchestrator decides).
 
     Each attempt opens a fresh coding session (``new``); the assigned
     session id and effective route are parsed back from Mai's stdout.
+    The catalog defaults to the repo catalog (Mai's own default is
+    CWD-relative, which breaks under the dashboard's working directory).
     """
     run_id = str(run.get("id", "?"))
     title = run.get("title") or "(untitled)"
     body = run.get("body") or ""
     prompt = f"Run {run_id}: {title}\nWorkspace: {repo_root}\n\nTask:\n{body}"
+    catalog_path = (
+        Path(catalog)
+        if catalog
+        else Path(repo_root) / "packages/ai_orchestrator/examples/model_catalog.toml"
+    )
     return [
         prompt,
         "--mode",
@@ -57,6 +70,8 @@ def build_mai_argv(run: dict, *, repo_root: Path | str, user_config: Path | str)
         str(repo_root),
         "--user-config",
         str(user_config),
+        "--catalog",
+        str(catalog_path),
     ]
 
 
@@ -138,12 +153,13 @@ def build_mai_executor(
     repo_root: Path | str,
     user_config: Path | str,
     *,
+    catalog: Path | str | None = None,
     runner: Callable[[Sequence[str]], int] | None = None,
 ) -> Callable[[dict], dict]:
     """Build a drain ``Executor`` handing runs to Mai sessions."""
 
     def execute(run: dict) -> dict:
-        argv = build_mai_argv(run, repo_root=repo_root, user_config=user_config)
+        argv = build_mai_argv(run, repo_root=repo_root, user_config=user_config, catalog=catalog)
         return mai_receipt(run_mai_session(argv, runner=runner), argv)
 
     return execute
