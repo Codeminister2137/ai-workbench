@@ -57,7 +57,7 @@ def test_static_controls_have_titles() -> None:
     for tag in re.findall(r"<button\b[^>]*>", html):
         assert "title=" in tag, f"button without title: {tag}"
     nav_links = re.findall(r"<a\b[^>]*data-view[^>]*>", html)
-    assert nav_links
+    assert len(nav_links) == 21  # 19 + modules tab + spend tab (was Home card)
     for tag in nav_links:
         assert "title=" in tag, f"nav link without title: {tag}"
 
@@ -66,7 +66,7 @@ def test_dynamic_buttons_have_titles() -> None:
     """Every button rendered by app.js templates carries a tooltip title."""
     js = _read("app.js")
     buttons = re.findall(r"<button\b[^>]*>", js)
-    assert buttons
+    assert len(buttons) == 40  # -quick-chat send +modules save (net zero)
     for tag in buttons:
         assert "title=" in tag, f"button without title: {tag}"
 
@@ -75,11 +75,11 @@ def test_dynamic_inputs_and_selects_have_titles() -> None:
     """Text inputs/selects in templates have titles (radios use labels)."""
     js = _read("app.js")
     inputs = [tag for tag in re.findall(r"<input\b[^>]*>", js) if 'type="radio"' not in tag]
-    assert inputs
+    assert len(inputs) == 53  # -quick-chat text +1 checkbox template (loop renders 5)
     for tag in inputs:
         assert "title=" in tag, f"input without title: {tag}"
     selects = re.findall(r"<select\b[^>]*>", js)
-    assert selects
+    assert len(selects) == 19  # +landing-page select
     for tag in selects:
         assert "title=" in tag, f"select without title: {tag}"
 
