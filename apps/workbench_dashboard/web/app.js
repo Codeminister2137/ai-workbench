@@ -501,7 +501,7 @@ async function renderChatList() {
          <span class="muted">${esc(s.updated_at_utc)} · ${esc(s.privacy_class)}</span></li>`).join("")
     : '<li class="muted">No chats yet — use + New.</li>';
   view.innerHTML = `<h1>Chat</h1>
-    <p class="muted">Supervisor answers; queue agent runs for approval from a thread. Full transcripts stay local.</p>
+    <p class="muted">Supervisor answers; queue pre-approved agent runs from a thread. Full transcripts stay local.</p>
     <ul class="plain">${items}</ul>`;
 }
 
@@ -521,7 +521,7 @@ async function renderChatThread(id, initial) {
     <div id="thread">${msgs || '<p class="muted">No messages yet.</p>'}</div>
     <form class="inline" id="chat-form"><input type="text" name="text" placeholder="Message..." title="Message the supervisor" required>
     <button type="submit" title="Send message">Send</button>
-    <button type="button" id="run-request-btn" title="Queue this message as an agent run (needs inbox approval)">Request run</button>
+    <button type="button" id="run-request-btn" title="Queue this message as an agent run (owner pre-approved)">Request run</button>
     <button type="button" id="dictate-btn" title="Dictate with the microphone (Meta server first, browser fallback)">Dictate</button></form>
     <p><select id="project-picker" title="Project for the next run request (optional)"></select>
     <span id="project-note" class="muted"></span></p>

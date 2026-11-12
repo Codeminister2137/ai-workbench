@@ -62,8 +62,8 @@ def _new_session(base: str) -> str:
     return created["id"]
 
 
-def test_run_request_queues_run_and_approval(chat_run_server) -> None:
-    """Chat run-request creates a queued run + approval decision + receipt."""
+def test_run_request_queues_preapproved_run_without_approval(chat_run_server) -> None:
+    """Chat run-request is owner-initiated: pre-approved, no approval item."""
     base, tmp_path = chat_run_server
     session_id = _new_session(base)
 
@@ -73,10 +73,10 @@ def test_run_request_queues_run_and_approval(chat_run_server) -> None:
         {"text": "Give me a status report", "title": "Status report"},
     )
     assert receipt["ok"] is True
-    assert receipt["status"] == "queued"
+    assert receipt["status"] == "preapproved"
+    assert receipt["inbox_id"] is None
     assert receipt["fanout_effective"] == "restricted"
     run_id = receipt["run_id"]
-    inbox_id = receipt["inbox_id"]
 
     run = _read_json(tmp_path / "data" / "runs" / f"{run_id}.json")
     assert run["status"] == "queued"
@@ -84,15 +84,11 @@ def test_run_request_queues_run_and_approval(chat_run_server) -> None:
     assert run["session_id"] == session_id
     assert run["fanout_policy"] == "restricted"
     assert run["fanout_effective"] == "restricted"
-    assert run["inbox_id"] == inbox_id
+    assert run["approval_mode"] == "owner-filed"
+    assert run["inbox_id"] is None
     assert "Give me a status report" in run["body"]
 
-    inbox = _read_json(tmp_path / "data" / "inbox" / f"{inbox_id}.json")
-    assert inbox["type"] == "decision"
-    assert inbox["status"] == "open"
-    assert inbox["task_id"] == run_id
-    assert inbox["options"] == ["Approve", "Reject"]
-    assert f"run:{run_id}" in inbox["context_refs"]
+    assert list((tmp_path / "data" / "inbox").glob("*.json")) == []
 
 
 def test_run_request_appends_transcript_receipt(chat_run_server) -> None:
@@ -167,7 +163,7 @@ def test_run_request_rejects_unknown_policy(chat_run_server) -> None:
 
 
 def test_run_request_attaches_transcript_digest(chat_run_server) -> None:
-    """Run body and approval carry the conversation, not just one message."""
+    """Run body carries the conversation, not just one message."""
     from ai_provider.chat_transcripts import SQLiteChatTranscriptStore
 
     base, tmp_path = chat_run_server
@@ -183,5 +179,3 @@ def test_run_request_attaches_transcript_digest(chat_run_server) -> None:
     assert "We need a status page" in run["body"]
     assert "Drafted the layout" in run["body"]
     assert session_id in run["body"]
-    inbox = _read_json(tmp_path / "data" / "inbox" / f"{receipt['inbox_id']}.json")
-    assert "We need a status page" in inbox["body"]
