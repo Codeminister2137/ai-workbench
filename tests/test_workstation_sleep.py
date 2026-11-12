@@ -194,7 +194,10 @@ def test_absolute_schedule_requires_owner_cancellation_path(tmp_path):
 
 
 def wait_receipt(path, predicate):
-    end = time.monotonic() + 10
+    # Cold powershell start takes ~5s solo and more under full-gate load;
+    # 10s flaked in the gate (2026-11-12). Startup latency is not the
+    # assertion, so allow headroom without masking real breakage.
+    end = time.monotonic() + 30
     while time.monotonic() < end:
         try:
             value = json.loads(path.read_text(encoding="utf-8-sig"))
@@ -405,7 +408,13 @@ def test_tampered_lease_outside_deadline_stops_without_power_request(tmp_path):
         receipt,
         saved,
     ):
-        Path(saved["lease_path"]).write_text((datetime.now(UTC) + timedelta(days=1)).isoformat())
+        lease = Path(saved["lease_path"])
+        # Atomic replace: the helper polls this file and a torn
+        # non-atomic write surfaces as a DateTime parse error instead of
+        # the deadline rejection (gate flake 2026-11-12).
+        pending = lease.with_name(lease.name + ".tmp")
+        pending.write_text((datetime.now(UTC) + timedelta(days=1)).isoformat())
+        pending.replace(lease)
         _, stderr = process.communicate(timeout=5)
         assert process.returncode != 0
         assert "outside fixed deadline" in stderr

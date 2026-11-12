@@ -152,3 +152,12 @@ def test_queue_tab_present_in_js() -> None:
     assert "#/inbox?status=queue" in js
     assert 'id="f-for"' in js
     assert "for AI" in js
+
+
+def test_human_and_attention_tabs_present_in_js() -> None:
+    js = (WEB_DIR / "app.js").read_text(encoding="utf-8")
+    assert "#/inbox?status=human" in js
+    assert "#/inbox?status=attention" in js
+    assert 'tab === "human"' in js
+    assert 'tab === "attention"' in js
+    assert "needsHuman(t) || isFollowup(t)" in js
