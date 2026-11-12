@@ -194,7 +194,10 @@ def test_absolute_schedule_requires_owner_cancellation_path(tmp_path):
 
 
 def wait_receipt(path, predicate):
-    end = time.monotonic() + 10
+    # Cold powershell start takes ~5s solo and more under full-gate load;
+    # 10s flaked in the gate (2026-11-12). Startup latency is not the
+    # assertion, so allow headroom without masking real breakage.
+    end = time.monotonic() + 30
     while time.monotonic() < end:
         try:
             value = json.loads(path.read_text(encoding="utf-8-sig"))
