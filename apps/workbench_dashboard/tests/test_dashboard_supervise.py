@@ -11,7 +11,11 @@ if str(DASHBOARD_DIR) not in sys.path:
     sys.path.insert(0, str(DASHBOARD_DIR))
 
 from dashboard_supervise import (  # noqa: E402
+    SuperviseConfig,
+    _pid_start_time,
+    _pidfile_matches_process,
     decide,
+    restart_dashboard,
     write_maintenance,
     write_serve_version,
 )
@@ -189,3 +193,93 @@ def test_js_banner_pill_and_poller_present() -> None:
     assert "loadVersionPill()" in js
     assert "/api/maintenance" in js
     assert "/api/version" in js
+
+
+def test_pid_start_time_matches_live_process() -> None:
+    import os
+    import time
+
+    started = _pid_start_time(os.getpid())
+    assert started is not None
+    assert abs(started - time.time()) < 86400
+
+
+def test_pid_start_time_unknown_for_dead_pid() -> None:
+    assert _pid_start_time(99999999) is None
+
+
+def test_pidfile_match_rejects_recycled_and_garbage() -> None:
+    import os
+    from datetime import UTC, datetime
+
+    live = {"pid": os.getpid(), "started_utc": datetime.now(UTC).isoformat()}
+    assert _pidfile_matches_process(live, os.getpid()) is True
+    stale = {"pid": os.getpid(), "started_utc": "2001-01-01T00:00:00+00:00"}
+    assert _pidfile_matches_process(stale, os.getpid()) is False
+    assert _pidfile_matches_process({"pid": os.getpid()}, os.getpid()) is False
+    assert (
+        _pidfile_matches_process({"pid": 99999999, "started_utc": live["started_utc"]}, 99999999)
+        is False
+    )
+
+
+def _supervise_config(tmp_path: Path) -> SuperviseConfig:
+    (tmp_path / "apps" / "workbench_dashboard").mkdir(parents=True)
+    return SuperviseConfig(
+        main_root=tmp_path,
+        worktree=tmp_path,
+        data_dir=tmp_path / "data",
+        config_path=tmp_path / "dashboard.json",
+        port=8766,
+        serve_branch="develop",
+        python_exe="python",
+    )
+
+
+def test_restart_escalates_to_sigterm_on_tracked_server(tmp_path, monkeypatch) -> None:
+    import os
+    import signal
+    import subprocess
+    from datetime import UTC, datetime
+
+    import dashboard_supervise as sup
+
+    (tmp_path / "data").mkdir()
+    (tmp_path / "data" / "dashboard.pid").write_text(
+        json.dumps({"pid": os.getpid(), "started_utc": datetime.now(UTC).isoformat()}),
+        encoding="utf-8",
+    )
+    signals: list = []
+    monkeypatch.setattr(os, "kill", lambda pid, sig: signals.append(sig))
+    busy = iter([True, False])
+    monkeypatch.setattr(sup, "_port_busy", lambda port: next(busy, False))
+    monkeypatch.setattr(sup, "PORT_FREE_TIMEOUT_SECONDS", 0)
+    spawned: list = []
+    monkeypatch.setattr(subprocess, "Popen", lambda *a, **k: spawned.append(a))
+    ok, _detail = restart_dashboard(_supervise_config(tmp_path))
+    assert ok is True
+    assert signals == [signal.SIGINT, signal.SIGTERM]
+    assert len(spawned) == 1
+
+
+def test_restart_refuses_strangers_without_signals(tmp_path, monkeypatch) -> None:
+    import os
+    import subprocess
+
+    import dashboard_supervise as sup
+
+    (tmp_path / "data").mkdir()
+    (tmp_path / "data" / "dashboard.pid").write_text(
+        json.dumps({"pid": os.getpid(), "started_utc": "2001-01-01T00:00:00+00:00"}),
+        encoding="utf-8",
+    )
+    signals: list = []
+    monkeypatch.setattr(os, "kill", lambda pid, sig: signals.append(sig))
+    monkeypatch.setattr(sup, "_port_busy", lambda port: True)
+    spawned: list = []
+    monkeypatch.setattr(subprocess, "Popen", lambda *a, **k: spawned.append(a))
+    ok, detail = restart_dashboard(_supervise_config(tmp_path))
+    assert ok is False
+    assert "unknown owner" in detail
+    assert signals == []
+    assert spawned == []

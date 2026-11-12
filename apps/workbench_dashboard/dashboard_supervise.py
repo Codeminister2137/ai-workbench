@@ -14,12 +14,14 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import signal
 import socket
 import subprocess
 import sys
 import time
 import urllib.request
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 MAINTENANCE_FILENAME = "maintenance.json"
@@ -214,6 +216,67 @@ def _port_busy(port: int) -> bool:
     return True
 
 
+def _pid_start_time(pid: int) -> float | None:
+    """Process creation time (epoch seconds) or None when unknown/dead."""
+    if os.name == "nt":
+        import ctypes
+
+        kernel32 = ctypes.windll.kernel32
+        handle = kernel32.OpenProcess(0x1000, False, pid)
+        if not handle:
+            return None
+        try:
+            creation = ctypes.c_ulonglong()
+            dummy = ctypes.c_ulonglong()
+            ok = kernel32.GetProcessTimes(
+                handle,
+                ctypes.byref(creation),
+                ctypes.byref(dummy),
+                ctypes.byref(dummy),
+                ctypes.byref(dummy),
+            )
+            if not ok:
+                return None
+            return creation.value / 10_000_000 - 11_644_473_600
+        finally:
+            kernel32.CloseHandle(handle)
+    if sys.platform == "linux":
+        try:
+            return os.stat(f"/proc/{pid}").st_ctime
+        except OSError:
+            return None
+    return None
+
+
+def _pidfile_matches_process(record: dict, pid: int) -> bool:
+    """True when the pidfile record plausibly identifies the live pid.
+
+    Guards escalation against PID reuse: only a tracked server whose
+    recorded start time matches may receive stronger signals.
+    """
+    try:
+        stamped = str(record.get("started_utc"))
+        expected = datetime.fromisoformat(stamped.replace("Z", "+00:00")).timestamp()
+    except (ValueError, TypeError):
+        return False
+    actual = _pid_start_time(pid)
+    return actual is not None and abs(actual - expected) <= 60
+
+
+def _stop_tracked_server(pid: int, port: int) -> None:
+    """Stop a verified-ours server: graceful SIGINT, then forceful SIGTERM."""
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        try:
+            os.kill(pid, sig)
+        except (OSError, ProcessLookupError):
+            return
+        deadline = time.monotonic() + PORT_FREE_TIMEOUT_SECONDS
+        while time.monotonic() < deadline and _port_busy(port):
+            time.sleep(0.5)
+        if not _port_busy(port):
+            return
+
+
 def _serve_env(worktree: Path) -> dict[str, str]:
     """Environment shadowing installed editables with worktree packages."""
     env = dict(os.environ)
@@ -228,16 +291,15 @@ def restart_dashboard(config: SuperviseConfig) -> tuple[bool, str]:
     """Restart the dashboard onto the synced worktree; (ok, detail)."""
     record = _read_pidfile(config.data_dir)
     pid = record.get("pid") if isinstance(record, dict) else None
-    if isinstance(pid, int) and pid > 0:
-        try:
-            os.kill(pid, 2)  # SIGINT-equivalent terminate on Windows
-        except (OSError, ProcessLookupError):
-            pass
-        deadline = time.monotonic() + PORT_FREE_TIMEOUT_SECONDS
-        while time.monotonic() < deadline and _port_busy(config.port):
-            time.sleep(0.5)
-        if _port_busy(config.port):
-            return False, "port still busy after stop; unknown owner, refusing to kill strangers"
+    if (
+        isinstance(record, dict)
+        and isinstance(pid, int)
+        and pid > 0
+        and _pidfile_matches_process(record, pid)
+    ):
+        _stop_tracked_server(pid, config.port)
+    if _port_busy(config.port):
+        return False, "port still busy after stop; unknown owner, refusing to kill strangers"
     app_dir = config.worktree / "apps" / "workbench_dashboard"
     try:
         subprocess.Popen(
