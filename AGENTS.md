@@ -993,7 +993,9 @@ Use this loop:
 1. Record the start, duration and deadline in UTC and `Europe/Warsaw` before
    implementation. Interpret "around two hours" as two hours from execution
    start, unless the owner specifies otherwise. Never reuse an expired deadline
-   for a new run or silently reset it after compaction.
+   for a new run or silently reset it after compaction. Turn the monitors off
+   at window start via `scripts/monitors-off.ps1` (power saving; any input
+   wakes them) and record the run in the plan.
 2. Before implementation, write the active session plan to local
    `docs/plans/unattended-work-plan.md`, using
    `docs/unattended-work-plan-template.md`. Link it from `CURRENT_CONTEXT.md`.
