@@ -27,6 +27,23 @@ def test_argv_hands_task_to_mai_without_model_override(tmp_path) -> None:
     assert argv[argv.index("--coding-session") + 1] == "new"
     assert argv[argv.index("--repo-root") + 1] == str(tmp_path)
     assert argv[argv.index("--catalog") + 1].endswith("model_catalog.toml")
+    assert argv[argv.index("--approval-policy") + 1] == "trusted_local"
+
+
+def test_session_stdin_is_eof_not_a_hang() -> None:
+    import sys
+
+    seen = {}
+
+    def runner(argv):
+        seen["data"] = sys.stdin.read()
+        seen["tty"] = sys.stdin.isatty()
+        return 0
+
+    real_stdin = sys.stdin
+    run_mai_session(["prompt"], runner=runner)
+    assert seen == {"data": "", "tty": False}
+    assert sys.stdin is real_stdin
 
 
 def test_argv_honors_explicit_catalog(tmp_path) -> None:

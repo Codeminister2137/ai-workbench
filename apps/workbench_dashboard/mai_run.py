@@ -13,6 +13,7 @@ from __future__ import annotations
 import contextlib
 import io
 import re
+import sys
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -72,6 +73,10 @@ def build_mai_argv(
         str(user_config),
         "--catalog",
         str(catalog_path),
+        # Run-level approval was granted at drain time; per-command
+        # interactive prompts would hang forever without a TTY.
+        "--approval-policy",
+        "trusted_local",
     ]
 
 
@@ -88,16 +93,25 @@ def parse_mai_facts(stdout: str) -> dict[str, str]:
 def run_mai_session(
     argv: Sequence[str], *, runner: Callable[[Sequence[str]], int] | None = None
 ) -> MaiRunOutcome:
-    """Invoke Mai, capturing output tails; never raises."""
+    """Invoke Mai, capturing output tails; never raises.
+
+    Stdin is an empty stream for the call: any residual interactive
+    prompt hits EOF immediately instead of hanging the drain thread.
+    """
     call = runner
     if call is None:  # pragma: no cover - default calls Mai (live only)
         from ai_agent.repo_coding_assistant import main as mai_main
 
         call = mai_main
+
     stdout, stderr = io.StringIO(), io.StringIO()
     try:
         with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
-            exit_code = int(call(list(argv)))
+            old_stdin, sys.stdin = sys.stdin, io.StringIO("")
+            try:
+                exit_code = int(call(list(argv)))
+            finally:
+                sys.stdin = old_stdin
     except Exception as exc:  # noqa: BLE001 - receipts carry failures, never raise
         return MaiRunOutcome(
             exit_code=3,
