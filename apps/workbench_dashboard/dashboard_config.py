@@ -31,6 +31,8 @@ class DashboardConfig:
     require_grounded_reports: bool = True
     route_policy: str = "configured"
     catalog_path: str | None = None
+    product_tier: str = "tooling"
+    serve_branch: str = "develop"
 
 
 def load_config(path: Path = DEFAULT_CONFIG_PATH) -> DashboardConfig:
@@ -59,6 +61,8 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> DashboardConfig:
         "require_grounded_reports": bool,
         "route_policy": str,
         "catalog_path": (str, type(None)),
+        "product_tier": str,
+        "serve_branch": str,
     }
     values: dict[str, object] = {}
     for key, types in known.items():
@@ -93,6 +97,14 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> DashboardConfig:
     supervision = values.get("supervision", "attended")
     if supervision not in ("attended", "unattended"):
         raise ValueError("Dashboard config key 'supervision' must be attended or unattended")
+    tier = values.get("product_tier", "tooling")
+    if tier not in ("special", "commercial", "tooling", "hobby"):
+        raise ValueError(
+            "Dashboard config key 'product_tier' must be special, commercial, tooling, or hobby"
+        )
+    branch = values.get("serve_branch", "develop")
+    if not isinstance(branch, str) or not branch.strip():
+        raise ValueError("Dashboard config key 'serve_branch' must be a non-empty string")
     return DashboardConfig(**values)  # type: ignore[arg-type]
 
 

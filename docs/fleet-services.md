@@ -46,6 +46,12 @@ hosted no-training route, and mails the summary to the owner. Receipts
 land under `.tmp/weekly-digest/`. Registered by
 `scripts/register-weekly-digest.ps1` (owner inbox answer, 2026-11-08).
 
+## WorkbenchDashboardSupervisor
+
+Every 5 minutes: redeploys the served dashboard when origin moves
+(fast-forward a clean serve worktree, restart, health-check). Skips
+when up to date; raises the maintenance banner around restarts.
+
 ## dashboard
 
 This server: the dashboard web app serving these pages on loopback. It

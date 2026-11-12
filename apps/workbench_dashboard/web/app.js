@@ -170,6 +170,42 @@ function startInboxPoll() {
   }, 10000);
 }
 
+/* Maintenance banner: poll /api/maintenance every ~30s; the redeploy
+   supervisor raises it around restarts. Best-effort, never breaks render. */
+let maintPollTimer = null;
+async function pollMaintenance() {
+  try {
+    const m = await api("/api/maintenance");
+    const el = document.getElementById("maint-banner");
+    if (!el) return;
+    if (m.active) {
+      el.textContent = m.message || "Maintenance in progress — the dashboard may restart.";
+      el.hidden = false;
+    } else {
+      el.hidden = true;
+    }
+  } catch (err) { /* keep last state; next tick retries */ }
+}
+function startMaintPoll() {
+  if (maintPollTimer) return;
+  pollMaintenance();
+  maintPollTimer = setInterval(async () => {
+    if (document.hidden) return;
+    await pollMaintenance();
+  }, 30000);
+}
+
+/* Served-version pill: branch@commit once at boot, so a stale page is obvious. */
+async function loadVersionPill() {
+  try {
+    const v = await api("/api/version");
+    const el = document.getElementById("version-pill");
+    if (!el) return;
+    el.textContent = `${v.branch || "?"}@${v.commit || "?"}`;
+    el.title = `Served ${v.branch || "?"}@${v.commit || "?"} since ${v.started_utc || "?"} (${v.tier || "?"} tier)`;
+  } catch (err) { /* leave blank; next load retries */ }
+}
+
 /* Run detail auto-refresh: re-read status + receipts every ~10s while
    the detail view is visible. Stopped on navigation (see render()). */
 let runDetailPollTimer = null;
@@ -1964,3 +2000,5 @@ document.querySelectorAll("[data-create]").forEach((btn) => {
 window.addEventListener("hashchange", render);
 render();
 startInboxPoll();
+startMaintPoll();
+loadVersionPill();

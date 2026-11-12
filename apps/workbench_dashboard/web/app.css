@@ -25,6 +25,7 @@ ul.plain { list-style: none; padding-left: 0; }
 ul.plain li { margin-bottom: var(--wb-space-2); }
 @media (max-width: 700px) { .columns { grid-template-columns: 1fr; } }
 .pill { display: inline-block; padding: var(--wb-pad-pill); border-radius: var(--wb-radius-pill); font-size: var(--wb-font-pill); }
+#maint-banner { background: var(--wb-color-warn-bg); color: var(--wb-color-warn); padding: var(--wb-pad-toast); border-bottom: var(--wb-border-thin); }
 .st-new, .st-open { background: var(--wb-color-info-bg); color: var(--wb-color-info); }
 .st-reviewing, .st-answered { background: var(--wb-color-warn-bg); color: var(--wb-color-warn); }
 .st-adopted, .st-merged, .st-live, .st-complete { background: var(--wb-color-good-bg); color: var(--wb-color-good); }
