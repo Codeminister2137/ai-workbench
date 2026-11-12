@@ -117,6 +117,24 @@ def test_pricing_copy_matches_intake_buckets() -> None:
     assert "confidential by default" in en_terms
 
 
+def test_placeholders_indexed() -> None:
+    """Every PLACEHOLDER(ID) marker in HTML has a ## ID index entry."""
+    index = (ROOT / "PLACEHOLDERS.md").read_text(encoding="utf-8")
+    found: set[str] = set()
+    for page in sorted(ROOT.rglob("*.html")):
+        for marker in re.findall(r"PLACEHOLDER\(([A-Z_]+)\)", page.read_text(encoding="utf-8")):
+            found.add(marker)
+            assert f"## {marker}" in index, (page, marker)
+    assert found >= {"COMPANY_NAME", "CONTACT_EMAIL", "SERVICE_CITIES"}
+
+
+def test_contact_pages_show_email_placeholder() -> None:
+    pl = (ROOT / "kontakt.html").read_text(encoding="utf-8")
+    assert "adres w przygotowaniu" in pl
+    en = (ROOT / "en" / "contact.html").read_text(encoding="utf-8")
+    assert "address pending" in en
+
+
 def test_discovery_floor_pl_only() -> None:
     """D4 followup (owner B): PL publishes the remote-discovery floor; EN silent."""
     pl = (ROOT / "uslugi.html").read_text(encoding="utf-8")
