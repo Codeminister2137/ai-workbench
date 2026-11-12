@@ -129,8 +129,14 @@ def load_prompt_context(
     context_file_budget_chars: int = DEFAULT_CONTEXT_FILE_BUDGET_CHARS,
     instruction_budget_chars: int = DEFAULT_INSTRUCTION_BUDGET_CHARS,
     diagnostic: Callable[[str], None] | None = None,
+    minimal_instructions: bool = False,
 ) -> tuple[RepoContextFile, ...]:
-    """Keep required instructions intact, budgeting optional snippets separately."""
+    """Keep required instructions intact, budgeting optional snippets separately.
+
+    ``minimal_instructions`` skips AGENTS.md required instructions entirely;
+    answer-only modes (ask) need no action/safety rules, which stay where
+    actions exist. Optional context still follows its own budgets.
+    """
 
     if context_budget_chars is not None and context_budget_chars <= 0:
         raise ValueError("context_budget_chars must be greater than zero or None.")
@@ -152,7 +158,9 @@ def load_prompt_context(
             ancestors.append(directory / "AGENTS.md")
             directory = directory.parent
         nested_instructions.extend(reversed(ancestors))
-    instruction_paths = [repo_root / "AGENTS.md", *nested_instructions]
+    instruction_paths = (
+        [] if minimal_instructions else [repo_root / "AGENTS.md", *nested_instructions]
+    )
     required_paths = {path.resolve() for path in instruction_paths if path.is_file()}
     context_paths = [
         *instruction_paths,

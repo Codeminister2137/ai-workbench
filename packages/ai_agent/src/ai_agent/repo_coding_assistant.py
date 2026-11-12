@@ -1394,6 +1394,7 @@ def _execute_request(
             context_file_budget_chars=args.context_file_budget_chars,
             instruction_budget_chars=args.instruction_budget_chars,
             diagnostic=print,
+            minimal_instructions=(args.mode == "ask"),
         )
     except (ValueError, OSError) as exc:
         print(f"failure_reason: {exc}")
