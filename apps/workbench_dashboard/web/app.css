@@ -54,3 +54,14 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; }
 .doc-body blockquote { margin: var(--wb-space-3) 0; padding-left: var(--wb-space-4); border-left: var(--wb-border-quote); }
 .doc-body table { border-collapse: collapse; }
 .doc-body th, .doc-body td { border: var(--wb-border-thin); padding: var(--wb-pad-cell); }
+
+.nav-group { position: relative; display: inline-block; }
+.nav-group summary { cursor: pointer; padding: var(--wb-space-3); }
+.nav-group > div { position: absolute; z-index: 30; background: var(--wb-color-surface); padding: var(--wb-space-3); min-width: var(--wb-nav-menu-width); border: var(--wb-border-plain); }
+.nav-group > div a { display: block; }
+#nav a[hidden], .nav-group[hidden] { display: none; }
+
+#nav { display: flex; align-items: center; }
+@media (max-width: 700px) {
+  .nav-group > div { position: static; }
+}

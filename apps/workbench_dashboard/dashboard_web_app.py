@@ -55,8 +55,10 @@ from dashboard_config import (
     DEFAULT_DATA_DIR,
     DashboardConfig,
     load_config,
+    save_modules,
     save_supervision,
 )
+from dashboard_modules import CORE_VIEWS, MODULES, module_for_path
 from dashboard_projects import (
     book_check_task,
     create_project,
@@ -67,20 +69,9 @@ from dashboard_projects import (
 from dashboard_stores import DashboardStores, StoreError, effective_fanout_policy
 from document_library import DocumentLibrary
 from drain_scheduler import DrainScheduler
-from meeting_notes import (
-    MEETING_BODY_MAX_BYTES,
-    analyze_meeting,
-    assemble_transcript,
-    get_meeting,
-    list_meetings,
-    parse_meeting_form,
-    split_wav_clips,
-    store_meeting,
-)
 from nl_tasks import ORDER_OPTIONS, SCHEDULE_ANSWER, propose_task, scheduled_run_record
 from owner_mail import mail_configured
 from owner_sleep import cancel_owner_sleep, schedule_owner_sleep, timer_state
-from p7_intake import approve_intake, list_intake
 from providers_view import provider_status as providers_status
 from providers_view import refresh_provider_status
 from restrictions_view import restrictions_status
@@ -804,7 +795,17 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             config = load_config(self.config_path)
         except ValueError as exc:
             return self._send_json({"ok": False, "error": str(exc)}, status=500)
+        if self._module_disabled(path, config):
+            return
         try:
+            if path == "/api/overview":
+                if "overview" not in config.activated_modules:
+                    return self._send_json(
+                        {"ok": False, "error": "Overview is disabled"}, status=409
+                    )
+                return self._send_overview()
+            if path == "/api/modules":
+                return self._send_modules(config)
             if path == "/api/status":
                 return self._send_json({"ok": True, **self._status(config)})
             if path == "/api/evidence":
@@ -830,6 +831,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             if path == "/api/agent-status":
                 return self._send_json({"ok": True, **load_window_status(self.repo_root)})
             if path == "/api/intake":
+                from p7_intake import list_intake
+
                 return self._send_json({"ok": True, "files": list_intake(self.repo_root)})
             if path == "/api/chat/sessions":
                 return self._send_chat_sessions(config)
@@ -907,6 +910,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             if path == "/api/maintenance":
                 return self._send_json({"ok": True, **read_maintenance(self.data_dir)})
             if path == "/api/meetings":
+                from meeting_notes import list_meetings
+
                 return self._send_json({"ok": True, "items": list_meetings(self.data_dir)})
             if path.startswith("/api/meetings/"):
                 return self._send_meeting(path[len("/api/meetings/") :])
@@ -921,6 +926,12 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         if not path.startswith("/api/"):
             self.send_error(HTTPStatus.NOT_FOUND, "Unknown endpoint")
             return
+        try:
+            activation_config = load_config(self.config_path)
+        except ValueError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=500)
+        if self._module_disabled(path, activation_config):
+            return
         if path == "/api/meetings/transcribe":
             return self._transcribe_meeting()
         if path == "/api/stt/transcribe":
@@ -934,6 +945,16 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         except ValueError as exc:
             return self._send_json({"ok": False, "error": str(exc)}, status=500)
         try:
+            if path == "/api/modules":
+                try:
+                    save_modules(
+                        self.config_path,
+                        payload.get("activated_modules"),
+                        payload.get("landing_page"),
+                    )
+                except ValueError as exc:
+                    return self._send_json({"ok": False, "error": str(exc)}, status=400)
+                return self._send_modules(load_config(self.config_path))
             if path == "/api/sleep":
                 return self._schedule_sleep(payload)
             if path == "/api/sleep/cancel":
@@ -975,6 +996,10 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             if path == "/api/tasks/propose":
                 return self._propose_task(payload)
             if path == "/api/projects":
+                if payload.get("type") == "book" and "books" not in config.activated_modules:
+                    return self._send_json(
+                        {"ok": False, "error": "Module books is disabled"}, status=409
+                    )
                 return self._create_project(payload)
             if path.startswith("/api/projects/") and path.endswith("/manuscript"):
                 project_id = path[len("/api/projects/") : -len("/manuscript")]
@@ -1035,6 +1060,59 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         except (StoreError, ValueError) as exc:
             return self._send_json({"ok": False, "error": str(exc)}, status=400)
         return self._send_json({"ok": False, "error": "Unknown endpoint"}, status=404)
+
+    def _module_disabled(self, path: str, config: DashboardConfig) -> bool:
+        module = module_for_path(path)
+        if module and module not in config.activated_modules:
+            self._send_json({"ok": False, "error": f"Module {module} is disabled"}, status=409)
+            return True
+        return False
+
+    def _send_overview(self) -> None:
+        stores = self._stores()
+        # Filter the complete local records before bounding the visible snapshot.
+        _, run_total = stores.runs.list(limit=0)
+        _, inbox_total = stores.inbox.list(limit=0)
+        runs, _ = stores.runs.list(limit=run_total)
+        inbox, _ = stores.inbox.list(limit=inbox_total)
+        pending = [item for item in inbox if item.get("status") == "open"]
+        active = [
+            item
+            for item in runs
+            if item.get("status")
+            in {"running", "queued", "paused", "waiting", "waiting_owner", "approved"}
+        ]
+        failed = [item for item in runs if item.get("status") == "failed"]
+
+        def summary(items: list[dict]) -> list[dict]:
+            return [
+                {key: item.get(key) for key in ("id", "title", "status")} for item in items[:20]
+            ]
+
+        self._send_json(
+            {
+                "ok": True,
+                "pending": summary(pending),
+                "active": summary(active),
+                "failed": summary(failed),
+                "pending_total": len(pending),
+                "active_total": len(active),
+                "failed_total": len(failed),
+            }
+        )
+
+    def _send_modules(self, config: DashboardConfig) -> None:
+        self._send_json(
+            {
+                "ok": True,
+                "modules": [
+                    {"id": key, **value, "activated": key in config.activated_modules}
+                    for key, value in MODULES.items()
+                ],
+                "landing_page": config.landing_page,
+                "core_views": CORE_VIEWS,
+            }
+        )
 
     def _send_settings(self, config: DashboardConfig) -> None:
         self._send_json(
@@ -1882,6 +1960,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         self._send_json({"ok": True, "inbox_id": task["id"]})
 
     def _approve_intake(self, name: str) -> None:
+        from p7_intake import approve_intake
+
         try:
             plan = approve_intake(self.repo_root, self.data_dir, name)
         except (ValueError, StoreError) as exc:
@@ -2068,6 +2148,14 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
 
     def _transcribe_meeting(self) -> None:
         """Slice 1: chunked meeting transcription with consent + retention."""
+        from meeting_notes import (
+            MEETING_BODY_MAX_BYTES,
+            assemble_transcript,
+            parse_meeting_form,
+            split_wav_clips,
+            store_meeting,
+        )
+
         try:
             body = self._read_body_bytes(MEETING_BODY_MAX_BYTES)
         except InvalidRequest as exc:
@@ -2153,12 +2241,16 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         self._send_json({"ok": True, **outcome})
 
     def _send_meeting(self, meeting_id: str) -> None:
+        from meeting_notes import get_meeting
+
         record = get_meeting(self.data_dir, meeting_id)
         if record is None:
             return self._send_json({"ok": False, "error": "Not found"}, status=404)
         self._send_json({"ok": True, **record})
 
     def _analyze_meeting_endpoint(self, config, meeting_id: str, payload: dict) -> None:
+        from meeting_notes import analyze_meeting
+
         confirm = payload.get("confirm_external", False)
         if confirm is not True:
             return self._send_json(

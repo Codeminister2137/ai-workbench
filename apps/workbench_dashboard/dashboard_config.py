@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
+from dashboard_modules import DEFAULT_MODULES, validate_preferences
+
 ROOT = Path(__file__).parent
 DEFAULT_CONFIG_PATH = ROOT / "dashboard.json"
 DEFAULT_DATA_DIR = ROOT / "data"
@@ -35,6 +37,8 @@ class DashboardConfig:
     seller: dict | None = None
     product_tier: str = "tooling"
     serve_branch: str = "develop"
+    activated_modules: tuple[str, ...] = DEFAULT_MODULES
+    landing_page: str = "home"
 
 
 def load_config(path: Path = DEFAULT_CONFIG_PATH) -> DashboardConfig:
@@ -67,6 +71,8 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> DashboardConfig:
         "seller": (dict, type(None)),
         "product_tier": str,
         "serve_branch": str,
+        "activated_modules": list,
+        "landing_page": str,
     }
     values: dict[str, object] = {}
     for key, types in known.items():
@@ -112,6 +118,10 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> DashboardConfig:
     branch = values.get("serve_branch", "develop")
     if not isinstance(branch, str) or not branch.strip():
         raise ValueError("Dashboard config key 'serve_branch' must be a non-empty string")
+    enabled, landing = validate_preferences(
+        values.get("activated_modules", DEFAULT_MODULES), values.get("landing_page", "home")
+    )
+    values.update(activated_modules=enabled, landing_page=landing)
     return DashboardConfig(**values)  # type: ignore[arg-type]
 
 
@@ -137,3 +147,15 @@ def save_supervision(path: Path, supervision: str) -> str:
     tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     tmp.replace(path)
     return supervision
+
+
+def save_modules(path: Path, modules: object, landing: object) -> None:
+    """Save validated activation preferences while preserving unrelated settings."""
+    enabled, destination = validate_preferences(modules, landing)
+    payload = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    if not isinstance(payload, dict):
+        raise ValueError("Dashboard config must be a JSON object")
+    payload.update(activated_modules=list(enabled), landing_page=destination)
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    tmp.replace(path)

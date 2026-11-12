@@ -232,6 +232,8 @@ def test_format_run_mail_includes_error() -> None:
 def test_settings_defaults_attended_unconfigured(dashboard_server, monkeypatch) -> None:
     monkeypatch.delenv("WORKBENCH_OWNER_EMAIL", raising=False)
     monkeypatch.delenv("WORKBENCH_SMTP_HOST", raising=False)
+    monkeypatch.delenv("GMAIL_EMAIL", raising=False)
+    monkeypatch.delenv("GMAIL_PASSWORD", raising=False)
     payload = get_json(dashboard_server, "/api/settings")
     assert payload == {"ok": True, "supervision": "attended", "mail_configured": False}
 
