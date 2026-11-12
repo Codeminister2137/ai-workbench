@@ -660,6 +660,13 @@ def test_fleet_tab_markers() -> None:
     assert "<h2>Sleep guard</h2>" in js
 
 
+def test_home_scheduled_card_uses_live_state() -> None:
+    js = _read("app.js")
+    assert "No scheduler yet" not in js
+    assert "status.drain_scheduler" in js
+    assert "Scheduler off." in js
+
+
 def test_schedule_tab_markers() -> None:
     """Schedule tab is wired: nav, route, live endpoint, sections."""
     js = _read("app.js")

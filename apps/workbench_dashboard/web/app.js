@@ -378,6 +378,10 @@ async function renderHome() {
     ? status.recent_runs.map((r) =>
         `<li><a href="#/runs/${esc(r.id)}">${esc(r.title || r.id)}</a> <span class="muted">${esc(r.status || "")}</span></li>`).join("")
     : '<li class="muted">No runs recorded</li>';
+  const sched = status.drain_scheduler || {};
+  const schedLine = sched.started
+    ? `Drain every ${esc(sched.interval_seconds)}s — ${esc(sched.ticks)} ticks, ${esc(sched.errors)} errors. <a href="#/schedule">Schedule view</a>`
+    : `Scheduler off. <a href="#/schedule">Schedule view</a>`;
   view.innerHTML = `
     <h1>${esc(status.title)}</h1>
     <p class="muted">Backend: ${esc(status.provider)} / ${esc(status.model)}</p>
@@ -403,7 +407,7 @@ async function renderHome() {
           <form class="inline" id="quick-chat"><input type="text" name="text" placeholder="Ask the supervisor..." title="Ask the supervisor (starts a new chat)" required>
           <button type="submit" title="Start a chat with this question">Send</button></form></div>
         <div class="card"><h2>Scheduled</h2>
-          <p class="muted">No scheduler yet — see P5. <a href="#/schedule">Schedule view</a></p></div>
+          <p class="muted">${schedLine}</p></div>
       </div>
     </div>`;
   document.getElementById("quick-chat").addEventListener("submit", async (ev) => {
