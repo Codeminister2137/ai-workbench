@@ -1134,7 +1134,7 @@ async function renderIdeas(id) {
   if (id) {
     const payload = await api("/api/ideas/" + encodeURIComponent(id));
     const item = payload.item;
-    const opts = ["new", "reviewing", "adopted", "parked", "declined"].map((s) =>
+    const opts = ["new", "reviewing", "adopted", "parked", "declined", "implemented"].map((s) =>
       `<option value="${s}"${item.status === s ? " selected" : ""}>${s}</option>`).join("");
     view.innerHTML = `<h1>Idea</h1><p><a href="#/ideas">All ideas</a></p>
       <div class="card"><h2>${gtext(item.title)}</h2>
@@ -1172,7 +1172,7 @@ async function renderIdeas(id) {
   }
   const ideasTab = new URLSearchParams((location.hash.split("?")[1] || "")).get("status") || "active";
   const payload = await api("/api/ideas");
-  const archivedIdeas = ["adopted", "parked", "declined"];
+  const archivedIdeas = ["adopted", "parked", "declined", "implemented"];
   const shownIdeas = payload.items.filter((t) => ideasTab === "archive" ? archivedIdeas.includes(t.status) : !archivedIdeas.includes(t.status));
   const backlogMark = (t) => t.plan_id
     ? ` <a href="#/plans/${esc(t.plan_id)}" title="Linked backlog plan">→ plan</a>`
