@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import io
 import json
 from typing import Any
+from urllib.error import HTTPError
 
 import pytest
 from ai_provider import (
@@ -22,6 +24,7 @@ from ai_provider import (
     UsageSource,
 )
 from ai_provider.adapters.ollama import (
+    _ollama_capability_400,
     ensure_complete,
     is_thinker_model,
     thinker_output_budget,
@@ -181,6 +184,72 @@ def test_invalid_thinking_refuses_response_without_printing_it(monkeypatch, stre
         else:
             client._response_from_raw(raw, model="test", latency_ms=0)
     assert "private-state" not in str(caught.value)
+
+
+def _http_error(code: int, body: bytes) -> HTTPError:
+    from email.message import Message
+
+    return HTTPError("http://ollama.test/api/chat", code, "error", Message(), io.BytesIO(body))
+
+
+def test_capability_400s_map_retryable() -> None:
+    tools_body = (
+        b'{"error": "registry.ollama.ai/library/deepseek-coder-v2:16b does not support tools"}'
+    )
+    matched = _ollama_capability_400(_http_error(400, tools_body))
+    assert matched is not None and "tool-capable" in matched
+    ctx_body = b'{"error": "the prompt is longer than the context length currently available"}'
+    matched = _ollama_capability_400(_http_error(400, ctx_body))
+    assert matched is not None and "longer-context" in matched
+    assert _ollama_capability_400(_http_error(400, b'{"error": "other"}')) is None
+    assert _ollama_capability_400(_http_error(400, b"not json")) is None
+    other = _http_error(500, tools_body)
+    assert _ollama_capability_400(other) is None
+    assert other.read() == tools_body  # 500 bodies stay intact for the sibling check
+
+
+def test_tools_unsupported_400_raises_retryable(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_urlopen(request: Any, timeout: float) -> Any:
+        raise _http_error(
+            400,
+            b'{"error": "registry.ollama.ai/library/deepseek-coder-v2:16b does not support tools"}',
+        )
+
+    monkeypatch.setattr("ai_provider.adapters.ollama.urlopen", fake_urlopen)
+    client = OllamaChatClient(
+        BackendConfig(
+            provider=ProviderKind.OLLAMA,
+            model="deepseek-coder-v2:16b",
+            base_url="http://ollama.test",
+            timeout_seconds=12.0,
+        )
+    )
+    with pytest.raises(ProviderError) as raised:
+        client.complete(
+            AIRequest(messages=(AIMessage(MessageRole.USER, "hi"),)),
+        )
+    assert raised.value.category == "retryable"
+    assert "tool-capable" in str(raised.value)
+
+
+def test_other_400_stays_non_retryable(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_urlopen(request: Any, timeout: float) -> Any:
+        raise _http_error(400, b'{"error": "malformed request"}')
+
+    monkeypatch.setattr("ai_provider.adapters.ollama.urlopen", fake_urlopen)
+    client = OllamaChatClient(
+        BackendConfig(
+            provider=ProviderKind.OLLAMA,
+            model="llama3.2",
+            base_url="http://ollama.test",
+            timeout_seconds=12.0,
+        )
+    )
+    with pytest.raises(ProviderError) as raised:
+        client.complete(
+            AIRequest(messages=(AIMessage(MessageRole.USER, "hi"),)),
+        )
+    assert raised.value.category == "non_retryable"
 
 
 def test_ollama_adapter_posts_neutral_request_and_normalizes_response(

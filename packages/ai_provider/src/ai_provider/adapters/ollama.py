@@ -77,6 +77,33 @@ def _known_tool_argument_failure(error: HTTPError) -> bool:
         error.close()
 
 
+def _ollama_capability_400(error: HTTPError) -> str | None:
+    """Map Ollama capability 400s to a retry-elsewhere message (None if other).
+
+    The code gate runs before any read so the sibling 500 classifier
+    still sees an intact body.
+    """
+    if error.code != 400:
+        return None
+    try:
+        body = error.read(65537)
+        if len(body) > 65536:
+            return None
+        payload = json.loads(body)
+        message = payload.get("error") if isinstance(payload, dict) else None
+        if not isinstance(message, str):
+            return None
+        if message.endswith("does not support tools"):
+            return "Ollama model does not support tools; route to a tool-capable model."
+        if "longer than the context length" in message:
+            return "Ollama prompt exceeds model context; route to a longer-context model or shorten the prompt."
+        return None
+    except (OSError, ValueError, RecursionError):
+        return None
+    finally:
+        error.close()
+
+
 def _tool_calls_from_raw(raw_calls: object) -> tuple[AIToolCall, ...]:
     if raw_calls is None:
         return ()
@@ -417,6 +444,15 @@ class OllamaChatClient:
                 raw_error=exc,
             ) from exc
         except HTTPError as exc:
+            capability = _ollama_capability_400(exc)
+            if capability is not None:
+                raise ProviderError(
+                    capability,
+                    category=ProviderErrorCategory.RETRYABLE,
+                    retryable=True,
+                    provider="ollama",
+                    raw_error=exc,
+                ) from exc
             if payload.get("tools") and _known_tool_argument_failure(exc):
                 raise ToolCallFormatError(provider="ollama") from exc
             category = (
@@ -488,6 +524,15 @@ class OllamaChatClient:
                 raw_error=exc,
             ) from exc
         except HTTPError as exc:
+            capability = _ollama_capability_400(exc)
+            if capability is not None:
+                raise ProviderError(
+                    capability,
+                    category=ProviderErrorCategory.RETRYABLE,
+                    retryable=True,
+                    provider="ollama",
+                    raw_error=exc,
+                ) from exc
             category = (
                 ProviderErrorCategory.RETRYABLE
                 if 500 <= exc.code < 600
