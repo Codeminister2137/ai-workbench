@@ -25,6 +25,8 @@ from ai_provider import (
     ProviderError,
     ProviderErrorCategory,
     ToolCallFormatError,
+    UsageMetadata,
+    UsageSource,
 )
 from ai_provider.closeout import safe_diagnostic_label
 
@@ -72,6 +74,46 @@ class AgentResult:
     model_output_errors: int = 0
     completion_failures: int = 0
     compactions: int = 0
+    # Accumulated model-call usage for this run() invocation: iterations
+    # plus compaction summarizer calls. Descendant delegated loops are not
+    # included (the delegation runner protocol carries no usage channel).
+    usage: UsageMetadata = field(default_factory=UsageMetadata)
+
+
+def _combine_usage(first: UsageMetadata, second: UsageMetadata) -> UsageMetadata:
+    """Sum two usage records; the source is the weakest link.
+
+    Token/cost fields sum treating None as zero. The combined source is
+    honest about gaps: any UNAVAILABLE call poisons the run label, mixed
+    reported/estimated degrades to ESTIMATED.
+    """
+    rank = {
+        UsageSource.PROVIDER_REPORTED: 2,
+        UsageSource.ESTIMATED: 1,
+        UsageSource.UNAVAILABLE: 0,
+    }
+    source = first.source if rank[first.source] <= rank[second.source] else second.source
+
+    def sum_int(*values: int | None) -> int | None:
+        known = [value for value in values if value is not None]
+        return sum(known) if known else None
+
+    def sum_float(*values: float | None) -> float | None:
+        known = [value for value in values if value is not None]
+        return sum(known) if known else None
+
+    combined_in = sum_int(first.input_tokens, second.input_tokens)
+    combined_out = sum_int(first.output_tokens, second.output_tokens)
+    combined_total = sum_int(first.total_tokens, second.total_tokens)
+    if combined_total is None:
+        combined_total = sum_int(combined_in, combined_out)
+    return UsageMetadata(
+        source=source,
+        input_tokens=combined_in,
+        output_tokens=combined_out,
+        total_tokens=combined_total,
+        reported_cost_usd=sum_float(first.reported_cost_usd, second.reported_cost_usd),
+    )
 
 
 class AgentLoop:
@@ -325,17 +367,18 @@ class AgentLoop:
         compactions: int,
         model: str | None,
         privacy_class: PrivacyClass,
-    ) -> int:
+    ) -> tuple[int, UsageMetadata | None]:
         """Summarize older turns when the loop context budget is exceeded.
 
         Original system messages (required instructions) are immune and always
         kept verbatim. Older non-system turns plus any prior compaction summary
         are folded into a fresh rolling summary; the newest tail stays verbatim.
-        Returns the updated compaction count.
+        Returns the updated compaction count plus the summarizer call usage
+        (None when nothing was compacted).
         """
         budget = self.loop_context_budget_chars
         if budget is None or self._measured_context_chars(messages) <= budget:
-            return compactions
+            return compactions, None
         if compactions >= self.max_compactions:
             raise ProviderError(
                 f"loop context still exceeds its budget after {compactions} "
@@ -396,7 +439,8 @@ class AgentLoop:
             metadata={**self.request_metadata, "task_type": "loop_compaction"},
         )
         enforce_credential_policy(summary_request, extra=self.context.credential_secrets)
-        summary_text = self.client.complete(summary_request).message.content.strip()
+        summary_response = self.client.complete(summary_request)
+        summary_text = summary_response.message.content.strip()
         if not summary_text:
             raise ProviderError(
                 "loop compaction summarizer returned an empty summary",
@@ -417,7 +461,7 @@ class AgentLoop:
             self.diagnostic(
                 f"loop_compaction: n={compactions + 1} summarized={len(foldable)} tail={len(tail)}"
             )
-        return compactions + 1
+        return compactions + 1, summary_response.usage
 
     def resume(
         self,
@@ -529,6 +573,9 @@ class AgentLoop:
         model_output_errors = 0
         completion_failures = 0
         compactions = 0
+        # Nullable until the first model call: an empty UNAVAILABLE seed
+        # would poison the weakest-link source of every run.
+        usage: UsageMetadata | None = None
         incomplete_states: Counter[tuple[tuple[str, ...], tuple[tuple[str, str], ...]]] = Counter()
 
         for iteration in range(1, self.max_iterations + 1):
@@ -540,7 +587,11 @@ class AgentLoop:
                         category=ProviderErrorCategory.NON_RETRYABLE,
                     )
                 self.context.delegation.budget.consume()
-            compactions = self._maybe_compact(messages, compactions, model, privacy_class)
+            compactions, compact_usage = self._maybe_compact(
+                messages, compactions, model, privacy_class
+            )
+            if compact_usage is not None:
+                usage = compact_usage if usage is None else _combine_usage(usage, compact_usage)
             try:
                 request = AIRequest(
                     messages=tuple(messages),
@@ -553,6 +604,7 @@ class AgentLoop:
                 )
                 enforce_credential_policy(request, extra=self.context.credential_secrets)
                 response = self.client.complete(request)
+                usage = response.usage if usage is None else _combine_usage(usage, response.usage)
             except ToolCallFormatError as exc:
                 model_output_errors += 1
                 self._check_deadline(messages)
@@ -714,6 +766,7 @@ class AgentLoop:
                     model_output_errors=model_output_errors,
                     completion_failures=completion_failures,
                     compactions=compactions,
+                    usage=usage if usage is not None else UsageMetadata(),
                 )
 
             seen_in_batch: set[tuple[str, str, str]] = set()
