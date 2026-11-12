@@ -60,3 +60,9 @@ models used for free, private inference.
 
 The unattended-window fallback: puts the PC to sleep at the planned
 time unless the owner cancels. Armed only during unattended loops.
+
+## agents
+
+Supervision verdicts over agent runs: stuck (running, silent 30+
+minutes), broken (fresh failure, with cause class), parked (queued
+over an hour), or ok. Anything stuck or broken needs attention.

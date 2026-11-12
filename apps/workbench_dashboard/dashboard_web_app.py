@@ -388,6 +388,83 @@ def fleet_sleep(repo_root: Path) -> dict[str, Any]:
     }
 
 
+SUPERVISION_STUCK_MINUTES = 30
+SUPERVISION_PARKED_MINUTES = 60
+SUPERVISION_BROKEN_HOURS = 24
+SUPERVISION_TERMINAL = frozenset({"completed", "cancelled", "canceled", "merged"})
+
+
+def _run_age_minutes(run: dict[str, Any], now: datetime) -> float | None:
+    raw = run.get("updated_at_utc")
+    if not isinstance(raw, str):
+        return None
+    try:
+        updated = datetime.fromisoformat(raw)
+    except ValueError:
+        return None
+    if updated.tzinfo is None:
+        updated = updated.replace(tzinfo=UTC)
+    return (now - updated).total_seconds() / 60
+
+
+def _run_failure_class(run: dict[str, Any]) -> str:
+    receipts = run.get("receipts")
+    if isinstance(receipts, list):
+        for receipt in reversed(receipts):
+            if isinstance(receipt, dict) and receipt.get("failure_class"):
+                return str(receipt["failure_class"])
+    return "unknown"
+
+
+def fleet_agents(stores, *, now: datetime | None = None) -> dict[str, Any]:
+    """Supervision verdicts over runs: stuck, broken, parked, or ok.
+
+    Failed runs stay visible while fresh; running runs older than
+    SUPERVISION_STUCK_MINUTES without an update are stuck; old queued
+    runs are parked. Fail-soft like every other Fleet probe.
+    """
+    try:
+        items, _total = stores.runs.list(limit=100)
+    except Exception:  # noqa: BLE001 - health board never raises
+        return {"runs": [], "stuck": 0, "broken": 0, "attention": False}
+    moment = now or datetime.now(UTC)
+    verdicts: list[dict[str, Any]] = []
+    for run in items:
+        if not isinstance(run, dict):
+            continue
+        status = run.get("status") or ""
+        if status in SUPERVISION_TERMINAL:
+            continue
+        age = _run_age_minutes(run, moment)
+        verdict = "ok"
+        reason = ""
+        if status == "failed":
+            if age is None or age <= SUPERVISION_BROKEN_HOURS * 60:
+                verdict = "broken"
+                reason = _run_failure_class(run)
+            else:
+                continue
+        elif status == "running" and age is not None and age > SUPERVISION_STUCK_MINUTES:
+            verdict = "stuck"
+            reason = f"no update for {age:.0f} min"
+        elif status == "queued" and age is not None and age > SUPERVISION_PARKED_MINUTES:
+            verdict = "parked"
+            reason = f"queued for {age:.0f} min"
+        verdicts.append(
+            {
+                "id": run.get("id"),
+                "title": run.get("title") or run.get("id"),
+                "status": status,
+                "verdict": verdict,
+                "reason": reason,
+                "updated": run.get("updated_at_utc"),
+            }
+        )
+    stuck = sum(1 for item in verdicts if item["verdict"] == "stuck")
+    broken = sum(1 for item in verdicts if item["verdict"] == "broken")
+    return {"runs": verdicts, "stuck": stuck, "broken": broken, "attention": bool(stuck or broken)}
+
+
 def fleet_runs(stores) -> list[dict[str, Any]]:
     """Non-terminal runs (live work plus anything awaiting merge/review)."""
     try:
@@ -511,12 +588,16 @@ def fleet_status(repo_root: Path, stores) -> dict[str, Any]:
         if explain.get(row["name"]):
             row["explain"] = explain[row["name"]]
         tasks.append(row)
+    agents: dict[str, Any] = fleet_agents(stores)
+    if explain.get("agents"):
+        agents["explain"] = explain["agents"]
     return {
         "dashboard": dashboard,
         "ollama": ollama,
         "tasks": tasks,
         "sleep": sleep,
         "runs": fleet_runs(stores),
+        "agents": agents,
     }
 
 
