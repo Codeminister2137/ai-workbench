@@ -1,10 +1,11 @@
-"""Inbox-to-run bridge: owner->agent tasks become approval-gated runs.
+"""Inbox-to-run bridge: agent tasks become runs, owner filings pre-approved.
 
 Mai reads its backlog through this bridge instead of polling the inbox UI.
 Only open items with ``assignee == "agent"`` and ``type == "task"`` are
 bridged; decisions, clarifications, and orders always need the owner first.
-Every bridged run is queued behind a fresh Approve/Reject decision, so the
-existing approval gate keeps working unchanged. Bridged items are marked
+Tasks filed by the owner are pre-approved (filing is approval) and queued
+without a self-approval decision; supervisor/agent-filed tasks keep the
+Approve/Reject gate. Bridged items are marked
 (``metadata.bridge_run_id``) and never proposed twice.
 """
 
@@ -46,6 +47,40 @@ def bridge_agent_queue(stores, *, fanout_policy: str = "restricted") -> list[dic
         run_id = uuid.uuid4().hex
         now = datetime.now(UTC).isoformat()
         run_title = title[:60]
+        if str(item.get("created_by") or "") == "owner":
+            stores.runs.put(
+                run_id,
+                {
+                    "id": run_id,
+                    "title": run_title,
+                    "status": "queued",
+                    "body": f"{title}\n\n{body}",
+                    "origin": "inbox",
+                    "inbox_id": None,
+                    "approval_mode": "owner-filed",
+                    "bridged_from": item["id"],
+                    "fanout_policy": fanout_policy,
+                    "fanout_effective": fanout_policy,
+                    "created_at_utc": now,
+                    "updated_at_utc": now,
+                },
+            )
+            updated = dict(item)
+            updated["metadata"] = {**metadata, "bridge_run_id": run_id}
+            refs = list(updated.get("context_refs") or [])
+            if f"run:{run_id}" not in refs:
+                refs.append(f"run:{run_id}")
+            updated["context_refs"] = refs
+            stores.inbox.put(item["id"], updated)
+            receipts.append(
+                {
+                    "inbox_id": item["id"],
+                    "run_id": run_id,
+                    "approval_id": None,
+                    "status": "preapproved",
+                }
+            )
+            continue
         try:
             approval = stores.create_inbox_task(
                 title=f"Approve agent run: {run_title}",
