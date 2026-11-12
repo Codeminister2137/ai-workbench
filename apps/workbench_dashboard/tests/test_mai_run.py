@@ -123,6 +123,17 @@ def test_config_validates_mai_backend(tmp_path) -> None:
         load_config(path)
 
 
+def test_empty_output_on_exit_zero_is_provider_failure() -> None:
+    def runner(argv):
+        return 0
+
+    outcome = run_mai_session(["prompt"], runner=runner)
+    receipt = mai_receipt(outcome, ["prompt"])
+    assert receipt["status"] == "failed"
+    assert receipt["failure_class"] == "provider"
+    assert "empty output" in receipt["error"]
+
+
 def test_facts_survive_tail_truncation() -> None:
     def runner(argv):
         print("coding_session_id: s1")
