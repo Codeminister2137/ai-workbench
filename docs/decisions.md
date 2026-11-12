@@ -1,3 +1,16 @@
+## Run isolation: scratch worktree per run (A) - owner 2026-11-12
+
+**Status:** Accepted (inbox d4ff0cc2, agree with recommendation;
+implementation feature/run-worktree-isolation).
+
+Each approved Mai run executes in `run/<id>` branched from `develop`
+under `.tmp/run-worktrees/`, with `user-config.toml` copied in and
+`.env` never copied. Receipts carry branch + path; worktrees are retained
+for review (no auto-merge/delete); setup failures fail closed. Agreed after
+scheduled drains edited the serve tree, then the dev checkout. Alternatives:
+current-tree + review (B), staged-output dir (C). Chat run-requests made
+pre-approved in the same session (owner requirement, no self-approval).
+
 ## Dashboard navigation and activation first - owner 2026-11-12
 
 **Status:** Accepted (inbox adcec2af=A; implementation task c5d5a2b2).
