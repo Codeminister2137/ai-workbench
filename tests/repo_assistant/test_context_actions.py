@@ -34,6 +34,41 @@ def test_load_prompt_context_loads_default_and_selected_repo_files(tmp_path: Pat
     assert all(item.inside_repo for item in context)
 
 
+def test_minimal_instructions_skips_agents_rules_but_keeps_selection(tmp_path: Path) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    (repo_root / "AGENTS.md").write_text("agent rules", encoding="utf-8")
+    (repo_root / "CURRENT_CONTEXT.md").write_text("handoff", encoding="utf-8")
+    (repo_root / "src.py").write_text("print('hello')", encoding="utf-8")
+
+    context = load_prompt_context(repo_root, [Path("src.py")], minimal_instructions=True)
+
+    assert [item.display_path for item in context] == ["CURRENT_CONTEXT.md", "src.py"]
+    assert all(not item.required_instruction for item in context)
+
+
+def test_minimal_instructions_still_honors_explicit_agents_selection(tmp_path: Path) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    (repo_root / "AGENTS.md").write_text("agent rules", encoding="utf-8")
+
+    context = load_prompt_context(repo_root, [Path("AGENTS.md")], minimal_instructions=True)
+
+    assert [item.display_path for item in context] == ["AGENTS.md"]
+    assert context[0].required_instruction is False
+
+
+def test_default_instructions_still_require_agents_rules(tmp_path: Path) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    (repo_root / "AGENTS.md").write_text("agent rules", encoding="utf-8")
+
+    context = load_prompt_context(repo_root, [])
+
+    assert [item.display_path for item in context] == ["AGENTS.md"]
+    assert context[0].required_instruction is True
+
+
 def test_load_prompt_context_asks_before_outside_repo_file(tmp_path: Path) -> None:
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
