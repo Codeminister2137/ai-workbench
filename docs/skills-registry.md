@@ -5,6 +5,9 @@ Checked in gate via `--check`.
 
 | Tool | Category | Description | Parameters | Module |
 |---|---|---|---|---|
+| poll_command | shell | Poll a background job: status (running/done/stopped/killed/orphaned), exit code when finished, and output since the previous poll. Poll again while running or while bytes remain. | job_id | background |
+| run_command_background | shell | Start a shell command in the background and return a job id immediately. Poll with poll_command until status is done, then read the final output. Prefer this for commands over ~30s. | command, cwd | background |
+| stop_command | shell | Terminate a running background job. Poll afterwards for any final output. Already-finished jobs report their state. | job_id | background |
 | DelegateTaskTool | ? | Tool that lets a primary agent delegate bounded coding subtasks. | - | ai_agent.tools.delegation |
 | create_file | write | Create a new file with specified content. Fails if file exists unless overwrite is True. | path, content, overwrite | filesystem |
 | edit_file | write | Edit an existing file by replacing 'old_text' with 'new_text'. Both strings are literal file text: preserve indentation and do not add patch markers, read-output line numbers, or Markdown fences. To insert text without deleting the anchor, include old_text unchanged in new_text along with the added text. Retain existing content that the task requires unchanged. If old_text is omitted or empty, replaces full file content. | path, new_text, old_text | filesystem |
