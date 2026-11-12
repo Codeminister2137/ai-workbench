@@ -1,7 +1,7 @@
 :root { color-scheme: light dark; }
 body { font-family: var(--wb-font-ui); margin: 0 auto; max-width: var(--wb-size-page); padding: var(--wb-pad-page); }
 header { display: flex; justify-content: space-between; align-items: center; padding: var(--wb-pad-header); border-bottom: var(--wb-border-thin); position: sticky; top: 0; background: var(--wb-color-surface); z-index: 5; }
-nav a { margin-right: var(--wb-space-5); text-decoration: none; }
+nav a { margin-right: var(--wb-space-5); text-decoration: none; white-space: nowrap; }
 nav a.active { font-weight: bold; text-decoration: underline; }
 .badge { background: var(--wb-color-red); color: var(--wb-color-white); border-radius: var(--wb-radius-badge); padding: var(--wb-pad-badge); font-size: var(--wb-font-badge); }
 #create-wrap { position: relative; }
@@ -23,7 +23,11 @@ input[type="text"], textarea { flex: 1; font: inherit; }
 button { font: inherit; cursor: pointer; }
 ul.plain { list-style: none; padding-left: 0; }
 ul.plain li { margin-bottom: var(--wb-space-2); }
-@media (max-width: 700px) { .columns { grid-template-columns: 1fr; } }
+@media (max-width: 700px) {
+  .columns { grid-template-columns: 1fr; }
+  header { flex-wrap: wrap; row-gap: var(--wb-space-3); }
+  nav { flex: 1 1 100%; overflow-x: auto; white-space: nowrap; padding-bottom: var(--wb-space-2); }
+}
 .pill { display: inline-block; padding: var(--wb-pad-pill); border-radius: var(--wb-radius-pill); font-size: var(--wb-font-pill); }
 #maint-banner { background: var(--wb-color-warn-bg); color: var(--wb-color-warn); padding: var(--wb-pad-toast); border-bottom: var(--wb-border-thin); }
 .st-new, .st-open { background: var(--wb-color-info-bg); color: var(--wb-color-info); }
