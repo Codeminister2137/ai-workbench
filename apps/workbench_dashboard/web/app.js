@@ -1131,6 +1131,82 @@ async function markIdeaSeen(id, item) {
   }
 }
 
+async function renderInvoices(id) {
+  if (id) {
+    const payload = await api("/api/invoices/" + encodeURIComponent(id));
+    const item = payload.item;
+    const approval = item.approval && item.approval_valid
+      ? `<p><span class="pill st-ready">approved</span> <span class="muted">by ${esc(item.approval.reviewer)} · ${esc(fmtTime(item.approval.reviewed_at))}</span></p>`
+      : '<p><span class="pill">draft</span> <span class="muted">not approved — review below approves this exact content</span></p>';
+    view.innerHTML = `<h1>Invoice ${esc(item.number)}</h1><p><a href="#/invoices">All invoices</a></p>
+      <div class="card"><h2>${esc(item.number)} · ${esc(item.draft.buyer.name)}</h2>
+      ${approval}
+      <pre>${esc(item.text)}</pre>
+      <p class="muted">Gross ${esc(item.totals.gross)} ${esc(item.draft.currency)}. KSeF preview available via API.</p>
+      <form id="review-invoice-form" class="inline">
+        <input type="text" name="reviewer" placeholder="Reviewer..." title="Reviewer name (required)">
+        <button type="submit" title="Approve this exact draft content">Approve draft</button>
+      </form></div>`;
+    document.getElementById("review-invoice-form").addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      try {
+        await api("/api/invoices/" + encodeURIComponent(id) + "/review", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({reviewer: ev.target.reviewer.value}),
+        });
+        toast("Draft approved", true);
+        render();
+      } catch (err) {
+        toast(err.message, false);
+      }
+    });
+    return;
+  }
+  const payload = await api("/api/invoices");
+  const rows = (payload.items || []).map((t) =>
+    `<li><a href="#/invoices/${esc(t.id)}">${esc(t.number)}</a> <span class="muted">${esc(t.buyer)} · ${esc(t.gross)}</span> ` +
+    (t.approved ? '<span class="pill st-ready">approved</span>' : '<span class="pill">draft</span>') + `</li>`).join("");
+  view.innerHTML = `<h1>Invoices</h1>
+    <p class="muted">Drafts only — sending needs the accountant-verified template. One line per draft for now.</p>
+    <ul class="plain">${rows || '<li class="muted">No drafts yet.</li>'}</ul>
+    <div class="card"><h2>New draft</h2>
+    <form id="invoice-form">
+      <p><input type="text" name="number" placeholder="FV/2026/11/7" title="Invoice number (SERIES/YYYY/MM/N)"></p>
+      <p><input type="text" name="issue_date" placeholder="2026-11-12" title="Issue date (YYYY-MM-DD)"></p>
+      <p><input type="text" name="b_name" placeholder="Buyer name..." title="Buyer name (required)"></p>
+      <p><input type="text" name="b_nip" placeholder="Buyer NIP..." title="Buyer NIP, 10 digits (required)"></p>
+      <p><input type="text" name="b_street" placeholder="Buyer street..." title="Buyer street (required)">
+      <input type="text" name="b_postal" placeholder="00-000" title="Buyer postal code (required)">
+      <input type="text" name="b_city" placeholder="Buyer city..." title="Buyer city (required)"></p>
+      <p><input type="text" name="l_desc" placeholder="Line description..." title="Line description (required)"></p>
+      <p><input type="text" name="l_qty" placeholder="1" title="Quantity (required)">
+      <input type="text" name="l_net" placeholder="1000.00" title="Net unit price PLN (required)">
+      <select name="l_vat" title="VAT rate"><option value="23">23</option><option value="8">8</option><option value="5">5</option><option value="0">0</option><option value="zw">zw</option><option value="np">np</option></select></p>
+      <p><button type="submit" title="Validate and store the draft">Create draft</button></p>
+    </form></div>`;
+  document.getElementById("invoice-form").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const f = ev.target;
+    const body = {
+      number: f.number.value, issue_date: f.issue_date.value,
+      buyer: {name: f.b_name.value, nip: f.b_nip.value, street: f.b_street.value, postal: f.b_postal.value, city: f.b_city.value},
+      lines: [{description: f.l_desc.value, quantity: f.l_qty.value, unit_net: f.l_net.value, vat_rate: f.l_vat.value}],
+    };
+    try {
+      const out = await api("/api/invoices", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(body),
+      });
+      toast("Draft stored", true);
+      location.hash = "#/invoices/" + out.id;
+    } catch (err) {
+      toast(err.message, false);
+    }
+  });
+}
+
 async function renderIdeas(id) {
   if (id) {
     const payload = await api("/api/ideas/" + encodeURIComponent(id));
@@ -1935,6 +2011,7 @@ async function render() {
     else if (name === "runs") await renderRuns(id);
     else if (name === "inbox") await renderInbox(id);
     else if (name === "ideas") await renderIdeas(id);
+    else if (name === "invoices") await renderInvoices(id);
     else if (name === "backlog") await renderBacklog(id);
     else if (name === "workflows") await renderWorkflows(id);
     else if (name === "projects") await renderProjects(id);

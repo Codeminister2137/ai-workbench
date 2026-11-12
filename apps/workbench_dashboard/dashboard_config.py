@@ -32,6 +32,7 @@ class DashboardConfig:
     route_policy: str = "configured"
     catalog_path: str | None = None
     mai_backend: str = "in-process"
+    seller: dict | None = None
 
 
 def load_config(path: Path = DEFAULT_CONFIG_PATH) -> DashboardConfig:
@@ -61,6 +62,7 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> DashboardConfig:
         "route_policy": str,
         "catalog_path": (str, type(None)),
         "mai_backend": str,
+        "seller": (dict, type(None)),
     }
     values: dict[str, object] = {}
     for key, types in known.items():
