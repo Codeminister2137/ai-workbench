@@ -128,7 +128,9 @@ $source = $source.Replace($powerCall, "throw 'Suspend forbidden in tests'`n" + $
         creationflags=subprocess.CREATE_NO_WINDOW,
     )
     try:
-        end = time.monotonic() + 10
+        # Same headroom as wait_receipt: cold helper start exceeds 10s
+        # under full-gate load (gate flake 2026-11-12).
+        end = time.monotonic() + 30
         while time.monotonic() < end:
             try:
                 saved = json.loads(receipt.read_text(encoding="utf-8-sig"))
