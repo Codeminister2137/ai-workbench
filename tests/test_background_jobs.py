@@ -5,6 +5,7 @@ from __future__ import annotations
 import shutil
 import sys
 import time
+from pathlib import Path
 
 import pytest
 from ai_agent.tools import default_coding_tools
@@ -187,6 +188,20 @@ def test_stop_refuses_bare_pid_without_handle(tmp_path) -> None:
     assert refused["status"] == "running"
     assert "refused" in refused["note"]
     assert manager_a.stop(record.id)["status"] == "stopped"
+
+
+def test_live_pid_without_handle_polls_orphaned_without_signals(tmp_path) -> None:
+    """A rehydrated manager cannot verify liveness: no bare-pid signals."""
+    import ai_agent.tools.background as background
+
+    manager_a = JobManager(jobs_root(tmp_path))
+    record = manager_a.start(_py("import time; time.sleep(10)"), tmp_path, _env())
+    manager_b = JobManager(jobs_root(tmp_path))
+    assert manager_b.poll(record.id)["status"] == "orphaned"
+    assert manager_a.poll(record.id)["status"] == "running"  # live handle re-asserts
+    assert manager_a.stop(record.id)["status"] == "stopped"
+    source = Path(background.__file__).read_text(encoding="utf-8")
+    assert "os.kill" not in source  # P0: signalling foreign pids kills sandboxed callers
 
 
 def test_list_jobs_summarizes(tmp_path) -> None:

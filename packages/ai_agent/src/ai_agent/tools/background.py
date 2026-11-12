@@ -38,18 +38,6 @@ def jobs_root(workspace_root: Path) -> Path:
     return Path(tempfile.gettempdir()).resolve() / "ai-workbench-jobs" / slug
 
 
-def _pid_alive(pid: int) -> bool:
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        return True
-    except OSError:
-        return False
-    return True
-
-
 def _utc_now() -> str:
     return datetime.now(UTC).isoformat()
 
@@ -257,11 +245,10 @@ class JobManager:
                         return False, None
             self._live.pop(record.id, None)
             return True, process.returncode
-        if _pid_alive(record.pid):
-            # No live handle: only the pid file is left. Refuse to signal a
-            # bare pid — reuse could hit an unrelated process.
-            return False, None
-        return True, None
+        # No live handle: only the pid is left. Never signal a bare pid
+        # (reuse could hit an unrelated process, and sandboxed callers get
+        # killed for signalling foreign pids) — refuse without checking.
+        return False, None
 
     def list_jobs(self) -> list[dict[str, Any]]:
         """Newest-first summaries; refreshes liveness without consuming output."""
@@ -294,8 +281,6 @@ class JobManager:
             return records
 
     def _refresh_state(self, record: JobRecord) -> None:
-        if record.status != "running":
-            return
         process = self._live.get(record.id)
         if process is not None:
             code = process.poll()
@@ -304,10 +289,21 @@ class JobManager:
                 record.exit_code = code
                 self._live.pop(record.id, None)
                 return
-        elif not _pid_alive(record.pid):
+            if record.status == "orphaned":
+                # Another manager marked this record from its own
+                # unsupervised view; a live handle re-asserts it.
+                record.status = "running"
+                record.exit_code = None
+        elif record.status != "running":
+            return
+        else:
+            # No live handle: liveness is unverifiable without signalling
+            # a bare pid, so the job is orphaned (not supervised here).
             record.status = "orphaned"
             record.exit_code = None
             self._write_meta(record)
+            return
+        if record.status != "running":
             return
         job_dir = self._root / record.id
         for stream in ("stdout", "stderr"):
@@ -333,7 +329,7 @@ class JobManager:
                 record.status = "orphaned"
                 self._write_meta(record)
                 return
-        elif not _pid_alive(record.pid):
+        else:
             record.exit_code = None
         record.status = "killed"
         self._write_meta(record)
