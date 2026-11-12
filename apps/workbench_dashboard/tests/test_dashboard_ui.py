@@ -753,3 +753,20 @@ def test_inbox_followup_mark_stays_out_of_archive() -> None:
     assert '(t.status !== "closed" || isFollowup(t))' in js
     assert "needs follow-up" in js
     assert "Marked for follow-up, kept in Active" in js
+
+
+def test_tab_links_never_wrap_badges_onto_their_own_line() -> None:
+    """Badges stay glued to their tab labels at every width."""
+    css = _read("app.css")
+    assert (
+        "nav a { margin-right: var(--wb-space-5); text-decoration: none; white-space: nowrap; }"
+        in css
+    )
+
+
+def test_mobile_media_query_keeps_single_scrollable_tab_row() -> None:
+    """Under 700px the tab bar scrolls horizontally instead of stacking."""
+    css = _read("app.css")
+    assert "@media (max-width: 700px)" in css
+    assert "header { flex-wrap: wrap;" in css
+    assert "nav { flex: 1 1 100%; overflow-x: auto; white-space: nowrap;" in css
