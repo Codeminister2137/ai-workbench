@@ -31,7 +31,7 @@ class DashboardConfig:
     require_grounded_reports: bool = True
     route_policy: str = "configured"
     catalog_path: str | None = None
-    mai_backend: str = "in-process"
+    mai_backend: str = "subprocess"
     seller: dict | None = None
     product_tier: str = "tooling"
     serve_branch: str = "develop"
@@ -101,7 +101,7 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> DashboardConfig:
     supervision = values.get("supervision", "attended")
     if supervision not in ("attended", "unattended"):
         raise ValueError("Dashboard config key 'supervision' must be attended or unattended")
-    backend = values.get("mai_backend", "in-process")
+    backend = values.get("mai_backend", "subprocess")
     if backend not in ("in-process", "subprocess"):
         raise ValueError("Dashboard config key 'mai_backend' must be in-process or subprocess")
     tier = values.get("product_tier", "tooling")

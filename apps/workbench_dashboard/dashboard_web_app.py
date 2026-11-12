@@ -2315,7 +2315,7 @@ def build_run_drain(
             repo_root,
             repo_root / "user-config.toml",
             catalog=config.catalog_path or None,
-            backend=getattr(config, "mai_backend", "in-process"),
+            backend=getattr(config, "mai_backend", "subprocess"),
         )
     return RunDrain(
         runs_dir=data_dir / "runs",

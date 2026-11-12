@@ -89,10 +89,6 @@ def test_executor_backend_dispatch() -> None:
 
     real_session, real_subprocess = mai_run.run_mai_session, mai_run.run_mai_subprocess
     try:
-        mai_run.run_mai_session = fake_session
-        build_mai_executor(".", "u")(_run())
-        assert seen == {"in_process": True}
-        seen.clear()
 
         def fake_subprocess(argv, cmd_prefix=None, timeout_seconds=0, cwd=None):
             seen["subprocess"] = True
@@ -101,8 +97,12 @@ def test_executor_backend_dispatch() -> None:
             return MaiRunOutcome(exit_code=0, stdout_tail="", stderr_tail="")
 
         mai_run.run_mai_subprocess = fake_subprocess
-        build_mai_executor(".", "u", backend="subprocess")(_run())
+        build_mai_executor(".", "u")(_run())
         assert seen == {"subprocess": True}
+        seen.clear()
+        mai_run.run_mai_session = fake_session
+        build_mai_executor(".", "u", backend="in-process")(_run())
+        assert seen == {"in_process": True}
     finally:
         mai_run.run_mai_session = real_session
         mai_run.run_mai_subprocess = real_subprocess
@@ -115,6 +115,8 @@ def test_config_validates_mai_backend(tmp_path) -> None:
     from dashboard_config import load_config
 
     path = tmp_path / "dashboard.json"
+    assert load_config(path).mai_backend == "subprocess"
+    path.write_text(json.dumps({"mai_backend": "in-process"}), encoding="utf-8")
     assert load_config(path).mai_backend == "in-process"
     path.write_text(json.dumps({"mai_backend": "subprocess"}), encoding="utf-8")
     assert load_config(path).mai_backend == "subprocess"
@@ -169,7 +171,7 @@ def test_completed_receipt_carries_transcript_tails() -> None:
         print("did the thing")
         return 0
 
-    receipt = build_mai_executor(".", "user.toml", runner=runner)(_run())
+    receipt = build_mai_executor(".", "user.toml", runner=runner, backend="in-process")(_run())
     assert receipt["status"] == "completed"
     assert "did the thing" in receipt["stdout_tail"]
     assert receipt["mai_argv"][0].startswith("Run r1:")

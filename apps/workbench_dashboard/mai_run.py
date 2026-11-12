@@ -229,14 +229,15 @@ def build_mai_executor(
     *,
     catalog: Path | str | None = None,
     runner: Callable[[Sequence[str]], int] | None = None,
-    backend: str = "in-process",
+    backend: str = "subprocess",
     subprocess_timeout_seconds: float = SUBPROCESS_TIMEOUT_SECONDS,
     mai_cmd_prefix: list[str] | None = None,
 ) -> Callable[[dict], dict]:
     """Build a drain ``Executor`` handing runs to Mai sessions.
 
-    ``backend="subprocess"`` isolates Mai in a supervised child process
-    with timeout recovery; anything else runs in-process (default).
+    ``backend="subprocess"`` (default) isolates Mai in a supervised child
+    process with timeout recovery; ``backend="in-process"`` runs inline
+    with no timeout (tests and fully trusted setups only).
     """
 
     def execute(run: dict) -> dict:
