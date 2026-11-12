@@ -72,7 +72,7 @@ class RunRequestReceipt:
     """Host-observed receipt for one chat-triggered agent run request."""
 
     run_id: str
-    inbox_id: str
+    inbox_id: str | None
     status: str
     fanout_effective: str
 
@@ -314,13 +314,13 @@ class DashboardChat:
         project: str | None = None,
         plan: str | None = None,
     ) -> RunRequestReceipt:
-        """Queue one agent run from a chat turn; the owner approves it in the inbox.
+        """Queue one pre-approved agent run from a chat turn.
 
-        Most-restrictive by default: the run inherits ``chat_fanout_policy``
-        (default ``restricted`` — no child spawns) and nothing executes until
-        the linked inbox decision is approved and a run worker drains the
-        queue. The approval is written before the run so a full inbox refuses
-        the request without leaving a queued run behind.
+        Owner-initiated like owner-filed inbox tasks: requesting is approval,
+        so no approval inbox item is created (the owner's own request is never
+        gated on itself). Most-restrictive otherwise: the run inherits
+        ``chat_fanout_policy`` (default ``restricted`` — no child spawns) and
+        a run worker drains the queue.
 
         ``project`` is an already-validated work-root path stored as
         ``project_id`` on the run; runs and inbox stay global (no
@@ -352,22 +352,6 @@ class DashboardChat:
             if digest
             else ""
         )
-        approval = stores.create_inbox_task(
-            title=f"Approve agent run: {run_title}",
-            body=(
-                f"Chat requested an agent run (fan-out: {policy.value}).\n\n"
-                f"Request:\n{text}\n"
-                f"{context_block}\n"
-                "Approve to let a run worker execute it; "
-                "Reject leaves it parked (never executed)."
-            ),
-            task_type="decision",
-            task_id=run_id,
-            plan_id=plan,
-            context_refs=[f"run:{run_id}", f"chat:{session_id}"]
-            + ([f"plan:{plan}"] if plan else []),
-            options=["Approve", "Reject"],
-        )
         stores.runs.put(
             run_id,
             {
@@ -379,7 +363,8 @@ class DashboardChat:
                 "session_id": session_id,
                 "fanout_policy": policy.value,
                 "fanout_effective": policy.value,
-                "inbox_id": approval["id"],
+                "approval_mode": "owner-filed",
+                "inbox_id": None,
                 "project_id": project,
                 "plan_id": plan,
                 "created_at_utc": now,
@@ -392,13 +377,13 @@ class DashboardChat:
             role="system",
             content=(
                 f"Run requested: {run_title} (id {run_id}, "
-                f"fan-out {policy.value}).{project_note} Queued for owner approval "
-                f"in inbox task {approval['id']}."
+                f"fan-out {policy.value}).{project_note} Queued for execution "
+                "(owner pre-approved)."
             ),
         )
         return RunRequestReceipt(
             run_id=run_id,
-            inbox_id=approval["id"],
-            status="queued",
+            inbox_id=None,
+            status="preapproved",
             fanout_effective=policy.value,
         )

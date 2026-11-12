@@ -282,10 +282,10 @@ def test_chat_thread_has_run_request_button() -> None:
     """Chat threads queue agent runs explicitly; the receipt shows fan-out."""
     js = _read("app.js")
     assert 'id="run-request-btn"' in js
-    assert 'title="Queue this message as an agent run (needs inbox approval)"' in js
+    assert 'title="Queue this message as an agent run (owner pre-approved)"' in js
     assert "/run-request" in js
     assert "Run queued (fan-out: " in js
-    assert "queue agent runs for approval from a thread" in js
+    assert "queue pre-approved agent runs from a thread" in js
 
 
 def test_inbox_badge_polls_live_open_count() -> None:

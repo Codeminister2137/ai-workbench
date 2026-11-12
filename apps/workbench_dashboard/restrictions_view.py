@@ -27,6 +27,9 @@ def restrictions_status(stores) -> dict[str, Any]:
         if isinstance(i, dict) and str(i.get("title") or "").startswith(RUN_APPROVAL_TITLE_PREFIX)
     ]
     approved = sum(1 for i in approvals if i.get("answer") == "Approve")
+    approved += sum(
+        1 for r in chat_runs if r.get("approval_mode") == "owner-filed" and not r.get("inbox_id")
+    )
     rejected = sum(1 for i in approvals if i.get("answer") == "Reject")
     pending = sum(1 for i in approvals if i.get("status") == "open")
     return {

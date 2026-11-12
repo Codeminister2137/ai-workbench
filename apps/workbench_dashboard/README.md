@@ -42,9 +42,9 @@ inspect the owned process only.
   (`data/chats.sqlite3`). Turns stay tool-less, but any message can be
   queued as an agent run (Request run, optional project scope): the run
   lands in `data/runs/` as `queued` with fan-out `restricted` unless
-  `chat_fanout_policy` says otherwise, an inbox approval decision is
-  created, and the thread keeps a system receipt. Nothing executes
-  until the owner approves and a worker drains the queue.
+  `chat_fanout_policy` says otherwise, pre-approved (requesting is
+  approval; no approval item), and the thread keeps a system receipt.
+  A worker drains the queue.
 - Plans/Runs: plans carry a phase checklist and an approve/reject flow;
   runs show live status, events/receipts, Did/Found/Next synthesis, and
   one fan-out indicator (allowed/restricted/denied, or unknown for

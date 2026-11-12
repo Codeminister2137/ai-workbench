@@ -57,5 +57,19 @@ def test_counts_runs_and_approvals(tmp_path) -> None:
     assert sub["pending"] == 1
 
 
+def test_preapproved_chat_runs_count_as_approved(tmp_path) -> None:
+    stores = _stores(tmp_path)
+    stores.runs.put(
+        "r9",
+        {"id": "r9", "origin": "chat", "status": "queued", "approval_mode": "owner-filed"},
+    )
+    view = restrictions_status(stores)
+    sub = view["subprocess"]
+    assert sub["run_requests"] == 1
+    assert sub["approvals"] == 0
+    assert sub["approved"] == 1
+    assert sub["pending"] == 0
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-q"]))
