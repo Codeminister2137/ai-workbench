@@ -10,7 +10,9 @@ Approval rule (fail-closed): a queued run executes only when its linked
 inbox record carries a recorded approval answer (``Approve``, or
 ``Schedule it`` for NL proposal orders) with status ``answered``
 or ``closed`` (close is archival and answers are immutable after close, so a
-close preceding the drain pass must not strand an approval). Open, rejected,
+close preceding the drain pass must not strand an approval), or when the run
+is marked ``approval_mode == "owner-filed"`` (filing is approval).
+Open, rejected,
 closed-without-answer, missing, or unreadable approvals leave the run parked:
 never executed, never deleted. Paused runs resume without re-approval. The
 refusal path is an explicit ``Reject`` answer (or run cancellation), never a
@@ -134,6 +136,8 @@ class RunDrain:
             pass
 
     def _approval_allows(self, run: dict) -> tuple[bool, str]:
+        if run.get("approval_mode") == "owner-filed":
+            return True, "filed by owner; filing is approval"
         inbox_id = run.get("inbox_id")
         if not inbox_id or not isinstance(inbox_id, str):
             return False, "run has no linked inbox approval"

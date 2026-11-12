@@ -51,9 +51,9 @@ def _agent_task(stores, **overrides):
     return stores.create_inbox_task(**payload)
 
 
-def test_bridges_open_agent_task_into_queued_run(tmp_path) -> None:
+def test_supervisor_filed_task_keeps_approval_gate(tmp_path) -> None:
     stores = DashboardStores(tmp_path)
-    item = _agent_task(stores)
+    item = _agent_task(stores, created_by="supervisor")
     (receipt,) = bridge_agent_queue(stores)
     assert receipt["inbox_id"] == item["id"]
     assert receipt["status"] == "proposed"
@@ -69,6 +69,24 @@ def test_bridges_open_agent_task_into_queued_run(tmp_path) -> None:
     assert marked is not None
     assert marked["metadata"]["bridge_run_id"] == receipt["run_id"]
     # Second pass proposes nothing new.
+    assert bridge_agent_queue(stores) == []
+
+
+def test_owner_filed_task_is_preapproved_without_approval(tmp_path) -> None:
+    """Filing is approval: owner-created tasks skip the self-approval decision."""
+    stores = DashboardStores(tmp_path)
+    item = _agent_task(stores, created_by="owner")
+    (receipt,) = bridge_agent_queue(stores)
+    assert receipt["inbox_id"] == item["id"]
+    assert receipt["status"] == "preapproved"
+    assert receipt["approval_id"] is None
+    run = stores.runs.get(receipt["run_id"])
+    assert run is not None
+    assert run["status"] == "queued"
+    assert run["approval_mode"] == "owner-filed"
+    assert run["inbox_id"] is None
+    approvals, _ = stores.inbox.list(limit=10)
+    assert [i for i in approvals if i["title"].startswith("Approve agent run:")] == []
     assert bridge_agent_queue(stores) == []
 
 

@@ -19,7 +19,6 @@ from pathlib import Path
 from typing import Any, ClassVar, cast
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
-from agent_executor import build_executor
 from ai_agent.run_tracking import request_run_cancel
 from ai_agent.staged_edits import (
     ProjectRoots,
@@ -2056,32 +2055,18 @@ def build_run_drain(
     stores: DashboardStores,
     executor_factory: Callable[[], Executor] | None = None,
 ) -> RunDrain:
-    """Build the approved-runs drain shared by manual and scheduled drains."""
-    roots = ProjectRoots(
-        config.work_roots,
-        protected_dirs=(
-            data_dir,
-            repo_root / ".venv",
-            repo_root / ".git",
-        ),
-    )
+    """Build the approved-runs drain shared by manual and scheduled drains.
+
+    The default executor hands each run to a Mai session (Mai routes the
+    model through the orchestrator by criteria); ``executor_factory``
+    overrides it in tests.
+    """
     if executor_factory is not None:
         executor = executor_factory()
     else:
-        from restrictions import load_toggles
+        from mai_run import build_mai_executor
 
-        try:
-            spend_ledger: SpendLedger | None = load_spend_ledger(data_dir)
-        except (ValueError, OSError):
-            spend_ledger = None
-        executor = build_executor(
-            config,
-            roots,
-            repo_root,
-            inbox_create=stores.create_inbox_task,
-            restrictions=load_toggles(data_dir),
-            spend_ledger=spend_ledger,
-        )
+        executor = build_mai_executor(repo_root, repo_root / "user-config.toml")
     return RunDrain(
         runs_dir=data_dir / "runs",
         get_inbox=lambda inbox_id: stores.inbox.get(inbox_id),

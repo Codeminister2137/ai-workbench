@@ -409,3 +409,24 @@ def test_non_list_staged_ignored(stores) -> None:
     )
     assert drain.drain() == [{"run_id": "run1", "status": "completed"}]
     assert "staged" not in stores.runs.get("run1")
+
+
+def test_owner_filed_run_executes_without_approval(drain, stores, calls) -> None:
+    """Bridge pre-approval: filing is approval, no linked decision needed."""
+    stores.runs.put(
+        "own1",
+        {
+            "id": "own1",
+            "title": "owner task",
+            "status": "queued",
+            "body": "do it",
+            "origin": "inbox",
+            "inbox_id": None,
+            "approval_mode": "owner-filed",
+            "created_at_utc": "2026-11-05T00:00:00+00:00",
+            "updated_at_utc": "2026-11-05T00:00:00+00:00",
+        },
+    )
+    assert drain.drain() == [{"run_id": "own1", "status": "completed"}]
+    assert [call["id"] for call in calls] == ["own1"]
+    assert stores.runs.get("own1")["status"] == "completed"
