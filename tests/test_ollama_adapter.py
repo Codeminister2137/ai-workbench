@@ -187,7 +187,9 @@ def test_invalid_thinking_refuses_response_without_printing_it(monkeypatch, stre
 
 
 def _http_error(code: int, body: bytes) -> HTTPError:
-    return HTTPError("http://ollama.test/api/chat", code, "error", {}, io.BytesIO(body))
+    from email.message import Message
+
+    return HTTPError("http://ollama.test/api/chat", code, "error", Message(), io.BytesIO(body))
 
 
 def test_capability_400s_map_retryable() -> None:
