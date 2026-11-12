@@ -742,6 +742,14 @@ def test_stt_transcribe_over_cap_rejected(dashboard_server, tmp_path, monkeypatc
     raised.value.close()
 
 
+def test_supervised_runs_card_present_in_js() -> None:
+    from pathlib import Path as _Path
+
+    js = (_Path(__file__).resolve().parent.parent / "web" / "app.js").read_text(encoding="utf-8")
+    assert "Supervised runs" in js
+    assert 'r.verdict === "stuck"' in js
+
+
 def test_fleet_shape_with_stubbed_probes(dashboard_server, monkeypatch) -> None:
     monkeypatch.setattr(
         "dashboard_web_app.fleet_tasks",
@@ -774,7 +782,8 @@ def test_fleet_shape_with_stubbed_probes(dashboard_server, monkeypatch) -> None:
     )
     payload = get_json(dashboard_server, "/api/fleet")
     assert payload["ok"] is True
-    assert set(payload["fleet"]) == {"dashboard", "ollama", "tasks", "sleep", "runs"}
+    assert set(payload["fleet"]) == {"dashboard", "ollama", "tasks", "sleep", "runs", "agents"}
+    assert payload["fleet"]["agents"]["attention"] is False
     assert payload["fleet"]["dashboard"] == {"up": True, "explain": "dashboard here"}
     assert payload["fleet"]["ollama"] == {"up": True, "models": 2, "explain": "ollama here"}
     assert payload["fleet"]["tasks"][0]["name"] == "WorkbenchDashboard"
@@ -788,7 +797,7 @@ def test_fleet_explain_covers_every_task_and_service() -> None:
     explain = fleet_explain(repo_root)
     for name in FLEET_TASKS:
         assert explain.get(name), f"missing explanation for {name}"
-    for name in ("dashboard", "ollama", "sleep guard"):
+    for name in ("dashboard", "ollama", "sleep guard", "agents"):
         assert explain.get(name), f"missing explanation for {name}"
 
 

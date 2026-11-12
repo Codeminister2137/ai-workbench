@@ -1700,6 +1700,10 @@ async function renderFleet() {
     const runRows = f.runs.length
       ? f.runs.map((r) => `<li><a href="#/runs/${esc(r.id)}">${esc(r.title || r.id)}</a> <span class="pill">${esc(r.status || "")}</span> <span class="muted">${esc(fmtTime(r.updated))}</span></li>`).join("")
       : '<li class="muted">No active runs.</li>';
+    const flagged = (f.agents.runs || []).filter((r) => r.verdict === "stuck" || r.verdict === "broken");
+    const agentRows = flagged.length
+      ? flagged.map((r) => `<li><a href="#/runs/${esc(r.id)}">${esc(r.title || r.id)}</a> <span class="pill st-${esc(r.verdict)}">${esc(r.verdict)}</span> <span class="muted">${esc(r.reason || r.status || "")} · ${esc(fmtTime(r.updated))}</span></li>`).join("")
+      : '<li class="muted">No stuck or broken runs.</li>';
     const sleep = f.sleep.active
       ? `Armed — due ${esc(fmtTime(f.sleep.due_utc))}, deadline ${esc(fmtTime(f.sleep.deadline_utc))} (PID ${esc(f.sleep.pid ?? "?")})${f.sleep.explain ? ` — ${esc(f.sleep.explain)}` : ""}`
       : `Idle (${esc(f.sleep.status || "no receipt")})`;
@@ -1717,8 +1721,9 @@ async function renderFleet() {
         <button type="submit" title="Schedule PC sleep after this delay">Schedule sleep</button>
         <button type="button" id="sleep-cancel" title="Cancel your scheduled sleep (agent timers untouched)">Cancel sleep</button>
       </form></div>
-      <div class="card"><h2>Active runs</h2><ul class="plain">${runRows}</ul></div>`;
-    view.innerHTML = `<h1>Fleet</h1><p class="muted">Probed live on open. Watchdogs, servers, sleep guard, active runs.</p>${body}`;
+      <div class="card"><h2>Active runs</h2><ul class="plain">${runRows}</ul></div>
+      <div class="card"><h2>Supervised runs</h2><ul class="plain">${agentRows}</ul>${f.agents.explain ? `<p class="muted">${esc(f.agents.explain)}</p>` : ""}</div>`;
+    view.innerHTML = `<h1>Fleet</h1><p class="muted">Probed live on open. Watchdogs, servers, sleep guard, active and supervised runs.</p>${body}`;
     document.getElementById("sleep-form").addEventListener("submit", async (ev) => {
       ev.preventDefault();
       const minutes = Number(ev.target.delay.value);
@@ -1751,7 +1756,7 @@ async function renderFleet() {
   } catch (err) {
     body = `<div class="card"><h2>Fleet</h2><p class="muted">Fleet unavailable: ${esc(err.message)}</p></div>`;
   }
-  view.innerHTML = `<h1>Fleet</h1><p class="muted">Probed live on open. Watchdogs, servers, sleep guard, active runs.</p>${body}`;
+  view.innerHTML = `<h1>Fleet</h1><p class="muted">Probed live on open. Watchdogs, servers, sleep guard, active and supervised runs.</p>${body}`;
 }
 
 async function flipToggle(checkbox) {
