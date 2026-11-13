@@ -6,7 +6,7 @@ import json
 import math
 import time
 from collections import Counter
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, Any, Literal
@@ -1003,11 +1003,11 @@ def _render_compaction_source(messages: list[AIMessage], cap_chars: int) -> str:
 _PATH_ARGUMENT_KEYS = ("path", "file", "files", "target")
 
 
-def _turn_file_mentions(calls: object) -> list[str]:
+def _turn_file_mentions(calls: Sequence[AIToolCall] | None) -> list[str]:
     """Distinct path-like tool arguments in one batch (max 3, strings only)."""
     found: list[str] = []
     for call in calls or ():
-        arguments = getattr(call, "arguments", None)
+        arguments = call.arguments
         if not isinstance(arguments, dict):
             continue
         for key in _PATH_ARGUMENT_KEYS:
