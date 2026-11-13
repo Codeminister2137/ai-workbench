@@ -53,8 +53,8 @@ def _drain(data_dir, calls: list) -> RunDrain:
     return RunDrain(runs_dir=data_dir / "runs", get_inbox=stores.inbox.get, executor=executor)
 
 
-def test_approve_runs_to_receipt(wake_server) -> None:
-    """Chat request, inbox Approve, drain executes, receipts are served."""
+def test_preapproved_runs_to_receipt(wake_server) -> None:
+    """Chat request is pre-approved: drain executes, receipts are served."""
     base, tmp_path = wake_server
     created = post_json(base, "/api/chat/sessions", {"title": "Wake me"})
     receipt = post_json(
@@ -62,11 +62,9 @@ def test_approve_runs_to_receipt(wake_server) -> None:
         f"/api/chat/sessions/{created['id']}/run-request",
         {"text": "Summarize plans"},
     )
-    run_id, inbox_id = receipt["run_id"], receipt["inbox_id"]
-
-    answered = post_json(base, f"/api/inbox/{inbox_id}/answer", {"answer": "", "option_index": 0})
-    assert answered["ok"] is True
-    assert answered["status"] == "answered"
+    assert receipt["status"] == "preapproved"
+    assert receipt["inbox_id"] is None
+    run_id = receipt["run_id"]
 
     calls: list = []
     outcomes = _drain(tmp_path / "data", calls).drain()
@@ -81,16 +79,19 @@ def test_approve_runs_to_receipt(wake_server) -> None:
 
 
 def test_reject_parks_forever(wake_server) -> None:
-    """A Rejected run never executes across drain passes."""
+    """A Rejected agent-filed run never executes across drain passes."""
     base, tmp_path = wake_server
-    created = post_json(base, "/api/chat/sessions", {"title": "Wake me"})
-    receipt = post_json(
+    post_json(
         base,
-        f"/api/chat/sessions/{created['id']}/run-request",
-        {"text": "Summarize plans"},
+        "/api/inbox",
+        {"title": "Agent chore", "body": "Do it", "type": "task", "assignee": "agent"},
     )
-    run_id, inbox_id = receipt["run_id"], receipt["inbox_id"]
-    post_json(base, f"/api/inbox/{inbox_id}/answer", {"answer": "", "option_index": 1})
+    bridged = post_json(base, "/api/inbox/bridge-runs", {})
+    assert bridged["ok"] is True
+    assert len(bridged["bridged"]) == 1
+    run_id = bridged["bridged"][0]["run_id"]
+    approval_id = bridged["bridged"][0]["approval_id"]
+    post_json(base, f"/api/inbox/{approval_id}/answer", {"answer": "", "option_index": 1})
 
     calls: list = []
     drain = _drain(tmp_path / "data", calls)
