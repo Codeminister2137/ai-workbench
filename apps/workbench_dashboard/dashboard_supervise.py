@@ -266,12 +266,19 @@ def _pidfile_matches_process(record: dict, pid: int) -> bool:
 
 
 def _stop_tracked_server(pid: int, port: int) -> None:
-    """Stop a verified-ours server: graceful SIGINT, then forceful SIGTERM."""
+    """Stop a verified-ours server: graceful SIGINT, then forceful SIGTERM.
+
+    A failed signal is not a stopped server: only a missing process ends
+    the escalation (Windows SIGINT fails for detached processes, so giving
+    up there would never reach SIGTERM).
+    """
     for sig in (signal.SIGINT, signal.SIGTERM):
         try:
             os.kill(pid, sig)
-        except (OSError, ProcessLookupError):
+        except ProcessLookupError:
             return
+        except OSError:
+            continue
         deadline = time.monotonic() + PORT_FREE_TIMEOUT_SECONDS
         while time.monotonic() < deadline and _port_busy(port):
             time.sleep(0.5)
@@ -293,14 +300,19 @@ def restart_dashboard(config: SuperviseConfig) -> tuple[bool, str]:
     """Restart the dashboard onto the synced worktree; (ok, detail)."""
     record = _read_pidfile(config.data_dir)
     pid = record.get("pid") if isinstance(record, dict) else None
-    if (
+    tracked = (
         isinstance(record, dict)
         and isinstance(pid, int)
         and pid > 0
         and _pidfile_matches_process(record, pid)
-    ):
+    )
+    if tracked:
         _stop_tracked_server(pid, config.port)
     if _port_busy(config.port):
+        if tracked:
+            return False, (
+                "port still busy after stopping tracked server; refusing to kill strangers"
+            )
         return False, "port still busy after stop; unknown owner, refusing to kill strangers"
     app_dir = config.worktree / "apps" / "workbench_dashboard"
     try:

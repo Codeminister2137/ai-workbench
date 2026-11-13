@@ -369,3 +369,68 @@ def test_restart_refuses_strangers_without_signals(tmp_path, monkeypatch) -> Non
     assert "unknown owner" in detail
     assert signals == []
     assert spawned == []
+
+
+def test_stop_escalates_past_sigint_oserror(monkeypatch) -> None:
+    import os
+    import signal
+
+    import dashboard_supervise as sup
+
+    signals: list = []
+
+    def fake_kill(pid, sig):
+        signals.append(sig)
+        if sig == signal.SIGINT:
+            raise OSError("GenerateConsoleCtrlEvent failed")
+
+    monkeypatch.setattr(os, "kill", fake_kill)
+    monkeypatch.setattr(sup, "_port_busy", lambda port: True)
+    monkeypatch.setattr(sup, "PORT_FREE_TIMEOUT_SECONDS", 0)
+    sup._stop_tracked_server(1234, 8766)
+    assert signals == [signal.SIGINT, signal.SIGTERM]
+
+
+def test_restart_names_tracked_server_when_stop_fails(tmp_path, monkeypatch) -> None:
+    import os
+    import signal
+    import subprocess
+
+    import dashboard_supervise as sup
+
+    (tmp_path / "data").mkdir()
+    (tmp_path / "data" / "dashboard.pid").write_text(
+        json.dumps({"pid": 4242, "started_utc": "2026-11-13T00:00:00+00:00"}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(sup, "_pidfile_matches_process", lambda record, pid: True)
+    signals: list = []
+    monkeypatch.setattr(os, "kill", lambda pid, sig: signals.append(sig))
+    monkeypatch.setattr(sup, "_port_busy", lambda port: True)
+    monkeypatch.setattr(sup, "PORT_FREE_TIMEOUT_SECONDS", 0)
+    spawned: list = []
+    monkeypatch.setattr(subprocess, "Popen", lambda *a, **k: spawned.append(a))
+    ok, detail = restart_dashboard(_supervise_config(tmp_path))
+    assert ok is False
+    assert "tracked server" in detail
+    assert signals == [signal.SIGINT, signal.SIGTERM]
+    assert spawned == []
+
+
+def test_stop_treats_missing_process_as_stopped(monkeypatch) -> None:
+    import os
+    import signal
+
+    import dashboard_supervise as sup
+
+    signals: list = []
+
+    def fake_kill(pid, sig):
+        signals.append(sig)
+        raise ProcessLookupError(pid)
+
+    monkeypatch.setattr(os, "kill", fake_kill)
+    monkeypatch.setattr(sup, "_port_busy", lambda port: True)
+    monkeypatch.setattr(sup, "PORT_FREE_TIMEOUT_SECONDS", 0)
+    sup._stop_tracked_server(1234, 8766)
+    assert signals == [signal.SIGINT]
