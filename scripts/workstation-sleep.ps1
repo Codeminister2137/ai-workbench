@@ -281,6 +281,13 @@ if ((Read-CancelGeneration) -ne $cancelGeneration -or
     return
 }
 Assert-WorkWindowEnded
+try {
+    & (Join-Path $PSScriptRoot 'monitors-on.ps1') | Out-Null
+    Write-Output "sleep_status: displays restored before suspend"
+    Start-Sleep -Seconds 3
+} catch {
+    Write-Output "sleep_status: display restore failed (proceeding): $_"
+}
 Write-SleepReceipt "sleep_requested"
 Write-Output "sleep_requested_warsaw: $($sleepTransitionTimesWarsaw['sleep_requested']) (Europe/Warsaw)"
 Write-Output "sleep_status: requesting"
