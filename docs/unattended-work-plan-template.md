@@ -1,6 +1,8 @@
+<!-- Project: meta | Status: active | Timebox: 1 window | Replaces: none -->
 # Unattended session plan template
 
-Copy this to local `docs/plans/unattended-work-plan.md` before an unattended run.
+Copy this to local `docs/plans/unattended-work-plan.md` before an unattended run
+(the header above travels with the copy and satisfies the plan-header gate).
 Link the active plan from `CURRENT_CONTEXT.md`; keep reusable instructions here
 and run evidence in the existing artifact locations. This plan does not grant
 inference, external access, dependencies, infrastructure or expanded task scope.

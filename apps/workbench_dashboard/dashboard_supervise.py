@@ -321,14 +321,16 @@ def restart_dashboard(config: SuperviseConfig) -> tuple[bool, str]:
     """Restart the dashboard onto the synced worktree; (ok, detail)."""
     record = _read_pidfile(config.data_dir)
     pid = record.get("pid") if isinstance(record, dict) else None
-    tracked = (
+    if (
         isinstance(record, dict)
         and isinstance(pid, int)
         and pid > 0
         and _pidfile_matches_process(record, pid)
-    )
-    if tracked:
+    ):
+        tracked = True
         _stop_tracked_server(pid, config.port)
+    else:
+        tracked = False
     if _port_busy(config.port):
         if tracked:
             return False, (
