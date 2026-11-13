@@ -262,6 +262,92 @@ def test_restart_escalates_to_sigterm_on_tracked_server(tmp_path, monkeypatch) -
     assert len(spawned) == 1
 
 
+def _mail_throttle_config(tmp_path: Path) -> SuperviseConfig:
+    (tmp_path / "data").mkdir(exist_ok=True)
+    return SuperviseConfig(
+        main_root=tmp_path,
+        worktree=tmp_path / "wt",
+        data_dir=tmp_path / "data",
+        config_path=tmp_path / "dashboard.json",
+        port=8766,
+        serve_branch="develop",
+        python_exe="python",
+    )
+
+
+def _stub_redeploy_pipeline(monkeypatch, *, restart_result: tuple) -> list:
+    """Force a redeploy attempt; return the list recording _mail_failure calls."""
+    import dashboard_supervise as sup
+
+    monkeypatch.setattr(sup, "read_origin_commit", lambda *a: "b" * 40)
+    monkeypatch.setattr(sup, "read_served_commit", lambda *a: "a" * 40)
+    monkeypatch.setattr(sup, "target_supports_worktree", lambda *a: True)
+    monkeypatch.setattr(sup, "ensure_worktree", lambda *a: (True, "ok"))
+    monkeypatch.setattr(sup, "sync_worktree", lambda *a: ("c" * 40, "synced"))
+    monkeypatch.setattr(sup, "restart_dashboard", lambda *a: restart_result)
+    monkeypatch.setattr(sup, "wait_healthy", lambda *a: True)
+    mailed: list = []
+    monkeypatch.setattr(sup, "_mail_failure", lambda config, reason: mailed.append(reason))
+    return mailed
+
+
+def test_first_failure_mails(tmp_path, monkeypatch) -> None:
+    import dashboard_supervise as sup
+
+    mailed = _stub_redeploy_pipeline(monkeypatch, restart_result=(False, "boom"))
+    outcome = sup.supervise_tick(_mail_throttle_config(tmp_path))
+    assert outcome["action"] == "failed"
+    assert mailed == ["boom"]
+
+
+def test_identical_repeat_failure_does_not_remail(tmp_path, monkeypatch) -> None:
+    import dashboard_supervise as sup
+
+    mailed = _stub_redeploy_pipeline(monkeypatch, restart_result=(False, "boom"))
+    config = _mail_throttle_config(tmp_path)
+    assert sup.supervise_tick(config)["action"] == "failed"
+    assert sup.supervise_tick(config)["action"] == "failed"
+    assert sup.supervise_tick(config)["action"] == "failed"
+    assert mailed == ["boom"]
+
+
+def test_changed_reason_mails_again(tmp_path, monkeypatch) -> None:
+    import dashboard_supervise as sup
+
+    mailed = _stub_redeploy_pipeline(monkeypatch, restart_result=(False, "boom"))
+    config = _mail_throttle_config(tmp_path)
+    assert sup.supervise_tick(config)["action"] == "failed"
+    monkeypatch.setattr(sup, "restart_dashboard", lambda *a: (False, "different"))
+    assert sup.supervise_tick(config)["action"] == "failed"
+    assert mailed == ["boom", "different"]
+
+
+def test_recovery_then_refail_mails_again(tmp_path, monkeypatch) -> None:
+    import dashboard_supervise as sup
+
+    mailed = _stub_redeploy_pipeline(monkeypatch, restart_result=(False, "boom"))
+    config = _mail_throttle_config(tmp_path)
+    assert sup.supervise_tick(config)["action"] == "failed"
+    monkeypatch.setattr(sup, "restart_dashboard", lambda *a: (True, "respawned"))
+    assert sup.supervise_tick(config)["action"] == "redeployed"
+    monkeypatch.setattr(sup, "restart_dashboard", lambda *a: (False, "boom"))
+    assert sup.supervise_tick(config)["action"] == "failed"
+    assert mailed == ["boom", "boom"]
+
+
+def test_up_to_date_clears_mailed_incident(tmp_path, monkeypatch) -> None:
+    import dashboard_supervise as sup
+
+    mailed = _stub_redeploy_pipeline(monkeypatch, restart_result=(False, "boom"))
+    config = _mail_throttle_config(tmp_path)
+    assert sup.supervise_tick(config)["action"] == "failed"
+    monkeypatch.setattr(sup, "read_origin_commit", lambda *a: "a" * 40)
+    assert sup.supervise_tick(config)["action"] == "up-to-date"
+    monkeypatch.setattr(sup, "read_origin_commit", lambda *a: "b" * 40)
+    assert sup.supervise_tick(config)["action"] == "failed"
+    assert mailed == ["boom", "boom"]
+
+
 def test_restart_refuses_strangers_without_signals(tmp_path, monkeypatch) -> None:
     import os
     import subprocess
