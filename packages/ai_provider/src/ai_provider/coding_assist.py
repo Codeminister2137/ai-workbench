@@ -37,6 +37,7 @@ from ai_provider import (
     create_chat_client,
     ensure_ollama_server,
 )
+from ai_provider.contracts import consume_stream
 
 
 @dataclass(frozen=True, slots=True)
@@ -136,6 +137,7 @@ def run_coding_prompt(
     progress_callback: Callable[[str], None] | None = None,
     progress_prefix: str = "local_agent_activity",
     cost_exemptions: frozenset[str] = frozenset(),
+    stream_text: Callable[[str], None] | None = None,
 ) -> CodingAssistResult:
     """Prepare and optionally execute one coding-oriented AI request."""
 
@@ -194,7 +196,10 @@ def run_coding_prompt(
         )
 
     client = client_factory(config)
-    response = client.complete(request)
+    if stream_text is not None and hasattr(client, "stream"):
+        response = consume_stream(client, request, stream_text)
+    else:
+        response = client.complete(request)
     if progress_callback is not None:
         progress_callback(
             f"{progress_prefix}: completed - provider={response.backend.provider} "

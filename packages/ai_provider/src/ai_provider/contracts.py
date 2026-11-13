@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any, Protocol
+
+from ai_provider.errors import ProviderError, ProviderErrorCategory
 
 
 class MessageRole(StrEnum):
@@ -248,6 +250,29 @@ class AIStreamFinal:
 
 
 AIStreamEvent = AIStreamDelta | AIStreamFinal
+
+
+def consume_stream(
+    client: ChatClient,
+    request: AIRequest,
+    stream_text: Callable[[str], None],
+) -> AIResponse:
+    """Consume a streaming response, forwarding text as it arrives.
+
+    Raises the standard no-final-response ProviderError when the stream
+    ends without AIStreamFinal.
+    """
+    for event in client.stream(request):
+        if isinstance(event, AIStreamDelta):
+            stream_text(event.content)
+        elif isinstance(event, AIStreamFinal):
+            return event.response
+    raise ProviderError(
+        "Stream ended without a final response object.",
+        category=ProviderErrorCategory.RETRYABLE,
+        retryable=True,
+        provider=client.backend.provider,
+    )
 
 
 class ChatClient(Protocol):

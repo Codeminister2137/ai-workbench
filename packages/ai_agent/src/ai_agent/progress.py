@@ -166,6 +166,17 @@ def reporter(*, verbose: bool) -> Callable[[str], None]:
     return lambda line: print(narrate(line))
 
 
+def stream_writer() -> Callable[[str], None]:
+    """Raw stdout sink for streamed model text (no added newlines)."""
+    import sys
+
+    def _write(chunk: str) -> None:
+        sys.stdout.write(chunk)
+        sys.stdout.flush()
+
+    return _write
+
+
 @contextlib.contextmanager
 def heartbeat(
     label: str,

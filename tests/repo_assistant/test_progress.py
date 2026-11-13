@@ -174,6 +174,209 @@ def test_heartbeat_joins_thread_on_error() -> None:
     assert threading.active_count() <= before
 
 
+def _streaming_loop_fixture(tmp_path, script):
+    from ai_agent import PermissionManager, PermissionPolicy, ToolContext, default_coding_tools
+    from ai_agent.loop import AgentLoop
+    from ai_provider import (
+        AIMessage,
+        AIResponse,
+        AIStreamDelta,
+        AIStreamFinal,
+        BackendInfo,
+        BackendLocation,
+        FinishReason,
+        MessageRole,
+        UsageMetadata,
+    )
+
+    class StreamingClient:
+        backend = BackendInfo(provider="fake", model="test", location=BackendLocation.LOCAL)
+
+        def __init__(self, turns):
+            self.turns = list(turns)
+            self.completed = 0
+
+        def complete(self, request):
+            self.completed += 1
+            return AIResponse(
+                message=AIMessage(MessageRole.ASSISTANT, "fallback"),
+                backend=self.backend,
+                finish_reason=FinishReason.STOP,
+                usage=UsageMetadata(),
+            )
+
+        def stream(self, request):
+            turn = self.turns.pop(0)
+            if isinstance(turn, str):
+                yield AIStreamDelta(content=turn)
+                yield AIStreamFinal(
+                    response=AIResponse(
+                        message=AIMessage(MessageRole.ASSISTANT, turn),
+                        backend=self.backend,
+                        finish_reason=FinishReason.STOP,
+                        usage=UsageMetadata(),
+                    )
+                )
+            else:
+                yield AIStreamDelta(content="")
+                yield AIStreamFinal(
+                    response=AIResponse(
+                        message=AIMessage(MessageRole.ASSISTANT, "", tool_calls=tuple(turn)),
+                        backend=self.backend,
+                        finish_reason=FinishReason.STOP,
+                        usage=UsageMetadata(),
+                    )
+                )
+
+    client = StreamingClient(script)
+    loop = AgentLoop(
+        client,
+        default_coding_tools(),
+        ToolContext(tmp_path),
+        permissions=PermissionManager(policy=PermissionPolicy.permissive()),
+    )
+    return client, loop
+
+
+def test_loop_streams_text_when_sink_set(tmp_path) -> None:
+    chunks: list[str] = []
+    client, loop = _streaming_loop_fixture(tmp_path, ["Hello there"])
+    loop.stream_text = chunks.append
+    result = loop.run("Say hi")
+    assert "".join(chunks) == "Hello there"
+    assert result.response.message.content == "Hello there"
+    assert client.completed == 0
+
+
+def test_loop_falls_back_to_complete_without_stream(tmp_path) -> None:
+    from ai_agent import PermissionManager, PermissionPolicy, ToolContext, default_coding_tools
+    from ai_agent.loop import AgentLoop
+    from ai_provider import (
+        AIMessage,
+        AIResponse,
+        BackendInfo,
+        BackendLocation,
+        FinishReason,
+        MessageRole,
+        UsageMetadata,
+    )
+
+    class PlainClient:
+        backend = BackendInfo(provider="fake", model="test", location=BackendLocation.LOCAL)
+
+        def complete(self, request):
+            return AIResponse(
+                message=AIMessage(MessageRole.ASSISTANT, "done"),
+                backend=self.backend,
+                finish_reason=FinishReason.STOP,
+                usage=UsageMetadata(),
+            )
+
+    chunks: list[str] = []
+    result = AgentLoop(
+        PlainClient(),
+        default_coding_tools(),
+        ToolContext(tmp_path),
+        permissions=PermissionManager(policy=PermissionPolicy.permissive()),
+        stream_text=chunks.append,
+    ).run("Say hi")
+    assert result.response.message.content == "done"
+    assert chunks == []
+
+
+def test_loop_stream_without_final_raises_retryable(tmp_path) -> None:
+    from ai_agent import PermissionManager, PermissionPolicy, ToolContext, default_coding_tools
+    from ai_agent.loop import AgentLoop
+    from ai_provider import (
+        AIStreamDelta,
+        BackendInfo,
+        BackendLocation,
+        ProviderError,
+        ProviderErrorCategory,
+    )
+
+    class BrokenClient:
+        backend = BackendInfo(provider="fake", model="test", location=BackendLocation.LOCAL)
+
+        def stream(self, request):
+            yield AIStreamDelta(content="partial")
+
+    with pytest.raises(ProviderError) as excinfo:
+        AgentLoop(
+            BrokenClient(),
+            default_coding_tools(),
+            ToolContext(tmp_path),
+            permissions=PermissionManager(policy=PermissionPolicy.permissive()),
+            stream_text=lambda chunk: None,
+        ).run("Say hi")
+    assert excinfo.value.category is ProviderErrorCategory.RETRYABLE
+
+
+def test_stream_writer_emits_raw_chunks(capsys: pytest.CaptureFixture) -> None:
+    from ai_agent.progress import stream_writer
+
+    write = stream_writer()
+    write("hel")
+    write("lo")
+    assert capsys.readouterr().out == "hello"
+
+
+def test_consume_stream_forwards_text_and_returns_final() -> None:
+    from ai_provider import (
+        AIMessage,
+        AIResponse,
+        AIStreamDelta,
+        AIStreamFinal,
+        BackendInfo,
+        BackendLocation,
+        FinishReason,
+        MessageRole,
+        UsageMetadata,
+    )
+    from ai_provider.contracts import consume_stream
+
+    class FakeClient:
+        backend = BackendInfo(provider="fake", model="t", location=BackendLocation.LOCAL)
+
+        def stream(self, request):
+            yield AIStreamDelta(content="he")
+            yield AIStreamDelta(content="llo")
+            yield AIStreamFinal(
+                response=AIResponse(
+                    message=AIMessage(MessageRole.ASSISTANT, "hello"),
+                    backend=self.backend,
+                    finish_reason=FinishReason.STOP,
+                    usage=UsageMetadata(),
+                )
+            )
+
+    chunks: list[str] = []
+    response = consume_stream(FakeClient(), object(), chunks.append)
+    assert "".join(chunks) == "hello"
+    assert response.message.content == "hello"
+
+
+def test_consume_stream_without_final_raises_retryable() -> None:
+    from ai_provider import (
+        AIStreamDelta,
+        BackendInfo,
+        BackendLocation,
+        ProviderError,
+        ProviderErrorCategory,
+    )
+    from ai_provider.contracts import consume_stream
+
+    class BrokenClient:
+        backend = BackendInfo(provider="fake", model="t", location=BackendLocation.LOCAL)
+
+        def stream(self, request):
+            yield AIStreamDelta(content="partial")
+
+    with pytest.raises(ProviderError) as excinfo:
+        consume_stream(BrokenClient(), object(), lambda chunk: None)
+    assert excinfo.value.category is ProviderErrorCategory.RETRYABLE
+
+
 def test_loop_emits_turn_summary_and_records_it(tmp_path) -> None:
     from ai_agent import PermissionManager, PermissionPolicy, ToolContext, default_coding_tools
     from ai_agent.loop import AgentLoop

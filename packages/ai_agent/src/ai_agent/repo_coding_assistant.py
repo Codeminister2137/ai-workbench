@@ -272,6 +272,7 @@ from ai_agent.external_reporting import (
     write_external_agent_stderr as _write_external_agent_stderr,  # noqa: F401 - compatibility export
 )
 from ai_agent.progress import reporter as _progress_reporter_factory
+from ai_agent.progress import stream_writer as _progress_stream_writer
 from ai_agent.repair_workflow import (
     build_orchestrated_repair_prompt as _build_orchestrated_repair_prompt,  # noqa: F401 - compatibility export
 )
@@ -1791,6 +1792,7 @@ def _execute_request(
             ollama_resource_profile=ollama_resource_profile,
             progress_callback=progress_reporter if args.execute and not args.native_tools else None,
             progress_prefix="local_agent_activity",
+            stream_text=_progress_stream_writer() if getattr(args, "stream", False) else None,
         )
         primary_elapsed_seconds = time.perf_counter() - primary_started
     except ProviderError as exc:
@@ -4245,6 +4247,7 @@ def _run_native_agent(
         ),
         deadline=getattr(getattr(args, "fallback_session", None), "deadline", None),
         diagnostic=progress_callback,
+        stream_text=_progress_stream_writer() if getattr(args, "stream", False) else None,
         completion_requirements=completion_requirements,
         **sampling_kwargs(args),
     )
@@ -4255,6 +4258,8 @@ def _run_native_agent(
             model=config.model,
             privacy_class=PrivacyClass(profile.privacy_class.value),
         )
+        if getattr(args, "stream", False):
+            print()
     except ProviderError as exc:
         if progress_callback is not None:
             try:

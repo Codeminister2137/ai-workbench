@@ -734,6 +734,11 @@ def build_argument_parser() -> argparse.ArgumentParser:
         help="Print raw telemetry lines instead of human progress narrations.",
     )
     parser.add_argument(
+        "--stream",
+        action="store_true",
+        help="Stream model text tokens as they arrive.",
+    )
+    parser.add_argument(
         "--apply-actions",
         action="store_true",
         help="Execute assistant-proposed local actions after a provider response.",
