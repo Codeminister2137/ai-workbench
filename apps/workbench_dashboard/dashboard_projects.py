@@ -21,6 +21,7 @@ MAX_NAME_CHARS = 200
 MAX_DESCRIPTION_CHARS = 2000
 PROJECT_TYPES = ("general", "book")
 BOOK_CHECKS = ("discrepancy", "scrutiny")
+GOALS_REGISTRY = "docs/goals/registry.json"
 
 
 def _projects_path(data_dir: Path) -> Path:
@@ -68,6 +69,52 @@ def list_projects(data_dir: Path) -> list[dict[str, Any]]:
 def get_project(data_dir: Path, project_id: str) -> dict[str, Any] | None:
     """Return one project record, or None when absent."""
     return load_registry(data_dir).get(project_id)
+
+
+def _next_action(repo_root: Path, goal_rel: str) -> str:
+    """First paragraph of the goal doc's Next action section (fail-soft)."""
+    try:
+        lines = (repo_root / goal_rel).read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return ""
+    capture: list[str] = []
+    inside = False
+    for line in lines:
+        if line.startswith("## "):
+            if inside:
+                break
+            inside = line.strip() == "## Next action"
+        elif inside and line.strip():
+            capture.append(line.strip())
+    return " ".join(capture)
+
+
+def list_goals(repo_root: Path) -> list[dict[str, Any]]:
+    """Goal registry entries with next actions; missing registry reads empty."""
+    try:
+        payload = json.loads((repo_root / GOALS_REGISTRY).read_text(encoding="utf-8"))
+        projects = payload.get("projects", {})
+    except (OSError, ValueError, AttributeError):
+        return []
+    if not isinstance(projects, dict):
+        return []
+    goals: list[dict[str, Any]] = []
+    for project_id in sorted(projects):
+        entry = projects[project_id]
+        if not isinstance(entry, dict):
+            continue
+        goals.append(
+            {
+                "id": project_id,
+                "goal": str(entry.get("goal", "")),
+                "repo": str(entry.get("repo", "")),
+                "owner": str(entry.get("owner", "")),
+                "health": str(entry.get("health", "")),
+                "relations": entry.get("relations", {}),
+                "next_action": _next_action(repo_root, str(entry.get("goal", ""))),
+            }
+        )
+    return goals
 
 
 def create_project(

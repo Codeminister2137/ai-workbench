@@ -817,6 +817,11 @@ async function renderProjects(id) {
     return;
   }
   const payload = await api("/api/projects");
+  const goals = (payload.goals || []).map((g) =>
+    `<li><strong>${esc(g.id)}</strong>
+     <span class="pill">${esc(g.health || "unknown")}</span>
+     <span class="muted">${esc(g.owner || "")} · ${esc(g.repo || "")}</span>
+     ${g.next_action ? `<br><span>${gtext(g.next_action)}</span>` : ""}</li>`).join("");
   const items = payload.projects.length
     ? payload.projects.map((p) =>
         `<li><a href="#/projects/${esc(p.id)}">${gtext(p.name)}</a>
@@ -824,6 +829,9 @@ async function renderProjects(id) {
          <span class="pill st-${esc(p.type || "general")}">${esc(p.type || "general")}</span></li>`).join("")
     : '<li class="muted">No projects registered yet.</li>';
   view.innerHTML = `<h1>Projects</h1>
+    <h2>Goals</h2>
+    <ul class="plain" id="goals-list">${goals || '<li class="muted">No goal registry found.</li>'}</ul>
+    <h2>Work roots</h2>
     <p class="muted">Named work roots. Book projects carry a manuscript plus ask-to-check actions.</p>
     <p><input type="text" id="filter-projects" placeholder="Filter projects..." title="Filter projects by text"></p>
     <ul class="plain" id="projects-list">${items}</ul>

@@ -63,6 +63,7 @@ from dashboard_projects import (
     book_check_task,
     create_project,
     get_project,
+    list_goals,
     list_projects,
     set_project_manuscript,
 )
@@ -889,7 +890,9 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                     projects = list_projects(self.data_dir)
                 except StagedEditError as exc:
                     return self._send_json({"ok": False, "error": str(exc)}, status=500)
-                return self._send_json({"ok": True, "projects": projects})
+                return self._send_json(
+                    {"ok": True, "projects": projects, "goals": list_goals(self.repo_root)}
+                )
             if path.startswith("/api/projects/"):
                 return self._send_project(path[len("/api/projects/") :])
             if path.startswith("/api/inbox/"):
