@@ -274,6 +274,8 @@ FLEET_TASKS = (
     "WakeSelfTest",
     "PrivateBackup",
     "WorkbenchWeeklyDigest",
+    "OpeningsWeb",
+    "OpeningsCollect",
 )
 FLEET_TERMINAL_RUN_STATUSES = frozenset({"completed", "failed", "cancelled", "canceled", "merged"})
 MAINTENANCE_FILENAME = "maintenance.json"

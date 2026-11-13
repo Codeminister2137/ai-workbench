@@ -72,3 +72,14 @@ time unless the owner cancels. Armed only during unattended loops.
 Supervision verdicts over agent runs: stuck (running, silent 30+
 minutes), broken (fresh failure, with cause class), parked (queued
 over an hour), or ok. Anything stuck or broken needs attention.
+
+## OpeningsWeb
+
+The Openings job-search app (dashboard, REST API, MCP) on
+127.0.0.1:8501, token-gated. Starts at logon; restarts itself a
+few times on failure.
+
+## OpeningsCollect
+
+Daily 06:30: one Openings collection run (LinkedIn + Indeed
+Poland, ~30s). Missed runs start when the PC is next awake.
