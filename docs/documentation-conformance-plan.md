@@ -252,3 +252,12 @@ implementation (recommender reuse for acceptance, priority never
 relaxes filters, cost escalation opt-in). No divergence found; no
 change. Live acceptance of fallback quality remains separately unproved
 (as the ADR itself states).
+
+Group 3 finding 1 (2026-11-13): our Openings bridge client verified live.
+`openings_api.OpeningsAPI` (previously offline-tested only) was exercised
+against the kept service: export page parses to `JobVacancy` rows, and an
+identical re-add through `add_posting` collapses to the same job id (the
+maintained mirror patch holding over HTTP). Auth contract confirmed both
+ways: the client sends `X-Openings-Token` (primary) and the server also
+accepts `Authorization: Bearer`. No divergence; the client's strict
+response-shape assertions held against real responses. No change.
