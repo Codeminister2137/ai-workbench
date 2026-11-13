@@ -2,7 +2,9 @@ import io
 import json
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
+from typing import cast
 
 import pytest
 from ai_orchestrator import AccessMethod
@@ -1040,6 +1042,10 @@ class _FakePopen:
         self.returncode = 9
 
 
+def _fake_factory(fake: _FakePopen) -> Callable[..., subprocess.Popen[str]]:
+    return cast("Callable[..., subprocess.Popen[str]]", lambda *args, **kwargs: fake)
+
+
 def _edge_config(tmp_path: Path, *, timeout_seconds: float) -> ExternalAgentConfig:
     return ExternalAgentConfig(
         access_method=AccessMethod.CODEX_CLI,
@@ -1062,7 +1068,7 @@ def test_callback_exception_kills_live_process(tmp_path: Path) -> None:
             "prompt",
             _edge_config(tmp_path, timeout_seconds=30.0),
             runner=subprocess.run,
-            popen_factory=lambda *args, **kwargs: fake,
+            popen_factory=_fake_factory(fake),
             progress_callback=boom,
             progress_interval_seconds=0,
         )
@@ -1078,7 +1084,7 @@ def test_chatty_process_hits_total_timeout(tmp_path: Path) -> None:
             "prompt",
             _edge_config(tmp_path, timeout_seconds=0.4),
             runner=subprocess.run,
-            popen_factory=lambda *args, **kwargs: fake,
+            popen_factory=_fake_factory(fake),
             progress_callback=None,
             progress_interval_seconds=0,
         )
@@ -1091,7 +1097,7 @@ def test_clean_exit_skips_finally_kill(tmp_path: Path) -> None:
         "prompt",
         _edge_config(tmp_path, timeout_seconds=30.0),
         runner=subprocess.run,
-        popen_factory=lambda *args, **kwargs: fake,
+        popen_factory=_fake_factory(fake),
         progress_callback=None,
         progress_interval_seconds=0,
     )
