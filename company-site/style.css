@@ -3,6 +3,7 @@
    fonts, no JS required except the intake form. */
 
 :root {
+  color-scheme: light dark;
   --paper: #ffffff;
   --wash: #f4f2ec;
   --ink: #1d1a16;
@@ -14,6 +15,30 @@
   --radius: 8px;
   --shell: 1080px;
   --measure: 68ch;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #16130f;
+    --wash: #201c16;
+    --ink: #ece7dc;
+    --muted: #a89f8d;
+    --line: #38322a;
+    --accent: #7bc79a;
+    --accent-ink: #a5e0bd;
+    --focus: #d99a3d;
+  }
+
+  .button {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #0e1a14;
+  }
+
+  .button:hover {
+    background: var(--accent-ink);
+    color: #0e1a14;
+  }
 }
 
 * { box-sizing: border-box; }
