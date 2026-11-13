@@ -16,13 +16,13 @@ Jakub.
 
 ## Health
 
-at-risk — shipped with tests, but no verified recent activity; needs an
-owner priority call (active track vs maintenance).
+on-track — owner 2026-11-13: active track. Next slice filed.
 
 ## Connected plans
 
-None filed. File the next slice here before starting it.
+- `docs/plans/council-deliberation-slice.md`
 
 ## Next action
 
-Owner: confirm council's place in the current roadmap or park it explicitly.
+Slice 1: settle the deliberation protocol (rounds, cost cap, storage, UI),
+then implement in slice 2.
