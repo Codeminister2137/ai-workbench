@@ -226,3 +226,16 @@ defects: Google is excluded on conflicting third-party evidence (one report
 of a 400 on this field with default usage); OpenRouter and OpenCode Go Chat
 are unverified and keep prior behavior. Verifying either is a bounded
 follow-up requiring primary-doc or live evidence.
+
+Group 2 finding 1 (2026-11-13): catalog `context_limits` are write-only.
+`model_catalog.toml` declares `context_window_tokens`/`runtime_context_tokens`
+for 8 of 25 routes (17 unset), the catalog parses them into
+`ModelContextLimits`, but no production code reads them: recommender,
+planner and scheduling never consult limits, so oversized prompts are never
+trimmed or routed by capacity. Ollama `num_ctx` instead flows from
+per-request `ollama_context_length` metadata hardcoded at call sites
+(32768 in `agent_executor.py`, `research_execution.py` default and its test),
+which already disagrees with the catalog (65536 for `ollama/gpt-oss:20b`).
+Recorded as an internal divergence, not an external-doc defect: the fix
+direction (enforce vs wire-catalog-as-source vs drop-as-advisory) is an
+owner decision (inbox brief filed). No behavior changed by this finding.
