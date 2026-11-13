@@ -22,7 +22,7 @@ import sys
 import time
 import urllib.request
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 MAINTENANCE_FILENAME = "maintenance.json"
@@ -364,8 +364,6 @@ def _read_last_mailed_key(data_dir: Path) -> str | None:
 
 def _write_last_mailed_key(data_dir: Path, key: str) -> None:
     """Record the mailed incident key (atomic, best-effort)."""
-    import datetime
-
     try:
         data_dir = Path(data_dir)
         data_dir.mkdir(parents=True, exist_ok=True)
@@ -375,7 +373,7 @@ def _write_last_mailed_key(data_dir: Path, key: str) -> None:
             json.dumps(
                 {
                     "key": key,
-                    "mailed_utc": datetime.datetime.now(datetime.UTC).isoformat(),
+                    "mailed_utc": datetime.now(UTC).isoformat(),
                 }
             ),
             encoding="utf-8",
