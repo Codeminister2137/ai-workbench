@@ -33,7 +33,11 @@ def test_ledger_covers_top_level_docs_and_plans() -> None:
         path.relative_to(ROOT).as_posix()
         for pattern in ("docs/*.md", "docs/plans/*.md", "docs/plans/*.txt", "docs/plans/*.docx")
         for path in ROOT.glob(pattern)
-    } - {"docs/document-status.md"}
+    } - {
+        "docs/document-status.md",
+        # Live session plan: rewritten every window, covered by its header gate.
+        "docs/plans/unattended-work-plan.md",
+    }
     assert expected, "no documents found"
     missing = sorted(expected - set(rows))
     assert not missing, f"ledger missing rows: {missing}"
