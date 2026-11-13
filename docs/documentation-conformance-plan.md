@@ -239,3 +239,11 @@ which already disagrees with the catalog (65536 for `ollama/gpt-oss:20b`).
 Recorded as an internal divergence, not an external-doc defect: the fix
 direction (enforce vs wire-catalog-as-source vs drop-as-advisory) is an
 owner decision (inbox brief filed). No behavior changed by this finding.
+
+Group 4 finding 1 (2026-11-13): clean bill on CLI entry examples. The
+documented `uv run --no-sync ai-assistant --help` (exit 0),
+`--mode plan "..."` (plan metadata, local context only, no inference
+observed), `--list-skills` and `--fallback-readiness` (both valid JSON
+payloads) all run as documented from the repo root. No divergence; the
+remaining Group 4 surface (dependencies, guides, examples beyond the
+entry page) is future scope.
