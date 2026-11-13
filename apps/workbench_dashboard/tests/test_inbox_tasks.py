@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import threading
 from http.server import ThreadingHTTPServer
+from urllib.error import HTTPError
 
 import pytest
 from dashboard_stores import DashboardStores, StoreError
@@ -142,3 +143,29 @@ def test_answer_still_refused_on_closed(tmp_path) -> None:
     stores.close_inbox_task(task["id"], resolution="Done.")
     with pytest.raises(StoreError):
         stores.answer_inbox_task(task["id"], answer="Late")
+
+
+def test_delete_removes_item_and_404s_after(tasks_server) -> None:
+    base, tmp_path = tasks_server
+    created = post_json(
+        base,
+        "/api/inbox",
+        {"title": "Scratch", "body": "x", "type": "task"},
+    )
+    item_id = created["id"]
+    deleted = post_json(base, f"/api/inbox/{item_id}/delete", {})
+    assert deleted == {"ok": True, "id": item_id}
+    assert not (tmp_path / "data" / "inbox" / f"{item_id}.json").exists()
+    with pytest.raises(HTTPError) as raised:
+        get_json(base, f"/api/inbox/{item_id}")
+    assert raised.value.code == 404
+    with pytest.raises(HTTPError) as raised:
+        post_json(base, f"/api/inbox/{item_id}/delete", {})
+    assert raised.value.code == 404
+
+
+def test_collection_delete_rejects_bad_ids(tmp_path) -> None:
+    stores = DashboardStores(tmp_path / "data")
+    assert stores.inbox.delete("no-such-id") is False
+    with pytest.raises(StoreError):
+        stores.inbox.delete("../escape")

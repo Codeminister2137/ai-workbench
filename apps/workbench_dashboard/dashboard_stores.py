@@ -110,6 +110,17 @@ class JsonCollection:
         tmp.replace(path)
         return path
 
+    def delete(self, item_id: str) -> bool:
+        """Remove one item; True when a file was removed."""
+        if not item_id or "/" in item_id or "\\" in item_id or item_id.startswith("."):
+            raise StoreError("Invalid item id")
+        path = self.directory / f"{item_id}.json"
+        try:
+            path.unlink()
+        except FileNotFoundError:
+            return False
+        return True
+
 
 class DashboardStores:
     """Plans, runs, and inbox collections plus the supervisor token gate."""

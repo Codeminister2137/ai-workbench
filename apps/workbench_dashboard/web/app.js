@@ -1113,7 +1113,8 @@ async function renderInbox(id) {
         <div><select name="resolution_kind" title="Final outcome, or closed pending follow-up"><option value="final">Final outcome \u2014 archive</option><option value="followup">No final answer \u2014 needs follow-up</option></select></div>
         <div><textarea name="resolution" rows="3" placeholder="Outcome note (required) — what was implemented, with technical details..." title="Implementation outcome, stored with the archived task"></textarea></div>
         <p><button type="submit" title="Record the outcome and archive this task">Close with outcome</button></p>
-      </form>`}</div>`;
+      </form>
+      <p><button type="button" id="delete-inbox-btn" title="Permanently delete this inbox item (linked runs keep their history)">Delete item</button></p>`}</div>`;
     const form = document.getElementById("answer-form");
     if (form) form.addEventListener("submit", async (ev) => {
       ev.preventDefault();
@@ -1144,6 +1145,29 @@ async function renderInbox(id) {
         });
         toast(ev.target.resolution_kind.value === "followup" ? "Marked for follow-up, kept in Active" : "Outcome recorded, task archived", true);
         render();
+      } catch (err) {
+        toast(err.message, false);
+      }
+    });
+    const deleteBtn = document.getElementById("delete-inbox-btn");
+    if (deleteBtn) deleteBtn.addEventListener("click", async () => {
+      if (deleteBtn.dataset.armed !== "1") {
+        deleteBtn.dataset.armed = "1";
+        deleteBtn.textContent = "Click again to confirm delete";
+        setTimeout(() => {
+          deleteBtn.dataset.armed = "";
+          deleteBtn.textContent = "Delete item";
+        }, 5000);
+        return;
+      }
+      try {
+        await api("/api/inbox/" + encodeURIComponent(id) + "/delete", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: "{}",
+        });
+        toast("Item deleted", true);
+        location.hash = "#/inbox";
       } catch (err) {
         toast(err.message, false);
       }
