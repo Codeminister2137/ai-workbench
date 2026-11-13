@@ -30,12 +30,10 @@ def test_run_request_links_plan(dashboard_server, tmp_path) -> None:
         {"text": "Build the shop", "plan": "p1"},
     )
     run_id = receipt["run_id"]
+    assert receipt["inbox_id"] is None
     stores = DashboardStores(tmp_path / "data")
     run = stores.runs.get(run_id)
     assert run is not None and run["plan_id"] == "p1"
-    inbox = stores.inbox.get(receipt["inbox_id"])
-    assert inbox is not None and inbox["plan_id"] == "p1"
-    assert "plan:p1" in inbox["context_refs"]
     filtered = get_json(dashboard_server, "/api/runs?plan_id=p1")
     assert [item["id"] for item in filtered["items"]] == [run_id]
     assert get_json(dashboard_server, "/api/runs?plan_id=other")["items"] == []
