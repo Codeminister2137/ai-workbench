@@ -6,7 +6,8 @@ not block redeploys. Each tick: ensure the worktree, fast-forward it to
 origin (refusing when unexpectedly dirty), restart the dashboard onto it
 with shared config/data/state from the main checkout, health-check the new
 commit, and clear the maintenance banner. Failures keep the banner up with
-the reason and mail the owner (a true exception, not routine noise).
+the reason and mail the owner on incident transition only (first failure
+or changed reason; repeats stay silent until recovery).
 """
 
 from __future__ import annotations
@@ -27,6 +28,7 @@ from pathlib import Path
 MAINTENANCE_FILENAME = "maintenance.json"
 PID_FILENAME = "dashboard.pid"
 SERVE_VERSION_FILENAME = "serve-version.json"
+MAIL_STATE_FILENAME = "supervise-mail-state.json"
 HEALTH_TIMEOUT_SECONDS = 60.0
 PORT_FREE_TIMEOUT_SECONDS = 15.0
 
@@ -344,6 +346,67 @@ def wait_healthy(config: SuperviseConfig, want_commit: str) -> bool:
     return False
 
 
+def _mail_state_path(data_dir: Path) -> Path:
+    return Path(data_dir) / MAIL_STATE_FILENAME
+
+
+def _read_last_mailed_key(data_dir: Path) -> str | None:
+    """Last-mailed incident key, or None when never mailed/unreadable."""
+    try:
+        payload = json.loads(_mail_state_path(data_dir).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    key = payload.get("key")
+    return key if isinstance(key, str) and key else None
+
+
+def _write_last_mailed_key(data_dir: Path, key: str) -> None:
+    """Record the mailed incident key (atomic, best-effort)."""
+    import datetime
+
+    try:
+        data_dir = Path(data_dir)
+        data_dir.mkdir(parents=True, exist_ok=True)
+        path = _mail_state_path(data_dir)
+        tmp = path.with_suffix(".json.tmp")
+        tmp.write_text(
+            json.dumps(
+                {
+                    "key": key,
+                    "mailed_utc": datetime.datetime.now(datetime.UTC).isoformat(),
+                }
+            ),
+            encoding="utf-8",
+        )
+        tmp.replace(path)
+    except OSError:
+        pass
+
+
+def _clear_last_mailed_key(data_dir: Path) -> None:
+    """Forget the mailed incident after recovery (no-op when no state)."""
+    try:
+        _mail_state_path(data_dir).unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
+def _maybe_mail_failure(config: SuperviseConfig, reason: str) -> bool:
+    """Mail on incident transition only; True when a send was attempted.
+
+    Repeated identical failures (same incident key) do not re-mail; a
+    changed reason or a failure after recovery mails again.
+    """
+    key = f"failed:{reason}"
+    if _read_last_mailed_key(config.data_dir) == key:
+        return False
+    _mail_failure(config, reason)
+    _write_last_mailed_key(config.data_dir, key)
+    return True
+
+
 def _mail_failure(config: SuperviseConfig, reason: str) -> None:
     try:
         from owner_mail import load_smtp_config, send_owner_mail
@@ -372,6 +435,8 @@ def supervise_tick(config: SuperviseConfig, *, dry_run: bool = False, force: boo
             action, reason = "redeploy", "forced redeploy"
         outcome.update(action=action, reason=reason, running=running, origin=origin)
         if action != "redeploy":
+            if action == "up-to-date" and not dry_run:
+                _clear_last_mailed_key(config.data_dir)
             return outcome
         if dry_run:
             return outcome
@@ -400,17 +465,18 @@ def supervise_tick(config: SuperviseConfig, *, dry_run: bool = False, force: boo
         ok, detail = restart_dashboard(config)
         if not ok:
             write_maintenance(config.data_dir, active=True, message=f"Restart failed: {detail}")
-            _mail_failure(config, detail)
+            _maybe_mail_failure(config, detail)
             outcome.update(action="failed", reason=detail)
             return outcome
         if not wait_healthy(config, commit):
             write_maintenance(
                 config.data_dir, active=True, message="New dashboard failed its health check."
             )
-            _mail_failure(config, "health check timeout")
+            _maybe_mail_failure(config, "health check timeout")
             outcome.update(action="failed", reason="health check timeout")
             return outcome
         write_maintenance(config.data_dir, active=False)
+        _clear_last_mailed_key(config.data_dir)
         outcome.update(action="redeployed", reason=f"now serving {commit[:12]}")
         return outcome
     except Exception as exc:  # noqa: BLE001 - supervisor ticks never raise
