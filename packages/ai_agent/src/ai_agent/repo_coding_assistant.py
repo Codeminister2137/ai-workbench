@@ -271,6 +271,7 @@ from ai_agent.external_reporting import (
 from ai_agent.external_reporting import (
     write_external_agent_stderr as _write_external_agent_stderr,  # noqa: F401 - compatibility export
 )
+from ai_agent.progress import reporter as _progress_reporter_factory
 from ai_agent.repair_workflow import (
     build_orchestrated_repair_prompt as _build_orchestrated_repair_prompt,  # noqa: F401 - compatibility export
 )
@@ -1150,6 +1151,8 @@ def _execute_request(
     from ai_provider.user_config import apply_user_defaults
 
     apply_user_defaults(args, user_config)
+
+    progress_reporter = _progress_reporter_factory(verbose=getattr(args, "verbose", False))
     if getattr(args, "experimental_measured_prefix", False):
         native_requested = (
             args.native_tools
@@ -1393,7 +1396,7 @@ def _execute_request(
             context_budget_chars=context_budget_chars,
             context_file_budget_chars=args.context_file_budget_chars,
             instruction_budget_chars=args.instruction_budget_chars,
-            diagnostic=print,
+            diagnostic=progress_reporter,
             minimal_instructions=(args.mode == "ask"),
         )
     except (ValueError, OSError) as exc:
@@ -1641,7 +1644,7 @@ def _execute_request(
             profile,
             catalog,
             max_chars=args.delegation_context_budget_chars,
-            progress_callback=print,
+            progress_callback=progress_reporter,
             deadline=execution_deadline,
         )
         if delegated_summary is not None:
@@ -1786,7 +1789,7 @@ def _execute_request(
             ollama_startup_timeout_seconds=args.ollama_startup_timeout_seconds,
             ollama_log_path=args.ollama_log_file if args.start_ollama else None,
             ollama_resource_profile=ollama_resource_profile,
-            progress_callback=print if args.execute and not args.native_tools else None,
+            progress_callback=progress_reporter if args.execute and not args.native_tools else None,
             progress_prefix="local_agent_activity",
         )
         primary_elapsed_seconds = time.perf_counter() - primary_started
@@ -1947,7 +1950,7 @@ def _execute_request(
                     if args.ollama_profile is not None
                     else None
                 ),
-                progress_callback=print,
+                progress_callback=progress_reporter,
             )
             if auxiliary_result.route_id is not None:
                 print(f"auxiliary_panel_route_id: {auxiliary_result.route_id}")
@@ -1994,7 +1997,7 @@ def _execute_request(
                 profile,
                 args,
                 repo_root,
-                progress_callback=print,
+                progress_callback=progress_reporter,
             )
         except ProviderError as exc:
             primary_elapsed_seconds = time.perf_counter() - primary_started
@@ -2183,7 +2186,7 @@ def _execute_request(
                 execute=True,
                 system_prompt=_RESPONSE_SCRUTINY_SYSTEM_PROMPT,
                 start_ollama=False,
-                progress_callback=print,
+                progress_callback=progress_reporter,
                 progress_prefix="scrutiny_activity",
                 **sampling_kwargs(args),
             )
@@ -2277,7 +2280,7 @@ def _execute_request(
                         profile,
                         repair_args,
                         repo_root,
-                        progress_callback=print,
+                        progress_callback=progress_reporter,
                     )
                     args._scrutiny_tool_results = (
                         *args._scrutiny_tool_results,
@@ -2300,7 +2303,7 @@ def _execute_request(
                     execute=True,
                     system_prompt=primary_system_prompt,
                     start_ollama=False,
-                    progress_callback=print,
+                    progress_callback=progress_reporter,
                     progress_prefix="repair_activity",
                 )
                 if repair_result.response is None:
@@ -2639,7 +2642,7 @@ def _run_coding_prompt_with_fallback(
             args=args,
             profile=profile,
             repo_root=repo_root,
-            progress_callback=print,
+            progress_callback=_progress_reporter_factory(verbose=getattr(args, "verbose", False)),
         )
 
     result = session.run(
@@ -3446,7 +3449,9 @@ def _run_external_agent_cli_mode(
                         if args.ollama_profile is not None
                         else None
                     ),
-                    progress_callback=print,
+                    progress_callback=_progress_reporter_factory(
+                        verbose=getattr(args, "verbose", False)
+                    ),
                 )
                 if auxiliary_result.route_id is not None:
                     print(f"auxiliary_panel_route_id: {auxiliary_result.route_id}")
@@ -3496,7 +3501,9 @@ def _run_external_agent_cli_mode(
                 args=args,
                 profile=profile,
                 repo_root=repo_root,
-                progress_callback=print,
+                progress_callback=_progress_reporter_factory(
+                    verbose=getattr(args, "verbose", False)
+                ),
             )
             primary_elapsed_seconds = time.perf_counter() - primary_started
             print("\n=== External agent diagnostics ===")
@@ -3625,7 +3632,9 @@ def _run_external_agent_cli_mode(
                     args=args,
                     profile=profile,
                     repo_root=repo_root,
-                    progress_callback=print,
+                    progress_callback=_progress_reporter_factory(
+                        verbose=getattr(args, "verbose", False)
+                    ),
                 )
                 print(f"repair_external_agent_returncode: {repair_result.returncode}")
                 parsed_failure = (
@@ -4652,7 +4661,7 @@ def _run_action_loop(
             ollama_command=args.ollama_command,
             ollama_startup_timeout_seconds=args.ollama_startup_timeout_seconds,
             ollama_log_path=args.ollama_log_file if args.start_ollama else None,
-            progress_callback=print,
+            progress_callback=_progress_reporter_factory(verbose=getattr(args, "verbose", False)),
             progress_prefix="local_tool_activity",
             **sampling_kwargs(args),
         )
