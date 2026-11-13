@@ -1,0 +1,22 @@
+{
+  "format_version": "1.0.0",
+  "project_id": "acme-consulting-site-20261101-a3f9",
+  "created_at": "2026-11-01T14:32:00Z",
+  "capture_method": "chatbot",
+  "parent_id": null,
+  "goal_summary": "Marketing website for Acme Consulting (B2B ops advisory) to explain services, show case studies, and capture leads via contact form and Calendly.",
+  "problem_statement": "Current WordPress template is slow (Lighthouse 52), has no clear CTA, and case studies are PDFs. Need fast static site we can update without developer.",
+  "target_users": ["SMB founders (10-100 employees)", "Operations managers in logistics"],
+  "success_criteria": ["Contact form delivers to jane@acme.co and shows confirmation", "Lighthouse performance >=90 on mobile", "Case study pages editable via Markdown by non-dev"],
+  "deliverable_type": "website",
+  "features_in": ["5-page responsive site: Home, Services, Case Studies, About, Contact", "Blog/case-study collection with Markdown authoring", "Contact form with spam protection", "Calendly embed on Contact page", "Basic SEO: sitemap, meta tags, OG images"],
+  "features_out": ["No user accounts or logins", "No payments or ecommerce", "No multilingual beyond EN (PL later)", "No custom CRM — email delivery only"],
+  "integrations": [{"name": "Calendly", "purpose": "booking widget on Contact page"}, {"name": "Plausible", "purpose": "privacy-friendly analytics"}],
+  "timeline": {"deadline": "2026-12-01", "urgency": "dated"},
+  "tech_constraints": ["Keep acme-consulting.pl domain", "Host on Hetzner VPS (provided)"],
+  "non_functional": ["GDPR-compliant form with consent checkbox", "Lighthouse a11y >=90"],
+  "budget_range": "5-15k",
+  "billing_model": "fixed",
+  "client_contact": {"name": "Jane Doe", "email": "jane@acme.co", "company": "Acme Consulting Sp. z o.o.", "phone": "+48601234567"},
+  "preferred_language": "en"
+}
