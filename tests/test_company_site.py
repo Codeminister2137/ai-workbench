@@ -128,6 +128,17 @@ def test_placeholders_indexed() -> None:
     assert found >= {"COMPANY_NAME", "CONTACT_EMAIL", "SERVICE_CITIES"}
 
 
+def test_dark_mode_follows_browser_setting() -> None:
+    """Dark tokens activate via prefers-color-scheme; controls stay readable."""
+    css = (ROOT / "style.css").read_text(encoding="utf-8")
+    assert "color-scheme: light dark" in css
+    assert "@media (prefers-color-scheme: dark)" in css
+    dark = css.split("@media (prefers-color-scheme: dark)", 1)[1]
+    for token in ("--paper:", "--ink:", "--muted:", "--line:", "--accent:"):
+        assert token in dark, token
+    assert ".button {" in dark
+
+
 def test_contact_pages_show_email_placeholder() -> None:
     pl = (ROOT / "kontakt.html").read_text(encoding="utf-8")
     assert "adres w przygotowaniu" in pl
