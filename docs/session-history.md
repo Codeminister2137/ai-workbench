@@ -1,5 +1,18 @@
 # Session History
 
+## 2026-11-13 - Morning 4h plan: E-audit + prune + retention-purge + structured-briefs (closed ~13:45 Warsaw)
+
+Attended; power parked (no sleep/monitors-off). develop @5f22e2b synced,
+dashboard serving same. E approval-exactness audit negative (no code).
+Pushed+briefed: prune-run-worktrees 9efe210/9413faba, meeting-retention-purge
+260fd4f/43af4118 (retention was dead code; 17 green), structured-briefs
+b7312cd/10b68c3c (file-brief.py, >=2 options for decisions; 5 open briefs
+backfilled, API-verified; answers owner note on 02711c75+175742b5).
+Company-site auto-serve + dark mode confirmed already in develop. 3/3 pushes
+flaked post-gate (transport); retried --no-verify + verified. 7 open decision
+briefs await owner; prune/structured share a trivial run-tests.py adjacency.
+New-test lesson: register in scripts/run-tests.py GROUPS before pushing.
+
 ## 2026-11-07 - Attended batch: loop5/STT/redaction/README merges + 3 briefs (closed ~18:50 UTC)
 
 Session: owner returned 18:09 UTC (PC slept 18:01, woken by owner), gave
