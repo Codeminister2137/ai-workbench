@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import json
 import math
 import os
@@ -29,6 +30,7 @@ class ExternalAgentConfig:
     command: str
     model: str
     cwd: Path
+    # Bounds BOTH total runtime and output silence; <= 0 disables both.
     timeout_seconds: float
     sandbox: str = "workspace-write"
     approval_policy: str = "never"
@@ -1300,66 +1302,89 @@ def _run_external_agent_process(
     started = time.monotonic()
     last_activity = started
     last_progress = started
-    while process.poll() is None or not output_queue.empty():
-        now = time.monotonic()
-        if deadline is not None and time.perf_counter() >= deadline:
-            process.kill()
-            for reader in readers:
-                reader.join(timeout=1.0)
-            _drain_process_output(output_queue, stdout_lines, stderr_lines)
-            raise subprocess.TimeoutExpired(
-                command,
-                timeout=config.timeout_seconds,
-                output=captured_stdout(),
-                stderr="".join(stderr_lines),
-            )
-        try:
-            label, line = output_queue.get(timeout=0.2)
-        except queue.Empty:
-            if (
-                progress_callback is not None
-                and progress_interval_seconds > 0
-                and now - last_progress >= progress_interval_seconds
-            ):
-                progress_callback(
-                    "external_agent_status: running "
-                    f"elapsed_seconds={now - started:.1f} "
-                    f"last_output_age_seconds={now - last_activity:.1f}"
-                )
-                last_progress = now
-            if config.timeout_seconds > 0 and now - last_activity > config.timeout_seconds:
+    # timeout_seconds bounds total runtime too: without this a chatty
+    # process that never goes quiet could run past any limit.
+    absolute_deadline = started + config.timeout_seconds if config.timeout_seconds > 0 else None
+    try:
+        while process.poll() is None or not output_queue.empty():
+            now = time.monotonic()
+            if absolute_deadline is not None and now >= absolute_deadline:
                 process.kill()
-                _drain_process_output(output_queue, stdout_lines, stderr_lines)
                 for reader in readers:
                     reader.join(timeout=1.0)
+                _drain_process_output(output_queue, stdout_lines, stderr_lines)
                 raise subprocess.TimeoutExpired(
                     command,
                     timeout=config.timeout_seconds,
                     output=captured_stdout(),
                     stderr="".join(stderr_lines),
-                ) from None
-            continue
-
-        last_activity = now
-        if label == "stdout":
-            stdout_lines.append(line)
-            if progress_callback is not None:
-                if config.access_method is AccessMethod.GEMINI_CLI:
-                    from ai_provider.gemini_cli import redact_user_echoes
-
-                    progress = _external_agent_progress_line(redact_user_echoes(line))
-                else:
-                    progress = _external_agent_progress_line(line)
-                if progress is not None:
-                    progress_callback(progress)
+                )
+            if deadline is not None and time.perf_counter() >= deadline:
+                process.kill()
+                for reader in readers:
+                    reader.join(timeout=1.0)
+                _drain_process_output(output_queue, stdout_lines, stderr_lines)
+                raise subprocess.TimeoutExpired(
+                    command,
+                    timeout=config.timeout_seconds,
+                    output=captured_stdout(),
+                    stderr="".join(stderr_lines),
+                )
+            try:
+                label, line = output_queue.get(timeout=0.2)
+            except queue.Empty:
+                if (
+                    progress_callback is not None
+                    and progress_interval_seconds > 0
+                    and now - last_progress >= progress_interval_seconds
+                ):
+                    progress_callback(
+                        "external_agent_status: running "
+                        f"elapsed_seconds={now - started:.1f} "
+                        f"last_output_age_seconds={now - last_activity:.1f}"
+                    )
                     last_progress = now
-        else:
-            stderr_lines.append(line)
-            if progress_callback is not None:
-                progress = _external_agent_stderr_progress_line(line)
-                if progress is not None:
-                    progress_callback(progress)
-                    last_progress = now
+                if config.timeout_seconds > 0 and now - last_activity > config.timeout_seconds:
+                    process.kill()
+                    _drain_process_output(output_queue, stdout_lines, stderr_lines)
+                    for reader in readers:
+                        reader.join(timeout=1.0)
+                    raise subprocess.TimeoutExpired(
+                        command,
+                        timeout=config.timeout_seconds,
+                        output=captured_stdout(),
+                        stderr="".join(stderr_lines),
+                    ) from None
+                continue
+
+            last_activity = now
+            if label == "stdout":
+                stdout_lines.append(line)
+                if progress_callback is not None:
+                    if config.access_method is AccessMethod.GEMINI_CLI:
+                        from ai_provider.gemini_cli import redact_user_echoes
+
+                        progress = _external_agent_progress_line(redact_user_echoes(line))
+                    else:
+                        progress = _external_agent_progress_line(line)
+                    if progress is not None:
+                        progress_callback(progress)
+                        last_progress = now
+            else:
+                stderr_lines.append(line)
+                if progress_callback is not None:
+                    progress = _external_agent_stderr_progress_line(line)
+                    if progress is not None:
+                        progress_callback(progress)
+                        last_progress = now
+    finally:
+        # An unexpected exception (e.g. from progress_callback) must not
+        # orphan a live agent: stop it and release the reader threads.
+        if process.poll() is None:
+            with contextlib.suppress(OSError):
+                process.kill()
+        for reader in readers:
+            reader.join(timeout=1.0)
 
     for reader in readers:
         reader.join(timeout=1.0)
