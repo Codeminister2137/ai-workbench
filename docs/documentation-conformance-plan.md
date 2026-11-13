@@ -240,3 +240,15 @@ limits, so those resolve to unknown capacity (admission proceeds
 unverified, per ADR-059's unknown-capacity path). Filling them from
 primary sources is a bounded data follow-up. The wire/enforce/drop
 brief was withdrawn with this correction. No behavior changed.
+
+Group 2 finding 2 (2026-11-13): clean bill on the fallback path. ADR-059's
+20% rule is implemented in `fallback_context.FallbackHistoryClient`
+(boundary-tested in `test_fallback_context.py`, incl. the exact 20%
+equality case) and wired in the composing CLI, which wraps the native
+client when fallback history exists. Capacity flows from catalog limits
+via `prepare_native_coding_client` (Ollama fail-closes on unknown).
+`fallback_candidates` ordering/privacy/cost docstring matches the
+implementation (recommender reuse for acceptance, priority never
+relaxes filters, cost escalation opt-in). No divergence found; no
+change. Live acceptance of fallback quality remains separately unproved
+(as the ADR itself states).
