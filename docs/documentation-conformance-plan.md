@@ -239,3 +239,10 @@ which already disagrees with the catalog (65536 for `ollama/gpt-oss:20b`).
 Recorded as an internal divergence, not an external-doc defect: the fix
 direction (enforce vs wire-catalog-as-source vs drop-as-advisory) is an
 owner decision (inbox brief filed). No behavior changed by this finding.
+
+Group 3 finding 2 (2026-11-13): clean bill on council API controls. Live
+loopback probe of the council server verified every README claim:
+127.0.0.1-only bind, foreign Origin refused (403), malformed JSON and
+missing prompt refused before inference/storage, >512KB body refused,
+root serves 200. Probe state removed afterwards (server stopped, temp
+config deleted). No divergence; no change.
