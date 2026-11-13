@@ -21,8 +21,7 @@ on-track — goals system landing; inbox at zero; gates green.
 
 - `docs/plans/backlog.md`
 - `docs/plans/product-roadmap-20261031.md`
-- Run plans (`loop-*`, `morning-*`, `tomorrow-*`, `track-b-*`,
-  `unattended-*`, `submission-crunch-ready-check.md`, `merge-inventory-*`)
+- Consumed run plans live in `docs/plans/archive/` (sweep 2026-11-13).
 
 ## Next action
 

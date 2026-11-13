@@ -81,24 +81,16 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/plans/deliberation-pack-20261110.md | PENDING | Tomorrow's decisions D1-D9. |
 | docs/plans/edge-round1-operator.md | TRIAGE | E research produced; fix-state unverified. |
 | docs/plans/edge-round1-workbench.md | TRIAGE | E research produced; fix-state unverified. |
-| docs/plans/hackathon-supervised-development-loop-20261030.md | ACTED | Oct-30 window passed. |
 | docs/plans/job-contact-sourcing-draft.md | ACTED | Vendor trial executed (Prospeo live, Apollo parked). |
 | docs/plans/job-search-execution-plan.md | TRIAGE | J plan; implementation state unknown. |
-| docs/plans/l2-spend-program-status.md | ACTED | Nov 4-9 window note; window passed. |
 | docs/plans/l3-eval-ladder-design.md | ACTED | Ladder shipped (route_eval.py + l3_ladder.py). |
-| docs/plans/local-model-quality-policy.md | IGNORE | Superseded by docs/local-model-quality-policy.md v1. |
 | docs/plans/local-model-queue.md | ACTED | Q1-Q4 all consumed into quality-policy v1. |
-| docs/plans/loop-20261102-evening.md | ACTED | Consumed run plan. |
 | docs/plans/mai-supervision-design.md | PENDING | Draft 2026-11-12; owner decision on placement/authority/paging open. |
-| docs/plans/morning-session-20261113-4h.md | PENDING | 2026-11-13 morning 4h run plan; flip to ACTED at closeout. |
 | docs/plans/p4-agent-ux-research.md | KNOWLEDGE | P4 loop-UX research 2026-11-12 (R1-R5 queued, no implementation). |
 | docs/plans/local-model-pilot-20261112.md | KNOWLEDGE | Local model micro-pilot + tool eval + ask-bloat findings 2026-11-12. |
-| docs/plans/unattended-work-plan.md | PENDING | Active 2026-11-12 afternoon window plan; flip to ACTED at closeout. |
 | docs/plans/mai-dashboard-wiring-plan.md | TRIAGE | Wiring execution plan; awaits verdict-A. |
 | docs/plans/marketing-r3-draft.md | PENDING | Compliance boundary binding; pilot proposal unapproved. |
-| docs/plans/merge-inventory-20261105.md | ACTED | Nov-5 merge DONE. |
 | docs/plans/model-capability-data-plan.md | KNOWLEDGE | Program reference; L1/L2 live per roadmap, L3 ladder pending. |
-| docs/plans/morning-20261104.md | ACTED | Consumed run plan. |
 | docs/plans/opencode-go-ide-handoff-20261022.md | KNOWLEDGE | Ordering superseded by integration-first; task detail still referenced. |
 | docs/plans/opencode-go-integration-first-20261022.md | ACTED | Task order consumed (Go work + acceptance scripts exist). |
 | docs/plans/p3-workbench-routed-loop-scouting.md | KNOWLEDGE | Durable finding (bridge claim half wrong). |
@@ -120,22 +112,10 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/plans/research-token-count-prototype.md | ACTED | Oct-4 checkpoint consumed. |
 | docs/plans/search-tooling-landscape-note-20261022.md | KNOWLEDGE | Captured for search-path revisit. |
 | docs/plans/shared-agent-capabilities-options.md | ACTED | Oct-4 checkpoint consumed. |
-| docs/plans/submission-crunch-ready-check.md | ACTED | Submission done 2026-11-04. |
-| docs/plans/tomorrow-20261103.md | ACTED | Consumed run plan. |
-| docs/plans/track-b-20261104.md | ACTED | Consumed run plan. |
-| docs/plans/unattended-codex-prompt-20261029.md | ACTED | Oct-29 window passed. |
-| docs/plans/unattended-work-plan-20261101.md | ACTED | Consumed run plan. |
 | docs/plans/mai-supervision-design.md | PENDING | Draft 2026-11-12; owner decision on placement/authority/paging open. |
-| docs/plans/unattended-work-plan.md | ACTED | Loop11 plan; superseded by tonight's work. |
 | docs/plans/weekly-digest-design.md | ACTED | Digest 2.0 shipped (loop10). |
 | docs/plans/workbench-remote-development-integration-20261027.md | ACTED | Decided 2026-10-27 (C now, B target, A rejected). |
 | docs/plans/workflow-builder-exploration.md | TRIAGE | Exploration note; adoption decision open. |
-| docs/plans/00_MASTER_CHECKLIST_AI_Job_Search_IT_Business.docx | IGNORE | Superseded working copy; archival format only. |
-| docs/plans/01_AI_Provider_Agnostic_Infrastructure_Plan.docx | IGNORE | Superseded working copy; archival format only. |
-| docs/plans/02_AI_Council_Project_Plan.docx | IGNORE | Superseded working copy; archival format only. |
-| docs/plans/03_Job_Search_Automation_Project_Plan.docx | IGNORE | Superseded working copy; archival format only. |
-| docs/plans/04_IT_Services_Business_Start_Plan_PL.docx | IGNORE | Superseded working copy; archival format only. |
-| docs/plans/05_AI_Orchestrator_Project_Plan.docx | IGNORE | Superseded working copy; archival format only. |
 | docs/plans/remote-ai-operator-2026/ | TRIAGE | Aggregate; per-file rows future scope. |
 | docs/api-reference/ | TRIAGE | Aggregate; per-file rows future scope. |
 | docs/artifacts/ | TRIAGE | Aggregate; per-file rows future scope. |
