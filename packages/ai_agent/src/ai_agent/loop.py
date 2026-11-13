@@ -141,6 +141,7 @@ class AgentLoop:
         temperature: float | None = None,
         top_p: float | None = None,
         diagnostic: Callable[[str], None] | None = None,
+        stream_text: Callable[[str], None] | None = None,
         completion_requirements: tuple[CompletionRequirement, ...] = (),
         fanout_policy: FanoutPolicy | str = "allowed",
         on_event: Callable[[ToolExecutionEvent], None] | None = None,
@@ -173,6 +174,7 @@ class AgentLoop:
         self.temperature = temperature
         self.top_p = top_p
         self.diagnostic = diagnostic
+        self.stream_text = stream_text
         self.on_event = on_event
         self.request_metadata = dict(request_metadata or {})
         self.loop_context_budget_chars = loop_context_budget_chars
@@ -205,6 +207,13 @@ class AgentLoop:
             )
             error.partial_messages = tuple(messages)
             raise error
+
+    def _complete_streamed(self, request: AIRequest) -> AIResponse:
+        """Consume a streaming response, forwarding text as it arrives."""
+        assert self.stream_text is not None
+        from ai_provider.contracts import consume_stream
+
+        return consume_stream(self.client, request, self.stream_text)
 
     @property
     def pending(self) -> tuple[ToolCall, ...]:
@@ -630,8 +639,11 @@ class AgentLoop:
                     metadata=dict(self.request_metadata),
                 )
                 enforce_credential_policy(request, extra=self.context.credential_secrets)
-                with heartbeat(f"model turn {iteration + 1}", self.diagnostic):
-                    response = self.client.complete(request)
+                if self.stream_text is not None and hasattr(self.client, "stream"):
+                    response = self._complete_streamed(request)
+                else:
+                    with heartbeat(f"model turn {iteration + 1}", self.diagnostic):
+                        response = self.client.complete(request)
                 usage = response.usage if usage is None else _combine_usage(usage, response.usage)
             except ToolCallFormatError as exc:
                 model_output_errors += 1
