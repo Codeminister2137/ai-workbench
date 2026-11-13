@@ -28,6 +28,14 @@ def _pretty(prefix: str) -> str:
     return _PRETTY.get(prefix, prefix)
 
 
+def _narrate_turn(n: str, tools: str, files: str, errors: str) -> str:
+    if tools == "-":
+        return f"Turn {n}: no tools ({errors} errors)"
+    if files == "-":
+        return f"Turn {n}: {tools} ({errors} errors)"
+    return f"Turn {n}: {tools} on {files} ({errors} errors)"
+
+
 _RULES: tuple[tuple[re.Pattern[str], Callable[[re.Match[str]], str]], ...] = (
     (
         re.compile(r"^local_agent_activity: model_request - provider=(\S+) model=(\S+)"),
@@ -123,6 +131,10 @@ _RULES: tuple[tuple[re.Pattern[str], Callable[[re.Match[str]], str]], ...] = (
     (
         re.compile(r"^heartbeat: (.+) \((\d+)s elapsed, still working\)"),
         lambda m: f"Still working: {m.group(1)} ({m.group(2)}s)…",
+    ),
+    (
+        re.compile(r"^turn_summary: n=(\d+) tools=(\S+) files=(\S+) errors=(\d+)"),
+        lambda m: _narrate_turn(m.group(1), m.group(2), m.group(3), m.group(4)),
     ),
     (
         re.compile(r"^([a-z_]+_activity): failed - (.+)"),

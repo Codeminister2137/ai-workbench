@@ -70,6 +70,7 @@ class AgentResult:
     response: AIResponse
     tool_results: tuple[ToolResult, ...] = ()
     iterations: int = 1
+    turn_summaries: tuple[str, ...] = ()
     # Transient only, like ProviderError.partial_messages; never log/persist raw continuation.
     messages: tuple[AIMessage, ...] = field(default=(), repr=False, compare=False)
     model_output_errors: int = 0
@@ -594,6 +595,7 @@ class AgentLoop:
                 messages.append(AIMessage(MessageRole.SYSTEM, system_prompt))
             messages.append(AIMessage(MessageRole.USER, prompt))
         tool_results: list[ToolResult] = list(prior_tool_results)
+        turn_summaries: list[str] = []
         recovery = ModelOutputRecovery(self.context.workspace_root)
         model_output_errors = 0
         completion_failures = 0
@@ -793,6 +795,7 @@ class AgentLoop:
                     completion_failures=completion_failures,
                     compactions=compactions,
                     usage=usage if usage is not None else UsageMetadata(),
+                    turn_summaries=tuple(turn_summaries),
                 )
 
             seen_in_batch: set[tuple[str, str, str]] = set()
@@ -892,6 +895,7 @@ class AgentLoop:
             )
             fanout_results: dict[int, tuple] = {}
             fanout_done = False
+            results_before = len(tool_results)
             for position, kind, payload, call in planned:
                 if kind == "result":
                     result, replay_key = payload
@@ -919,6 +923,17 @@ class AgentLoop:
                     )
                 )
                 self._check_deadline(messages)
+            batch_results = tool_results[results_before:]
+            batch_errors = sum(1 for item in batch_results if item.is_error)
+            summary = (
+                f"turn_summary: n={iteration} "
+                f"tools={','.join(call.name for _, _, _, call in planned) or '-'} "
+                f"files={','.join(_turn_file_mentions(tool_calls)) or '-'} "
+                f"errors={batch_errors}"
+            )
+            turn_summaries.append(summary)
+            if self.diagnostic:
+                self.diagnostic(summary)
 
         error = ProviderError(
             f"Agent loop exceeded max_iterations={self.max_iterations}; "
@@ -983,6 +998,30 @@ def _render_compaction_source(messages: list[AIMessage], cap_chars: int) -> str:
         + ")\n"
     )
     return header + "\n\n".join(parts)
+
+
+_PATH_ARGUMENT_KEYS = ("path", "file", "files", "target")
+
+
+def _turn_file_mentions(calls: object) -> list[str]:
+    """Distinct path-like tool arguments in one batch (max 3, strings only)."""
+    found: list[str] = []
+    for call in calls or ():
+        arguments = getattr(call, "arguments", None)
+        if not isinstance(arguments, dict):
+            continue
+        for key in _PATH_ARGUMENT_KEYS:
+            value = arguments.get(key)
+            candidates = value if isinstance(value, list) else [value]
+            for candidate in candidates:
+                if (
+                    isinstance(candidate, str)
+                    and candidate
+                    and candidate not in found
+                    and len(found) < 3
+                ):
+                    found.append(candidate)
+    return found
 
 
 def _replay_key(call: AIToolCall) -> tuple[str, str, str] | None:
