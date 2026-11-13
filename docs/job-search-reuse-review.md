@@ -282,3 +282,22 @@ is intentionally gone and the promised last snapshot is not retrievable
 Drop open-jobs from the integration plan; the target-board coverage gap
 (Just Join IT, Pracuj.pl, RocketJobs) still needs a JobSpy or Openings
 adapter trial.
+
+## Openings runtime trial (2026-11-13, authorized option A)
+
+Pinned v0.4.2 (156dedef) in an isolated venv (py3.14, Windows-native,
+pip install clean). Config: loopback intent (note: web hardcodes
+0.0.0.0:8501, token-gated), random API token, embeddings OFF, empty
+profile (no PII), notifications OFF, data dir under .tmp (torn down
+after). Healthcheck 4/4 OK.
+
+One collection (`openings run`, jobspy/linkedin, "software engineer"
+in Poland, fulltime): 47 rows in 58s, 45 saved to SQLite, scored
+(max 55, avg 33.1), 0 notified, no errors, no ONNX download, no
+browser automation needed. Sample: Senior Software Engineer Platform
+(Java) @ Sprout Social (Poland, 55).
+
+Verdict: Openings runs natively on this box and collects + scores
+reliably. Remaining for adoption: web/API+MCP smoke, scheduler
+always-on decision, frontend build (npm) if the dashboard UI is
+wanted, and the Indeed/Poland + target-board coverage question.
