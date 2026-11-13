@@ -55,7 +55,7 @@
       "goal": "docs/goals/council.md",
       "repo": "ai-workbench",
       "owner": "Jakub",
-      "health": "at-risk",
+      "health": "on-track",
       "relations": {"uses": ["provider"]}
     },
     "company-site": {
