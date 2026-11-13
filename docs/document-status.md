@@ -77,6 +77,7 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/plans/company-naming-r5.md | ACTED | Owner verdict recorded in R6 (none good enough). |
 | docs/plans/company-naming-r6.md | PENDING | Founder research delivered; panel round (R7) + decision open. |
 | docs/plans/company-offering-draft.md | PENDING | Proposal with open questions; pricing partly re-anchored by grounding §2. |
+| docs/plans/council-deliberation-slice.md | PENDING | Deliberation rounds + synthesis next slice; design then implement. |
 | docs/plans/deferred-baseline-work-20261022.md | PENDING | Bounded offline backlog; item 1 ties to in-progress conformance plan. |
 | docs/plans/deliberation-pack-20261110.md | PENDING | Tomorrow's decisions D1-D9. |
 | docs/plans/edge-round1-operator.md | TRIAGE | E research produced; fix-state unverified. |
