@@ -261,3 +261,11 @@ maintained mirror patch holding over HTTP). Auth contract confirmed both
 ways: the client sends `X-Openings-Token` (primary) and the server also
 accepts `Authorization: Bearer`. No divergence; the client's strict
 response-shape assertions held against real responses. No change.
+
+Group 4 finding 1 (2026-11-13): clean bill on CLI entry examples. The
+documented `uv run --no-sync ai-assistant --help` (exit 0),
+`--mode plan "..."` (plan metadata, local context only, no inference
+observed), `--list-skills` and `--fallback-readiness` (both valid JSON
+payloads) all run as documented from the repo root. No divergence; the
+remaining Group 4 surface (dependencies, guides, examples beyond the
+entry page) is future scope.
