@@ -828,9 +828,14 @@ async function renderProjects(id) {
          <span class="muted">${esc(p.root || "")}</span>
          <span class="pill st-${esc(p.type || "general")}">${esc(p.type || "general")}</span></li>`).join("")
     : '<li class="muted">No projects registered yet.</li>';
+  const attention = (payload.attention || []).map((a) =>
+    `<li><strong>${esc(a.plan)}</strong>
+     <span class="pill">${esc(a.status)}</span>
+     <span class="muted">${esc(a.project)} · ${(a.reasons || []).map(esc).join("; ")}</span></li>`).join("");
   view.innerHTML = `<h1>Projects</h1>
     <h2>Goals</h2>
     <ul class="plain" id="goals-list">${goals || '<li class="muted">No goal registry found.</li>'}</ul>
+    ${attention ? `<h2>Plan attention</h2><ul class="plain" id="attention-list">${attention}</ul>` : ""}
     <h2>Work roots</h2>
     <p class="muted">Named work roots. Book projects carry a manuscript plus ask-to-check actions.</p>
     <p><input type="text" id="filter-projects" placeholder="Filter projects..." title="Filter projects by text"></p>

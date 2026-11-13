@@ -12,6 +12,7 @@ from dashboard_projects import (
     create_project,
     get_project,
     list_goals,
+    list_plan_attention,
     list_projects,
     set_project_manuscript,
 )
@@ -61,6 +62,7 @@ def test_projects_endpoints(dashboard_server, tmp_path) -> None:
         "ok": True,
         "projects": [],
         "goals": [],
+        "attention": [],
     }
     root = tmp_path / "proj"
     root.mkdir()
@@ -224,3 +226,36 @@ def test_projects_endpoint_carries_goals(dashboard_server) -> None:
     payload = get_json(dashboard_server, "/api/projects")
     assert payload["ok"] is True
     assert isinstance(payload["goals"], list)
+
+
+def test_plan_attention_flags_triage_and_stale(tmp_path) -> None:
+    import os
+    import time
+
+    plans = tmp_path / "docs" / "plans"
+    plans.mkdir(parents=True)
+    (plans / "fresh.md").write_text(
+        "<!-- Project: meta | Status: active | Timebox: 1 session | Replaces: none -->\n",
+        encoding="utf-8",
+    )
+    (plans / "notime.md").write_text(
+        "<!-- Project: meta | Status: active | Timebox: triage | Replaces: none -->\n",
+        encoding="utf-8",
+    )
+    old = plans / "stale.md"
+    old.write_text(
+        "<!-- Project: meta | Status: active | Timebox: 1 session | Replaces: none -->\n",
+        encoding="utf-8",
+    )
+    ancient = time.time() - 70 * 86400
+    os.utime(old, (ancient, ancient))
+    (plans / "done.md").write_text(
+        "<!-- Project: meta | Status: done | Timebox: n/a | Replaces: none -->\n",
+        encoding="utf-8",
+    )
+    flagged = {item["plan"]: item["reasons"] for item in list_plan_attention(tmp_path)}
+    assert flagged["notime.md"] == ["timebox unset"]
+    assert flagged["stale.md"] == ["untouched 70 days (>60)"]
+    assert "fresh.md" not in flagged
+    assert "done.md" not in flagged
+    assert list_plan_attention(tmp_path / "empty") == []
