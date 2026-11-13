@@ -53,6 +53,42 @@ def test_serve_version_prefers_file_over_git(tmp_path, monkeypatch) -> None:
     assert info["started_utc"]
 
 
+def test_serve_version_carries_commit_timestamp(tmp_path) -> None:
+    import json
+
+    from dashboard_web_app import capture_server_version
+
+    write_serve_version(
+        tmp_path, branch="develop", commit="abc1234", commit_utc="2026-11-13T12:00:00+00:00"
+    )
+    filed = json.loads((tmp_path / "serve-version.json").read_text(encoding="utf-8"))
+    assert filed["commit_utc"] == "2026-11-13T12:00:00+00:00"
+    info = capture_server_version(Path("."), data_dir=tmp_path)
+    assert info["commit_utc"] == "2026-11-13T12:00:00+00:00"
+
+
+def test_capture_version_reads_commit_date_from_git(tmp_path) -> None:
+    import subprocess
+
+    from dashboard_web_app import capture_server_version
+
+    subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=tmp_path, check=True)
+    (tmp_path / "f.txt").write_text("x", encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "-m", "init"], cwd=tmp_path, check=True)
+    info = capture_server_version(tmp_path)
+    expect = subprocess.run(
+        ["git", "show", "-s", "--format=%cI", "HEAD"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+    assert info["commit_utc"] == expect
+
+
 def test_version_endpoint_serves_snapshot(dashboard_server, monkeypatch) -> None:
     from dashboard_test_http import get_json
     from dashboard_web_app import DashboardRequestHandler

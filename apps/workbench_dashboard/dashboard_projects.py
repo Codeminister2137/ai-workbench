@@ -10,6 +10,7 @@ root; the root must be an existing directory at creation time.
 from __future__ import annotations
 
 import json
+import re
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -21,6 +22,7 @@ MAX_NAME_CHARS = 200
 MAX_DESCRIPTION_CHARS = 2000
 PROJECT_TYPES = ("general", "book")
 BOOK_CHECKS = ("discrepancy", "scrutiny")
+GOALS_REGISTRY = "docs/goals/registry.json"
 
 
 def _projects_path(data_dir: Path) -> Path:
@@ -68,6 +70,101 @@ def list_projects(data_dir: Path) -> list[dict[str, Any]]:
 def get_project(data_dir: Path, project_id: str) -> dict[str, Any] | None:
     """Return one project record, or None when absent."""
     return load_registry(data_dir).get(project_id)
+
+
+def _next_action(repo_root: Path, goal_rel: str) -> str:
+    """First paragraph of the goal doc's Next action section (fail-soft)."""
+    try:
+        lines = (repo_root / goal_rel).read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return ""
+    capture: list[str] = []
+    inside = False
+    for line in lines:
+        if line.startswith("## "):
+            if inside:
+                break
+            inside = line.strip() == "## Next action"
+        elif inside and line.strip():
+            capture.append(line.strip())
+    return " ".join(capture)
+
+
+PLAN_HEADER_RE = re.compile(
+    r"<!-- Project: ([^|]+) \| Status: ([^|]+) \| Timebox: ([^|]+) \| Replaces: ([^-]+) -->"
+)
+PLAN_STALE_DAYS = {"draft": 60, "active": 60, "blocked": 30}
+
+
+def list_plan_attention(repo_root: Path, *, now: float | None = None) -> list[dict[str, Any]]:
+    """Plans needing eyes: unset timebox or untouched past threshold.
+
+    Fail-soft: a missing plans dir reads empty. advisory, never a gate.
+    """
+    import time
+
+    plans_dir = repo_root / "docs" / "plans"
+    if not plans_dir.is_dir():
+        return []
+    moment = time.time() if now is None else now
+    flagged: list[dict[str, Any]] = []
+    for path in sorted(plans_dir.glob("*.md")):
+        try:
+            head = path.read_text(encoding="utf-8").splitlines()[:5]
+            age_days = (moment - path.stat().st_mtime) / 86400
+        except OSError:
+            continue
+        match = next((PLAN_HEADER_RE.fullmatch(line.strip()) for line in head), None)
+        if match is None:
+            continue
+        status = match.group(2).strip()
+        timebox = match.group(3).strip()
+        if status not in PLAN_STALE_DAYS:
+            continue
+        reasons: list[str] = []
+        if timebox == "triage":
+            reasons.append("timebox unset")
+        limit = PLAN_STALE_DAYS[status]
+        if age_days > limit:
+            reasons.append(f"untouched {int(age_days)} days (>{limit})")
+        if reasons:
+            flagged.append(
+                {
+                    "plan": path.name,
+                    "project": match.group(1).strip(),
+                    "status": status,
+                    "reasons": reasons,
+                }
+            )
+    return flagged
+
+
+def list_goals(repo_root: Path) -> list[dict[str, Any]]:
+    """Goal registry entries with next actions; missing registry reads empty."""
+    try:
+        payload = json.loads((repo_root / GOALS_REGISTRY).read_text(encoding="utf-8"))
+        projects = payload.get("projects", {})
+    except (OSError, ValueError, AttributeError):
+        return []
+    if not isinstance(projects, dict):
+        return []
+    goals: list[dict[str, Any]] = []
+    for project_id in sorted(projects):
+        entry = projects[project_id]
+        if not isinstance(entry, dict):
+            continue
+        goals.append(
+            {
+                "id": project_id,
+                "goal": str(entry.get("goal", "")),
+                "repo": str(entry.get("repo", "")),
+                "owner": str(entry.get("owner", "")),
+                "health": str(entry.get("health", "")),
+                "relations": entry.get("relations", {}),
+                "next_action": _next_action(repo_root, str(entry.get("goal", ""))),
+            }
+        )
+    return goals
 
 
 def create_project(

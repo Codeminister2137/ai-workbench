@@ -1,0 +1,84 @@
+{
+  "_comment": "Single project registry. Plans, tasks and the dashboard reference projects by id; merges/splits edit this file plus the goal docs, never a grep over all files.",
+  "version": 1,
+  "projects": {
+    "provider": {
+      "goal": "docs/goals/provider.md",
+      "repo": "ai-workbench",
+      "owner": "Jakub",
+      "health": "on-track",
+      "relations": {}
+    },
+    "orchestrator": {
+      "goal": "docs/goals/orchestrator.md",
+      "repo": "ai-workbench",
+      "owner": "Jakub",
+      "health": "on-track",
+      "relations": {}
+    },
+    "agent-cli": {
+      "goal": "docs/goals/agent-cli.md",
+      "repo": "ai-workbench",
+      "owner": "Jakub",
+      "health": "on-track",
+      "relations": {"uses": ["provider"]}
+    },
+    "dashboard": {
+      "goal": "docs/goals/dashboard.md",
+      "repo": "ai-workbench",
+      "owner": "Jakub",
+      "health": "on-track",
+      "relations": {}
+    },
+    "meetings-transcriber": {
+      "goal": "docs/goals/meetings-transcriber.md",
+      "repo": "ai-workbench",
+      "owner": "Jakub",
+      "health": "on-track",
+      "relations": {"runs-on": ["dashboard"]}
+    },
+    "knowledge-bank": {
+      "goal": "docs/goals/knowledge-bank.md",
+      "repo": "ai-workbench",
+      "owner": "Jakub",
+      "health": "at-risk",
+      "relations": {"runs-on": ["dashboard"]}
+    },
+    "job-search": {
+      "goal": "docs/goals/job-search.md",
+      "repo": "ai-workbench",
+      "owner": "Jakub",
+      "health": "on-track",
+      "relations": {"uses": ["provider"]}
+    },
+    "council": {
+      "goal": "docs/goals/council.md",
+      "repo": "ai-workbench",
+      "owner": "Jakub",
+      "health": "at-risk",
+      "relations": {"uses": ["provider"]}
+    },
+    "company-site": {
+      "goal": "docs/goals/company-site.md",
+      "repo": "ai-workbench",
+      "owner": "Jakub",
+      "health": "at-risk",
+      "relations": {}
+    },
+    "company-ops": {
+      "goal": "docs/goals/company-ops.md",
+      "repo": "ai-workbench",
+      "owner": "Jakub",
+      "health": "at-risk",
+      "relations": {}
+    },
+    "meta": {
+      "goal": "docs/goals/meta.md",
+      "repo": "ai-workbench",
+      "owner": "Jakub",
+      "health": "on-track",
+      "relations": {},
+      "_comment": "Repo operations itself: run plans, workflow, gates, sweeps."
+    }
+  }
+}

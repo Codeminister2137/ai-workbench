@@ -244,6 +244,10 @@ select a dependency, deployment, privacy boundary or third-party permission.
 - File decision briefs with `scripts/file-brief.py` (explicit `--option`
   values, never prose-only "Options: A/B"), so multi-choice renders
   without further parsing.
+- Plans live under `docs/plans/*.md` with a header naming their registry
+  project (`docs/goals/registry.json`); flip the header `Status` in the
+  same commit that finishes the work. Project health lives in the registry;
+  goal docs (`docs/goals/*.md`) explain the why.
 
 ## Unattended execution windows
 

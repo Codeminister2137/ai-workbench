@@ -11,6 +11,8 @@ from dashboard_projects import (
     book_check_task,
     create_project,
     get_project,
+    list_goals,
+    list_plan_attention,
     list_projects,
     set_project_manuscript,
 )
@@ -56,7 +58,12 @@ def test_registry_refusals(tmp_path) -> None:
 
 
 def test_projects_endpoints(dashboard_server, tmp_path) -> None:
-    assert get_json(dashboard_server, "/api/projects") == {"ok": True, "projects": []}
+    assert get_json(dashboard_server, "/api/projects") == {
+        "ok": True,
+        "projects": [],
+        "goals": [],
+        "attention": [],
+    }
     root = tmp_path / "proj"
     root.mkdir()
     created = post_json(dashboard_server, "/api/projects", {"name": "Shop", "root": str(root)})
@@ -180,3 +187,75 @@ def test_book_endpoints(dashboard_server, tmp_path) -> None:
             {"check": "discrepancy"},
         )
     assert exc.value.code == 400
+
+
+def test_list_goals_reads_registry_and_next_actions(tmp_path) -> None:
+    goals_dir = tmp_path / "docs" / "goals"
+    goals_dir.mkdir(parents=True)
+    (goals_dir / "registry.json").write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "projects": {
+                    "demo": {
+                        "goal": "docs/goals/demo.md",
+                        "repo": "ai-workbench",
+                        "owner": "Jakub",
+                        "health": "on-track",
+                        "relations": {"uses": ["provider"]},
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    (goals_dir / "demo.md").write_text(
+        "# Demo\n\n## Goal\n\nShip it.\n\n## Next action\n\nDo the thing.\n",
+        encoding="utf-8",
+    )
+    (goals_dir / "ghost.md").write_text("# Ghost\n", encoding="utf-8")
+    goals = list_goals(tmp_path)
+    assert [item["id"] for item in goals] == ["demo"]
+    assert goals[0]["health"] == "on-track"
+    assert goals[0]["next_action"] == "Do the thing."
+    assert goals[0]["relations"] == {"uses": ["provider"]}
+    assert list_goals(tmp_path / "empty") == []
+
+
+def test_projects_endpoint_carries_goals(dashboard_server) -> None:
+    payload = get_json(dashboard_server, "/api/projects")
+    assert payload["ok"] is True
+    assert isinstance(payload["goals"], list)
+
+
+def test_plan_attention_flags_triage_and_stale(tmp_path) -> None:
+    import os
+    import time
+
+    plans = tmp_path / "docs" / "plans"
+    plans.mkdir(parents=True)
+    (plans / "fresh.md").write_text(
+        "<!-- Project: meta | Status: active | Timebox: 1 session | Replaces: none -->\n",
+        encoding="utf-8",
+    )
+    (plans / "notime.md").write_text(
+        "<!-- Project: meta | Status: active | Timebox: triage | Replaces: none -->\n",
+        encoding="utf-8",
+    )
+    old = plans / "stale.md"
+    old.write_text(
+        "<!-- Project: meta | Status: active | Timebox: 1 session | Replaces: none -->\n",
+        encoding="utf-8",
+    )
+    ancient = time.time() - 70 * 86400
+    os.utime(old, (ancient, ancient))
+    (plans / "done.md").write_text(
+        "<!-- Project: meta | Status: done | Timebox: n/a | Replaces: none -->\n",
+        encoding="utf-8",
+    )
+    flagged = {item["plan"]: item["reasons"] for item in list_plan_attention(tmp_path)}
+    assert flagged["notime.md"] == ["timebox unset"]
+    assert flagged["stale.md"] == ["untouched 70 days (>60)"]
+    assert "fresh.md" not in flagged
+    assert "done.md" not in flagged
+    assert list_plan_attention(tmp_path / "empty") == []

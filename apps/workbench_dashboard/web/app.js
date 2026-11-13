@@ -817,13 +817,26 @@ async function renderProjects(id) {
     return;
   }
   const payload = await api("/api/projects");
+  const goals = (payload.goals || []).map((g) =>
+    `<li><strong>${esc(g.id)}</strong>
+     <span class="pill">${esc(g.health || "unknown")}</span>
+     <span class="muted">${esc(g.owner || "")} · ${esc(g.repo || "")}</span>
+     ${g.next_action ? `<br><span>${gtext(g.next_action)}</span>` : ""}</li>`).join("");
   const items = payload.projects.length
     ? payload.projects.map((p) =>
         `<li><a href="#/projects/${esc(p.id)}">${gtext(p.name)}</a>
          <span class="muted">${esc(p.root || "")}</span>
          <span class="pill st-${esc(p.type || "general")}">${esc(p.type || "general")}</span></li>`).join("")
     : '<li class="muted">No projects registered yet.</li>';
+  const attention = (payload.attention || []).map((a) =>
+    `<li><strong>${esc(a.plan)}</strong>
+     <span class="pill">${esc(a.status)}</span>
+     <span class="muted">${esc(a.project)} · ${(a.reasons || []).map(esc).join("; ")}</span></li>`).join("");
   view.innerHTML = `<h1>Projects</h1>
+    <h2>Goals</h2>
+    <ul class="plain" id="goals-list">${goals || '<li class="muted">No goal registry found.</li>'}</ul>
+    ${attention ? `<h2>Plan attention</h2><ul class="plain" id="attention-list">${attention}</ul>` : ""}
+    <h2>Work roots</h2>
     <p class="muted">Named work roots. Book projects carry a manuscript plus ask-to-check actions.</p>
     <p><input type="text" id="filter-projects" placeholder="Filter projects..." title="Filter projects by text"></p>
     <ul class="plain" id="projects-list">${items}</ul>
@@ -1880,9 +1893,16 @@ async function renderFleet() {
     const ownerLine = ownerSleep.active
       ? `<span class="pill st-ready">scheduled</span> <strong>due ${esc(ownerSleep.due_warsaw || "?")} Warsaw</strong>`
       : `<span class="pill">none</span> <span class="muted">${esc(ownerSleep.status || "no owner timer")}</span>`;
+    const serviceRows = (f.services || []).map((s) =>
+      `<li><span class="pill st-${s.up ? "ready" : "missing"}">${s.up ? "up" : "down"}</span> <strong>${esc(s.name)}</strong>` +
+      ` <span class="muted">${esc(s.version || "?")}` +
+      (s.commit_utc ? ` · committed ${esc(fmtTime(s.commit_utc))}` : "") +
+      (s.started_utc ? ` · started ${esc(fmtTime(s.started_utc))}` : "") +
+      `</span></li>`).join("");
     body = `<div class="card"><h2>Servers</h2><ul class="plain">
       <li><span class="pill st-ready">up</span> <strong>dashboard</strong> <span class="muted">${esc(f.dashboard.explain || "this server")}</span></li>
       <li><span class="pill st-${f.ollama.up ? "ready" : "missing"}">${f.ollama.up ? "up" : "down"}</span> <strong>ollama</strong> <span class="muted">${f.ollama.up ? esc(f.ollama.models) + " model(s)" : esc(f.ollama.detail || "")}${f.ollama.explain ? ` — ${esc(f.ollama.explain)}` : ""}</span></li></ul></div>
+      <div class="card"><h2>Service versions</h2><ul class="plain">${serviceRows || '<li class="muted">No versioned services.</li>'}</ul></div>
       <div class="card"><h2>Watchdog tasks</h2><ul class="plain">${taskRows}</ul></div>
       <div class="card"><h2>Sleep guard</h2><p>${sleep}</p></div>
       <div class="card"><h2>Sleep button</h2><p>${ownerLine}</p>

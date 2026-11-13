@@ -45,6 +45,8 @@
 - [ ] Decisions recorded if significant.
 - [ ] Obsolete documentation updated rather than duplicated.
 - [ ] Local `CURRENT_CONTEXT.md` updated for non-trivial work when present.
+- [ ] New plans carry the header (`Project` = registry id, `Status`, `Timebox`,
+  `Replaces`); finished work flips its plan header `Status` in the same commit.
 
 ## Final review
 - [ ] `git diff` reviewed.

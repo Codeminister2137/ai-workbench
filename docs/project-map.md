@@ -48,6 +48,10 @@ Use this file to decide where a change belongs before adding new abstractions.
 - `packages/` — reusable Python libraries.
 - `apps/` — applications and prototypes.
 - `tests/` — repository-level integration and contract tests.
+- `docs/goals/` — project registry (`registry.json`) + one goal doc per
+  project. Repo policy (owner, 2026-11-13): monorepo default; split a
+  project out only for client ownership or independent versioning need.
+  The registry's `repo` field records where each project lives.
 
 ## Projects
 
