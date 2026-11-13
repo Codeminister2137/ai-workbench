@@ -1,7 +1,10 @@
+import io
 import json
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
+from typing import cast
 
 import pytest
 from ai_orchestrator import AccessMethod
@@ -10,6 +13,7 @@ from ai_provider.external_agents import (
     _external_agent_progress_line,
     _external_agent_result_from_completed_process,
     _external_agent_stderr_progress_line,
+    _run_external_agent_process,
     build_codex_plugin_command,
     build_external_agent_command,
     codex_plugin_status_by_name,
@@ -1013,3 +1017,89 @@ def test_run_diagnostic_command_completed_process(returncode: int, monkeypatch):
     assert "private_arg" not in str(result)
     assert PRIVATE_COMMAND not in str(result)
     assert PRIVATE_ARGUMENT not in str(result)
+
+
+class _FakePopen:
+    """Never exits on its own; records kill (edge W2/W3 harness)."""
+
+    def __init__(self, lines: list[str], *, exits_after_polls: int | None = None) -> None:
+        self.stdin = io.StringIO()
+        self.stdout = io.StringIO("".join(lines))
+        self.stderr = io.StringIO("")
+        self.returncode: int | None = None
+        self.killed = False
+        self._polls = 0
+        self._exits_after = exits_after_polls
+
+    def poll(self) -> int | None:
+        self._polls += 1
+        if self._exits_after is not None and self._polls >= self._exits_after:
+            self.returncode = 0
+        return self.returncode
+
+    def kill(self) -> None:
+        self.killed = True
+        self.returncode = 9
+
+
+def _fake_factory(fake: _FakePopen) -> Callable[..., subprocess.Popen[str]]:
+    return cast("Callable[..., subprocess.Popen[str]]", lambda *args, **kwargs: fake)
+
+
+def _edge_config(tmp_path: Path, *, timeout_seconds: float) -> ExternalAgentConfig:
+    return ExternalAgentConfig(
+        access_method=AccessMethod.CODEX_CLI,
+        command="fake",
+        model="fixture",
+        cwd=tmp_path,
+        timeout_seconds=timeout_seconds,
+    )
+
+
+def test_callback_exception_kills_live_process(tmp_path: Path) -> None:
+    """W2: an unexpected exception must not orphan a live agent process."""
+
+    def boom(_line: str) -> None:
+        raise RuntimeError("boom")
+
+    fake = _FakePopen(["hello\n"])
+    with pytest.raises(RuntimeError, match="boom"):
+        _run_external_agent_process(
+            "prompt",
+            _edge_config(tmp_path, timeout_seconds=30.0),
+            runner=subprocess.run,
+            popen_factory=_fake_factory(fake),
+            progress_callback=boom,
+            progress_interval_seconds=0,
+        )
+    assert fake.killed is True
+
+
+def test_chatty_process_hits_total_timeout(tmp_path: Path) -> None:
+    """W3: continuous output must not outrun timeout_seconds."""
+
+    fake = _FakePopen(["tick\n"] * 5000)
+    with pytest.raises(subprocess.TimeoutExpired):
+        _run_external_agent_process(
+            "prompt",
+            _edge_config(tmp_path, timeout_seconds=0.4),
+            runner=subprocess.run,
+            popen_factory=_fake_factory(fake),
+            progress_callback=None,
+            progress_interval_seconds=0,
+        )
+    assert fake.killed is True
+
+
+def test_clean_exit_skips_finally_kill(tmp_path: Path) -> None:
+    fake = _FakePopen(["done\n"], exits_after_polls=5)
+    result = _run_external_agent_process(
+        "prompt",
+        _edge_config(tmp_path, timeout_seconds=30.0),
+        runner=subprocess.run,
+        popen_factory=_fake_factory(fake),
+        progress_callback=None,
+        progress_interval_seconds=0,
+    )
+    assert fake.killed is False
+    assert result.returncode == 0
