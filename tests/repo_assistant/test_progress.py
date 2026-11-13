@@ -96,6 +96,18 @@ from ai_agent.progress import heartbeat, narrate, reporter
             "repair_activity: started - fix it",
             "Repair started: fix it",
         ),
+        (
+            "turn_summary: n=2 tools=read_file,edit_file files=a.py errors=0",
+            "Turn 2: read_file,edit_file on a.py (0 errors)",
+        ),
+        (
+            "turn_summary: n=1 tools=list_dir files=- errors=0",
+            "Turn 1: list_dir (0 errors)",
+        ),
+        (
+            "turn_summary: n=3 tools=- files=- errors=1",
+            "Turn 3: no tools (1 errors)",
+        ),
     ],
 )
 def test_narrate_known_events(raw: str, expected: str) -> None:
@@ -160,3 +172,56 @@ def test_heartbeat_joins_thread_on_error() -> None:
         with heartbeat("model turn 1", events.append, interval_seconds=0.01):
             raise RuntimeError("boom")
     assert threading.active_count() <= before
+
+
+def test_loop_emits_turn_summary_and_records_it(tmp_path) -> None:
+    from ai_agent import PermissionManager, PermissionPolicy, ToolContext, default_coding_tools
+    from ai_agent.loop import AgentLoop
+    from ai_provider import (
+        AIMessage,
+        AIResponse,
+        AIToolCall,
+        BackendInfo,
+        BackendLocation,
+        FinishReason,
+        MessageRole,
+        UsageMetadata,
+    )
+
+    class ScriptedClient:
+        backend = BackendInfo(provider="fake", model="test", location=BackendLocation.LOCAL)
+
+        def __init__(self, turns):
+            self.turns = list(turns)
+
+        def complete(self, request):
+            turn = self.turns.pop(0)
+            message = (
+                AIMessage(MessageRole.ASSISTANT, turn)
+                if isinstance(turn, str)
+                else AIMessage(MessageRole.ASSISTANT, "", tool_calls=tuple(turn))
+            )
+            return AIResponse(
+                message=message,
+                backend=self.backend,
+                finish_reason=FinishReason.STOP,
+                usage=UsageMetadata(),
+            )
+
+        def stream(self, request):
+            raise NotImplementedError
+
+    events: list[str] = []
+    client = ScriptedClient(
+        [[AIToolCall("c1", "create_file", {"path": "out.txt", "content": "done"})], "Finished"]
+    )
+    result = AgentLoop(
+        client,
+        default_coding_tools(),
+        ToolContext(tmp_path),
+        permissions=PermissionManager(policy=PermissionPolicy.permissive()),
+        diagnostic=events.append,
+    ).run("Create the file")
+    assert result.turn_summaries == ("turn_summary: n=1 tools=create_file files=out.txt errors=0",)
+    assert result.turn_summaries[0] in events
+    assert narrate(result.turn_summaries[0]) == "Turn 1: create_file on out.txt (0 errors)"
