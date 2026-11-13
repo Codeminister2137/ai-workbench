@@ -36,6 +36,7 @@ from ai_agent.contracts import PermissionAction, ToolCall, ToolResult
 from ai_agent.groundedness import check_groundedness
 from ai_agent.model_output_recovery import ModelOutputRecovery
 from ai_agent.permissions import PermissionManager
+from ai_agent.progress import heartbeat
 from ai_agent.tools.base import ToolContext, ToolRegistry
 
 if TYPE_CHECKING:
@@ -444,7 +445,8 @@ class AgentLoop:
         summary_usage: UsageMetadata | None = None
         for _attempt in (1, 2):
             try:
-                summary_response = self.client.complete(summary_request)
+                with heartbeat("compacting transcript", self.diagnostic):
+                    summary_response = self.client.complete(summary_request)
                 summary_usage = summary_response.usage
                 summary_text = summary_response.message.content.strip()
             except ProviderError as exc:
@@ -626,7 +628,8 @@ class AgentLoop:
                     metadata=dict(self.request_metadata),
                 )
                 enforce_credential_policy(request, extra=self.context.credential_secrets)
-                response = self.client.complete(request)
+                with heartbeat(f"model turn {iteration + 1}", self.diagnostic):
+                    response = self.client.complete(request)
                 usage = response.usage if usage is None else _combine_usage(usage, response.usage)
             except ToolCallFormatError as exc:
                 model_output_errors += 1

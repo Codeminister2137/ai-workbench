@@ -8,8 +8,11 @@ the print sink: verbose mode prints raw telemetry, default mode narrates.
 
 from __future__ import annotations
 
+import contextlib
 import re
-from collections.abc import Callable
+import threading
+import time
+from collections.abc import Callable, Iterator
 
 _PRETTY = {
     "local_agent_activity": "Agent",
@@ -118,6 +121,10 @@ _RULES: tuple[tuple[re.Pattern[str], Callable[[re.Match[str]], str]], ...] = (
         lambda m: f"Context: truncated {m.group(1)}",
     ),
     (
+        re.compile(r"^heartbeat: (.+) \((\d+)s elapsed, still working\)"),
+        lambda m: f"Still working: {m.group(1)} ({m.group(2)}s)…",
+    ),
+    (
         re.compile(r"^([a-z_]+_activity): failed - (.+)"),
         lambda m: f"{_pretty(m.group(1))} failed: {m.group(2)}",
     ),
@@ -145,3 +152,35 @@ def reporter(*, verbose: bool) -> Callable[[str], None]:
     if verbose:
         return print
     return lambda line: print(narrate(line))
+
+
+@contextlib.contextmanager
+def heartbeat(
+    label: str,
+    sink: Callable[[str], None] | None,
+    *,
+    interval_seconds: float = 15.0,
+) -> Iterator[None]:
+    """Emit still-working lines while the wrapped call runs.
+
+    Silent when the call finishes before the first interval or when no
+    sink is attached. The beat thread is daemonic and always joined.
+    """
+    if sink is None or interval_seconds <= 0:
+        yield
+        return
+    done = threading.Event()
+    start = time.monotonic()
+
+    def _beat() -> None:
+        while not done.wait(interval_seconds):
+            elapsed = time.monotonic() - start
+            sink(f"heartbeat: {label} ({elapsed:.0f}s elapsed, still working)")
+
+    thread = threading.Thread(target=_beat, daemon=True, name="mai-heartbeat")
+    thread.start()
+    try:
+        yield
+    finally:
+        done.set()
+        thread.join(timeout=interval_seconds + 5)
