@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import threading
+import time
+
 import pytest
-from ai_agent.progress import narrate, reporter
+from ai_agent.progress import heartbeat, narrate, reporter
 
 
 @pytest.mark.parametrize(
@@ -119,3 +122,41 @@ def test_reporter_verbose_prints_raw(capsys: pytest.CaptureFixture) -> None:
 def test_reporter_default_narrates(capsys: pytest.CaptureFixture) -> None:
     reporter(verbose=False)("local_agent_activity: model_request - provider=a model=b")
     assert capsys.readouterr().out.strip() == "Asking b (a)…"
+
+
+def test_narrate_heartbeat_line() -> None:
+    assert narrate("heartbeat: model turn 2 (31s elapsed, still working)") == (
+        "Still working: model turn 2 (31s)…"
+    )
+
+
+def test_heartbeat_beats_during_slow_call() -> None:
+    events: list[str] = []
+    with heartbeat("model turn 1", events.append, interval_seconds=0.05):
+        time.sleep(0.22)
+    assert len(events) >= 2
+    assert all(e.startswith("heartbeat: model turn 1 (") for e in events)
+    assert narrate(events[0]).startswith("Still working: model turn 1 (")
+
+
+def test_heartbeat_silent_when_quick() -> None:
+    events: list[str] = []
+    with heartbeat("model turn 1", events.append, interval_seconds=60):
+        pass
+    assert events == []
+
+
+def test_heartbeat_without_sink_is_noop() -> None:
+    before = threading.active_count()
+    with heartbeat("model turn 1", None, interval_seconds=0.01):
+        time.sleep(0.05)
+    assert threading.active_count() <= before
+
+
+def test_heartbeat_joins_thread_on_error() -> None:
+    events: list[str] = []
+    before = threading.active_count()
+    with pytest.raises(RuntimeError, match="boom"):
+        with heartbeat("model turn 1", events.append, interval_seconds=0.01):
+            raise RuntimeError("boom")
+    assert threading.active_count() <= before
