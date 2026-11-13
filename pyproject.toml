@@ -67,6 +67,7 @@ include = ["packages", "apps", "tests"]
 exclude = [
     "**/__pycache__",
     "**/.pytest_cache",
+    "apps/job_search/openings-svc",
 ]
 pythonVersion = "3.13"
 typeCheckingMode = "standard"
