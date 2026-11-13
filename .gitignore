@@ -51,6 +51,9 @@ build/
 venv/
 env/
 
+# Openings kept service (external app + venv + sqlite; see docs/job-search-openings-service.md)
+apps/job_search/openings-svc/
+
 # Tooling
 .uv-cache/
 .tools/

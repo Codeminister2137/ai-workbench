@@ -249,6 +249,8 @@ def test_loop_streams_text_when_sink_set(tmp_path) -> None:
 
 
 def test_loop_falls_back_to_complete_without_stream(tmp_path) -> None:
+    from typing import cast
+
     from ai_agent import PermissionManager, PermissionPolicy, ToolContext, default_coding_tools
     from ai_agent.loop import AgentLoop
     from ai_provider import (
@@ -260,8 +262,10 @@ def test_loop_falls_back_to_complete_without_stream(tmp_path) -> None:
         MessageRole,
         UsageMetadata,
     )
+    from ai_provider.contracts import ChatClient
 
     class PlainClient:
+        # Intentionally stream-less: this test pins the complete() fallback.
         backend = BackendInfo(provider="fake", model="test", location=BackendLocation.LOCAL)
 
         def complete(self, request):
@@ -274,7 +278,7 @@ def test_loop_falls_back_to_complete_without_stream(tmp_path) -> None:
 
     chunks: list[str] = []
     result = AgentLoop(
-        PlainClient(),
+        cast(ChatClient, PlainClient()),
         default_coding_tools(),
         ToolContext(tmp_path),
         permissions=PermissionManager(policy=PermissionPolicy.permissive()),
@@ -297,6 +301,9 @@ def test_loop_stream_without_final_raises_retryable(tmp_path) -> None:
 
     class BrokenClient:
         backend = BackendInfo(provider="fake", model="test", location=BackendLocation.LOCAL)
+
+        def complete(self, request):
+            raise AssertionError("complete() is not used on the stream path")
 
         def stream(self, request):
             yield AIStreamDelta(content="partial")
@@ -324,6 +331,7 @@ def test_stream_writer_emits_raw_chunks(capsys: pytest.CaptureFixture) -> None:
 def test_consume_stream_forwards_text_and_returns_final() -> None:
     from ai_provider import (
         AIMessage,
+        AIRequest,
         AIResponse,
         AIStreamDelta,
         AIStreamFinal,
@@ -338,6 +346,9 @@ def test_consume_stream_forwards_text_and_returns_final() -> None:
     class FakeClient:
         backend = BackendInfo(provider="fake", model="t", location=BackendLocation.LOCAL)
 
+        def complete(self, request):
+            raise AssertionError("complete() is not used on the stream path")
+
         def stream(self, request):
             yield AIStreamDelta(content="he")
             yield AIStreamDelta(content="llo")
@@ -351,16 +362,20 @@ def test_consume_stream_forwards_text_and_returns_final() -> None:
             )
 
     chunks: list[str] = []
-    response = consume_stream(FakeClient(), object(), chunks.append)
+    request = AIRequest(messages=(AIMessage(MessageRole.USER, "hi"),))
+    response = consume_stream(FakeClient(), request, chunks.append)
     assert "".join(chunks) == "hello"
     assert response.message.content == "hello"
 
 
 def test_consume_stream_without_final_raises_retryable() -> None:
     from ai_provider import (
+        AIMessage,
+        AIRequest,
         AIStreamDelta,
         BackendInfo,
         BackendLocation,
+        MessageRole,
         ProviderError,
         ProviderErrorCategory,
     )
@@ -369,11 +384,15 @@ def test_consume_stream_without_final_raises_retryable() -> None:
     class BrokenClient:
         backend = BackendInfo(provider="fake", model="t", location=BackendLocation.LOCAL)
 
+        def complete(self, request):
+            raise AssertionError("complete() is not used on the stream path")
+
         def stream(self, request):
             yield AIStreamDelta(content="partial")
 
+    request = AIRequest(messages=(AIMessage(MessageRole.USER, "hi"),))
     with pytest.raises(ProviderError) as excinfo:
-        consume_stream(BrokenClient(), object(), lambda chunk: None)
+        consume_stream(BrokenClient(), request, lambda chunk: None)
     assert excinfo.value.category is ProviderErrorCategory.RETRYABLE
 
 

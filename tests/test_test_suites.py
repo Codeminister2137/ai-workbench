@@ -165,6 +165,18 @@ class TestSuiteSelection:
         with pytest.raises(ValueError, match="test_unassigned.py"):
             suites.suite_files(tmp_path)
 
+    def test_external_tree_tests_are_ignored(self, tmp_path):
+        for patterns in suites.GROUPS.values():
+            for pattern in patterns:
+                target = tmp_path / pattern.replace("*", "fixture")
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.touch()
+        external = tmp_path / "apps/job_search/openings-svc/upstream/tests"
+        external.mkdir(parents=True, exist_ok=True)
+        (external / "test_upstream.py").touch()
+        groups = suites.suite_files(tmp_path)
+        assert all("openings-svc" not in path for paths in groups.values() for path in paths)
+
     def test_combining_groups_deduplicates_modules(self):
         (command,) = suites.test_commands(["agent", "agent"], [])
         assert command.count("tests/test_ide_bridge.py") == 1
