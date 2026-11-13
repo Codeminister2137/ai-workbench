@@ -182,6 +182,17 @@ GROUPS = {
 }
 
 
+# External checkouts inside the workspace (kept services, vendor mirrors).
+# Their tests belong to upstream, not to this gate.
+EXTERNAL_TREES = ("apps/job_search/openings-svc",)
+
+
+def _is_external(relative_posix: str) -> bool:
+    return any(
+        relative_posix == tree or relative_posix.startswith(tree + "/") for tree in EXTERNAL_TREES
+    )
+
+
 def suite_files(root: Path = ROOT) -> dict[str, tuple[str, ...]]:
     """Fail visibly when a test is missing from or duplicated across groups."""
     groups = {
@@ -206,6 +217,7 @@ def suite_files(root: Path = ROOT) -> dict[str, tuple[str, ...]]:
             part.startswith(".") or part == "__pycache__"
             for part in path.relative_to(directory).parts
         )
+        and not _is_external(path.relative_to(root).as_posix())
     }
     missing = sorted(discovered - owners.keys())
     duplicate = sorted(path for path, names in owners.items() if len(names) > 1)
