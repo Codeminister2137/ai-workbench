@@ -6,7 +6,13 @@ revision the trial and reuse review validated.
 
 ## Layout (all under `apps/job_search/openings-svc/`, gitignored)
 
-- `upstream/` — pinned source checkout (never edited; reinstall, don't patch).
+- `upstream/` — pinned source checkout carrying ONE maintained patch:
+  `integrations/openings/manual-import-mirrors.patch` (manual import with
+  a new posting key routes through collector upsert, retaining both
+  postings and original provenance; the patch's trailing-newline hunk is
+  moot — the checkout already ends with newline). Re-apply after any
+  upstream refresh, then reinstall + replay-check (probe kept at
+  `$env:TEMP/mirror-check.py` pattern; verified green 2026-11-13).
 - `.venv/` — service interpreter (py3.14) with `openings` installed.
 - `data/` — `OPENINGS_DATA_DIR`: `config/settings.yaml`, `db/openings.db`,
   `logs/`, `attachments/`. The database is the durable archive.
