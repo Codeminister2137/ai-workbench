@@ -167,6 +167,7 @@ GROUPS = {
         "tests/test_document_status.py",
         "tests/test_package_layering.py",
         "tests/test_go_acceptance_wiring.py",
+        "tests/test_prune_run_worktrees.py",
     ),
     "research": (
         "tests/test_research_*.py",
