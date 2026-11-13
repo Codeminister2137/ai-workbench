@@ -1020,6 +1020,9 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             if path.startswith("/api/inbox/") and path.endswith("/reopen"):
                 item_id = path[len("/api/inbox/") : -len("/reopen")]
                 return self._reopen_inbox_task(item_id)
+            if path.startswith("/api/inbox/") and path.endswith("/delete"):
+                item_id = path[len("/api/inbox/") : -len("/delete")]
+                return self._delete_inbox_task(item_id)
             if path == "/api/inbox/bridge-runs":
                 return self._bridge_inbox_runs()
             if path.startswith("/api/plans/") and path.endswith("/approve"):
@@ -1508,6 +1511,15 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             status = 404 if "not found" in str(exc).lower() else 400
             return self._send_json({"ok": False, "error": str(exc)}, status=status)
         self._send_json({"ok": True, "id": record["id"], "status": record["status"]})
+
+    def _delete_inbox_task(self, item_id: str) -> None:
+        try:
+            removed = self._stores().inbox.delete(item_id)
+        except StoreError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        if not removed:
+            return self._send_json({"ok": False, "error": "Inbox task not found"}, status=404)
+        self._send_json({"ok": True, "id": item_id})
 
     def _decide_plan(self, plan_id: str, payload: dict) -> None:
         approved = payload.get("approved")

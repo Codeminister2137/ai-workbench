@@ -66,7 +66,7 @@ def test_dynamic_buttons_have_titles() -> None:
     """Every button rendered by app.js templates carries a tooltip title."""
     js = _read("app.js")
     buttons = re.findall(r"<button\b[^>]*>", js)
-    assert len(buttons) == 40  # -quick-chat send +modules save (net zero)
+    assert len(buttons) == 41  # +delete-inbox-btn
     for tag in buttons:
         assert "title=" in tag, f"button without title: {tag}"
 
@@ -734,6 +734,15 @@ def test_restrictions_renders_live_subprocess_counts() -> None:
     assert "/api/restrictions" in js
     assert "run request(s) recorded" in js
     assert "not yet evaluated" in js
+
+
+def test_inbox_detail_has_delete_button_with_confirm() -> None:
+    """Owners can delete an item from its detail view (two-click arm)."""
+    js = _read("app.js")
+    assert 'id="delete-inbox-btn"' in js
+    assert "Permanently delete this inbox item" in js
+    assert "Click again to confirm delete" in js
+    assert 'encodeURIComponent(id) + "/delete"' in js
 
 
 def test_inbox_followup_mark_stays_out_of_archive() -> None:
