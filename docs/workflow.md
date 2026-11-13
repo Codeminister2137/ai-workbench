@@ -241,6 +241,9 @@ select a dependency, deployment, privacy boundary or third-party permission.
 - While unattended: decisions go to the dashboard inbox + mail notification
   (mail-inbox tandem), and work continues on independent items. A queued
   question is never a reason to stop or idle.
+- File decision briefs with `scripts/file-brief.py` (explicit `--option`
+  values, never prose-only "Options: A/B"), so multi-choice renders
+  without further parsing.
 
 ## Unattended execution windows
 
