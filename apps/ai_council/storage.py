@@ -34,11 +34,17 @@ class ConversationStore:
                 member_name TEXT,
                 model TEXT,
                 content TEXT NOT NULL,
+                round INTEGER,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (conversation_id) REFERENCES conversations(id)
             );
             """
         )
+        columns = {
+            row["name"] for row in self.connection.execute("PRAGMA table_info(messages)").fetchall()
+        }
+        if "round" not in columns:
+            self.connection.execute("ALTER TABLE messages ADD COLUMN round INTEGER")
         self.connection.commit()
 
     def get_or_create_conversation(self, name: str) -> int:
@@ -60,20 +66,21 @@ class ConversationStore:
         content: str,
         member_name: str | None = None,
         model: str | None = None,
+        round: int = 1,
     ) -> None:
         self.connection.execute(
             """
-            INSERT INTO messages(conversation_id, role, member_name, model, content)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO messages(conversation_id, role, member_name, model, content, round)
+            VALUES (?, ?, ?, ?, ?, ?)
             """,
-            (conversation_id, role, member_name, model, content),
+            (conversation_id, role, member_name, model, content, round),
         )
         self.connection.commit()
 
     def list_messages(self, conversation_id: int) -> list[dict[str, str]]:
         rows = self.connection.execute(
             """
-            SELECT role, member_name, model, content
+            SELECT role, member_name, model, content, COALESCE(round, 1) AS round
             FROM messages
             WHERE conversation_id = ?
             ORDER BY id

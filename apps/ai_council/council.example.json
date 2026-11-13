@@ -1,6 +1,10 @@
 {
   "ollama_base_url": null,
   "default_conversation": "default",
+  "chair": null,
+  "max_rounds": 3,
+  "reaction_cap_chars": 2000,
+  "max_tokens_per_question": 0,
   "members": [
     {
       "name": "Analyst",
