@@ -42,6 +42,7 @@ from ai_provider.scrutiny import (
 )
 
 from ai_agent.contracts import ToolResult
+from ai_agent.progress import reporter as _progress_reporter_factory
 from ai_agent.repair_workflow import format_validation_failures_for_prompt
 from ai_agent.run_tracking import OrchestratedRunTracker, remaining_orchestrated_budget_seconds
 
@@ -447,7 +448,9 @@ def run_orchestrated_scrutiny(
                 ollama_resource_profile=get_ollama_resource_profile(args.ollama_profile)
                 if args.ollama_profile
                 else None,
-                progress_callback=print,
+                progress_callback=_progress_reporter_factory(
+                    verbose=getattr(args, "verbose", False)
+                ),
                 progress_prefix="scrutiny_activity",
                 **review_options,
             )
