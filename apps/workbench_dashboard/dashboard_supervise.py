@@ -164,7 +164,27 @@ def target_supports_worktree(main_root: Path, commit: str) -> bool:
     return proc.returncode == 0 and "--repo-root" in proc.stdout
 
 
-def write_serve_version(data_dir: Path, *, branch: str, commit: str) -> None:
+def _commit_date_utc(worktree: Path, commit: str) -> str | None:
+    """Committer date of a synced commit (fail-soft)."""
+    import subprocess
+
+    try:
+        proc = subprocess.run(
+            ["git", "show", "-s", "--format=%cI", commit],
+            cwd=worktree,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    stamp = proc.stdout.strip() if proc.returncode == 0 else ""
+    return stamp or None
+
+
+def write_serve_version(
+    data_dir: Path, *, branch: str, commit: str, commit_utc: str | None = None
+) -> None:
     """Record the synced commit for /api/version (atomic)."""
     import datetime
 
@@ -175,6 +195,7 @@ def write_serve_version(data_dir: Path, *, branch: str, commit: str) -> None:
             {
                 "branch": branch,
                 "commit": commit,
+                "commit_utc": commit_utc,
                 "updated_utc": datetime.datetime.now(datetime.UTC).isoformat(),
             }
         ),
@@ -471,7 +492,12 @@ def supervise_tick(config: SuperviseConfig, *, dry_run: bool = False, force: boo
             write_maintenance(config.data_dir, active=True, message=f"Update held: {detail}")
             outcome.update(action="held", reason=detail)
             return outcome
-        write_serve_version(config.data_dir, branch=config.serve_branch, commit=commit[:12])
+        write_serve_version(
+            config.data_dir,
+            branch=config.serve_branch,
+            commit=commit[:12],
+            commit_utc=_commit_date_utc(config.worktree, commit),
+        )
         ok, detail = restart_dashboard(config)
         if not ok:
             write_maintenance(config.data_dir, active=True, message=f"Restart failed: {detail}")

@@ -315,6 +315,7 @@ def capture_server_version(
     info: dict[str, Any] = {
         "branch": "unknown",
         "commit": "unknown",
+        "commit_utc": None,
         "started_utc": datetime.now(UTC).isoformat(),
         "tier": "tooling",
         "serve_branch": "develop",
@@ -331,6 +332,8 @@ def capture_server_version(
                 info["branch"] = filed["branch"]
             if isinstance(filed.get("commit"), str) and filed["commit"]:
                 info["commit"] = filed["commit"]
+            if isinstance(filed.get("commit_utc"), str) and filed["commit_utc"]:
+                info["commit_utc"] = filed["commit_utc"]
             return _with_tier(info, config_path)
     try:
         branch = subprocess.run(
@@ -347,6 +350,13 @@ def capture_server_version(
             text=True,
             timeout=10,
         )
+        stamped = subprocess.run(
+            ["git", "show", "-s", "--format=%cI", "HEAD"],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
     except (OSError, subprocess.SubprocessError):
         pass
     else:
@@ -354,6 +364,8 @@ def capture_server_version(
             info["branch"] = branch.stdout.strip()
         if commit.returncode == 0 and commit.stdout.strip():
             info["commit"] = commit.stdout.strip()
+        if stamped.returncode == 0 and stamped.stdout.strip():
+            info["commit_utc"] = stamped.stdout.strip()
     return _with_tier(info, config_path)
 
 
@@ -657,7 +669,59 @@ def _resolve_analysis_client(config, repo_root: Path):
     return client, target.model, target.route_id
 
 
-def fleet_status(repo_root: Path, stores) -> dict[str, Any]:
+def _tcp_up(host: str, port: int) -> bool:
+    """True when a TCP connect succeeds (fail-soft, ~1s budget)."""
+    import socket
+
+    try:
+        with socket.create_connection((host, port), timeout=1):
+            return True
+    except OSError:
+        return False
+
+
+def _dir_version(path: Path) -> str:
+    """Short HEAD of a checkout, or 'unknown' (fail-soft)."""
+    try:
+        proc = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=path,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return "unknown"
+    return proc.stdout.strip() if proc.returncode == 0 else "unknown"
+
+
+def fleet_services(repo_root: Path, version: dict[str, Any] | None) -> list[dict[str, Any]]:
+    """Kept-service versions; every probe is fail-soft."""
+    services: list[dict[str, Any]] = []
+    if isinstance(version, dict):
+        services.append(
+            {
+                "name": "dashboard",
+                "up": True,
+                "version": f"{version.get('branch', '?')}@{version.get('commit', '?')}",
+                "commit_utc": version.get("commit_utc"),
+                "started_utc": version.get("started_utc"),
+            }
+        )
+    openings = repo_root / "apps" / "job_search" / "openings-svc"
+    if openings.is_dir():
+        services.append(
+            {
+                "name": "openings",
+                "up": _tcp_up("127.0.0.1", 8501),
+                "version": _dir_version(openings / "upstream"),
+                "port": 8501,
+            }
+        )
+    return services
+
+
+def fleet_status(repo_root: Path, stores, version: dict[str, Any] | None = None) -> dict[str, Any]:
     """Aggregate live fleet probes; every probe is fail-soft."""
     explain = fleet_explain(repo_root)
     dashboard: dict[str, Any] = {"up": True}
@@ -684,6 +748,7 @@ def fleet_status(repo_root: Path, stores) -> dict[str, Any]:
         "sleep": sleep,
         "runs": fleet_runs(stores),
         "agents": agents,
+        "services": fleet_services(repo_root, version),
     }
 
 
@@ -825,7 +890,14 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 return self._send_json(providers_status(self.data_dir, self.repo_root))
             if path == "/api/fleet":
                 return self._send_json(
-                    {"ok": True, "fleet": fleet_status(self.repo_root, self._stores())}
+                    {
+                        "ok": True,
+                        "fleet": fleet_status(
+                            self.repo_root,
+                            self._stores(),
+                            version=type(self).served_version,
+                        ),
+                    }
                 )
             if path == "/api/work-roots":
                 return self._send_work_roots(config)

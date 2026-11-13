@@ -17,6 +17,7 @@ from dashboard_web_app import (
     LedgerSttMetering,
     fleet_explain,
     fleet_ollama,
+    fleet_services,
     fleet_sleep,
     fleet_tasks,
     run_failure,
@@ -789,7 +790,15 @@ def test_fleet_shape_with_stubbed_probes(dashboard_server, monkeypatch) -> None:
     )
     payload = get_json(dashboard_server, "/api/fleet")
     assert payload["ok"] is True
-    assert set(payload["fleet"]) == {"dashboard", "ollama", "tasks", "sleep", "runs", "agents"}
+    assert set(payload["fleet"]) == {
+        "dashboard",
+        "ollama",
+        "tasks",
+        "sleep",
+        "runs",
+        "agents",
+        "services",
+    }
     assert payload["fleet"]["agents"]["attention"] is False
     assert payload["fleet"]["dashboard"] == {"up": True, "explain": "dashboard here"}
     assert payload["fleet"]["ollama"] == {"up": True, "models": 2, "explain": "ollama here"}
@@ -810,6 +819,45 @@ def test_fleet_explain_covers_every_task_and_service() -> None:
 
 def test_fleet_explain_fail_soft_on_missing_doc(tmp_path: Path) -> None:
     assert fleet_explain(tmp_path) == {}
+
+
+def test_fleet_services_versions_dashboard_and_openings(tmp_path: Path) -> None:
+    version = {
+        "branch": "develop",
+        "commit": "abc1234",
+        "commit_utc": "2026-11-13T12:00:00+00:00",
+        "started_utc": "2026-11-13T13:00:00+00:00",
+    }
+    assert fleet_services(tmp_path, None) == []
+    assert fleet_services(tmp_path, version)[0]["version"] == "develop@abc1234"
+    svc = tmp_path / "apps" / "job_search" / "openings-svc" / "upstream"
+    svc.mkdir(parents=True)
+    rows = fleet_services(tmp_path, version)
+    assert [row["name"] for row in rows] == ["dashboard", "openings"]
+    assert rows[1]["version"] == "unknown"
+    assert rows[1]["up"] in (True, False)
+
+
+def test_fleet_services_openings_reports_checkout_sha(tmp_path: Path) -> None:
+    import subprocess
+
+    upstream = tmp_path / "apps" / "job_search" / "openings-svc" / "upstream"
+    upstream.mkdir(parents=True)
+    subprocess.run(["git", "init"], cwd=upstream, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=upstream, check=True)
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=upstream, check=True)
+    (upstream / "f.txt").write_text("x", encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=upstream, check=True)
+    subprocess.run(["git", "commit", "-m", "init"], cwd=upstream, check=True)
+    (rows,) = [row for row in fleet_services(tmp_path, None) if row["name"] == "openings"]
+    expect = subprocess.run(
+        ["git", "rev-parse", "--short", "HEAD"],
+        cwd=upstream,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+    assert rows["version"] == expect
 
 
 def test_fleet_watches_weekly_digest() -> None:

@@ -1888,9 +1888,16 @@ async function renderFleet() {
     const ownerLine = ownerSleep.active
       ? `<span class="pill st-ready">scheduled</span> <strong>due ${esc(ownerSleep.due_warsaw || "?")} Warsaw</strong>`
       : `<span class="pill">none</span> <span class="muted">${esc(ownerSleep.status || "no owner timer")}</span>`;
+    const serviceRows = (f.services || []).map((s) =>
+      `<li><span class="pill st-${s.up ? "ready" : "missing"}">${s.up ? "up" : "down"}</span> <strong>${esc(s.name)}</strong>` +
+      ` <span class="muted">${esc(s.version || "?")}` +
+      (s.commit_utc ? ` · committed ${esc(fmtTime(s.commit_utc))}` : "") +
+      (s.started_utc ? ` · started ${esc(fmtTime(s.started_utc))}` : "") +
+      `</span></li>`).join("");
     body = `<div class="card"><h2>Servers</h2><ul class="plain">
       <li><span class="pill st-ready">up</span> <strong>dashboard</strong> <span class="muted">${esc(f.dashboard.explain || "this server")}</span></li>
       <li><span class="pill st-${f.ollama.up ? "ready" : "missing"}">${f.ollama.up ? "up" : "down"}</span> <strong>ollama</strong> <span class="muted">${f.ollama.up ? esc(f.ollama.models) + " model(s)" : esc(f.ollama.detail || "")}${f.ollama.explain ? ` — ${esc(f.ollama.explain)}` : ""}</span></li></ul></div>
+      <div class="card"><h2>Service versions</h2><ul class="plain">${serviceRows || '<li class="muted">No versioned services.</li>'}</ul></div>
       <div class="card"><h2>Watchdog tasks</h2><ul class="plain">${taskRows}</ul></div>
       <div class="card"><h2>Sleep guard</h2><p>${sleep}</p></div>
       <div class="card"><h2>Sleep button</h2><p>${ownerLine}</p>
