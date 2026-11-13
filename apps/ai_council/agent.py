@@ -49,6 +49,83 @@ class LocalAgent:
             elif isinstance(event, AIStreamFinal):
                 continue
 
+    def react(self, conversation: Iterable[AIMessage], peer_answers: list[tuple[str, str]]) -> str:
+        """React to other members' round-1 answers (round 2)."""
+        response = self.client.complete(
+            AIRequest(
+                messages=self._reaction_messages(conversation, peer_answers),
+                model=self.member.model,
+                temperature=self.member.temperature,
+            )
+        )
+        return response.message.content
+
+    def stream_react(self, conversation: Iterable[AIMessage], peer_answers: list[tuple[str, str]]):
+        for event in self.client.stream(
+            AIRequest(
+                messages=self._reaction_messages(conversation, peer_answers),
+                model=self.member.model,
+                temperature=self.member.temperature,
+            )
+        ):
+            if isinstance(event, AIStreamDelta):
+                yield event.content
+            elif isinstance(event, AIStreamFinal):
+                continue
+
+    def synthesize(self, conversation: Iterable[AIMessage], answers: list[tuple[str, str]]) -> str:
+        """Synthesize all positions as chair (round 3)."""
+        response = self.client.complete(
+            AIRequest(
+                messages=self._synthesis_messages(conversation, answers),
+                model=self.member.model,
+                temperature=self.member.temperature,
+            )
+        )
+        return response.message.content
+
+    def stream_synthesize(self, conversation: Iterable[AIMessage], answers: list[tuple[str, str]]):
+        for event in self.client.stream(
+            AIRequest(
+                messages=self._synthesis_messages(conversation, answers),
+                model=self.member.model,
+                temperature=self.member.temperature,
+            )
+        ):
+            if isinstance(event, AIStreamDelta):
+                yield event.content
+            elif isinstance(event, AIStreamFinal):
+                continue
+
+    def _reaction_messages(
+        self, conversation: Iterable[AIMessage], peer_answers: list[tuple[str, str]]
+    ) -> tuple[AIMessage, ...]:
+        others = "\n\n".join(f"{name} said:\n{text}" for name, text in peer_answers)
+        return (
+            *self._messages(conversation),
+            AIMessage(
+                MessageRole.USER,
+                "Other council members answered as follows:\n\n"
+                f"{others}\n\nReply in at most 150 words: what you agree with, "
+                "what you disagree with, and what would change your answer.",
+            ),
+        )
+
+    def _synthesis_messages(
+        self, conversation: Iterable[AIMessage], answers: list[tuple[str, str]]
+    ) -> tuple[AIMessage, ...]:
+        positions = "\n\n".join(f"{name}:\n{text}" for name, text in answers)
+        return (
+            *self._messages(conversation),
+            AIMessage(
+                MessageRole.USER,
+                "As chair, synthesize the council positions below into one "
+                "answer: agreed points, open disagreements (name who holds "
+                "them), and what the asker should do next. Never invent "
+                f"consensus that is not there.\n\n{positions}",
+            ),
+        )
+
     def _messages(self, conversation: Iterable[AIMessage]) -> tuple[AIMessage, ...]:
         return (
             AIMessage(MessageRole.SYSTEM, self.member.system_prompt),

@@ -16,6 +16,10 @@ class CouncilConfig:
     ollama_base_url: str | None
     default_conversation: str
     members: list[CouncilMember]
+    chair: str | None = None
+    max_rounds: int = 3
+    reaction_cap_chars: int = 2000
+    max_tokens_per_question: int = 0
 
 
 def load_config(path: Path = DEFAULT_CONFIG_PATH) -> CouncilConfig:
@@ -29,11 +33,28 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> CouncilConfig:
     members = [_member_from_json(item) for item in raw.get("members", [])]
     if not members:
         raise ValueError("Council config must define at least one member.")
+    names = {member.name for member in members}
+    chair = raw.get("chair")
+    if chair is not None and chair not in names:
+        raise ValueError(f"Council chair {chair!r} is not a member.")
+    max_rounds = int(raw.get("max_rounds", 3))
+    if not 1 <= max_rounds <= 3:
+        raise ValueError("Council max_rounds must be 1-3.")
+    reaction_cap = int(raw.get("reaction_cap_chars", 2000))
+    if reaction_cap < 100:
+        raise ValueError("Council reaction_cap_chars must be >= 100.")
+    token_cap = int(raw.get("max_tokens_per_question", 0))
+    if token_cap < 0:
+        raise ValueError("Council max_tokens_per_question must be >= 0.")
 
     return CouncilConfig(
         ollama_base_url=raw.get("ollama_base_url"),
         default_conversation=raw.get("default_conversation", "default"),
         members=members,
+        chair=chair,
+        max_rounds=max_rounds,
+        reaction_cap_chars=reaction_cap,
+        max_tokens_per_question=token_cap,
     )
 
 
