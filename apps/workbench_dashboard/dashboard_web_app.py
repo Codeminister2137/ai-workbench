@@ -910,8 +910,9 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             if path == "/api/maintenance":
                 return self._send_json({"ok": True, **read_maintenance(self.data_dir)})
             if path == "/api/meetings":
-                from meeting_notes import list_meetings
+                from meeting_notes import list_meetings, purge_expired_meetings
 
+                purge_expired_meetings(self.data_dir)
                 return self._send_json({"ok": True, "items": list_meetings(self.data_dir)})
             if path.startswith("/api/meetings/"):
                 return self._send_meeting(path[len("/api/meetings/") :])
@@ -2253,8 +2254,9 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         self._send_json({"ok": True, **outcome})
 
     def _send_meeting(self, meeting_id: str) -> None:
-        from meeting_notes import get_meeting
+        from meeting_notes import get_meeting, purge_expired_meetings
 
+        purge_expired_meetings(self.data_dir)
         record = get_meeting(self.data_dir, meeting_id)
         if record is None:
             return self._send_json({"ok": False, "error": "Not found"}, status=404)

@@ -29,6 +29,7 @@ from meeting_notes import (
     get_meeting,
     list_meetings,
     parse_meeting_form,
+    purge_expired_meetings,
     purge_meeting,
     split_wav_clips,
     store_meeting,
@@ -196,6 +197,34 @@ def test_expired_and_purge_roundtrip(tmp_path) -> None:
     assert purge_meeting(tmp_path, old["id"]) is True
     assert expired_meetings(tmp_path, base) == []
     assert (tmp_path / "meetings" / fresh["id"] / "meta.json").exists()
+
+
+def test_purge_expired_meetings_removes_only_expired(tmp_path) -> None:
+    base = datetime(2026, 11, 9, 20, 0, tzinfo=UTC)
+    old = store_meeting(
+        tmp_path,
+        transcript="o",
+        segments=[],
+        consent=True,
+        retention_days=1,
+        engine_id="e",
+        source_name="s",
+        recorded_at=base - timedelta(days=5),
+    )
+    fresh = store_meeting(
+        tmp_path,
+        transcript="n",
+        segments=[],
+        consent=True,
+        retention_days=90,
+        engine_id="e",
+        source_name="s",
+        recorded_at=base,
+    )
+    assert purge_expired_meetings(tmp_path, base) == [old["id"]]
+    assert not (tmp_path / "meetings" / old["id"]).exists()
+    assert (tmp_path / "meetings" / fresh["id"] / "meta.json").exists()
+    assert purge_expired_meetings(tmp_path, base) == []
 
 
 class _CountingEngine:
@@ -450,6 +479,27 @@ def _post_json(base: str, path: str, payload: dict) -> dict:
     )
     with urlopen(request, timeout=30) as response:
         return json.loads(response.read().decode("utf-8"))
+
+
+def test_meeting_endpoints_purge_expired_on_read(meeting_server) -> None:
+    base, tmp_path, _, _ = meeting_server
+    data_dir = tmp_path / "data"
+    old = store_meeting(
+        data_dir,
+        transcript="o",
+        segments=[],
+        consent=True,
+        retention_days=1,
+        engine_id="e",
+        source_name="s",
+        recorded_at=datetime(2020, 1, 1, tzinfo=UTC),
+    )
+    listed = _get_json(base, "/api/meetings")
+    assert listed["items"] == []
+    assert not (data_dir / "meetings" / old["id"]).exists()
+    with pytest.raises(HTTPError) as exc:
+        _get_json(base, f"/api/meetings/{old['id']}")
+    assert exc.value.code == 404
 
 
 def test_meeting_endpoints_list_get_and_analyze(meeting_server, monkeypatch) -> None:

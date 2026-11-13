@@ -212,6 +212,15 @@ def expired_meetings(data_dir: Path, now: datetime | None = None) -> list[str]:
     return expired
 
 
+def purge_expired_meetings(data_dir: Path, now: datetime | None = None) -> list[str]:
+    """Delete meetings past their purge_after_utc; returns purged ids."""
+    purged: list[str] = []
+    for meeting_id in expired_meetings(data_dir, now):
+        if purge_meeting(data_dir, meeting_id):
+            purged.append(meeting_id)
+    return purged
+
+
 def purge_meeting(data_dir: Path, meeting_id: str) -> bool:
     """Delete one stored meeting; False when the id is invalid/missing."""
     if not _valid_id(meeting_id):
