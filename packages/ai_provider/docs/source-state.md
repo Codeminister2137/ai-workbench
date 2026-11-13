@@ -21,6 +21,16 @@ routing configuration. The [model catalog](../../ai_orchestrator/examples/model_
 contains declared route capabilities; native readers report supported account
 observations. Neither establishes coding quality by itself.
 
+## Ollama context lengths verified — 2026-11-13 (runtime)
+
+`ollama show` on this box confirms the catalog values exactly:
+gpt-oss:20b 131072, qwen3:14b 40960, qwen2.5-coder:14b 32768,
+deepseek-coder-v2:16b 163840. All four models installed, last pulled
+~7 weeks ago; re-verify after any re-pull (context length follows the
+quantization/build). Spend-ledger usage shows only ollama + meta routes
+active; the catalog's other unset routes are speculative until used —
+declare limits from primary sources when a route goes live, not before.
+
 ## Meta hackathon free-credit balance — 2026-11-10 (owner-reported)
 
 Scope: owner's hackathon Meta account only (private runtime evidence, not a
