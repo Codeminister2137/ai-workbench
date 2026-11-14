@@ -185,6 +185,50 @@ $source = $source.Replace($powerCall, '$accepted = $false')
     assert saved["transition_times_utc"]["sleep_requested"] >= saved["planned_sleep_utc"]
 
 
+def test_pending_update_reboot_blocks_sleep(tmp_path):
+    """A pending update reboot refuses suspend and records the signals."""
+    receipt = tmp_path / "receipt.json"
+    command = f"""
+$source = [IO.File]::ReadAllText('{SCRIPT.as_posix()}')
+$powerCall = '$accepted = [System.Windows.Forms.Application]::SetSuspendState('
+if (-not $source.Contains($powerCall)) {{ throw 'Suspend safety shim no longer matches' }}
+$source = $source.Replace($powerCall, "throw 'Suspend forbidden in tests'`n" + $powerCall)
+$probe = '$signals = @()'
+if (-not $source.Contains($probe)) {{ throw 'Reboot-signal shim no longer matches' }}
+$source = $source.Replace($probe, '$signals = @(''WindowsUpdate/RebootRequired''); return $signals')
+& ([scriptblock]::Create($source)) -Sleep -DelaySeconds 0 `
+    -ControlDirectory '{tmp_path / "control"}' `
+    -ReceiptPath '{receipt.as_posix()}' -CancelPath '{tmp_path / "cancel"}'
+"""
+    result = run_helper(command)
+    assert result.returncode == 0, result.stderr
+    saved = json.loads(receipt.read_text(encoding="utf-8-sig"))
+    assert saved["status"] == "sleep_blocked_pending_update"
+    assert "WindowsUpdate/RebootRequired" in saved["detail"]
+    assert "sleep_requested" not in saved["transition_times_utc"]
+    assert "sleep_status: blocked" in result.stdout
+
+
+def test_clear_update_state_reaches_suspend(tmp_path):
+    """With no reboot signals the gate passes through to the power call."""
+    receipt = tmp_path / "receipt.json"
+    command = f"""
+$source = [IO.File]::ReadAllText('{SCRIPT.as_posix()}')
+$powerCall = '$accepted = [System.Windows.Forms.Application]::SetSuspendState('
+if (-not $source.Contains($powerCall)) {{ throw 'Suspend safety shim no longer matches' }}
+$source = $source.Replace($powerCall, "throw 'Suspend forbidden in tests'`n" + $powerCall)
+$probe = '$signals = @()'
+if (-not $source.Contains($probe)) {{ throw 'Reboot-signal shim no longer matches' }}
+$source = $source.Replace($probe, '$signals = @(); return $signals')
+& ([scriptblock]::Create($source)) -Sleep -DelaySeconds 0 `
+    -ControlDirectory '{tmp_path / "control"}' `
+    -ReceiptPath '{receipt.as_posix()}' -CancelPath '{tmp_path / "cancel"}'
+"""
+    result = run_helper(command)
+    assert result.returncode != 0
+    assert "Suspend forbidden in tests" in result.stderr
+
+
 def test_absolute_schedule_requires_owner_cancellation_path(tmp_path):
     result = run_helper(
         f"& '{SCRIPT.as_posix()}' -Sleep -WhatIf "

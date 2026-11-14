@@ -156,6 +156,22 @@ function Assert-WorkWindowEnded {
     }
 }
 
+function Get-PendingUpdateReboot {
+    # Strong reboot-required signals from Windows Update servicing. A pending
+    # update reboot means Windows will reboot for updates on its own schedule;
+    # sleeping through it trades a clean owner reboot for an update-driven one
+    # mid-work (observed 2026-11-13). PendingFileRenameOperations is
+    # deliberately info-only: it is routinely non-empty for benign reasons.
+    $signals = @()
+    if (Test-Path -LiteralPath 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired') {
+        $signals += 'WindowsUpdate/RebootRequired'
+    }
+    if (Test-Path -LiteralPath 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending') {
+        $signals += 'ComponentBasedServicing/RebootPending'
+    }
+    return $signals
+}
+
 $absoluteSchedule = $PSBoundParameters.ContainsKey('SleepAtUtc')
 if ($Rolling -and -not $absoluteSchedule) { throw 'Rolling requires a fixed SleepAtUtc deadline.' }
 if ($absoluteSchedule) {
@@ -213,7 +229,7 @@ $plannedSleepWarsaw = [TimeZoneInfo]::ConvertTimeFromUtc(
     $dueUtc.UtcDateTime, $warsawTimeZone
 ).ToString("yyyy-MM-dd HH:mm:ss")
 
-function Write-SleepReceipt([string]$Status) {
+function Write-SleepReceipt([string]$Status, [string]$Detail = "") {
     $transitionUtc = [datetime]::UtcNow
     if (-not $sleepTransitionTimesUtc.Contains($Status)) {
         $sleepTransitionTimesUtc[$Status] = $transitionUtc.ToString("o")
@@ -226,6 +242,7 @@ function Write-SleepReceipt([string]$Status) {
         [System.IO.Directory]::CreateDirectory([System.IO.Path]::GetDirectoryName($receiptFile)) | Out-Null
         [ordered]@{
             status = $Status
+            detail = $Detail
             recorded_utc = $transitionUtc.ToString("o")
             time_zone = "Europe/Warsaw"
             planned_sleep_warsaw = $plannedSleepWarsaw
@@ -281,6 +298,13 @@ if ((Read-CancelGeneration) -ne $cancelGeneration -or
     return
 }
 Assert-WorkWindowEnded
+$pendingUpdateReboot = @(Get-PendingUpdateReboot)
+if ($pendingUpdateReboot.Count -gt 0) {
+    $blockDetail = "pending update reboot: $($pendingUpdateReboot -join ', '); reboot for updates instead of sleeping"
+    Write-SleepReceipt "sleep_blocked_pending_update" $blockDetail
+    Write-Output "sleep_status: blocked ($blockDetail)"
+    return
+}
 try {
     & (Join-Path $PSScriptRoot 'monitors-on.ps1') | Out-Null
     Write-Output "sleep_status: displays restored before suspend"

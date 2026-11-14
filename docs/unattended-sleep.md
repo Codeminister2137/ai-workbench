@@ -93,6 +93,17 @@ usage cutoff, the existing helper continues without model calls; do not silently
 restart the window. On return inspect the actual receipt/process state. Report
 scheduled, requested, rejected and verified Windows transition separately.
 
+## Pending-update gate (2026-11-14)
+
+Before requesting sleep, the helper refuses when Windows Update servicing
+reports a reboot is required (`RebootRequired` / `RebootPending`). Sleeping
+through a pending update reboot trades a clean owner reboot for an
+update-driven one mid-work. A refused timer records
+`status=sleep_blocked_pending_update` with the signals in `detail` and
+requests no sleep; the agent reports it and asks the owner to reboot for
+updates instead of sleeping. `PendingFileRenameOperations` alone never
+blocks (routinely benign).
+
 ## Rolling renewal — owner approved 2026-10-20
 
 A renewable 30-minute timer reduces idle time after an interruption. Renew
