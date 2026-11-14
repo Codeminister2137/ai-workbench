@@ -3,8 +3,8 @@
 Context: 2026-11-13 night showed a broken S3 resume (firmware S3 pair with
 no OS resume event) plus update-driven reboots. PC: MSI B650 GAMING PLUS
 WIFI (MS-7E26), BIOS 1.G0 (Oct 2024), Fast Startup currently ON, no
-BitLocker. Do guide 1 first (5 min, reversible, no reboot needed beyond
-a shutdown test); guide 2 second (~20 min, needs care).
+BitLocker. Do guide 1 first (5 min), guide 2 second (~20 min, needs
+care), guide 3 last (2 min, owner only — needs your Windows password).
 
 ## Guide 1 — turn Fast Startup OFF
 
@@ -81,3 +81,37 @@ After the flash:
 If anything looks wrong after flashing (no boot): do NOT panic-flash
 again; clear CMOS per the MSI manual (JBAT1 jumper, PSU off) and tell
 the agent exactly what the board shows (debug LEDs).
+
+## Guide 3 — enable auto-logon (owner only)
+
+Why: after any reboot (updates, crashes, power loss), the PC currently
+sits at the login screen with no dashboard, no supervisor, no agent —
+remote access dead until you physically log on. Auto-logon restores a
+desktop session on every boot so the whole stack comes back by itself.
+Approved by owner 2026-11-14 for this physically-trusted home PC.
+
+Security note (read once): Windows stores your password reversibly to
+do this, and anyone at the keyboard walks into a logged-on session.
+At home with no untrusted physical access, that is acceptable. It does
+NOT expose anything new over the network. If the threat picture ever
+changes (office, travel, laptop), revisit: disable auto-logon and run
+dashboard+supervisor as non-interactive tasks instead.
+
+Steps:
+
+1. Press Win+R, type `netplwiz`, Enter.
+2. Select your account (`Jakub`).
+3. UNCHECK "Users must enter a user name and password to use this
+   computer", click Apply.
+   - If the checkbox is missing (some Windows builds): open an admin
+     PowerShell and run:
+     `Set-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\PasswordLess\Device' -Name DevicePasswordLessBuildVersion -Value 0 -Type DWord`
+     then close and reopen `netplwiz`.
+4. Enter your Windows password twice, OK, OK.
+5. Verify: Restart (Start → Restart, not Shut down). The PC must boot
+   straight to your desktop with no password prompt.
+
+Revert: re-check the box in step 3 (password required again at boot).
+
+After enabling: tell the agent, so the wake track can verify the
+dashboard+supervisor come back on the next reboot on their own.
