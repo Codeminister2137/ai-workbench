@@ -90,6 +90,18 @@ def test_subprocess_backend_captures_and_times_out(tmp_path) -> None:
     assert missing.exit_code == 3 and "spawn failed" in (missing.error or "")
 
 
+def test_subprocess_backend_survives_nonlocale_bytes() -> None:
+    import sys
+
+    from mai_run import run_mai_subprocess
+
+    # 0x81 is undefined in cp1252; locale decoding used to crash capture.
+    raw = [sys.executable, "-c", "import sys; sys.stdout.buffer.write(b'ok\\x81done\\n')"]
+    outcome = run_mai_subprocess(["ignored"], cmd_prefix=raw, timeout_seconds=30)
+    assert outcome.exit_code == 0
+    assert "ok" in outcome.stdout_tail and "done" in outcome.stdout_tail
+
+
 def test_executor_backend_dispatch() -> None:
     seen: dict = {}
 
