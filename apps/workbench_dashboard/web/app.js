@@ -1115,16 +1115,37 @@ async function renderE2E(id) {
     const payload = await api("/api/e2e/tasks/" + encodeURIComponent(id));
     const task = payload.item;
     const submitted = task.status !== "open";
+    const whatHtml = (entry) => {
+      const subjects = (entry.what || []).map((s) => `<li>${esc(s)}</li>`).join("");
+      const files = (entry.files || []).map((f) => {
+        const c = (entry.churn || {})[f];
+        const tag = c ? ` <span class="muted">+${c[0]}/-${c[1]}</span>` : "";
+        return `<li>${esc(f)}${tag}</li>`;
+      }).join("");
+      if (!subjects && !files) return "";
+      return `<h4>What changed</h4>`
+        + (subjects ? `<ul>${subjects}</ul>` : "")
+        + (files ? `<ul class="plain">${files}</ul>` : "");
+    };
+    const howHtml = (entry) => {
+      const steps = (entry.how || []).map((s) => `<li>${esc(s)}</li>`).join("");
+      if (!steps && !entry.expected && !entry.where) return "";
+      return `<h4>How to test</h4>`
+        + (steps ? `<ol>${steps}</ol>` : "")
+        + (entry.expected ? `<p><strong>Expected:</strong> ${esc(entry.expected)}</p>` : "")
+        + (entry.where ? `<p class="muted">Look at: ${esc(entry.where)}</p>` : "");
+    };
     const blocks = (task.items || []).map((entry) => {
       if (entry.status === "auto-pass") {
         const note = entry.warning || entry.reason || "auto-passed";
         return `<li><strong>${esc(entry.behavior || entry.id)}</strong>
           <span class="pill">auto-pass · ${esc(entry.verdict_by || "")}</span>
-          <p class="muted">${esc(note)}</p></li>`;
+          <p class="muted">${esc(note)}</p>${whatHtml(entry)}</li>`;
       }
       return `<li><strong>${esc(entry.behavior || entry.id)}</strong>
         <span class="pill st-pending">${esc(entry.kind || "")} · needs testing</span>
-        <p class="muted">${esc((entry.files || []).join(", "))}</p>
+        ${whatHtml(entry)}
+        ${howHtml(entry)}
         <div><label><input type="radio" name="verdict-${esc(entry.id)}" value="pass"> Pass</label>
         <label><input type="radio" name="verdict-${esc(entry.id)}" value="fail"> Fail</label></div>
         <div><textarea name="notes-${esc(entry.id)}" rows="2" placeholder="Notes (what you tried, what you saw)..." title="Test notes for this behavior"></textarea></div></li>`;

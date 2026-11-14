@@ -69,6 +69,85 @@ NONBEHAVIORAL_AREAS = frozenset({"tooling", "tests", "docs"})
 
 BEHAVIOR_AREA_IDS = frozenset(area for _, area, _, _, _ in AREA_TABLE)
 
+# Area -> (how steps, expected outcome, where to observe). The owner reads
+# this instead of guessing what "test the behavior" means for a diff.
+TEST_GUIDANCE: dict[str, tuple[list[str], str, str]] = {
+    "dashboard": (
+        [
+            "Open the served dashboard and navigate each affected view.",
+            "Exercise the changed controls end to end, including submit and cancel paths.",
+            "Watch for error toasts and confirm badge counts update.",
+        ],
+        "Views render, actions complete, no error toasts.",
+        "Dashboard UI plus GET /api/status staying green.",
+    ),
+    "agent-cli": (
+        [
+            "Run the affected command with --help first.",
+            "Run the documented dry-run form (plan/diagnose, no --execute).",
+            "For execute paths, run once against a scratch copy and inspect the diff.",
+        ],
+        "Exit 0, plan metadata printed, no traceback, no unintended writes.",
+        "Terminal output plus the artifacts transcript for the run.",
+    ),
+    "provider": (
+        [
+            "Run the scoped pytest for the touched adapter module.",
+            "Trigger one real request on a local route and read the route line.",
+            "Confirm usage/allowance reporting shows the call.",
+        ],
+        "Correct route chosen, response complete, usage recorded.",
+        "Pytest output and the run's route/cost evidence.",
+    ),
+    "orchestrator": (
+        [
+            "Run the scoped pytest for the touched decision module.",
+            "Trigger one decision (plan or route) and read the reasoning.",
+            "Confirm privacy and cost-policy gates still hold.",
+        ],
+        "Sensible decision with visible reasoning; no gate bypass.",
+        "Pytest output and the decision/route evidence.",
+    ),
+    "council": (
+        [
+            "Follow the apps/ai_council README quickstart for one deliberation.",
+            "Confirm every model answers and the synthesis preserves disagreement.",
+        ],
+        "Raw responses plus a faithful synthesis, loopback-only.",
+        "Council output and the served transcript.",
+    ),
+    "job-search": (
+        [
+            "Run the job-search suite for the touched flow.",
+            "Walk the approval preview once (never --send in E2E).",
+            "Confirm digest binding rejects a changed attachment.",
+        ],
+        "Preview correct, guards refuse tampered materials.",
+        "Pytest output and the CLI preview text.",
+    ),
+    "apps": (
+        [
+            "Follow the app's README quickstart for the touched flow.",
+            "Exercise the changed path once with realistic input.",
+        ],
+        "Flow completes with no errors and sensible output.",
+        "App output and logs.",
+    ),
+    "packages": (
+        [
+            "Run the scoped pytest for the touched package.",
+            "Exercise one consumer-facing entry point directly.",
+        ],
+        "Tests green and the entry point behaves as documented.",
+        "Pytest output.",
+    ),
+}
+
+REGRESSION_LEAD = (
+    "Nothing here changed directly; confirm the behavior still works "
+    "end to end after the shared-dependency change."
+)
+
 
 def area_for_path(path: str) -> tuple[str, str, str, tuple[str, ...]]:
     """Map one repo-relative path to (area, behavior, goal, neighbors)."""
@@ -85,18 +164,33 @@ def _item_id(kind: str, area: str) -> str:
     return f"{kind}:{area}"
 
 
+def _guidance_for(area: str, kind: str) -> dict:
+    """Actionable test guidance: what to do, what to expect, where to look."""
+    how, expected, where = TEST_GUIDANCE.get(area, ([], "", ""))
+    if kind == "regression":
+        how = [REGRESSION_LEAD, *how]
+    return {"how": list(how), "expected": expected, "where": where}
+
+
 def generate_checklist(
     merge_commit: str,
     files: Sequence[str],
     *,
     title: str | None = None,
+    summaries: dict | None = None,
 ) -> dict:
     """Build one checklist from a merge diff's file list plus goal docs.
 
     One item per touched area; untouched regression neighbors of touched
     areas become ``regression`` items (the ancestor-matchable scope).
     Empty diffs yield an empty item list, never a silent pass.
+    ``summaries`` (from :func:`change_summary`) adds per-item What
+    (commit subjects + churn) and How/Expected guidance so the owner
+    knows what to test and how.
     """
+    by_file = (summaries or {}).get("by_file", {})
+    churn = (summaries or {}).get("numstat", {})
+    subjects = (summaries or {}).get("subjects", [])
     by_area: dict[str, dict] = {}
     for path in files:
         area, behavior, goal, _neighbors = area_for_path(path)
@@ -107,15 +201,20 @@ def generate_checklist(
     for area in sorted(by_area):
         entry = by_area[area]
         kind = "nonbehavioral" if area in NONBEHAVIORAL_AREAS else "behavior"
+        item_files = sorted(entry["files"])
+        what = sorted({subject for path in item_files for subject in by_file.get(path, [])})
         items.append(
             {
                 "id": _item_id(kind, area),
                 "kind": kind,
                 "area": area,
                 "behavior": entry["behavior"],
-                "files": sorted(entry["files"]),
+                "files": item_files,
+                "churn": {path: churn[path] for path in item_files if path in churn},
+                "what": what or list(subjects),
                 "goals": sorted(entry["goals"]),
                 "status": "pending",
+                **_guidance_for(area, kind),
             }
         )
     neighbors: set[str] = set()
@@ -133,8 +232,11 @@ def generate_checklist(
                 "area": area,
                 "behavior": f"{behavior} (regression scope)",
                 "files": [],
+                "churn": {},
+                "what": list(subjects),
                 "goals": [goal],
                 "status": "pending",
+                **_guidance_for(area, "regression"),
             }
         )
     return {
@@ -357,6 +459,40 @@ def merges_between(
     out = run(repo_root, "log", "--merges", "--format=%H", "--reverse", f"{base}..{head}")
     text = out.decode("utf-8", "replace").strip()
     return [line for line in text.splitlines() if line] if text else []
+
+
+def change_summary(
+    repo_root: str,
+    base: str,
+    head: str,
+    files: Sequence[str],
+    runner: Callable[..., bytes] | None = None,
+) -> dict:
+    """Commit subjects + per-file churn for the merge diff (the item's What)."""
+    run = runner or run_git
+    log = run(repo_root, "log", "--format=SUBJECT:%s", "--name-only", f"{base}..{head}")
+    subjects: list[str] = []
+    by_file: dict[str, list[str]] = {}
+    current: str | None = None
+    for line in log.decode("utf-8", "replace").splitlines():
+        if line.startswith("SUBJECT:"):
+            current = line[len("SUBJECT:") :].strip()
+            if current and current not in subjects:
+                subjects.append(current)
+        elif line.strip() and current:
+            by_file.setdefault(line.strip().replace("\\", "/"), []).append(current)
+    numstat = run(repo_root, "diff", "--numstat", f"{base}...{head}", "--", *files)
+    churn: dict[str, list[int]] = {}
+    for line in numstat.decode("utf-8", "replace").splitlines():
+        parts = line.split("\t")
+        if len(parts) != 3:
+            continue
+        added, removed, path = parts
+        churn[path.replace("\\", "/")] = [
+            int(added) if added.isdigit() else 0,
+            int(removed) if removed.isdigit() else 0,
+        ]
+    return {"subjects": subjects, "numstat": churn, "by_file": by_file}
 
 
 def covers_range(

@@ -39,6 +39,7 @@ sys.path.insert(0, str(HERE.parent))
 
 from e2e_promotion import (  # noqa: E402
     apply_ancestor_matching,
+    change_summary,
     generate_checklist,
     merge_diff_files,
     merges_between,
@@ -127,10 +128,11 @@ def cmd_generate(args: argparse.Namespace) -> int:
     try:
         base = resolve_base(repo, args.merge, args.base)
         files = merge_diff_files(repo, base, args.merge)
+        summaries = change_summary(repo, base, args.merge, files)
     except RuntimeError as exc:
         print(f"error: {exc}")
         return 2
-    checklist = generate_checklist(args.merge, files, title=args.title)
+    checklist = generate_checklist(args.merge, files, title=args.title, summaries=summaries)
     if args.base:
         checklist["range_base"] = base
     reports = load_reports(data_dir)
