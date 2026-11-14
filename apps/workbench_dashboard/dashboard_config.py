@@ -39,6 +39,7 @@ class DashboardConfig:
     serve_branch: str = "develop"
     activated_modules: tuple[str, ...] = DEFAULT_MODULES
     landing_page: str = "home"
+    chat_agent_enabled: bool = False
 
 
 def load_config(path: Path = DEFAULT_CONFIG_PATH) -> DashboardConfig:
@@ -73,6 +74,7 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> DashboardConfig:
         "serve_branch": str,
         "activated_modules": list,
         "landing_page": str,
+        "chat_agent_enabled": bool,
     }
     values: dict[str, object] = {}
     for key, types in known.items():

@@ -135,6 +135,7 @@ class DashboardStores:
         self.invoices = JsonCollection(data_dir / "invoices")
         self.e2e_tasks = JsonCollection(data_dir / "e2e_tasks")
         self.e2e_reports = JsonCollection(data_dir / "e2e_reports")
+        self.chat_modes = JsonCollection(data_dir / "chat_modes")
 
     @property
     def token_path(self) -> Path:
@@ -602,3 +603,30 @@ class DashboardStores:
         record["report_id"] = report["id"]
         self.e2e_tasks.put(task_id, record)
         return {"task": record, "report": report}
+
+    def get_chat_mode(self, session_id: str) -> dict:
+        """Chat mode record; sessions default to ask with no binding."""
+        record = self.chat_modes.get(session_id)
+        if isinstance(record, dict):
+            return record
+        return {"session_id": session_id, "mode": "ask", "coding_session_id": None}
+
+    def set_chat_mode(self, session_id: str, *, mode: str) -> dict:
+        """Set one chat session's mode (ask or agent)."""
+        if mode not in ("ask", "agent"):
+            raise StoreError("Chat mode must be ask or agent")
+        record = self.get_chat_mode(session_id)
+        record["mode"] = mode
+        record["updated_at"] = _utc_now()
+        self.chat_modes.put(session_id, record)
+        return record
+
+    def set_chat_binding(self, session_id: str, coding_session_id: str) -> dict:
+        """Bind one chat session to its Mai coding session."""
+        if not str(coding_session_id).strip():
+            raise StoreError("Coding session id is required")
+        record = self.get_chat_mode(session_id)
+        record["coding_session_id"] = str(coding_session_id).strip()
+        record["updated_at"] = _utc_now()
+        self.chat_modes.put(session_id, record)
+        return record

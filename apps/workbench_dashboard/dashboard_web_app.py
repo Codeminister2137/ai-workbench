@@ -915,6 +915,9 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             if path.startswith("/api/chat/sessions/") and path.endswith("/messages"):
                 session_id = path[len("/api/chat/sessions/") : -len("/messages")]
                 return self._send_chat_messages(config, session_id)
+            if path.startswith("/api/chat/sessions/") and path.endswith("/staged"):
+                session_id = path[len("/api/chat/sessions/") : -len("/staged")]
+                return self._send_chat_staged(session_id)
             if path == "/api/plans":
                 return self._send_collection(self._stores().plans, parsed.query)
             if path.startswith("/api/plans/"):
@@ -1062,6 +1065,12 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             if path.startswith("/api/chat/sessions/") and path.endswith("/rename"):
                 session_id = path[len("/api/chat/sessions/") : -len("/rename")]
                 return self._rename_chat_session(config, session_id, payload)
+            if path.startswith("/api/chat/sessions/") and path.endswith("/mode"):
+                session_id = path[len("/api/chat/sessions/") : -len("/mode")]
+                return self._set_chat_mode(config, session_id, payload)
+            if path.startswith("/api/chat/sessions/") and path.endswith("/apply"):
+                session_id = path[len("/api/chat/sessions/") : -len("/apply")]
+                return self._apply_chat_staged(session_id, payload)
             if path.startswith("/api/chat/sessions/") and path.endswith("/delete"):
                 session_id = path[len("/api/chat/sessions/") : -len("/delete")]
                 return self._delete_chat_session(config, session_id)
@@ -1282,20 +1291,67 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
 
     def _send_chat_sessions(self, config: DashboardConfig) -> None:
         sessions = self._chat(config).list_sessions()
+        stores = self._stores()
         self._send_json(
             {
                 "ok": True,
+                "agent_enabled": config.chat_agent_enabled,
                 "sessions": [
                     {
                         "id": record.session_id,
                         "title": record.title,
                         "updated_at_utc": record.updated_at_utc,
                         "privacy_class": record.privacy_class,
+                        "mode": stores.get_chat_mode(record.session_id).get("mode", "ask"),
                     }
                     for record in sessions
                 ],
             }
         )
+
+    def _send_chat_staged(self, session_id: str) -> None:
+        from chat_agent import ChatAgentError, ensure_chat_worktree, staged_files
+
+        record = self._stores().get_chat_mode(session_id)
+        if record.get("mode") != "agent":
+            return self._send_json({"ok": True, "files": []})
+        try:
+            worktree = ensure_chat_worktree(self.repo_root, session_id)
+        except ChatAgentError:
+            return self._send_json({"ok": True, "files": []})
+        try:
+            files = staged_files(worktree.path)
+        except ChatAgentError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        self._send_json({"ok": True, "files": files})
+
+    def _set_chat_mode(self, config: DashboardConfig, session_id: str, payload: dict) -> None:
+        mode = payload.get("mode", "")
+        if mode == "agent" and not config.chat_agent_enabled:
+            return self._send_json(
+                {"ok": False, "error": "Agent mode is disabled (chat_agent_enabled is off)"},
+                status=403,
+            )
+        try:
+            record = self._stores().set_chat_mode(session_id, mode=mode)
+        except StoreError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        self._send_json({"ok": True, "id": session_id, "mode": record["mode"]})
+
+    def _apply_chat_staged(self, session_id: str, payload: dict) -> None:
+        from chat_agent import ChatAgentError, apply_staged, ensure_chat_worktree
+
+        paths = payload.get("paths", [])
+        if not isinstance(paths, list) or not all(isinstance(p, str) for p in paths):
+            return self._send_json(
+                {"ok": False, "error": "paths must be a string array"}, status=400
+            )
+        try:
+            worktree = ensure_chat_worktree(self.repo_root, session_id)
+            outcome = apply_staged(self.repo_root, worktree, paths)
+        except ChatAgentError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        self._send_json({"ok": True, **outcome})
 
     def _send_chat_messages(self, config: DashboardConfig, session_id: str) -> None:
         try:
@@ -1334,9 +1390,17 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         language = payload.get("language", "en")
         if not isinstance(language, str):
             return self._send_json({"ok": False, "error": "Language must be a string"}, status=400)
+        mode = payload.get("mode")
+        if mode is not None and mode not in ("ask", "agent"):
+            return self._send_json({"ok": False, "error": "mode must be ask or agent"}, status=400)
         try:
             outcome = self._chat(config).send(
-                session_id, text, language=language, translator=self.chat_translator
+                session_id,
+                text,
+                language=language,
+                translator=self.chat_translator,
+                mode=mode,
+                stores=self._stores(),
             )
         except TranslationError as exc:
             return self._send_json({"ok": False, "error": str(exc)}, status=exc.status)

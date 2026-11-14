@@ -66,7 +66,7 @@ def test_dynamic_buttons_have_titles() -> None:
     """Every button rendered by app.js templates carries a tooltip title."""
     js = _read("app.js")
     buttons = re.findall(r"<button\b[^>]*>", js)
-    assert len(buttons) == 42  # +delete-inbox-btn +e2e submit
+    assert len(buttons) == 46  # +delete-inbox-btn +e2e submit +chat mode/apply
     for tag in buttons:
         assert "title=" in tag, f"button without title: {tag}"
 
@@ -452,6 +452,19 @@ def test_e2e_tab_checks_and_submits() -> None:
     assert "How to test" in js
     assert "Expected:" in js
     assert "Look at:" in js
+
+
+def test_chat_agent_mode_toggle_and_staged() -> None:
+    """Chat offers Ask/Agent toggle plus staged review/apply when enabled."""
+    js = _read("app.js")
+    assert "mode-ask-btn" in js
+    assert "mode-agent-btn" in js
+    assert "/mode" in js
+    assert "Staged files" in js
+    assert "data-apply" in js
+    assert "apply-all-btn" in js
+    assert "/apply" in js
+    assert "agent_enabled" in js
 
 
 def test_documents_view_lists_and_previews() -> None:
