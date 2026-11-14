@@ -287,3 +287,12 @@ observed), `--list-skills` and `--fallback-readiness` (both valid JSON
 payloads) all run as documented from the repo root. No divergence; the
 remaining Group 4 surface (dependencies, guides, examples beyond the
 entry page) is future scope.
+
+Group 4 finding 2 (2026-11-14): clean bill on the getting-started
+guide. All ten referenced files exist; `--mode diagnose` prints
+readiness JSON (exit 0, no stderr); the documented
+`python -m uv run ai-assistant --mode plan` entry point runs as
+written (plan metadata, no model contact). The privacy-default
+statement matches ADR-085; the dated spending-exemption block is a
+labeled example. Remaining Group 4 surface: dependencies. No
+divergence; no change.
