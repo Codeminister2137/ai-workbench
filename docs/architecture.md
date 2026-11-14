@@ -497,6 +497,23 @@ run-wide successful-final-URL maximum is checked by the HTTP fetcher before body
 reads. Receipts and the configured maximum reuse existing stage metadata; source
 text does not receive a new persistent store or reviewer retrieval tools.
 
+ADR-087 tiers merges (Tier 1 auto, Tier 2 to `develop` on green agent gates,
+Tier 3 explicit approval) and gates `develop` → `master` promotion on a passed
+per-behavior E2E checklist. The dashboard owns generation (merge diff plus goal
+docs), ancestor matching with no-diff proofs and visible warnings, the owner
+E2E task UI with per-item verdicts, auto-built reports, and the promotion gate
+(`e2e_promotion`, `e2e_tasks`/`e2e_reports` stores, `/api/e2e/*`,
+`scripts/e2e-promotion.py`). A failed E2E blocks only its own merge.
+
+Drained runs stamp a worker epoch at start; dashboard boot reconciles runs
+orphaned by a restart (different-epoch `running` runs requeue with evidence,
+live-epoch runs are never double-executed). The redeploy supervisor restarts
+by verifying every dashboard process (port holders plus command-line matches,
+launcher-shim aware), stopping all verified-ours servers, spawning exactly
+one, and reaping strays on up-to-date ticks; unknown holders still refuse.
+The sleep helper refuses when Windows Update servicing reports a reboot is
+required (`sleep_blocked_pending_update`).
+
 Codex must ask before making material decisions involving new services, persistent storage, major dependencies, microservice extraction, public API/schema changes, provider policy, privacy/data routing, automatic external actions, autonomous AI optimization, or significant shared-interface changes.
 
 ## 12. Architecture change process
