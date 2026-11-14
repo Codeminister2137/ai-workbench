@@ -322,3 +322,14 @@ with accumulated text, backend identity, provider-reported usage
 (15/80/95), finish `stop`, and measured latency. Tool-call
 accumulation across chunks and the privacy gate are as implemented
 (code-read, not live-exercised here). No divergence; no change.
+
+Group 1 finding (2026-11-14): clean bill on error normalization.
+Every documented mapping holds in code: SSE accepts `data:` with
+optional space plus `[DONE]`, skips comment/event/id/retry lines,
+and raises nonretryable `ProviderError` on malformed JSON/UTF-8 or
+non-object chunks; Ollama tool shape violations (non-array,
+non-object, empty name) raise nonretryable errors while bad
+argument JSON raises the neutral `ToolCallFormatError` (never a
+silent empty call); stream indices require `type(index) is int`
+(bool-excluding) and nonnegativity. 101 adapter contract tests
+green. No divergence; no change.
