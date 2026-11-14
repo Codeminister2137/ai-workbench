@@ -681,6 +681,19 @@ async function renderChatThread(id, initial) {
     const btn = form.querySelector("button");
     btn.disabled = true;
     btn.textContent = "Sending...";
+    const statusLine = document.createElement("p");
+    statusLine.id = "chat-working-line";
+    statusLine.className = "muted";
+    const started = Date.now();
+    const tick = () => {
+      const secs = Math.floor((Date.now() - started) / 1000);
+      statusLine.textContent = (mode === "agent" ? "Agent working in scratch worktree… " : "Working… ") + secs + "s";
+    };
+    tick();
+    form.after(statusLine);
+    const reduceMotion = window.matchMedia
+      && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const timer = reduceMotion ? null : setInterval(tick, 1000);
     try {
       const out = await api("/api/chat/sessions/" + encodeURIComponent(id) + "/messages", {
         method: "POST",
@@ -691,6 +704,7 @@ async function renderChatThread(id, initial) {
     } catch (err) {
       toast(err.message, false);
     } finally {
+      if (timer) clearInterval(timer);
       render();
       btn.disabled = false;
       btn.textContent = "Send";

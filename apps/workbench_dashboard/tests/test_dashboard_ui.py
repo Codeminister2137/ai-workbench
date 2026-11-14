@@ -469,6 +469,9 @@ def test_chat_agent_mode_toggle_and_staged() -> None:
     assert "reject-turn-btn" in js
     assert "Parked turn" in js
     assert "__chatHeartbeat" in js
+    assert "chat-working-line" in js
+    assert "Agent working in scratch worktree" in js
+    assert "prefers-reduced-motion" in js
 
 
 def test_documents_view_lists_and_previews() -> None:
@@ -617,7 +620,7 @@ def test_inbox_supports_owner_tasks() -> None:
 def test_chat_send_refreshes_thread_on_failure() -> None:
     """Failed turns still re-render the thread (messages are saved anyway)."""
     js = _read("app.js").replace("\r\n", "\n")
-    assert "} finally {\n      render();\n      btn.disabled = false;" in js
+    assert "} finally {\n      if (timer) clearInterval(timer);\n      render();" in js
 
 
 def test_create_form_disables_submit_while_creating() -> None:
