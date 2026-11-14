@@ -448,6 +448,10 @@ def test_e2e_tab_checks_and_submits() -> None:
     assert "Every behavior needs a pass/fail verdict" in js
     assert "not re-tested" not in js  # warning text is server-rendered data
     assert "open_e2e" in js
+    assert "What changed" in js
+    assert "How to test" in js
+    assert "Expected:" in js
+    assert "Look at:" in js
 
 
 def test_documents_view_lists_and_previews() -> None:

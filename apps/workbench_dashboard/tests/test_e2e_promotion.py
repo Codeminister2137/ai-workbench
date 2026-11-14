@@ -10,6 +10,7 @@ from e2e_promotion import (
     apply_ancestor_matching,
     area_for_path,
     build_report,
+    change_summary,
     covers_range,
     find_ancestor_report,
     generate_checklist,
@@ -240,6 +241,41 @@ def test_range_report_covers_merges_inside_span() -> None:
     assert covers_range({"commit": "tip", "overall": "pass"}, "mid", ".", runner) is False
     assert uncovered_merges(["mid"], [span], ".", runner) == []
     assert uncovered_merges(["mid"], [], ".", runner) == ["mid"]
+
+
+def test_guidance_attaches_what_how_expected() -> None:
+    summaries = {
+        "subjects": ["Add E2E tab"],
+        "numstat": {"apps/workbench_dashboard/web/app.js": [120, 4]},
+        "by_file": {"apps/workbench_dashboard/web/app.js": ["Add E2E tab"]},
+    }
+    checklist = generate_checklist(
+        "tip", ["apps/workbench_dashboard/web/app.js"], summaries=summaries
+    )
+    dashboard = next(i for i in checklist["items"] if i["id"] == "behavior:dashboard")
+    assert dashboard["what"] == ["Add E2E tab"]
+    assert dashboard["churn"] == {"apps/workbench_dashboard/web/app.js": [120, 4]}
+    assert len(dashboard["how"]) >= 2
+    assert dashboard["expected"]
+    assert dashboard["where"]
+
+
+def test_regression_guidance_leads_with_framing() -> None:
+    checklist = generate_checklist("tip", ["packages/ai_provider/a.py"], summaries={})
+    regression = next(i for i in checklist["items"] if i["kind"] == "regression")
+    assert regression["how"][0].startswith("Nothing here changed directly")
+
+
+def test_change_summary_parses_log_and_numstat() -> None:
+    def runner(_root: str, *args: str) -> bytes:
+        if args[0] == "log":
+            return b"SUBJECT:Add tab\n\napps/x.py\nSUBJECT:Fix tab\n\napps/x.py\n"
+        return b"10\t2\tapps/x.py\n"
+
+    summary = change_summary(".", "base", "tip", ["apps/x.py"], runner)
+    assert summary["subjects"] == ["Add tab", "Fix tab"]
+    assert summary["numstat"] == {"apps/x.py": [10, 2]}
+    assert summary["by_file"] == {"apps/x.py": ["Add tab", "Fix tab"]}
 
 
 def test_merge_listers_parse_git_output() -> None:
