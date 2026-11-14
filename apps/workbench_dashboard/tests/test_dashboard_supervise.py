@@ -298,6 +298,7 @@ def test_restart_escalates_to_sigterm_on_tracked_server(tmp_path, monkeypatch) -
     monkeypatch.setattr(sup, "_port_busy", lambda port: next(busy, False))
     monkeypatch.setattr(sup, "PORT_FREE_TIMEOUT_SECONDS", 0)
     monkeypatch.setattr(sup, "_port_listeners", lambda port: [])
+    monkeypatch.setattr(sup, "_python_pids", lambda: [])
     monkeypatch.setattr(
         sup,
         "_probe_cmdlines",
@@ -416,6 +417,7 @@ def test_restart_refuses_strangers_without_signals(tmp_path, monkeypatch) -> Non
     monkeypatch.setattr(os, "kill", lambda pid, sig: signals.append(sig))
     monkeypatch.setattr(sup, "_port_busy", lambda port: True)
     monkeypatch.setattr(sup, "_port_listeners", lambda port: [999])
+    monkeypatch.setattr(sup, "_python_pids", lambda: [])
     monkeypatch.setattr(sup, "_probe_cmdlines", lambda pids: {999: "evil.exe --port 8766"})
     spawned: list = []
     monkeypatch.setattr(subprocess, "Popen", lambda *a, **k: spawned.append(a))
@@ -438,6 +440,7 @@ def test_restart_refuses_unidentifiable_holders(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(os, "kill", lambda pid, sig: signals.append(sig))
     monkeypatch.setattr(sup, "_port_busy", lambda port: True)
     monkeypatch.setattr(sup, "_port_listeners", lambda port: [999])
+    monkeypatch.setattr(sup, "_python_pids", lambda: [])
     monkeypatch.setattr(sup, "_probe_cmdlines", lambda pids: {})
     spawned: list = []
     monkeypatch.setattr(subprocess, "Popen", lambda *a, **k: spawned.append(a))
@@ -463,6 +466,7 @@ def test_restart_kills_every_verified_duplicate(tmp_path, monkeypatch) -> None:
         "--host 127.0.0.1 --port 8766 --repo-root C:\\repo\\ai-workbench"
     )
     monkeypatch.setattr(sup, "_port_listeners", lambda port: [111, 222])
+    monkeypatch.setattr(sup, "_python_pids", lambda: [])
     monkeypatch.setattr(sup, "_probe_cmdlines", lambda pids: {111: ours_cmdline, 222: ours_cmdline})
     monkeypatch.setattr(sup, "_pid_start_time", lambda pid: time.time())
     monkeypatch.setattr(sup, "PORT_FREE_TIMEOUT_SECONDS", 0)
@@ -524,6 +528,7 @@ def test_restart_names_survivors_when_stop_fails(tmp_path, monkeypatch) -> None:
     )
     monkeypatch.setattr(sup, "_pidfile_matches_process", lambda record, pid: True)
     monkeypatch.setattr(sup, "_port_listeners", lambda port: [])
+    monkeypatch.setattr(sup, "_python_pids", lambda: [])
     monkeypatch.setattr(
         sup,
         "_probe_cmdlines",
@@ -562,6 +567,81 @@ def test_stop_treats_missing_process_as_stopped(monkeypatch) -> None:
     survivors = sup._stop_verified_servers({1234: time.time()}, 8766)
     assert signals == [signal.SIGINT]
     assert survivors == []
+
+
+def test_restart_adopts_stuck_non_holder(tmp_path, monkeypatch) -> None:
+    import os
+    import signal
+    import subprocess
+    import time
+    import types
+
+    import dashboard_supervise as sup
+
+    (tmp_path / "data").mkdir()
+    ours_cmdline = "C:\\repo\\.venv\\Scripts\\python.exe dashboard_web_app.py --port 8766 C:\\repo\\ai-workbench"
+    monkeypatch.setattr(sup, "_port_listeners", lambda port: [111])
+    monkeypatch.setattr(sup, "_python_pids", lambda: [111, 222])
+    monkeypatch.setattr(sup, "_probe_cmdlines", lambda pids: {111: ours_cmdline, 222: ours_cmdline})
+    monkeypatch.setattr(sup, "_pid_start_time", lambda pid: time.time())
+    monkeypatch.setattr(sup, "PORT_FREE_TIMEOUT_SECONDS", 0)
+    busy = iter([True, False])
+    monkeypatch.setattr(sup, "_port_busy", lambda port: next(busy, False))
+    signals: list = []
+
+    def fake_kill(pid, sig):
+        signals.append((pid, sig))
+        raise ProcessLookupError(pid)
+
+    monkeypatch.setattr(os, "kill", fake_kill)
+    spawned: list = []
+    monkeypatch.setattr(
+        subprocess, "Popen", lambda *a, **k: spawned.append(42) or types.SimpleNamespace(pid=4242)
+    )
+    ok, _detail = restart_dashboard(_supervise_config(tmp_path))
+    assert ok is True
+    assert (111, signal.SIGINT) in signals
+    assert (222, signal.SIGINT) in signals
+    assert len(spawned) == 1
+
+
+def test_unrelated_pythons_never_wedge_restart(tmp_path, monkeypatch) -> None:
+    import subprocess
+    import types
+
+    import dashboard_supervise as sup
+
+    (tmp_path / "data").mkdir()
+    monkeypatch.setattr(sup, "_port_listeners", lambda port: [])
+    monkeypatch.setattr(sup, "_python_pids", lambda: [777])
+    monkeypatch.setattr(sup, "_probe_cmdlines", lambda pids: {777: "pytest -q"})
+    busy = iter([True, False])
+    monkeypatch.setattr(sup, "_port_busy", lambda port: next(busy, False))
+    spawned: list = []
+    monkeypatch.setattr(
+        subprocess, "Popen", lambda *a, **k: spawned.append(42) or types.SimpleNamespace(pid=4242)
+    )
+    ok, _detail = restart_dashboard(_supervise_config(tmp_path))
+    assert ok is True
+    assert len(spawned) == 1
+
+
+def test_python_pids_parses_tasklist(monkeypatch) -> None:
+    import subprocess
+    import types
+
+    import dashboard_supervise as sup
+
+    out = (
+        '"python.exe","13700","Console","1","45,000 K"\r\n'
+        '"python.exe","14456","Console","1","46,000 K"\r\n'
+    )
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda *a, **k: types.SimpleNamespace(returncode=0, stdout=out),
+    )
+    assert sup._python_pids() == [13700, 14456]
 
 
 def test_port_listeners_parses_netstat(monkeypatch) -> None:

@@ -437,19 +437,51 @@ def _serve_env(worktree: Path) -> dict[str, str]:
     return env
 
 
+def _python_pids() -> list[int]:
+    """Live python interpreters (Windows tasklist); best-effort."""
+
+    if os.name != "nt":
+        return []
+    try:
+        proc = subprocess.run(
+            ["tasklist", "/FI", "IMAGENAME eq python.exe", "/FO", "CSV", "/NH"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return []
+    if proc.returncode != 0:
+        return []
+    pids: list[int] = []
+    for line in proc.stdout.splitlines():
+        parts = [field.strip().strip('"') for field in line.split('","')]
+        if len(parts) < 2:
+            continue
+        try:
+            pids.append(int(parts[1]))
+        except ValueError:
+            continue
+    return sorted(set(pids))
+
+
 def _identify_ours(
     config: SuperviseConfig,
 ) -> tuple[dict[int, float | None], list[int], list[int]]:
-    """Split live dashboard-port holders into ours, strangers, unknown.
+    """Split live dashboard processes into ours, strangers, unknown.
 
-    Returns (verified_ours, strangers, unverifiable). A holder is ours
-    only when its command line carries our server markers; anything else
-    — or anything the probe cannot answer for — is never signalled.
+    Returns (verified_ours, strangers, unverifiable). Port holders are
+    classified by command line; every other live python whose command
+    line carries our server markers (a stuck pre-bind duplicate, a stale
+    pidfile entry) joins verified-ours so no second server survives the
+    restart. Anything else — or anything the probe cannot answer for —
+    is never signalled.
     """
     holders = _port_listeners(config.port)
     record = _read_pidfile(config.data_dir)
     pid = record.get("pid") if isinstance(record, dict) else None
     candidates = list(holders)
+    extras = [extra for extra in _python_pids() if extra not in candidates]
     if (
         isinstance(pid, int)
         and pid > 0
@@ -457,18 +489,20 @@ def _identify_ours(
         and _pidfile_matches_process(record or {}, pid)
     ):
         candidates.append(pid)
+    candidates.extend(extra for extra in extras if extra not in candidates)
     cmdlines = _probe_cmdlines(candidates) if candidates else {}
+    holder_set = set(holders)
     ours: dict[int, float | None] = {}
     strangers: list[int] = []
     unknown: list[int] = []
     for candidate in candidates:
         cmdline = cmdlines.get(candidate)
-        if cmdline is None:
-            unknown.append(candidate)
-        elif _cmdline_is_ours(cmdline, config.port):
+        if cmdline is not None and _cmdline_is_ours(cmdline, config.port):
             ours[candidate] = _pid_start_time(candidate)
-        else:
-            strangers.append(candidate)
+        elif candidate in holder_set:
+            # Only a port holder can wedge the restart; unrelated live
+            # pythons that merely fail to match are ignored, never fatal.
+            (unknown if cmdline is None else strangers).append(candidate)
     return ours, strangers, unknown
 
 
