@@ -318,6 +318,7 @@ def build_report(task: dict, submissions: dict[str, dict]) -> dict:
     return {
         "task_id": task.get("id"),
         "commit": task.get("merge_commit"),
+        "range_base": task.get("range_base"),
         "title": task.get("title"),
         "items": items,
         "overall": overall,
@@ -330,6 +331,70 @@ def tested_on_for(item: dict) -> str:
     if item.get("verdict_by") == "ancestor":
         return str(item.get("tested_on") or "")
     return ""
+
+
+def merge_diff_files(
+    repo_root: str,
+    base: str,
+    head: str,
+    runner: Callable[..., bytes] | None = None,
+) -> list[str]:
+    """Files changed across ``base...head`` (the merge's own diff)."""
+    run = runner or run_git
+    out = run(repo_root, "diff", "--name-only", f"{base}...{head}")
+    text = out.decode("utf-8", "replace").strip()
+    return [line for line in text.splitlines() if line] if text else []
+
+
+def merges_between(
+    repo_root: str,
+    base: str,
+    head: str,
+    runner: Callable[..., bytes] | None = None,
+) -> list[str]:
+    """Merge commits in ``base..head``, oldest first."""
+    run = runner or run_git
+    out = run(repo_root, "log", "--merges", "--format=%H", "--reverse", f"{base}..{head}")
+    text = out.decode("utf-8", "replace").strip()
+    return [line for line in text.splitlines() if line] if text else []
+
+
+def covers_range(
+    report: dict,
+    merge_commit: str,
+    repo_root: str,
+    runner: Callable[..., bytes] | None = None,
+) -> bool:
+    """True when a passing range report covers one merge's promotion.
+
+    A range report (catch-up E2E over ``range_base...commit``) covers a
+    merge only when the merge sits inside that span on the ancestry
+    line. Ordinary per-merge reports cover only their own commit.
+    """
+    if report.get("overall") != "pass":
+        return False
+    if report.get("commit") == merge_commit and not report.get("range_base"):
+        return True
+    range_base = report.get("range_base")
+    if not range_base:
+        return False
+    return is_ancestor(repo_root, str(range_base), merge_commit, runner) and is_ancestor(
+        repo_root, merge_commit, str(report.get("commit")), runner
+    )
+
+
+def uncovered_merges(
+    merges: Sequence[str],
+    reports: Sequence[dict],
+    repo_root: str,
+    runner: Callable[..., bytes] | None = None,
+) -> list[str]:
+    """Merges with no passing own or covering range report."""
+    return [
+        merge
+        for merge in merges
+        if not any(covers_range(report, merge, repo_root, runner) for report in reports)
+    ]
 
 
 @dataclass(frozen=True)

@@ -10,10 +10,14 @@ from e2e_promotion import (
     apply_ancestor_matching,
     area_for_path,
     build_report,
+    covers_range,
     find_ancestor_report,
     generate_checklist,
     is_ancestor,
+    merge_diff_files,
+    merges_between,
     promotion_verdict,
+    uncovered_merges,
     verify_no_diff,
 )
 
@@ -217,6 +221,35 @@ def test_promotion_verdict_is_per_merge_only() -> None:
     assert promotion_verdict("bad", reports).allowed is False
     missing = promotion_verdict("other", reports)
     assert missing.allowed is False and "no E2E report" in missing.reason
+
+
+def test_range_report_covers_merges_inside_span() -> None:
+    order = {"base": 0, "mid": 1, "tip": 2}
+
+    def runner(_root: str, *args: str) -> bytes:
+        if args[:2] == ("merge-base", "--is-ancestor"):
+            if order[args[2]] <= order[args[3]]:
+                return b""
+            raise RuntimeError("not ancestor")
+        raise AssertionError(args)
+
+    span = {"commit": "tip", "range_base": "base", "overall": "pass"}
+    assert covers_range(span, "mid", ".", runner) is True
+    assert covers_range(span, "tip", ".", runner) is True
+    assert covers_range({**span, "overall": "fail"}, "mid", ".", runner) is False
+    assert covers_range({"commit": "tip", "overall": "pass"}, "mid", ".", runner) is False
+    assert uncovered_merges(["mid"], [span], ".", runner) == []
+    assert uncovered_merges(["mid"], [], ".", runner) == ["mid"]
+
+
+def test_merge_listers_parse_git_output() -> None:
+    def runner(_root: str, *args: str) -> bytes:
+        if args[0] == "diff":
+            return b"a.py\nb.py\n"
+        return b"m1\nm2\n"
+
+    assert merge_diff_files(".", "base", "tip", runner) == ["a.py", "b.py"]
+    assert merges_between(".", "base", "tip", runner) == ["m1", "m2"]
 
 
 def test_git_helpers_against_tmp_repo(tmp_path: Path) -> None:

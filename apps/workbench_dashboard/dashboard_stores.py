@@ -134,6 +134,8 @@ class DashboardStores:
         self.backlog = JsonCollection(data_dir / "backlog")
         self.workflows = JsonCollection(data_dir / "workflows")
         self.invoices = JsonCollection(data_dir / "invoices")
+        self.e2e_tasks = JsonCollection(data_dir / "e2e_tasks")
+        self.e2e_reports = JsonCollection(data_dir / "e2e_reports")
 
     @property
     def token_path(self) -> Path:
@@ -504,3 +506,100 @@ class DashboardStores:
         record["reviewed_at"] = _utc_now()
         self.backlog.put(item_id, record)
         return {"item": record, "inbox": brief}
+
+    def open_e2e_count(self) -> int:
+        """Count unsubmitted E2E tasks for the owner badge."""
+        items, _total = self.e2e_tasks.list(limit=1000)
+        return sum(1 for item in items if item.get("status") == "open")
+
+    def create_e2e_task(
+        self,
+        *,
+        merge_commit: str,
+        title: str,
+        items: list[dict],
+        created_by: str = "supervisor",
+        range_base: str | None = None,
+    ) -> dict:
+        """File one E2E task for a merge; one open task per merge commit.
+
+        A resubmitted merge replaces nothing: while an open task exists
+        for the commit, generation refuses so the owner never faces two
+        checklists for the same merge.
+        """
+        from e2e_promotion import BEHAVIOR_AREA_IDS
+
+        merge_commit = merge_commit.strip()
+        if not merge_commit:
+            raise StoreError("E2E task needs a merge commit")
+        if not isinstance(items, list) or not items:
+            raise StoreError("E2E task needs at least one checklist item")
+        if created_by not in INBOX_PARTIES:
+            raise StoreError(f"E2E creator must be one of {INBOX_PARTIES}")
+        for item in items:
+            if not isinstance(item, dict):
+                raise StoreError("E2E checklist items must be objects")
+            if item.get("kind") not in ("behavior", "regression", "nonbehavioral"):
+                raise StoreError("E2E item kind must be behavior, regression or nonbehavioral")
+            if item.get("area") not in BEHAVIOR_AREA_IDS:
+                raise StoreError(f"Unknown E2E area: {item.get('area')}")
+            if not str(item.get("id", "")).strip():
+                raise StoreError("E2E items need ids")
+        existing, _total = self.e2e_tasks.list(limit=1000)
+        if any(
+            entry.get("merge_commit") == merge_commit and entry.get("status") == "open"
+            for entry in existing
+            if isinstance(entry, dict)
+        ):
+            raise StoreError("An open E2E task already exists for this merge")
+        now = _utc_now()
+        record = {
+            "id": uuid.uuid4().hex,
+            "merge_commit": merge_commit,
+            "range_base": (range_base or "").strip() or None,
+            "title": title.strip() or f"E2E promotion for {merge_commit}",
+            "items": items,
+            "status": "open",
+            "created_by": created_by,
+            "created_at": now,
+            "submitted_at": None,
+            "report_id": None,
+        }
+        self.e2e_tasks.put(record["id"], record)
+        return record
+
+    def submit_e2e_task(self, task_id: str, results: list[dict]) -> dict:
+        """Submit owner verdicts; submitting auto-builds the E2E report.
+
+        Every pending item needs exactly one pass/fail verdict; the
+        report (including carried ancestor approvals with warnings) is
+        stored alongside the task. Submitted tasks are immutable.
+        """
+        from e2e_promotion import build_report
+
+        record = self.e2e_tasks.get(task_id)
+        if record is None:
+            raise StoreError("E2E task not found")
+        if record.get("status") != "open":
+            raise StoreError("E2E task is already submitted")
+        if not isinstance(results, list):
+            raise StoreError("E2E submission needs a results list")
+        submissions: dict[str, dict] = {}
+        for entry in results:
+            if not isinstance(entry, dict) or not str(entry.get("item_id", "")).strip():
+                raise StoreError("E2E results need item ids")
+            submissions[str(entry["item_id"])] = {
+                "verdict": entry.get("verdict"),
+                "notes": entry.get("notes", ""),
+            }
+        try:
+            report = build_report(record, submissions)
+        except ValueError as exc:
+            raise StoreError(str(exc)) from exc
+        report["id"] = uuid.uuid4().hex
+        self.e2e_reports.put(report["id"], report)
+        record["status"] = "submitted"
+        record["submitted_at"] = _utc_now()
+        record["report_id"] = report["id"]
+        self.e2e_tasks.put(task_id, record)
+        return {"task": record, "report": report}

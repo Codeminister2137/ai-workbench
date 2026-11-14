@@ -50,3 +50,13 @@ def test_main_rejects_optionless_decision(capsys) -> None:
     mod = _load()
     assert mod.main(["--title", "t", "--body", "b"]) == 2
     assert "at least two" in capsys.readouterr().err
+
+
+def test_tier_metadata_optional_and_validated() -> None:
+    mod = _load()
+    payload = mod.build_payload(title="t", body="b", options=["A", "B"], tier="tier2")
+    assert payload["metadata"] == {"tier": "tier2"}
+    plain = mod.build_payload(title="t", body="b", options=["A", "B"])
+    assert "metadata" not in plain
+    with pytest.raises(ValueError, match="tier"):
+        mod.build_payload(title="t", body="b", options=["A", "B"], tier="tier9")
