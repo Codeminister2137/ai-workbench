@@ -84,6 +84,7 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/plans/edge-round1-workbench.md | ACTED | Research done; W1 fixed, W2+W3 fixed (726b004). |
 | docs/plans/job-contact-sourcing-draft.md | ACTED | Vendor trial executed (Prospeo live, Apollo parked). |
 | docs/plans/job-search-execution-plan.md | PENDING | Refreshed 2026-11-13; S3/D2, M3/D3, M4/D4 open. |
+| docs/plans/interactive-mai-plan.md | PENDING | Draft 2026-11-14; owner decision on approval model open. |
 | docs/plans/l3-eval-ladder-design.md | ACTED | Ladder shipped (route_eval.py + l3_ladder.py). |
 | docs/plans/local-model-queue.md | ACTED | Q1-Q4 all consumed into quality-policy v1. |
 | docs/plans/mai-supervision-design.md | PENDING | Draft 2026-11-12; owner decision on placement/authority/paging open. |
