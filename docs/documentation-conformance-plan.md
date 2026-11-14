@@ -314,3 +314,11 @@ details). `/api/pull` was deliberately not exercised live (model
 download side effect); its stream parsing stays covered by offline
 fixtures. No documented version pin contradicts 0.32.5. No
 divergence; no change.
+
+Group 1 finding (2026-11-14): clean bill on Ollama streaming. One
+live loopback stream (qwen3:14b, "Reply with exactly: OK") matched
+the interface contract exactly: text deltas, then exactly one final
+with accumulated text, backend identity, provider-reported usage
+(15/80/95), finish `stop`, and measured latency. Tool-call
+accumulation across chunks and the privacy gate are as implemented
+(code-read, not live-exercised here). No divergence; no change.
