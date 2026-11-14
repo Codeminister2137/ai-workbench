@@ -2095,7 +2095,7 @@ async function renderKnowme() {
     view.innerHTML = `<h1>KnowMe</h1><p class="muted">Bank unavailable: ${esc(err.message)}</p>`;
     return;
   }
-  const cats = ["", "training", "diet", "preference", "health", "note"];
+  const cats = ["", "training", "diet", "preference", "health", "note", "skills", "career"];
   const tabs = cats.map((c) =>
     `<a href="#/knowme${c ? ("?category=" + c) : ""}">${c || "all"}</a>`).join(" · ");
   const items = (payload.entries || []).length

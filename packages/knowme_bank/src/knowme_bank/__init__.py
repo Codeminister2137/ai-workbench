@@ -8,7 +8,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
-CATEGORIES = ("training", "diet", "preference", "health", "note")
+CATEGORIES = ("training", "diet", "preference", "health", "note", "skills", "career")
 SOURCES = ("interview", "xiaomi", "note", "demo", "import")
 
 
