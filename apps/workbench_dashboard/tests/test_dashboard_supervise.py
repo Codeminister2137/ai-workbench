@@ -276,6 +276,7 @@ def test_restart_escalates_to_sigterm_on_tracked_server(tmp_path, monkeypatch) -
     import os
     import signal
     import subprocess
+    import types
     from datetime import UTC, datetime
 
     import dashboard_supervise as sup
@@ -286,12 +287,28 @@ def test_restart_escalates_to_sigterm_on_tracked_server(tmp_path, monkeypatch) -
         encoding="utf-8",
     )
     signals: list = []
-    monkeypatch.setattr(os, "kill", lambda pid, sig: signals.append(sig))
+
+    def fake_kill(pid, sig):
+        signals.append(sig)
+        if sig == signal.SIGTERM:
+            raise ProcessLookupError(pid)
+
+    monkeypatch.setattr(os, "kill", fake_kill)
     busy = iter([True, False])
     monkeypatch.setattr(sup, "_port_busy", lambda port: next(busy, False))
     monkeypatch.setattr(sup, "PORT_FREE_TIMEOUT_SECONDS", 0)
+    monkeypatch.setattr(sup, "_port_listeners", lambda port: [])
+    monkeypatch.setattr(
+        sup,
+        "_probe_cmdlines",
+        lambda pids: {
+            os.getpid(): "C:\\venv\\python.exe dashboard_web_app.py --port 8766 --repo-root C:\\ai-workbench"
+        },
+    )
     spawned: list = []
-    monkeypatch.setattr(subprocess, "Popen", lambda *a, **k: spawned.append(a))
+    monkeypatch.setattr(
+        subprocess, "Popen", lambda *a, **k: spawned.append(42) or types.SimpleNamespace(pid=4242)
+    )
     ok, _detail = restart_dashboard(_supervise_config(tmp_path))
     assert ok is True
     assert signals == [signal.SIGINT, signal.SIGTERM]
@@ -398,18 +415,82 @@ def test_restart_refuses_strangers_without_signals(tmp_path, monkeypatch) -> Non
     signals: list = []
     monkeypatch.setattr(os, "kill", lambda pid, sig: signals.append(sig))
     monkeypatch.setattr(sup, "_port_busy", lambda port: True)
+    monkeypatch.setattr(sup, "_port_listeners", lambda port: [999])
+    monkeypatch.setattr(sup, "_probe_cmdlines", lambda pids: {999: "evil.exe --port 8766"})
     spawned: list = []
     monkeypatch.setattr(subprocess, "Popen", lambda *a, **k: spawned.append(a))
     ok, detail = restart_dashboard(_supervise_config(tmp_path))
     assert ok is False
-    assert "unknown owner" in detail
+    assert "strangers=[999]" in detail
+    assert "refusing to kill strangers" in detail
     assert signals == []
     assert spawned == []
+
+
+def test_restart_refuses_unidentifiable_holders(tmp_path, monkeypatch) -> None:
+    import os
+    import subprocess
+
+    import dashboard_supervise as sup
+
+    (tmp_path / "data").mkdir()
+    signals: list = []
+    monkeypatch.setattr(os, "kill", lambda pid, sig: signals.append(sig))
+    monkeypatch.setattr(sup, "_port_busy", lambda port: True)
+    monkeypatch.setattr(sup, "_port_listeners", lambda port: [999])
+    monkeypatch.setattr(sup, "_probe_cmdlines", lambda pids: {})
+    spawned: list = []
+    monkeypatch.setattr(subprocess, "Popen", lambda *a, **k: spawned.append(a))
+    ok, detail = restart_dashboard(_supervise_config(tmp_path))
+    assert ok is False
+    assert "unknown=[999]" in detail
+    assert signals == []
+    assert spawned == []
+
+
+def test_restart_kills_every_verified_duplicate(tmp_path, monkeypatch) -> None:
+    import os
+    import signal
+    import subprocess
+    import time
+    import types
+
+    import dashboard_supervise as sup
+
+    (tmp_path / "data").mkdir()
+    ours_cmdline = (
+        "C:\\repo\\.venv\\Scripts\\python.exe dashboard_web_app.py "
+        "--host 127.0.0.1 --port 8766 --repo-root C:\\repo\\ai-workbench"
+    )
+    monkeypatch.setattr(sup, "_port_listeners", lambda port: [111, 222])
+    monkeypatch.setattr(sup, "_probe_cmdlines", lambda pids: {111: ours_cmdline, 222: ours_cmdline})
+    monkeypatch.setattr(sup, "_pid_start_time", lambda pid: time.time())
+    monkeypatch.setattr(sup, "PORT_FREE_TIMEOUT_SECONDS", 0)
+    busy = iter([True, False])
+    monkeypatch.setattr(sup, "_port_busy", lambda port: next(busy, False))
+    signals: list = []
+
+    def fake_kill(pid, sig):
+        signals.append((pid, sig))
+        raise ProcessLookupError(pid)
+
+    monkeypatch.setattr(os, "kill", fake_kill)
+    spawned: list = []
+    monkeypatch.setattr(
+        subprocess, "Popen", lambda *a, **k: spawned.append(42) or types.SimpleNamespace(pid=4242)
+    )
+    ok, detail = restart_dashboard(_supervise_config(tmp_path))
+    assert ok is True
+    assert (111, signal.SIGINT) in signals
+    assert (222, signal.SIGINT) in signals
+    assert len(spawned) == 1
+    assert "pid=4242" in detail
 
 
 def test_stop_escalates_past_sigint_oserror(monkeypatch) -> None:
     import os
     import signal
+    import time
 
     import dashboard_supervise as sup
 
@@ -421,16 +502,18 @@ def test_stop_escalates_past_sigint_oserror(monkeypatch) -> None:
             raise OSError("GenerateConsoleCtrlEvent failed")
 
     monkeypatch.setattr(os, "kill", fake_kill)
-    monkeypatch.setattr(sup, "_port_busy", lambda port: True)
+    monkeypatch.setattr(sup, "_pid_start_time", lambda pid: time.time())
     monkeypatch.setattr(sup, "PORT_FREE_TIMEOUT_SECONDS", 0)
-    sup._stop_tracked_server(1234, 8766)
+    survivors = sup._stop_verified_servers({1234: time.time()}, 8766)
     assert signals == [signal.SIGINT, signal.SIGTERM]
+    assert survivors == [1234]
 
 
-def test_restart_names_tracked_server_when_stop_fails(tmp_path, monkeypatch) -> None:
+def test_restart_names_survivors_when_stop_fails(tmp_path, monkeypatch) -> None:
     import os
     import signal
     import subprocess
+    import time
 
     import dashboard_supervise as sup
 
@@ -440,6 +523,13 @@ def test_restart_names_tracked_server_when_stop_fails(tmp_path, monkeypatch) -> 
         encoding="utf-8",
     )
     monkeypatch.setattr(sup, "_pidfile_matches_process", lambda record, pid: True)
+    monkeypatch.setattr(sup, "_port_listeners", lambda port: [])
+    monkeypatch.setattr(
+        sup,
+        "_probe_cmdlines",
+        lambda pids: {4242: "python dashboard_web_app.py --port 8766 C:\\ai-workbench"},
+    )
+    monkeypatch.setattr(sup, "_pid_start_time", lambda pid: time.time())
     signals: list = []
     monkeypatch.setattr(os, "kill", lambda pid, sig: signals.append(sig))
     monkeypatch.setattr(sup, "_port_busy", lambda port: True)
@@ -448,7 +538,7 @@ def test_restart_names_tracked_server_when_stop_fails(tmp_path, monkeypatch) -> 
     monkeypatch.setattr(subprocess, "Popen", lambda *a, **k: spawned.append(a))
     ok, detail = restart_dashboard(_supervise_config(tmp_path))
     assert ok is False
-    assert "tracked server" in detail
+    assert "survivors=[4242]" in detail
     assert signals == [signal.SIGINT, signal.SIGTERM]
     assert spawned == []
 
@@ -456,6 +546,7 @@ def test_restart_names_tracked_server_when_stop_fails(tmp_path, monkeypatch) -> 
 def test_stop_treats_missing_process_as_stopped(monkeypatch) -> None:
     import os
     import signal
+    import time
 
     import dashboard_supervise as sup
 
@@ -466,7 +557,76 @@ def test_stop_treats_missing_process_as_stopped(monkeypatch) -> None:
         raise ProcessLookupError(pid)
 
     monkeypatch.setattr(os, "kill", fake_kill)
-    monkeypatch.setattr(sup, "_port_busy", lambda port: True)
+    monkeypatch.setattr(sup, "_pid_start_time", lambda pid: time.time())
     monkeypatch.setattr(sup, "PORT_FREE_TIMEOUT_SECONDS", 0)
-    sup._stop_tracked_server(1234, 8766)
+    survivors = sup._stop_verified_servers({1234: time.time()}, 8766)
     assert signals == [signal.SIGINT]
+    assert survivors == []
+
+
+def test_port_listeners_parses_netstat(monkeypatch) -> None:
+    import subprocess
+    import types
+
+    import dashboard_supervise as sup
+
+    out = (
+        "Active Connections\r\n"
+        "  Proto  Local Address          Foreign Address        State           PID\r\n"
+        "  TCP    127.0.0.1:8766         0.0.0.0:0              LISTENING       13700\r\n"
+        "  TCP    127.0.0.1:8766         0.0.0.0:0              LISTENING       14456\r\n"
+        "  TCP    127.0.0.1:8000         0.0.0.0:0              LISTENING       999\r\n"
+        "  TCP    127.0.0.1:8766         127.0.0.1:50000        ESTABLISHED     13700\r\n"
+    )
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda *a, **k: types.SimpleNamespace(returncode=0, stdout=out),
+    )
+    assert sup._port_listeners(8766) == [13700, 14456]
+
+
+def test_cmdline_verdicts() -> None:
+    import dashboard_supervise as sup
+
+    ours = "C:\\r\\.venv\\Scripts\\python.exe dashboard_web_app.py --port 8766 --repo-root C:\\r\\ai-workbench"
+    assert sup._cmdline_is_ours(ours, 8766) is True
+    assert sup._cmdline_is_ours("evil.exe --port 8766", 8766) is False
+    assert sup._cmdline_is_ours(ours, 9999) is False
+    assert sup._cmdline_is_ours("", 8766) is False
+
+
+def test_tick_lock_serializes(tmp_path) -> None:
+    import dashboard_supervise as sup
+
+    data = tmp_path / "data"
+    first = sup._TickLock(data)
+    assert first.__enter__() is True
+    try:
+        second = sup._TickLock(data)
+        assert second.__enter__() is False
+    finally:
+        first.__exit__()
+
+
+def test_supervise_tick_busy_on_lock_contention(tmp_path, monkeypatch) -> None:
+    import dashboard_supervise as sup
+
+    data = tmp_path / "data"
+    data.mkdir()
+    lock = sup._TickLock(data)
+    assert lock.__enter__() is True
+    try:
+        outcome = sup.supervise_tick(_mail_throttle_config(tmp_path))
+    finally:
+        lock.__exit__()
+    assert outcome["action"] == "busy"
+
+
+def test_ensure_single_server_refuses_busy_port() -> None:
+    import pytest
+    from dashboard_web_app import ensure_single_server
+
+    with pytest.raises(SystemExit):
+        ensure_single_server("127.0.0.1", 8766, probe=lambda host, port: True)
+    ensure_single_server("127.0.0.1", 8766, probe=lambda host, port: False)

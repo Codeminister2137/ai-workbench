@@ -29,6 +29,7 @@ MAINTENANCE_FILENAME = "maintenance.json"
 PID_FILENAME = "dashboard.pid"
 SERVE_VERSION_FILENAME = "serve-version.json"
 MAIL_STATE_FILENAME = "supervise-mail-state.json"
+TICK_LOCK_FILENAME = "supervise-tick.lock"
 HEALTH_TIMEOUT_SECONDS = 60.0
 PORT_FREE_TIMEOUT_SECONDS = 15.0
 
@@ -286,25 +287,144 @@ def _pidfile_matches_process(record: dict, pid: int) -> bool:
     return actual is not None and abs(actual - expected) <= 60
 
 
-def _stop_tracked_server(pid: int, port: int) -> None:
-    """Stop a verified-ours server: graceful SIGINT, then forceful SIGTERM.
+def _start_matches(expected: float | None, pid: int) -> bool:
+    """True when the pid is alive with the expected start time (reuse guard)."""
+    if expected is None:
+        return False
+    actual = _pid_start_time(pid)
+    return actual is not None and abs(actual - expected) <= 60
 
-    A failed signal is not a stopped server: only a missing process ends
-    the escalation (Windows SIGINT fails for detached processes, so giving
-    up there would never reach SIGTERM).
+
+def _stop_verified_servers(servers: dict[int, float | None], port: int) -> list[int]:
+    """Stop every verified-ours server; return surviving pids.
+
+    Each pid is re-verified by start time before every signal, so PID
+    reuse can never redirect a signal at an unrelated process. Waits on
+    process exit (not the port: several holders may share it).
     """
+    pending = dict(servers)
     for sig in (signal.SIGINT, signal.SIGTERM):
-        try:
-            os.kill(pid, sig)
-        except ProcessLookupError:
-            return
-        except OSError:
-            continue
+        for pid, started in list(pending.items()):
+            if not _start_matches(started, pid):
+                pending.pop(pid, None)
+                continue
+            try:
+                os.kill(pid, sig)
+            except ProcessLookupError:
+                pending.pop(pid, None)
+            except OSError:
+                continue
         deadline = time.monotonic() + PORT_FREE_TIMEOUT_SECONDS
-        while time.monotonic() < deadline and _port_busy(port):
-            time.sleep(0.5)
-        if not _port_busy(port):
-            return
+        while pending and time.monotonic() < deadline:
+            for pid, started in list(pending.items()):
+                if not _start_matches(started, pid):
+                    pending.pop(pid, None)
+            if pending:
+                time.sleep(0.5)
+    return sorted(pending)
+
+
+def _port_listeners(port: int) -> list[int]:
+    """Pids in LISTENING state on the dashboard port (Windows netstat).
+
+    Best-effort: unparseable output or a non-Windows host yields no
+    holders, and the restart falls back to refusing unverifiable stops.
+    """
+    if os.name != "nt":
+        return []
+    try:
+        proc = subprocess.run(
+            ["netstat", "-ano", "-p", "TCP"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return []
+    if proc.returncode != 0:
+        return []
+    holders: list[int] = []
+    for line in proc.stdout.splitlines():
+        parts = line.split()
+        if len(parts) < 5 or parts[0] != "TCP" or parts[-2] != "LISTENING":
+            continue
+        local = parts[1]
+        if not local.endswith(f":{port}"):
+            continue
+        try:
+            holders.append(int(parts[-1]))
+        except ValueError:
+            continue
+    return sorted(set(holders))
+
+
+def _probe_cmdlines(pids: list[int]) -> dict[int, str]:
+    """Map pids to command lines via one CIM query (Windows only).
+
+    Returns only the pids the query answered for; any failure yields an
+    empty map and the restart refuses rather than guessing ownership.
+    """
+    if os.name != "nt" or not pids:
+        return {}
+    filt = " or ".join(f"ProcessId={pid}" for pid in sorted(set(pids)))
+    script = (
+        "$rows = @(Get-CimInstance Win32_Process -Filter '"
+        + filt
+        + "' | Select-Object ProcessId, CommandLine); "
+        "$rows | ConvertTo-Json -Compress"
+    )
+    try:
+        proc = subprocess.run(
+            ["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return {}
+    if proc.returncode != 0:
+        return {}
+    try:
+        payload = json.loads(proc.stdout.strip() or "null")
+    except ValueError:
+        return {}
+    rows = payload if isinstance(payload, list) else [payload]
+    found: dict[int, str] = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        try:
+            pid = int(row.get("ProcessId", -1))
+        except (TypeError, ValueError):
+            continue
+        cmdline = row.get("CommandLine")
+        if pid > 0 and isinstance(cmdline, str):
+            found[pid] = cmdline
+    return found
+
+
+def _cmdline_is_ours(cmdline: str, port: int) -> bool:
+    """True when a command line is verifiably our dashboard server."""
+    lowered = cmdline.lower()
+    return (
+        "dashboard_web_app.py" in lowered
+        and f"--port {port}" in lowered
+        and "ai-workbench" in lowered.replace("\\", "/").replace("//", "/")
+    )
+
+
+def _write_pidfile(data_dir: Path, pid: int) -> None:
+    """Atomically record a supervisor-spawned server (best-effort)."""
+    try:
+        path = Path(data_dir) / PID_FILENAME
+        tmp = path.with_suffix(".json.tmp")
+        tmp.write_text(
+            json.dumps({"pid": pid, "started_utc": datetime.now(UTC).isoformat()}),
+            encoding="utf-8",
+        )
+        tmp.replace(path)
+    except OSError:
+        pass
 
 
 def _serve_env(worktree: Path) -> dict[str, str]:
@@ -317,29 +437,76 @@ def _serve_env(worktree: Path) -> dict[str, str]:
     return env
 
 
-def restart_dashboard(config: SuperviseConfig) -> tuple[bool, str]:
-    """Restart the dashboard onto the synced worktree; (ok, detail)."""
+def _identify_ours(
+    config: SuperviseConfig,
+) -> tuple[dict[int, float | None], list[int], list[int]]:
+    """Split live dashboard-port holders into ours, strangers, unknown.
+
+    Returns (verified_ours, strangers, unverifiable). A holder is ours
+    only when its command line carries our server markers; anything else
+    — or anything the probe cannot answer for — is never signalled.
+    """
+    holders = _port_listeners(config.port)
     record = _read_pidfile(config.data_dir)
     pid = record.get("pid") if isinstance(record, dict) else None
+    candidates = list(holders)
     if (
-        isinstance(record, dict)
-        and isinstance(pid, int)
+        isinstance(pid, int)
         and pid > 0
-        and _pidfile_matches_process(record, pid)
+        and pid not in candidates
+        and _pidfile_matches_process(record or {}, pid)
     ):
-        tracked = True
-        _stop_tracked_server(pid, config.port)
-    else:
-        tracked = False
+        candidates.append(pid)
+    cmdlines = _probe_cmdlines(candidates) if candidates else {}
+    ours: dict[int, float | None] = {}
+    strangers: list[int] = []
+    unknown: list[int] = []
+    for candidate in candidates:
+        cmdline = cmdlines.get(candidate)
+        if cmdline is None:
+            unknown.append(candidate)
+        elif _cmdline_is_ours(cmdline, config.port):
+            ours[candidate] = _pid_start_time(candidate)
+        else:
+            strangers.append(candidate)
+    return ours, strangers, unknown
+
+
+def restart_dashboard(config: SuperviseConfig) -> tuple[bool, str]:
+    """Restart the dashboard onto the synced worktree; (ok, detail).
+
+    Stops every verified-ours server (duplicates included), then spawns
+    exactly one. A holder that is not verifiably ours — or that cannot
+    be identified at all — refuses the whole restart; that refusal names
+    the pids so the next failure is self-explanatory.
+    """
     if _port_busy(config.port):
-        if tracked:
+        ours, strangers, unknown = _identify_ours(config)
+        if strangers or unknown:
             return False, (
-                "port still busy after stopping tracked server; refusing to kill strangers"
+                f"port {config.port} held by unverified pids "
+                f"(strangers={sorted(strangers)} unknown={sorted(unknown)} "
+                f"ours={sorted(ours)}); refusing to kill strangers"
             )
-        return False, "port still busy after stop; unknown owner, refusing to kill strangers"
+        if ours:
+            survivors = _stop_verified_servers(ours, config.port)
+            if survivors:
+                return False, (
+                    f"port {config.port} still busy after stopping ours "
+                    f"(survivors={survivors}); refusing to kill strangers"
+                )
+            if _port_busy(config.port):
+                return False, (
+                    f"port {config.port} still busy after stopping ours "
+                    f"(stopped={sorted(ours)}); refusing to kill strangers"
+                )
+        elif _port_busy(config.port):
+            return False, (
+                f"port {config.port} busy with no identifiable holder; refusing to kill strangers"
+            )
     app_dir = config.worktree / "apps" / "workbench_dashboard"
     try:
-        subprocess.Popen(
+        proc = subprocess.Popen(
             [
                 config.python_exe,
                 "dashboard_web_app.py",
@@ -363,7 +530,8 @@ def restart_dashboard(config: SuperviseConfig) -> tuple[bool, str]:
         )
     except OSError as exc:
         return False, f"respawn failed: {exc}"
-    return True, "respawned"
+    _write_pidfile(config.data_dir, proc.pid)
+    return True, f"respawned pid={proc.pid}"
 
 
 def wait_healthy(config: SuperviseConfig, want_commit: str) -> bool:
@@ -457,9 +625,74 @@ def _mail_failure(config: SuperviseConfig, reason: str) -> None:
         pass
 
 
+class _TickLock:
+    """Non-blocking exclusive tick lock (another tick may be mid-restart).
+
+    Boot/logon trigger overlap used to run two ticks at once; both saw a
+    down dashboard and both spawned a server. The loser now backs off and
+    retries on the next tick instead of double-serving the port.
+    """
+
+    def __init__(self, data_dir: Path) -> None:
+        self.path = Path(data_dir) / TICK_LOCK_FILENAME
+        self.handle = None
+
+    def __enter__(self) -> bool:
+        try:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            self.handle = open(self.path, "a+b")  # noqa: PTH123 - lock file
+        except OSError:
+            return False
+        try:
+            if os.name == "nt":
+                import msvcrt
+
+                msvcrt.locking(self.handle.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(self.handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            self.handle.close()
+            self.handle = None
+            return False
+        return True
+
+    def __exit__(self, *exc_info: object) -> None:
+        if self.handle is None:
+            return
+        try:
+            if os.name == "nt":
+                import msvcrt
+
+                msvcrt.locking(self.handle.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(self.handle.fileno(), fcntl.LOCK_UN)
+        finally:
+            self.handle.close()
+            self.handle = None
+
+
 def supervise_tick(config: SuperviseConfig, *, dry_run: bool = False, force: bool = False) -> dict:
     """One supervisor pass; returns a JSON-able outcome (never raises)."""
     outcome: dict = {"action": "error", "reason": "", "dry_run": dry_run}
+    if dry_run:
+        origin = read_origin_commit(config.main_root, config.serve_branch)
+        running = read_served_commit(config.port)
+        action, reason = decide(running_commit=running, origin_commit=origin)
+        outcome.update(action=action, reason=reason, running=running, origin=origin)
+        return outcome
+    with _TickLock(config.data_dir) as acquired:
+        if not acquired:
+            outcome.update(action="busy", reason="another supervisor tick holds the lock")
+            return outcome
+        return _supervised_tick(config, force=force, outcome=outcome)
+
+
+def _supervised_tick(config: SuperviseConfig, *, force: bool, outcome: dict) -> dict:
+    """Locked tick body; every path returns the outcome (never raises)."""
     try:
         origin = read_origin_commit(config.main_root, config.serve_branch)
         running = read_served_commit(config.port)
@@ -468,10 +701,8 @@ def supervise_tick(config: SuperviseConfig, *, dry_run: bool = False, force: boo
             action, reason = "redeploy", "forced redeploy"
         outcome.update(action=action, reason=reason, running=running, origin=origin)
         if action != "redeploy":
-            if action == "up-to-date" and not dry_run:
+            if action == "up-to-date":
                 _clear_last_mailed_key(config.data_dir)
-            return outcome
-        if dry_run:
             return outcome
         assert origin is not None
         if not target_supports_worktree(config.main_root, origin):
@@ -557,7 +788,11 @@ def main(argv: list[str] | None = None) -> int:
     print(json.dumps(outcome))
     if args.dry_run:
         return 0
-    return 0 if outcome["action"] in {"up-to-date", "redeployed", "skip-unknown", "held"} else 1
+    return (
+        0
+        if outcome["action"] in {"up-to-date", "redeployed", "skip-unknown", "held", "busy"}
+        else 1
+    )
 
 
 if __name__ == "__main__":

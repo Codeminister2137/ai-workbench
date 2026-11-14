@@ -2652,6 +2652,38 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def ensure_single_server(host: str, port: int, *, probe=None) -> None:
+    """Refuse to start when another server already holds the port.
+
+    On Windows the listener socket allows double binds, so two racing
+    starters would both serve (and split traffic) without this guard.
+    Exits loudly instead of double-serving: a second server is never
+    correct, and the supervisor's health check reports the outcome.
+    """
+    check = probe or _probe_busy
+    if check(host, port):
+        print(
+            f"Workbench dashboard: {host}:{port} is already served; "
+            "refusing to start a second server."
+        )
+        raise SystemExit(1)
+
+
+def _probe_busy(host: str, port: int) -> bool:
+    """True when something answers on the dashboard port."""
+    import socket
+
+    probe = socket.socket()
+    probe.settimeout(2.0)
+    try:
+        probe.connect((host, port))
+    except OSError:
+        return False
+    finally:
+        probe.close()
+    return True
+
+
 def main() -> None:
     args = build_parser().parse_args()
     from ai_provider.secrets import load_dotenv
@@ -2667,7 +2699,9 @@ def main() -> None:
         REPO_ROOT, config_path=args.config, data_dir=args.data_dir
     )
     try:
-        (args.data_dir / "dashboard.pid").write_text(
+        pid_path = args.data_dir / "dashboard.pid"
+        pid_tmp = pid_path.with_suffix(".json.tmp")
+        pid_tmp.write_text(
             json.dumps(
                 {
                     "pid": os.getpid(),
@@ -2678,6 +2712,7 @@ def main() -> None:
             ),
             encoding="utf-8",
         )
+        pid_tmp.replace(pid_path)
     except OSError as exc:
         print(f"Workbench dashboard: pidfile unwritable, supervisor restarts unavailable: {exc}")
     try:
@@ -2704,6 +2739,7 @@ def main() -> None:
         print("Workbench dashboard: Meta STT engine wired (shared spend bucket)")
     else:
         print("Workbench dashboard: STT engine unwired (no key or no ledger)")
+    ensure_single_server(args.host, args.port)
     server = ThreadingHTTPServer((args.host, args.port), DashboardRequestHandler)
     print(f"Workbench dashboard: http://{args.host}:{args.port}")
     server.serve_forever()
