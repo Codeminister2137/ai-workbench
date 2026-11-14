@@ -51,6 +51,15 @@ def _agent_task(stores, **overrides):
     return stores.create_inbox_task(**payload)
 
 
+def test_timeout_override_flows_to_run(tmp_path) -> None:
+    stores = DashboardStores(tmp_path)
+    _agent_task(stores, created_by="supervisor", metadata={"mai_timeout_seconds": 1200})
+    (receipt,) = bridge_agent_queue(stores)
+    assert stores.runs.get(receipt["run_id"])["mai_timeout_seconds"] == 1200
+    _agent_task(stores, created_by="supervisor", metadata={"mai_timeout_seconds": "soon"})
+    assert "mai_timeout_seconds" not in stores.runs.get(bridge_agent_queue(stores)[0]["run_id"])
+
+
 def test_supervisor_filed_task_keeps_approval_gate(tmp_path) -> None:
     stores = DashboardStores(tmp_path)
     item = _agent_task(stores, created_by="supervisor")
