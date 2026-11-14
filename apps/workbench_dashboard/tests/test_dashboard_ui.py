@@ -454,6 +454,7 @@ def test_e2e_tab_checks_and_submits() -> None:
     assert "Look at:" in js
     assert "renderE2EReminders" in js
     assert "Test needed while you are here" in js
+    assert "view.append(card)" in js  # reminders sit below tab content, never on top
     assert "data-save-notes" in js
     assert "Jot down what you observe" in js
 

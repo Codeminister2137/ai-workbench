@@ -2410,7 +2410,7 @@ async function renderE2EReminders(name) {
       <div><textarea data-notes-task="${esc(entry.task_id)}" data-notes-item="${esc(entry.item_id)}" rows="2" placeholder="Jot down what you observe..." title="Draft notes for this behavior">${esc(entry.draft_notes || "")}</textarea></div>
       <p><button type="button" data-save-notes="${esc(entry.task_id)}:${esc(entry.item_id)}" title="Save these notes as a draft">Save notes</button></p></div>`;
   }).join("");
-  view.prepend(card);
+  view.append(card);
   card.querySelectorAll("[data-save-notes]").forEach((btn) => btn.addEventListener("click", async () => {
     const sep = btn.dataset.saveNotes.indexOf(":");
     const taskId = btn.dataset.saveNotes.slice(0, sep);
