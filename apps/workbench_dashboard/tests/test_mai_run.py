@@ -44,6 +44,16 @@ def test_argv_accepts_explicit_overrides(tmp_path) -> None:
     assert argv[argv.index("--model") + 1] == "qwen3:14b"
 
 
+def test_argv_timeout_override_clamped(tmp_path) -> None:
+    from mai_run import _run_timeout_seconds
+
+    argv = build_mai_argv(_run(), repo_root=tmp_path, user_config="u", timeout_seconds=1200.0)
+    assert argv[argv.index("--timeout-seconds") + 1] == "1200"
+    assert _run_timeout_seconds({"mai_timeout_seconds": 30}) is None
+    assert _run_timeout_seconds({"mai_timeout_seconds": "xx"}) is None
+    assert _run_timeout_seconds({"mai_timeout_seconds": 99999}) == 1740.0
+
+
 def test_session_stdin_is_eof_not_a_hang() -> None:
     import sys
 

@@ -20,6 +20,25 @@ from dashboard_stores import StoreError
 MAX_BRIDGE_PER_CALL = 10
 
 
+def _mai_timeout_override(metadata: dict) -> dict[str, float]:
+    """Validated Mai timeout override from task metadata (empty when absent).
+
+    Long agent tasks die on Mai's internal default otherwise; the value
+    is clamped below the drain's own subprocess timeout so the override
+    can never outlive its supervisor.
+    """
+    raw = metadata.get("mai_timeout_seconds")
+    if raw is None:
+        return {}
+    try:
+        seconds = float(raw)
+    except (TypeError, ValueError):
+        return {}
+    if seconds < 60:
+        return {}
+    return {"mai_timeout_seconds": min(seconds, 1500.0)}
+
+
 def bridge_agent_queue(stores, *, fanout_policy: str = "restricted") -> list[dict[str, Any]]:
     """Propose one queued run per unbridged open agent task.
 
@@ -45,6 +64,7 @@ def bridge_agent_queue(stores, *, fanout_policy: str = "restricted") -> list[dic
         if not title:
             continue
         run_id = uuid.uuid4().hex
+        timeout_override = _mai_timeout_override(metadata)
         now = datetime.now(UTC).isoformat()
         run_title = title[:60]
         if str(item.get("created_by") or "") == "owner":
@@ -63,6 +83,7 @@ def bridge_agent_queue(stores, *, fanout_policy: str = "restricted") -> list[dic
                     "fanout_effective": fanout_policy,
                     "created_at_utc": now,
                     "updated_at_utc": now,
+                    **timeout_override,
                 },
             )
             updated = dict(item)
@@ -111,6 +132,7 @@ def bridge_agent_queue(stores, *, fanout_policy: str = "restricted") -> list[dic
                 "fanout_effective": fanout_policy,
                 "created_at_utc": now,
                 "updated_at_utc": now,
+                **timeout_override,
             },
         )
         updated = dict(item)

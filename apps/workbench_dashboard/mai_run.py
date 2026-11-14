@@ -48,6 +48,7 @@ def build_mai_argv(
     coding_session: str | None = None,
     provider: str | None = None,
     model: str | None = None,
+    timeout_seconds: float | None = None,
 ) -> list[str]:
     """Argv handing a run to Mai; never pins a model (orchestrator decides).
 
@@ -91,7 +92,23 @@ def build_mai_argv(
         argv += ["--provider", provider]
     if model:
         argv += ["--model", model]
+    if timeout_seconds:
+        argv += ["--timeout-seconds", str(int(timeout_seconds))]
     return argv
+
+
+def _run_timeout_seconds(run: dict) -> float | None:
+    """Validated Mai timeout from a run record (None keeps the default)."""
+    raw = run.get("mai_timeout_seconds")
+    if raw is None:
+        return None
+    try:
+        seconds = float(raw)
+    except (TypeError, ValueError):
+        return None
+    if seconds < 60:
+        return None
+    return min(seconds, SUBPROCESS_TIMEOUT_SECONDS - 60.0)
 
 
 def parse_mai_facts(stdout: str) -> dict[str, str]:
@@ -303,6 +320,7 @@ def build_mai_executor(
             coding_session=coding_session,
             provider=provider,
             model=model,
+            timeout_seconds=_run_timeout_seconds(run),
         )
         if backend == "subprocess":
             outcome = run_mai_subprocess(
