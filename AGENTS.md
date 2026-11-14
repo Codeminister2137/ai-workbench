@@ -903,7 +903,7 @@ Owner clarification (2026-10-28): before any edit, including documentation or
 mechanical fixes, verify the branch and create/resume a focused `feature/`, `fix/`
 or `docs/` branch based on `develop`. Read-only investigation may start on develop.
 `develop` is the permanent integration target. Logical commits on working branches
-are standing-authorized (owner, 2026-11-02); merging to `develop` needs explicit owner approval per merge (pipeline auto-screen is an open question, not a decision). Do further fixes on a working branch. Direct develop edits/commits require
+are standing-authorized (owner, 2026-11-02). Merging follows [ADR-087](docs/decisions/ADR-087-tiered-merge-gates-e2e-promotion.md). Do further fixes on a working branch. Direct develop edits/commits require
 an explicit owner exception for that task. A clean checkout, branch cleanup or
 "continue/work only on develop" handoff identifies the base/target, not an exception.
 Keep handoffs consistent. If edits already exist on develop, preserve them with

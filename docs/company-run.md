@@ -44,7 +44,9 @@ Per slice, before any push:
 
 - Run `report` field + inbox close with resolution (final-report
   artifact awaits the audience decision, brief a96f576b).
-- Merge to `develop` only with explicit per-merge approval.
+- Merge under the tier policy ([ADR-087](decisions/ADR-087-tiered-merge-gates-e2e-promotion.md)):
+  Tier 1 auto-merges on green, Tier 2 merges to `develop` on green agent gates,
+  Tier 3 still needs explicit owner approval per merge.
 
 ## 6. Invoice inputs
 

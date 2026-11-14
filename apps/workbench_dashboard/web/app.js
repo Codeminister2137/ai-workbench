@@ -1716,7 +1716,7 @@ function renderHelp() {
     <li>2. Plan: review the phase checklist, approve in a review window.</li>
     <li>3. Execute: <code>.\\scripts\\repo-assistant.ps1 "task" --execute</code> or an unattended loop.</li>
     <li>4. Verify: focused pytest, <code>run-tests.py full</code>, ruff, pyright; green gate before push.</li>
-    <li>5. Report: run report + inbox close; merge needs per-merge approval.</li>
+    <li>5. Report: run report + inbox close; merge follows tier policy (ADR-087).</li>
     </ul></div>
     <div class="card"><h2>Troubleshooting</h2>
     <ul class="plain">
