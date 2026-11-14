@@ -269,6 +269,17 @@ missing prompt refused before inference/storage, >512KB body refused,
 root serves 200. Probe state removed afterwards (server stopped, temp
 config deleted). No divergence; no change.
 
+Group 3 finding 3 (2026-11-14): clean bill on job-email approval
+binding. Every ADR-047 boundary holds in code: `materials_digest`
+binds recipient, message, attachment identity and exact bytes;
+`deliver_application` rejects bypass flags and changed materials and
+sends a verified temporary attachment copy (removed after the call);
+the `--send` flow adds preview-by-default, exact per-recipient
+confirmation and a review-vs-approval digest recheck; sent-file and
+record writes stop the batch on failure. `test_email_cli.py` covers
+all nine boundary cases (219 job-search tests green). No divergence;
+no change.
+
 Group 4 finding 1 (2026-11-13): clean bill on CLI entry examples. The
 documented `uv run --no-sync ai-assistant --help` (exit 0),
 `--mode plan "..."` (plan metadata, local context only, no inference
