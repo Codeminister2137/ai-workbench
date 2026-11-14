@@ -227,6 +227,7 @@ class DashboardChat:
         mode: str | None = None,
         stores: object | None = None,
         agent_executor: Callable[[dict], dict] | None = None,
+        approved: bool = False,
     ) -> DashboardTurnOutcome:
         """Translate at ingestion, then append one turn plus its answer.
 
@@ -235,7 +236,9 @@ class DashboardChat:
         ``mode="agent"`` (or the session's stored mode) routes the turn
         through a Mai session in the chat's scratch worktree instead of
         the read-only relay; agent turns require the
-        ``chat_agent_enabled`` master switch.
+        ``chat_agent_enabled`` master switch. Under the ask-always policy
+        the turn parks for approval instead of executing (unless this
+        call carries an approval); under yolo, staged files auto-apply.
         """
         session = self.store.get_session(session_id)
         if session is None:
@@ -252,6 +255,14 @@ class DashboardChat:
             else None
         )
         resolved_mode = self._resolve_mode(session_id, mode, stores)
+        if (
+            resolved_mode == "agent"
+            and self.config.chat_agent_approval == "ask-always"
+            and not approved
+        ):
+            if stores is None:
+                raise ValueError("Parking an agent turn needs dashboard stores")
+            return self._park_turn(session_id, normalized.working, stores)
         controller = self._controller(session_id, session.privacy_class)
         if resolved_mode == "agent":
             result = controller.turn(
@@ -266,6 +277,31 @@ class DashboardChat:
             execution_status=result.execution_status,
             failure_reason=result.failure_reason,
             provider=result.provider,
+            model=self.config.model,
+        )
+
+    def _park_turn(self, session_id: str, text: str, stores: object) -> DashboardTurnOutcome:
+        """Park one agent turn for approval in the chat thread.
+
+        Approval lives in the chat UI only (single surface): the web
+        layer mails the owner a thread link when they are away. An inbox
+        brief would accept answers nothing resumes, so none is filed.
+        """
+        try:
+            stores.park_chat_turn(session_id, text)  # type: ignore[attr-defined]
+        except Exception as exc:  # noqa: BLE001 - store refusal fails the turn, not the server
+            return DashboardTurnOutcome(
+                response_text="",
+                execution_status="failed",
+                failure_reason=str(exc),
+                provider=self.config.provider,
+                model=self.config.model,
+            )
+        return DashboardTurnOutcome(
+            response_text="Turn parked for approval. Approve it in this chat to run it.",
+            execution_status="parked",
+            failure_reason=None,
+            provider=self.config.provider,
             model=self.config.model,
         )
 
@@ -329,6 +365,25 @@ class DashboardChat:
         if staged:
             listing = "\n".join(f"- {entry['path']} ({entry['status']})" for entry in staged)
             text += f"\n\n_Staged files (review before applying):_\n{listing}"
+        if staged and self.config.chat_agent_approval == "yolo":
+            from chat_agent import apply_staged
+
+            try:
+                outcome = apply_staged(
+                    self.workspace, worktree, [entry["path"] for entry in staged]
+                )
+            except ChatAgentError as exc:
+                text += f"\n\n_YOLO auto-apply failed: {exc}_"
+            else:
+                applied = outcome["applied"]
+                refused = outcome["refused"]
+                applied_count = len(applied) if isinstance(applied, list) else 0
+                text += f"\n\n_YOLO auto-applied {applied_count} file(s)."
+                if isinstance(refused, dict) and refused:
+                    details = "; ".join(f"{path}: {reason}" for path, reason in refused.items())
+                    text += f" Refused: {details}_"
+                else:
+                    text += "_"
         return CodingTurnResult(
             0,
             text or "Agent turn completed with no output.",

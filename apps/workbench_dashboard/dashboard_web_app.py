@@ -1071,6 +1071,15 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             if path.startswith("/api/chat/sessions/") and path.endswith("/apply"):
                 session_id = path[len("/api/chat/sessions/") : -len("/apply")]
                 return self._apply_chat_staged(session_id, payload)
+            if path.startswith("/api/chat/sessions/") and path.endswith("/heartbeat"):
+                session_id = path[len("/api/chat/sessions/") : -len("/heartbeat")]
+                return self._heartbeat_chat_session(session_id)
+            if path.startswith("/api/chat/sessions/") and path.endswith("/approve"):
+                session_id = path[len("/api/chat/sessions/") : -len("/approve")]
+                return self._approve_chat_turn(config, session_id)
+            if path.startswith("/api/chat/sessions/") and path.endswith("/reject"):
+                session_id = path[len("/api/chat/sessions/") : -len("/reject")]
+                return self._reject_chat_turn(session_id)
             if path.startswith("/api/chat/sessions/") and path.endswith("/delete"):
                 session_id = path[len("/api/chat/sessions/") : -len("/delete")]
                 return self._delete_chat_session(config, session_id)
@@ -1353,14 +1362,80 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             return self._send_json({"ok": False, "error": str(exc)}, status=400)
         self._send_json({"ok": True, **outcome})
 
+    def _heartbeat_chat_session(self, session_id: str) -> None:
+        try:
+            record = self._stores().touch_chat_heartbeat(session_id)
+        except StoreError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        self._send_json({"ok": True, "id": session_id, "last_seen_at": record.get("last_seen_at")})
+
+    def _approve_chat_turn(self, config: DashboardConfig, session_id: str) -> None:
+        try:
+            pending = self._stores().take_parked_turn(session_id)
+        except StoreError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        try:
+            outcome = self._chat(config).send(
+                session_id,
+                str(pending.get("text", "")),
+                stores=self._stores(),
+                approved=True,
+            )
+        except ValueError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        self._send_json(
+            {
+                "ok": outcome.execution_status == "completed",
+                "response_text": outcome.response_text,
+                "execution_status": outcome.execution_status,
+                "failure_reason": outcome.failure_reason,
+            }
+        )
+
+    def _reject_chat_turn(self, session_id: str) -> None:
+        try:
+            self._stores().take_parked_turn(session_id)
+        except StoreError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        self._send_json({"ok": True, "id": session_id, "rejected": True})
+
+    def _mail_if_away(self, session_id: str, text: str) -> None:
+        """Mail a parked-turn ping when the owner has no recent heartbeat."""
+        from datetime import datetime
+
+        try:
+            record = self._stores().get_chat_mode(session_id)
+            last_seen = record.get("last_seen_at") or ""
+            seen = datetime.fromisoformat(str(last_seen)) if last_seen else None
+            if seen is not None and (datetime.now(seen.tzinfo) - seen).total_seconds() < 300:
+                return
+            from owner_mail import load_smtp_config, send_owner_mail
+
+            mail_config = load_smtp_config(root=self.repo_root)
+            send_owner_mail(
+                to=mail_config["owner"],
+                subject=f"Agent turn parked in chat {session_id[:8]}",
+                body=(
+                    "An agent turn parked for approval (ask-always policy):\n\n"
+                    f"{text[:2000]}\n\nApprove in the chat thread to run it."
+                ),
+                config=mail_config,
+                dry_run=False,
+                receipts_dir=self.data_dir / "mail-receipts",
+            )
+        except Exception:  # noqa: BLE001 - mail is best-effort; parked state is the record
+            pass
+
     def _send_chat_messages(self, config: DashboardConfig, session_id: str) -> None:
         try:
             messages = self._chat(config).list_messages(session_id)
         except ValueError as exc:
             return self._send_json({"ok": False, "error": str(exc)}, status=404)
+        pending = self._stores().get_chat_mode(session_id).get("pending_turn")
         self._send_json(
             {
                 "ok": True,
+                "pending_turn": pending if isinstance(pending, dict) else None,
                 "messages": [
                     {
                         "id": message.message_id,
@@ -1408,9 +1483,11 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             message = str(exc).lower()
             code = 404 if ("not found" in message or "unavailable" in message) else 400
             return self._send_json({"ok": False, "error": str(exc)}, status=code)
+        if outcome.execution_status == "parked":
+            self._mail_if_away(session_id, text)
         self._send_json(
             {
-                "ok": outcome.execution_status == "completed",
+                "ok": outcome.execution_status in ("completed", "parked"),
                 "response_text": outcome.response_text,
                 "execution_status": outcome.execution_status,
                 "failure_reason": outcome.failure_reason,

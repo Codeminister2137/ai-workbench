@@ -40,6 +40,7 @@ class DashboardConfig:
     activated_modules: tuple[str, ...] = DEFAULT_MODULES
     landing_page: str = "home"
     chat_agent_enabled: bool = False
+    chat_agent_approval: str = "scoped"
 
 
 def load_config(path: Path = DEFAULT_CONFIG_PATH) -> DashboardConfig:
@@ -75,6 +76,7 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> DashboardConfig:
         "activated_modules": list,
         "landing_page": str,
         "chat_agent_enabled": bool,
+        "chat_agent_approval": str,
     }
     values: dict[str, object] = {}
     for key, types in known.items():
@@ -112,6 +114,11 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> DashboardConfig:
     backend = values.get("mai_backend", "subprocess")
     if backend not in ("in-process", "subprocess"):
         raise ValueError("Dashboard config key 'mai_backend' must be in-process or subprocess")
+    approval = values.get("chat_agent_approval", "scoped")
+    if approval not in ("scoped", "ask-always", "yolo"):
+        raise ValueError(
+            "Dashboard config key 'chat_agent_approval' must be scoped, ask-always, or yolo"
+        )
     tier = values.get("product_tier", "tooling")
     if tier not in ("special", "commercial", "tooling", "hobby"):
         raise ValueError(
