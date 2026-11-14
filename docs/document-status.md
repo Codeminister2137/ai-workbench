@@ -66,7 +66,7 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/plans/03_Job_Search_Automation_Project_Plan.txt | KNOWLEDGE | Founder source plan (R3-owned content). |
 | docs/plans/04_IT_Services_Business_Start_Plan_PL.txt | KNOWLEDGE | Founder source plan (primary R1 input). |
 | docs/plans/05_AI_Orchestrator_Project_Plan.txt | KNOWLEDGE | Founder source plan (capability evidence). |
-| docs/plans/ai-trainer-framing.md | TRIAGE | Trainer vs assistant framing; scope decision open. |
+| docs/plans/ai-trainer-framing.md | PENDING | Blocked: needs owner go on first slice. |
 | docs/plans/accountant-investigation.md | PENDING | Owner action: paid hour before first invoice (D6). |
 | docs/plans/backlog.md | ACTED | All items DONE (fan-out, merge). |
 | docs/plans/branch-consolidation-checklist.md | PENDING | DO NOT EXECUTE — owner review gate (Nov-9 prune was develop-local only). |
@@ -78,35 +78,35 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/plans/company-naming-r5.md | ACTED | Owner verdict recorded in R6 (none good enough). |
 | docs/plans/company-naming-r6.md | PENDING | Founder research delivered; panel round (R7) + decision open. |
 | docs/plans/company-offering-draft.md | PENDING | Proposal with open questions; pricing partly re-anchored by grounding §2. |
-| docs/plans/council-deliberation-slice.md | PENDING | Deliberation rounds + synthesis next slice; design then implement. |
-| docs/plans/deferred-baseline-work-20261022.md | PENDING | Bounded offline backlog; item 1 ties to in-progress conformance plan. |
+| docs/plans/council-deliberation-slice.md | ACTED | Designed + implemented (add2383), brief filed. |
+| docs/plans/deferred-baseline-work-20261022.md | PENDING | Only Groups 2-4 question left (q filed 2026-11-13). |
 | docs/plans/deliberation-pack-20261110.md | PENDING | Tomorrow's decisions D1-D9. |
-| docs/plans/edge-round1-operator.md | TRIAGE | E research produced; fix-state unverified. |
-| docs/plans/edge-round1-workbench.md | TRIAGE | E research produced; fix-state unverified. |
+| docs/plans/edge-round1-operator.md | ACTED | Research done; H1 fixed, H2 mitigated-by-design, H3 UI-recoverable. |
+| docs/plans/edge-round1-workbench.md | ACTED | Research done; W1 fixed, W2+W3 fixed (726b004). |
 | docs/plans/job-contact-sourcing-draft.md | ACTED | Vendor trial executed (Prospeo live, Apollo parked). |
-| docs/plans/job-search-execution-plan.md | TRIAGE | J plan; implementation state unknown. |
+| docs/plans/job-search-execution-plan.md | PENDING | Refreshed 2026-11-13; S3/D2, M3/D3, M4/D4 open. |
 | docs/plans/l3-eval-ladder-design.md | ACTED | Ladder shipped (route_eval.py + l3_ladder.py). |
 | docs/plans/local-model-queue.md | ACTED | Q1-Q4 all consumed into quality-policy v1. |
 | docs/plans/mai-supervision-design.md | PENDING | Draft 2026-11-12; owner decision on placement/authority/paging open. |
 | docs/plans/p4-agent-ux-research.md | KNOWLEDGE | P4 loop-UX research 2026-11-12 (R1-R5 queued, no implementation). |
 | docs/plans/local-model-pilot-20261112.md | KNOWLEDGE | Local model micro-pilot + tool eval + ask-bloat findings 2026-11-12. |
-| docs/plans/mai-dashboard-wiring-plan.md | TRIAGE | Wiring execution plan; awaits verdict-A. |
+| docs/plans/mai-dashboard-wiring-plan.md | PENDING | Blocked: awaits owner verdict-A. |
 | docs/plans/marketing-r3-draft.md | PENDING | Compliance boundary binding; pilot proposal unapproved. |
 | docs/plans/model-capability-data-plan.md | KNOWLEDGE | Program reference; L1/L2 live per roadmap, L3 ladder pending. |
 | docs/plans/opencode-go-ide-handoff-20261022.md | KNOWLEDGE | Ordering superseded by integration-first; task detail still referenced. |
 | docs/plans/opencode-go-integration-first-20261022.md | ACTED | Task order consumed (Go work + acceptance scripts exist). |
 | docs/plans/p3-workbench-routed-loop-scouting.md | KNOWLEDGE | Durable finding (bridge claim half wrong). |
-| docs/plans/p4-agent-ux-proposal.md | PENDING | Research proposal; owner review state unverified. |
+| docs/plans/p4-agent-ux-proposal.md | ACTED | Research done; R1-R3+R5 shipped. |
 | docs/plans/p5-spend-policy-proposal.md | PENDING | Draft for owner review; may be partly consumed by shipped spend ledger — confirm. (Mojibake repaired.) |
 | docs/plans/p6-dashboard-proposal.md | ACTED | Dashboard built; proposals consumed. |
 | docs/plans/p6-dashboard-scouting.md | ACTED | Dashboard built; scouting consumed. |
 | docs/plans/p7-capability-analysis.md | KNOWLEDGE | P7 working reference. |
-| docs/plans/p7-company-scouting.md | PENDING | Social bots TBD/cut; paperwork inventory open. |
+| docs/plans/p7-company-scouting.md | ACTED | Scouting consumed; residue in P7 deliberation. |
 | docs/plans/p7-discovery-checklist.md | KNOWLEDGE | On-site discovery tool v1. |
 | docs/plans/p7-grounding-20261109.md | KNOWLEDGE | Pricing/positioning ground truth §§1-9. |
 | docs/plans/p7-knowledge-bank.md | KNOWLEDGE | Chatbot can/cannot bank. |
 | docs/plans/p7-paperwork-checklist.md | PENDING | OPEN checklist; phases filed as backlog, owner/accountant steps pending. |
-| docs/plans/p7-project-file-format-proposal.md | PENDING | Proposed; owner review (overlaps D5). |
+| docs/plans/p7-project-file-format-proposal.md | ACTED | Approved D9e-A; schema+validator shipped (029c874). |
 | docs/plans/p8-templates-scouting.md | KNOWLEDGE | Greenfield note, correctly ordered after P7. |
 | docs/plans/product-roadmap-20261031.md | KNOWLEDGE | P1-P9 direction; schedule section stale (hackathon windows passed). |
 | docs/plans/repo-assistant-cli-parity-plan.md | ACTED | Consumed into CLI/ADRs (one narrow Oct-19 PENDING likely moot). |
@@ -114,10 +114,9 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/plans/research-token-count-prototype.md | ACTED | Oct-4 checkpoint consumed. |
 | docs/plans/search-tooling-landscape-note-20261022.md | KNOWLEDGE | Captured for search-path revisit. |
 | docs/plans/shared-agent-capabilities-options.md | ACTED | Oct-4 checkpoint consumed. |
-| docs/plans/mai-supervision-design.md | PENDING | Draft 2026-11-12; owner decision on placement/authority/paging open. |
 | docs/plans/weekly-digest-design.md | ACTED | Digest 2.0 shipped (loop10). |
 | docs/plans/workbench-remote-development-integration-20261027.md | ACTED | Decided 2026-10-27 (C now, B target, A rejected). |
-| docs/plans/workflow-builder-exploration.md | TRIAGE | Exploration note; adoption decision open. |
+| docs/plans/workflow-builder-exploration.md | PENDING | Adoption proposal next, then owner decision. |
 | docs/plans/remote-ai-operator-2026/ | TRIAGE | Aggregate; per-file rows future scope. |
 | docs/api-reference/ | TRIAGE | Aggregate; per-file rows future scope. |
 | docs/artifacts/ | TRIAGE | Aggregate; per-file rows future scope. |
