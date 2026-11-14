@@ -19,7 +19,6 @@ INBOX_TYPES = ("decision", "clarification", "order", "task")
 INBOX_STATUSES = ("open", "answered", "closed")
 INBOX_PARTIES = ("supervisor", "owner", "agent")
 INBOX_ASSIGNEES = ("owner", "agent")
-FANOUT_POLICIES = ("allowed", "restricted", "denied")
 FANOUT_UNKNOWN = "unknown"
 IDEA_SOURCES = ("owner", "third-party")
 IDEA_STATUSES = ("new", "reviewing", "adopted", "parked", "declined", "implemented")
