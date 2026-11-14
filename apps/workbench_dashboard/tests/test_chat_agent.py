@@ -16,7 +16,7 @@ from chat_agent import (
     ensure_chat_worktree,
 )
 from dashboard_chat import DashboardChat
-from dashboard_config import DashboardConfig
+from dashboard_config import DashboardConfig, load_config
 from dashboard_stores import DashboardStores
 
 
@@ -142,6 +142,83 @@ def test_build_chat_prompt_states_convention() -> None:
     prompt = build_chat_prompt("digest", "do it")
     assert "do it" in prompt and "digest" in prompt
     assert "never push" in prompt.lower()
+
+
+def test_ask_always_parks_then_approves(tmp_path, git_repo, stores) -> None:
+    from dashboard_chat import DashboardChat
+    from dashboard_config import DashboardConfig
+
+    store = SQLiteChatTranscriptStore(tmp_path / "chats.sqlite3")
+    config = DashboardConfig(
+        provider="ollama", model="fake", chat_agent_enabled=True, chat_agent_approval="ask-always"
+    )
+    chat = DashboardChat(store, config, git_repo)
+    session = chat.create_session(title="t")
+    calls: list = []
+
+    def fake_execute(run: dict) -> dict:
+        calls.append(run)
+        return {"status": "completed", "stdout_tail": "Done.", "mai_session_id": "m1"}
+
+    parked = chat.send(
+        session.session_id, "do it", stores=stores, mode="agent", agent_executor=fake_execute
+    )
+    assert parked.execution_status == "parked"
+    assert calls == []
+    assert stores.get_chat_mode(session.session_id)["pending_turn"]["text"] == "do it"
+    resumed = chat.send(
+        session.session_id,
+        "do it",
+        stores=stores,
+        mode="agent",
+        agent_executor=fake_execute,
+        approved=True,
+    )
+    assert resumed.execution_status == "completed"
+    assert len(calls) == 1
+
+
+def test_park_rejects_double_park(stores) -> None:
+    stores.park_chat_turn("s", "one")
+    with pytest.raises(Exception, match="already parked"):
+        stores.park_chat_turn("s", "two")
+    pending = stores.take_parked_turn("s")
+    assert pending["text"] == "one"
+    with pytest.raises(Exception, match="No parked turn"):
+        stores.take_parked_turn("s")
+
+
+def test_yolo_auto_applies_staged(tmp_path, git_repo, stores) -> None:
+    from dashboard_chat import DashboardChat
+    from dashboard_config import DashboardConfig
+
+    store = SQLiteChatTranscriptStore(tmp_path / "chats.sqlite3")
+    config = DashboardConfig(
+        provider="ollama", model="fake", chat_agent_enabled=True, chat_agent_approval="yolo"
+    )
+    chat = DashboardChat(store, config, git_repo)
+    session = chat.create_session(title="t")
+    worktree = ensure_chat_worktree(git_repo, session.session_id)
+    (worktree.path / "app.py").write_text("v2", encoding="utf-8")
+
+    def fake_execute(run: dict) -> dict:
+        return {"status": "completed", "stdout_tail": "Done.", "mai_session_id": "m1"}
+
+    outcome = chat.send(
+        session.session_id, "do it", stores=stores, mode="agent", agent_executor=fake_execute
+    )
+    assert outcome.execution_status == "completed"
+    assert "auto-applied 1" in outcome.response_text
+    assert (git_repo / "app.py").read_text(encoding="utf-8") == "v2"
+
+
+def test_heartbeat_and_config_validation(stores, tmp_path) -> None:
+    record = stores.touch_chat_heartbeat("s")
+    assert record["last_seen_at"]
+    bad = tmp_path / "bad.json"
+    bad.write_text(json.dumps({"chat_agent_approval": "sometimes"}), encoding="utf-8")
+    with pytest.raises(ValueError, match="chat_agent_approval"):
+        load_config(bad)
 
 
 def _api(base: str, method: str, path: str, payload: dict | None = None) -> dict:

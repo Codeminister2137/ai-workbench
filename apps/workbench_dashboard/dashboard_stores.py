@@ -630,3 +630,33 @@ class DashboardStores:
         record["updated_at"] = _utc_now()
         self.chat_modes.put(session_id, record)
         return record
+
+    def touch_chat_heartbeat(self, session_id: str) -> dict:
+        """Record that the owner has the chat thread open (presence)."""
+        record = self.get_chat_mode(session_id)
+        record["last_seen_at"] = _utc_now()
+        self.chat_modes.put(session_id, record)
+        return record
+
+    def park_chat_turn(self, session_id: str, text: str) -> dict:
+        """Park one agent turn awaiting approval (ask-always policy)."""
+        if not str(text).strip():
+            raise StoreError("Parked turn needs text")
+        record = self.get_chat_mode(session_id)
+        if record.get("pending_turn"):
+            raise StoreError("A turn is already parked for this chat")
+        record["pending_turn"] = {"text": str(text), "parked_at": _utc_now()}
+        record["updated_at"] = _utc_now()
+        self.chat_modes.put(session_id, record)
+        return record
+
+    def take_parked_turn(self, session_id: str) -> dict:
+        """Take (and clear) the parked turn; raises when none is parked."""
+        record = self.get_chat_mode(session_id)
+        pending = record.get("pending_turn")
+        if not isinstance(pending, dict) or not str(pending.get("text", "")).strip():
+            raise StoreError("No parked turn for this chat")
+        record["pending_turn"] = None
+        record["updated_at"] = _utc_now()
+        self.chat_modes.put(session_id, record)
+        return pending

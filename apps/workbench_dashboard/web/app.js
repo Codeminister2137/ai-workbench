@@ -541,12 +541,17 @@ async function renderChatThread(id, initial) {
       stagedBar = `<p class="muted">Staged files unavailable.</p>`;
     }
   }
+  const pending = payload.pending_turn;
+  const pendingBar = !pending ? "" : `<div class="card"><h3>Parked turn (ask-always policy)</h3>
+    <p>${esc(pending.text || "")}</p>
+    <p><button type="button" id="approve-turn-btn" title="Approve and run the parked turn">Approve turn</button>
+    <button type="button" id="reject-turn-btn" title="Discard the parked turn">Reject turn</button></p></div>`;
   view.innerHTML = `<h1>Chat: ${esc(found.title || id)}</h1><p><a href="#/chat">All chats</a></p>
     <form id="rename-form" class="inline"><input type="text" name="title" value="${esc(found.title || "")}" title="Chat title">
     <button type="submit" title="Rename this chat">Rename</button></form>
     <p><button id="delete-btn" title="Delete this chat and its transcript">Delete chat</button>
     <button type="button" id="draft-plan-btn" title="Draft a proposed plan from this chat transcript">Draft plan</button></p>
-    ${modeBar}${stagedBar}
+    ${modeBar}${stagedBar}${pendingBar}
     <div id="thread">${msgs || '<p class="muted">No messages yet.</p>'}</div>
     <form class="inline" id="chat-form"><input type="text" name="text" placeholder="Message..." title="Message the supervisor" required>
     <button type="submit" title="Send message">Send</button>
@@ -646,6 +651,31 @@ async function renderChatThread(id, initial) {
       toast(err.message, false);
     }
   });
+  async function decideTurn(action) {
+    try {
+      await api("/api/chat/sessions/" + encodeURIComponent(id) + "/" + action, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: "{}",
+      });
+      toast("Turn " + action + "d", true);
+      render();
+    } catch (err) {
+      toast(err.message, false);
+    }
+  }
+  const approveBtn = document.getElementById("approve-turn-btn");
+  if (approveBtn) approveBtn.addEventListener("click", () => decideTurn("approve"));
+  const rejectBtn = document.getElementById("reject-turn-btn");
+  if (rejectBtn) rejectBtn.addEventListener("click", () => decideTurn("reject"));
+  if (window.__chatHeartbeat) clearInterval(window.__chatHeartbeat);
+  window.__chatHeartbeat = setInterval(() => {
+    api("/api/chat/sessions/" + encodeURIComponent(id) + "/heartbeat", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: "{}",
+    }).catch(() => {});
+  }, 30000);
   const form = document.getElementById("chat-form");
   async function send(text) {
     const btn = form.querySelector("button");
