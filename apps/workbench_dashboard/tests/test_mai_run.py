@@ -30,6 +30,20 @@ def test_argv_hands_task_to_mai_without_model_override(tmp_path) -> None:
     assert argv[argv.index("--approval-policy") + 1] == "trusted_local"
 
 
+def test_argv_accepts_explicit_overrides(tmp_path) -> None:
+    argv = build_mai_argv(
+        _run(),
+        repo_root=tmp_path,
+        user_config=tmp_path / "user.toml",
+        coding_session="abc",
+        provider="ollama",
+        model="qwen3:14b",
+    )
+    assert argv[argv.index("--coding-session") + 1] == "abc"
+    assert argv[argv.index("--provider") + 1] == "ollama"
+    assert argv[argv.index("--model") + 1] == "qwen3:14b"
+
+
 def test_session_stdin_is_eof_not_a_hang() -> None:
     import sys
 
