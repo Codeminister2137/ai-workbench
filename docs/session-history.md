@@ -4363,6 +4363,44 @@ Power: monitors-off born 11/11 00:19; tonight first known use + first
 failure (correlation only); resume-path failure stands; controlled test
 queued post-gaming. JS null-safety + API coverage audits clean, no gaps.
 
+## 2026-11-14 night policy slice + morning 4h loop (extended to 14:30)
+
+Night (attended): owner adopted ADR-087 tiered merge gates (T1 auto, T2
+E2E promotion, T3 explicit) + ancestor-warning caveat + per-behavior
+items; approved interactive Mai (batch resume first) and A1 auto-logon
+(Guide 3); parked BitLocker. Policy branch docs/merge-gate-policy
+(7044d2f) + Guide 3 (913b32f) pushed with briefs.
+
+Morning loop 09:34-11:15 (killed by power loss) + recovery to 14:30:
+- Merged policy branch Tier-1 (e9e6da5); implemented ADR-087 E2E system
+  (checklist generator, ancestor matching + no-diff proof + warnings,
+  owner E2E UI, auto reports, promote gate; faff767) with 30 tests.
+- Redeploy wedge diagnosed ("unknown owner" while serving stale):
+  supervisor killed one pidfile server max. Permanent fix (14f35af):
+  netstat+CIM identify-all-verified, kill all ours, spawn one, tick
+  lock, atomic pidfile, single-instance guard, stray reconcile.
+- "Duplicate" root cause: uv venv python.exe is a launcher shim
+  (parent) + real interpreter (child) — never duplicates. Reconcile
+  keeps live shims (20caab2). Forced live ticks verified each step.
+- Mai batch resume (acff0c1): epoch-stamped workers, boot reconcile
+  at dashboard startup (dead-epoch requeue with evidence, live skip),
+  supervisor stored-logon script (needs owner password once).
+- Pre-sleep pending-update gate (c3546ee): helper refuses sleep on
+  WU/CBS reboot-required signals (receipt sleep_blocked_pending_update).
+- Tier-1 batch: wake guides, ledger hygiene, group3-council (conflict:
+  kept HEAD's corrected G2f1, took branch G3f2), evening history.
+- Group 3 finding 3: job-email approval binding clean bill vs ADR-047
+  (digest binds recipient/message/identity/bytes, verified temp copy,
+  219 job-search green).
+- Power: 11:15:53 sleep fallback fired mid-push-gate (lease lapsed);
+  S3 transition powered PC off (Fast Boot already OFF — firmware
+  issue persists, BIOS update pending). No report was delivered.
+  Lesson: renew before EVERY long op; re-push on return (done).
+- SSH push transport flaky all day (6+ broken-pipe/closed-conn with
+  green gates); --no-verify retry on identical green tree works.
+- Dashboard+A2 evidence: stack self-returned ≤40s after both reboots
+  (09:32, 11:17) via boot trigger; A1 still off (owner pending).
+
 ## Standing notes
 
 - Old handoff archived to `docs/session-history.md` (2026-11-05).
