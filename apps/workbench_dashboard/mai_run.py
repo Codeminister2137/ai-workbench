@@ -207,7 +207,12 @@ def run_mai_subprocess(
     timeout_seconds: float = SUBPROCESS_TIMEOUT_SECONDS,
     cwd: Path | str | None = None,
 ) -> MaiRunOutcome:
-    """Invoke Mai as a supervised subprocess; kill on timeout; never raises."""
+    """Invoke Mai as a supervised subprocess; kill on timeout; never raises.
+
+    Streams decode as UTF-8 with replacement: model output routinely
+    carries bytes outside the Windows locale, which used to crash the
+    capture thread and surface as an empty-output failure.
+    """
     import subprocess
 
     try:
@@ -217,6 +222,8 @@ def run_mai_subprocess(
             stderr=subprocess.PIPE,
             stdin=subprocess.DEVNULL,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             cwd=str(cwd) if cwd is not None else None,
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
