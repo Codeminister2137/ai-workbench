@@ -296,3 +296,11 @@ written (plan metadata, no model contact). The privacy-default
 statement matches ADR-085; the dated spending-exemption block is a
 labeled example. Remaining Group 4 surface: dependencies. No
 divergence; no change.
+
+Group 4 finding 3 (2026-11-14): clean bill on Python workspace
+claims. `requires-python` is exactly the documented `>=3.13,<3.15`;
+the live `.venv` runs 3.14.4 (in range); `uv.lock` exists and
+`uv lock --check` resolves 104 packages with no drift; `.venv/` and
+`.tools/` are both gitignored as documented; the installer path
+`scripts/install-workbench.ps1` exists. Group 4 fully covered. No
+divergence; no change.
