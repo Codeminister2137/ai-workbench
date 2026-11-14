@@ -46,6 +46,8 @@ def build_mai_argv(
     user_config: Path | str,
     catalog: Path | str | None = None,
     coding_session: str | None = None,
+    provider: str | None = None,
+    model: str | None = None,
 ) -> list[str]:
     """Argv handing a run to Mai; never pins a model (orchestrator decides).
 
@@ -54,7 +56,9 @@ def build_mai_argv(
     session); the assigned session id and effective route are parsed
     back from Mai's stdout. The catalog defaults to the repo catalog
     (Mai's own default is CWD-relative, which breaks under the
-    dashboard's working directory).
+    dashboard's working directory). ``provider``/``model`` overrides
+    exist for zero-spend local smokes only; production paths leave the
+    orchestrator in charge.
     """
     run_id = str(run.get("id", "?"))
     title = run.get("title") or "(untitled)"
@@ -65,7 +69,7 @@ def build_mai_argv(
         if catalog
         else Path(repo_root) / "packages/ai_orchestrator/examples/model_catalog.toml"
     )
-    return [
+    argv = [
         prompt,
         "--mode",
         "implement",
@@ -83,6 +87,11 @@ def build_mai_argv(
         "--approval-policy",
         "trusted_local",
     ]
+    if provider:
+        argv += ["--provider", provider]
+    if model:
+        argv += ["--model", model]
+    return argv
 
 
 def parse_mai_facts(stdout: str) -> dict[str, str]:
@@ -249,6 +258,8 @@ def build_mai_executor(
     mai_cmd_prefix: list[str] | None = None,
     isolate: bool = False,
     coding_session: str | None = None,
+    provider: str | None = None,
+    model: str | None = None,
 ) -> Callable[[dict], dict]:
     """Build a drain ``Executor`` handing runs to Mai sessions.
 
@@ -283,6 +294,8 @@ def build_mai_executor(
             user_config=(root / "user-config.toml" if isolated else user_config),
             catalog=catalog,
             coding_session=coding_session,
+            provider=provider,
+            model=model,
         )
         if backend == "subprocess":
             outcome = run_mai_subprocess(
