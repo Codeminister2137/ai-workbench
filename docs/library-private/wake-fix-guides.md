@@ -1,10 +1,11 @@
-# Wake-fix guides (do tomorrow, in order)
+# Wake-fix guides (do in order)
 
 Context: 2026-11-13 night showed a broken S3 resume (firmware S3 pair with
 no OS resume event) plus update-driven reboots. PC: MSI B650 GAMING PLUS
-WIFI (MS-7E26), BIOS 1.G0 (Oct 2024), Fast Startup currently ON, no
-BitLocker. Do guide 1 first (5 min), guide 2 second (~20 min, needs
-care), guide 3 last (2 min, owner only — needs your Windows password).
+WIFI (MS-7E26), BIOS 1.G0 (Oct 2024), no BitLocker. Guide 1 DONE
+2026-11-14 (Fast Startup verified OFF) but power-offs persist, so
+guides 2 and 3 remain. Do guide 2 second (~20 min, needs care),
+guide 3 last (2 min, owner only — needs your Windows password).
 
 ## Guide 1 — turn Fast Startup OFF
 
@@ -20,7 +21,11 @@ Steps:
 3. Under "Shutdown settings", UNCHECK "Turn on fast startup (recommended)".
 4. Click "Save changes".
 5. Verify (PowerShell, no admin needed):
-   `Get-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Power' -Name HiberbootEnabled`
+
+   ```powershell
+   Get-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Power' -Name HiberbootEnabled
+   ```
+
    Expect `HiberbootEnabled : 0`.
 6. Test: shut down fully (Start → Shut down, not restart), wait 30s,
    power on. Should boot normally, slightly slower than before.
@@ -28,8 +33,14 @@ Steps:
 Revert if undesired: re-check the box in step 3.
 
 Note: this does NOT disable hibernate or sleep, and does not delete
-`hiberfil.sys`. If resume problems persist later, the next escalations
-are `powercfg -h off` + `powercfg -h on` (rebuilds hiberfil, admin),
+`hiberfil.sys`. If resume problems persist later, the next escalation
+is rebuilding hiberfil (admin PowerShell):
+
+```powershell
+powercfg -h off
+powercfg -h on
+```
+
 then the BIOS track below.
 
 ## Guide 2 — update MSI BIOS (B650 GAMING PLUS WIFI, MS-7E26)
@@ -105,8 +116,13 @@ Steps:
    computer", click Apply.
    - If the checkbox is missing (some Windows builds): open an admin
      PowerShell and run:
-     `Set-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\PasswordLess\Device' -Name DevicePasswordLessBuildVersion -Value 0 -Type DWord`
-     then close and reopen `netplwiz`.
+
+     ```powershell
+     Set-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\PasswordLess\Device' -Name DevicePasswordLessBuildVersion -Value 0 -Type DWord
+     ```
+
+     then close and reopen `netplwiz`. Copy only the command line,
+     without any backticks.
 4. Enter your Windows password twice, OK, OK.
 5. Verify: Restart (Start → Restart, not Shut down). The PC must boot
    straight to your desktop with no password prompt.
