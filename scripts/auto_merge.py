@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Opt-in auto-merge for low-risk branches (owner decision: auto-merge B).
+"""Opt-in auto-merge for low-risk branches (owner decision: auto-merge B,
+now the Tier-1 mechanic under ADR-087).
 
 Only branches named ``auto/*`` are eligible (explicit opt-in, never default).
 Eligible classes: docs-only, test-only, and small fixes (<=3 files, no

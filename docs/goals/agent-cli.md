@@ -34,3 +34,7 @@ pre-approval; supervision design pending owner placement decision.
 ## Next action
 
 Owner decision on Mai supervision placement/authority/paging, then implement.
+Queued (owner-approved 2026-11-14): Mai-as-service batch resume first
+(unattended drain driver + boot reconciliation), then interactive Mai —
+dashboard chat was always meant to be agentic, not single-shot Q&A
+(needs conversational loop + scope-based approvals + presence routing).

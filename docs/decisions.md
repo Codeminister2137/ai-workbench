@@ -1,3 +1,15 @@
+## Tiered merge gates + E2E promotion (adopted) - owner 2026-11-14
+
+**Status:** Accepted (chat; per-merge approval was theater without reading).
+
+Tier 1 (docs/tests/format/bumps/tooling) auto-merges on green CI. Tier 2
+(features/behavior) merges to `develop` on green agent gates and promotes
+to `master` only on a passed per-behavior E2E checklist; ancestor-report
+auto-approvals carry a visible warning plus no-diff proof. Tier 3
+(auth/secrets/money/data-loss/architecture) keeps explicit pre-merge
+approval. Plan approval before code unchanged. Failed E2E blocks only its
+own merge. See [ADR-087](decisions/ADR-087-tiered-merge-gates-e2e-promotion.md).
+
 ## Run isolation: scratch worktree per run (A) - owner 2026-11-12
 
 **Status:** Accepted (inbox d4ff0cc2, agree with recommendation;
@@ -31,6 +43,9 @@ docs-only, test-only, or small-fix (<=3 files, no dependency manifests, no
 migration/schema/decision signals); no conflicts; scoped gate green (ruff +
 scoped pytest). Anything else keeps per-merge briefs. Implemented as
 scripts/auto_merge.py; the calling agent mails the receipt.
+
+Superseded 2026-11-14 by [ADR-087](decisions/ADR-087-tiered-merge-gates-e2e-promotion.md)
+as the general merge rule; `auto/*` remains as the Tier-1 mechanic.
 
 ## Secrets stay on .env; dashboard reads presence from it - owner 2026-11-11
 
