@@ -262,6 +262,13 @@ ways: the client sends `X-Openings-Token` (primary) and the server also
 accepts `Authorization: Bearer`. No divergence; the client's strict
 response-shape assertions held against real responses. No change.
 
+Group 3 finding 2 (2026-11-13): clean bill on council API controls. Live
+loopback probe of the council server verified every README claim:
+127.0.0.1-only bind, foreign Origin refused (403), malformed JSON and
+missing prompt refused before inference/storage, >512KB body refused,
+root serves 200. Probe state removed afterwards (server stopped, temp
+config deleted). No divergence; no change.
+
 Group 4 finding 1 (2026-11-13): clean bill on CLI entry examples. The
 documented `uv run --no-sync ai-assistant --help` (exit 0),
 `--mode plan "..."` (plan metadata, local context only, no inference
