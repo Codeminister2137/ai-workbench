@@ -703,6 +703,53 @@ def test_supervise_tick_busy_on_lock_contention(tmp_path, monkeypatch) -> None:
     assert outcome["action"] == "busy"
 
 
+def test_reconcile_reaps_old_strays_keeps_server(tmp_path, monkeypatch) -> None:
+    import time
+
+    import dashboard_supervise as sup
+
+    (tmp_path / "data").mkdir()
+    now = time.time()
+    monkeypatch.setattr(sup, "_port_listeners", lambda port: [111])
+    monkeypatch.setattr(sup, "_python_pids", lambda: [111, 222, 333])
+    monkeypatch.setattr(
+        sup,
+        "_probe_cmdlines",
+        lambda pids: {
+            111: "python dashboard_web_app.py --port 8766 C:\\ai-workbench",
+            222: "python dashboard_web_app.py --port 8766 C:\\ai-workbench",
+            333: "python dashboard_web_app.py --port 8766 C:\\ai-workbench",
+        },
+    )
+    starts = {111: now, 222: now - 600, 333: now - 10}
+    monkeypatch.setattr(sup, "_pid_start_time", lambda pid: starts[pid])
+    stopped: list = []
+    monkeypatch.setattr(
+        sup, "_stop_verified_servers", lambda servers, port: stopped.append(servers) or []
+    )
+    reaped, detail = sup.reconcile_strays(_mail_throttle_config(tmp_path))
+    assert reaped == 1
+    assert stopped == [{222: starts[222]}]
+    assert "reaped=[222]" in detail
+
+
+def test_reconcile_aborts_on_stranger_holder(tmp_path, monkeypatch) -> None:
+    import dashboard_supervise as sup
+
+    (tmp_path / "data").mkdir()
+    monkeypatch.setattr(sup, "_port_listeners", lambda port: [999])
+    monkeypatch.setattr(sup, "_python_pids", lambda: [])
+    monkeypatch.setattr(sup, "_probe_cmdlines", lambda pids: {999: "evil.exe"})
+    stopped: list = []
+    monkeypatch.setattr(
+        sup, "_stop_verified_servers", lambda servers, port: stopped.append(servers) or []
+    )
+    reaped, detail = sup.reconcile_strays(_mail_throttle_config(tmp_path))
+    assert reaped == 0
+    assert stopped == []
+    assert "kept all" in detail
+
+
 def test_ensure_single_server_refuses_busy_port() -> None:
     import pytest
     from dashboard_web_app import ensure_single_server

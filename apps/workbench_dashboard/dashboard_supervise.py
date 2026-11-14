@@ -506,6 +506,43 @@ def _identify_ours(
     return ours, strangers, unknown
 
 
+STRAY_MIN_AGE_SECONDS = 120.0
+
+
+def reconcile_strays(config: SuperviseConfig) -> tuple[int, str]:
+    """Reap verified-ours dashboard processes that serve nothing.
+
+    Every up-to-date tick enforces exactly one server: verified-ours
+    processes older than two minutes that do not hold the dashboard
+    port (stuck pre-bind duplicates) are stopped. Servers younger than
+    that are left alone — they may still be starting. A foreign or
+    unidentifiable port holder aborts the whole pass; strangers are
+    never signalled.
+    """
+    import time
+
+    ours, strangers, unknown = _identify_ours(config)
+    holders = set(_port_listeners(config.port))
+    if strangers or unknown:
+        return 0, (
+            f"kept all: unverified holders "
+            f"(strangers={sorted(strangers)} unknown={sorted(unknown)})"
+        )
+    now = time.time()
+    strays = {
+        pid: started
+        for pid, started in ours.items()
+        if pid not in holders and started is not None and now - started > STRAY_MIN_AGE_SECONDS
+    }
+    if not strays:
+        return 0, f"one server or starting (ours={sorted(ours)})"
+    survivors = _stop_verified_servers(strays, config.port)
+    reaped = sorted(pid for pid in strays if pid not in survivors)
+    if survivors:
+        return len(reaped), f"reaped={reaped} survivors={survivors}"
+    return len(reaped), f"reaped={reaped}"
+
+
 def restart_dashboard(config: SuperviseConfig) -> tuple[bool, str]:
     """Restart the dashboard onto the synced worktree; (ok, detail).
 
@@ -737,6 +774,9 @@ def _supervised_tick(config: SuperviseConfig, *, force: bool, outcome: dict) -> 
         if action != "redeploy":
             if action == "up-to-date":
                 _clear_last_mailed_key(config.data_dir)
+                reaped, detail = reconcile_strays(config)
+                if reaped:
+                    outcome.update(reason=f"{reason}; reaped {reaped} stray(s): {detail}")
             return outcome
         assert origin is not None
         if not target_supports_worktree(config.main_root, origin):
