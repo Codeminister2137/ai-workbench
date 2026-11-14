@@ -1,14 +1,18 @@
 # Official-documentation conformance review
 
-**Priority: High. Scope: whole repository. Status: in progress; first Ollama fix
-implemented and further bounded findings recorded below.**
+**Priority: High. Scope: whole repository. Status: in progress; coverage
+as of 2026-11-14 below. Clean bills do not establish live coding-quality
+acceptance.**
 
 The owner prioritized this on 2026-10-11: differences between official documentation
-and implementation confuse humans and AI and create later problems. Dropped Ollama
-thinking state between tool calls is the first confirmed discrepancy; its repair
-does not establish repo-wide conformance or successful coding-quality acceptance.
-Group 1 (provider adapters/shared contracts) has several recorded findings below;
-the rest of group 1 and the remaining groups are not yet covered.
+and implementation confuse humans and AI and create later problems.
+Coverage: Group 1 — thinking/tools roundtrip, representation privacy,
+endpoint surface, streaming, error normalization (multi-turn
+continuation via ADR-055). Group 2 — catalog limits correction,
+fallback path. Group 3 — Openings bridge, council controls, approval
+binding. Group 4 — fully covered (CLI entries, guides, workspace).
+Open residue: Group 3 matching/evidence depth; any single Groups 2-4
+question filed 2026-11-13.
 
 ## Bounded review order
 
