@@ -604,6 +604,28 @@ class DashboardStores:
         self.e2e_tasks.put(task_id, record)
         return {"task": record, "report": report}
 
+    def save_e2e_draft_notes(self, task_id: str, item_id: str, notes: str) -> dict:
+        """Save in-progress notes for one open checklist item.
+
+        Drafts let the owner jot behaviour down while using the app;
+        submitting still requires explicit per-item verdicts.
+        """
+        record = self.e2e_tasks.get(task_id)
+        if record is None:
+            raise StoreError("E2E task not found")
+        if record.get("status") != "open":
+            raise StoreError("E2E task is already submitted")
+        if not isinstance(notes, str):
+            raise StoreError("E2E draft notes must be a string")
+        for item in record.get("items", []):
+            if isinstance(item, dict) and item.get("id") == item_id:
+                if item.get("status") == "auto-pass":
+                    raise StoreError("Auto-passed items take no notes")
+                item["draft_notes"] = notes
+                self.e2e_tasks.put(task_id, record)
+                return record
+        raise StoreError("E2E item not found")
+
     def get_chat_mode(self, session_id: str) -> dict:
         """Chat mode record; sessions default to ask with no binding."""
         record = self.chat_modes.get(session_id)

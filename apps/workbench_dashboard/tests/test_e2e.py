@@ -109,3 +109,42 @@ def test_e2e_http_roundtrip(dashboard_server) -> None:
     assert report["item"]["overall"] == "fail"
     status = get_json(dashboard_server, "/api/status")
     assert status["open_e2e"] == 0
+
+
+def test_by_view_matches_area_and_saves_drafts(dashboard_server) -> None:
+    created = post_json(
+        dashboard_server,
+        "/api/e2e/tasks",
+        {
+            "merge_commit": "abc",
+            "title": "t",
+            "items": [
+                {
+                    "id": "behavior:dashboard",
+                    "kind": "behavior",
+                    "area": "dashboard",
+                    "behavior": "dashboard views",
+                    "files": [],
+                    "goals": [],
+                    "status": "pending",
+                    "how": ["open it"],
+                    "expected": "renders",
+                }
+            ],
+        },
+    )
+    assert created["ok"] is True
+    home = get_json(dashboard_server, "/api/e2e/by-view?view=home")
+    assert home["total"] == 1 if "total" in home else len(home["items"]) == 1
+    assert home["items"][0]["behavior"] == "dashboard views"
+    assert home["items"][0]["how"] == ["open it"]
+    elsewhere = get_json(dashboard_server, "/api/e2e/by-view?view=chat")
+    assert elsewhere["items"] == []
+    saved = post_json(
+        dashboard_server,
+        f"/api/e2e/tasks/{created['id']}/notes",
+        {"item_id": "behavior:dashboard", "notes": "looks good"},
+    )
+    assert saved["ok"] is True
+    again = get_json(dashboard_server, "/api/e2e/by-view?view=home")
+    assert again["items"][0]["draft_notes"] == "looks good"

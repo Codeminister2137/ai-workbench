@@ -990,6 +990,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 return self._send_e2e_tasks(parsed.query)
             if path == "/api/e2e/reports":
                 return self._send_e2e_reports()
+            if path == "/api/e2e/by-view":
+                return self._send_e2e_by_view(parsed.query)
             if path.startswith("/api/e2e/tasks/"):
                 return self._send_item(self._stores().e2e_tasks, path[len("/api/e2e/tasks/") :])
             if path.startswith("/api/e2e/reports/"):
@@ -1098,6 +1100,9 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             if path.startswith("/api/e2e/tasks/") and path.endswith("/submit"):
                 task_id = path[len("/api/e2e/tasks/") : -len("/submit")]
                 return self._submit_e2e_task(task_id, payload)
+            if path.startswith("/api/e2e/tasks/") and path.endswith("/notes"):
+                task_id = path[len("/api/e2e/tasks/") : -len("/notes")]
+                return self._save_e2e_notes(task_id, payload)
             if path == "/api/ideas":
                 return self._create_idea(payload)
             if path == "/api/backlog":
@@ -1718,6 +1723,52 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
     def _send_e2e_reports(self) -> None:
         items, total = self._stores().e2e_reports.list(limit=100)
         self._send_json({"ok": True, "items": items, "total": total})
+
+    def _send_e2e_by_view(self, query: str) -> None:
+        from e2e_promotion import views_for_area
+
+        params = parse_qs(query)
+        view = (params.get("view", [""])[0] or "").strip()
+        if not view:
+            return self._send_json({"ok": False, "error": "view is required"}, status=400)
+        items, _total = self._stores().e2e_tasks.list(limit=100)
+        matches: list[dict] = []
+        for task in items:
+            if not isinstance(task, dict) or task.get("status") != "open":
+                continue
+            for entry in task.get("items", []):
+                if (
+                    not isinstance(entry, dict)
+                    or entry.get("status") == "auto-pass"
+                    or view not in views_for_area(str(entry.get("area", "")))
+                ):
+                    continue
+                matches.append(
+                    {
+                        "task_id": task.get("id"),
+                        "task_title": task.get("title"),
+                        "item_id": entry.get("id"),
+                        "behavior": entry.get("behavior"),
+                        "how": entry.get("how", []),
+                        "expected": entry.get("expected", ""),
+                        "draft_notes": entry.get("draft_notes", ""),
+                    }
+                )
+        self._send_json({"ok": True, "view": view, "items": matches})
+
+    def _save_e2e_notes(self, task_id: str, payload: dict) -> None:
+        item_id = payload.get("item_id", "")
+        notes = payload.get("notes", "")
+        if not isinstance(item_id, str) or not item_id.strip():
+            return self._send_json({"ok": False, "error": "item_id is required"}, status=400)
+        if not isinstance(notes, str):
+            return self._send_json({"ok": False, "error": "notes must be a string"}, status=400)
+        try:
+            self._stores().save_e2e_draft_notes(task_id, item_id, notes)
+        except StoreError as exc:
+            status = 404 if "not found" in str(exc).lower() else 400
+            return self._send_json({"ok": False, "error": str(exc)}, status=status)
+        self._send_json({"ok": True, "id": task_id, "item_id": item_id})
 
     def _create_e2e_task(self, payload: dict) -> None:
         stores = self._stores()
