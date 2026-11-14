@@ -998,6 +998,26 @@ def _ensure_provider_in_catalog(
         raise SystemExit(1)
 
 
+def _intermediate_failure_only(
+    returncode: int, parsed_failure: str | None, final_answer: str | None
+) -> bool:
+    """True when only an intermediate event failed but the result is complete."""
+    return returncode == 0 and parsed_failure is not None and bool((final_answer or "").strip())
+
+
+def _external_execution_completed(
+    returncode: int, parsed_failure: str | None, final_answer: str | None
+) -> bool:
+    """Owner decision 9add8f87 (option A): an intermediate event failure
+    fails the run only when the final result is missing. A zero exit plus
+    a final answer completes; the intermediate failure stays recorded as
+    a warning, never silently dropped."""
+    return returncode == 0 and (
+        parsed_failure is None
+        or _intermediate_failure_only(returncode, parsed_failure, final_answer)
+    )
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Optionally bind a durable session to this foreground invocation."""
     for stream in (sys.stdout, sys.stderr):
@@ -3552,9 +3572,19 @@ def _run_external_agent_cli_mode(
                     print("external_agent_failure_hint: inspect external_agent_stderr_file")
             elif parsed_failure is not None:
                 failure_reason = parsed_failure
+            final_answer = (
+                external_result.events.final_answer if external_result.events is not None else None
+            )
+            if _intermediate_failure_only(external_result.returncode, parsed_failure, final_answer):
+                print(
+                    "external_agent_warning: intermediate failure "
+                    f"({parsed_failure}) with complete final result"
+                )
             execution_status = (
                 "completed"
-                if external_result.returncode == 0 and parsed_failure is None
+                if _external_execution_completed(
+                    external_result.returncode, parsed_failure, final_answer
+                )
                 else "failed"
             )
             if orchestrated_tracker is not None and args.mode == "implement":
