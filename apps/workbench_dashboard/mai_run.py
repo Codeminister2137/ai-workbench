@@ -45,13 +45,16 @@ def build_mai_argv(
     repo_root: Path | str,
     user_config: Path | str,
     catalog: Path | str | None = None,
+    coding_session: str | None = None,
 ) -> list[str]:
     """Argv handing a run to Mai; never pins a model (orchestrator decides).
 
-    Each attempt opens a fresh coding session (``new``); the assigned
-    session id and effective route are parsed back from Mai's stdout.
-    The catalog defaults to the repo catalog (Mai's own default is
-    CWD-relative, which breaks under the dashboard's working directory).
+    Each attempt opens a fresh coding session (``new``) unless
+    ``coding_session`` names one to resume (chat turns reuse their bound
+    session); the assigned session id and effective route are parsed
+    back from Mai's stdout. The catalog defaults to the repo catalog
+    (Mai's own default is CWD-relative, which breaks under the
+    dashboard's working directory).
     """
     run_id = str(run.get("id", "?"))
     title = run.get("title") or "(untitled)"
@@ -68,7 +71,7 @@ def build_mai_argv(
         "implement",
         "--execute",
         "--coding-session",
-        "new",
+        coding_session or "new",
         "--repo-root",
         str(repo_root),
         "--user-config",
@@ -245,6 +248,7 @@ def build_mai_executor(
     subprocess_timeout_seconds: float = SUBPROCESS_TIMEOUT_SECONDS,
     mai_cmd_prefix: list[str] | None = None,
     isolate: bool = False,
+    coding_session: str | None = None,
 ) -> Callable[[dict], dict]:
     """Build a drain ``Executor`` handing runs to Mai sessions.
 
@@ -253,6 +257,8 @@ def build_mai_executor(
     with no timeout (tests and fully trusted setups only). ``isolate``
     runs Mai in a per-run scratch worktree (``run/<id>``) instead of the
     shared checkout; setup failures fail the run instead of falling back.
+    ``coding_session`` resumes a bound Mai session (chat turns); runs
+    always start fresh.
     """
 
     def execute(run: dict) -> dict:
@@ -276,6 +282,7 @@ def build_mai_executor(
             repo_root=root,
             user_config=(root / "user-config.toml" if isolated else user_config),
             catalog=catalog,
+            coding_session=coding_session,
         )
         if backend == "subprocess":
             outcome = run_mai_subprocess(

@@ -521,11 +521,32 @@ async function renderChatThread(id, initial) {
      <div>${esc(m.content)}</div></div>`).join("");
   const sessions = await api("/api/chat/sessions");
   const found = (sessions.sessions || []).find((s) => s.id === id) || {};
+  const agentOn = sessions.agent_enabled === true;
+  const mode = found.mode === "agent" ? "agent" : "ask";
+  const modeBar = !agentOn ? "" : `<p>Mode:
+    <button type="button" id="mode-ask-btn" title="Ask mode: read-only answers, no edits"${mode === "ask" ? " disabled" : ""}>Ask</button>
+    <button type="button" id="mode-agent-btn" title="Agent mode: Mai edits in a scratch worktree, staged for your review"${mode === "agent" ? " disabled" : ""}>Agent</button>
+    <span class="muted">Agent turns stage edits; nothing lands without Apply.</span></p>`;
+  let stagedBar = "";
+  if (agentOn && mode === "agent") {
+    try {
+      const staged = await api("/api/chat/sessions/" + encodeURIComponent(id) + "/staged");
+      stagedBar = (staged.files || []).length
+        ? `<div class="card"><h3>Staged files</h3><ul class="plain">` + staged.files.map((f) =>
+            `<li>${esc(f.path)} <span class="muted">(${esc(f.status)})</span>
+             <button type="button" data-apply="${esc(f.path)}" title="Apply this staged file to the checkout">Apply</button></li>`).join("")
+          + `</ul><p><button type="button" id="apply-all-btn" title="Apply all staged files to the checkout">Apply all</button></p></div>`
+        : `<p class="muted">No staged files.</p>`;
+    } catch (err) {
+      stagedBar = `<p class="muted">Staged files unavailable.</p>`;
+    }
+  }
   view.innerHTML = `<h1>Chat: ${esc(found.title || id)}</h1><p><a href="#/chat">All chats</a></p>
     <form id="rename-form" class="inline"><input type="text" name="title" value="${esc(found.title || "")}" title="Chat title">
     <button type="submit" title="Rename this chat">Rename</button></form>
     <p><button id="delete-btn" title="Delete this chat and its transcript">Delete chat</button>
     <button type="button" id="draft-plan-btn" title="Draft a proposed plan from this chat transcript">Draft plan</button></p>
+    ${modeBar}${stagedBar}
     <div id="thread">${msgs || '<p class="muted">No messages yet.</p>'}</div>
     <form class="inline" id="chat-form"><input type="text" name="text" placeholder="Message..." title="Message the supervisor" required>
     <button type="submit" title="Send message">Send</button>
@@ -579,6 +600,48 @@ async function renderChatThread(id, initial) {
       });
       toast("Chat deleted", true);
       location.hash = "#/chat";
+    } catch (err) {
+      toast(err.message, false);
+    }
+  });
+  async function setMode(next) {
+    try {
+      await api("/api/chat/sessions/" + encodeURIComponent(id) + "/mode", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({mode: next}),
+      });
+      toast("Chat mode: " + next, true);
+      render();
+    } catch (err) {
+      toast(err.message, false);
+    }
+  }
+  const askBtn = document.getElementById("mode-ask-btn");
+  if (askBtn) askBtn.addEventListener("click", () => setMode("ask"));
+  const agentBtn = document.getElementById("mode-agent-btn");
+  if (agentBtn) agentBtn.addEventListener("click", () => setMode("agent"));
+  async function applyPaths(paths) {
+    try {
+      const out = await api("/api/chat/sessions/" + encodeURIComponent(id) + "/apply", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({paths}),
+      });
+      const refused = Object.entries(out.refused || {}).map(([p, r]) => `${p}: ${r}`);
+      toast("Applied " + (out.applied || []).length + (refused.length ? "; refused: " + refused.join("; ") : ""), !refused.length);
+      render();
+    } catch (err) {
+      toast(err.message, false);
+    }
+  }
+  view.querySelectorAll("[data-apply]").forEach((btn) =>
+    btn.addEventListener("click", () => applyPaths([btn.dataset.apply])));
+  const applyAll = document.getElementById("apply-all-btn");
+  if (applyAll) applyAll.addEventListener("click", async () => {
+    try {
+      const staged = await api("/api/chat/sessions/" + encodeURIComponent(id) + "/staged");
+      await applyPaths((staged.files || []).map((f) => f.path));
     } catch (err) {
       toast(err.message, false);
     }

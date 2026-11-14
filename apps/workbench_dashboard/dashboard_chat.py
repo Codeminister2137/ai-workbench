@@ -224,11 +224,18 @@ class DashboardChat:
         *,
         language: str = "en",
         translator: Translator | None = None,
+        mode: str | None = None,
+        stores: object | None = None,
+        agent_executor: Callable[[dict], dict] | None = None,
     ) -> DashboardTurnOutcome:
         """Translate at ingestion, then append one turn plus its answer.
 
         Non-English input without a translator fails closed (nothing stored);
         translated turns keep the verbatim source in message metadata.
+        ``mode="agent"`` (or the session's stored mode) routes the turn
+        through a Mai session in the chat's scratch worktree instead of
+        the read-only relay; agent turns require the
+        ``chat_agent_enabled`` master switch.
         """
         session = self.store.get_session(session_id)
         if session is None:
@@ -244,14 +251,101 @@ class DashboardChat:
             if normalized.translated
             else None
         )
+        resolved_mode = self._resolve_mode(session_id, mode, stores)
         controller = self._controller(session_id, session.privacy_class)
-        result = controller.turn(normalized.working, self._execute, user_metadata=metadata)
+        if resolved_mode == "agent":
+            result = controller.turn(
+                normalized.working,
+                lambda request: self._execute_agent(request, session_id, stores, agent_executor),
+                user_metadata=metadata,
+            )
+        else:
+            result = controller.turn(normalized.working, self._execute, user_metadata=metadata)
         return DashboardTurnOutcome(
             response_text=result.response_text,
             execution_status=result.execution_status,
             failure_reason=result.failure_reason,
             provider=result.provider,
             model=self.config.model,
+        )
+
+    @staticmethod
+    def _resolve_mode(session_id: str, mode: str | None, stores: object | None) -> str:
+        """Turn mode: explicit parameter wins, then stored session mode."""
+        if mode is not None:
+            if mode not in ("ask", "agent"):
+                raise ValueError("Chat mode must be ask or agent")
+            return mode
+        if stores is not None:
+            record = stores.get_chat_mode(session_id)  # type: ignore[attr-defined]
+            if isinstance(record, dict) and record.get("mode") in ("ask", "agent"):
+                return str(record["mode"])
+        return "ask"
+
+    def _execute_agent(
+        self,
+        request: CodingTurnRequest,
+        session_id: str,
+        stores: object | None,
+        agent_executor: Callable[[dict], dict] | None,
+    ) -> CodingTurnResult:
+        """Run one turn through Mai in the chat's scratch worktree."""
+        from chat_agent import ChatAgentError, build_chat_prompt, ensure_chat_worktree, staged_files
+
+        if not self.config.chat_agent_enabled:
+            return CodingTurnResult(
+                1, None, "failed", "Agent mode is disabled (chat_agent_enabled is off)."
+            )
+        if stores is None:
+            return CodingTurnResult(1, None, "failed", "Agent turns need dashboard stores.")
+        try:
+            worktree = ensure_chat_worktree(self.workspace, session_id)
+        except ChatAgentError as exc:
+            return CodingTurnResult(1, None, "failed", f"Agent worktree unavailable: {exc}")
+        record = stores.get_chat_mode(session_id)  # type: ignore[attr-defined]
+        binding = record.get("coding_session_id") if isinstance(record, dict) else None
+        execute = agent_executor or self._default_agent_executor(worktree, binding)
+        receipt = execute(
+            {
+                "id": f"chat-{request.message_id}",
+                "instruction": build_chat_prompt(request.history, request.text),
+            }
+        )
+        if receipt.get("status") != "completed":
+            return CodingTurnResult(
+                1,
+                None,
+                "failed",
+                str(receipt.get("error") or "Mai session failed"),
+                provider=self.config.provider,
+            )
+        if receipt.get("mai_session_id"):
+            stores.set_chat_binding(session_id, str(receipt["mai_session_id"]))  # type: ignore[attr-defined]
+        try:
+            staged = staged_files(worktree.path)
+        except ChatAgentError:
+            staged = []
+        text = str(receipt.get("stdout_tail") or "").strip()
+        if staged:
+            listing = "\n".join(f"- {entry['path']} ({entry['status']})" for entry in staged)
+            text += f"\n\n_Staged files (review before applying):_\n{listing}"
+        return CodingTurnResult(
+            0,
+            text or "Agent turn completed with no output.",
+            "completed",
+            provider=self.config.provider,
+            inference_observation={"staged_files": len(staged)},
+        )
+
+    def _default_agent_executor(self, worktree: object, binding: object) -> Callable[[dict], dict]:
+        """Mai subprocess executor bound to one chat worktree + session."""
+        from mai_run import build_mai_executor
+
+        return build_mai_executor(
+            worktree.path,  # type: ignore[attr-defined]
+            worktree.path / "user-config.toml",  # type: ignore[attr-defined]
+            catalog=getattr(self.config, "catalog_path", None),
+            coding_session=str(binding) if binding else None,
         )
 
     def draft_plan(
