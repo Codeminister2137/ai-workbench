@@ -304,3 +304,13 @@ the live `.venv` runs 3.14.4 (in range); `uv.lock` exists and
 `.tools/` are both gitignored as documented; the installer path
 `scripts/install-workbench.ps1` exists. Group 4 fully covered. No
 divergence; no change.
+
+Group 1 finding (2026-11-14): clean bill on the Ollama endpoint
+surface. Live loopback probes against installed Ollama 0.32.5
+verified every read endpoint the adapter consumes: `/api/tags`
+(4 models, including all getting-started references), `/api/version`,
+`/api/ps` (valid empty shape) and `/api/show` (qwen3:14b Modelfile
+details). `/api/pull` was deliberately not exercised live (model
+download side effect); its stream parsing stays covered by offline
+fixtures. No documented version pin contradicts 0.32.5. No
+divergence; no change.
