@@ -148,6 +148,27 @@ REGRESSION_LEAD = (
     "end to end after the shared-dependency change."
 )
 
+# Area -> dashboard views where a live testing reminder makes sense.
+# Areas without a dedicated tab fall back to home (the landing view).
+AREA_VIEWS: dict[str, list[str]] = {
+    "dashboard": ["home", "inbox"],
+    "agent-cli": ["chat", "runs"],
+    "provider": ["providers", "fleet"],
+    "orchestrator": ["fleet", "runs"],
+    "council": ["home"],
+    "job-search": ["home"],
+    "apps": ["home"],
+    "packages": ["home"],
+    "tooling": ["home"],
+    "tests": ["home"],
+    "docs": ["home"],
+}
+
+
+def views_for_area(area: str) -> list[str]:
+    """Dashboard views showing live reminders for one area."""
+    return list(AREA_VIEWS.get(area, ["home"]))
+
 
 def area_for_path(path: str) -> tuple[str, str, str, tuple[str, ...]]:
     """Map one repo-relative path to (area, behavior, goal, neighbors)."""

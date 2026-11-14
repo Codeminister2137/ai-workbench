@@ -1255,7 +1255,7 @@ async function renderE2E(id) {
         ${howHtml(entry)}
         <div><label><input type="radio" name="verdict-${esc(entry.id)}" value="pass"> Pass</label>
         <label><input type="radio" name="verdict-${esc(entry.id)}" value="fail"> Fail</label></div>
-        <div><textarea name="notes-${esc(entry.id)}" rows="2" placeholder="Notes (what you tried, what you saw)..." title="Test notes for this behavior"></textarea></div></li>`;
+        <div><textarea name="notes-${esc(entry.id)}" rows="2" placeholder="Notes (what you tried, what you saw)..." title="Test notes for this behavior">${esc(entry.draft_notes || "")}</textarea></div></li>`;
     }).join("");
     view.innerHTML = `<h1>E2E checklist</h1><p><a href="#/e2e">All checklists</a></p>
       <div class="card"><h2>${gtext(task.title || "")}</h2>
@@ -2378,11 +2378,55 @@ async function render() {
     else if (name === "help") renderHelp();
     else if (name === "create" && id) renderCreate(id);
     else view.innerHTML = "<h1>Not found</h1>";
+    await renderE2EReminders(name);
   } catch (err) {
     view.innerHTML = `<h1>Something failed</h1><p>${esc(err.message)}</p>`;
     toast(err.message, false);
   }
   refreshBadge();
+}
+
+const E2E_REMINDER_VIEWS = ["home", "inbox", "chat", "runs", "fleet", "providers"];
+
+async function renderE2EReminders(name) {
+  if (!E2E_REMINDER_VIEWS.includes(name)) return;
+  let payload;
+  try {
+    payload = await api("/api/e2e/by-view?view=" + encodeURIComponent(name));
+  } catch (err) {
+    return;
+  }
+  const items = payload.items || [];
+  if (!items.length) return;
+  const card = document.createElement("div");
+  card.className = "card";
+  card.id = "e2e-reminders";
+  card.innerHTML = `<h2>Test needed while you are here</h2>` + items.map((entry) => {
+    const steps = (entry.how || []).map((s) => `<li>${esc(s)}</li>`).join("");
+    return `<div><p><strong>${esc(entry.behavior || entry.item_id)}</strong>
+      <a href="#/e2e/${esc(entry.task_id)}" title="Open the full E2E checklist">open checklist</a></p>
+      ${steps ? `<ol>${steps}</ol>` : ""}
+      ${entry.expected ? `<p class="muted">Expected: ${esc(entry.expected)}</p>` : ""}
+      <div><textarea data-notes-task="${esc(entry.task_id)}" data-notes-item="${esc(entry.item_id)}" rows="2" placeholder="Jot down what you observe..." title="Draft notes for this behavior">${esc(entry.draft_notes || "")}</textarea></div>
+      <p><button type="button" data-save-notes="${esc(entry.task_id)}:${esc(entry.item_id)}" title="Save these notes as a draft">Save notes</button></p></div>`;
+  }).join("");
+  view.prepend(card);
+  card.querySelectorAll("[data-save-notes]").forEach((btn) => btn.addEventListener("click", async () => {
+    const sep = btn.dataset.saveNotes.indexOf(":");
+    const taskId = btn.dataset.saveNotes.slice(0, sep);
+    const itemId = btn.dataset.saveNotes.slice(sep + 1);
+    const box = card.querySelector(`textarea[data-notes-item="${CSS.escape(itemId)}"]`);
+    try {
+      await api("/api/e2e/tasks/" + encodeURIComponent(taskId) + "/notes", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({item_id: itemId, notes: box ? box.value : ""}),
+      });
+      toast("Draft notes saved", true);
+    } catch (err) {
+      toast(err.message, false);
+    }
+  }));
 }
 
 document.getElementById("create-btn").addEventListener("click", () => {

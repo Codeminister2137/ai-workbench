@@ -266,6 +266,15 @@ def test_regression_guidance_leads_with_framing() -> None:
     assert regression["how"][0].startswith("Nothing here changed directly")
 
 
+def test_views_for_area_maps_and_falls_back() -> None:
+    from e2e_promotion import views_for_area
+
+    assert "chat" in views_for_area("agent-cli")
+    assert "providers" in views_for_area("provider")
+    assert views_for_area("council") == ["home"]
+    assert views_for_area("unknown-area") == ["home"]
+
+
 def test_change_summary_parses_log_and_numstat() -> None:
     def runner(_root: str, *args: str) -> bytes:
         if args[0] == "log":
