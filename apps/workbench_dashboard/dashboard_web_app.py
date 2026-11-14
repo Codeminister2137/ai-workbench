@@ -2576,13 +2576,15 @@ def build_run_drain(
     repo_root: Path,
     stores: DashboardStores,
     executor_factory: Callable[[], Executor] | None = None,
+    worker_epoch: str | None = None,
 ) -> RunDrain:
     """Build the approved-runs drain shared by manual and scheduled drains.
 
     The default executor hands each run to a Mai session (Mai routes the
     model through the orchestrator by criteria) inside a per-run scratch
     worktree, so agent edits never touch shared checkouts; ``executor_factory``
-    overrides it in tests.
+    overrides it in tests. Runs are stamped with the worker epoch so boot
+    reconciliation can tell orphaned runs from live ones.
     """
     if executor_factory is not None:
         executor = executor_factory()
@@ -2600,7 +2602,36 @@ def build_run_drain(
         runs_dir=data_dir / "runs",
         get_inbox=lambda inbox_id: stores.inbox.get(inbox_id),
         executor=executor,
+        worker_epoch=worker_epoch or datetime.now(UTC).isoformat(),
     )
+
+
+def reconcile_runs_at_startup(
+    config: DashboardConfig,
+    data_dir: Path,
+    drain_root: Path,
+    stores: DashboardStores,
+    epoch: str,
+) -> list[dict]:
+    """Requeue runs orphaned by a restart; drained runs resume unattended.
+
+    Only runs from a different worker epoch — provably dead workers —
+    are requeued; anything stamped with this boot's epoch is live and
+    stays untouched. Never raises: reconcile must not block serving.
+    """
+    try:
+        drain = build_run_drain(config, data_dir, drain_root, stores)
+    except (StagedEditError, ValueError, OSError) as exc:
+        print(f"Workbench dashboard: startup reconcile skipped (drain: {exc})")
+        return []
+    try:
+        outcomes = drain.reconcile(epoch)
+    except Exception as exc:  # noqa: BLE001 - reconcile must never block serving
+        print(f"Workbench dashboard: startup reconcile failed: {exc}")
+        return []
+    if outcomes:
+        print(f"Workbench dashboard: startup reconcile: {outcomes}")
+    return outcomes
 
 
 def maybe_start_drain_scheduler(
@@ -2715,6 +2746,14 @@ def main() -> None:
         pid_tmp.replace(pid_path)
     except OSError as exc:
         print(f"Workbench dashboard: pidfile unwritable, supervisor restarts unavailable: {exc}")
+    boot_epoch = datetime.now(UTC).isoformat()
+    try:
+        boot_config = load_config(args.config)
+        reconcile_runs_at_startup(
+            boot_config, args.data_dir, state_root, DashboardStores(args.data_dir), boot_epoch
+        )
+    except Exception as exc:  # noqa: BLE001 - reconcile must never block serving
+        print(f"Workbench dashboard: startup reconcile failed: {exc}")
     try:
         DashboardRequestHandler.drain_scheduler = maybe_start_drain_scheduler(
             args.config, args.data_dir, repo_root=state_root

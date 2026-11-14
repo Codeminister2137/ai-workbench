@@ -281,6 +281,48 @@ def test_reconcile_requeues_interrupted_running(drain, stores) -> None:
     assert stored["events"][-1]["kind"] == "run_requeued"
 
 
+def test_reconcile_epoch_skips_live_worker(stores) -> None:
+    epoch = "2026-11-14T11:00:00+00:00"
+    drain = RunDrain(
+        runs_dir=stores.data_dir / "runs",
+        get_inbox=stores.inbox.get,
+        executor=lambda run: {"status": "completed"},
+        worker_epoch=epoch,
+    )
+    stores.runs.put(
+        "live", {"id": "live", "title": "t", "status": "running", "worker_epoch": epoch}
+    )
+    stores.runs.put(
+        "dead", {"id": "dead", "title": "t", "status": "running", "worker_epoch": "old"}
+    )
+    stores.runs.put("legacy", {"id": "legacy", "title": "t", "status": "running"})
+    outcomes = drain.reconcile(epoch)
+    assert outcomes == [
+        {"run_id": "dead", "action": "requeued"},
+        {"run_id": "legacy", "action": "requeued"},
+        {"run_id": "live", "action": "skipped", "reason": "live worker epoch"},
+    ]
+    assert stores.runs.get("live")["status"] == "running"
+    assert stores.runs.get("dead")["status"] == "queued"
+    event = stores.runs.get("dead")["events"][-1]
+    assert event["kind"] == "run_requeued"
+    assert event["payload"]["worker_epoch"] == "old"
+    assert event["payload"]["reconciled_by_epoch"] == epoch
+
+
+def test_drain_stamps_worker_epoch(stores) -> None:
+    run_id, _inbox_id = _queue_chat_run(stores, answer="Approve")
+    seen: dict = {}
+    drain = RunDrain(
+        runs_dir=stores.data_dir / "runs",
+        get_inbox=stores.inbox.get,
+        executor=lambda run: seen.update(run) or {"status": "completed"},
+        worker_epoch="epoch-1",
+    )
+    assert drain.drain() == [{"run_id": run_id, "status": "completed"}]
+    assert seen["worker_epoch"] == "epoch-1"
+
+
 def test_cancel_race_marks_cancelled_without_executing(drain, stores, calls) -> None:
     run_id, _inbox_id = _queue_chat_run(stores, answer="Approve")
     record = stores.runs.get(run_id)

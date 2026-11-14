@@ -86,12 +86,14 @@ class RunDrain:
         executor: Executor,
         now: Callable[[], float] | None = None,
         on_terminal: TerminalHook | None = None,
+        worker_epoch: str | None = None,
     ) -> None:
         self._runs_dir = runs_dir
         self._get_inbox = get_inbox
         self._executor = executor
         self._now = now or time.time
         self._on_terminal = on_terminal
+        self._worker_epoch = worker_epoch
 
     def _notify_terminal(self, run: dict, status: str) -> None:
         if self._on_terminal is None:
@@ -186,8 +188,15 @@ class RunDrain:
             outcomes.append(self._run_claimed(path))
         return outcomes
 
-    def reconcile(self) -> list[dict]:
-        """Release stale claims and requeue interrupted runs; never replays."""
+    def reconcile(self, epoch: str | None = None) -> list[dict]:
+        """Release stale claims and requeue interrupted runs; never replays.
+
+        With an ``epoch`` (the reconciler's own worker epoch), only runs
+        from a different epoch — provably dead workers — are requeued; a
+        run stamped with the live epoch is left alone so reconcile can
+        never double-execute a running worker. Without an epoch, every
+        ``running`` run requeues (legacy boot behavior).
+        """
         self._runs_dir.mkdir(parents=True, exist_ok=True)
         outcomes = []
         for claim in sorted(self._runs_dir.glob(f"*{CLAIM_SUFFIX}")):
@@ -218,10 +227,22 @@ class RunDrain:
             if run is None or run.get("status") != "running":
                 continue
             run_id = run.get("id", path.stem)
+            if epoch is not None and run.get("worker_epoch") == epoch:
+                outcomes.append(
+                    {"run_id": run_id, "action": "skipped", "reason": "live worker epoch"}
+                )
+                continue
+            evidence = {
+                "reason": "interrupted worker",
+                "attempts": run.get("attempts", 0),
+                "last_updated_at_utc": run.get("updated_at_utc"),
+                "worker_epoch": run.get("worker_epoch"),
+                "reconciled_by_epoch": epoch,
+            }
             run["status"] = "queued"
             run["note"] = "Interrupted run reconciled; will resume"
             run["updated_at_utc"] = self._iso_now()
-            append_run_event(run, "run_requeued", {"reason": "interrupted worker"})
+            append_run_event(run, "run_requeued", evidence)
             self._write_json(path, run)
             outcomes.append({"run_id": run_id, "action": "requeued"})
         return outcomes
@@ -294,6 +315,8 @@ class RunDrain:
             run["status"] = "running"
             run["attempts"] = int(run.get("attempts", 0)) + 1
             run["updated_at_utc"] = self._iso_now()
+            if self._worker_epoch is not None:
+                run["worker_epoch"] = self._worker_epoch
             append_run_event(run, "run_started", {"attempt": run["attempts"]})
             self._write_json(claim, run)
             try:
