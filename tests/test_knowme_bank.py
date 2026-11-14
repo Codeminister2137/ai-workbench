@@ -57,6 +57,14 @@ def test_interview_skips_blanks(monkeypatch, tmp_path) -> None:
     assert store.find(category="training")[0].text == "I lift twice a week."
 
 
+def test_skills_and_career_categories_accepted(tmp_path) -> None:
+    store = KnowMeStore(tmp_path / "bank.sqlite3")
+    store.add("skills", "Python, Django, FastAPI.", "import")
+    store.add("career", "ZF 2024-2026.", "import")
+    assert [entry.category for entry in store.find()] == ["career", "skills"]
+    assert store.find(category="skills")[0].text.startswith("Python")
+
+
 def test_plan_context_formats_entries(tmp_path) -> None:
     from knowme_bank.consumer import plan_context
 
