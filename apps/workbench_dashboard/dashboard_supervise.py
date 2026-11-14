@@ -358,8 +358,16 @@ def _port_listeners(port: int) -> list[int]:
     return sorted(set(holders))
 
 
-def _probe_cmdlines(pids: list[int]) -> dict[int, str]:
-    """Map pids to command lines via one CIM query (Windows only).
+@dataclass(slots=True)
+class ProcessInfo:
+    """One probed process: command line plus parent pid."""
+
+    cmdline: str
+    parent: int | None
+
+
+def _probe_processes(pids: list[int]) -> dict[int, ProcessInfo]:
+    """Map pids to command line + parent via one CIM query (Windows only).
 
     Returns only the pids the query answered for; any failure yields an
     empty map and the restart refuses rather than guessing ownership.
@@ -370,7 +378,7 @@ def _probe_cmdlines(pids: list[int]) -> dict[int, str]:
     script = (
         "$rows = @(Get-CimInstance Win32_Process -Filter '"
         + filt
-        + "' | Select-Object ProcessId, CommandLine); "
+        + "' | Select-Object ProcessId, CommandLine, ParentProcessId); "
         "$rows | ConvertTo-Json -Compress"
     )
     try:
@@ -389,7 +397,7 @@ def _probe_cmdlines(pids: list[int]) -> dict[int, str]:
     except ValueError:
         return {}
     rows = payload if isinstance(payload, list) else [payload]
-    found: dict[int, str] = {}
+    found: dict[int, ProcessInfo] = {}
     for row in rows:
         if not isinstance(row, dict):
             continue
@@ -398,9 +406,20 @@ def _probe_cmdlines(pids: list[int]) -> dict[int, str]:
         except (TypeError, ValueError):
             continue
         cmdline = row.get("CommandLine")
+        try:
+            parent = int(row.get("ParentProcessId", -1))
+        except (TypeError, ValueError):
+            parent = None
         if pid > 0 and isinstance(cmdline, str):
-            found[pid] = cmdline
+            found[pid] = ProcessInfo(
+                cmdline=cmdline, parent=parent if parent and parent > 0 else None
+            )
     return found
+
+
+def _probe_cmdlines(pids: list[int]) -> dict[int, str]:
+    """Map pids to command lines (parent-blind convenience wrapper)."""
+    return {pid: info.cmdline for pid, info in _probe_processes(pids).items()}
 
 
 def _cmdline_is_ours(cmdline: str, port: int) -> bool:
@@ -529,13 +548,33 @@ def reconcile_strays(config: SuperviseConfig) -> tuple[int, str]:
             f"(strangers={sorted(strangers)} unknown={sorted(unknown)})"
         )
     now = time.time()
-    strays = {
+    olds = {
         pid: started
         for pid, started in ours.items()
         if pid not in holders and started is not None and now - started > STRAY_MIN_AGE_SECONDS
     }
-    if not strays:
+    if not olds:
         return 0, f"one server or starting (ours={sorted(ours)})"
+    # A launcher shim (uv venv python re-execs the base interpreter as a
+    # same-argv child) looks like a stray: socketless, old, ours. Never
+    # reap a shim whose child is alive — it is the live server's parent.
+    detail_map = _probe_processes(sorted(set(olds) | set(ours)))
+    children: dict[int, list[int]] = {}
+    for pid, info in detail_map.items():
+        if info.parent is not None:
+            children.setdefault(info.parent, []).append(pid)
+    old_list = ", ".join(f"{pid}" for pid in sorted(olds))
+    strays: dict[int, float | None] = {
+        pid: started
+        for pid, started in olds.items()
+        if not any(
+            child in detail_map
+            and detail_map[child].cmdline == (detail_map.get(pid) or ProcessInfo("", None)).cmdline
+            for child in children.get(pid, [])
+        )
+    }
+    if not strays:
+        return 0, f"one server plus its launcher shim (olds={old_list})"
     survivors = _stop_verified_servers(strays, config.port)
     reaped = sorted(pid for pid in strays if pid not in survivors)
     if survivors:
