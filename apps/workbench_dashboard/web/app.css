@@ -35,6 +35,10 @@ ul.plain li { margin-bottom: var(--wb-space-2); }
 .st-adopted, .st-merged, .st-live, .st-complete { background: var(--wb-color-good-bg); color: var(--wb-color-good); }
 .st-parked, .st-closed { background: var(--wb-color-idle-bg); color: var(--wb-color-idle); }
 .st-declined, .st-failed { background: var(--wb-color-bad-bg); color: var(--wb-color-bad); }
+.st-pass { background: var(--wb-color-good-bg); color: var(--wb-color-good); }
+.st-fail { background: var(--wb-color-bad-bg); color: var(--wb-color-bad); }
+.st-pending { background: var(--wb-color-warn-bg); color: var(--wb-color-warn); }
+.st-submitted { background: var(--wb-color-idle-bg); color: var(--wb-color-idle); }
 abbr[title] { text-decoration: underline dotted; cursor: help; }
 .checklist { list-style: none; padding-left: 0; }
 .checklist li { margin-bottom: var(--wb-space-1); }

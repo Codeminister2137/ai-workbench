@@ -57,7 +57,7 @@ def test_static_controls_have_titles() -> None:
     for tag in re.findall(r"<button\b[^>]*>", html):
         assert "title=" in tag, f"button without title: {tag}"
     nav_links = re.findall(r"<a\b[^>]*data-view[^>]*>", html)
-    assert len(nav_links) == 21  # 19 + modules tab + spend tab (was Home card)
+    assert len(nav_links) == 22  # 19 + modules tab + spend tab + E2E tab
     for tag in nav_links:
         assert "title=" in tag, f"nav link without title: {tag}"
 
@@ -66,7 +66,7 @@ def test_dynamic_buttons_have_titles() -> None:
     """Every button rendered by app.js templates carries a tooltip title."""
     js = _read("app.js")
     buttons = re.findall(r"<button\b[^>]*>", js)
-    assert len(buttons) == 41  # +delete-inbox-btn
+    assert len(buttons) == 42  # +delete-inbox-btn +e2e submit
     for tag in buttons:
         assert "title=" in tag, f"button without title: {tag}"
 
@@ -429,6 +429,25 @@ def test_chat_thread_has_dictate_button() -> None:
     assert "Stop (recording...)" in js
     assert "Dictation failed: " in js
     assert "type instead" in js
+
+
+def test_e2e_tab_checks_and_submits() -> None:
+    """E2E list/detail files per-behavior verdicts; reports show warnings."""
+    html = _read("index.html")
+    assert 'data-view="e2e"' in html
+    assert 'id="e2e-badge"' in html
+    js = _read("app.js")
+    assert "renderE2E" in js
+    assert 'name === "e2e"' in js
+    assert "/api/e2e/tasks" in js
+    assert "/api/e2e/reports" in js
+    assert 'id="e2e-form"' in js
+    assert "Submit E2E results" in js
+    assert 'value="pass"> Pass' in js
+    assert 'value="fail"> Fail' in js
+    assert "Every behavior needs a pass/fail verdict" in js
+    assert "not re-tested" not in js  # warning text is server-rendered data
+    assert "open_e2e" in js
 
 
 def test_documents_view_lists_and_previews() -> None:
