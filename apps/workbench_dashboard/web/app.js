@@ -6,6 +6,7 @@ const toasts = document.getElementById("toasts");
 const badge = document.getElementById("inbox-badge");
 const ideasBadge = document.getElementById("ideas-badge");
 const backlogBadge = document.getElementById("backlog-badge");
+const e2eBadge = document.getElementById("e2e-badge");
 
 function toast(message, ok) {
   const el = document.createElement("div");
@@ -69,10 +70,17 @@ async function refreshBadge() {
     } else {
       backlogBadge.hidden = true;
     }
+    if (status.open_e2e > 0) {
+      e2eBadge.textContent = status.open_e2e;
+      e2eBadge.hidden = false;
+    } else {
+      e2eBadge.hidden = true;
+    }
   } catch (err) {
     badge.hidden = true;
     ideasBadge.hidden = true;
     backlogBadge.hidden = true;
+    e2eBadge.hidden = true;
   }
 }
 
@@ -1078,6 +1086,99 @@ async function renderRuns(id) {
     }
   });
   startRunsPoll();
+}
+
+async function renderE2E(id) {
+  if (id && id.startsWith("report/")) {
+    const reportId = id.slice("report/".length);
+    const payload = await api("/api/e2e/reports/" + encodeURIComponent(reportId));
+    const report = payload.item;
+    const rows = (report.items || []).map((entry) => {
+      const verdict = entry.verdict === "pass" ? "pass" : "fail";
+      const by = entry.verdict_by === "owner" ? "tested by you"
+        : entry.verdict_by === "ancestor" ? "ancestor approval"
+        : "no user-visible behavior";
+      return `<li><strong>${esc(entry.behavior || entry.id)}</strong>
+        <span class="pill st-${verdict}">${verdict} · ${esc(by)}</span>
+        ${entry.warning ? `<p class="muted">Warning: ${esc(entry.warning)}</p>` : ""}
+        ${entry.notes ? `<p>${esc(entry.notes)}</p>` : ""}</li>`;
+    }).join("");
+    view.innerHTML = `<h1>E2E report</h1><p><a href="#/e2e">All checklists</a></p>
+      <div class="card"><h2>${gtext(report.title || "")}</h2>
+      <p class="muted">Merge ${esc(report.commit || "")} ·
+      <span class="pill st-${report.overall === "pass" ? "pass" : "fail"}">${esc(report.overall || "")}</span>
+      · built ${fmtTime(report.built_utc)}</p>
+      <ul class="plain">${rows}</ul></div>`;
+    return;
+  }
+  if (id) {
+    const payload = await api("/api/e2e/tasks/" + encodeURIComponent(id));
+    const task = payload.item;
+    const submitted = task.status !== "open";
+    const blocks = (task.items || []).map((entry) => {
+      if (entry.status === "auto-pass") {
+        const note = entry.warning || entry.reason || "auto-passed";
+        return `<li><strong>${esc(entry.behavior || entry.id)}</strong>
+          <span class="pill">auto-pass · ${esc(entry.verdict_by || "")}</span>
+          <p class="muted">${esc(note)}</p></li>`;
+      }
+      return `<li><strong>${esc(entry.behavior || entry.id)}</strong>
+        <span class="pill st-pending">${esc(entry.kind || "")} · needs testing</span>
+        <p class="muted">${esc((entry.files || []).join(", "))}</p>
+        <div><label><input type="radio" name="verdict-${esc(entry.id)}" value="pass"> Pass</label>
+        <label><input type="radio" name="verdict-${esc(entry.id)}" value="fail"> Fail</label></div>
+        <div><textarea name="notes-${esc(entry.id)}" rows="2" placeholder="Notes (what you tried, what you saw)..." title="Test notes for this behavior"></textarea></div></li>`;
+    }).join("");
+    view.innerHTML = `<h1>E2E checklist</h1><p><a href="#/e2e">All checklists</a></p>
+      <div class="card"><h2>${gtext(task.title || "")}</h2>
+      <p class="muted">Merge ${esc(task.merge_commit || "")} · ${esc(task.status || "")}</p>
+      ${submitted
+        ? `<p class="muted">Submitted; verdicts are immutable.</p>
+           ${task.report_id ? `<p><a href="#/e2e/report/${esc(task.report_id)}">Open the report</a></p>` : ""}`
+        : `<form id="e2e-form"><ul class="plain">${blocks}</ul>
+           <p><button type="submit" title="Record verdicts and build the E2E report">Submit E2E results</button></p></form>`}</div>`;
+    const form = document.getElementById("e2e-form");
+    if (form) form.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const results = [];
+      for (const entry of task.items || []) {
+        if (entry.status === "auto-pass") continue;
+        const checked = form.querySelector(`input[name="verdict-${CSS.escape(entry.id)}"]:checked`);
+        if (!checked) {
+          toast("Every behavior needs a pass/fail verdict: " + entry.id, false);
+          return;
+        }
+        const notes = form.querySelector(`textarea[name="notes-${CSS.escape(entry.id)}"]`);
+        results.push({item_id: entry.id, verdict: checked.value, notes: notes ? notes.value : ""});
+      }
+      try {
+        const out = await api("/api/e2e/tasks/" + encodeURIComponent(id) + "/submit", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({results}),
+        });
+        toast("E2E report built: " + out.overall, out.overall === "pass");
+        render();
+      } catch (err) {
+        toast(err.message, false);
+      }
+    });
+    return;
+  }
+  const tasks = await api("/api/e2e/tasks");
+  const reports = await api("/api/e2e/reports");
+  const rows = tasks.items.length
+    ? tasks.items.map((t) =>
+        `<li><a href="#/e2e/${esc(t.id)}">${gtext(t.title)}</a>
+         <span class="pill st-${esc(t.status)}">${esc(t.status)} · ${esc(t.merge_commit || "")}</span></li>`).join("")
+    : '<li class="muted">No checklists yet. Tier-2 merges file one E2E task each.</li>';
+  const reportRows = (reports.items || []).slice(0, 10).map((r) =>
+    `<li><a href="#/e2e/report/${esc(r.id)}">${gtext(r.title || r.id)}</a>
+     <span class="pill st-${r.overall === "pass" ? "pass" : "fail"}">${esc(r.overall || "")}</span></li>`).join("");
+  view.innerHTML = `<h1>E2E promotion</h1>
+    <p class="muted">Test each behavior, note what you saw, submit once. Report assembly and promotion state are automated.</p>
+    <h2>Checklists</h2><ul class="plain">${rows}</ul>
+    <h2>Recent reports</h2><ul class="plain">${reportRows || '<li class="muted">No reports yet.</li>'}</ul>`;
 }
 
 async function renderInbox(id) {
@@ -2132,6 +2233,7 @@ async function render() {
     else if (name === "plans") await renderPlans(id);
     else if (name === "runs") await renderRuns(id);
     else if (name === "inbox") await renderInbox(id);
+    else if (name === "e2e") await renderE2E(id);
     else if (name === "ideas") await renderIdeas(id);
     else if (name === "invoices") await renderInvoices(id);
     else if (name === "backlog") await renderBacklog(id);

@@ -983,6 +983,14 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 return self._get_invoice(path[len("/api/invoices/") :])
             if path.startswith("/api/workflows/"):
                 return self._send_item(self._stores().workflows, path[len("/api/workflows/") :])
+            if path == "/api/e2e/tasks":
+                return self._send_e2e_tasks(parsed.query)
+            if path == "/api/e2e/reports":
+                return self._send_e2e_reports()
+            if path.startswith("/api/e2e/tasks/"):
+                return self._send_item(self._stores().e2e_tasks, path[len("/api/e2e/tasks/") :])
+            if path.startswith("/api/e2e/reports/"):
+                return self._send_item(self._stores().e2e_reports, path[len("/api/e2e/reports/") :])
             if path == "/api/sleep":
                 return self._send_json({"ok": True, **timer_state(self.repo_root)})
             if path == "/api/version":
@@ -1067,6 +1075,11 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 return self._send_json(refresh_provider_status(self.data_dir, self.repo_root))
             if path == "/api/inbox":
                 return self._create_inbox_task(payload)
+            if path == "/api/e2e/tasks":
+                return self._create_e2e_task(payload)
+            if path.startswith("/api/e2e/tasks/") and path.endswith("/submit"):
+                task_id = path[len("/api/e2e/tasks/") : -len("/submit")]
+                return self._submit_e2e_task(task_id, payload)
             if path == "/api/ideas":
                 return self._create_idea(payload)
             if path == "/api/backlog":
@@ -1240,6 +1253,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             "provider": config.provider,
             "model": config.model,
             "open_inbox": stores.open_inbox_count(),
+            "open_e2e": stores.open_e2e_count(),
             "new_ideas": stores.new_idea_count(),
             "open_backlog": stores.open_backlog_count(),
             "plan_total": plan_total,
@@ -1509,6 +1523,9 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 {"ok": False, "error": "created_by and assignee must be strings"},
                 status=400,
             )
+        metadata = payload.get("metadata")
+        if metadata is not None and not isinstance(metadata, dict):
+            return self._send_json({"ok": False, "error": "metadata must be an object"}, status=400)
         record = stores.create_inbox_task(
             title=title,
             body=body,
@@ -1519,6 +1536,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             task_id=payload.get("task_id"),
             context_refs=payload.get("context_refs"),
             options=payload.get("options"),
+            metadata=metadata,
         )
         self._send_json({"ok": True, "id": record["id"]})
 
@@ -1543,6 +1561,76 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 "id": record["id"],
                 "status": record["status"],
                 "scheduled_run": scheduled_run,
+            }
+        )
+
+    def _send_e2e_tasks(self, query: str) -> None:
+        params = parse_qs(query)
+        wanted = params.get("status", [None])[0]
+        if wanted is not None and wanted not in {"open", "submitted"}:
+            return self._send_json({"ok": False, "error": "Invalid status filter"}, status=400)
+        items, _total = self._stores().e2e_tasks.list(limit=100)
+        if wanted is not None:
+            items = [item for item in items if item.get("status") == wanted]
+        self._send_json({"ok": True, "items": items, "total": len(items)})
+
+    def _send_e2e_reports(self) -> None:
+        items, total = self._stores().e2e_reports.list(limit=100)
+        self._send_json({"ok": True, "items": items, "total": total})
+
+    def _create_e2e_task(self, payload: dict) -> None:
+        stores = self._stores()
+        if not stores.check_supervisor_token(self.headers.get("X-Supervisor-Token")):
+            return self._send_json({"ok": False, "error": "Supervisor token required"}, status=403)
+        merge_commit = payload.get("merge_commit", "")
+        title = payload.get("title", "")
+        items = payload.get("items")
+        if not isinstance(merge_commit, str) or not isinstance(title, str):
+            return self._send_json(
+                {"ok": False, "error": "merge_commit and title must be strings"}, status=400
+            )
+        if not isinstance(items, list):
+            return self._send_json(
+                {"ok": False, "error": "items must be a checklist array"}, status=400
+            )
+        created_by = payload.get("created_by", "supervisor")
+        if not isinstance(created_by, str):
+            return self._send_json(
+                {"ok": False, "error": "created_by must be a string"}, status=400
+            )
+        range_base = payload.get("range_base")
+        if range_base is not None and not isinstance(range_base, str):
+            return self._send_json(
+                {"ok": False, "error": "range_base must be a string"}, status=400
+            )
+        try:
+            record = stores.create_e2e_task(
+                merge_commit=merge_commit,
+                title=title,
+                items=items,
+                created_by=created_by,
+                range_base=range_base,
+            )
+        except StoreError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        self._send_json({"ok": True, "id": record["id"]})
+
+    def _submit_e2e_task(self, task_id: str, payload: dict) -> None:
+        results = payload.get("results")
+        if not isinstance(results, list):
+            return self._send_json({"ok": False, "error": "Invalid submit payload"}, status=400)
+        try:
+            outcome = self._stores().submit_e2e_task(task_id, results)
+        except StoreError as exc:
+            status = 404 if "not found" in str(exc).lower() else 400
+            return self._send_json({"ok": False, "error": str(exc)}, status=status)
+        self._send_json(
+            {
+                "ok": True,
+                "id": outcome["task"]["id"],
+                "status": outcome["task"]["status"],
+                "report_id": outcome["report"]["id"],
+                "overall": outcome["report"]["overall"],
             }
         )
 

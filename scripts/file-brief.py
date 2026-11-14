@@ -18,6 +18,9 @@ from pathlib import Path
 DEFAULT_URL = "http://127.0.0.1:8766"
 
 
+MERGE_TIERS = ("tier1", "tier2", "tier3")
+
+
 def build_payload(
     *,
     title: str,
@@ -26,13 +29,14 @@ def build_payload(
     item_type: str = "decision",
     created_by: str = "supervisor",
     assignee: str = "owner",
+    tier: str | None = None,
 ) -> dict:
     """Assemble the /api/inbox payload; decisions need >= 2 options."""
     if not title.strip():
         raise ValueError("title is required")
     if item_type == "decision" and len(options) < 2:
         raise ValueError("decision briefs need at least two --option values")
-    return {
+    payload = {
         "title": title,
         "body": body,
         "type": item_type,
@@ -40,6 +44,11 @@ def build_payload(
         "assignee": assignee,
         "options": options,
     }
+    if tier is not None:
+        if tier not in MERGE_TIERS:
+            raise ValueError(f"tier must be one of {MERGE_TIERS}")
+        payload["metadata"] = {"tier": tier}
+    return payload
 
 
 def send(url: str, payload: dict, token: str | None = None) -> dict:
@@ -63,6 +72,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--body-file", type=Path, default=None)
     parser.add_argument("--option", action="append", default=[], dest="options")
     parser.add_argument("--type", default="decision", dest="item_type")
+    parser.add_argument("--tier", default=None, help="Merge tier (tier1/2/3, ADR-087).")
     parser.add_argument("--url", default=DEFAULT_URL)
     parser.add_argument("--token", default=None)
     parser.add_argument("--dry-run", action="store_true")
@@ -72,7 +82,11 @@ def main(argv: list[str] | None = None) -> int:
         body = args.body_file.read_text(encoding="utf-8")
     try:
         payload = build_payload(
-            title=args.title, body=body, options=args.options, item_type=args.item_type
+            title=args.title,
+            body=body,
+            options=args.options,
+            item_type=args.item_type,
+            tier=args.tier,
         )
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)
