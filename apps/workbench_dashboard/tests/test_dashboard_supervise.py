@@ -723,6 +723,7 @@ def test_reconcile_reaps_old_strays_keeps_server(tmp_path, monkeypatch) -> None:
     )
     starts = {111: now, 222: now - 600, 333: now - 10}
     monkeypatch.setattr(sup, "_pid_start_time", lambda pid: starts[pid])
+    monkeypatch.setattr(sup, "_probe_processes", lambda pids: {})
     stopped: list = []
     monkeypatch.setattr(
         sup, "_stop_verified_servers", lambda servers, port: stopped.append(servers) or []
@@ -731,6 +732,37 @@ def test_reconcile_reaps_old_strays_keeps_server(tmp_path, monkeypatch) -> None:
     assert reaped == 1
     assert stopped == [{222: starts[222]}]
     assert "reaped=[222]" in detail
+
+
+def test_reconcile_keeps_launcher_shim(tmp_path, monkeypatch) -> None:
+    import time
+
+    import dashboard_supervise as sup
+
+    (tmp_path / "data").mkdir()
+    now = time.time()
+    cmdline = "python dashboard_web_app.py --port 8766 C:\\ai-workbench"
+    monkeypatch.setattr(sup, "_port_listeners", lambda port: [222])
+    monkeypatch.setattr(sup, "_python_pids", lambda: [111, 222])
+    monkeypatch.setattr(sup, "_probe_cmdlines", lambda pids: {111: cmdline, 222: cmdline})
+    monkeypatch.setattr(
+        sup,
+        "_probe_processes",
+        lambda pids: {
+            111: sup.ProcessInfo(cmdline=cmdline, parent=999),
+            222: sup.ProcessInfo(cmdline=cmdline, parent=111),
+        },
+    )
+    starts = {111: now - 600, 222: now - 600}
+    monkeypatch.setattr(sup, "_pid_start_time", lambda pid: starts[pid])
+    stopped: list = []
+    monkeypatch.setattr(
+        sup, "_stop_verified_servers", lambda servers, port: stopped.append(servers) or []
+    )
+    reaped, detail = sup.reconcile_strays(_mail_throttle_config(tmp_path))
+    assert reaped == 0
+    assert stopped == []
+    assert "launcher shim" in detail
 
 
 def test_reconcile_aborts_on_stranger_holder(tmp_path, monkeypatch) -> None:
