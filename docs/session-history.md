@@ -1,5 +1,18 @@
 # Session History
 
+## 2026-11-16 - E2E notes batch: triage, fixes, re-issue (01a1e5ab cont.)
+
+All 11 fail + 2 pass-notes reports triaged verify-first. Landed agent
+follow-up fixes Tier-2 (#/ route ab6f14e; filter-hash + empty state +
+badge 96c1a08) and a notes batch (7b15c26: reminder separators, exact
+pytest steps; execution-test upgrade e2dd44d). Rest resolved by later
+work (trail label, subjects-once, per-step verdicts, grounding
+tightening, agent mode live), stale-serve timing, or wave-1 bootstrap
+(regression auto-pass needs a first pass). Filed KnowMe regroup study
+(b9459ccb), filter-UX clarification (6a01f397), Tier-3 regression
+semantics brief (4f52d6b2). Re-issued 14 E2E tasks (8 open, 6 drafts;
+2 trivial drafts agent-finalized). Session kept (16MB log, no pressure).
+
 ## 2026-11-16 - Sweep, agent queue, resolved-first hardening (01a1e5ab cont.)
 
 Forgotten sweep built + weekly task live (581a078): 22 findings filed,
