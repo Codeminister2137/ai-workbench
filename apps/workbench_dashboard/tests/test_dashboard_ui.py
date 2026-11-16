@@ -460,7 +460,6 @@ def test_e2e_tab_checks_and_submits() -> None:
     assert "whatHtml(entry, index === 0)" in js
     assert "renderE2EReminders" in js
     assert "Test needed while you are here" in js
-    assert 'index > 0 ? "<hr>" : ""' in js  # entries separated, never one run-on block
     assert "view.append(card)" in js  # reminders sit below tab content, never on top
     assert "data-save-notes" in js
     assert "Jot down what you observe" in js
@@ -983,6 +982,43 @@ eval(source.slice(source.indexOf('async function pollInboxBadge()'), source.inde
 (async () => {
   await pollInboxBadge(); assert.equal(badge.textContent, 3); assert.equal(badge.hidden, false);
   attention = 0; await pollInboxBadge(); assert.equal(badge.hidden, true);
+})().catch(error => {console.error(error); process.exitCode = 1;});
+"""
+    result = subprocess.run(
+        [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_reminder_entries_separated_execute():
+    """Reminder cards separate entries with a rule, never one run-on block."""
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node is required for reminder execution")
+    driver = r"""
+const assert = require('assert');
+const source = require('fs').readFileSync(process.argv[1], 'utf8');
+const E2E_REMINDER_VIEWS = ['inbox'];
+let html = '';
+const card = {className: '', id: '',
+  set innerHTML(v) { html = v; }, querySelectorAll: () => []};
+const view = {append: () => {}};
+const document = {createElement: () => card};
+const esc = (s) => String(s ?? '');
+const api = async () => ({items: [
+  {behavior: 'b1', item_id: 'i1', task_id: 't1',
+   steps: [{action: 'a1', expected: 'e1'}]},
+  {behavior: 'b2', item_id: 'i2', task_id: 't2',
+   steps: [{action: 'a2', expected: 'e2'}]},
+]});
+eval(source.slice(source.indexOf('async function renderE2EReminders('),
+  source.indexOf('document.getElementById("create-btn")')));
+(async () => {
+  await renderE2EReminders('inbox');
+  assert(html.includes('b1') && html.includes('b2'));
+  assert(html.includes('a1') && html.includes('a2'));
+  assert.equal((html.match(/<hr>/g) || []).length, 1);
+  assert(html.indexOf('<hr>') > html.indexOf('b1'));
 })().catch(error => {console.error(error); process.exitCode = 1;});
 """
     result = subprocess.run(
