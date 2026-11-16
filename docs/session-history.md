@@ -1,5 +1,21 @@
 # Session History
 
+## 2026-11-14/16 - E2E/Mai mega-session, window-loss saga, switch to fresh session
+
+Multi-day attended session (01a1d930, grew to 66MB/58k records — retired for
+length; new session continues from CURRENT_CONTEXT handoff). Shipped: ADR-087
+E2E promotion system + case-specific steps + pointer drafts + proof reports +
+per-step verdicts + shared checkbox filters on all 8 tabs + attention badges;
+Mai batch resume + timeout passthrough + P4 retry completed (341s, branch
+feature/p4-chat-progress +310/-6 awaits rebase/review/merge); chat Agent mode
+A-C; window-loss countermeasure (capture + recovery drill + WorkbenchWindowWatch
+live); Mai vision recorded. Window vanished 5x (hide-not-destroy proven by
+watchdog auto-capture 18:20); actor unknown; remote-session/other-desktop/
+ai-workbench-code all ruled out. Ritual fix: keepalive -Restart is a no-op;
+redeploy = dashboard-supervise.cmd. Owner queue at switch: P4 integration,
+scoring-answers config, clone centralization, Openings trial, forgotten-sweep
+as weekly task.
+
 ## 2026-11-13 - Evening 6h unattended (16:19-22:19 Warsaw, gaming then away)
 
 Remote-contact verified first (Tailscale serve live, wake 6/6, mailed).
