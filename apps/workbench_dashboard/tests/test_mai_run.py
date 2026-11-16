@@ -230,6 +230,10 @@ def test_classify_failure_prefers_allowance_then_provider() -> None:
     assert classify_failure("model auth timeout") == "provider"
     assert classify_failure("weird local crash") == "unknown"
     assert classify_failure("denied", "ProviderError: x") == "allowance"
+    assert (
+        classify_failure("Required instructions exceed instruction_budget_chars=64000: AGENTS.md")
+        == "config"
+    )
 
 
 def test_progress_subprocess_and_executor(tmp_path):

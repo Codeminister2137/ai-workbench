@@ -22,6 +22,7 @@ from pathlib import Path
 TAIL_CHARS = 4000
 
 _ALLOWANCE_RE = re.compile(r"allowance|denied|cost polic|budget|quota|exhaust", re.IGNORECASE)
+_CONFIG_RE = re.compile(r"instruction.?budget", re.IGNORECASE)
 _PROVIDER_RE = re.compile(
     r"ProviderError|provider|authenticat|timeout|timed out|connect|model|route",
     re.IGNORECASE,
@@ -162,6 +163,8 @@ def run_mai_session(
 def classify_failure(*texts: str) -> str:
     """Map failure text to the supervision cause class (narrow first)."""
     blob = "\n".join(texts)
+    if _CONFIG_RE.search(blob):
+        return "config"
     if _ALLOWANCE_RE.search(blob):
         return "allowance"
     if _PROVIDER_RE.search(blob):
