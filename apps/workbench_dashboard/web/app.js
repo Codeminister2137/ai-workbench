@@ -1336,11 +1336,17 @@ async function renderE2E(id) {
     const stepsHtml = (entry, readOnly) => {
       if (!entry.steps || !entry.steps.length) return howHtml(entry);
       const dis = readOnly ? " disabled" : "";
-      const rows = entry.steps.map((s, i) =>
-        `<li><strong>${esc(s.action || "")}</strong><br>`
-        + `<span class="muted">Expected: ${esc(s.expected || "")}</span><br>`
+      const rows = entry.steps.map((s, i) => {
+        const runnable = s.agent_runnable && !readOnly;
+        const evidence = s.evidence
+          ? `<br><details><summary>Agent evidence (exit ${esc(s.evidence_exit ?? "?")})</summary><pre>${esc(s.evidence)}</pre></details>` : "";
+        const runBtn = runnable
+          ? ` <button type="button" data-agent-check="${esc(entry.id)}:${i}" title="Run this exact command agent-side and attach the output">Run check</button>` : "";
+        return `<li><strong>${esc(s.action || "")}</strong><br>`
+        + `<span class="muted">Expected: ${esc(s.expected || "")}</span>${evidence}<br>`
         + `<label><input type="radio" name="step-${esc(entry.id)}-${i}" value="pass" title="Step ${i + 1} passed"${dis}> Pass</label> `
-        + `<label><input type="radio" name="step-${esc(entry.id)}-${i}" value="fail" title="Step ${i + 1} failed"${dis}> Fail</label></li>`).join("");
+        + `<label><input type="radio" name="step-${esc(entry.id)}-${i}" value="fail" title="Step ${i + 1} failed"${dis}> Fail</label>${runBtn}</li>`;
+      }).join("");
       return `<h4>Checklist (pass/fail each step)</h4><ol>${rows}</ol>`;
     };
     const historyHtml = (entry) => {
@@ -1384,6 +1390,22 @@ async function renderE2E(id) {
           : `<form id="e2e-form"><ul class="plain">${blocks}</ul>
            <p><button type="submit" title="Record verdicts and build the E2E report">Submit E2E results</button></p></form>`}</div>`;
     const form = document.getElementById("e2e-form");
+    document.querySelectorAll("[data-agent-check]").forEach((btn) => btn.addEventListener("click", async () => {
+      const [itemId, stepIndex] = btn.dataset.agentCheck.split(":");
+      btn.disabled = true;
+      try {
+        await api("/api/e2e/tasks/" + encodeURIComponent(id) + "/agent-check", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({item_id: itemId, step_index: Number(stepIndex)}),
+        });
+        toast("Agent evidence attached — review it, then verdict", true);
+        render();
+      } catch (err) {
+        toast(err.message, false);
+        btn.disabled = false;
+      }
+    }));
     if (form) form.addEventListener("submit", async (ev) => {
       ev.preventDefault();
       const results = [];

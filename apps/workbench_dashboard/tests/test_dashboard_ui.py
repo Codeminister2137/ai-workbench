@@ -67,8 +67,8 @@ def test_dynamic_buttons_have_titles() -> None:
     js = _read("app.js")
     buttons = re.findall(r"<button\b[^>]*>", js)
     assert (
-        len(buttons) == 51
-    )  # +doc pin; +fanout apply; +delete-inbox-btn +e2e submit +chat mode/apply/approve +notes save
+        len(buttons) == 52
+    )  # +doc pin; +fanout apply; +delete-inbox-btn +e2e submit +chat mode/apply/approve +notes save +agent-check run
     for tag in buttons:
         assert "title=" in tag, f"button without title: {tag}"
 
@@ -471,6 +471,9 @@ def test_e2e_tab_checks_and_submits() -> None:
     assert "Flag bad test design" in js
     assert 'input[name="badtest-' in js
     assert "Describe what is wrong with the test" in js
+    assert 'data-agent-check="${esc(entry.id)}:' in js
+    assert "Run this exact command agent-side and attach the output" in js
+    assert "Agent evidence attached — review it, then verdict" in js
     assert ".st-bad-test" in _read("app.css")
     assert "Draft — waiting on pointers" in js
     assert "Recent verdicts for this area (all merges)" in js
