@@ -683,6 +683,8 @@ def _tcp_up(host: str, port: int) -> bool:
 
 def _dir_version(path: Path) -> str:
     """Short HEAD of a checkout, or 'unknown' (fail-soft)."""
+    if not (path / ".git").exists():
+        return "unknown"
     try:
         proc = subprocess.run(
             ["git", "rev-parse", "--short", "HEAD"],
@@ -912,6 +914,10 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 return self._send_json({"ok": True, "files": list_intake(self.repo_root)})
             if path == "/api/chat/sessions":
                 return self._send_chat_sessions(config)
+            if path.startswith("/api/chat/sessions/") and path.endswith("/progress"):
+                session_id = path[len("/api/chat/sessions/") : -len("/progress")]
+                message_id = parse_qs(parsed.query).get("message_id", [""])[0]
+                return self._send_chat_progress(config, session_id, message_id)
             if path.startswith("/api/chat/sessions/") and path.endswith("/messages"):
                 session_id = path[len("/api/chat/sessions/") : -len("/messages")]
                 return self._send_chat_messages(config, session_id)
@@ -1330,6 +1336,26 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 ],
             }
         )
+
+    def _send_chat_progress(
+        self, config: DashboardConfig, session_id: str, message_id: str
+    ) -> None:
+        """Read activity and existing scratch status; never create a worktree."""
+        from chat_agent import CHAT_WORKTREE_DIRNAME, progress_path, read_progress, staged_files
+
+        result = {"ok": True, "lines": [], "staged": []}
+        try:
+            record = self._stores().get_chat_mode(session_id)
+            if config.chat_agent_enabled and record.get("mode") == "agent":
+                activity = progress_path(self.data_dir, session_id, message_id)
+                short = "".join(ch for ch in session_id if ch.isalnum())[:12]
+                worktree = self.repo_root / CHAT_WORKTREE_DIRNAME / short
+                if worktree.is_dir():
+                    result["lines"] = read_progress(activity)
+                    result["staged"] = staged_files(worktree)
+        except Exception:  # noqa: BLE001 - progress must never break chat
+            pass
+        self._send_json(result)
 
     def _send_chat_staged(self, session_id: str) -> None:
         from chat_agent import ChatAgentError, ensure_chat_worktree, staged_files

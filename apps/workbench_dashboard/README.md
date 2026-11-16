@@ -89,6 +89,13 @@ inspect the owned process only.
 
 ## Limits (honest)
 
+Agent chat turns show captured stdout activity, a tool checklist, and the
+current staged files while running. The UI polls every two seconds; reduced
+motion disables polling and shows a static note. Activity is stored locally
+under `data/chat-progress/` as per-turn JSONL; the API returns the last 200
+valid lines. Progress failures do not interrupt the turn. This displays
+available Mai output; it does not stream model tokens or add heartbeats.
+
 - Runs drain manually (Runs "Drain now" / `POST /api/runs/drain`,
   one run per call) or on a schedule (`drain_interval_seconds` ≥ 60
   in `dashboard.json` + restart; default off). No UI/API toggle yet;

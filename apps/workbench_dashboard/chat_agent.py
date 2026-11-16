@@ -15,14 +15,57 @@ and presence routing are slice B.
 
 from __future__ import annotations
 
+import json
 import shutil
 import subprocess
+from collections import deque
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 
 CHAT_MODES = ("ask", "agent")
 CHAT_WORKTREE_DIRNAME = ".tmp/chat-worktrees"
 CHAT_BASE_BRANCH = "develop"
+
+
+def progress_path(data_dir: Path, session_id: str, message_id: str) -> Path:
+    """Resolve a turn's local activity file, rejecting path separators."""
+    for value in (session_id, message_id):
+        if not value or any(not (ch.isalnum() or ch == "-") for ch in value):
+            raise ValueError("Invalid progress identifier")
+    return data_dir / "chat-progress" / f"{session_id}_{message_id}.jsonl"
+
+
+class ProgressWriter:
+    """Best-effort local stdout activity; failures must not interrupt a turn."""
+
+    def __init__(self, path: Path | str) -> None:
+        self.path = Path(path)
+
+    def append(self, line: str) -> None:
+        try:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            with self.path.open("a", encoding="utf-8") as stream:
+                stream.write(json.dumps({"ts": datetime.now(UTC).isoformat(), "line": line}) + "\n")
+        except (OSError, ValueError):
+            pass
+
+
+def read_progress(path: Path | str) -> list[str]:
+    """Return at most the last 200 valid activity lines, tolerating partial writes."""
+    lines: deque[str] = deque(maxlen=200)
+    try:
+        with Path(path).open(encoding="utf-8", errors="replace") as stream:
+            for raw in stream:
+                try:
+                    row = json.loads(raw)
+                    if isinstance(row, dict) and isinstance(row.get("line"), str):
+                        lines.append(row["line"])
+                except ValueError:
+                    continue
+    except (OSError, ValueError):
+        pass
+    return list(lines)
 
 
 class ChatAgentError(RuntimeError):

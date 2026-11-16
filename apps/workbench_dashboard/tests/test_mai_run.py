@@ -230,3 +230,71 @@ def test_classify_failure_prefers_allowance_then_provider() -> None:
     assert classify_failure("model auth timeout") == "provider"
     assert classify_failure("weird local crash") == "unknown"
     assert classify_failure("denied", "ProviderError: x") == "allowance"
+
+
+def test_progress_subprocess_and_executor(tmp_path):
+    import sys
+
+    from chat_agent import read_progress
+
+    path = tmp_path / "progress.jsonl"
+    command = [
+        sys.executable,
+        "-u",
+        "-c",
+        "print('Tool read'); print('coding_session_id: s1'); print('done')",
+    ]
+    receipt = build_mai_executor(
+        tmp_path, tmp_path / "u.toml", mai_cmd_prefix=command, progress_path=path
+    )(_run())
+    assert read_progress(path) == ["Tool read", "coding_session_id: s1", "done"]
+    assert receipt["status"] == "completed"
+    assert receipt["mai_session_id"] == "s1"
+    assert receipt["stdout_tail"].endswith("done\n")
+    assert "--approval-policy" in receipt["mai_argv"]
+
+
+def test_progress_failure_does_not_break_capture(tmp_path):
+    import sys
+
+    from mai_run import run_mai_subprocess
+
+    outcome = run_mai_subprocess(
+        [], cmd_prefix=[sys.executable, "-c", "print('done')"], progress_path=tmp_path
+    )
+    assert outcome.exit_code == 0
+    assert outcome.stdout_tail == "done\n"
+
+
+def test_progress_arrives_before_process_exit(tmp_path):
+    import sys
+    import time
+    from concurrent.futures import ThreadPoolExecutor
+
+    from chat_agent import read_progress
+    from mai_run import run_mai_subprocess
+
+    path = tmp_path / "live.jsonl"
+    release = tmp_path / "release"
+    script = (
+        "import pathlib,sys,time; print('Tool read'); "
+        "release=pathlib.Path(sys.argv[1]); "
+        "exec('while not release.exists(): time.sleep(0.01)')"
+    )
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(
+            run_mai_subprocess,
+            [],
+            cmd_prefix=[sys.executable, "-c", script, str(release)],
+            progress_path=path,
+            timeout_seconds=10,
+        )
+        try:
+            deadline = time.monotonic() + 5
+            while not read_progress(path) and time.monotonic() < deadline:
+                time.sleep(0.01)
+            assert read_progress(path) == ["Tool read"]
+            assert not future.done()
+        finally:
+            release.touch()
+        assert future.result(timeout=10).exit_code == 0
