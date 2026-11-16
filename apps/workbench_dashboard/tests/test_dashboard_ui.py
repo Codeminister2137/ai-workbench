@@ -578,6 +578,8 @@ def test_schedule_propose_form_posts_to_endpoint() -> None:
     assert 'id="propose-form"' in js
     assert "/api/tasks/propose" in js
     assert "Nothing runs until you approve it" in js
+    assert "Queue a one-shot run" in js
+    assert "recurring Windows tasks, a separate thing" in js
 
 
 def test_md_renderer_cases() -> None:

@@ -2257,10 +2257,10 @@ async function renderSchedule() {
     body = `<div class="card"><h2>Schedule</h2><p class="muted">Schedule unavailable: ${esc(err.message)}</p></div>`;
   }
   view.innerHTML = `<h1>Schedule</h1>
-    <div class="card"><h2>Propose a task</h2>
-    <p class="muted">Type what you want done — a proposal (model + budget) lands in the inbox for approval. Nothing runs until you approve it.</p>
+    <div class="card"><h2>Queue a one-shot run</h2>
+    <p class="muted">Type what you want done — a proposal (model + budget) lands in the inbox for approval. Nothing runs until you approve it. One-shot runs live in the Runs view afterwards; this page's Upcoming and Recurring lists are recurring Windows tasks, a separate thing.</p>
     <form class="inline" id="propose-form"><input type="text" name="text" placeholder="Review the auth module, about 30 min..." title="Describe the task in free text"><button type="submit" title="File as an approval-gated proposal">Propose</button></form></div>
-    <p class="muted">Live from the fleet probe: scheduled tasks and the sleep guard.</p>${body}`;
+    <p class="muted">Live from the fleet probe: recurring Windows tasks and the sleep guard.</p>${body}`;
   document.getElementById("propose-form").addEventListener("submit", async (ev) => {
     ev.preventDefault();
     try {
