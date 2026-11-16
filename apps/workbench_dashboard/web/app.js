@@ -1321,7 +1321,7 @@ async function renderE2E(id) {
           headers: {"Content-Type": "application/json"},
           body: JSON.stringify({results}),
         });
-        toast("E2E report built: " + out.overall, out.overall === "pass");
+        toast("E2E report built: " + out.overall + (out.followup_id ? " (agent follow-up filed)" : ""), out.overall === "pass");
         render();
       } catch (err) {
         toast(err.message, false);
@@ -1331,18 +1331,30 @@ async function renderE2E(id) {
   }
   const tasks = await api("/api/e2e/tasks");
   const reports = await api("/api/e2e/reports");
-  const rows = tasks.items.length
-    ? tasks.items.map((t) =>
+  const params = new URLSearchParams(location.hash.split("?")[1] || "");
+  const picked = new Set((params.get("s") || "open,draft,fail").split(",").filter(Boolean));
+  const shownTasks = (tasks.items || []).filter((t) => picked.has(t.status || "open"));
+  const rows = shownTasks.length
+    ? shownTasks.map((t) =>
         `<li><a href="#/e2e/${esc(t.id)}">${gtext(t.title)}</a>
          <span class="pill st-${esc(t.status)}">${esc(t.status)} · ${esc(t.merge_commit || "")}</span></li>`).join("")
-    : '<li class="muted">No checklists yet. Tier-2 merges file one E2E task each.</li>';
-  const reportRows = (reports.items || []).slice(0, 10).map((r) =>
+    : '<li class="muted">No checklists match these filters.</li>';
+  const shownReports = (reports.items || []).filter((r) => picked.has(r.overall || ""));
+  const reportRows = shownReports.slice(0, 10).map((r) =>
     `<li><a href="#/e2e/report/${esc(r.id)}">${gtext(r.title || r.id)}</a>
      <span class="pill st-${r.overall === "pass" ? "pass" : "fail"}">${esc(r.overall || "")}</span></li>`).join("");
+  const box = (token, label, title) =>
+    `<label><input type="checkbox" data-s="${token}" title="${title}"${picked.has(token) ? " checked" : ""}> ${label}</label>`;
   view.innerHTML = `<h1>E2E promotion</h1>
     <p class="muted">Test each behavior, note what you saw, submit once. Report assembly and promotion state are automated.</p>
+    <p id="e2e-filters"><span>Checklists: ${box("open", "Open", "Checklists awaiting your tests")} ${box("draft", "Drafts", "Awaiting pointers before testing opens")} ${box("submitted", "Submitted", "Finished checklists")}</span>
+    <span>Reports: ${box("fail", "Failed", "Reports needing fixes")} ${box("pass", "Passed", "Passing reports, kept as proof")}</span></p>
     <h2>Checklists</h2><ul class="plain">${rows}</ul>
-    <h2>Recent reports</h2><ul class="plain">${reportRows || '<li class="muted">No reports yet.</li>'}</ul>`;
+    <h2>Recent reports</h2><ul class="plain">${reportRows || '<li class="muted">No reports match these filters.</li>'}</ul>`;
+  view.querySelectorAll("#e2e-filters input[data-s]").forEach((box) => box.addEventListener("change", () => {
+    const on = [...view.querySelectorAll("#e2e-filters input[data-s]:checked")].map((b) => b.dataset.s);
+    location.hash = "#/e2e?s=" + on.join(",");
+  }));
 }
 
 async function renderInbox(id) {
@@ -1466,19 +1478,28 @@ async function renderInbox(id) {
     });
     return;
   }
-  const tab = new URLSearchParams((location.hash.split("?")[1] || "")).get("status") || "active";
+  const params = new URLSearchParams(location.hash.split("?")[1] || "");
+  const picked = new Set((params.get("f") || "human,open,followup").split(",").filter(Boolean));
   const inboxUrl = inboxProjectFilter ? "/api/inbox?project_id=" + encodeURIComponent(inboxProjectFilter) : "/api/inbox";
   const payload = await api(inboxUrl);
   const isFollowup = (t) => (t.resolution_kind || "final") !== "final";
-  const needsHuman = (t) => t.assignee !== "agent" && t.status === "open";
-  const shown = payload.items.filter((t) => tab === "archive" ? (t.status === "closed" && !isFollowup(t)) : tab === "queue" ? (t.assignee === "agent" && t.status === "open") : tab === "human" ? needsHuman(t) : tab === "attention" ? (needsHuman(t) || isFollowup(t)) : (t.status !== "closed" || isFollowup(t)));
+  const who = (t) => t.assignee === "agent" ? "ai" : "human";
+  const states = (t) => {
+    const s = [t.status || "open"];
+    if (isFollowup(t)) s.push("followup");
+    return s;
+  };
+  const shown = payload.items.filter((t) => picked.has(who(t)) && states(t).some((s) => picked.has(s)));
   const items = shown.length
     ? shown.map((t) =>
         `<li><a href="#/inbox/${esc(t.id)}">${gtext(t.title)}</a>
          <span class="pill st-${esc((t.status || "none").replace(/\s+/g, "-"))}">${esc(t.type)} · ${esc(t.status)}${t.assignee === "agent" ? " · for AI" : ""}${isFollowup(t) ? " · needs follow-up" : ""}</span></li>`).join("")
-    : '<li class="muted">Nothing here. The supervisor assigns decisions and tasks to the inbox.</li>';
+    : '<li class="muted">Nothing matches these filters. Tick more boxes, or tick Closed to see the archive.</li>';
+  const box = (token, label, title) =>
+    `<label><input type="checkbox" data-f="${token}" title="${title}"${picked.has(token) ? " checked" : ""}> ${label}</label>`;
   view.innerHTML = `<h1>Inbox</h1>
-    <p><a href="#/inbox">Active</a> · <a href="#/inbox?status=queue">AI queue</a> · <a href="#/inbox?status=human">Human</a> · <a href="#/inbox?status=attention">Needs attention</a> · <a href="#/inbox?status=archive">Archive</a></p>
+    <p id="inbox-filters"><span>Who: ${box("human", "Human", "Tasks assigned to you")} ${box("ai", "AI", "Tasks assigned to the agent")}</span>
+    <span>State: ${box("open", "Open", "Not yet answered")} ${box("answered", "Answered", "Answered, awaiting close")} ${box("followup", "Needs follow-up", "Closed or open with follow-up requested")} ${box("closed", "Closed", "Archived tasks")}</span></p>
     <p><input type="text" id="filter-inbox" placeholder="Filter tasks..." title="Filter inbox by text">
     <select id="filter-inbox-project" title="Show inbox tasks for one project">${await projectOptions(inboxProjectFilter)}</select></p>
     <ul class="plain" id="inbox-list">${items}</ul>`;
@@ -1486,6 +1507,10 @@ async function renderInbox(id) {
   document.getElementById("filter-inbox-project").addEventListener("change", (ev) => {
     inboxProjectFilter = ev.target.value; renderInbox();
   });
+  view.querySelectorAll("#inbox-filters input[data-f]").forEach((box) => box.addEventListener("change", () => {
+    const on = [...view.querySelectorAll("#inbox-filters input[data-f]:checked")].map((b) => b.dataset.f);
+    location.hash = "#/inbox?f=" + on.join(",");
+  }));
 }
 
 async function markIdeaSeen(id, item) {

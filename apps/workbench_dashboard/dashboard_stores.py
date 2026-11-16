@@ -633,7 +633,60 @@ class DashboardStores:
         record["submitted_at"] = _utc_now()
         record["report_id"] = report["id"]
         self.e2e_tasks.put(task_id, record)
-        return {"task": record, "report": report}
+        followup_id = self._maybe_file_e2e_followup(record, report)
+        return {"task": record, "report": report, "followup_id": followup_id}
+
+    def _maybe_file_e2e_followup(self, record: dict, report: dict) -> str | None:
+        """File one agent follow-up when fails or notes need action.
+
+        A failed item means the behavior is broken; a note on a pass
+        means the tester saw something worth considering. Both land in
+        a single AI-queue task so neither dies in the report. Filing
+        never fails the submit: a refusal is stamped on the task.
+        """
+        fails = []
+        noted = []
+        for entry in report.get("items", []):
+            if entry.get("status") != "tested":
+                continue
+            notes = str(entry.get("notes", "") or "").strip()
+            if entry.get("verdict") == "fail":
+                fails.append(entry)
+            elif notes:
+                noted.append(entry)
+        if not fails and not noted:
+            return None
+        merge = str(record.get("merge_commit") or "")
+        parts = [f"{len(fails)} failed"] if fails else []
+        if noted:
+            parts.append(f"{len(noted)} noted")
+        lines = [f"E2E report {report.get('id')} for merge {merge} needs action.", ""]
+        for entry in fails:
+            lines.append(f"FAIL {entry.get('id')} ({entry.get('behavior') or ''}):")
+            lines.append(str(entry.get("notes", "") or "(no notes)").strip()[:2000] or "(no notes)")
+            lines.append("")
+        for entry in noted:
+            lines.append(f"NOTE on {entry.get('id')} (passed):")
+            lines.append(str(entry.get("notes", "") or "").strip()[:2000])
+            lines.append("")
+        try:
+            filed = self.create_inbox_task(
+                title=f"E2E follow-up: {merge} ({', '.join(parts)})",
+                body="\n".join(lines).strip(),
+                task_type="task",
+                created_by="supervisor",
+                assignee="agent",
+                metadata={
+                    "kind": "e2e-followup",
+                    "merge_commit": merge,
+                    "report_id": report.get("id"),
+                },
+            )
+        except StoreError as exc:
+            record["followup_error"] = str(exc)
+            self.e2e_tasks.put(record["id"], record)
+            return None
+        return str(filed["id"])
 
     def finalize_e2e_task(self, task_id: str, steps_by_item: dict) -> dict:
         """Turn a draft into an open task with finalized checkable steps.
