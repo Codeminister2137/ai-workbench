@@ -2379,6 +2379,20 @@ async function flipToggle(checkbox) {
     render();
   }
 }
+async function setFanoutDefault(sel) {
+  try {
+    await api("/api/restrictions/fanout", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({scope: sel.dataset.scope, policy: sel.value}),
+    });
+    toast("Fan-out default updated", true);
+    render();
+  } catch (err) {
+    toast(err.message, false);
+    render();
+  }
+}
 async function renderKnowme() {
   const category = new URLSearchParams((location.hash.split("?")[1] || "")).get("category") || "";
   const query = category ? ("?category=" + encodeURIComponent(category)) : "";
@@ -2405,16 +2419,25 @@ async function renderKnowme() {
 async function renderRestrictions() {
   let sub = null;
   let toggles = [];
+  let fanout = null;
   try {
     const status = await api("/api/restrictions");
     sub = status.subprocess;
     toggles = status.toggles || [];
+    fanout = status.fanout || null;
   } catch (err) { /* static fallback below */ }
   const toggleRows = toggles.map((t) => `
       <li><label><input type="checkbox" data-toggle="${esc(t.name)}"
         title="${esc(t.description)}"
         ${t.enabled ? "checked" : ""} onchange="flipToggle(this)">
         <strong>${esc(t.name)}</strong></label> — ${esc(t.description)}</li>`).join("");
+  const fanoutRows = fanout ? ["chat", "bridge"].map((scope) => `
+      <li><label>${scope === "chat" ? "Chat run requests" : "Inbox-bridged runs"}
+        <select data-scope="${scope}" title="Default fan-out policy for ${scope} runs"
+          onchange="setFanoutDefault(this)">
+          ${["allowed", "restricted", "denied"].map((p) =>
+            `<option value="${p}"${fanout[scope] === p ? " selected" : ""}>${p}</option>`).join("")}
+        </select></label></li>`).join("") : "";
   const subLine = sub
     ? `Status: ${esc(sub.run_requests)} run request(s) recorded (${esc(sub.approved)} approved, ${esc(sub.rejected)} rejected, ${esc(sub.pending)} pending). Fed by: run-request receipts.`
     : "Status: not yet evaluated. Would be fed by: run-request receipts.";
@@ -2427,6 +2450,9 @@ async function renderRestrictions() {
     <div class="card"><h2>Run toggles</h2><ul class="plain">
       ${toggleRows || "<li>Not yet evaluated.</li>"}
     </ul><p class="muted">Enforced on the next drained run.</p></div>
+    <div class="card"><h2>Fan-out defaults</h2><ul class="plain">
+      ${fanoutRows || "<li>Not yet evaluated.</li>"}
+    </ul><p class="muted">Applies to runs queued after the change; per-run policy still wins.</p></div>
     <div class="card"><h2>Dimensions</h2><ul class="plain">
       <li><strong>Outbound network</strong> — which hosts an agent may call.
         Status: not yet evaluated. Would be fed by: an egress allowlist in

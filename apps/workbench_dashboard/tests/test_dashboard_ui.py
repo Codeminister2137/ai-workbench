@@ -81,7 +81,7 @@ def test_dynamic_inputs_and_selects_have_titles() -> None:
     for tag in inputs:
         assert "title=" in tag, f"input without title: {tag}"
     selects = re.findall(r"<select\b[^>]*>", js)
-    assert len(selects) == 20  # +fanout select; +landing-page select
+    assert len(selects) == 21  # +restrictions fan-out; +run fanout; +landing-page select
     for tag in selects:
         assert "title=" in tag, f"select without title: {tag}"
 
@@ -863,6 +863,11 @@ def test_restrictions_renders_live_subprocess_counts() -> None:
     assert "/api/restrictions" in js
     assert "run request(s) recorded" in js
     assert "not yet evaluated" in js
+    assert "Fan-out defaults" in js
+    assert 'data-scope="${scope}"' in js
+    assert "setFanoutDefault(this)" in js
+    assert '"/api/restrictions/fanout"' in js
+    assert "Fan-out default updated" in js
 
 
 def test_inbox_detail_has_delete_button_with_confirm() -> None:
