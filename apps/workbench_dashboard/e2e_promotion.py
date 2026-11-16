@@ -207,11 +207,17 @@ def generate_checklist(
     Empty diffs yield an empty item list, never a silent pass.
     ``summaries`` (from :func:`change_summary`) adds per-item What
     (commit subjects + churn) and How/Expected guidance so the owner
-    knows what to test and how.
+    knows what to test and how. Behavior items also carry checkable
+    ``steps`` drafted from diff evidence; steps the generator could
+    not ground flag ``needs_pointers`` instead of scheduling a vague
+    test.
     """
+    from e2e_cases import draft_steps, needs_pointers, regression_steps
+
     by_file = (summaries or {}).get("by_file", {})
     churn = (summaries or {}).get("numstat", {})
     subjects = (summaries or {}).get("subjects", [])
+    evidence = (summaries or {}).get("evidence", {})
     by_area: dict[str, dict] = {}
     for path in files:
         area, behavior, goal, _neighbors = area_for_path(path)
@@ -224,6 +230,8 @@ def generate_checklist(
         kind = "nonbehavioral" if area in NONBEHAVIORAL_AREAS else "behavior"
         item_files = sorted(entry["files"])
         what = sorted({subject for path in item_files for subject in by_file.get(path, [])})
+        area_evidence = {path: evidence[path] for path in item_files if path in evidence}
+        steps = draft_steps(area, area_evidence, subjects) if kind == "behavior" else []
         items.append(
             {
                 "id": _item_id(kind, area),
@@ -235,6 +243,8 @@ def generate_checklist(
                 "what": what or list(subjects),
                 "goals": sorted(entry["goals"]),
                 "status": "pending",
+                "steps": steps,
+                "needs_pointers": needs_pointers(steps) if kind == "behavior" else False,
                 **_guidance_for(area, kind),
             }
         )
@@ -257,6 +267,8 @@ def generate_checklist(
                 "what": list(subjects),
                 "goals": [goal],
                 "status": "pending",
+                "steps": regression_steps(area),
+                "needs_pointers": False,
                 **_guidance_for(area, "regression"),
             }
         )
@@ -406,8 +418,11 @@ def build_report(task: dict, submissions: dict[str, dict]) -> dict:
     """Assemble the E2E report from owner submissions plus auto-passes.
 
     Every pending item needs a ``pass``/``fail`` verdict; anything else
-    (or a missing verdict) fails closed. Auto-passed items keep their
-    proof, warning, and originally tested commit.
+    (or a missing verdict) fails closed. Items with checkable steps
+    additionally require every step marked performed — a checkbox is
+    the record that the step ran, the verdict is the outcome — and the
+    per-step results are stored as durable proof. Auto-passed items
+    keep their proof, warning, and originally tested commit.
     """
     items: list[dict] = []
     for item in task.get("items", []):
@@ -427,6 +442,7 @@ def build_report(task: dict, submissions: dict[str, dict]) -> dict:
         verdict = str(submission.get("verdict", "")).strip().lower()
         if verdict not in ("pass", "fail"):
             raise ValueError(f"Verdict for {item_id} must be pass or fail")
+        step_results = _step_results_for(item, submission, item_id)
         items.append(
             {
                 **item,
@@ -435,6 +451,7 @@ def build_report(task: dict, submissions: dict[str, dict]) -> dict:
                 "verdict_by": "owner",
                 "notes": str(submission.get("notes", "") or ""),
                 "tested_on": str(task.get("merge_commit")),
+                "step_results": step_results,
             }
         )
     overall = "pass" if items and all(e.get("verdict") == "pass" for e in items) else "fail"
@@ -447,6 +464,26 @@ def build_report(task: dict, submissions: dict[str, dict]) -> dict:
         "overall": overall,
         "built_utc": datetime.now(UTC).isoformat(),
     }
+
+
+def _step_results_for(item: dict, submission: dict, item_id: str) -> list[dict]:
+    """Per-step proof; every step must be marked performed to submit."""
+    steps = item.get("steps") or []
+    if not steps:
+        return []
+    checked = submission.get("steps")
+    if not isinstance(checked, list) or len(checked) != len(steps):
+        raise ValueError(f"Verdict for {item_id} needs one check per step")
+    if not all(checked):
+        raise ValueError(f"Verdict for {item_id} needs every step performed")
+    return [
+        {
+            "action": step.get("action", ""),
+            "expected": step.get("expected", ""),
+            "performed": True,
+        }
+        for step in steps
+    ]
 
 
 def tested_on_for(item: dict) -> str:

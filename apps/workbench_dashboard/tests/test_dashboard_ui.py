@@ -75,7 +75,7 @@ def test_dynamic_inputs_and_selects_have_titles() -> None:
     """Text inputs/selects in templates have titles (radios use labels)."""
     js = _read("app.js")
     inputs = [tag for tag in re.findall(r"<input\b[^>]*>", js) if 'type="radio"' not in tag]
-    assert len(inputs) == 53  # -quick-chat text +1 checkbox template (loop renders 5)
+    assert len(inputs) == 54  # -quick-chat text +1 checkbox template +e2e step checkbox
     for tag in inputs:
         assert "title=" in tag, f"input without title: {tag}"
     selects = re.findall(r"<select\b[^>]*>", js)
@@ -448,10 +448,12 @@ def test_e2e_tab_checks_and_submits() -> None:
     assert "Every behavior needs a pass/fail verdict" in js
     assert "not re-tested" not in js  # warning text is server-rendered data
     assert "open_e2e" in js
-    assert "What changed" in js
+    assert "Record: what changed" in js
     assert "How to test" in js
     assert "Expected:" in js
     assert "Look at:" in js
+    assert "Tick every performed step" in js
+    assert "Draft — waiting on pointers" in js
     assert "renderE2EReminders" in js
     assert "Test needed while you are here" in js
     assert "view.append(card)" in js  # reminders sit below tab content, never on top

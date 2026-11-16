@@ -993,7 +993,10 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             if path == "/api/e2e/by-view":
                 return self._send_e2e_by_view(parsed.query)
             if path.startswith("/api/e2e/tasks/"):
-                return self._send_item(self._stores().e2e_tasks, path[len("/api/e2e/tasks/") :])
+                task_id = path[len("/api/e2e/tasks/") :]
+                if "/" in task_id:
+                    return self._send_item(self._stores().e2e_tasks, task_id)
+                return self._send_e2e_task(task_id)
             if path.startswith("/api/e2e/reports/"):
                 return self._send_item(self._stores().e2e_reports, path[len("/api/e2e/reports/") :])
             if path == "/api/sleep":
@@ -1103,6 +1106,9 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             if path.startswith("/api/e2e/tasks/") and path.endswith("/notes"):
                 task_id = path[len("/api/e2e/tasks/") : -len("/notes")]
                 return self._save_e2e_notes(task_id, payload)
+            if path.startswith("/api/e2e/tasks/") and path.endswith("/finalize"):
+                task_id = path[len("/api/e2e/tasks/") : -len("/finalize")]
+                return self._finalize_e2e_task(task_id, payload)
             if path == "/api/ideas":
                 return self._create_idea(payload)
             if path == "/api/backlog":
@@ -1710,10 +1716,41 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             }
         )
 
+    def _send_e2e_task(self, task_id: str) -> None:
+        record = self._stores().e2e_tasks.get(task_id)
+        if record is None:
+            return self._send_json({"ok": False, "error": "E2E task not found"}, status=404)
+        enriched = dict(record)
+        enriched["items"] = [
+            (
+                {**item, "history": self._stores().history_for_area(str(item.get("area", "")))}
+                if isinstance(item, dict)
+                else item
+            )
+            for item in record.get("items", [])
+        ]
+        self._send_json({"ok": True, "item": enriched})
+
+    def _finalize_e2e_task(self, task_id: str, payload: dict) -> None:
+        stores = self._stores()
+        if not stores.check_supervisor_token(self.headers.get("X-Supervisor-Token")):
+            return self._send_json({"ok": False, "error": "Supervisor token required"}, status=403)
+        steps = payload.get("steps")
+        if not isinstance(steps, dict):
+            return self._send_json(
+                {"ok": False, "error": "steps must map item ids to step lists"}, status=400
+            )
+        try:
+            record = stores.finalize_e2e_task(task_id, steps)
+        except StoreError as exc:
+            status = 404 if "not found" in str(exc).lower() else 400
+            return self._send_json({"ok": False, "error": str(exc)}, status=status)
+        self._send_json({"ok": True, "id": record["id"], "status": record["status"]})
+
     def _send_e2e_tasks(self, query: str) -> None:
         params = parse_qs(query)
         wanted = params.get("status", [None])[0]
-        if wanted is not None and wanted not in {"open", "submitted"}:
+        if wanted is not None and wanted not in {"open", "submitted", "draft"}:
             return self._send_json({"ok": False, "error": "Invalid status filter"}, status=400)
         items, _total = self._stores().e2e_tasks.list(limit=100)
         if wanted is not None:
@@ -1795,6 +1832,9 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             return self._send_json(
                 {"ok": False, "error": "range_base must be a string"}, status=400
             )
+        draft = payload.get("draft", False)
+        if not isinstance(draft, bool):
+            return self._send_json({"ok": False, "error": "draft must be a boolean"}, status=400)
         try:
             record = stores.create_e2e_task(
                 merge_commit=merge_commit,
@@ -1802,6 +1842,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 items=items,
                 created_by=created_by,
                 range_base=range_base,
+                draft=draft,
             )
         except StoreError as exc:
             return self._send_json({"ok": False, "error": str(exc)}, status=400)

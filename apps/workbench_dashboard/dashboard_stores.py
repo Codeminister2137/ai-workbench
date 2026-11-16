@@ -520,12 +520,14 @@ class DashboardStores:
         items: list[dict],
         created_by: str = "supervisor",
         range_base: str | None = None,
+        draft: bool = False,
     ) -> dict:
         """File one E2E task for a merge; one open task per merge commit.
 
         A resubmitted merge replaces nothing: while an open task exists
         for the commit, generation refuses so the owner never faces two
-        checklists for the same merge.
+        checklists for the same merge. Drafts (tasks awaiting pointers)
+        are replaced in place by regeneration since they hold no verdicts.
         """
         from e2e_promotion import BEHAVIOR_AREA_IDS
 
@@ -545,13 +547,19 @@ class DashboardStores:
                 raise StoreError(f"Unknown E2E area: {item.get('area')}")
             if not str(item.get("id", "")).strip():
                 raise StoreError("E2E items need ids")
+            self._check_item_steps(item)
         existing, _total = self.e2e_tasks.list(limit=1000)
-        if any(
-            entry.get("merge_commit") == merge_commit and entry.get("status") == "open"
-            for entry in existing
-            if isinstance(entry, dict)
-        ):
-            raise StoreError("An open E2E task already exists for this merge")
+        for entry in existing:
+            if not isinstance(entry, dict) or entry.get("merge_commit") != merge_commit:
+                continue
+            if entry.get("status") == "open":
+                raise StoreError("An open E2E task already exists for this merge")
+            if entry.get("status") == "draft":
+                entry["title"] = title.strip() or f"E2E promotion for {merge_commit}"
+                entry["items"] = items
+                entry["range_base"] = (range_base or "").strip() or None
+                self.e2e_tasks.put(entry["id"], entry)
+                return entry
         now = _utc_now()
         record = {
             "id": uuid.uuid4().hex,
@@ -559,7 +567,7 @@ class DashboardStores:
             "range_base": (range_base or "").strip() or None,
             "title": title.strip() or f"E2E promotion for {merge_commit}",
             "items": items,
-            "status": "open",
+            "status": "draft" if draft else "open",
             "created_by": created_by,
             "created_at": now,
             "submitted_at": None,
@@ -568,18 +576,35 @@ class DashboardStores:
         self.e2e_tasks.put(record["id"], record)
         return record
 
+    @staticmethod
+    def _check_item_steps(item: dict) -> None:
+        """Steps are optional (legacy tasks) but must be well-formed."""
+        steps = item.get("steps")
+        if steps is None:
+            return
+        if not isinstance(steps, list):
+            raise StoreError("E2E item steps must be a list")
+        for step in steps:
+            if not isinstance(step, dict):
+                raise StoreError("E2E steps must be objects")
+            if not str(step.get("action", "")).strip() or not str(step.get("expected", "")).strip():
+                raise StoreError("E2E steps need an action and an expected result")
+
     def submit_e2e_task(self, task_id: str, results: list[dict]) -> dict:
         """Submit owner verdicts; submitting auto-builds the E2E report.
 
         Every pending item needs exactly one pass/fail verdict; the
         report (including carried ancestor approvals with warnings) is
-        stored alongside the task. Submitted tasks are immutable.
+        stored alongside the task. Submitted tasks are immutable, and
+        drafts finalize before they can take verdicts.
         """
         from e2e_promotion import build_report
 
         record = self.e2e_tasks.get(task_id)
         if record is None:
             raise StoreError("E2E task not found")
+        if record.get("status") == "draft":
+            raise StoreError("E2E task is a draft awaiting pointers")
         if record.get("status") != "open":
             raise StoreError("E2E task is already submitted")
         if not isinstance(results, list):
@@ -591,6 +616,7 @@ class DashboardStores:
             submissions[str(entry["item_id"])] = {
                 "verdict": entry.get("verdict"),
                 "notes": entry.get("notes", ""),
+                "steps": entry.get("steps"),
             }
         try:
             report = build_report(record, submissions)
@@ -603,6 +629,69 @@ class DashboardStores:
         record["report_id"] = report["id"]
         self.e2e_tasks.put(task_id, record)
         return {"task": record, "report": report}
+
+    def finalize_e2e_task(self, task_id: str, steps_by_item: dict) -> dict:
+        """Turn a draft into an open task with finalized checkable steps.
+
+        Called after the owner answers the pointer request: every
+        pending behavior/regression item gets its authored steps, the
+        pointers flag clears, and the task opens for testing.
+        """
+        from e2e_cases import validate_steps
+
+        record = self.e2e_tasks.get(task_id)
+        if record is None:
+            raise StoreError("E2E task not found")
+        if record.get("status") != "draft":
+            raise StoreError("Only draft E2E tasks can be finalized")
+        if not isinstance(steps_by_item, dict):
+            raise StoreError("Finalize needs steps per item id")
+        for item in record.get("items", []):
+            if not isinstance(item, dict) or item.get("status") == "auto-pass":
+                continue
+            item_id = str(item.get("id", ""))
+            if item_id not in steps_by_item:
+                raise StoreError(f"Finalize needs steps for {item_id}")
+            try:
+                item["steps"] = validate_steps(steps_by_item[item_id])
+            except ValueError as exc:
+                raise StoreError(str(exc)) from exc
+            item["needs_pointers"] = False
+        record["status"] = "open"
+        record["finalized_at"] = _utc_now()
+        self.e2e_tasks.put(task_id, record)
+        return record
+
+    def history_for_area(self, area: str, limit: int = 3) -> list[dict]:
+        """Recent per-area verdicts, newest first — the forensic trail.
+
+        Each entry names the tested commit and report so the owner can
+        look up what worked, on which patch, at any moment.
+        """
+        reports, _total = self.e2e_reports.list(limit=1000)
+        trail: list[dict] = []
+        for report in sorted(
+            (r for r in reports if isinstance(r, dict)),
+            key=lambda r: str(r.get("built_utc") or ""),
+            reverse=True,
+        ):
+            for entry in report.get("items", []):
+                if not isinstance(entry, dict) or entry.get("area") != area:
+                    continue
+                if entry.get("verdict") not in ("pass", "fail"):
+                    continue
+                trail.append(
+                    {
+                        "report_id": report.get("id"),
+                        "commit": entry.get("tested_on") or report.get("commit"),
+                        "built_utc": report.get("built_utc"),
+                        "verdict": entry.get("verdict"),
+                        "verdict_by": entry.get("verdict_by"),
+                    }
+                )
+            if len(trail) >= limit:
+                break
+        return trail[:limit]
 
     def save_e2e_draft_notes(self, task_id: str, item_id: str, notes: str) -> dict:
         """Save in-progress notes for one open checklist item.
