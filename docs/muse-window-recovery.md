@@ -34,9 +34,12 @@ conhost reports handle 0 from inside it). Window enumeration and
 screenshots therefore need the owner-side run above; everything
 else the agent can collect itself.
 
-## Open follow-up (needs owner decision)
+## Watchdog (owner-approved 2026-11-16)
 
-A scheduled-task watchdog that polls visible conhost windows every
-few minutes and auto-captures on vanish detection. That is a
-persistent background service, so it ships only on explicit owner
-approval — the on-demand scripts above are the approved slice.
+Scheduled task `WorkbenchWindowWatch` runs `watch-window-loss.ps1`
+every 5 minutes (interactive-only, so it sees the desktop). A titled
+console stable across two ticks whose window disappears while its
+process lives is a suspected vanish: capture runs automatically into
+`.tmp/window-loss/auto-<stamp>/`, once per PID. Normal closes drop
+silently. Manage with `register-window-watchdog.ps1` (`-Unregister`
+removes it); state in `.tmp/watch-window-loss/state.json`.
