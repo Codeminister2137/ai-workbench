@@ -288,15 +288,16 @@ def test_chat_thread_has_run_request_button() -> None:
     assert "queue pre-approved agent runs from a thread" in js
 
 
-def test_inbox_badge_polls_live_open_count() -> None:
-    """The nav badge refreshes from /api/inbox on the ~10s cadence."""
+def test_inbox_badge_polls_live_attention_count() -> None:
+    """The nav badge refreshes the status attention count on the ~10s cadence."""
     js = _read("app.js")
     assert "inboxPollTimer" in js
     assert "stopInboxPoll" in js
     assert "startInboxPoll" in js
     assert "pollInboxBadge" in js
-    assert 'api("/api/inbox")' in js
-    assert 't.status === "open"' in js
+    assert 'api("/api/status")' in js
+    assert "await refreshBadge();" in js
+    assert "status.attention_inbox ?? status.open_inbox" in js
     assert "document.hidden" in js
     assert "10000" in js
     assert "startInboxPoll();" in js
@@ -940,3 +941,50 @@ def test_chat_live_progress_pins():
     assert 'mode === "agent" && !reduceMotion' in js
     assert "clearInterval(progressTimer)" in js
     assert "if (progressStopped) return;" in js
+
+
+def test_filter_changes_and_badge_execute():
+    """Checkbox changes keep valid routes and explicit empty selections across reloads."""
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node is required for filter execution")
+    driver = r"""
+const assert = require('assert');
+const source = require('fs').readFileSync(process.argv[1], 'utf8');
+const location = {hash: ''};
+let change;
+let checked = [];
+const view = {querySelectorAll: selector => selector.endsWith(':checked') ? checked :
+  [{addEventListener: (event, callback) => {assert.equal(event, 'change'); change = callback;}}]};
+eval(source.slice(source.indexOf('function bindFilterBoxes('), source.indexOf('/* Project filter')));
+for (const base of ['inbox', 'ideas', 'documents', 'plans', 'runs', 'backlog', 'workflows', 'e2e']) {
+  const param = base === 'e2e' ? 's' : 'f';
+  location.hash = '#/' + base;
+  assert.deepEqual([...pickedTokens(param, 'open,followup')], ['open', 'followup']);
+  bindFilterBoxes(base + '-filters', base, param);
+  checked = [{dataset: {f: 'open'}}]; change();
+  assert.equal(location.hash, '#/' + base + '?' + param + '=open');
+  assert.deepEqual([...pickedTokens(param, 'open,followup')], ['open']);
+  checked = []; change();
+  assert.equal(location.hash, '#/' + base + '?' + param + '=');
+  assert.equal(pickedTokens(param, 'open,followup').size, 0);
+  // Reading again models a fresh render/reload from the same hash.
+  assert.equal(pickedTokens(param, 'open,followup').size, 0);
+}
+const badge = {}, ideasBadge = {}, backlogBadge = {}, e2eBadge = {};
+let attention = 3;
+const api = async path => {
+  assert.equal(path, '/api/status');
+  return {attention_inbox: attention, open_inbox: 9};
+};
+eval(source.slice(source.indexOf('async function refreshBadge()'), source.indexOf('const GLOSSARY')));
+eval(source.slice(source.indexOf('async function pollInboxBadge()'), source.indexOf('function startInboxPoll()')));
+(async () => {
+  await pollInboxBadge(); assert.equal(badge.textContent, 3); assert.equal(badge.hidden, false);
+  attention = 0; await pollInboxBadge(); assert.equal(badge.hidden, true);
+})().catch(error => {console.error(error); process.exitCode = 1;});
+"""
+    result = subprocess.run(
+        [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
+    )
+    assert result.returncode == 0, result.stderr

@@ -137,11 +137,11 @@ function filterBoxes(id, groups, picked) {
 function bindFilterBoxes(id, base, param) {
   view.querySelectorAll(`#${id} input[data-f]`).forEach((b) => b.addEventListener("change", () => {
     const on = [...view.querySelectorAll(`#${id} input[data-f]:checked`)].map((x) => x.dataset.f);
-    location.hash = "#" + base + "?" + param + "=" + on.join(",");
+    location.hash = "#/" + base + "?" + param + "=" + on.join(",");
   }));
 }
 function pickedTokens(param, fallback) {
-  return new Set(((new URLSearchParams(location.hash.split("?")[1] || "").get(param) || fallback).split(",").filter(Boolean)));
+  return new Set(((new URLSearchParams(location.hash.split("?")[1] || "").get(param) ?? fallback).split(",").filter(Boolean)));
 }
 
 /* Project filter shared by the Runs and Inbox list views. */
@@ -171,24 +171,14 @@ function startRunsPoll() {
   }, 10000);
 }
 
-/* Inbox badge: honest live open count from /api/inbox every ~10s.
-   Best-effort read-only refresh; opening the inbox just re-renders,
-   it never answers or acknowledges anything. */
+/* Inbox badge: live human open/follow-up count from the status endpoint.
+   Read-only refresh; opening the inbox never answers or acknowledges tasks. */
 let inboxPollTimer = null;
 function stopInboxPoll() {
   if (inboxPollTimer) { clearInterval(inboxPollTimer); inboxPollTimer = null; }
 }
 async function pollInboxBadge() {
-  try {
-    const payload = await api("/api/inbox");
-    const open = (payload.items || []).filter((t) => t.status === "open").length;
-    if (open > 0) {
-      badge.textContent = open;
-      badge.hidden = false;
-    } else {
-      badge.hidden = true;
-    }
-  } catch (err) { /* keep the last badge; next tick retries */ }
+  await refreshBadge();
 }
 function startInboxPoll() {
   if (inboxPollTimer) return;
