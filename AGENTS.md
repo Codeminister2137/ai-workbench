@@ -677,6 +677,10 @@ component boundaries. Identify the failing operation, the component reporting it
 the originating service/runtime when evidenced, and the underlying cause. A generic
 HTTP status or wrapper message alone does not establish the underlying cause.
 
+Owner direction (2026-11-16): searching the web for similar bugs is a mandatory
+investigation step for product/runtime issues with no established cause. Do it
+before concluding the cause is unknown, and record what was searched and found.
+
 Pause repetition of the affected operation while investigating. A fresh bounded
 diagnostic may run under existing authorization when it answers a concrete question;
 it must not silently replay a consumed trial, extend bounds or bypass safeguards.
