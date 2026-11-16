@@ -24,6 +24,7 @@ class DashboardConfig:
     title: str = "Workbench Dashboard"
     history_budget_chars: int = 20000
     chat_fanout_policy: str = "restricted"
+    bridge_fanout_policy: str = "restricted"
     work_roots: tuple[str, ...] = ()
     supervision: str = "attended"
     trusted_hosts: tuple[str, ...] = ()
@@ -60,6 +61,7 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> DashboardConfig:
         "title": str,
         "history_budget_chars": int,
         "chat_fanout_policy": str,
+        "bridge_fanout_policy": str,
         "work_roots": list,
         "supervision": str,
         "trusted_hosts": list,

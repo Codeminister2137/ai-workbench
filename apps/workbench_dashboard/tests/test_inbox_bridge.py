@@ -56,6 +56,25 @@ def test_supervisor_filed_task_keeps_approval_gate(tmp_path) -> None:
     assert bridge_agent_queue(stores) == []
 
 
+def test_resolve_bridge_fanout_coerces_and_fails_closed() -> None:
+    from inbox_bridge import resolve_bridge_fanout
+
+    assert resolve_bridge_fanout("allowed") == "allowed"
+    assert resolve_bridge_fanout("denied") == "denied"
+    assert resolve_bridge_fanout(None) == "restricted"
+    assert resolve_bridge_fanout("sometimes") == "restricted"
+
+
+def test_bridge_uses_configured_fanout_policy(tmp_path) -> None:
+    stores = DashboardStores(tmp_path)
+    _agent_task(stores, created_by="supervisor")
+    (receipt,) = bridge_agent_queue(stores, fanout_policy="allowed")
+    run = stores.runs.get(receipt["run_id"])
+    assert run is not None
+    assert run["fanout_policy"] == "allowed"
+    assert run["fanout_effective"] == "allowed"
+
+
 def test_e2e_followup_is_preapproved_without_approval(tmp_path) -> None:
     """E2E follow-ups skip owner approval: agent acts, owner re-tests (owner decision 2026-11-16)."""
     stores = DashboardStores(tmp_path)

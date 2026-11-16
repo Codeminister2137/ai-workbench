@@ -2269,10 +2269,16 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         self._send_json({"ok": True, "toggles": describe_toggles(toggles)})
 
     def _bridge_inbox_runs(self) -> None:
-        from inbox_bridge import bridge_agent_queue
+        from inbox_bridge import bridge_agent_queue, resolve_bridge_fanout
 
         try:
-            receipts = bridge_agent_queue(self._stores())
+            from dashboard_config import load_config
+
+            policy = resolve_bridge_fanout(load_config(self.config_path).bridge_fanout_policy)
+        except Exception:  # noqa: BLE001 - config trouble fails closed to restricted
+            policy = "restricted"
+        try:
+            receipts = bridge_agent_queue(self._stores(), fanout_policy=policy)
         except Exception as exc:  # noqa: BLE001 - report, never 500 blindly
             return self._send_json({"ok": False, "error": str(exc)}, status=500)
         self._send_json({"ok": True, "bridged": receipts})
@@ -2915,10 +2921,12 @@ def maybe_start_drain_scheduler(
     drain_root = repo_root or REPO_ROOT
 
     def tick() -> None:
-        from inbox_bridge import bridge_agent_queue
+        from inbox_bridge import bridge_agent_queue, resolve_bridge_fanout
 
         try:
-            bridged = bridge_agent_queue(stores)
+            bridged = bridge_agent_queue(
+                stores, fanout_policy=resolve_bridge_fanout(config.bridge_fanout_policy)
+            )
         except Exception as exc:  # noqa: BLE001 - tick failures are never fatal
             print(f"Workbench dashboard: inbox bridge failed: {exc}")
             bridged = []
