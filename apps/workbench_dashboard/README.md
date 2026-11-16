@@ -27,7 +27,8 @@ inspect the owned process only.
 - Modules: catalogue distinguishes available, installed, and activated features.
   Toggle Overview, KnowMe, Meetings, Intake, and book tools; Trainer is listed
   as planned and cannot be activated. Save a landing page here; explicit deep
-  links take precedence. Disabled views point to Modules and their feature APIs
+  links take precedence. The root hash `#/` opens Home; URLs without a hash use
+  the saved landing page. Disabled views point to Modules and their feature APIs
   return 409. Existing data and installed code remain; prior approved runs are
   not cancelled. This is feature activation, not an authorization boundary.
 - Overview (the former Home): pending decisions, active/failed runs (up to 20
