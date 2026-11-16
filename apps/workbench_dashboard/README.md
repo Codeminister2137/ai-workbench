@@ -22,8 +22,10 @@ inspect the owned process only.
 ## What v1 does
 
 - Navigation groups Work (Plans, Runs, Schedule, Workflows), Library
-  (Documents, Ideas, Backlog), System (Fleet, Providers, Restrictions, Spend),
-  and specialist views. Existing hash links remain valid.
+  (Documents, Ideas, Backlog), System (Fleet, Providers, Restrictions),
+  and specialist views. Existing hash links remain valid (`#/spend`
+  redirects to Fleet, which now carries the spend card; providers list
+  their own allowances).
 - Modules: catalogue distinguishes available, installed, and activated features.
   Toggle Overview, KnowMe, Meetings, Intake, and book tools; Trainer is listed
   as planned and cannot be activated. Save a landing page here; explicit deep
