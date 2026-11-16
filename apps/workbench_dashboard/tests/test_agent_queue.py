@@ -149,15 +149,14 @@ def test_get_filters_by_assignee(queue_server) -> None:
 
 def test_queue_tab_present_in_js() -> None:
     js = (WEB_DIR / "app.js").read_text(encoding="utf-8")
-    assert "#/inbox?status=queue" in js
+    assert 'box("ai", "AI"' in js
     assert 'id="f-for"' in js
     assert "for AI" in js
 
 
 def test_human_and_attention_tabs_present_in_js() -> None:
     js = (WEB_DIR / "app.js").read_text(encoding="utf-8")
-    assert "#/inbox?status=human" in js
-    assert "#/inbox?status=attention" in js
-    assert 'tab === "human"' in js
-    assert 'tab === "attention"' in js
-    assert "needsHuman(t) || isFollowup(t)" in js
+    assert 'box("human", "Human"' in js
+    assert 'box("followup", "Needs follow-up"' in js
+    assert '"human,open,followup"' in js
+    assert "picked.has(who(t))" in js
