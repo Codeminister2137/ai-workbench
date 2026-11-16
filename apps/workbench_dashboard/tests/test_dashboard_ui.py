@@ -66,7 +66,9 @@ def test_dynamic_buttons_have_titles() -> None:
     """Every button rendered by app.js templates carries a tooltip title."""
     js = _read("app.js")
     buttons = re.findall(r"<button\b[^>]*>", js)
-    assert len(buttons) == 49  # +delete-inbox-btn +e2e submit +chat mode/apply/approve +notes save
+    assert (
+        len(buttons) == 50
+    )  # +fanout apply; +delete-inbox-btn +e2e submit +chat mode/apply/approve +notes save
     for tag in buttons:
         assert "title=" in tag, f"button without title: {tag}"
 
@@ -79,7 +81,7 @@ def test_dynamic_inputs_and_selects_have_titles() -> None:
     for tag in inputs:
         assert "title=" in tag, f"input without title: {tag}"
     selects = re.findall(r"<select\b[^>]*>", js)
-    assert len(selects) == 19  # +landing-page select
+    assert len(selects) == 20  # +fanout select; +landing-page select
     for tag in selects:
         assert "title=" in tag, f"select without title: {tag}"
 
@@ -98,6 +100,18 @@ def test_run_detail_has_report_section_and_button() -> None:
     assert 'id="report-btn"' in js
     assert 'title="Ask for a completion report for this run"' in js
     assert "/report-request" in js
+
+
+def test_run_detail_fanout_control_for_pending_runs() -> None:
+    """Run detail offers a fan-out selector on queued/paused runs only."""
+    js = _read("app.js")
+    assert 'id="fanout-select"' in js
+    assert 'id="fanout-apply-btn"' in js
+    assert 'title="Fan-out policy for this run"' in js
+    assert 'title="Apply fan-out policy to this run"' in js
+    assert '"/api/runs/" + encodeURIComponent(id) + "/fanout"' in js
+    assert 'run.status === "queued" || run.status === "paused"' in js
+    assert "Fan-out updated" in js
 
 
 def test_backlog_tab_grooms_and_promotes() -> None:

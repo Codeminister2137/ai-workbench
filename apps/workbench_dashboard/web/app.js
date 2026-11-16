@@ -1147,6 +1147,10 @@ async function renderRuns(id) {
     const run = payload.item;
     const meta = [run.status, run.branch, run.commit].filter(Boolean).map(esc).join(" · ");
     const fanout = run.fanout_effective || run.fanout_policy || "unknown";
+    const fanoutControl = (run.status === "queued" || run.status === "paused")
+      ? ` <select id="fanout-select" title="Fan-out policy for this run">${["allowed", "restricted", "denied"].map((p) => `<option value="${p}"${p === fanout ? " selected" : ""}>${p}</option>`).join("")}</select>
+        <button id="fanout-apply-btn" title="Apply fan-out policy to this run">Apply</button>`
+      : "";
     const report = run.report
       ? `<h3>Report</h3><pre>${gtext(run.report)}</pre>`
       : run.report_request_id
@@ -1170,7 +1174,7 @@ async function renderRuns(id) {
       ${failure}
       <div class="card"><h2>${gtext(run.title || run.id)}</h2>
       <p class="muted" id="run-status">${meta}</p>
-      <p title="Whether this run may spawn subagent children"><strong>Fan-out:</strong> <span class="pill">${esc(fanout)}</span></p>
+      <p title="Whether this run may spawn subagent children"><strong>Fan-out:</strong> <span class="pill">${esc(fanout)}</span>${fanoutControl}</p>
       ${synthesisHtml(run)}
       ${run.validation ? `<p><strong>Validation:</strong> ${esc(run.validation)}</p>` : ""}
       ${run.body ? `<pre>${gtext(run.body)}</pre>` : ""}
@@ -1193,6 +1197,21 @@ async function renderRuns(id) {
           body: "{}",
         });
         toast("Report requested — see inbox", true);
+        render();
+      } catch (err) {
+        toast(err.message, false);
+      }
+    });
+    const fanoutBtn = document.getElementById("fanout-apply-btn");
+    if (fanoutBtn) fanoutBtn.addEventListener("click", async () => {
+      const sel = document.getElementById("fanout-select");
+      try {
+        await api("/api/runs/" + encodeURIComponent(id) + "/fanout", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({policy: sel ? sel.value : "restricted"}),
+        });
+        toast("Fan-out updated", true);
         render();
       } catch (err) {
         toast(err.message, false);
