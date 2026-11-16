@@ -94,6 +94,10 @@ def prune(repo_root: Path, candidate: dict) -> None:
     if not branch.startswith("run/"):
         raise RuntimeError(f"refusing non-run branch: {branch}")
     _git(repo_root, "worktree", "remove", "--force", candidate["path"])
+    try:
+        _git(repo_root, "show-ref", "--verify", "--quiet", f"refs/heads/{branch}")
+    except RuntimeError:
+        return  # branch already pruned as merged; worktree removal is the fix
     _git(repo_root, "branch", "-D", branch)
 
 
