@@ -1,5 +1,21 @@
 # Session History
 
+## 2026-11-16 - Window-vanish: actor hunt exhausted, v2 auto-restore shipped (fa064c4)
+
+Fresh session 01a1e5ab. Corrected timeline from owner-report anchors
+(#1 = process death not hide; #2 ≈15:54-56; #3 ≈16:33-34; #4 ≈18:15-17;
+#5 ≈18:57-58; boot 15:19:55). Mechanism proven single-SW_HIDE-on-visible
+via semantics test; keepalive/push timing correlation identified as
+detection bias (log proves all-up at hides). Closed every actor family
+with evidence (crash, power/display, session, tasks, repo code, agent
+calls, injectors, public precedent — 14 web queries, no match). Actor
+remains unknown. Shipped watchdog v2: SW_SHOWNA auto-restore with
+minimized-never-touched guardrails + forensic fire-context per fire,
+live-tested end-to-end (minimize→no-fire, hide→VANISH+RESTORED),
+Tier-1 merged and pushed with verified gate. No new persistence.
+Pending (non-blocking): owner activity-at-hide questions; v2 trap
+collects prospective evidence. Next: forgotten-items sweep, agent queue.
+
 ## 2026-11-14/16 - E2E/Mai mega-session, window-loss saga, switch to fresh session
 
 Multi-day attended session (01a1d930, grew to 66MB/58k records — retired for
