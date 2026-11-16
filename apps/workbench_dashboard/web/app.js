@@ -275,7 +275,18 @@ async function renderReceiptsInto(id) {
     list.innerHTML = '<p class="muted">No receipts yet.</p>';
     return;
   }
+  const sig = JSON.stringify(receipts);
+  if (list.dataset.sig === sig) return;  // unchanged: keep the reader's open receipts
+  const openKeys = new Set([...list.querySelectorAll("details.open")].map((d) => {
+    const s = d.querySelector("summary");
+    return s ? s.textContent : "";
+  }));
   list.innerHTML = receipts.map(receiptHtml).join("");
+  list.dataset.sig = sig;
+  if (openKeys.size) list.querySelectorAll("details").forEach((d) => {
+    const s = d.querySelector("summary");
+    if (s && openKeys.has(s.textContent)) d.setAttribute("open", "");
+  });
 }
 
 /* Project picker: GET /api/work-roots -> {ok, roots:[{id,path,display_name}]}.

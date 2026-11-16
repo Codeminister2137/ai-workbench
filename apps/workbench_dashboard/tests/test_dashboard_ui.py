@@ -1026,3 +1026,47 @@ eval(source.slice(source.indexOf('async function renderE2EReminders('),
         [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
     )
     assert result.returncode == 0, result.stderr
+
+
+def test_receipts_keep_open_state_across_refreshes():
+    """Unchanged receipts skip re-render; changed ones restore open entries."""
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node is required for receipts execution")
+    driver = r"""
+const assert = require('assert');
+const source = require('fs').readFileSync(process.argv[1], 'utf8');
+const esc = (s) => String(s ?? '');
+let receipts = [{kind: 'r1'}, {kind: 'r2'}];
+const api = async () => ({receipts});
+let writes = 0;
+const opened = [];
+const details = (text) => ({
+  querySelector: () => ({textContent: text}),
+  setAttribute: (k) => { if (k === 'open') opened.push(text); },
+});
+let current = [];
+const list = {
+  dataset: {},
+  set innerHTML(v) { writes++; this._html = v; },
+  querySelectorAll: (sel) => sel === 'details.open' ? current.filter((d) => d._open) : current,
+};
+const document = {getElementById: () => list};
+eval(source.slice(source.indexOf('function receiptHtml('), source.indexOf('/* Project picker')));
+(async () => {
+  await renderReceiptsInto('x');
+  assert.equal(writes, 1);
+  await renderReceiptsInto('x');
+  assert.equal(writes, 1);  // unchanged data: no rewrite, reader undisturbed
+  current = [Object.assign(details('r1'), {_open: true}),
+    Object.assign(details('r2'), {_open: false})];
+  receipts = [{kind: 'r1'}, {kind: 'r2'}, {kind: 'r3'}];
+  await renderReceiptsInto('x');
+  assert.equal(writes, 2);
+  assert.deepEqual(opened, ['r1']);  // previously open entry restored
+})().catch(error => {console.error(error); process.exitCode = 1;});
+"""
+    result = subprocess.run(
+        [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
+    )
+    assert result.returncode == 0, result.stderr

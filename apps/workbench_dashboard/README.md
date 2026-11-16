@@ -50,7 +50,9 @@ inspect the owned process only.
   runs show live status, events/receipts, Did/Found/Next synthesis, and
   one fan-out indicator (allowed/restricted/denied, or unknown for
   records that predate the field). Project-scoped runs show staged
-  diffs for review with approve-and-apply.
+  diffs for review with approve-and-apply. Inbox-bridged runs inherit
+  `bridge_fanout_policy` from dashboard.json (`restricted` unless set);
+  E2E follow-up runs skip the approval item (owner re-tests instead).
 - Inbox: decisions/clarifications assigned to the owner; answers flow
   back as record updates. Creation requires the supervisor token when
   `data/supervisor.token` exists. The nav badge counts human-assigned open or follow-up tasks, independent of

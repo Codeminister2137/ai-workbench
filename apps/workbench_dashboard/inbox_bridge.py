@@ -21,6 +21,16 @@ from dashboard_stores import StoreError
 MAX_BRIDGE_PER_CALL = 10
 
 
+def resolve_bridge_fanout(raw: object) -> str:
+    """Coerce the configured bridge fan-out policy; fail-closed to restricted."""
+    from ai_agent.fanout import FanoutPolicy
+
+    try:
+        return FanoutPolicy.coerce(str(raw or "restricted")).value
+    except ValueError:
+        return FanoutPolicy.RESTRICTED.value
+
+
 def _mai_timeout_override(metadata: dict) -> dict[str, float]:
     """Validated Mai timeout override from task metadata (empty when absent).
 
