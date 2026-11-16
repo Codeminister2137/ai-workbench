@@ -75,6 +75,8 @@ def _dashboard_steps(evidence: dict[str, dict[str, list[str]]]) -> list[dict]:
     seen: set[str] = set()
     for path in sorted(evidence):
         for view in evidence[path]["views"]:
+            if view.strip("#/").count("/") > 0:
+                continue  # nested hashes need an id; not an openable view
             key = f"view:{view}"
             if key in seen:
                 continue
