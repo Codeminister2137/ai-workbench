@@ -1268,7 +1268,8 @@ async function renderE2E(id) {
     const payload = await api("/api/e2e/reports/" + encodeURIComponent(reportId));
     const report = payload.item;
     const rows = (report.items || []).map((entry) => {
-      const verdict = entry.verdict === "pass" ? "pass" : "fail";
+      const verdict = entry.verdict === "pass" ? "pass"
+        : entry.verdict === "bad-test" ? "bad-test" : "fail";
       const by = entry.verdict_by === "owner" ? "tested by you"
         : entry.verdict_by === "ancestor" ? "ancestor approval"
         : "no user-visible behavior";
@@ -1348,6 +1349,7 @@ async function renderE2E(id) {
         <label><input type="radio" name="verdict-${esc(entry.id)}" value="fail"> Fail</label></div>`;
       const controls = readOnly ? "" : `
         ${verdictRow}
+        <div><label><input type="checkbox" name="badtest-${esc(entry.id)}" title="Flag bad test design"> Flag bad test design (steps untestable or unclear)</label></div>
         <div><textarea name="notes-${esc(entry.id)}" rows="2" placeholder="Notes (what you tried, what you saw)..." title="Test notes for this behavior">${esc(entry.draft_notes || "")}</textarea></div>`;
       return `<li><strong>${esc(entry.behavior || entry.id)}</strong>
         <span class="pill st-pending">${esc(entry.kind || "")} · needs testing</span>
@@ -1374,17 +1376,29 @@ async function renderE2E(id) {
       const results = [];
       for (const entry of task.items || []) {
         if (entry.status === "auto-pass") continue;
+        const badFlag = form.querySelector(`input[name="badtest-${CSS.escape(entry.id)}"]`);
+        const flaggedBad = badFlag ? badFlag.checked : false;
+        const notesEl = form.querySelector(`textarea[name="notes-${CSS.escape(entry.id)}"]`);
+        const notes = notesEl ? notesEl.value : "";
+        if (flaggedBad && !notes.trim()) {
+          toast("Describe what is wrong with the test: " + entry.id, false);
+          return;
+        }
         const stepVerdicts = [];
-        for (let i = 0; i < (entry.steps || []).length; i++) {
-          const sel = form.querySelector(`input[name="step-${CSS.escape(entry.id)}-${i}"]:checked`);
-          if (!sel) {
-            toast("Every step needs a pass/fail verdict: " + entry.id, false);
-            return;
+        if (!flaggedBad) {
+          for (let i = 0; i < (entry.steps || []).length; i++) {
+            const sel = form.querySelector(`input[name="step-${CSS.escape(entry.id)}-${i}"]:checked`);
+            if (!sel) {
+              toast("Every step needs a pass/fail verdict: " + entry.id, false);
+              return;
+            }
+            stepVerdicts.push(sel.value);
           }
-          stepVerdicts.push(sel.value);
         }
         let verdict;
-        if (stepVerdicts.length) {
+        if (flaggedBad) {
+          verdict = "bad-test";
+        } else if (stepVerdicts.length) {
           verdict = stepVerdicts.includes("fail") ? "fail" : "pass";
         } else {
           const checked = form.querySelector(`input[name="verdict-${CSS.escape(entry.id)}"]:checked`);
@@ -1394,8 +1408,7 @@ async function renderE2E(id) {
           }
           verdict = checked.value;
         }
-        const notes = form.querySelector(`textarea[name="notes-${CSS.escape(entry.id)}"]`);
-        results.push({item_id: entry.id, verdict, notes: notes ? notes.value : "", steps: stepVerdicts});
+        results.push({item_id: entry.id, verdict, notes, steps: stepVerdicts});
       }
       try {
         const out = await api("/api/e2e/tasks/" + encodeURIComponent(id) + "/submit", {

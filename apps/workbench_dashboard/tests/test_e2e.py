@@ -88,6 +88,37 @@ def test_submit_files_followup_for_fails_and_notes(stores) -> None:
     assert followup["metadata"]["report_id"] == outcome["report"]["id"]
 
 
+def test_submit_accepts_bad_test_flag_without_steps(stores) -> None:
+    items = _items()
+    items[0]["steps"] = [
+        {"action": "Do the thing", "expected": "Works", "grounded": True},
+        {"action": "Do more", "expected": "Works", "grounded": True},
+    ]
+    task = stores.create_e2e_task(merge_commit="abc", title="t", items=items)
+    outcome = stores.submit_e2e_task(
+        task["id"],
+        [{"item_id": "behavior:dashboard", "verdict": "bad-test", "notes": "steps unclear"}],
+    )
+    entry = next(e for e in outcome["report"]["items"] if e["id"] == "behavior:dashboard")
+    assert entry["verdict"] == "bad-test"
+    assert entry["step_results"] == []
+    assert outcome["report"]["overall"] == "fail"
+    assert outcome["followup_id"]
+    inbox, _total = stores.inbox.list(limit=10)
+    (followup,) = [entry for entry in inbox if entry["id"] == outcome["followup_id"]]
+    assert "1 bad-test" in followup["title"]
+    assert "BAD TEST DESIGN" in followup["body"]
+
+
+def test_submit_rejects_bad_test_without_notes(stores) -> None:
+    task = stores.create_e2e_task(merge_commit="abc", title="t", items=_items())
+    with pytest.raises(StoreError, match="needs notes"):
+        stores.submit_e2e_task(
+            task["id"],
+            [{"item_id": "behavior:dashboard", "verdict": "bad-test", "notes": "  "}],
+        )
+
+
 def test_submit_files_followup_for_notes_on_pass(stores) -> None:
     task = stores.create_e2e_task(merge_commit="abc", title="t", items=_items())
     outcome = stores.submit_e2e_task(

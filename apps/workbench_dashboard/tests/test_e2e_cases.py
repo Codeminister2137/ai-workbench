@@ -52,7 +52,8 @@ def test_dashboard_steps_cite_views_and_routes() -> None:
     assert all(step["grounded"] for step in steps)
     actions = " ".join(step["action"] for step in steps)
     assert "#/e2e" in actions
-    assert "/api/e2e/tasks" in actions
+    assert "E2E tab (#/e2e)" in actions
+    assert "/api/e2e/tasks" not in actions
     assert all(step["action"].strip() and step["expected"].strip() for step in steps)
 
 
@@ -94,6 +95,35 @@ def test_nested_view_prefixes_ground_no_steps() -> None:
     evidence = {"x.js": {"symbols": [], "routes": [], "views": ["#/e2e", "#/e2e/report/"]}}
     steps = e2e_cases.draft_steps("dashboard", evidence, ["s"])
     assert [s["action"] for s in steps] == ["Open the e2e view (#/e2e)"]
+
+
+def test_mapped_routes_name_the_tab() -> None:
+    evidence = {
+        "x.js": {
+            "symbols": ["renderRuns"],
+            "routes": ["/api/runs", "/api/e2e/tasks"],
+            "views": [],
+        }
+    }
+    steps = e2e_cases.draft_steps("dashboard", evidence, ["s"])
+    assert [s["action"] for s in steps] == [
+        "Open the Runs tab (#/runs) and exercise the changed control end to end"
+        " (touched: renderRuns)",
+        "Open the E2E tab (#/e2e) and exercise the changed control end to end"
+        " (touched: renderRuns)",
+    ]
+    assert all(s["grounded"] for s in steps)
+    assert e2e_cases.needs_pointers(steps) is False
+
+
+def test_unmapped_routes_fall_back_to_pointers() -> None:
+    evidence = {
+        "x.js": {"symbols": [], "routes": ["/api/status"], "views": []},
+    }
+    (step,) = e2e_cases.draft_steps("dashboard", evidence, ["s"])
+    assert step["grounded"] is False
+    assert "/api/status" in step["action"]
+    assert e2e_cases.needs_pointers([step]) is True
 
 
 def test_agent_cli_steps_do_not_claim_help_flags() -> None:

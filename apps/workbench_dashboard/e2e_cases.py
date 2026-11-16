@@ -81,9 +81,45 @@ def _view_label(view: str) -> str:
     return view.removeprefix("#/").strip("/").replace("/", " ").strip() or "home"
 
 
+# API route prefix -> (tab label, tab hash). Verified against the app.js
+# router; routes without a mapped tab cannot ground a UI step and fall
+# back to owner pointers instead of an unactionable "trigger from the UI".
+ROUTE_UI: tuple[tuple[str, str, str], ...] = (
+    ("/api/e2e/", "E2E", "#/e2e"),
+    ("/api/chat/", "Chat", "#/chat"),
+    ("/api/inbox", "Inbox", "#/inbox"),
+    ("/api/runs", "Runs", "#/runs"),
+    ("/api/ideas", "Ideas", "#/ideas"),
+    ("/api/backlog", "Backlog", "#/backlog"),
+    ("/api/plans", "Plans", "#/plans"),
+    ("/api/documents", "Documents", "#/documents"),
+    ("/api/workflows", "Workflows", "#/workflows"),
+    ("/api/projects", "Projects", "#/projects"),
+    ("/api/meetings", "Meetings", "#/meetings"),
+    ("/api/knowme", "KnowMe", "#/knowme"),
+    ("/api/providers", "Providers", "#/providers"),
+    ("/api/fleet", "Fleet", "#/fleet"),
+    ("/api/spend", "Spend", "#/spend"),
+    ("/api/invoices", "Invoices", "#/invoices"),
+    ("/api/intake", "Intake", "#/intake"),
+    ("/api/modules", "Modules", "#/modules"),
+    ("/api/restrictions", "Restrictions", "#/restrictions"),
+    ("/api/tasks/propose", "Schedule", "#/schedule"),
+    ("/api/overview", "Home", "#/"),
+)
+
+
+def _route_ui(route: str) -> tuple[str, str] | None:
+    for prefix, label, view_hash in ROUTE_UI:
+        if route == prefix.rstrip("/") or route.startswith(prefix):
+            return label, view_hash
+    return None
+
+
 def _dashboard_steps(evidence: dict[str, dict[str, list[str]]]) -> list[dict]:
     steps: list[dict] = []
     seen: set[str] = set()
+    unmapped: list[str] = []
     for path in sorted(evidence):
         for view in evidence[path]["views"]:
             if view.strip("#/").count("/") > 0:
@@ -99,21 +135,42 @@ def _dashboard_steps(evidence: dict[str, dict[str, list[str]]]) -> list[dict]:
                     "grounded": True,
                 }
             )
+        symbols = ", ".join(sorted(set(evidence[path]["symbols"])))
+        touched = f" (touched: {symbols})" if symbols else ""
         for route in evidence[path]["routes"]:
             key = f"route:{route}"
             if key in seen:
                 continue
             seen.add(key)
+            mapped = _route_ui(route)
+            if mapped is None:
+                unmapped.append(route)
+                continue
+            label, view_hash = mapped
             steps.append(
                 {
-                    "action": f"Trigger the action served by {route} from the UI",
+                    "action": (
+                        f"Open the {label} tab ({view_hash}) and exercise "
+                        f"the changed control end to end{touched}"
+                    ),
                     "expected": "Action completes; badges and counts update; no error toast.",
                     "grounded": True,
                 }
             )
+    if unmapped:
+        steps.append(
+            {
+                "action": (
+                    "Route(s) without a mapped UI surface: "
+                    + ", ".join(sorted(set(unmapped)))
+                    + " — pointers needed"
+                ),
+                "expected": "N/A: the owner names what to verify.",
+                "grounded": False,
+            }
+        )
     # Note: _send_* symbols are API handlers, not views — views ground
-    # only from #/... hashes, actions only from /api/... routes. A .py-only
-    # dashboard diff therefore falls through to the pointer fallback below.
+    # only from #/... hashes, actions only from mapped /api/... routes.
     return steps
 
 
