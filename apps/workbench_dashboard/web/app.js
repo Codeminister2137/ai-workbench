@@ -471,24 +471,18 @@ async function renderModules() {
   });
 }
 
-async function renderSpend() {
-  let spend = "";
-  try {
-    const sp = await api("/api/spend");
-    const policy = sp.spend.policy || { rules: [], prepaid_spent_today_cents: 0 };
-    const policyRules = policy.rules.map((r) =>
-      `<li>${esc(r.scope)}: prepaid ${r.prepaid_allowed ? "allowed" : "blocked"}` + (r.max_prepaid_cents_per_day == null ? "" : `, cap ${esc(r.max_prepaid_cents_per_day)}&#162;/day`) + `</li>`).join("");
-    spend = sp.spend.configured
-      ? `<ul class="plain">${sp.spend.buckets.map((b) =>
-          `<li><span class="pill" title="Allowance status">${esc(b.status)}</span> ${esc(b.provider)} ${esc(b.kind)} — ${esc(b.balance_cents)}/${esc(b.granted_cents)}¢</li>`).join("")}</ul>
-        <p class="muted">${esc(sp.spend.open_reservations)} open reservation(s), ${esc(sp.spend.records)} record(s).</p>
-        <p class="muted">Order: free &#8594; expiring &#8594; prepaid-if-allowed. Prepaid today: ${esc(policy.prepaid_spent_today_cents)}&#162;.</p>
-        <ul class="plain">${policyRules}</ul>`
-      : '<p class="muted">No spend grants configured — billable calls are denied by default.</p>';
-  } catch (err) {
-    spend = '<p class="muted">Spend unavailable: ' + esc(err.message) + "</p>";
-  }
-  view.innerHTML = `<h1>Spend</h1><div class="card"><h2>Spend</h2>${spend}</div>`;
+function spendCardHtml(spend) {
+  const policy = spend.policy || { rules: [], prepaid_spent_today_cents: 0 };
+  const policyRules = policy.rules.map((r) =>
+    `<li>${esc(r.scope)}: prepaid ${r.prepaid_allowed ? "allowed" : "blocked"}` + (r.max_prepaid_cents_per_day == null ? "" : `, cap ${esc(r.max_prepaid_cents_per_day)}&#162;/day`) + `</li>`).join("");
+  const body = spend.configured
+    ? `<ul class="plain">${spend.buckets.map((b) =>
+        `<li><span class="pill" title="Allowance status">${esc(b.status)}</span> ${esc(b.provider)} ${esc(b.kind)} — ${esc(b.balance_cents)}/${esc(b.granted_cents)}¢</li>`).join("")}</ul>
+      <p class="muted">${esc(spend.open_reservations)} open reservation(s), ${esc(spend.records)} record(s).</p>
+      <p class="muted">Order: free &#8594; expiring &#8594; prepaid-if-allowed. Prepaid today: ${esc(policy.prepaid_spent_today_cents)}&#162;.</p>
+      <ul class="plain">${policyRules}</ul>`
+    : '<p class="muted">No spend grants configured — billable calls are denied by default.</p>';
+  return `<div class="card"><h2>Spend</h2>${body}</div>`;
 }
 
 async function renderHome() {
@@ -2284,6 +2278,13 @@ async function renderFleet() {
   try {
     const payload = await api("/api/fleet");
     const f = payload.fleet;
+    let spendCard = "";
+    try {
+      const sp = await api("/api/spend");
+      spendCard = spendCardHtml(sp.spend);
+    } catch (err) {
+      spendCard = '<div class="card"><h2>Spend</h2><p class="muted">Spend unavailable: ' + esc(err.message) + "</p></div>";
+    }
     let ownerSleep = {active: false};
     try {
       ownerSleep = await api("/api/sleep");
@@ -2328,7 +2329,8 @@ async function renderFleet() {
         <button type="button" id="sleep-cancel" title="Cancel your scheduled sleep (agent timers untouched)">Cancel sleep</button>
       </form></div>
       <div class="card"><h2>Active runs</h2><ul class="plain">${runRows}</ul></div>
-      <div class="card"><h2>Supervised runs</h2><ul class="plain">${agentRows}</ul>${f.agents.explain ? `<p class="muted">${esc(f.agents.explain)}</p>` : ""}</div>`;
+      <div class="card"><h2>Supervised runs</h2><ul class="plain">${agentRows}</ul>${f.agents.explain ? `<p class="muted">${esc(f.agents.explain)}</p>` : ""}</div>
+      ${spendCard}`;
     view.innerHTML = `<h1>Fleet</h1><p class="muted">Probed live on open. Watchdogs, servers, sleep guard, active and supervised runs.</p>${body}`;
     document.getElementById("sleep-form").addEventListener("submit", async (ev) => {
       ev.preventDefault();
@@ -2499,7 +2501,7 @@ function providerCheckedAt(p) {
   return d.toLocaleString();
 }
 
-function providerCardHtml(p) {
+function providerCardHtml(p, allowances) {
   const samples = (p.sample_ids || []).map((s) => `<li>${esc(s)}</li>`).join("");
   const sampleBlock = samples
     ? `<p class="muted">Sample models:</p><ul class="plain">${samples}</ul>` : "";
@@ -2514,16 +2516,27 @@ function providerCardHtml(p) {
     : (p.key_configured
       ? '<p class="muted">API key is configured.</p>'
       : '<p class="muted">No API key configured - add one to use this provider.</p>');
+  const allowanceRows = (allowances || [])
+    .map((b) => `<li><span class="pill" title="Allowance status">${esc(b.status)}</span> ${esc(b.kind)} — ${esc(b.balance_cents)}/${esc(b.granted_cents)}¢</li>`)
+    .join("");
+  const allowanceBlock = (allowances || []).length
+    ? `<p class="muted">Allowances:</p><ul class="plain">${allowanceRows}</ul>` : "";
   return `<div class="card"><h2>${esc(p.display)}</h2>
     <p>${providerStatusPill(p)}</p>
     <p class="muted">${esc(p.blurb || "")}</p>
-    ${keyLine}${site}${latency}${err}${sampleBlock}
+    ${keyLine}${site}${latency}${err}${allowanceBlock}${sampleBlock}
     <p class="muted">Checked: ${esc(providerCheckedAt(p))}</p></div>`;
 }
 
 async function renderProviders() {
   const data = await api("/api/providers");
-  const cards = (data.providers || []).map(providerCardHtml).join("");
+  let buckets = [];
+  try {
+    const sp = await api("/api/spend");
+    buckets = (sp.spend && sp.spend.buckets) || [];
+  } catch (err) { /* allowances stay hidden when spend is unavailable */ }
+  const cards = (data.providers || []).map((p) =>
+    providerCardHtml(p, buckets.filter((b) => b.provider === p.route))).join("");
   const note = data.cached
     ? "Showing the last saved check."
     : "Fresh check.";
@@ -2564,7 +2577,7 @@ async function render() {
       return;
     }
     if (name === "modules") await renderModules();
-    else if (name === "spend") await renderSpend();
+    else if (name === "spend") { location.hash = "#/fleet"; return; }
     else if (name === "home") await renderHome();
     else if (name === "chat" && id) {
       const q = new URLSearchParams(query || "").get("q");

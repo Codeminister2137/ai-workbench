@@ -57,7 +57,7 @@ def test_static_controls_have_titles() -> None:
     for tag in re.findall(r"<button\b[^>]*>", html):
         assert "title=" in tag, f"button without title: {tag}"
     nav_links = re.findall(r"<a\b[^>]*data-view[^>]*>", html)
-    assert len(nav_links) == 22  # 19 + modules tab + spend tab + E2E tab
+    assert len(nav_links) == 21  # 19 + modules tab + E2E tab (spend merged into fleet)
     for tag in nav_links:
         assert "title=" in tag, f"nav link without title: {tag}"
 
@@ -841,8 +841,20 @@ def test_providers_view_markers_present() -> None:
     assert "/api/providers/refresh" in js
     assert "providers-refresh" in js
     assert "Log in / register at" in js
+    assert "Allowances:" in js
+    assert "b.provider === p.route" in js
     html = _read("index.html")
     assert 'data-view="providers"' in html
+
+
+def test_spend_merged_into_fleet() -> None:
+    """Spend view merged: fleet carries the spend card, #/spend redirects."""
+    js = _read("app.js")
+    html = _read("index.html")
+    assert "renderSpend" not in js
+    assert "spendCardHtml" in js
+    assert 'location.hash = "#/fleet"' in js
+    assert 'data-view="spend"' not in html
 
 
 def test_schedule_and_fleet_use_readable_times_and_explanations() -> None:
