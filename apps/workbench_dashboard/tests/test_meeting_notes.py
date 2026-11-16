@@ -19,6 +19,7 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 import pytest
+from dashboard_test_http import post_json
 from dashboard_web_app import DashboardRequestHandler
 from meeting_notes import (
     DEFAULT_RETENTION_DAYS,
@@ -470,17 +471,6 @@ def _get_json(base: str, path: str) -> dict:
         return json.loads(response.read().decode("utf-8"))
 
 
-def _post_json(base: str, path: str, payload: dict) -> dict:
-    request = Request(
-        f"{base}{path}",
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    with urlopen(request, timeout=30) as response:
-        return json.loads(response.read().decode("utf-8"))
-
-
 def test_meeting_endpoints_purge_expired_on_read(meeting_server) -> None:
     base, tmp_path, _, _ = meeting_server
     data_dir = tmp_path / "data"
@@ -525,13 +515,20 @@ def test_meeting_endpoints_list_get_and_analyze(meeting_server, monkeypatch) -> 
         raising=False,
     )
     with pytest.raises(HTTPError) as exc:
-        _post_json(base, f"/api/meetings/{meeting_id}/analyze", {"confirm_external": False})
+        post_json(
+            base,
+            f"/api/meetings/{meeting_id}/analyze",
+            {"confirm_external": False},
+            timeout=30,
+        )
     assert exc.value.code == 409
-    out = _post_json(base, f"/api/meetings/{meeting_id}/analyze", {"confirm_external": True})
+    out = post_json(
+        base, f"/api/meetings/{meeting_id}/analyze", {"confirm_external": True}, timeout=30
+    )
     assert out["ok"] is True and "do the thing" in out["analysis"]
     assert out["route"] == "fake/route"
     refetched = _get_json(base, f"/api/meetings/{meeting_id}")
     assert refetched["analysis"] is not None
     with pytest.raises(HTTPError) as exc:
-        _post_json(base, "/api/meetings/mtg-ghost/analyze", {"confirm_external": True})
+        post_json(base, "/api/meetings/mtg-ghost/analyze", {"confirm_external": True}, timeout=30)
     assert exc.value.code == 404

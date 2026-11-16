@@ -26,20 +26,22 @@ class LocalAgent:
             )
         )
 
-    def answer(self, conversation: Iterable[AIMessage]) -> str:
+    def _complete(self, messages: tuple[AIMessage, ...]) -> str:
+        """Run one blocking completion with this member's model settings."""
         response = self.client.complete(
             AIRequest(
-                messages=self._messages(conversation),
+                messages=messages,
                 model=self.member.model,
                 temperature=self.member.temperature,
             )
         )
         return response.message.content
 
-    def stream_answer(self, conversation: Iterable[AIMessage]):
+    def _stream(self, messages: tuple[AIMessage, ...]):
+        """Stream one completion, yielding text deltas with this member's settings."""
         for event in self.client.stream(
             AIRequest(
-                messages=self._messages(conversation),
+                messages=messages,
                 model=self.member.model,
                 temperature=self.member.temperature,
             )
@@ -48,54 +50,26 @@ class LocalAgent:
                 yield event.content
             elif isinstance(event, AIStreamFinal):
                 continue
+
+    def answer(self, conversation: Iterable[AIMessage]) -> str:
+        return self._complete(self._messages(conversation))
+
+    def stream_answer(self, conversation: Iterable[AIMessage]):
+        yield from self._stream(self._messages(conversation))
 
     def react(self, conversation: Iterable[AIMessage], peer_answers: list[tuple[str, str]]) -> str:
         """React to other members' round-1 answers (round 2)."""
-        response = self.client.complete(
-            AIRequest(
-                messages=self._reaction_messages(conversation, peer_answers),
-                model=self.member.model,
-                temperature=self.member.temperature,
-            )
-        )
-        return response.message.content
+        return self._complete(self._reaction_messages(conversation, peer_answers))
 
     def stream_react(self, conversation: Iterable[AIMessage], peer_answers: list[tuple[str, str]]):
-        for event in self.client.stream(
-            AIRequest(
-                messages=self._reaction_messages(conversation, peer_answers),
-                model=self.member.model,
-                temperature=self.member.temperature,
-            )
-        ):
-            if isinstance(event, AIStreamDelta):
-                yield event.content
-            elif isinstance(event, AIStreamFinal):
-                continue
+        yield from self._stream(self._reaction_messages(conversation, peer_answers))
 
     def synthesize(self, conversation: Iterable[AIMessage], answers: list[tuple[str, str]]) -> str:
         """Synthesize all positions as chair (round 3)."""
-        response = self.client.complete(
-            AIRequest(
-                messages=self._synthesis_messages(conversation, answers),
-                model=self.member.model,
-                temperature=self.member.temperature,
-            )
-        )
-        return response.message.content
+        return self._complete(self._synthesis_messages(conversation, answers))
 
     def stream_synthesize(self, conversation: Iterable[AIMessage], answers: list[tuple[str, str]]):
-        for event in self.client.stream(
-            AIRequest(
-                messages=self._synthesis_messages(conversation, answers),
-                model=self.member.model,
-                temperature=self.member.temperature,
-            )
-        ):
-            if isinstance(event, AIStreamDelta):
-                yield event.content
-            elif isinstance(event, AIStreamFinal):
-                continue
+        yield from self._stream(self._synthesis_messages(conversation, answers))
 
     def _reaction_messages(
         self, conversation: Iterable[AIMessage], peer_answers: list[tuple[str, str]]

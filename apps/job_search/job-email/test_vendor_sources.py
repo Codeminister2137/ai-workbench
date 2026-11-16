@@ -66,24 +66,23 @@ def _prospeo_ok(url, headers, payload, timeout):
     }
 
 
-def test_apollo_resolves_verified_proposal() -> None:
-    source = ApolloContactSource(api_key="k-apollo", post=_apollo_ok)
+@pytest.mark.parametrize(
+    ("source_cls", "post", "api_key", "expected_source"),
+    [
+        (ApolloContactSource, _apollo_ok, "k-apollo", "apollo:people/match"),
+        (ProspeoContactSource, _prospeo_ok, "k-prospeo", "prospeo:enrich-person"),
+    ],
+)
+def test_vendor_resolves_verified_proposal(
+    source_cls, post, api_key: str, expected_source: str
+) -> None:
+    source = source_cls(api_key=api_key, post=post)
     assert source.ready is True
     proposal = source.resolve(_vacancy())
     assert proposal is not None
     assert proposal.email == "anna.kowalska@example.com"
     assert proposal.verified is True
-    assert proposal.source == "apollo:people/match"
-
-
-def test_prospeo_resolves_verified_proposal() -> None:
-    source = ProspeoContactSource(api_key="k-prospeo", post=_prospeo_ok)
-    assert source.ready is True
-    proposal = source.resolve(_vacancy())
-    assert proposal is not None
-    assert proposal.email == "anna.kowalska@example.com"
-    assert proposal.verified is True
-    assert proposal.source == "prospeo:enrich-person"
+    assert proposal.source == expected_source
 
 
 def test_vendors_return_none_without_signals() -> None:

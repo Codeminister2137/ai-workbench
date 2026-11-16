@@ -9,49 +9,17 @@ answers never schedule.
 from __future__ import annotations
 
 import json
-import threading
-from http.server import ThreadingHTTPServer
 from pathlib import Path
 
 import pytest
-from dashboard_test_http import post_json
-from dashboard_web_app import DashboardRequestHandler
+from dashboard_test_http import post_json, serve_dashboard
 
 
 @pytest.fixture
-def sched_server(tmp_path, monkeypatch):
-    config_path = tmp_path / "dashboard.json"
-    config_path.write_text(
-        json.dumps({"provider": "ollama", "model": "fake", "title": "Test Board"}),
-        encoding="utf-8",
-    )
-    data_dir = tmp_path / "data"
-
-    class TestHandler(DashboardRequestHandler):
-        def log_message(self, format, *args):
-            return
-
-    TestHandler.config_path = config_path
-    TestHandler.data_dir = data_dir
-    TestHandler.repo_root = tmp_path
+def sched_server(tmp_path):
     calls: list = []
-
-    def fake_factory():
-        def fake_executor(run: dict) -> dict:
-            calls.append(run["id"])
-            return {"status": "completed", "summary": "fake ran it"}
-
-        return fake_executor
-
-    monkeypatch.setattr(TestHandler, "drain_executor_factory", staticmethod(fake_factory))
-    server = ThreadingHTTPServer(("127.0.0.1", 0), TestHandler)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    try:
-        yield f"http://127.0.0.1:{server.server_port}", tmp_path, calls
-    finally:
-        server.shutdown()
-        server.server_close()
+    with serve_dashboard(tmp_path, drain_calls=calls) as (base, _tmp):
+        yield base, _tmp, calls
 
 
 def _propose(base: str) -> dict:

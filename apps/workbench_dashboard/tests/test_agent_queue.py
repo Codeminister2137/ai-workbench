@@ -2,44 +2,20 @@
 
 from __future__ import annotations
 
-import json
-import threading
-from http.server import ThreadingHTTPServer
 from pathlib import Path
 from urllib.error import HTTPError
 
 import pytest
 from dashboard_stores import DashboardStores, StoreError
-from dashboard_test_http import get_json, post_json
-from dashboard_web_app import DashboardRequestHandler
+from dashboard_test_http import get_json, post_json, serve_dashboard
 
 WEB_DIR = Path(__file__).resolve().parents[1] / "web"
 
 
 @pytest.fixture
 def queue_server(tmp_path):
-    config_path = tmp_path / "dashboard.json"
-    config_path.write_text(
-        json.dumps({"provider": "ollama", "model": "fake", "title": "Test Board"}),
-        encoding="utf-8",
-    )
-    data_dir = tmp_path / "data"
-
-    class TestHandler(DashboardRequestHandler):
-        def log_message(self, format, *args):
-            return
-
-    TestHandler.config_path = config_path
-    TestHandler.data_dir = data_dir
-    TestHandler.repo_root = tmp_path
-    server = ThreadingHTTPServer(("127.0.0.1", 0), TestHandler)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    try:
-        yield f"http://127.0.0.1:{server.server_port}", tmp_path
-    finally:
-        server.shutdown()
-        server.server_close()
+    with serve_dashboard(tmp_path) as server:
+        yield server
 
 
 def test_create_defaults_to_supervisor_owner(tmp_path) -> None:
