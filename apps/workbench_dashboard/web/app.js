@@ -1227,8 +1227,8 @@ async function renderE2E(id) {
     const payload = await api("/api/e2e/tasks/" + encodeURIComponent(id));
     const task = payload.item;
     const submitted = task.status === "submitted";
-    const whatHtml = (entry) => {
-      const subjects = (entry.what || []).map((s) => `<li>${esc(s)}</li>`).join("");
+    const whatHtml = (entry, showSubjects) => {
+      const subjects = showSubjects ? (entry.what || []).map((s) => `<li>${esc(s)}</li>`).join("") : "";
       const files = (entry.files || []).map((f) => {
         const c = (entry.churn || {})[f];
         const tag = c ? ` <span class="muted">+${c[0]}/-${c[1]}</span>` : "";
@@ -1259,15 +1259,15 @@ async function renderE2E(id) {
     const historyHtml = (entry) => {
       const trail = (entry.history || []).map((h) =>
         `<a href="#/e2e/report/${esc(h.report_id || "")}" title="Open the report">${esc(h.verdict || "")} @ ${esc((h.commit || "").slice(0, 7))}</a>`).join(" · ");
-      return trail ? `<p class="muted">Previously: ${trail}</p>` : "";
+      return trail ? `<p class="muted">Recent verdicts for this area (all merges): ${trail}</p>` : "";
     };
     const readOnly = task.status !== "open";
-    const blocks = (task.items || []).map((entry) => {
+    const blocks = (task.items || []).map((entry, index) => {
       if (entry.status === "auto-pass") {
         const note = entry.warning || entry.reason || "auto-passed";
         return `<li><strong>${esc(entry.behavior || entry.id)}</strong>
           <span class="pill">auto-pass · ${esc(entry.verdict_by || "")}</span>
-          <p class="muted">${esc(note)}</p>${whatHtml(entry)}</li>`;
+          <p class="muted">${esc(note)}</p>${whatHtml(entry, index === 0)}</li>`;
       }
       const controls = readOnly ? "" : `
         <div><label><input type="radio" name="verdict-${esc(entry.id)}" value="pass"> Pass</label>
@@ -1278,7 +1278,7 @@ async function renderE2E(id) {
         ${entry.needs_pointers ? `<p class="muted">Draft steps — pointers requested; final checks land before testing opens.</p>` : ""}
         ${stepsHtml(entry, readOnly)}
         ${historyHtml(entry)}
-        ${whatHtml(entry)}
+        ${whatHtml(entry, index === 0)}
         ${controls}</li>`;
     }).join("");
     const isDraft = task.status === "draft";
