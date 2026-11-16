@@ -1868,6 +1868,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 "status": outcome["task"]["status"],
                 "report_id": outcome["report"]["id"],
                 "overall": outcome["report"]["overall"],
+                "followup_id": outcome.get("followup_id"),
             }
         )
 

@@ -75,7 +75,7 @@ def test_dynamic_inputs_and_selects_have_titles() -> None:
     """Text inputs/selects in templates have titles (radios use labels)."""
     js = _read("app.js")
     inputs = [tag for tag in re.findall(r"<input\b[^>]*>", js) if 'type="radio"' not in tag]
-    assert len(inputs) == 54  # -quick-chat text +1 checkbox template +e2e step checkbox
+    assert len(inputs) == 56  # +inbox filter box +e2e filter box templates
     for tag in inputs:
         assert "title=" in tag, f"input without title: {tag}"
     selects = re.findall(r"<select\b[^>]*>", js)
@@ -624,7 +624,7 @@ def test_inbox_supports_owner_tasks() -> None:
     assert 'item.type === "task"' in js
     assert "answer Done with a note" in js
     assert "Never paste secrets here" in js
-    assert "assigns decisions and tasks to the inbox" in js
+    assert "tick Closed to see the archive" in js
 
 
 def test_chat_send_refreshes_thread_on_failure() -> None:
@@ -682,7 +682,43 @@ def test_inbox_close_form_and_reopen_markers() -> None:
     assert 'id="reopen-btn"' in js
     assert "/reopen" in js
     assert "<h3>Outcome</h3>" in js
-    assert "#/inbox?status=archive" in js
+    assert 'box("closed", "Closed"' in js
+
+
+def test_inbox_checkbox_filters_default_human_attention() -> None:
+    """Inbox mixes Who/State checkboxes; default is human attention."""
+    js = _read("app.js")
+    assert 'id="inbox-filters"' in js
+    assert '"human,open,followup"' in js
+    assert 'data-f="${token}"' in js
+    for token, label in (
+        ("human", "Human"),
+        ("ai", "AI"),
+        ("open", "Open"),
+        ("answered", "Answered"),
+        ("followup", "Needs follow-up"),
+        ("closed", "Closed"),
+    ):
+        assert f'box("{token}", "{label}"' in js
+    assert "status=queue" not in js
+    assert "status=attention" not in js
+
+
+def test_e2e_checkbox_filters_default_attention_no_ai() -> None:
+    """E2E mixes checklist/report checkboxes; default open/draft/failed."""
+    js = _read("app.js")
+    assert 'id="e2e-filters"' in js
+    assert '"open,draft,fail"' in js
+    assert 'data-s="${token}"' in js
+    for token, label in (
+        ("open", "Open"),
+        ("draft", "Drafts"),
+        ("submitted", "Submitted"),
+        ("fail", "Failed"),
+        ("pass", "Passed"),
+    ):
+        assert f'box("{token}", "{label}"' in js
+    assert js.count('box("ai"') == 1  # inbox only; E2E is human by design
 
 
 def test_system_retains_spend_card() -> None:
@@ -799,13 +835,13 @@ def test_inbox_detail_has_delete_button_with_confirm() -> None:
 
 
 def test_inbox_followup_mark_stays_out_of_archive() -> None:
-    """Follow-up closes are marked and excluded from the archive tab."""
+    """Follow-up closes are marked and filtered by their own checkbox."""
     js = _read("app.js")
     assert 'name="resolution_kind"' in js
     assert "No final answer" in js
     assert "const isFollowup = (t)" in js
-    assert 't.status === "closed" && !isFollowup(t)' in js
-    assert '(t.status !== "closed" || isFollowup(t))' in js
+    assert "picked.has(who(t))" in js
+    assert "states(t).some((s) => picked.has(s))" in js
     assert "needs follow-up" in js
     assert "Marked for follow-up, kept in Active" in js
 

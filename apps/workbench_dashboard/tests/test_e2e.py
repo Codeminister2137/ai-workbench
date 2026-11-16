@@ -76,6 +76,54 @@ def test_submit_requires_every_pending_verdict(stores) -> None:
         stores.submit_e2e_task(task["id"], [])
 
 
+def test_submit_files_followup_for_fails_and_notes(stores) -> None:
+    task = stores.create_e2e_task(merge_commit="abc", title="t", items=_items())
+    outcome = stores.submit_e2e_task(
+        task["id"],
+        [{"item_id": "behavior:dashboard", "verdict": "fail", "notes": "broken button"}],
+    )
+    assert outcome["followup_id"]
+    inbox, _total = stores.inbox.list(limit=10)
+    (followup,) = [entry for entry in inbox if entry["id"] == outcome["followup_id"]]
+    assert followup["assignee"] == "agent"
+    assert "1 failed" in followup["title"]
+    assert "broken button" in followup["body"]
+    assert followup["metadata"]["report_id"] == outcome["report"]["id"]
+
+
+def test_submit_files_followup_for_notes_on_pass(stores) -> None:
+    task = stores.create_e2e_task(merge_commit="abc", title="t", items=_items())
+    outcome = stores.submit_e2e_task(
+        task["id"],
+        [{"item_id": "behavior:dashboard", "verdict": "pass", "notes": "consider tabs"}],
+    )
+    assert outcome["followup_id"]
+    inbox, _total = stores.inbox.list(limit=10)
+    assert "1 noted" in inbox[0]["title"]
+
+
+def test_submit_skips_followup_for_clean_pass(stores) -> None:
+    task = stores.create_e2e_task(merge_commit="abc", title="t", items=_items())
+    outcome = stores.submit_e2e_task(
+        task["id"], [{"item_id": "behavior:dashboard", "verdict": "pass", "notes": "  "}]
+    )
+    assert outcome["followup_id"] is None
+    inbox, _total = stores.inbox.list(limit=10)
+    assert inbox == []
+
+
+def test_submit_stamps_followup_refusal(stores) -> None:
+    for num in range(50):
+        stores.create_inbox_task(title=f"filler {num}", body="b", task_type="task")
+    task = stores.create_e2e_task(merge_commit="abc", title="t", items=_items())
+    outcome = stores.submit_e2e_task(
+        task["id"], [{"item_id": "behavior:dashboard", "verdict": "fail", "notes": "x"}]
+    )
+    assert outcome["task"]["status"] == "submitted"
+    assert outcome["followup_id"] is None
+    assert "followup_error" in outcome["task"]
+
+
 def post_json(base: str, path: str, payload: dict) -> dict:
     request = Request(
         f"{base}{path}",
