@@ -80,7 +80,7 @@ def _report(commit: str, built: str, verdict: str = "pass") -> dict:
         "commit": commit,
         "overall": "pass",
         "built_utc": built,
-        "items": [{"id": "behavior:dashboard", "verdict": verdict}],
+        "items": [{"id": "behavior:dashboard", "area": "dashboard", "verdict": verdict}],
     }
 
 
@@ -129,6 +129,58 @@ def test_ancestor_matching_attaches_proof_and_warning() -> None:
     assert dashboard["proof"]["ancestor_commit"] == "old"
     assert "not re-tested" in dashboard["warning"]
     assert "old" in dashboard["warning"]
+
+
+def test_regression_matches_behavior_pass_with_area_proof() -> None:
+    seen: dict = {}
+
+    def runner(_root: str, *args: str) -> bytes:
+        if args[0] == "merge-base":
+            return b""
+        seen["diff"] = args
+        return b""  # empty diff
+
+    checklist = {
+        "merge_commit": "tip",
+        "items": [
+            {
+                "id": "regression:dashboard",
+                "kind": "regression",
+                "area": "dashboard",
+                "files": [],
+                "status": "pending",
+            }
+        ],
+    }
+    out = apply_ancestor_matching(
+        checklist, [_report("old", "2026-01-01T00:00:00+00:00")], ".", runner
+    )
+    (item,) = out["items"]
+    assert item["status"] == "auto-pass"
+    assert item["proof"]["files"] == ["apps/workbench_dashboard/"]
+    assert "apps/workbench_dashboard/" in seen["diff"]
+
+
+def test_regression_ignores_other_area_passes() -> None:
+    def runner(_root: str, *args: str) -> bytes:
+        return b""
+
+    report = _report("old", "2026-01-01T00:00:00+00:00")
+    report["items"] = [{"id": "behavior:agent-cli", "area": "agent-cli", "verdict": "pass"}]
+    checklist = {
+        "merge_commit": "tip",
+        "items": [
+            {
+                "id": "regression:dashboard",
+                "kind": "regression",
+                "area": "dashboard",
+                "files": [],
+                "status": "pending",
+            }
+        ],
+    }
+    out = apply_ancestor_matching(checklist, [report], ".", runner)
+    assert out["items"][0]["status"] == "pending"
 
 
 def test_ancestor_matching_refuses_changed_code() -> None:

@@ -69,6 +69,10 @@ NONBEHAVIORAL_AREAS = frozenset({"tooling", "tests", "docs"})
 
 BEHAVIOR_AREA_IDS = frozenset(area for _, area, _, _, _ in AREA_TABLE)
 
+AREA_PREFIXES: dict[str, list[str]] = {}
+for _prefix, _area, _, _, _ in AREA_TABLE:
+    AREA_PREFIXES.setdefault(_area, []).append(_prefix)
+
 # Area -> (how steps, expected outcome, where to observe). The owner reads
 # this instead of guessing what "test the behavior" means for a diff.
 TEST_GUIDANCE: dict[str, tuple[list[str], str, str]] = {
@@ -339,15 +343,26 @@ def find_ancestor_report(
     reports: Sequence[dict],
     repo_root: str,
     runner: Callable[..., bytes] | None = None,
+    area: str = "",
 ) -> dict | None:
-    """Latest passing report for the behavior on an ancestor commit."""
+    """Latest passing report for the behavior on an ancestor commit.
+
+    Behavior items match the same entry id; regression items (owner
+    decision 4f52d6b2, option B) also match a passing behavior entry
+    for the same area, with the no-diff proof then spanning the
+    area's path prefixes.
+    """
     candidates = [
         report
         for report in reports
         if report.get("overall") == "pass"
         and report.get("commit") != merge_commit
         and any(
-            entry.get("id") == item_id and entry.get("verdict") == "pass"
+            entry.get("verdict") == "pass"
+            and (
+                entry.get("id") == item_id
+                or (area and item_id == f"regression:{area}" and entry.get("area") == area)
+            )
             for entry in report.get("items", [])
         )
         and is_ancestor(repo_root, str(report.get("commit")), merge_commit, runner)
@@ -380,16 +395,24 @@ def apply_ancestor_matching(
             matched.append(entry)
             continue
         report = find_ancestor_report(
-            str(entry.get("id")), merge_commit, reports, repo_root, runner
+            str(entry.get("id")),
+            merge_commit,
+            reports,
+            repo_root,
+            runner,
+            str(entry.get("area") or ""),
         )
         if report is None:
             matched.append(entry)
             continue
+        proof_files = [str(path) for path in entry.get("files", [])]
+        if not proof_files:
+            proof_files = list(AREA_PREFIXES.get(str(entry.get("area") or ""), []))
         proof = verify_no_diff(
             repo_root,
             str(report.get("commit")),
             merge_commit,
-            [str(path) for path in entry.get("files", [])],
+            proof_files,
             runner,
         )
         if proof is None:
