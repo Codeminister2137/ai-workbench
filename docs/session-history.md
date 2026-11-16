@@ -1,5 +1,17 @@
 # Session History
 
+## 2026-11-16 - Delegation C approved + implemented (01a1e5ab cont.)
+
+Owner chose C from the grill brief. Shipped e17d73d (Tier 3): bridge
+pre-approves all agent-queue tasks (modes owner-filed/e2e-followup/
+agent-queue; decisions/clarifications/orders/plan approvals unchanged)
+plus drain auto-pause on allowance/config failure with one deduped
+owner alert (close resumes; manual drain bypasses). Verified existing
+backstops instead of rebuilding: 1800s subprocess kill, prepaid
+default-block with finite grants, in-process backend test-only.
+Recorded ADR-089 (extends ADR-088) + decisions log. Caught in passing:
+E2E pre-approval needed the drain to honor new modes (fixed).
+
 ## 2026-11-16 - Fan-out control, sweep precision, delegation brief (01a1e5ab cont.)
 
 Per-run fan-out selector on queued/paused runs + API (4eafa31 Tier-2;
