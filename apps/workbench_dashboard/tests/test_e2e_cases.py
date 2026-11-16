@@ -56,6 +56,81 @@ def test_dashboard_steps_cite_views_and_routes() -> None:
     assert all(step["action"].strip() and step["expected"].strip() for step in steps)
 
 
+def test_handler_symbols_do_not_fake_views() -> None:
+    evidence = {
+        "apps/workbench_dashboard/dashboard_web_app.py": {
+            "symbols": ["_send_e2e_by_view"],
+            "routes": [],
+            "views": [],
+        }
+    }
+    steps = e2e_cases.draft_steps("dashboard", evidence, ["s"])
+    assert e2e_cases.needs_pointers(steps)
+    assert "_send_e2e_by_view" in steps[0]["action"]
+
+
+def test_template_braces_are_not_routes() -> None:
+    diff = (
+        "+++ b/x.js\n"
+        '+  const u = api("/api/e2e/tasks/" + id + "/finalize");\n'
+        "+  const t = `{created} ok`;\n"
+    )
+    evidence = e2e_cases.extract_diff_evidence("r", "b", "h", ["x.js"], runner=_runner(diff))
+    assert evidence["x.js"]["routes"] == ["/api/e2e/tasks"]
+
+
+def test_agent_cli_steps_do_not_claim_help_flags() -> None:
+    evidence = {
+        "packages/ai_agent/src/ai_agent/repo_coding_assistant.py": {
+            "symbols": ["_external_execution_completed"],
+            "routes": [],
+            "views": [],
+        }
+    }
+    (step,) = e2e_cases.draft_steps("agent-cli", evidence, ["s"])
+    assert "--help" not in step["action"]
+    assert "_external_execution_completed" in step["action"]
+
+
+def test_reauthor_replaces_checklist_on_verdict_less_task(tmp_path) -> None:
+    stores = DashboardStores(tmp_path)
+    task = stores.create_e2e_task(
+        merge_commit="abc123",
+        title="t",
+        items=[
+            {
+                "id": "behavior:dashboard",
+                "kind": "behavior",
+                "area": "dashboard",
+                "status": "pending",
+            }
+        ],
+    )
+    items = [
+        {
+            "id": "behavior:dashboard",
+            "kind": "behavior",
+            "area": "dashboard",
+            "behavior": "dashboard views and actions",
+            "files": [],
+            "status": "pending",
+            "steps": [{"action": "Open x", "expected": "Renders", "grounded": True}],
+            "needs_pointers": False,
+        }
+    ]
+    redone = stores.reauthor_e2e_items(task["id"], items, reauthored_by="agent")
+    assert redone["id"] == task["id"]
+    assert redone["items"] == items
+    assert redone["reauthored_by"] == "agent"
+    assert redone["reauthored_at"]
+    stores.submit_e2e_task(
+        task["id"],
+        [{"item_id": "behavior:dashboard", "verdict": "pass", "steps": [True]}],
+    )
+    with pytest.raises(StoreError, match="Only open"):
+        stores.reauthor_e2e_items(task["id"], items)
+
+
 def test_empty_evidence_needs_pointers() -> None:
     steps = e2e_cases.draft_steps("dashboard", {}, ["mystery change"])
     assert steps

@@ -21,9 +21,8 @@ import re
 from collections.abc import Callable, Sequence
 
 _SYMBOL_RE = re.compile(r"^\+\s*(?:def|class)\s+([A-Za-z_][A-Za-z0-9_]*)")
-_ROUTE_RE = re.compile(r"/api/[A-Za-z0-9_\-/{}]+")
+_ROUTE_RE = re.compile(r"/api/[A-Za-z0-9_\-/]+")
 _VIEW_RE = re.compile(r"#/[A-Za-z0-9/_-]+")
-_SEND_HANDLER_RE = re.compile(r"_send_([a-z0-9_]+)$")
 
 
 def extract_diff_evidence(
@@ -68,7 +67,7 @@ def extract_diff_evidence(
 
 
 def _view_label(view: str) -> str:
-    return view.removeprefix("#/").replace("/", " ").strip() or "home"
+    return view.removeprefix("#/").strip("/").replace("/", " ").strip() or "home"
 
 
 def _dashboard_steps(evidence: dict[str, dict[str, list[str]]]) -> list[dict]:
@@ -99,18 +98,9 @@ def _dashboard_steps(evidence: dict[str, dict[str, list[str]]]) -> list[dict]:
                     "grounded": True,
                 }
             )
-        for symbol in evidence[path]["symbols"]:
-            handler = _SEND_HANDLER_RE.match(symbol)
-            if not handler or f"view:#/{handler.group(1)}" in seen:
-                continue
-            seen.add(f"view:#/{handler.group(1)}")
-            steps.append(
-                {
-                    "action": f"Open the {handler.group(1).replace('_', ' ')} view (handler {symbol})",
-                    "expected": "View renders current data with no error toast.",
-                    "grounded": True,
-                }
-            )
+    # Note: _send_* symbols are API handlers, not views — views ground
+    # only from #/... hashes, actions only from /api/... routes. A .py-only
+    # dashboard diff therefore falls through to the pointer fallback below.
     return steps
 
 
@@ -148,8 +138,8 @@ def draft_steps(
     elif area == "agent-cli":
         steps = _command_steps(
             evidence,
-            "Run the affected command path through {symbol} (--help, then the documented dry-run)",
-            "Exit 0, plan metadata printed, no traceback, no unintended writes.",
+            "Exercise the changed path {symbol} ({path}) through its documented caller, then run the scoped pytest",
+            "Behaves as before; no traceback; no unintended writes.",
         )
     elif area == "provider":
         steps = _command_steps(
@@ -176,11 +166,17 @@ def draft_steps(
         ]
         return steps
     if not steps:
+        seen = sorted({s for entry in evidence.values() for s in entry["symbols"]})
+        detail = (
+            f"changed: {', '.join(seen)} — but no route or view to point at"
+            if seen
+            else "no symbol, route, or view found in the diff"
+        )
         steps = [
             {
                 "action": (
                     "Exercise the changed code path from its nearest user surface "
-                    "(no symbol, route, or view found in the diff — pointers needed)"
+                    f"({detail}; pointers needed)"
                 ),
                 "expected": "Behaves as before with no errors.",
                 "grounded": False,
