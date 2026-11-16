@@ -25,6 +25,13 @@ _ROUTE_RE = re.compile(r"/api/[A-Za-z0-9_\-/]+")
 _VIEW_RE = re.compile(r"#/[A-Za-z0-9/_-]+")
 
 
+def _is_test_file(path: str) -> bool:
+    """Test files never ground steps; fixtures cite routes they don't serve."""
+    normalized = path.replace("\\", "/")
+    name = normalized.rsplit("/", 1)[-1]
+    return "/tests/" in f"/{normalized}" or name.startswith("test_")
+
+
 def extract_diff_evidence(
     repo_root: str,
     base: str,
@@ -35,7 +42,9 @@ def extract_diff_evidence(
     """Per-file evidence: changed symbols, API routes, dashboard views.
 
     Parsed from added diff lines only, so renamed-but-untouched code
-    cannot ground a step. Files with no evidence get no entry.
+    cannot ground a step. Test files are excluded: a fixture string
+    mentioning a route is not the route changing. Files with no
+    evidence get no entry.
     """
     from e2e_promotion import run_git
 
@@ -50,6 +59,8 @@ def extract_diff_evidence(
             current = line[len("+++ b/") :].strip()
             continue
         if current is None or not line.startswith("+") or line.startswith("+++"):
+            continue
+        if _is_test_file(current):
             continue
         entry = evidence.setdefault(current, {"symbols": set(), "routes": set(), "views": set()})
         symbol = _SYMBOL_RE.match(line)

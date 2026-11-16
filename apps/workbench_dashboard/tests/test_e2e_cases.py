@@ -79,6 +79,17 @@ def test_template_braces_are_not_routes() -> None:
     assert evidence["x.js"]["routes"] == ["/api/e2e/tasks"]
 
 
+def test_fixture_routes_in_tests_ground_nothing() -> None:
+    diff = (
+        "+++ b/apps/workbench_dashboard/tests/test_x.py\n"
+        '+  api("/api/e2e/tasks/" + i)\n'
+        '+  link("#/e2e")\n'
+        "+  def helper_thing():\n"
+    )
+    evidence = e2e_cases.extract_diff_evidence("r", "b", "h", ["t"], runner=_runner(diff))
+    assert evidence == {}
+
+
 def test_nested_view_prefixes_ground_no_steps() -> None:
     evidence = {"x.js": {"symbols": [], "routes": [], "views": ["#/e2e", "#/e2e/report/"]}}
     steps = e2e_cases.draft_steps("dashboard", evidence, ["s"])
