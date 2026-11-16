@@ -65,6 +65,20 @@ def test_r1_flags_failed_without_followup_and_skips_superseded() -> None:
     assert by_key["R1:ddd"]["fileable"] is False  # watching
 
 
+def test_r1_skips_superseded_runs() -> None:
+    runs = [
+        {
+            "id": "old",
+            "title": "Old fail",
+            "status": "failed",
+            "created_at_utc": _ts(100),
+            "inbox_id": None,
+            "superseded_by": "new",
+        },
+    ]
+    assert SWEEP.collect_runs(runs, [], NOW) == []
+
+
 def test_r1_skips_failed_mentioned_in_open_inbox() -> None:
     runs = [
         {
