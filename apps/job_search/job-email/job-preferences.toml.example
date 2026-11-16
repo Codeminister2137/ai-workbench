@@ -1,0 +1,11 @@
+# Example job preferences — SYNTHETIC DATA ONLY.
+# Copy to data/profiles/job-preferences.toml (git-ignored, never committed)
+# and replace with real details. All keys are optional; unknown keys are
+# rejected on load so typos fail loud instead of corrupting filtering.
+# CLI flags (--location, --no-remote, --exclude-company, --title-contains,
+# --employment-type) override these file values per field.
+locations = ["Warsaw"]
+remote_ok = true
+excluded_companies = []
+title_must_include = []
+employment_types = []

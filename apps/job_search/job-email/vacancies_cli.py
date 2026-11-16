@@ -15,7 +15,12 @@ from pathlib import Path
 
 from evidence import analyze_vacancy_fit
 from openings_import import import_openings_export
-from preferences import JobPreferences, check_preferences
+from preferences import (
+    JobPreferences,
+    check_preferences,
+    default_preferences_path,
+    load_preferences_file,
+)
 from profiles import default_profile_path, load_profile
 
 
@@ -32,28 +37,62 @@ def build_parser() -> argparse.ArgumentParser:
         help="Candidate profile TOML (default: private data path)",
     )
     parser.add_argument(
-        "--location", action="append", default=[], help="Acceptable location (repeatable)"
+        "--location", action="append", default=None, help="Acceptable location (repeatable)"
     )
-    parser.add_argument("--no-remote", action="store_true", help="Exclude remote vacancies")
+    parser.add_argument(
+        "--no-remote",
+        action="store_true",
+        default=None,
+        help="Exclude remote vacancies",
+    )
     parser.add_argument(
         "--exclude-company",
         action="append",
-        default=[],
+        default=None,
         help="Excluded company (repeatable)",
     )
     parser.add_argument(
         "--title-contains",
         action="append",
-        default=[],
+        default=None,
         help="Required title word (repeatable, all must match)",
     )
     parser.add_argument(
         "--employment-type",
         action="append",
-        default=[],
+        default=None,
         help="Allowed employment type (repeatable)",
     )
+    parser.add_argument(
+        "--prefs-file",
+        type=Path,
+        default=None,
+        help="Preferences TOML (default: private job-preferences.toml when present)",
+    )
     return parser
+
+
+def _resolve_preferences(args: argparse.Namespace) -> JobPreferences:
+    """Merge the preferences file (when present) with CLI flag overrides."""
+    base = JobPreferences()
+    if args.prefs_file is not None:
+        base = load_preferences_file(args.prefs_file)
+    elif default_preferences_path().is_file():
+        base = load_preferences_file(default_preferences_path())
+    no_remote = args.no_remote
+    return JobPreferences(
+        locations=tuple(args.location) if args.location is not None else base.locations,
+        remote_ok=(not no_remote) if no_remote is not None else base.remote_ok,
+        excluded_companies=tuple(args.exclude_company)
+        if args.exclude_company is not None
+        else base.excluded_companies,
+        title_must_include=tuple(args.title_contains)
+        if args.title_contains is not None
+        else base.title_must_include,
+        employment_types=tuple(args.employment_type)
+        if args.employment_type is not None
+        else base.employment_types,
+    )
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -63,16 +102,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         rows = json.loads(args.export.read_text(encoding="utf-8"))
         vacancies = import_openings_export(rows)
         profile = load_profile(args.profile)
+        preferences = _resolve_preferences(args)
     except (OSError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
-    preferences = JobPreferences(
-        locations=tuple(args.location),
-        remote_ok=not args.no_remote,
-        excluded_companies=tuple(args.exclude_company),
-        title_must_include=tuple(args.title_contains),
-        employment_types=tuple(args.employment_type),
-    )
     ranked: list[tuple[float, str]] = []
     excluded = 0
     for vacancy in vacancies:

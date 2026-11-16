@@ -5,7 +5,18 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+import vacancies_cli
 from vacancies_cli import main
+
+
+@pytest.fixture(autouse=True)
+def _no_ambient_prefs(tmp_path, monkeypatch):
+    """Neutralize the owner's real prefs file; tests set prefs explicitly."""
+    monkeypatch.setattr(
+        vacancies_cli, "default_preferences_path", lambda: tmp_path / "absent-prefs.toml"
+    )
+
 
 PROFILE_TOML = """
 applicant_name = "Synthetic Applicant"
@@ -64,4 +75,39 @@ def test_preferences_exclude(tmp_path, capsys):
 def test_missing_export_fails_cleanly(tmp_path, capsys):
     _, profile = write_inputs(tmp_path)
     assert main([str(tmp_path / "absent.json"), "--profile", str(profile)]) == 1
+    assert "error:" in capsys.readouterr().err
+
+
+def test_prefs_file_filters(tmp_path, capsys):
+    export, profile = write_inputs(tmp_path)
+    prefs = tmp_path / "prefs.toml"
+    prefs.write_text('locations = ["warsaw"]\n', encoding="utf-8")
+    assert main([str(export), "--profile", str(profile), "--prefs-file", str(prefs)]) == 0
+    out = capsys.readouterr().out
+    assert "1 shown, 1 excluded by preferences" in out
+
+
+def test_cli_flags_override_prefs_file(tmp_path, capsys):
+    export, profile = write_inputs(tmp_path)
+    prefs = tmp_path / "prefs.toml"
+    prefs.write_text('locations = ["warsaw"]\nremote_ok = false\n', encoding="utf-8")
+    argv = [
+        str(export),
+        "--profile",
+        str(profile),
+        "--prefs-file",
+        str(prefs),
+        "--location",
+        "berlin",
+    ]
+    assert main(argv) == 0
+    out = capsys.readouterr().out
+    assert "Java Developer at Other Inc" in out
+    assert "1 shown, 1 excluded by preferences" in out
+
+
+def test_missing_prefs_file_fails_cleanly(tmp_path, capsys):
+    export, profile = write_inputs(tmp_path)
+    argv = [str(export), "--profile", str(profile), "--prefs-file", str(tmp_path / "absent.toml")]
+    assert main(argv) == 1
     assert "error:" in capsys.readouterr().err
