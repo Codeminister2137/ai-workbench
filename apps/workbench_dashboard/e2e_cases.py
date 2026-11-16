@@ -117,15 +117,27 @@ def _dashboard_steps(evidence: dict[str, dict[str, list[str]]]) -> list[dict]:
     return steps
 
 
+def _is_test_path(path: str) -> bool:
+    normalized = path.replace("\\", "/")
+    return "/tests/" in normalized or normalized.split("/")[-1].startswith("test_")
+
+
 def _command_steps(
     evidence: dict[str, dict[str, list[str]]], action_template: str, expected: str
 ) -> list[dict]:
     steps: list[dict] = []
     for path in sorted(evidence):
         for symbol in evidence[path]["symbols"]:
+            if _is_test_path(path):
+                action = (
+                    f"Run `.venv/Scripts/python.exe -m pytest {path} -q` "
+                    "(via pytest, never by executing the file directly)"
+                )
+            else:
+                action = action_template.format(symbol=symbol, path=path)
             steps.append(
                 {
-                    "action": action_template.format(symbol=symbol, path=path),
+                    "action": action,
                     "expected": expected,
                     "grounded": True,
                 }

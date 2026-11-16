@@ -2546,14 +2546,15 @@ async function renderE2EReminders(name) {
   const card = document.createElement("div");
   card.className = "card";
   card.id = "e2e-reminders";
-  card.innerHTML = `<h2>Test needed while you are here</h2>` + items.map((entry) => {
+  card.innerHTML = `<h2>Test needed while you are here</h2>` + items.map((entry, index) => {
     const live = (entry.steps || []).map((s) =>
       `<li><strong>${esc(s.action || "")}</strong><br><span class="muted">Expected: ${esc(s.expected || "")}</span></li>`).join("");
     const legacy = (entry.how || []).map((s) => `<li>${esc(s)}</li>`).join("");
     const guide = live ? `<ol>${live}</ol>`
       : `${legacy ? `<ol>${legacy}</ol>` : ""}`
         + `${entry.expected ? `<p class="muted">Expected: ${esc(entry.expected)}</p>` : ""}`;
-    return `<div><p><strong>${esc(entry.behavior || entry.item_id)}</strong>
+    const rule = index > 0 ? "<hr>" : "";
+    return `${rule}<div><p><strong>${esc(entry.behavior || entry.item_id)}</strong>
       <a href="#/e2e/${esc(entry.task_id)}" title="Open the full E2E checklist">open checklist</a></p>
       ${guide}
       <div><textarea data-notes-task="${esc(entry.task_id)}" data-notes-item="${esc(entry.item_id)}" rows="2" placeholder="Jot down what you observe..." title="Draft notes for this behavior">${esc(entry.draft_notes || "")}</textarea></div>

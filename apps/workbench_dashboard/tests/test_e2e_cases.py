@@ -109,6 +109,22 @@ def test_agent_cli_steps_do_not_claim_help_flags() -> None:
     assert "_external_execution_completed" in step["action"]
 
 
+def test_command_steps_give_exact_pytest_for_test_files() -> None:
+    evidence = {
+        "tests/repo_assistant/test_external_execution_completed.py": {
+            "symbols": ["test_x"],
+            "routes": [],
+            "views": [],
+        }
+    }
+    (step,) = e2e_cases.draft_steps("agent-cli", evidence, ["s"])
+    assert step["action"].startswith(
+        "Run `.venv/Scripts/python.exe -m pytest "
+        "tests/repo_assistant/test_external_execution_completed.py -q`"
+    )
+    assert "never by executing the file directly" in step["action"]
+
+
 def test_reauthor_replaces_checklist_on_verdict_less_task(tmp_path) -> None:
     stores = DashboardStores(tmp_path)
     task = stores.create_e2e_task(
