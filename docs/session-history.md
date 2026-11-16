@@ -1,5 +1,18 @@
 # Session History
 
+## 2026-11-16 - E2E wave-2: owner rejects terminal steps, fixes + briefs (01a1e5ab cont.)
+
+12 new fails + 1 pass triaged. Owner directives applied: E2E tab
+default open/fail (d658c3c); E2E follow-up pre-approval ADR-088
+(8279e24, humans = escalation); instruction budget 96000 + config
+failure class (7119d20) after proving the diacritics failure was
+budget overflow (AGENTS.md 65,498 chars > 64000), not diacritics;
+receipts open-state + bridge_fanout_policy knob (5c11c11); route→tab
+generator map + bad-test verdict flow (44b6eec). 12 duplicate
+follow-up runs stood down with notes (handled live). Filed step-split
+Tier-3 brief 492fc69a (terminal-native areas). Issued 17 E2E tasks
+(15 open, 9 agent-finalized; 2 supervisor drafts left for owner).
+
 ## 2026-11-16 - E2E notes batch: triage, fixes, re-issue (01a1e5ab cont.)
 
 All 11 fail + 2 pass-notes reports triaged verify-first. Landed agent
