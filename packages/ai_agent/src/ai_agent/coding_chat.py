@@ -53,6 +53,7 @@ class CodingTurnResult:
     fallback_handoff: Mapping[str, object] | None = None
     report_scope: str | None = None
     inference_observation: Mapping[str, int] | None = None
+    message_metadata: Mapping[str, object] | None = None
 
     def __post_init__(self) -> None:
         """Keep additive diagnostics bounded before observers or stores consume them."""
@@ -312,6 +313,7 @@ class CodingChatController:
                 result.response_text or result.failure_reason or "No final agent report received."
             ),
             metadata={
+                **(result.message_metadata or {}),
                 "execution_status": result.execution_status,
                 "returncode": result.returncode,
                 "failure_reason": result.failure_reason,

@@ -73,6 +73,12 @@ def test_agent_turn_binds_session_and_lists_staged(chat, stores, git_repo) -> No
     assert "Staged files" in outcome.response_text
     assert "app.py" in outcome.response_text
     assert stores.get_chat_mode(session.session_id)["coding_session_id"] == "mai-1"
+    messages = chat.store.list_messages(session.session_id)
+    from chat_agent import progress_path
+
+    assert messages[-1].metadata["progress_path"] == str(
+        progress_path(stores.data_dir, session.session_id, messages[0].message_id)
+    )
 
 
 def test_agent_turn_refuses_when_disabled(git_repo, tmp_path, stores) -> None:
@@ -246,3 +252,63 @@ def test_chat_mode_api_roundtrip(dashboard_server) -> None:
     assert ok["mode"] == "ask"
     staged = _api(dashboard_server, "GET", f"/api/chat/sessions/{sid}/staged")
     assert staged["files"] == []
+
+
+def test_progress_roundtrip_and_cap(tmp_path):
+    from chat_agent import ProgressWriter, progress_path, read_progress
+
+    path = progress_path(tmp_path, "session-1", "message-1")
+    assert read_progress(path) == []
+    writer = ProgressWriter(path)
+    writer.append("Tool read caf\u00e9")
+    row = json.loads(path.read_text(encoding="utf-8"))
+    assert row["ts"] and row["line"] == "Tool read caf\u00e9"
+    assert read_progress(path) == ["Tool read caf\u00e9"]
+    for i in range(205):
+        writer.append(str(i))
+    with path.open("a", encoding="utf-8") as stream:
+        stream.write('{"line":')
+    assert read_progress(path) == [str(i) for i in range(5, 205)]
+    with pytest.raises(ValueError):
+        progress_path(tmp_path, "../escape", "m")
+    ProgressWriter(tmp_path).append("unwritable directory")
+
+
+def test_progress_api_disabled(dashboard_server):
+    assert _api(dashboard_server, "GET", "/api/chat/sessions/unknown/progress?message_id=m") == {
+        "ok": True,
+        "lines": [],
+        "staged": [],
+    }
+
+
+def test_progress_api_existing_worktree(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    from chat_agent import ProgressWriter, progress_path
+    from dashboard_web_app import DashboardRequestHandler
+
+    handler = object.__new__(DashboardRequestHandler)
+    handler.data_dir = tmp_path / "data"
+    handler.repo_root = tmp_path
+    stores = DashboardStores(handler.data_dir)
+    stores.set_chat_mode("s", mode="agent")
+    monkeypatch.setattr(handler, "_stores", lambda: stores)
+    responses = []
+    monkeypatch.setattr(handler, "_send_json", responses.append)
+    config = SimpleNamespace(chat_agent_enabled=True)
+    handler._send_chat_progress(config, "s", "m")
+    assert responses[-1]["lines"] == []
+    assert not (tmp_path / ".tmp").exists()
+    worktree = tmp_path / ".tmp/chat-worktrees/s"
+    worktree.mkdir(parents=True)
+    ProgressWriter(progress_path(handler.data_dir, "s", "m")).append("Tool read")
+    monkeypatch.setattr("chat_agent.staged_files", lambda path: [{"path": "a.py", "status": "M"}])
+    handler._send_chat_progress(config, "s", "m")
+    assert responses[-1]["lines"] == ["Tool read"]
+    assert responses[-1]["staged"] == [{"path": "a.py", "status": "M"}]
+    handler._send_chat_progress(config, "../escape", "m")
+    assert responses[-1]["lines"] == []
+    stores.set_chat_mode("s", mode="ask")
+    handler._send_chat_progress(config, "s", "m")
+    assert responses[-1] == {"ok": True, "lines": [], "staged": []}

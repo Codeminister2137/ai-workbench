@@ -223,6 +223,7 @@ def run_mai_subprocess(
     cmd_prefix: list[str] | None = None,
     timeout_seconds: float = SUBPROCESS_TIMEOUT_SECONDS,
     cwd: Path | str | None = None,
+    progress_path: Path | str | None = None,
 ) -> MaiRunOutcome:
     """Invoke Mai as a supervised subprocess; kill on timeout; never raises.
 
@@ -242,18 +243,48 @@ def run_mai_subprocess(
             encoding="utf-8",
             errors="replace",
             cwd=str(cwd) if cwd is not None else None,
+            env={**os.environ, "PYTHONUNBUFFERED": "1"} if progress_path is not None else None,
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
     except OSError as exc:
         return MaiRunOutcome(
             exit_code=3, stdout_tail="", stderr_tail="", error=f"spawn failed: {exc}"
         )
+    output: list[str] = []
+    reader = None
+    if progress_path is not None:
+        from threading import Thread
+
+        from chat_agent import ProgressWriter
+
+        writer = ProgressWriter(progress_path)
+        stream = proc.stdout
+
+        def capture() -> None:
+            if stream is not None:
+                for line in stream:
+                    output.append(line)
+                    writer.append(line.rstrip("\r\n"))
+                stream.close()
+
+        reader = Thread(target=capture, name="chat-progress", daemon=True)
+        reader.start()
+        # communicate drains stderr while the dedicated reader owns stdout.
+        proc.stdout = None
+
+    def collect(timeout: float) -> tuple[str, str]:
+        stdout, stderr = proc.communicate(timeout=timeout)
+        if reader is not None:
+            reader.join(timeout=10)
+            stdout = "".join(output)
+        return stdout or "", stderr or ""
+
     try:
-        stdout, stderr = proc.communicate(timeout=timeout_seconds)
+        stdout, stderr = collect(timeout_seconds)
     except subprocess.TimeoutExpired:
         proc.kill()
         try:
-            stdout, stderr = proc.communicate(timeout=10)
+            stdout, stderr = collect(10)
         except subprocess.TimeoutExpired:
             stdout, stderr = "", ""
         return MaiRunOutcome(
@@ -284,6 +315,7 @@ def build_mai_executor(
     coding_session: str | None = None,
     provider: str | None = None,
     model: str | None = None,
+    progress_path: Path | str | None = None,
 ) -> Callable[[dict], dict]:
     """Build a drain ``Executor`` handing runs to Mai sessions.
 
@@ -328,6 +360,7 @@ def build_mai_executor(
                 cmd_prefix=mai_cmd_prefix,
                 timeout_seconds=subprocess_timeout_seconds,
                 cwd=root,
+                **({"progress_path": progress_path} if progress_path is not None else {}),
             )
         else:
             outcome = run_mai_session(argv, runner=runner)

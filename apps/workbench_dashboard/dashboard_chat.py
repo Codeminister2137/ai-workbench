@@ -340,7 +340,15 @@ class DashboardChat:
             return CodingTurnResult(1, None, "failed", f"Agent worktree unavailable: {exc}")
         record = stores.get_chat_mode(session_id)  # type: ignore[attr-defined]
         binding = record.get("coding_session_id") if isinstance(record, dict) else None
-        execute = agent_executor or self._default_agent_executor(worktree, binding)
+        from chat_agent import progress_path
+
+        try:
+            activity_path = progress_path(
+                Path(getattr(stores, "data_dir", "")), session_id, request.message_id
+            )
+        except (ValueError, OSError):
+            activity_path = None
+        execute = agent_executor or self._default_agent_executor(worktree, binding, activity_path)
         receipt = execute(
             {
                 "id": f"chat-{request.message_id}",
@@ -390,9 +398,12 @@ class DashboardChat:
             "completed",
             provider=self.config.provider,
             inference_observation={"staged_files": len(staged)},
+            message_metadata={"progress_path": str(activity_path)} if activity_path else None,
         )
 
-    def _default_agent_executor(self, worktree: object, binding: object) -> Callable[[dict], dict]:
+    def _default_agent_executor(
+        self, worktree: object, binding: object, progress_path: Path | None = None
+    ) -> Callable[[dict], dict]:
         """Mai subprocess executor bound to one chat worktree + session."""
         from mai_run import build_mai_executor
 
@@ -401,6 +412,7 @@ class DashboardChat:
             worktree.path / "user-config.toml",  # type: ignore[attr-defined]
             catalog=getattr(self.config, "catalog_path", None),
             coding_session=str(binding) if binding else None,
+            progress_path=progress_path,
         )
 
     def draft_plan(

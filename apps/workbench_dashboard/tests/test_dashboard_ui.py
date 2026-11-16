@@ -627,7 +627,8 @@ def test_inbox_supports_owner_tasks() -> None:
 def test_chat_send_refreshes_thread_on_failure() -> None:
     """Failed turns still re-render the thread (messages are saved anyway)."""
     js = _read("app.js").replace("\r\n", "\n")
-    assert "} finally {\n      if (timer) clearInterval(timer);\n      render();" in js
+    assert "} finally {\n      if (timer) clearInterval(timer);" in js
+    assert "if (progressTimer) clearInterval(progressTimer);\n      render();" in js
 
 
 def test_create_form_disables_submit_while_creating() -> None:
@@ -919,3 +920,15 @@ eval(router);
         [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
     )
     assert result.returncode == 0, result.stderr
+
+
+def test_chat_live_progress_pins():
+    js = _read("app.js")
+    assert "setInterval(pollProgress, 2000)" in js
+    assert "/progress?message_id=" in js
+    assert "/^Tool (\\w+)/" in js
+    assert "Live staged files" in js
+    assert "Live progress paused (reduced motion)." in js
+    assert 'mode === "agent" && !reduceMotion' in js
+    assert "clearInterval(progressTimer)" in js
+    assert "if (progressStopped) return;" in js

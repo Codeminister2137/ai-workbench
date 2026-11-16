@@ -715,6 +715,38 @@ async function renderChatThread(id, initial) {
     const reduceMotion = window.matchMedia
       && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const timer = reduceMotion ? null : setInterval(tick, 1000);
+    const activity = document.createElement("div");
+    statusLine.after(activity);
+    let progressStopped = false;
+    let progressBusy = false;
+    let progressMessage = null;
+    const previousMessages = new Set(payload.messages.map((m) => m.id));
+    const pollProgress = async () => {
+      if (progressStopped || progressBusy) return;
+      progressBusy = true;
+      try {
+        const base = "/api/chat/sessions/" + encodeURIComponent(id);
+        if (!progressMessage) {
+          const thread = await api(base + "/messages");
+          const turn = thread.messages.find((m) => m.role === "user" && !previousMessages.has(m.id));
+          if (!turn) return;
+          progressMessage = turn.id;
+        }
+        const progress = await api(base + "/progress?message_id=" + encodeURIComponent(progressMessage));
+        if (progressStopped) return;
+        const lines = progress.lines || [];
+        const tools = lines.map((line) => /^Tool (\w+)/.exec(line)).filter(Boolean);
+        activity.innerHTML = `<pre>${esc(lines.join("\n"))}</pre>`
+          + `<ul aria-label="Tool checklist">${tools.map((m) => `<li>☑ ${esc(m[1])}</li>`).join("")}</ul>`
+          + `<ul aria-label="Live staged files">${(progress.staged || []).map((f) => `<li>${esc(f.path)} (${esc(f.status)})</li>`).join("")}</ul>`;
+      } catch (_) {
+        // Activity is best-effort; the pending turn owns its result.
+      } finally {
+        progressBusy = false;
+      }
+    };
+    const progressTimer = mode === "agent" && !reduceMotion ? setInterval(pollProgress, 2000) : null;
+    if (mode === "agent" && reduceMotion) activity.textContent = "Live progress paused (reduced motion).";
     try {
       const out = await api("/api/chat/sessions/" + encodeURIComponent(id) + "/messages", {
         method: "POST",
@@ -726,6 +758,8 @@ async function renderChatThread(id, initial) {
       toast(err.message, false);
     } finally {
       if (timer) clearInterval(timer);
+      progressStopped = true;
+      if (progressTimer) clearInterval(progressTimer);
       render();
       btn.disabled = false;
       btn.textContent = "Send";
