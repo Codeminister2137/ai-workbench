@@ -1184,6 +1184,9 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             if path.startswith("/api/runs/") and path.endswith("/cancel"):
                 run_id = path[len("/api/runs/") : -len("/cancel")]
                 return self._cancel_run(run_id)
+            if path.startswith("/api/runs/") and path.endswith("/fanout"):
+                run_id = path[len("/api/runs/") : -len("/fanout")]
+                return self._set_run_fanout(run_id, payload)
             if path == "/api/runs/drain":
                 return self._drain_runs(config, payload)
             if path.startswith("/api/intake/") and path.endswith("/approve"):
@@ -2459,6 +2462,36 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             request_run_cancel(run)
             self._stores().runs.put(run_id, run)
         except (StoreError, ValueError) as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        self._send_json({"ok": True, "run": with_fanout_policy(run)})
+
+    def _set_run_fanout(self, run_id: str, payload: dict) -> None:
+        from ai_agent.fanout import FanoutPolicy
+
+        try:
+            run = self._stores().runs.get(run_id)
+        except StoreError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        if run is None:
+            return self._send_json({"ok": False, "error": "Not found"}, status=404)
+        if str(run.get("status") or "") not in ("queued", "paused"):
+            return self._send_json(
+                {"ok": False, "error": "Fan-out can only change before execution (queued/paused)"},
+                status=409,
+            )
+        try:
+            policy = FanoutPolicy.coerce(str(payload.get("policy") or "")).value
+        except ValueError:
+            return self._send_json(
+                {"ok": False, "error": "policy must be one of: allowed, restricted, denied"},
+                status=400,
+            )
+        run["fanout_policy"] = policy
+        run["fanout_effective"] = policy
+        run["updated_at_utc"] = datetime.now(UTC).isoformat()
+        try:
+            self._stores().runs.put(run_id, run)
+        except StoreError as exc:
             return self._send_json({"ok": False, "error": str(exc)}, status=400)
         self._send_json({"ok": True, "run": with_fanout_policy(run)})
 
