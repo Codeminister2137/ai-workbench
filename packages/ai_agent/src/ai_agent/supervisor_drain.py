@@ -11,7 +11,8 @@ inbox record carries a recorded approval answer (``Approve``, or
 ``Schedule it`` for NL proposal orders) with status ``answered``
 or ``closed`` (close is archival and answers are immutable after close, so a
 close preceding the drain pass must not strand an approval), or when the run
-is marked ``approval_mode == "owner-filed"`` (filing is approval).
+is marked with a preapproved ``approval_mode`` (``owner-filed``,
+``e2e-followup``, ``agent-queue``).
 Open, rejected,
 closed-without-answer, missing, or unreadable approvals leave the run parked:
 never executed, never deleted. Paused runs resume without re-approval. The
@@ -42,6 +43,7 @@ from ai_agent.run_tracking import (
 APPROVAL_ANSWER = "Approve"
 APPROVAL_ANSWERS = frozenset({APPROVAL_ANSWER, "Schedule it"})
 CLAIM_SUFFIX = ".json.claim"
+PREAPPROVED_MODES = frozenset({"owner-filed", "e2e-followup", "agent-queue"})
 TMP_SUFFIX = ".json.tmp"
 
 Executor = Callable[[dict], dict]
@@ -138,8 +140,8 @@ class RunDrain:
             pass
 
     def _approval_allows(self, run: dict) -> tuple[bool, str]:
-        if run.get("approval_mode") == "owner-filed":
-            return True, "filed by owner; filing is approval"
+        if run.get("approval_mode") in PREAPPROVED_MODES:
+            return True, f"preapproved ({run.get('approval_mode')})"
         inbox_id = run.get("inbox_id")
         if not inbox_id or not isinstance(inbox_id, str):
             return False, "run has no linked inbox approval"

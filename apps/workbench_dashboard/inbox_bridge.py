@@ -1,13 +1,16 @@
-"""Inbox-to-run bridge: agent tasks become runs, owner filings pre-approved.
+"""Inbox-to-run bridge: agent tasks become runs, all pre-approved.
 
 Mai reads its backlog through this bridge instead of polling the inbox UI.
 Only open items with ``assignee == "agent"`` and ``type == "task"`` are
 bridged; decisions, clarifications, and orders always need the owner first.
-Tasks filed by the owner are pre-approved (filing is approval) and queued
-without a self-approval decision, as are E2E follow-up tasks (owner
-decision 2026-11-16: the agent acts, the owner re-tests the behavior).
-Other supervisor/agent-filed tasks keep the Approve/Reject gate. Bridged
-items are marked (``metadata.bridge_run_id``) and never proposed twice.
+Every bridged task is pre-approved (owner decision 2026-11-16 C: humans
+are escalation, not the norm); provenance stays explicit via
+``approval_mode`` (``owner-filed``, ``e2e-followup``, ``agent-queue``).
+Money/config safety comes from budgets, not launch clicks: runs die on
+the 1800s subprocess timeout, prepaid spend stays default-blocked with
+finite explicit grants, and the drain pauses itself on allowance/config
+failures with an owner alert. Bridged items are marked
+(``metadata.bridge_run_id``) and never proposed twice.
 """
 
 from __future__ import annotations
@@ -15,8 +18,6 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 from typing import Any
-
-from dashboard_stores import StoreError
 
 MAX_BRIDGE_PER_CALL = 10
 
@@ -79,62 +80,11 @@ def bridge_agent_queue(stores, *, fanout_policy: str = "restricted") -> list[dic
         now = datetime.now(UTC).isoformat()
         run_title = title[:60]
         if str(item.get("created_by") or "") == "owner":
-            preapproval = "owner-filed"
+            approval_mode = "owner-filed"
         elif metadata.get("kind") == "e2e-followup":
-            preapproval = "e2e-followup"
+            approval_mode = "e2e-followup"
         else:
-            preapproval = None
-        if preapproval is not None:
-            stores.runs.put(
-                run_id,
-                {
-                    "id": run_id,
-                    "title": run_title,
-                    "status": "queued",
-                    "body": f"{title}\n\n{body}",
-                    "origin": "inbox",
-                    "inbox_id": None,
-                    "approval_mode": preapproval,
-                    "bridged_from": item["id"],
-                    "fanout_policy": fanout_policy,
-                    "fanout_effective": fanout_policy,
-                    "created_at_utc": now,
-                    "updated_at_utc": now,
-                    **timeout_override,
-                },
-            )
-            updated = dict(item)
-            updated["metadata"] = {**metadata, "bridge_run_id": run_id}
-            refs = list(updated.get("context_refs") or [])
-            if f"run:{run_id}" not in refs:
-                refs.append(f"run:{run_id}")
-            updated["context_refs"] = refs
-            stores.inbox.put(item["id"], updated)
-            receipts.append(
-                {
-                    "inbox_id": item["id"],
-                    "run_id": run_id,
-                    "approval_id": None,
-                    "status": "preapproved",
-                }
-            )
-            continue
-        try:
-            approval = stores.create_inbox_task(
-                title=f"Approve agent run: {run_title}",
-                body=(
-                    f"Inbox task {item['id']} was filed for the agent "
-                    f"(fan-out: {fanout_policy}).\n\nTask:\n{title}\n\n{body}\n\n"
-                    "Approve to let a run worker execute it; "
-                    "Reject leaves it parked (never executed)."
-                ),
-                task_type="decision",
-                task_id=run_id,
-                context_refs=[f"run:{run_id}", f"inbox:{item['id']}"],
-                options=["Approve", "Reject"],
-            )
-        except StoreError:
-            break
+            approval_mode = "agent-queue"
         stores.runs.put(
             run_id,
             {
@@ -143,7 +93,8 @@ def bridge_agent_queue(stores, *, fanout_policy: str = "restricted") -> list[dic
                 "status": "queued",
                 "body": f"{title}\n\n{body}",
                 "origin": "inbox",
-                "inbox_id": approval["id"],
+                "inbox_id": None,
+                "approval_mode": approval_mode,
                 "bridged_from": item["id"],
                 "fanout_policy": fanout_policy,
                 "fanout_effective": fanout_policy,
@@ -163,8 +114,8 @@ def bridge_agent_queue(stores, *, fanout_policy: str = "restricted") -> list[dic
             {
                 "inbox_id": item["id"],
                 "run_id": run_id,
-                "approval_id": approval["id"],
-                "status": "proposed",
+                "approval_id": None,
+                "status": "preapproved",
             }
         )
     return receipts

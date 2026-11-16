@@ -1,7 +1,10 @@
 # ADR-088: E2E follow-up runs skip owner approval
 
 Status: Accepted by owner, 2026-11-16 (chat; explicit direction on top of
-the earlier E2E-follow-up approval requirement).
+the earlier E2E-follow-up approval requirement). Scope extended the
+same day by [ADR-089](ADR-089-agent-queue-preapproval.md) (all
+agent-queue runs pre-approved); this record stands for the E2E rule
+and rationale.
 
 ## Problem
 

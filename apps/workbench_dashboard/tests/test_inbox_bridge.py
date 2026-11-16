@@ -35,20 +35,22 @@ def test_timeout_override_flows_to_run(tmp_path) -> None:
     assert "mai_timeout_seconds" not in stores.runs.get(bridge_agent_queue(stores)[0]["run_id"])
 
 
-def test_supervisor_filed_task_keeps_approval_gate(tmp_path) -> None:
+def test_supervisor_filed_task_is_preapproved_as_agent_queue(tmp_path) -> None:
+    """Owner decision C: every bridged task pre-approved, provenance kept."""
     stores = DashboardStores(tmp_path)
     item = _agent_task(stores, created_by="supervisor")
     (receipt,) = bridge_agent_queue(stores)
     assert receipt["inbox_id"] == item["id"]
-    assert receipt["status"] == "proposed"
+    assert receipt["status"] == "preapproved"
+    assert receipt["approval_id"] is None
     run = stores.runs.get(receipt["run_id"])
     assert run is not None
     assert run["status"] == "queued"
     assert run["origin"] == "inbox"
-    assert run["inbox_id"] == receipt["approval_id"]
-    approval = stores.inbox.get(receipt["approval_id"])
-    assert approval is not None
-    assert approval["options"] == ["Approve", "Reject"]
+    assert run["inbox_id"] is None
+    assert run["approval_mode"] == "agent-queue"
+    approvals, _ = stores.inbox.list(limit=10)
+    assert [i for i in approvals if i["title"].startswith("Approve agent run:")] == []
     marked = stores.inbox.get(item["id"])
     assert marked is not None
     assert marked["metadata"]["bridge_run_id"] == receipt["run_id"]

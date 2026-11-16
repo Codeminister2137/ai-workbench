@@ -1,3 +1,19 @@
+## Pre-approve all agent-queue runs + budget backstops (adopted) - owner 2026-11-16
+
+**Status:** Accepted (chat; owner chose C "I approve C" from the
+delegation brief with pros and cons).
+
+All bridged agent tasks run without an approval click
+(`approval_mode`: owner-filed / e2e-followup / agent-queue).
+Backstops instead of clicks: 1800s subprocess kill (verified),
+prepaid default-blocked with finite grants (unchanged), and a drain
+auto-pause on allowance/config failure with one deduped owner alert
+(closing resumes; manual drain bypasses). Decisions, clarifications,
+orders, and plan approvals still need the owner. Known gaps: per-run
+Mai usage attribution, action-level shell sandboxing. Extends
+[ADR-088](decisions/ADR-088-e2e-followup-preapproved.md); see
+[ADR-089](decisions/ADR-089-agent-queue-preapproval.md).
+
 ## E2E follow-up runs skip owner approval (adopted) - owner 2026-11-16
 
 **Status:** Accepted (chat; owner: human tests/decisions are escalation,
