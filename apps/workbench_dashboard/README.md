@@ -53,7 +53,8 @@ inspect the owned process only.
   diffs for review with approve-and-apply.
 - Inbox: decisions/clarifications assigned to the owner; answers flow
   back as record updates. Creation requires the supervisor token when
-  `data/supervisor.token` exists. The nav badge is a live open count.
+  `data/supervisor.token` exists. The nav badge counts human-assigned open or follow-up tasks, independent of
+  the selected list filters; agent tasks are excluded.
 - Voice/language: the chat Dictate button posts microphone clips to
   `POST /api/stt/transcribe`; messages accept a `language` tag and
   translate at ingestion with source provenance. Both fail closed
