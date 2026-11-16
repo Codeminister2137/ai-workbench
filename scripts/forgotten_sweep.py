@@ -194,6 +194,8 @@ def collect_runs(
         if age is None:
             continue
         if status == "failed":
+            if run.get("superseded_by"):
+                continue  # loop closed: fixed/retried elsewhere, see the stamp
             siblings = [r for r in by_inbox.get(str(run.get("inbox_id") or ""), []) if r is not run]
             newer_ok = any(
                 (_parse_ts(_record_ts(r)) or now) > (_parse_ts(created) or now)
@@ -212,7 +214,8 @@ def collect_runs(
                     "R1",
                     f"Failed run with no follow-up: {title[:70]}",
                     "agent",
-                    "Investigate the error; queue a fix run or close with a note.",
+                    "Investigate the error; queue a fix run, or stamp the run "
+                    "record with superseded_by=<run-id> when fixed elsewhere.",
                     [_member(rid, title, age, str(run.get("error", "")))],
                     age,
                 )
