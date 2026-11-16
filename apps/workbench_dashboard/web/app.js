@@ -52,8 +52,9 @@ function fmtTime(value) {
 async function refreshBadge() {
   try {
     const status = await api("/api/status");
-    if (status.open_inbox > 0) {
-      badge.textContent = status.open_inbox;
+    const needInbox = status.attention_inbox ?? status.open_inbox;
+    if (needInbox > 0) {
+      badge.textContent = needInbox;
       badge.hidden = false;
     } else {
       badge.hidden = true;
@@ -70,8 +71,9 @@ async function refreshBadge() {
     } else {
       backlogBadge.hidden = true;
     }
-    if (status.open_e2e > 0) {
-      e2eBadge.textContent = status.open_e2e;
+    const needE2E = status.attention_e2e ?? status.open_e2e;
+    if (needE2E > 0) {
+      e2eBadge.textContent = needE2E;
       e2eBadge.hidden = false;
     } else {
       e2eBadge.hidden = true;
@@ -121,6 +123,25 @@ function filterList(listId, query) {
   document.querySelectorAll("#" + listId + " li").forEach((li) => {
     li.hidden = q !== "" && !li.textContent.toLowerCase().includes(q);
   });
+}
+
+/* Checkbox filter groups shared by list views: mixable Who/State sets,
+   hash-encoded (?f=a,b), attention-first defaults per tab. One group
+   per line so boxes stay visually attached to their group. */
+function filterBoxes(id, groups, picked) {
+  const row = (boxes) => boxes.map(([t, l, ti]) =>
+    `<label><input type="checkbox" data-f="${t}" title="${esc(ti)}"${picked.has(t) ? " checked" : ""}> ${esc(l)}</label>`).join(" ");
+  return `<p id="${id}">` + groups.map(([g, boxes]) =>
+    `<span class="fgroup"><strong>${esc(g)}:</strong> ${row(boxes)}</span>`).join("") + `</p>`;
+}
+function bindFilterBoxes(id, base, param) {
+  view.querySelectorAll(`#${id} input[data-f]`).forEach((b) => b.addEventListener("change", () => {
+    const on = [...view.querySelectorAll(`#${id} input[data-f]:checked`)].map((x) => x.dataset.f);
+    location.hash = "#" + base + "?" + param + "=" + on.join(",");
+  }));
+}
+function pickedTokens(param, fallback) {
+  return new Set(((new URLSearchParams(location.hash.split("?")[1] || "").get(param) || fallback).split(",").filter(Boolean)));
 }
 
 /* Project filter shared by the Runs and Inbox list views. */
@@ -859,19 +880,24 @@ async function renderPlans(id) {
       <pre>${gtext(plan.body || "(empty plan)")}</pre>${linkedRuns}</div>`;
     return;
   }
-  const plansTab = new URLSearchParams((location.hash.split("?")[1] || "")).get("status") || "active";
+  const picked = pickedTokens("f", "active");
   const payload = await api("/api/plans");
-  const shownPlans = payload.items.filter((p) => plansTab === "archive" ? p.status === "complete" : p.status !== "complete");
+  const planState = (p) => p.status === "complete" ? "complete" : "active";
+  const shownPlans = payload.items.filter((p) => picked.has(planState(p)));
   const items = shownPlans.length
     ? shownPlans.map((p) =>
         `<li><a href="#/plans/${esc(p.id)}">${gtext(p.title || p.id)}</a>
          <span class="pill st-${esc((p.status || "none").replace(/\s+/g, "-"))}">${esc(p.status || "")}</span></li>`).join("")
-    : '<li class="muted">No plans on file. Plans are created by Workbench flows.</li>';
+    : '<li class="muted">No plans match these filters.</li>';
+  const groups = [
+    ["State", [["active", "Active", "Plans in progress"], ["complete", "Complete", "Finished plans"]]],
+  ];
   view.innerHTML = `<h1>Plans</h1>
-    <p><a href="#/plans">Active</a> · <a href="#/plans?status=archive">Archive</a></p>
+    ${filterBoxes("plans-filters", groups, picked)}
     <p><input type="text" id="filter-plans" placeholder="Filter plans..." title="Filter plans by text"></p>
     <ul class="plain" id="plans-list">${items}</ul><p class="muted">${payload.total} total.</p>`;
   document.getElementById("filter-plans").addEventListener("input", (ev) => filterList("plans-list", ev.target.value));
+  bindFilterBoxes("plans-filters", "plans", "f");
 }
 
 async function renderProjects(id) {
@@ -1141,16 +1167,15 @@ async function renderRuns(id) {
   }
   const prevFilter = (document.getElementById("filter-runs") || {}).value || "";
   const runsUrl = runsProjectFilter ? "/api/runs?project_id=" + encodeURIComponent(runsProjectFilter) : "/api/runs";
-  const runsTab = new URLSearchParams((location.hash.split("?")[1] || "")).get("status") || "active";
+  const picked = pickedTokens("f", "failed,running,queued,paused,waiting,approved");
   const payload = await api(runsUrl);
-  const terminalRuns = ["completed", "cancelled", "merged"];
-  const shownRuns = payload.items.filter((r) => runsTab === "archive" ? terminalRuns.includes(r.status) : !terminalRuns.includes(r.status));
+  const shownRuns = payload.items.filter((r) => picked.has(r.status || ""));
   const items = shownRuns.length
     ? shownRuns.map((r) =>
         `<li><a href="#/runs/${esc(r.id)}">${gtext(r.title || r.id)}</a>
          <span class="pill st-${esc((r.status || "none").replace(/\s+/g, "-"))}">${esc(r.status || "")}</span>
          <span class="pill" title="Fan-out policy: whether this run may spawn subagent children">fan-out: ${esc(r.fanout_effective || r.fanout_policy || "unknown")}</span></li>`).join("")
-    : '<li class="muted">No runs recorded.</li>';
+    : '<li class="muted">No runs match these filters.</li>';
   let evidence = "";
   try {
     const ev = await api("/api/evidence");
@@ -1163,8 +1188,14 @@ async function renderRuns(id) {
   } catch (err) {
     evidence = '<p class="muted">Evidence unavailable: ' + esc(err.message) + "</p>";
   }
+  const groups = [
+    ["Attention", [["failed", "Failed", "Runs needing fixes or follow-up"]]],
+    ["Active", [["running", "Running", "Currently executing"], ["queued", "Queued", "Awaiting a worker"], ["paused", "Paused", "Paused, resumable"], ["waiting", "Waiting", "Waiting on a dependency"], ["approved", "Approved", "Approved, not yet queued"]]],
+    ["Finished", [["completed", "Completed", "Finished runs"], ["cancelled", "Cancelled", "Cancelled runs"]]],
+    ["Streams", [["live", "Live", "Live stream runs"], ["merged", "Merged", "Merged stream runs"], ["branch-ready", "Branch-ready", "Streams with a branch ready"]]],
+  ];
   view.innerHTML = `<h1>Runs</h1>
-    <p><a href="#/runs">Active</a> · <a href="#/runs?status=archive">Archive</a></p>
+    ${filterBoxes("runs-filters", groups, picked)}
     <p><input type="text" id="filter-runs" placeholder="Filter runs..." title="Filter runs by text">
     <select id="filter-runs-project" title="Show runs for one project">${await projectOptions(runsProjectFilter)}</select>
     <button id="drain-runs" title="Execute approved queued runs (one per click)">Drain now</button></p>
@@ -1175,6 +1206,7 @@ async function renderRuns(id) {
   document.getElementById("filter-runs-project").addEventListener("change", (ev) => {
     runsProjectFilter = ev.target.value; renderRuns();
   });
+  bindFilterBoxes("runs-filters", "runs", "f");
   document.getElementById("drain-runs").addEventListener("click", async (ev) => {
     const btn = ev.target;
     btn.disabled = true;
@@ -1206,8 +1238,12 @@ async function renderE2E(id) {
         : entry.verdict_by === "ancestor" ? "ancestor approval"
         : "no user-visible behavior";
       const testedOn = entry.tested_on ? ` · tested on ${esc(entry.tested_on)}` : "";
-      const stepRows = (entry.step_results || []).map((s) =>
-        `<li>[done] ${esc(s.action || "")}<br><span class="muted">Expected: ${esc(s.expected || "")}</span></li>`).join("");
+      const stepRows = (entry.step_results || []).map((s) => {
+        const mark = s.verdict
+          ? `<span class="pill st-${esc(s.verdict)}">${esc(s.verdict)}</span>`
+          : "[done]";
+        return `<li>${mark} ${esc(s.action || "")}<br><span class="muted">Expected: ${esc(s.expected || "")}</span></li>`;
+      }).join("");
       return `<li><strong>${esc(entry.behavior || entry.id)}</strong>
         <span class="pill st-${verdict}">${verdict} · ${esc(by)}</span>
         ${entry.warning ? `<p class="muted">Warning: ${esc(entry.warning)}</p>` : ""}
@@ -1250,11 +1286,13 @@ async function renderE2E(id) {
     };
     const stepsHtml = (entry, readOnly) => {
       if (!entry.steps || !entry.steps.length) return howHtml(entry);
+      const dis = readOnly ? " disabled" : "";
       const rows = entry.steps.map((s, i) =>
-        `<li><label><input type="checkbox" name="step-${esc(entry.id)}-${i}" title="Mark this step performed"${readOnly ? " disabled" : ""}>`
-        + ` <strong>${esc(s.action || "")}</strong><br>`
-        + `<span class="muted">Expected: ${esc(s.expected || "")}</span></label></li>`).join("");
-      return `<h4>Checklist (tick each step you performed)</h4><ol>${rows}</ol>`;
+        `<li><strong>${esc(s.action || "")}</strong><br>`
+        + `<span class="muted">Expected: ${esc(s.expected || "")}</span><br>`
+        + `<label><input type="radio" name="step-${esc(entry.id)}-${i}" value="pass" title="Step ${i + 1} passed"${dis}> Pass</label> `
+        + `<label><input type="radio" name="step-${esc(entry.id)}-${i}" value="fail" title="Step ${i + 1} failed"${dis}> Fail</label></li>`).join("");
+      return `<h4>Checklist (pass/fail each step)</h4><ol>${rows}</ol>`;
     };
     const historyHtml = (entry) => {
       const trail = (entry.history || []).map((h) =>
@@ -1269,9 +1307,12 @@ async function renderE2E(id) {
           <span class="pill">auto-pass · ${esc(entry.verdict_by || "")}</span>
           <p class="muted">${esc(note)}</p>${whatHtml(entry, index === 0)}</li>`;
       }
-      const controls = readOnly ? "" : `
+      const hasSteps = entry.steps && entry.steps.length;
+      const verdictRow = hasSteps ? "" : `
         <div><label><input type="radio" name="verdict-${esc(entry.id)}" value="pass"> Pass</label>
-        <label><input type="radio" name="verdict-${esc(entry.id)}" value="fail"> Fail</label></div>
+        <label><input type="radio" name="verdict-${esc(entry.id)}" value="fail"> Fail</label></div>`;
+      const controls = readOnly ? "" : `
+        ${verdictRow}
         <div><textarea name="notes-${esc(entry.id)}" rows="2" placeholder="Notes (what you tried, what you saw)..." title="Test notes for this behavior">${esc(entry.draft_notes || "")}</textarea></div>`;
       return `<li><strong>${esc(entry.behavior || entry.id)}</strong>
         <span class="pill st-pending">${esc(entry.kind || "")} · needs testing</span>
@@ -1298,22 +1339,28 @@ async function renderE2E(id) {
       const results = [];
       for (const entry of task.items || []) {
         if (entry.status === "auto-pass") continue;
-        const checked = form.querySelector(`input[name="verdict-${CSS.escape(entry.id)}"]:checked`);
-        if (!checked) {
-          toast("Every behavior needs a pass/fail verdict: " + entry.id, false);
-          return;
-        }
-        const stepChecks = [];
+        const stepVerdicts = [];
         for (let i = 0; i < (entry.steps || []).length; i++) {
-          const box = form.querySelector(`input[name="step-${CSS.escape(entry.id)}-${i}"]`);
-          stepChecks.push(box ? box.checked : false);
+          const sel = form.querySelector(`input[name="step-${CSS.escape(entry.id)}-${i}"]:checked`);
+          if (!sel) {
+            toast("Every step needs a pass/fail verdict: " + entry.id, false);
+            return;
+          }
+          stepVerdicts.push(sel.value);
         }
-        if (stepChecks.length && stepChecks.some((c) => !c)) {
-          toast("Tick every performed step before submitting: " + entry.id, false);
-          return;
+        let verdict;
+        if (stepVerdicts.length) {
+          verdict = stepVerdicts.includes("fail") ? "fail" : "pass";
+        } else {
+          const checked = form.querySelector(`input[name="verdict-${CSS.escape(entry.id)}"]:checked`);
+          if (!checked) {
+            toast("Every behavior needs a pass/fail verdict: " + entry.id, false);
+            return;
+          }
+          verdict = checked.value;
         }
         const notes = form.querySelector(`textarea[name="notes-${CSS.escape(entry.id)}"]`);
-        results.push({item_id: entry.id, verdict: checked.value, notes: notes ? notes.value : "", steps: stepChecks});
+        results.push({item_id: entry.id, verdict, notes: notes ? notes.value : "", steps: stepVerdicts});
       }
       try {
         const out = await api("/api/e2e/tasks/" + encodeURIComponent(id) + "/submit", {
@@ -1331,8 +1378,7 @@ async function renderE2E(id) {
   }
   const tasks = await api("/api/e2e/tasks");
   const reports = await api("/api/e2e/reports");
-  const params = new URLSearchParams(location.hash.split("?")[1] || "");
-  const picked = new Set((params.get("s") || "open,draft,fail").split(",").filter(Boolean));
+  const picked = pickedTokens("s", "open,draft,fail");
   const shownTasks = (tasks.items || []).filter((t) => picked.has(t.status || "open"));
   const rows = shownTasks.length
     ? shownTasks.map((t) =>
@@ -1343,18 +1389,16 @@ async function renderE2E(id) {
   const reportRows = shownReports.slice(0, 10).map((r) =>
     `<li><a href="#/e2e/report/${esc(r.id)}">${gtext(r.title || r.id)}</a>
      <span class="pill st-${r.overall === "pass" ? "pass" : "fail"}">${esc(r.overall || "")}</span></li>`).join("");
-  const box = (token, label, title) =>
-    `<label><input type="checkbox" data-s="${token}" title="${title}"${picked.has(token) ? " checked" : ""}> ${label}</label>`;
+  const groups = [
+    ["Checklists", [["open", "Open", "Checklists awaiting your tests"], ["draft", "Drafts", "Awaiting pointers before testing opens"], ["submitted", "Submitted", "Finished checklists"]]],
+    ["Reports", [["fail", "Failed", "Reports needing fixes"], ["pass", "Passed", "Passing reports, kept as proof"]]],
+  ];
   view.innerHTML = `<h1>E2E promotion</h1>
     <p class="muted">Test each behavior, note what you saw, submit once. Report assembly and promotion state are automated.</p>
-    <p id="e2e-filters"><span>Checklists: ${box("open", "Open", "Checklists awaiting your tests")} ${box("draft", "Drafts", "Awaiting pointers before testing opens")} ${box("submitted", "Submitted", "Finished checklists")}</span>
-    <span>Reports: ${box("fail", "Failed", "Reports needing fixes")} ${box("pass", "Passed", "Passing reports, kept as proof")}</span></p>
+    ${filterBoxes("e2e-filters", groups, picked)}
     <h2>Checklists</h2><ul class="plain">${rows}</ul>
     <h2>Recent reports</h2><ul class="plain">${reportRows || '<li class="muted">No reports match these filters.</li>'}</ul>`;
-  view.querySelectorAll("#e2e-filters input[data-s]").forEach((box) => box.addEventListener("change", () => {
-    const on = [...view.querySelectorAll("#e2e-filters input[data-s]:checked")].map((b) => b.dataset.s);
-    location.hash = "#/e2e?s=" + on.join(",");
-  }));
+  bindFilterBoxes("e2e-filters", "e2e", "s");
 }
 
 async function renderInbox(id) {
@@ -1478,8 +1522,7 @@ async function renderInbox(id) {
     });
     return;
   }
-  const params = new URLSearchParams(location.hash.split("?")[1] || "");
-  const picked = new Set((params.get("f") || "human,open,followup").split(",").filter(Boolean));
+  const picked = pickedTokens("f", "human,open,followup");
   const inboxUrl = inboxProjectFilter ? "/api/inbox?project_id=" + encodeURIComponent(inboxProjectFilter) : "/api/inbox";
   const payload = await api(inboxUrl);
   const isFollowup = (t) => (t.resolution_kind || "final") !== "final";
@@ -1495,11 +1538,12 @@ async function renderInbox(id) {
         `<li><a href="#/inbox/${esc(t.id)}">${gtext(t.title)}</a>
          <span class="pill st-${esc((t.status || "none").replace(/\s+/g, "-"))}">${esc(t.type)} · ${esc(t.status)}${t.assignee === "agent" ? " · for AI" : ""}${isFollowup(t) ? " · needs follow-up" : ""}</span></li>`).join("")
     : '<li class="muted">Nothing matches these filters. Tick more boxes, or tick Closed to see the archive.</li>';
-  const box = (token, label, title) =>
-    `<label><input type="checkbox" data-f="${token}" title="${title}"${picked.has(token) ? " checked" : ""}> ${label}</label>`;
+  const groups = [
+    ["Who", [["human", "Human", "Tasks assigned to you"], ["ai", "AI", "Tasks assigned to the agent"]]],
+    ["State", [["open", "Open", "Not yet answered"], ["answered", "Answered", "Answered, awaiting close"], ["followup", "Needs follow-up", "Closed or open with follow-up requested"], ["closed", "Closed", "Archived tasks"]]],
+  ];
   view.innerHTML = `<h1>Inbox</h1>
-    <p id="inbox-filters"><span>Who: ${box("human", "Human", "Tasks assigned to you")} ${box("ai", "AI", "Tasks assigned to the agent")}</span>
-    <span>State: ${box("open", "Open", "Not yet answered")} ${box("answered", "Answered", "Answered, awaiting close")} ${box("followup", "Needs follow-up", "Closed or open with follow-up requested")} ${box("closed", "Closed", "Archived tasks")}</span></p>
+    ${filterBoxes("inbox-filters", groups, picked)}
     <p><input type="text" id="filter-inbox" placeholder="Filter tasks..." title="Filter inbox by text">
     <select id="filter-inbox-project" title="Show inbox tasks for one project">${await projectOptions(inboxProjectFilter)}</select></p>
     <ul class="plain" id="inbox-list">${items}</ul>`;
@@ -1507,10 +1551,7 @@ async function renderInbox(id) {
   document.getElementById("filter-inbox-project").addEventListener("change", (ev) => {
     inboxProjectFilter = ev.target.value; renderInbox();
   });
-  view.querySelectorAll("#inbox-filters input[data-f]").forEach((box) => box.addEventListener("change", () => {
-    const on = [...view.querySelectorAll("#inbox-filters input[data-f]:checked")].map((b) => b.dataset.f);
-    location.hash = "#/inbox?f=" + on.join(",");
-  }));
+  bindFilterBoxes("inbox-filters", "inbox", "f");
 }
 
 async function markIdeaSeen(id, item) {
@@ -1643,25 +1684,30 @@ async function renderIdeas(id) {
     });
     return;
   }
-  const ideasTab = new URLSearchParams((location.hash.split("?")[1] || "")).get("status") || "active";
+  const picked = pickedTokens("f", "new,reviewing");
   const payload = await api("/api/ideas");
-  const archivedIdeas = ["adopted", "parked", "declined", "implemented"];
-  const shownIdeas = payload.items.filter((t) => ideasTab === "archive" ? archivedIdeas.includes(t.status) : !archivedIdeas.includes(t.status));
+  const shownIdeas = payload.items.filter((t) => picked.has(t.status || ""));
+  const archiveOnly = ["new", "reviewing"].every((s) => !picked.has(s));
   const backlogMark = (t) => t.plan_id
     ? ` <a href="#/plans/${esc(t.plan_id)}" title="Linked backlog plan">→ plan</a>`
-    : (ideasTab === "archive" ? ` <span class="muted" title="No backlog link">archive-only</span>` : "");
+    : (archiveOnly ? ` <span class="muted" title="No backlog link">archive-only</span>` : "");
   const items = shownIdeas.length
     ? shownIdeas.map((t) =>
         `<li><a href="#/ideas/${esc(t.id)}">${gtext(t.title)}</a>
          <span class="muted">${esc(t.source)} · ${esc((t.created_at || "").slice(0, 10))}</span>
          <span class="pill st-${esc((t.status || "none").replace(/\s+/g, "-"))}">${esc(t.status)}</span>${backlogMark(t)}</li>`).join("")
-    : '<li class="muted">No ideas captured yet — use + New.</li>';
+    : '<li class="muted">No ideas match these filters.</li>';
+  const groups = [
+    ["Triage", [["new", "New", "Untriaged ideas"], ["reviewing", "Reviewing", "Ideas under triage"]]],
+    ["Decided", [["adopted", "Adopted", "Adopted ideas"], ["implemented", "Implemented", "Implemented ideas"], ["parked", "Parked", "Parked ideas"], ["declined", "Declined", "Declined ideas"]]],
+  ];
   view.innerHTML = `<h1>Ideas</h1>
-    <p><a href="#/ideas">Active</a> · <a href="#/ideas?status=archive">Archive</a></p>
+    ${filterBoxes("ideas-filters", groups, picked)}
     <p class="muted">Capture inbox for brain-dumps and third-party wishes. Triage in planning sessions.</p>
     <p><input type="text" id="filter-ideas" placeholder="Filter ideas..." title="Filter ideas by text"></p>
     <ul class="plain" id="ideas-list">${items}</ul>`;
   document.getElementById("filter-ideas").addEventListener("input", (ev) => filterList("ideas-list", ev.target.value));
+  bindFilterBoxes("ideas-filters", "ideas", "f");
 }
 
 async function renderBacklog(id) {
@@ -1711,22 +1757,26 @@ async function renderBacklog(id) {
     });
     return;
   }
-  const backlogTab = new URLSearchParams((location.hash.split("?")[1] || "")).get("status") || "active";
+  const picked = pickedTokens("f", "proposed,ready,doing,blocked");
   const payload = await api("/api/backlog");
-  const archivedBacklog = ["done", "dropped"];
-  const shownBacklog = payload.items.filter((t) => backlogTab === "archive" ? archivedBacklog.includes(t.status) : !archivedBacklog.includes(t.status));
+  const shownBacklog = payload.items.filter((t) => picked.has(t.status || ""));
   const items = shownBacklog.length
     ? shownBacklog.map((t) =>
         `<li><a href="#/backlog/${esc(t.id)}">${gtext(t.title)}</a>
          <span class="muted">${esc(t.source)} · ${esc((t.created_at || "").slice(0, 10))}</span>
          <span class="pill st-${esc((t.status || "none").replace(/\s+/g, "-"))}">${esc(t.status)}</span></li>`).join("")
-    : '<li class="muted">No backlog items yet — use + New.</li>';
+    : '<li class="muted">No backlog items match these filters.</li>';
+  const groups = [
+    ["Flow", [["proposed", "Proposed", "Proposed work"], ["ready", "Ready", "Ready to schedule"], ["doing", "Doing", "In progress"], ["blocked", "Blocked", "Stuck work"]]],
+    ["Closed", [["done", "Done", "Finished work"], ["dropped", "Dropped", "Dropped work"]]],
+  ];
   view.innerHTML = `<h1>Backlog</h1>
-    <p><a href="#/backlog">Active</a> · <a href="#/backlog?status=archive">Archive</a></p>
+    ${filterBoxes("backlog-filters", groups, picked)}
     <p class="muted">Groomed work before inbox briefs. Groom in planning sessions; promote to file a decision.</p>
     <p><input type="text" id="filter-backlog" placeholder="Filter backlog..." title="Filter backlog by text"></p>
     <ul class="plain" id="backlog-list">${items}</ul>`;
   document.getElementById("filter-backlog").addEventListener("input", (ev) => filterList("backlog-list", ev.target.value));
+  bindFilterBoxes("backlog-filters", "backlog", "f");
 }
 
 function wfNodeRow(node, index, options) {
@@ -1784,23 +1834,27 @@ function wfReadNodes(root) {
 async function renderWorkflows(id) {
   const options = await api("/api/workflows/options");
   if (!id) {
-    const tab = new URLSearchParams((location.hash.split("?")[1] || "")).get("status") || "active";
+    const picked = pickedTokens("f", "active");
     const payload = await api("/api/workflows");
-    const shown = payload.items.filter((t) => tab === "archive" ? t.status === "archived" : t.status === "active");
+    const shown = payload.items.filter((t) => picked.has(t.status || ""));
     const items = shown.length
       ? shown.map((t) =>
           `<li><a href="#/workflows/${esc(t.id)}">${esc(t.name)}</a>
            <span class="muted">${(t.nodes || []).length} nodes</span>
            <span class="pill st-${esc(t.status)}">${esc(t.status)}</span></li>`).join("")
-      : '<li class="muted">No workflows yet — compose one below.</li>';
+      : '<li class="muted">No workflows match these filters.</li>';
+    const groups = [
+      ["State", [["active", "Active", "Workflows in use"], ["archived", "Archived", "Archived workflows"]]],
+    ];
     view.innerHTML = `<h1>Workflows</h1>
-      <p><a href="#/workflows">Active</a> · <a href="#/workflows?status=archive">Archive</a></p>
+      ${filterBoxes("workflows-filters", groups, picked)}
       <p class="muted">Named node lists over existing runners. Validate maps each node; execution arrives later.</p>
       <p><button id="wf-new" title="Compose a new workflow graph">New workflow</button></p>
       <p><input type="text" id="filter-workflows" placeholder="Filter workflows..." title="Filter workflows by text"></p>
       <ul class="plain" id="workflows-list">${items}</ul>`;
     document.getElementById("wf-new").addEventListener("click", () => { location.hash = "#/workflows/new"; });
     document.getElementById("filter-workflows").addEventListener("input", (ev) => filterList("workflows-list", ev.target.value));
+    bindFilterBoxes("workflows-filters", "workflows", "f");
     return;
   }
   let graph = {name: "", description: "", nodes: []};
@@ -1947,22 +2001,27 @@ async function renderDocuments(id) {
       ${body}</div>`;
     return;
   }
-  const docsTab = new URLSearchParams((location.hash.split("?")[1] || "")).get("status") || "active";
+  const picked = pickedTokens("f", "current");
   const payload = await api("/api/documents");
-  const shownDocs = payload.documents.filter((d) => docsTab === "archive" ? d.archived : !d.archived);
+  const docState = (d) => d.archived ? "archived" : "current";
+  const shownDocs = payload.documents.filter((d) => picked.has(docState(d)));
   const items = shownDocs.length
     ? shownDocs.map((d) =>
         `<li><a href="#/documents/${encodeURIComponent(d.id)}">${esc(d.title)}</a>
          <span class="muted">${esc(d.root)} · ${esc((d.modified_utc || "").slice(0, 10))}</span>
          <span class="pill st-${esc(d.sensitivity)}">${esc(d.sensitivity)}</span>
          ${d.project ? `<span class="pill" title="Linked project">${esc(d.project)}</span>` : ""}</li>`).join("")
-    : '<li class="muted">No documents yet.</li>';
+    : '<li class="muted">No documents match these filters.</li>';
+  const groups = [
+    ["State", [["current", "Current", "Current documents"], ["archived", "Archived", "Archived documents"]]],
+  ];
   view.innerHTML = `<h1>Documents</h1>
-    <p><a href="#/documents">Active</a> · <a href="#/documents?status=archive">Archive</a></p>
+    ${filterBoxes("documents-filters", groups, picked)}
     <p class="muted">Company knowledge: public library, private research, and existing plans. Private files never leave this PC.</p>
     <p><input type="text" id="filter-documents" placeholder="Filter documents..." title="Filter documents by text"></p>
     <ul class="plain" id="documents-list">${items}</ul>`;
   document.getElementById("filter-documents").addEventListener("input", (ev) => filterList("documents-list", ev.target.value));
+  bindFilterBoxes("documents-filters", "documents", "f");
 }
 
 async function renderIntake() {

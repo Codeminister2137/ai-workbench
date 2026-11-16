@@ -134,6 +134,8 @@ def test_inbox_flow_and_token_gate(dashboard_server, tmp_path) -> None:
 
     status = get_json(dashboard_server, "/api/status")
     assert status["open_inbox"] == 1
+    assert status["attention_inbox"] == 1
+    assert status["attention_e2e"] == 0
 
     answered = post_json(
         dashboard_server, f"/api/inbox/{item_id}/answer", {"answer": "", "option_index": 0}
