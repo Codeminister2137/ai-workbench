@@ -194,7 +194,7 @@ def test_e2e_linkage() -> None:
     runs = [
         {"id": "f1", "title": "E2E follow-up: 9999999 (1 failed)", "status": "failed"},
     ]
-    findings = SWEEP.collect_e2e(tasks, reports, runs, [], NOW)
+    findings, _resolved = SWEEP.collect_e2e(tasks, reports, runs, [], NOW)
     by_key = {f["key"]: f for f in findings}
     assert by_key["E1:r1"]["fileable"] is True  # no follow-up anywhere
     assert by_key["E2:r2"]["fileable"] is True  # follow-up failed
@@ -294,6 +294,57 @@ def test_old_run_verify_first_with_evidence() -> None:
     member_ids = [m["id"] for m in finding["members"]]
     assert "inbox:i9" in member_ids
     assert "branch:fix/mobile-topbar" in member_ids
+
+
+def test_e3_skips_superseded_tasks() -> None:
+    tasks = [
+        {
+            "id": "old",
+            "title": "E2E promotion for abc",
+            "status": "open",
+            "created_at": _ts(100),
+            "merge_commit": "abc123",
+            "items": [{"id": "behavior:x", "behavior": "X"}],
+        },
+        {
+            "id": "new",
+            "title": "E2E promotion for abc",
+            "status": "open",
+            "created_at": _ts(10),
+            "merge_commit": "abc123",
+            "items": [{"id": "behavior:x", "behavior": "X"}],
+        },
+    ]
+    findings, resolved = SWEEP.collect_e2e(tasks, [], [], [], NOW)
+    keys = {f["key"] for f in findings}
+    assert "E3:old" not in keys
+    assert "E3:new" in keys
+    assert {r["key"] for r in resolved} == {"E3:old"}
+
+
+def test_findings_carry_dashboard_links() -> None:
+    runs = [
+        {
+            "id": "r1",
+            "title": "Fail",
+            "status": "failed",
+            "created_at_utc": _ts(100),
+            "inbox_id": None,
+        },
+    ]
+    findings, _resolved = SWEEP.collect_runs(runs, [], NOW)
+    assert findings[0]["link"] == ""  # links attach in run(), not collectors
+    body = SWEEP._filing_body(
+        {
+            "key": "E3:t",
+            "gate_h": 48,
+            "action": "act",
+            "members": [],
+            "link": "http://127.0.0.1:8766/#/e2e/t",
+        },
+        "receipt-x.json",
+    )
+    assert "Open: http://127.0.0.1:8766/#/e2e/t" in body
 
 
 def test_run_writes_receipt_and_skips(tmp_path: Path) -> None:

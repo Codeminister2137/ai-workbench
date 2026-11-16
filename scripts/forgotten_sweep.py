@@ -182,6 +182,7 @@ def _finding(
     action: str,
     members: list[dict[str, Any]],
     max_age_h: float | None,
+    link: str = "",
 ) -> dict[str, Any]:
     gate = GATE_H[category]
     return {
@@ -194,7 +195,12 @@ def _finding(
         "max_age_h": round(max_age_h, 1) if max_age_h is not None else None,
         "gate_h": gate,
         "fileable": max_age_h is not None and max_age_h >= gate,
+        "link": link,
     }
+
+
+def _dash_link(*parts: str) -> str:
+    return "http://127.0.0.1:8766/#/" + "/".join(parts)
 
 
 def _member(record_id: str, title: str, age_h: float | None, extra: str = "") -> dict[str, Any]:
@@ -352,6 +358,9 @@ def collect_runs(
         elif status in IDLE_RUN:
             linked = _closed_loop(run)
             if linked is not None:
+                if run.get("cancel_requested"):
+                    resolved.append({"key": f"R2:{rid}", "reason": "cancellation in flight"})
+                    continue
                 stale_records.append(
                     _member(
                         rid,
@@ -495,8 +504,9 @@ def collect_e2e(
     runs: list[dict[str, Any]],
     inbox: list[dict[str, Any]],
     now: datetime,
-) -> list[dict[str, Any]]:
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     findings: list[dict[str, Any]] = []
+    resolved: list[dict[str, Any]] = []
     followups = _followup_shorts(runs, inbox)
     for task in tasks:
         if str(task.get("status", "")) == "submitted":
@@ -506,6 +516,29 @@ def collect_e2e(
         age = _age_h(_record_ts(task), now)
         if age is None:
             continue
+        merge = str(task.get("merge_commit") or "")
+        if merge:
+            own_ts = _parse_ts(_record_ts(task))
+            superseded = any(
+                str(other.get("merge_commit") or "") == merge
+                and str(other.get("id", "")) != tid
+                and (_parse_ts(_record_ts(other)) or now) > (own_ts or now)
+                for other in tasks
+            )
+            if superseded:
+                resolved.append(
+                    {"key": f"E3:{tid}", "reason": "superseded by a newer task for the merge"}
+                )
+                continue
+        behaviors = ", ".join(
+            sorted(
+                {
+                    str(item.get("behavior") or item.get("id", ""))
+                    for item in (task.get("items") or [])
+                    if isinstance(item, dict)
+                }
+            )
+        )
         findings.append(
             _finding(
                 f"E3:{tid}",
@@ -513,8 +546,9 @@ def collect_e2e(
                 f"Open E2E task (owner testing): {title[:70]}",
                 "owner",
                 "Run the checklist and submit, or close as superseded.",
-                [_member(tid, title, age)],
+                [_member(tid, title, age, behaviors[:140])],
                 age,
+                _dash_link("e2e", tid),
             )
         )
     for report in reports:
@@ -555,7 +589,7 @@ def collect_e2e(
                     age,
                 )
             )
-    return findings
+    return findings, resolved
 
 
 def _aggregate_key(category: str, members: list[dict[str, Any]]) -> str:
@@ -593,15 +627,17 @@ def collect_git(repo: Path, runs_dir: Path, now: datetime) -> list[dict[str, Any
     except RuntimeError:
         return findings
     prune_local = [b for b in merged_local if b not in ("develop", "master") and b not in linked]
-    if prune_local:
-        members = []
-        for branch in sorted(prune_local):
-            try:
-                stamp = _git(repo, "log", "-1", "--format=%ci", branch)
-                age = _age_h(stamp.strip(), now)
-            except RuntimeError:
-                age = None
-            members.append(_member(branch, branch, age))
+    members = []
+    for branch in sorted(prune_local):
+        try:
+            stamp = _git(repo, "log", "-1", "--format=%ci", branch)
+            age = _age_h(stamp.strip(), now)
+        except RuntimeError:
+            age = None
+        if age is not None and age < 24:
+            continue  # fresh pointer (e.g. just-spawned run branch); re-check next week
+        members.append(_member(branch, branch, age))
+    if members:
         findings.append(
             _finding(
                 _aggregate_key("G1", members),
@@ -619,8 +655,17 @@ def collect_git(repo: Path, runs_dir: Path, now: datetime) -> list[dict[str, Any
         if b not in ("origin/develop", "origin/master", "origin/HEAD")
         and b.removeprefix("origin/") not in linked
     ]
-    if prune_remote:
-        members = [_member(b, b, None) for b in sorted(prune_remote)]
+    members = []
+    for branch in sorted(prune_remote):
+        try:
+            stamp = _git(repo, "log", "-1", "--format=%ci", branch)
+            age = _age_h(stamp.strip(), now)
+        except RuntimeError:
+            age = None
+        if age is not None and age < 24:
+            continue  # fresh pointer; re-check next week
+        members.append(_member(branch, branch, age))
+    if members:
         findings.append(
             _finding(
                 _aggregate_key("G2", members),
@@ -629,7 +674,7 @@ def collect_git(repo: Path, runs_dir: Path, now: datetime) -> list[dict[str, Any
                 "agent",
                 "Delete via `git push origin --delete` after re-verifying.",
                 members,
-                0.0,
+                max((m["age_h"] for m in members if m["age_h"] is not None), default=0.0),
             )
         )
     try:
@@ -704,8 +749,9 @@ def collect_plans(repo: Path) -> list[dict[str, Any]]:
                 _aggregate_key("P2", off_track),
                 "P2",
                 f"Registry projects off on-track ({len(off_track)})",
-                "owner",
-                "Review health; update the registry or queue recovery work.",
+                "agent",
+                "Investigate each project and propose a concrete recovery "
+                "(or re-scope); file the proposal for owner approval.",
                 off_track,
                 0.0,
             )
@@ -780,8 +826,10 @@ def _filing_body(finding: dict[str, Any], receipt_name: str) -> str:
         "",
         f"Suggested action: {finding['action']}",
         "",
-        "Members (up to 15):",
     ]
+    if finding.get("link"):
+        lines += [f"Open: {finding['link']}", ""]
+    lines.append("Members (up to 15):")
     for member in finding["members"][:15]:
         age = f"{member['age_h']}h" if member["age_h"] is not None else "age?"
         extra = f" — {member['extra']}" if member["extra"] else ""
@@ -819,10 +867,20 @@ def run(
     run_findings, resolved = collect_runs(runs, inbox, now, merged_branches)
     findings += run_findings
     findings += collect_inbox(inbox, now)
-    findings += collect_e2e(tasks, reports, runs, inbox, now)
+    e2e_findings, e2e_resolved = collect_e2e(tasks, reports, runs, inbox, now)
+    findings += e2e_findings
+    resolved += e2e_resolved
     findings += collect_git(repo, data_dir / "runs", now)
     findings += collect_plans(repo)
     findings += collect_drafts(now)
+    for finding in findings:
+        if finding.get("link"):
+            continue
+        key = finding["key"]
+        if key[:3] in ("R1:", "R2:", "R3:", "R4:"):
+            finding["link"] = _dash_link("runs", key[3:])
+        elif key[:3] in ("I1:", "I2:", "I3:"):
+            finding["link"] = _dash_link("inbox", key[3:])
     findings.sort(key=lambda f: (f["category"], f["key"]))
 
     previous = _latest_receipt(out_dir)
