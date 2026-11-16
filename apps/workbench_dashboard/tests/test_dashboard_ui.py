@@ -907,12 +907,20 @@ const refreshBadge = () => {}, toast = () => {}, esc = String;
 let rendered = '';
 const renderRuns = async (id) => {rendered = 'runs:' + (id || '');};
 const renderChatList = async () => {rendered = 'chat';};
+const renderHome = async () => {rendered = 'home';};
 eval(router);
 (async () => {
  await render(); assert.equal(rendered, 'runs:');
  location.hash = '#/chat'; await render(); assert.equal(rendered, 'chat');
  location.hash = '#/runs/example'; await render(); assert.equal(rendered, 'runs:example');
  location.hash = '#/home'; await render(); assert(view.innerHTML.includes('Module inactive'));
+ location.hash = '#/'; view.innerHTML = ''; await render(); assert(view.innerHTML.includes('Module inactive'));
+ moduleSettings.modules[0].activated = true;
+ for (const hash of ['#/', '#/?f=open', '#/home']) {
+   location.hash = hash; rendered = ''; await render(); assert.equal(rendered, 'home');
+ }
+ location.hash = ''; rendered = ''; await render(); assert.equal(rendered, 'runs:');
+ location.hash = '#/unknown'; view.innerHTML = ''; await render(); assert(view.innerHTML.includes('Not found'));
 })().catch(error => {console.error(error); process.exitCode = 1;});
 """
     assert "moduleSettings.landing_page" in router

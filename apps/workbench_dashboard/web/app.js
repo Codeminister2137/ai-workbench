@@ -2491,7 +2491,8 @@ async function render() {
   try { await loadModules(); }
   catch (err) { view.innerHTML = `<h1>Settings unavailable</h1><p>${esc(err.message)}</p>`; return; }
   const raw = (location.hash || "#/" + moduleSettings.landing_page).slice(2);
-  const [path, query] = raw.split("?");
+  const [routePath, query] = raw.split("?");
+  const path = routePath || "home";
   // Document ids are multi-segment (root/relpath); single-segment ids behave as before.
   const [name, ...rest] = path.split("/");
   const id = rest.length ? decodeURIComponent(rest.join("/")) : undefined;
