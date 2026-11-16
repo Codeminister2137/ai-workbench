@@ -1205,10 +1205,15 @@ async function renderE2E(id) {
       const by = entry.verdict_by === "owner" ? "tested by you"
         : entry.verdict_by === "ancestor" ? "ancestor approval"
         : "no user-visible behavior";
+      const testedOn = entry.tested_on ? ` · tested on ${esc(entry.tested_on)}` : "";
+      const stepRows = (entry.step_results || []).map((s) =>
+        `<li>[done] ${esc(s.action || "")}<br><span class="muted">Expected: ${esc(s.expected || "")}</span></li>`).join("");
       return `<li><strong>${esc(entry.behavior || entry.id)}</strong>
         <span class="pill st-${verdict}">${verdict} · ${esc(by)}</span>
         ${entry.warning ? `<p class="muted">Warning: ${esc(entry.warning)}</p>` : ""}
-        ${entry.notes ? `<p>${esc(entry.notes)}</p>` : ""}</li>`;
+        ${stepRows ? `<ol>${stepRows}</ol>` : ""}
+        ${entry.notes ? `<p>${esc(entry.notes)}</p>` : ""}
+        <p class="muted">Merge ${esc(report.commit || "")}${testedOn} · built ${fmtTime(report.built_utc)}</p></li>`;
     }).join("");
     view.innerHTML = `<h1>E2E report</h1><p><a href="#/e2e">All checklists</a></p>
       <div class="card"><h2>${gtext(report.title || "")}</h2>
@@ -1221,7 +1226,7 @@ async function renderE2E(id) {
   if (id) {
     const payload = await api("/api/e2e/tasks/" + encodeURIComponent(id));
     const task = payload.item;
-    const submitted = task.status !== "open";
+    const submitted = task.status === "submitted";
     const whatHtml = (entry) => {
       const subjects = (entry.what || []).map((s) => `<li>${esc(s)}</li>`).join("");
       const files = (entry.files || []).map((f) => {
@@ -1230,9 +1235,10 @@ async function renderE2E(id) {
         return `<li>${esc(f)}${tag}</li>`;
       }).join("");
       if (!subjects && !files) return "";
-      return `<h4>What changed</h4>`
+      return `<details><summary>Record: what changed</summary>`
         + (subjects ? `<ul>${subjects}</ul>` : "")
-        + (files ? `<ul class="plain">${files}</ul>` : "");
+        + (files ? `<ul class="plain">${files}</ul>` : "")
+        + `</details>`;
     };
     const howHtml = (entry) => {
       const steps = (entry.how || []).map((s) => `<li>${esc(s)}</li>`).join("");
@@ -1242,6 +1248,20 @@ async function renderE2E(id) {
         + (entry.expected ? `<p><strong>Expected:</strong> ${esc(entry.expected)}</p>` : "")
         + (entry.where ? `<p class="muted">Look at: ${esc(entry.where)}</p>` : "");
     };
+    const stepsHtml = (entry, readOnly) => {
+      if (!entry.steps || !entry.steps.length) return howHtml(entry);
+      const rows = entry.steps.map((s, i) =>
+        `<li><label><input type="checkbox" name="step-${esc(entry.id)}-${i}" title="Mark this step performed"${readOnly ? " disabled" : ""}>`
+        + ` <strong>${esc(s.action || "")}</strong><br>`
+        + `<span class="muted">Expected: ${esc(s.expected || "")}</span></label></li>`).join("");
+      return `<h4>Checklist (tick each step you performed)</h4><ol>${rows}</ol>`;
+    };
+    const historyHtml = (entry) => {
+      const trail = (entry.history || []).map((h) =>
+        `<a href="#/e2e/report/${esc(h.report_id || "")}" title="Open the report">${esc(h.verdict || "")} @ ${esc((h.commit || "").slice(0, 7))}</a>`).join(" · ");
+      return trail ? `<p class="muted">Previously: ${trail}</p>` : "";
+    };
+    const readOnly = task.status !== "open";
     const blocks = (task.items || []).map((entry) => {
       if (entry.status === "auto-pass") {
         const note = entry.warning || entry.reason || "auto-passed";
@@ -1249,21 +1269,28 @@ async function renderE2E(id) {
           <span class="pill">auto-pass · ${esc(entry.verdict_by || "")}</span>
           <p class="muted">${esc(note)}</p>${whatHtml(entry)}</li>`;
       }
-      return `<li><strong>${esc(entry.behavior || entry.id)}</strong>
-        <span class="pill st-pending">${esc(entry.kind || "")} · needs testing</span>
-        ${whatHtml(entry)}
-        ${howHtml(entry)}
+      const controls = readOnly ? "" : `
         <div><label><input type="radio" name="verdict-${esc(entry.id)}" value="pass"> Pass</label>
         <label><input type="radio" name="verdict-${esc(entry.id)}" value="fail"> Fail</label></div>
-        <div><textarea name="notes-${esc(entry.id)}" rows="2" placeholder="Notes (what you tried, what you saw)..." title="Test notes for this behavior">${esc(entry.draft_notes || "")}</textarea></div></li>`;
+        <div><textarea name="notes-${esc(entry.id)}" rows="2" placeholder="Notes (what you tried, what you saw)..." title="Test notes for this behavior">${esc(entry.draft_notes || "")}</textarea></div>`;
+      return `<li><strong>${esc(entry.behavior || entry.id)}</strong>
+        <span class="pill st-pending">${esc(entry.kind || "")} · needs testing</span>
+        ${entry.needs_pointers ? `<p class="muted">Draft steps — pointers requested; final checks land before testing opens.</p>` : ""}
+        ${stepsHtml(entry, readOnly)}
+        ${historyHtml(entry)}
+        ${whatHtml(entry)}
+        ${controls}</li>`;
     }).join("");
+    const isDraft = task.status === "draft";
     view.innerHTML = `<h1>E2E checklist</h1><p><a href="#/e2e">All checklists</a></p>
       <div class="card"><h2>${gtext(task.title || "")}</h2>
       <p class="muted">Merge ${esc(task.merge_commit || "")} · ${esc(task.status || "")}</p>
       ${submitted
         ? `<p class="muted">Submitted; verdicts are immutable.</p>
            ${task.report_id ? `<p><a href="#/e2e/report/${esc(task.report_id)}">Open the report</a></p>` : ""}`
-        : `<form id="e2e-form"><ul class="plain">${blocks}</ul>
+        : isDraft
+          ? `<p class="muted">Draft — waiting on pointers. No verdicts yet; the checklist opens once concrete steps are finalized.</p><ul class="plain">${blocks}</ul>`
+          : `<form id="e2e-form"><ul class="plain">${blocks}</ul>
            <p><button type="submit" title="Record verdicts and build the E2E report">Submit E2E results</button></p></form>`}</div>`;
     const form = document.getElementById("e2e-form");
     if (form) form.addEventListener("submit", async (ev) => {
@@ -1276,8 +1303,17 @@ async function renderE2E(id) {
           toast("Every behavior needs a pass/fail verdict: " + entry.id, false);
           return;
         }
+        const stepChecks = [];
+        for (let i = 0; i < (entry.steps || []).length; i++) {
+          const box = form.querySelector(`input[name="step-${CSS.escape(entry.id)}-${i}"]`);
+          stepChecks.push(box ? box.checked : false);
+        }
+        if (stepChecks.length && stepChecks.some((c) => !c)) {
+          toast("Tick every performed step before submitting: " + entry.id, false);
+          return;
+        }
         const notes = form.querySelector(`textarea[name="notes-${CSS.escape(entry.id)}"]`);
-        results.push({item_id: entry.id, verdict: checked.value, notes: notes ? notes.value : ""});
+        results.push({item_id: entry.id, verdict: checked.value, notes: notes ? notes.value : "", steps: stepChecks});
       }
       try {
         const out = await api("/api/e2e/tasks/" + encodeURIComponent(id) + "/submit", {

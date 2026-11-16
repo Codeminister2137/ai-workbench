@@ -7,6 +7,9 @@ Implements the ADR-087 use-based promotion gate:
   touched goal docs, applies ancestor matching (no-diff proof +
   warnings), and files one E2E task. Fully auto-passed tasks submit
   themselves; anything pending waits for the owner in the dashboard.
+  Items whose steps cannot ground in diff evidence file the task as a
+  draft plus one pointer clarification instead of a vague checklist.
+* ``finalize`` opens a draft with authored steps after pointers land.
 * ``gate`` reports whether one merge may promote (its own passing
   report exists).
 * ``promote`` merges ``develop`` to ``master`` only when every merge in
@@ -37,6 +40,7 @@ DEFAULT_URL = "http://127.0.0.1:8766"
 sys.path.insert(0, str(DASHBOARD_DIR))
 sys.path.insert(0, str(HERE.parent))
 
+from e2e_cases import extract_diff_evidence  # noqa: E402
 from e2e_promotion import (  # noqa: E402
     apply_ancestor_matching,
     change_summary,
@@ -87,6 +91,7 @@ def file_task(url: str, payload: dict, token: str | None, data_dir: Path) -> dic
             title=str(payload["title"]),
             items=list(payload["items"]),
             range_base=payload.get("range_base"),
+            draft=bool(payload.get("draft", False)),
         )
         return {"ok": True, "id": record["id"], "direct": True}
 
@@ -122,6 +127,61 @@ def resolve_base(repo: str, merge: str, base: str | None) -> str:
     return run_git(repo, "rev-parse", f"{merge}^1").decode("utf-8").strip()
 
 
+def pointer_body(merge: str, unclear: list[dict]) -> str:
+    """Owner-readable pointer request for behaviors the generator could not ground."""
+    lines = [
+        f"The E2E generator could not determine concrete checks for {merge}.",
+        "Reply with what to verify for each behavior (what to click, what to expect);",
+        "the draft checklist finalizes once pointers land. Evidence the generator saw:",
+        "",
+    ]
+    for item in unclear:
+        lines.append(f"- {item.get('behavior')} ({item.get('id')})")
+        for subject in item.get("what", [])[:4]:
+            lines.append(f"  what: {subject}")
+        for path in item.get("files", [])[:8]:
+            lines.append(f"  file: {path}")
+    return "\n".join(lines)
+
+
+def file_pointers(
+    url: str, token: str | None, data_dir: Path, merge: str, unclear: list[dict]
+) -> str:
+    """File one clarification asking the owner how to test unclear behaviors."""
+    payload = {
+        "title": f"E2E pointers needed: {merge}",
+        "body": pointer_body(merge, unclear),
+        "type": "clarification",
+        "created_by": "supervisor",
+        "assignee": "owner",
+        "metadata": {"merge_commit": merge, "kind": "e2e-pointers"},
+    }
+    body = json.dumps(payload).encode("utf-8")
+    request = urllib.request.Request(
+        f"{url.rstrip('/')}/api/inbox",
+        data=body,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    if token:
+        request.add_header("X-Supervisor-Token", token)
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            return str(json.loads(response.read().decode("utf-8"))["id"])
+    except OSError:
+        from dashboard_stores import DashboardStores
+
+        record = DashboardStores(data_dir).create_inbox_task(
+            title=str(payload["title"]),
+            body=str(payload["body"]),
+            task_type="clarification",
+            created_by="supervisor",
+            assignee="owner",
+            metadata=dict(payload["metadata"]),
+        )
+        return str(record["id"])
+
+
 def cmd_generate(args: argparse.Namespace) -> int:
     repo = str(REPO_ROOT)
     data_dir = Path(args.data_dir)
@@ -129,6 +189,7 @@ def cmd_generate(args: argparse.Namespace) -> int:
         base = resolve_base(repo, args.merge, args.base)
         files = merge_diff_files(repo, base, args.merge)
         summaries = change_summary(repo, base, args.merge, files)
+        summaries["evidence"] = extract_diff_evidence(repo, base, args.merge, files)
     except RuntimeError as exc:
         print(f"error: {exc}")
         return 2
@@ -144,10 +205,16 @@ def cmd_generate(args: argparse.Namespace) -> int:
     if args.dry_run:
         print(json.dumps(matched, indent=2))
         return 0
+    unclear = [
+        item
+        for item in matched["items"]
+        if item.get("status") == "pending" and item.get("needs_pointers")
+    ]
     payload = {
         "merge_commit": args.merge,
         "title": matched["title"],
         "items": matched["items"],
+        "draft": bool(unclear),
     }
     if args.base:
         payload["range_base"] = base
@@ -162,9 +229,56 @@ def cmd_generate(args: argparse.Namespace) -> int:
     pending = sum(1 for item in matched["items"] if item.get("status") == "pending")
     task_id = filed["id"]
     print(f"task: {task_id} pending={pending} items={len(matched['items'])}")
+    if unclear:
+        try:
+            inbox_id = file_pointers(args.url, args.token, data_dir, args.merge, unclear)
+        except Exception as exc:  # noqa: BLE001 - pointer filing must not lose the draft
+            print(f"error: could not file pointer request: {exc}")
+            return 1
+        print(f"pointers: {inbox_id} unclear={len(unclear)} (task stays draft)")
+        return 0
     if pending == 0:
         submitted = submit_task(args.url, task_id, data_dir)
         print(f"report: {submitted.get('report_id')} overall={submitted.get('overall')}")
+    return 0
+
+
+def cmd_finalize(args: argparse.Namespace) -> int:
+    """Finalize a draft with authored steps after pointers land."""
+    try:
+        steps = json.loads(Path(args.steps_json).read_text(encoding="utf-8"))
+    except (ValueError, OSError) as exc:
+        print(f"error: cannot read steps file: {exc}")
+        return 2
+    if not isinstance(steps, dict):
+        print("error: steps file must map item ids to step lists")
+        return 2
+    body = json.dumps({"steps": steps}).encode("utf-8")
+    request = urllib.request.Request(
+        f"{args.url.rstrip('/')}/api/e2e/tasks/{args.task_id}/finalize",
+        data=body,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    if args.token:
+        request.add_header("X-Supervisor-Token", args.token)
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            outcome = json.loads(response.read().decode("utf-8"))
+    except OSError:
+        from dashboard_stores import DashboardStores
+
+        try:
+            record = DashboardStores(Path(args.data_dir)).finalize_e2e_task(args.task_id, steps)
+        except Exception as exc:  # noqa: BLE001 - store refusal surfaces as error
+            print(f"error: could not finalize: {exc}")
+            return 1
+        print(f"finalized: {record['id']} status={record['status']} (direct)")
+        return 0
+    if not outcome.get("ok", True):
+        print(f"error: {outcome.get('error', 'unknown finalize failure')}")
+        return 1
+    print(f"finalized: {outcome['id']} status={outcome['status']}")
     return 0
 
 
@@ -227,6 +341,13 @@ def build_parser() -> argparse.ArgumentParser:
     gen.add_argument("--token", default=None)
     gen.add_argument("--dry-run", action="store_true")
     gen.set_defaults(func=cmd_generate)
+    fin = sub.add_parser("finalize", help="Open a draft with authored steps.")
+    fin.add_argument("task_id", help="Draft E2E task id.")
+    fin.add_argument("steps_json", help="JSON file mapping item ids to step lists.")
+    fin.add_argument("--data-dir", default=str(DEFAULT_DATA_DIR))
+    fin.add_argument("--url", default=DEFAULT_URL)
+    fin.add_argument("--token", default=None)
+    fin.set_defaults(func=cmd_finalize)
     gate = sub.add_parser("gate", help="Check one merge's promotion verdict.")
     gate.add_argument("merge")
     gate.add_argument("--data-dir", default=str(DEFAULT_DATA_DIR))

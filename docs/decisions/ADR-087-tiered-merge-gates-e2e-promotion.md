@@ -65,3 +65,22 @@ state are automated.
   misclassification toward lower tiers is itself a review failure.
 - Rejected alternative: keep per-merge approval for everything (proven
   theater); reviewer-assigned PRs (no second human exists).
+
+## Addendum 2026-11-14: case-specific steps, pointer drafts, proof reports
+
+Owner verdict: area-level "how to test" prose plus a file list does not
+tell the tester what to click or what to expect. Checklists now follow
+the ISTQB/ISO-29119 test-case shape: each behavior item carries
+checkable ``steps`` (action + expected result), drafted from evidence
+extracted from the merge diff (changed symbols, API routes, dashboard
+views). Affected files stay on the item as the record, collapsed.
+
+Steps the generator cannot ground flag ``needs_pointers``: the task is
+filed as a draft plus one inbox clarification asking the owner what to
+verify, and opens only after authored steps land (`finalize`). A vague
+scheduled test the owner must send back costs more than a question.
+
+Submitting requires every step ticked (checkbox = performed, verdict =
+outcome); reports store per-step results with the tested commit and
+build time, and each item shows its recent verdict trail, so reports
+serve as durable proof of what worked on which patch.
