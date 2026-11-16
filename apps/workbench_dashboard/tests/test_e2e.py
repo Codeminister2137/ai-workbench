@@ -2,12 +2,9 @@
 
 from __future__ import annotations
 
-import json
-from urllib.request import Request, urlopen
-
 import pytest
 from dashboard_stores import DashboardStores, StoreError
-from dashboard_test_http import get_json
+from dashboard_test_http import get_json, post_json
 
 
 @pytest.fixture
@@ -145,17 +142,6 @@ def test_submit_stamps_followup_refusal(stores) -> None:
     assert outcome["task"]["status"] == "submitted"
     assert outcome["followup_id"] is None
     assert "followup_error" in outcome["task"]
-
-
-def post_json(base: str, path: str, payload: dict) -> dict:
-    request = Request(
-        f"{base}{path}",
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    with urlopen(request, timeout=10) as response:
-        return json.loads(response.read().decode("utf-8"))
 
 
 def test_e2e_http_roundtrip(dashboard_server) -> None:
