@@ -45,6 +45,7 @@ GATE_H = {
     "R2": 48,  # idle queued/running/paused run
     "R3": 48,  # branch-ready run awaiting merge
     "R4": 12,  # live run stuck
+    "R5": 0,  # stale run records with closed approvals
     "I1": 24,  # answered-never-closed inbox
     "I2": 48,  # open agent inbox rotting
     "I3": 168,  # open owner inbox backlog (7d)
@@ -62,6 +63,41 @@ GATE_H = {
 
 SHORT_RE = re.compile(r"[0-9a-f]{7,40}")
 FOLLOWUP_RE = re.compile(r"E2E follow-up:\s*([0-9a-f]{7,40})", re.IGNORECASE)
+STILL_OPEN_RE = re.compile(r"stays open|still open|not resolved|unresolved|reopen", re.IGNORECASE)
+TRACKER_RE = re.compile(r"\b[0-9a-f]{8,40}\b")
+STOPWORDS = frozenset(
+    {
+        "with",
+        "from",
+        "that",
+        "this",
+        "have",
+        "will",
+        "task",
+        "tasks",
+        "failed",
+        "failure",
+        "error",
+        "follow",
+        "followup",
+        "promotion",
+        "agent",
+        "owner",
+        "workbench",
+        "dashboard",
+    }
+)
+OLD_RUN_H = 168  # runs older than this were likely done another way: verify first
+
+
+def _title_words(title: str) -> set[str]:
+    words = {w for w in re.split(r"[^a-z0-9]+", title.casefold()) if len(w) >= 4}
+    return words - STOPWORDS
+
+
+def _strong_word_overlap(left: set[str], right: set[str]) -> bool:
+    shared = left & right
+    return any(len(w) >= 5 for w in shared) or len(shared) >= 2
 
 
 def _now() -> datetime:
@@ -170,14 +206,63 @@ def _member(record_id: str, title: str, age_h: float | None, extra: str = "") ->
     }
 
 
-def collect_runs(
-    runs: list[dict[str, Any]], inbox: list[dict[str, Any]], now: datetime
+def _done_elsewhere_evidence(
+    title: str,
+    own_inbox_id: str,
+    inbox: list[dict[str, Any]],
+    merged_branches: tuple[str, ...],
 ) -> list[dict[str, Any]]:
+    """Gather possibly-resolved evidence: closed inbox + merged branches."""
+    evidence: list[dict[str, Any]] = []
+    words = _title_words(title)
+    if not words:
+        return evidence
+    for item in inbox:
+        if str(item.get("status", "")) != "closed":
+            continue
+        if str(item.get("id", "")) == own_inbox_id:
+            continue
+        if _strong_word_overlap(words, _title_words(str(item.get("title", "")))):
+            evidence.append(
+                _member(
+                    f"inbox:{str(item.get('id', '?'))[:8]}",
+                    str(item.get("title", "")),
+                    None,
+                    f"closed: {str(item.get('resolution', ''))[:100]}",
+                )
+            )
+            if len(evidence) >= 3:
+                return evidence
+    for branch in merged_branches:
+        tokens = set(re.split(r"[^a-z0-9]+", branch.casefold())) - STOPWORDS
+        if _strong_word_overlap(words, tokens):
+            evidence.append(_member(f"branch:{branch}", branch, None, "merged to develop"))
+            if len(evidence) >= 5:
+                return evidence
+    return evidence
+
+
+def collect_runs(
+    runs: list[dict[str, Any]],
+    inbox: list[dict[str, Any]],
+    now: datetime,
+    merged_branches: tuple[str, ...] = (),
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Collect run findings; resolved-first: a closed loop never files.
+
+    Returns (findings, resolved_skipped). A failed/idle run whose linked
+    approval is closed is resolved (or a stale record, see R5), never
+    forgotten work. Old runs without hard resolution file only with a
+    verify-first action plus done-elsewhere evidence.
+    """
     findings: list[dict[str, Any]] = []
+    resolved: list[dict[str, Any]] = []
+    stale_records: list[dict[str, Any]] = []
     by_inbox: dict[str, list[dict[str, Any]]] = {}
     for run in runs:
         if run.get("inbox_id"):
             by_inbox.setdefault(str(run["inbox_id"]), []).append(run)
+    inbox_by_id = {str(item.get("id", "")): item for item in inbox}
     open_refs: list[str] = []
     for item in inbox:
         if item.get("status") in ("open", "answered"):
@@ -185,6 +270,32 @@ def collect_runs(
                 f"{item.get('title', '')} {item.get('body', '')} "
                 f"{item.get('resolution', '')} {item.get('note', '')}".lower()
             )
+
+    def _closed_loop(run: dict[str, Any]) -> dict[str, Any] | None:
+        """Return the closed linked approval, if the run's loop is closed."""
+        linked = inbox_by_id.get(str(run.get("inbox_id") or ""))
+        if linked is None or str(linked.get("status", "")) != "closed":
+            return None
+        resolution = f"{linked.get('resolution', '')} {linked.get('answer', '')}"
+        if STILL_OPEN_RE.search(resolution):
+            for ref in TRACKER_RE.findall(resolution):
+                tracker = next(
+                    (item for item in inbox if str(item.get("id", "")).startswith(ref[:12])),
+                    None,
+                )
+                if tracker is not None and str(tracker.get("status", "")) != "closed":
+                    return None  # tracked elsewhere and still open: not resolved
+        return linked
+
+    def _verify_first_action(base: str, age: float | None) -> str:
+        if age is not None and age >= OLD_RUN_H:
+            return (
+                "VERIFY FIRST — old run, likely done another way: check the "
+                "evidence below and the run report; stamp superseded_by when "
+                "confirmed, else: " + base[0].lower() + base[1:]
+            )
+        return base
+
     for run in runs:
         rid = str(run.get("id", "?"))
         title = str(run.get("title", ""))
@@ -195,7 +306,17 @@ def collect_runs(
             continue
         if status == "failed":
             if run.get("superseded_by"):
-                continue  # loop closed: fixed/retried elsewhere, see the stamp
+                resolved.append({"key": f"R1:{rid}", "reason": "superseded_by stamp"})
+                continue
+            linked = _closed_loop(run)
+            if linked is not None:
+                resolved.append(
+                    {
+                        "key": f"R1:{rid}",
+                        "reason": f"linked approval closed: {str(linked.get('resolution', ''))[:120]}",
+                    }
+                )
+                continue
             siblings = [r for r in by_inbox.get(str(run.get("inbox_id") or ""), []) if r is not run]
             newer_ok = any(
                 (_parse_ts(_record_ts(r)) or now) > (_parse_ts(created) or now)
@@ -207,28 +328,53 @@ def collect_runs(
             )
             mentioned = any(rid[:8].lower() in ref for ref in open_refs)
             if newer_ok or newer_failed or mentioned:
-                continue  # superseded or already queued
+                resolved.append({"key": f"R1:{rid}", "reason": "superseded or queued"})
+                continue
+            members = [_member(rid, title, age, str(run.get("error", "")))]
+            members += _done_elsewhere_evidence(
+                title, str(run.get("inbox_id") or ""), inbox, merged_branches
+            )
             findings.append(
                 _finding(
                     f"R1:{rid}",
                     "R1",
                     f"Failed run with no follow-up: {title[:70]}",
                     "agent",
-                    "Investigate the error; queue a fix run, or stamp the run "
-                    "record with superseded_by=<run-id> when fixed elsewhere.",
-                    [_member(rid, title, age, str(run.get("error", "")))],
+                    _verify_first_action(
+                        "Investigate the error; queue a fix run, or stamp the run "
+                        "record with superseded_by=<run-id> when fixed elsewhere.",
+                        age,
+                    ),
+                    members,
                     age,
                 )
             )
         elif status in IDLE_RUN:
+            linked = _closed_loop(run)
+            if linked is not None:
+                stale_records.append(
+                    _member(
+                        rid,
+                        title,
+                        age,
+                        f"approval {str(linked.get('id', ''))[:8]} closed: "
+                        f"{str(linked.get('resolution', ''))[:100]}",
+                    )
+                )
+                resolved.append({"key": f"R2:{rid}", "reason": "loop closed; stale record"})
+                continue
+            members = [_member(rid, title, age)]
+            members += _done_elsewhere_evidence(
+                title, str(run.get("inbox_id") or ""), inbox, merged_branches
+            )
             findings.append(
                 _finding(
                     f"R2:{rid}",
                     "R2",
                     f"Idle {status} run: {title[:70]}",
                     "agent",
-                    "Drain it, requeue it, or cancel with a note.",
-                    [_member(rid, title, age)],
+                    _verify_first_action("Drain it, requeue it, or cancel with a note.", age),
+                    members,
                     age,
                 )
             )
@@ -256,7 +402,20 @@ def collect_runs(
                     age,
                 )
             )
-    return findings
+    if stale_records:
+        oldest = max(m["age_h"] for m in stale_records if m["age_h"] is not None)
+        findings.append(
+            _finding(
+                _aggregate_key("R5", stale_records),
+                "R5",
+                f"Stale run records with closed approvals ({len(stale_records)})",
+                "agent",
+                "Cancel the stale records (work already decided/done); loops are closed.",
+                stale_records,
+                oldest,
+            )
+        )
+    return findings, resolved
 
 
 def collect_inbox(inbox: list[dict[str, Any]], now: datetime) -> list[dict[str, Any]]:
@@ -648,8 +807,17 @@ def run(
     inbox = _load_store(data_dir, "inbox")
     tasks = _load_store(data_dir, "e2e_tasks")
     reports = _load_store(data_dir, "e2e_reports")
+    try:
+        merged_branches = tuple(
+            b.strip().lstrip("*+ ")
+            for b in _git(repo, "branch", "--merged", "develop").splitlines()
+            if b.strip()
+        )
+    except RuntimeError:
+        merged_branches = ()
     findings: list[dict[str, Any]] = []
-    findings += collect_runs(runs, inbox, now)
+    run_findings, resolved = collect_runs(runs, inbox, now, merged_branches)
+    findings += run_findings
     findings += collect_inbox(inbox, now)
     findings += collect_e2e(tasks, reports, runs, inbox, now)
     findings += collect_git(repo, data_dir / "runs", now)
@@ -714,9 +882,11 @@ def run(
             "watching": len(watching),
             "already_filed": len(skipped_filed),
             "skipped_manual": len(skipped_manual),
+            "resolved_skipped": len(resolved),
             "file_errors": len(file_errors),
         },
         "findings": findings,
+        "resolved_skipped": resolved,
         "file_errors": file_errors,
     }
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -758,8 +928,8 @@ def main(argv: list[str] | None = None) -> int:
     print(
         f"sweep: findings={counts['findings']} fileable_new={counts['fileable_new']} "
         f"watching={counts['watching']} already_filed={counts['already_filed']} "
-        f"skipped={counts['skipped_manual']} file_errors={counts['file_errors']} "
-        f"receipt={receipt['receipt']}"
+        f"skipped={counts['skipped_manual']} resolved={counts['resolved_skipped']} "
+        f"file_errors={counts['file_errors']} receipt={receipt['receipt']}"
     )
     for finding in receipt["findings"]:
         if finding.get("skipped"):

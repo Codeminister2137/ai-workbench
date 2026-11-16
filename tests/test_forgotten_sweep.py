@@ -58,7 +58,7 @@ def test_r1_flags_failed_without_followup_and_skips_superseded() -> None:
             "inbox_id": None,
         },
     ]
-    findings = SWEEP.collect_runs(runs, [], NOW)
+    findings, _resolved = SWEEP.collect_runs(runs, [], NOW)
     by_key = {f["key"]: f for f in findings}
     assert by_key["R1:aaa"]["fileable"] is True
     assert "R1:bbb" not in by_key  # superseded by newer sibling
@@ -76,7 +76,7 @@ def test_r1_skips_superseded_runs() -> None:
             "superseded_by": "new",
         },
     ]
-    assert SWEEP.collect_runs(runs, [], NOW) == []
+    assert SWEEP.collect_runs(runs, [], NOW)[0] == []
 
 
 def test_r1_skips_failed_mentioned_in_open_inbox() -> None:
@@ -99,7 +99,7 @@ def test_r1_skips_failed_mentioned_in_open_inbox() -> None:
             "note": "",
         },
     ]
-    assert SWEEP.collect_runs(runs, inbox, NOW) == []
+    assert SWEEP.collect_runs(runs, inbox, NOW)[0] == []
 
 
 def test_idle_branch_ready_live_flagged() -> None:
@@ -109,7 +109,8 @@ def test_idle_branch_ready_live_flagged() -> None:
         {"id": "l", "title": "L", "status": "live", "created_at_utc": _ts(20)},
         {"id": "m", "title": "M", "status": "merged", "created_at_utc": _ts(200)},
     ]
-    by_key = {f["key"]: f for f in SWEEP.collect_runs(runs, [], NOW)}
+    findings, _resolved = SWEEP.collect_runs(runs, [], NOW)
+    by_key = {f["key"]: f for f in findings}
     assert by_key["R2:q"]["fileable"] is True
     assert by_key["R3:b"]["fileable"] is True
     assert by_key["R4:l"]["fileable"] is True
@@ -124,7 +125,7 @@ def test_mtime_fallback_flags_timestamp_less_records(tmp_path: Path) -> None:
     )
     runs = SWEEP._load_store(tmp_path, "runs")
     assert runs[0]["_file_mtime"]
-    findings = SWEEP.collect_runs(runs, [], NOW)
+    findings, _resolved = SWEEP.collect_runs(runs, [], NOW)
     assert findings[0]["key"] == "R4:x"
     assert findings[0]["fileable"] is False  # just written -> watching
 
@@ -200,6 +201,99 @@ def test_e2e_linkage() -> None:
     assert "E1:r3" in by_key and by_key["E1:r3"]["fileable"] is True
     assert "E3:t1" in by_key and by_key["E3:t1"]["assignee"] == "owner"
     assert not [k for k in by_key if ":t2" in k or ":r4" in k]
+
+
+def test_closed_approval_resolves_r1_and_stales_r2() -> None:
+    inbox = [
+        {
+            "id": "i1",
+            "title": "Approve: A",
+            "status": "closed",
+            "created_at": _ts(100),
+            "resolution": "underlying task resolved",
+        },
+        {
+            "id": "i2",
+            "title": "Approve: B",
+            "status": "closed",
+            "created_at": _ts(100),
+            "resolution": "Superseded: done directly",
+        },
+    ]
+    runs = [
+        {
+            "id": "f",
+            "title": "Failed A",
+            "status": "failed",
+            "created_at_utc": _ts(100),
+            "inbox_id": "i1",
+        },
+        {
+            "id": "q",
+            "title": "Queued B",
+            "status": "queued",
+            "created_at_utc": _ts(100),
+            "inbox_id": "i2",
+        },
+    ]
+    findings, resolved = SWEEP.collect_runs(runs, inbox, NOW)
+    by_key = {f["key"]: f for f in findings}
+    assert "R1:f" not in by_key
+    assert "R2:q" not in by_key
+    assert {r["key"] for r in resolved} == {"R1:f", "R2:q"}
+    r5 = [f for f in findings if f["category"] == "R5"]
+    assert len(r5) == 1 and r5[0]["members"][0]["id"] == "q"
+
+
+def test_still_open_tracker_keeps_finding() -> None:
+    inbox = [
+        {
+            "id": "i1",
+            "title": "Approve: A",
+            "status": "closed",
+            "created_at": _ts(100),
+            "resolution": "Partial: task abc12345 stays open for the second half",
+        },
+        {"id": "abc12345zz", "title": "Second half", "status": "open", "created_at": _ts(90)},
+    ]
+    runs = [
+        {
+            "id": "deadbeefdeadbeefdeadbeefdeadbeef",
+            "title": "Failed A",
+            "status": "failed",
+            "created_at_utc": _ts(100),
+            "inbox_id": "i1",
+        },
+    ]
+    findings, _resolved = SWEEP.collect_runs(runs, inbox, NOW)
+    assert "R1:deadbeefdeadbeefdeadbeefdeadbeef" in {f["key"] for f in findings}
+
+
+def test_old_run_verify_first_with_evidence() -> None:
+    inbox = [
+        {
+            "id": "i9",
+            "title": "Approve: mobile top bar",
+            "status": "closed",
+            "created_at": _ts(200),
+            "resolution": "Merged fix/mobile-topbar",
+        },
+    ]
+    runs = [
+        {
+            "id": "old",
+            "title": "Top bar in mobile",
+            "status": "failed",
+            "created_at_utc": _ts(200),
+            "inbox_id": None,
+        },
+    ]
+    findings, _resolved = SWEEP.collect_runs(runs, inbox, NOW, ("develop", "fix/mobile-topbar"))
+    finding = next(f for f in findings if f["key"] == "R1:old")
+    assert finding["action"].startswith("VERIFY FIRST")
+    member_ids = [m["id"] for m in finding["members"]]
+    assert "inbox:i9" in member_ids
+    assert "branch:fix/mobile-topbar" in member_ids
 
 
 def test_run_writes_receipt_and_skips(tmp_path: Path) -> None:
