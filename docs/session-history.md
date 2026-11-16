@@ -1,5 +1,19 @@
 # Session History
 
+## 2026-11-16 - Sweep, agent queue, resolved-first hardening (01a1e5ab cont.)
+
+Forgotten sweep built + weekly task live (581a078): 22 findings filed,
+185 local + 137 remote merged branches pruned, prune-script robustness
+fix. Owner feedback applied same session (79d0e89): resolved-first
+(closed loop never files), R5 stale-record aggregate, verify-first +
+done-elsewhere evidence for 7d+ runs — all 13 filed R1/R2 proven already
+resolved via closed approvals/tracker/fix-merge. Agent queue cleared:
+P4 merged Tier-2 (ac2c331; uncommitted worktree changes rebased cleanly,
+567+100 tests), scoring answers applied (9fedddf; prefs TOML + CLI +
+diacritics, 227 tests), clone batch merged Tier-1 (06ad88f, -120 net),
+Openings trial verified live + closed (83 jobs; personalization queued
+307838dd). No new window-vanish (v2 ticking, trap armed).
+
 ## 2026-11-16 - Window-vanish: actor hunt exhausted, v2 auto-restore shipped (fa064c4)
 
 Fresh session 01a1e5ab. Corrected timeline from owner-report anchors
