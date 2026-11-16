@@ -52,7 +52,9 @@ inspect the owned process only.
   records that predate the field). Project-scoped runs show staged
   diffs for review with approve-and-apply. Inbox-bridged runs inherit
   `bridge_fanout_policy` from dashboard.json (`restricted` unless set);
-  E2E follow-up runs skip the approval item (owner re-tests instead).
+  bridged agent runs are pre-approved (humans are escalation): the
+  drain pauses itself with one owner alert on allowance/config
+  failure instead of burning the queue.
 - Inbox: decisions/clarifications assigned to the owner; answers flow
   back as record updates. Creation requires the supervisor token when
   `data/supervisor.token` exists. The nav badge counts human-assigned open or follow-up tasks, independent of

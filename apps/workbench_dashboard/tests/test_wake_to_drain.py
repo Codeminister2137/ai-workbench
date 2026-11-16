@@ -78,8 +78,8 @@ def test_preapproved_runs_to_receipt(wake_server) -> None:
     assert receipts["receipts"] == [{"status": "completed", "summary": "fixture did it"}]
 
 
-def test_reject_parks_forever(wake_server) -> None:
-    """A Rejected agent-filed run never executes across drain passes."""
+def test_bridged_agent_task_preapproved_executes(wake_server) -> None:
+    """Owner decision C: bridged agent tasks run without an approval click."""
     base, tmp_path = wake_server
     post_json(
         base,
@@ -89,14 +89,35 @@ def test_reject_parks_forever(wake_server) -> None:
     bridged = post_json(base, "/api/inbox/bridge-runs", {})
     assert bridged["ok"] is True
     assert len(bridged["bridged"]) == 1
-    run_id = bridged["bridged"][0]["run_id"]
-    approval_id = bridged["bridged"][0]["approval_id"]
-    post_json(base, f"/api/inbox/{approval_id}/answer", {"answer": "", "option_index": 1})
+    assert bridged["bridged"][0]["status"] == "preapproved"
+    assert bridged["bridged"][0]["approval_id"] is None
+
+    calls: list = []
+    drain = _drain(tmp_path / "data", calls)
+    assert drain.drain()[0]["status"] == "completed"
+    assert len(calls) == 1
+
+
+def test_reject_parks_forever(wake_server) -> None:
+    """A Rejected linked approval still parks the run across drain passes."""
+    base, tmp_path = wake_server
+    stores = DashboardStores(tmp_path / "data")
+    approval = stores.create_inbox_task(
+        title="Approve agent run: legacy",
+        body="Legacy approval-gated run.",
+        task_type="decision",
+        options=["Approve", "Reject"],
+    )
+    stores.runs.put(
+        "r1",
+        {"id": "r1", "title": "legacy", "status": "queued", "inbox_id": approval["id"]},
+    )
+    post_json(base, f"/api/inbox/{approval['id']}/answer", {"answer": "", "option_index": 1})
 
     calls: list = []
     drain = _drain(tmp_path / "data", calls)
     assert drain.drain()[0]["action"] == "parked"
     assert drain.drain()[0]["action"] == "parked"
     assert calls == []
-    run = get_json(base, f"/api/runs/{run_id}")
+    run = get_json(base, "/api/runs/r1")
     assert run["item"]["status"] == "queued"

@@ -2868,6 +2868,91 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
 
 DRAIN_SCHEDULER_MIN_INTERVAL_SECONDS = 60
 SCHEDULER_DRAIN_MAX_RUNS = 1
+DRAIN_PAUSE_ALERT_KIND = "drain-pause"
+DRAIN_PAUSE_CLASSES = frozenset({"allowance", "config"})
+
+
+def _run_sort_key(run: dict) -> str:
+    return str(
+        run.get("finished_at_utc") or run.get("updated_at_utc") or run.get("created_at_utc") or ""
+    )
+
+
+def drain_pause_state(stores: DashboardStores) -> dict | None:
+    """Owner-visible drain pause; None means proceed this tick.
+
+    Pauses when the newest terminal failure is allowance/config-related
+    with no success since, so the queue stops burning money or hammering
+    a broken setup. Files one owner alert (deduped); the owner resumes
+    by closing it, and a later failure re-files. Recovered runs
+    auto-close a stale alert. Manual drains bypass the pause (explicit
+    owner action).
+    """
+    runs, _ = stores.runs.list(limit=10000)
+    failed = sorted(
+        (
+            run
+            for run in runs
+            if isinstance(run, dict)
+            and run.get("status") == "failed"
+            and _run_failure_class(run) in DRAIN_PAUSE_CLASSES
+        ),
+        key=_run_sort_key,
+        reverse=True,
+    )
+    succeeded = sorted(
+        (
+            run
+            for run in runs
+            if isinstance(run, dict) and run.get("status") in ("completed", "merged")
+        ),
+        key=_run_sort_key,
+        reverse=True,
+    )
+    inbox, _ = stores.inbox.list(limit=10000)
+    alerts = [
+        item
+        for item in inbox
+        if isinstance(item, dict)
+        and (item.get("metadata") or {}).get("kind") == DRAIN_PAUSE_ALERT_KIND
+    ]
+    open_alerts = [item for item in alerts if item.get("status") == "open"]
+    blocking = bool(failed) and (
+        not succeeded or _run_sort_key(failed[0]) > _run_sort_key(succeeded[0])
+    )
+    if not blocking:
+        for alert in open_alerts:
+            stores.close_inbox_task(
+                alert["id"],
+                resolution="Recovered: a run completed since the pause; drain resumed.",
+            )
+        return None
+    newest = failed[0]
+    reason = (
+        f"run {newest.get('id', '?')[:8]} failed ({_run_failure_class(newest)}): "
+        f"{str(newest.get('error') or 'no error recorded')[:160]}"
+    )
+    if open_alerts:
+        return {"paused": True, "reason": reason, "alert_id": open_alerts[0]["id"]}
+    failure_ts = _run_sort_key(newest)
+    if any(
+        str(alert.get("resolved_at") or alert.get("updated_at") or "") > failure_ts
+        for alert in alerts
+        if alert.get("status") != "open"
+    ):
+        return None  # owner acknowledged by closing; resume until the next failure
+    alert = stores.create_inbox_task(
+        title="Drain paused: allowance or config failure",
+        body=(
+            f"{reason}\n\nQueued runs are held, not executed. Fix the underlying "
+            "issue (grants/budget or configuration), then close this task to resume. "
+            "A later failure re-files automatically."
+        ),
+        task_type="task",
+        metadata={"kind": DRAIN_PAUSE_ALERT_KIND},
+        assignee="owner",
+    )
+    return {"paused": True, "reason": reason, "alert_id": alert["id"]}
 
 
 def should_start_drain_scheduler(config: DashboardConfig) -> bool:
@@ -2965,6 +3050,10 @@ def maybe_start_drain_scheduler(
             bridged = []
         if bridged:
             print(f"Workbench dashboard: bridged {len(bridged)} inbox tasks to runs")
+        paused = drain_pause_state(stores)
+        if paused is not None:
+            print(f"Workbench dashboard: scheduled drain paused: {paused['reason']}")
+            return
         drain = build_run_drain(config, data_dir, drain_root, stores)
         outcomes = drain.drain(max_runs=SCHEDULER_DRAIN_MAX_RUNS)
         print(f"Workbench dashboard: scheduled drain: {outcomes}")
