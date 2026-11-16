@@ -172,6 +172,8 @@ GROUPS = {
         "tests/test_e2e_promotion.py",
         "tests/test_company_templates.py",
         "tests/test_p7_intake.py",
+        "tests/test_forgotten_sweep.py",
+        "tests/test_window_watch_restore.py",
     ),
     "research": (
         "tests/test_research_*.py",
