@@ -454,6 +454,9 @@ def test_e2e_tab_checks_and_submits() -> None:
     assert "Look at:" in js
     assert "Tick every performed step" in js
     assert "Draft — waiting on pointers" in js
+    assert "Recent verdicts for this area (all merges)" in js
+    assert "Previously:" not in js
+    assert "whatHtml(entry, index === 0)" in js
     assert "renderE2EReminders" in js
     assert "Test needed while you are here" in js
     assert "view.append(card)" in js  # reminders sit below tab content, never on top
