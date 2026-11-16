@@ -1,5 +1,19 @@
 # Session History
 
+## 2026-11-16 - Fan-out control, sweep precision, delegation brief (01a1e5ab cont.)
+
+Per-run fan-out selector on queued/paused runs + API (4eafa31 Tier-2;
+server refuses other states since policy binds at execution build).
+Sweep precision from owner item review (8240ace Tier-1): dashboard
+links on filings, E3 supersede-skip, P2 reassigned to agent with
+investigate+propose, 24h branch age floor, cancel-in-flight skip.
+Closed 5 stale E3 nags (tasks tested meanwhile), finalized 5 more
+drafts with authored steps, enriched 3 supervisor drafts, did the
+Openings personalization as agent work (queries/keywords applied,
+dry-run verified, Q7 left). Owner directives recorded: humans are
+escalation (ADR-088), everything dashboard-operable. Delegation-scope
+decision brief put to owner (grill); pending answer.
+
 ## 2026-11-16 - E2E wave-2: owner rejects terminal steps, fixes + briefs (01a1e5ab cont.)
 
 12 new fails + 1 pass triaged. Owner directives applied: E2E tab
