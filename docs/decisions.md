@@ -1,3 +1,15 @@
+## E2E follow-up runs skip owner approval (adopted) - owner 2026-11-16
+
+**Status:** Accepted (chat; owner: human tests/decisions are escalation,
+not the norm for follow-up execution).
+
+Items with `metadata.kind == "e2e-followup"` bridge pre-approved
+(`approval_mode: e2e-followup`); no "Approve agent run" item is filed.
+The agent fixes from the failing report + notes; the owner re-tests via
+the re-issued E2E checklist (that verdict stays the human gate). Scope:
+E2E follow-ups only; other agent tasks keep the gate. See
+[ADR-088](decisions/ADR-088-e2e-followup-preapproved.md).
+
 ## Tiered merge gates + E2E promotion (adopted) - owner 2026-11-14
 
 **Status:** Accepted (chat; per-merge approval was theater without reading).

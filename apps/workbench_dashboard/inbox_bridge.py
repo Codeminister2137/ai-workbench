@@ -4,9 +4,10 @@ Mai reads its backlog through this bridge instead of polling the inbox UI.
 Only open items with ``assignee == "agent"`` and ``type == "task"`` are
 bridged; decisions, clarifications, and orders always need the owner first.
 Tasks filed by the owner are pre-approved (filing is approval) and queued
-without a self-approval decision; supervisor/agent-filed tasks keep the
-Approve/Reject gate. Bridged items are marked
-(``metadata.bridge_run_id``) and never proposed twice.
+without a self-approval decision, as are E2E follow-up tasks (owner
+decision 2026-11-16: the agent acts, the owner re-tests the behavior).
+Other supervisor/agent-filed tasks keep the Approve/Reject gate. Bridged
+items are marked (``metadata.bridge_run_id``) and never proposed twice.
 """
 
 from __future__ import annotations
@@ -68,6 +69,12 @@ def bridge_agent_queue(stores, *, fanout_policy: str = "restricted") -> list[dic
         now = datetime.now(UTC).isoformat()
         run_title = title[:60]
         if str(item.get("created_by") or "") == "owner":
+            preapproval = "owner-filed"
+        elif metadata.get("kind") == "e2e-followup":
+            preapproval = "e2e-followup"
+        else:
+            preapproval = None
+        if preapproval is not None:
             stores.runs.put(
                 run_id,
                 {
@@ -77,7 +84,7 @@ def bridge_agent_queue(stores, *, fanout_policy: str = "restricted") -> list[dic
                     "body": f"{title}\n\n{body}",
                     "origin": "inbox",
                     "inbox_id": None,
-                    "approval_mode": "owner-filed",
+                    "approval_mode": preapproval,
                     "bridged_from": item["id"],
                     "fanout_policy": fanout_policy,
                     "fanout_effective": fanout_policy,
