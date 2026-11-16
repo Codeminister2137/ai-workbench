@@ -529,8 +529,6 @@ class DashboardStores:
         checklists for the same merge. Drafts (tasks awaiting pointers)
         are replaced in place by regeneration since they hold no verdicts.
         """
-        from e2e_promotion import BEHAVIOR_AREA_IDS
-
         merge_commit = merge_commit.strip()
         if not merge_commit:
             raise StoreError("E2E task needs a merge commit")
@@ -538,16 +536,7 @@ class DashboardStores:
             raise StoreError("E2E task needs at least one checklist item")
         if created_by not in INBOX_PARTIES:
             raise StoreError(f"E2E creator must be one of {INBOX_PARTIES}")
-        for item in items:
-            if not isinstance(item, dict):
-                raise StoreError("E2E checklist items must be objects")
-            if item.get("kind") not in ("behavior", "regression", "nonbehavioral"):
-                raise StoreError("E2E item kind must be behavior, regression or nonbehavioral")
-            if item.get("area") not in BEHAVIOR_AREA_IDS:
-                raise StoreError(f"Unknown E2E area: {item.get('area')}")
-            if not str(item.get("id", "")).strip():
-                raise StoreError("E2E items need ids")
-            self._check_item_steps(item)
+        self._check_e2e_items(items)
         existing, _total = self.e2e_tasks.list(limit=1000)
         for entry in existing:
             if not isinstance(entry, dict) or entry.get("merge_commit") != merge_commit:
@@ -575,6 +564,22 @@ class DashboardStores:
         }
         self.e2e_tasks.put(record["id"], record)
         return record
+
+    @staticmethod
+    def _check_e2e_items(items: list[dict]) -> None:
+        """Shared checklist validation for filing and reauthoring."""
+        from e2e_promotion import BEHAVIOR_AREA_IDS
+
+        for item in items:
+            if not isinstance(item, dict):
+                raise StoreError("E2E checklist items must be objects")
+            if item.get("kind") not in ("behavior", "regression", "nonbehavioral"):
+                raise StoreError("E2E item kind must be behavior, regression or nonbehavioral")
+            if item.get("area") not in BEHAVIOR_AREA_IDS:
+                raise StoreError(f"Unknown E2E area: {item.get('area')}")
+            if not str(item.get("id", "")).strip():
+                raise StoreError("E2E items need ids")
+            DashboardStores._check_item_steps(item)
 
     @staticmethod
     def _check_item_steps(item: dict) -> None:
@@ -659,6 +664,34 @@ class DashboardStores:
             item["needs_pointers"] = False
         record["status"] = "open"
         record["finalized_at"] = _utc_now()
+        self.e2e_tasks.put(task_id, record)
+        return record
+
+    def reauthor_e2e_items(
+        self, task_id: str, items: list[dict], reauthored_by: str = "agent"
+    ) -> dict:
+        """Replace the checklist on an open, verdict-less task.
+
+        Used when a filed checklist proves unusable (vague steps) and no
+        verdicts exist yet: the new items must validate like a fresh
+        filing, keep the task id/merge/title, and the replacement is
+        stamped. Submitted tasks are immutable; drafts use finalize.
+        """
+        record = self.e2e_tasks.get(task_id)
+        if record is None:
+            raise StoreError("E2E task not found")
+        if record.get("status") != "open":
+            raise StoreError("Only open E2E tasks can be reauthored")
+        if record.get("submitted_at") or record.get("report_id"):
+            raise StoreError("E2E task already holds verdicts")
+        if not isinstance(items, list) or not items:
+            raise StoreError("E2E task needs at least one checklist item")
+        if reauthored_by not in INBOX_PARTIES:
+            raise StoreError(f"E2E reauthor must be one of {INBOX_PARTIES}")
+        self._check_e2e_items(items)
+        record["items"] = items
+        record["reauthored_at"] = _utc_now()
+        record["reauthored_by"] = reauthored_by
         self.e2e_tasks.put(task_id, record)
         return record
 
