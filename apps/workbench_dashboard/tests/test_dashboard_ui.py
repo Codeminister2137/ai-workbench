@@ -704,10 +704,11 @@ def test_inbox_checkbox_filters_default_human_attention() -> None:
 
 
 def test_e2e_checkbox_filters_default_attention_no_ai() -> None:
-    """E2E mixes checklist/report checkboxes; default open/draft/failed."""
+    """E2E mixes checklist/report checkboxes; default open/failed, drafts opt-in."""
     js = _read("app.js")
     assert 'filterBoxes("e2e-filters"' in js
-    assert '"open,draft,fail"' in js
+    assert '"open,fail"' in js
+    assert '"open,draft,fail"' not in js
     for token, label in (
         ("open", "Open"),
         ("draft", "Drafts"),
@@ -727,7 +728,7 @@ def test_all_list_tabs_share_filter_helper() -> None:
     assert "function pickedTokens(param, fallback)" in js
     for view, default in (
         ("inbox", "human,open,followup"),
-        ("e2e", "open,draft,fail"),
+        ("e2e", "open,fail"),
         ("plans", "active"),
         ("runs", "failed,running,queued,paused,waiting,approved"),
         ("ideas", "new,reviewing"),

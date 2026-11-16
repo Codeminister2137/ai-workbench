@@ -1402,7 +1402,7 @@ async function renderE2E(id) {
   }
   const tasks = await api("/api/e2e/tasks");
   const reports = await api("/api/e2e/reports");
-  const picked = pickedTokens("s", "open,draft,fail");
+  const picked = pickedTokens("s", "open,fail");
   const shownTasks = (tasks.items || []).filter((t) => picked.has(t.status || "open"));
   const rows = shownTasks.length
     ? shownTasks.map((t) =>
