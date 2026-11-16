@@ -661,30 +661,40 @@ class DashboardStores:
         """File one agent follow-up when fails or notes need action.
 
         A failed item means the behavior is broken; a note on a pass
-        means the tester saw something worth considering. Both land in
-        a single AI-queue task so neither dies in the report. Filing
+        means the tester saw something worth considering; a bad-test
+        flag means the steps themselves were untestable. All land in
+        a single AI-queue task so none dies in the report. Filing
         never fails the submit: a refusal is stamped on the task.
         """
         fails = []
         noted = []
+        bad_tests = []
         for entry in report.get("items", []):
             if entry.get("status") != "tested":
                 continue
             notes = str(entry.get("notes", "") or "").strip()
-            if entry.get("verdict") == "fail":
+            if entry.get("verdict") == "bad-test":
+                bad_tests.append(entry)
+            elif entry.get("verdict") == "fail":
                 fails.append(entry)
             elif notes:
                 noted.append(entry)
-        if not fails and not noted:
+        if not fails and not noted and not bad_tests:
             return None
         merge = str(record.get("merge_commit") or "")
         parts = [f"{len(fails)} failed"] if fails else []
         if noted:
             parts.append(f"{len(noted)} noted")
+        if bad_tests:
+            parts.append(f"{len(bad_tests)} bad-test")
         lines = [f"E2E report {report.get('id')} for merge {merge} needs action.", ""]
         for entry in fails:
             lines.append(f"FAIL {entry.get('id')} ({entry.get('behavior') or ''}):")
             lines.append(str(entry.get("notes", "") or "(no notes)").strip()[:2000] or "(no notes)")
+            lines.append("")
+        for entry in bad_tests:
+            lines.append(f"BAD TEST DESIGN {entry.get('id')} (fix the test, not the product):")
+            lines.append(str(entry.get("notes", "") or "").strip()[:2000])
             lines.append("")
         for entry in noted:
             lines.append(f"NOTE on {entry.get('id')} (passed):")

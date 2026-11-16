@@ -75,7 +75,7 @@ def test_dynamic_inputs_and_selects_have_titles() -> None:
     """Text inputs/selects in templates have titles (radios use labels)."""
     js = _read("app.js")
     inputs = [tag for tag in re.findall(r"<input\b[^>]*>", js) if 'type="radio"' not in tag]
-    assert len(inputs) == 54  # shared filter helper replaces 3 box templates; step radios excluded
+    assert len(inputs) == 55  # +bad-test checkbox; step radios excluded
     for tag in inputs:
         assert "title=" in tag, f"input without title: {tag}"
     selects = re.findall(r"<select\b[^>]*>", js)
@@ -454,6 +454,10 @@ def test_e2e_tab_checks_and_submits() -> None:
     assert "Expected:" in js
     assert "Look at:" in js
     assert "Every step needs a pass/fail verdict" in js
+    assert "Flag bad test design" in js
+    assert 'input[name="badtest-' in js
+    assert "Describe what is wrong with the test" in js
+    assert ".st-bad-test" in _read("app.css")
     assert "Draft — waiting on pointers" in js
     assert "Recent verdicts for this area (all merges)" in js
     assert "Previously:" not in js

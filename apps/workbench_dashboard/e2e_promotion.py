@@ -422,7 +422,9 @@ def build_report(task: dict, submissions: dict[str, dict]) -> dict:
     failed step fails the item). Stepless legacy items keep one
     explicit item verdict. Anything else fails closed. Per-step
     results are stored as durable proof. Auto-passed items keep
-    their proof, warning, and originally tested commit.
+    their proof, warning, and originally tested commit. A ``bad-test``
+    flag (with required notes) records that the steps themselves were
+    untestable; it fails the overall report like any non-pass.
     """
     items: list[dict] = []
     for item in task.get("items", []):
@@ -439,7 +441,12 @@ def build_report(task: dict, submissions: dict[str, dict]) -> dict:
         submission = submissions.get(item_id)
         if submission is None:
             raise ValueError(f"Missing verdict for {item_id}")
-        if item.get("steps"):
+        if str(submission.get("verdict", "")).strip().lower() == "bad-test":
+            if not str(submission.get("notes", "") or "").strip():
+                raise ValueError(f"Bad-test flag for {item_id} needs notes describing why")
+            verdict = "bad-test"
+            step_results = []
+        elif item.get("steps"):
             step_results = _step_results_for(item, submission, item_id)
             verdict = (
                 "fail" if any(entry["verdict"] == "fail" for entry in step_results) else "pass"
