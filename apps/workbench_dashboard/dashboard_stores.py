@@ -157,6 +157,22 @@ class DashboardStores:
         items, _total = self.inbox.list(limit=MAX_OPEN_TASKS + 1)
         return sum(1 for item in items if item.get("status") == "open")
 
+    def attention_inbox_count(self) -> int:
+        """Human attention items: the badge mirrors the default filter.
+
+        Counts what the inbox default view shows (human assignee with
+        open or follow-up state), never the AI queue.
+        """
+        items, _total = self.inbox.list(limit=1000)
+        return sum(
+            1
+            for item in items
+            if item.get("assignee") != "agent"
+            and (
+                item.get("status") == "open" or (item.get("resolution_kind") or "final") != "final"
+            )
+        )
+
     def create_inbox_task(
         self,
         *,
@@ -511,6 +527,11 @@ class DashboardStores:
         """Count unsubmitted E2E tasks for the owner badge."""
         items, _total = self.e2e_tasks.list(limit=1000)
         return sum(1 for item in items if item.get("status") == "open")
+
+    def attention_e2e_count(self) -> int:
+        """E2E attention tasks: open plus drafts awaiting owner pointers."""
+        items, _total = self.e2e_tasks.list(limit=1000)
+        return sum(1 for item in items if item.get("status") in ("open", "draft"))
 
     def create_e2e_task(
         self,

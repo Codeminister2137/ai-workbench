@@ -417,12 +417,12 @@ def tested_commit(report: dict, item_id: str) -> str:
 def build_report(task: dict, submissions: dict[str, dict]) -> dict:
     """Assemble the E2E report from owner submissions plus auto-passes.
 
-    Every pending item needs a ``pass``/``fail`` verdict; anything else
-    (or a missing verdict) fails closed. Items with checkable steps
-    additionally require every step marked performed — a checkbox is
-    the record that the step ran, the verdict is the outcome — and the
-    per-step results are stored as durable proof. Auto-passed items
-    keep their proof, warning, and originally tested commit.
+    Verdicts are per step: every checkable step needs its own
+    ``pass``/``fail``, and the item verdict derives fail-closed (any
+    failed step fails the item). Stepless legacy items keep one
+    explicit item verdict. Anything else fails closed. Per-step
+    results are stored as durable proof. Auto-passed items keep
+    their proof, warning, and originally tested commit.
     """
     items: list[dict] = []
     for item in task.get("items", []):
@@ -439,10 +439,16 @@ def build_report(task: dict, submissions: dict[str, dict]) -> dict:
         submission = submissions.get(item_id)
         if submission is None:
             raise ValueError(f"Missing verdict for {item_id}")
-        verdict = str(submission.get("verdict", "")).strip().lower()
-        if verdict not in ("pass", "fail"):
-            raise ValueError(f"Verdict for {item_id} must be pass or fail")
-        step_results = _step_results_for(item, submission, item_id)
+        if item.get("steps"):
+            step_results = _step_results_for(item, submission, item_id)
+            verdict = (
+                "fail" if any(entry["verdict"] == "fail" for entry in step_results) else "pass"
+            )
+        else:
+            verdict = str(submission.get("verdict", "")).strip().lower()
+            if verdict not in ("pass", "fail"):
+                raise ValueError(f"Verdict for {item_id} must be pass or fail")
+            step_results = []
         items.append(
             {
                 **item,
@@ -467,23 +473,24 @@ def build_report(task: dict, submissions: dict[str, dict]) -> dict:
 
 
 def _step_results_for(item: dict, submission: dict, item_id: str) -> list[dict]:
-    """Per-step proof; every step must be marked performed to submit."""
+    """Per-step proof; every step needs its own pass/fail verdict."""
     steps = item.get("steps") or []
-    if not steps:
-        return []
-    checked = submission.get("steps")
-    if not isinstance(checked, list) or len(checked) != len(steps):
-        raise ValueError(f"Verdict for {item_id} needs one check per step")
-    if not all(checked):
-        raise ValueError(f"Verdict for {item_id} needs every step performed")
-    return [
-        {
-            "action": step.get("action", ""),
-            "expected": step.get("expected", ""),
-            "performed": True,
-        }
-        for step in steps
-    ]
+    verdicts = submission.get("steps")
+    if not isinstance(verdicts, list) or len(verdicts) != len(steps):
+        raise ValueError(f"Verdict for {item_id} needs one verdict per step")
+    results = []
+    for step, verdict in zip(steps, verdicts, strict=True):
+        clean = str(verdict or "").strip().lower()
+        if clean not in ("pass", "fail"):
+            raise ValueError(f"Verdict for {item_id} needs every step decided")
+        results.append(
+            {
+                "action": step.get("action", ""),
+                "expected": step.get("expected", ""),
+                "verdict": clean,
+            }
+        )
+    return results
 
 
 def tested_on_for(item: dict) -> str:

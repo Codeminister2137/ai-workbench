@@ -112,6 +112,29 @@ def test_submit_skips_followup_for_clean_pass(stores) -> None:
     assert inbox == []
 
 
+def test_attention_counts_mirror_default_filters(stores) -> None:
+    stores.create_inbox_task(title="h", body="b", task_type="task", assignee="owner")
+    stores.create_inbox_task(title="a", body="b", task_type="task", assignee="agent")
+    assert stores.open_inbox_count() == 2
+    assert stores.attention_inbox_count() == 1
+    stores.create_e2e_task(merge_commit="abc", title="t", items=_items())
+    assert stores.open_e2e_count() == 1
+    assert stores.attention_e2e_count() == 1
+    draft_items = [
+        {
+            "id": "behavior:dashboard",
+            "kind": "behavior",
+            "area": "dashboard",
+            "status": "pending",
+            "steps": [{"action": "x", "expected": "y", "grounded": False}],
+            "needs_pointers": True,
+        }
+    ]
+    stores.create_e2e_task(merge_commit="def", title="t", items=draft_items, draft=True)
+    assert stores.open_e2e_count() == 1
+    assert stores.attention_e2e_count() == 2
+
+
 def test_submit_stamps_followup_refusal(stores) -> None:
     for num in range(50):
         stores.create_inbox_task(title=f"filler {num}", body="b", task_type="task")

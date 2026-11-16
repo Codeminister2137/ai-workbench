@@ -142,7 +142,7 @@ def test_reauthor_replaces_checklist_on_verdict_less_task(tmp_path) -> None:
     assert redone["reauthored_at"]
     stores.submit_e2e_task(
         task["id"],
-        [{"item_id": "behavior:dashboard", "verdict": "pass", "steps": [True]}],
+        [{"item_id": "behavior:dashboard", "verdict": "pass", "steps": ["pass"]}],
     )
     with pytest.raises(StoreError, match="Only open"):
         stores.reauthor_e2e_items(task["id"], items)
@@ -185,7 +185,7 @@ def test_checklist_regression_items_need_no_pointers() -> None:
     assert all(r["needs_pointers"] is False for r in regressions)
 
 
-def test_report_requires_every_step_performed() -> None:
+def test_report_derives_item_verdict_from_step_verdicts() -> None:
     task = {
         "merge_commit": "abc123",
         "items": [
@@ -199,14 +199,22 @@ def test_report_requires_every_step_performed() -> None:
             }
         ],
     }
-    with pytest.raises(ValueError, match="every step performed"):
-        build_report(task, {"behavior:dashboard": {"verdict": "pass", "steps": [True, False]}})
-    report = build_report(task, {"behavior:dashboard": {"verdict": "pass", "steps": [True, True]}})
+    with pytest.raises(ValueError, match="every step decided"):
+        build_report(task, {"behavior:dashboard": {"verdict": "pass", "steps": ["pass", ""]}})
+    report = build_report(
+        task, {"behavior:dashboard": {"verdict": "pass", "steps": ["pass", "pass"]}}
+    )
     assert report["overall"] == "pass"
+    assert report["items"][0]["verdict"] == "pass"
     assert report["items"][0]["step_results"] == [
-        {"action": "Open x", "expected": "Renders", "performed": True},
-        {"action": "Click y", "expected": "Confirms", "performed": True},
+        {"action": "Open x", "expected": "Renders", "verdict": "pass"},
+        {"action": "Click y", "expected": "Confirms", "verdict": "pass"},
     ]
+    mixed = build_report(
+        task, {"behavior:dashboard": {"verdict": "pass", "steps": ["pass", "fail"]}}
+    )
+    assert mixed["items"][0]["verdict"] == "fail"
+    assert mixed["overall"] == "fail"
 
 
 def _draft(stores: DashboardStores) -> dict:

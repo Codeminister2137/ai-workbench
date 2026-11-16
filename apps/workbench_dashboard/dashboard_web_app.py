@@ -1283,6 +1283,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             "model": config.model,
             "open_inbox": stores.open_inbox_count(),
             "open_e2e": stores.open_e2e_count(),
+            "attention_inbox": stores.attention_inbox_count(),
+            "attention_e2e": stores.attention_e2e_count(),
             "new_ideas": stores.new_idea_count(),
             "open_backlog": stores.open_backlog_count(),
             "plan_total": plan_total,

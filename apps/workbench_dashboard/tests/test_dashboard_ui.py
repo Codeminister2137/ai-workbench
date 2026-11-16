@@ -75,7 +75,7 @@ def test_dynamic_inputs_and_selects_have_titles() -> None:
     """Text inputs/selects in templates have titles (radios use labels)."""
     js = _read("app.js")
     inputs = [tag for tag in re.findall(r"<input\b[^>]*>", js) if 'type="radio"' not in tag]
-    assert len(inputs) == 56  # +inbox filter box +e2e filter box templates
+    assert len(inputs) == 54  # shared filter helper replaces 3 box templates; step radios excluded
     for tag in inputs:
         assert "title=" in tag, f"input without title: {tag}"
     selects = re.findall(r"<select\b[^>]*>", js)
@@ -452,7 +452,7 @@ def test_e2e_tab_checks_and_submits() -> None:
     assert "How to test" in js
     assert "Expected:" in js
     assert "Look at:" in js
-    assert "Tick every performed step" in js
+    assert "Every step needs a pass/fail verdict" in js
     assert "Draft — waiting on pointers" in js
     assert "Recent verdicts for this area (all merges)" in js
     assert "Previously:" not in js
@@ -515,34 +515,31 @@ def test_document_preview_renders_markdown() -> None:
 
 
 def test_ideas_archive_tab_and_backlog_markers() -> None:
-    """Ideas list has Active/Archive tabs; archive shows plan links or archive-only."""
+    """Ideas list filters Triage/Decided boxes; decided-only keeps the mark."""
     js = _read("app.js")
-    assert '<a href="#/ideas">Active</a>' in js
-    assert '<a href="#/ideas?status=archive">Archive</a>' in js
-    assert '["adopted", "parked", "declined", "implemented"]' in js
+    assert 'filterBoxes("ideas-filters"' in js
+    assert '"new,reviewing"' in js
+    assert '["new", "reviewing"]' in js
     assert "archive-only" in js
     assert 'name="plan"' in js
     assert "plan_id: ev.target.plan.value || null" in js
 
 
 def test_documents_archive_tab_and_pill() -> None:
-    """Documents list has Active/Archive tabs on the archived flag."""
+    """Documents list filters Current/Archived boxes on the archived flag."""
     js = _read("app.js")
-    assert '<a href="#/documents">Active</a>' in js
-    assert '<a href="#/documents?status=archive">Archive</a>' in js
+    assert 'filterBoxes("documents-filters"' in js
     assert "d.archived" in js
     assert ">archived</span>" in js
 
 
 def test_plans_and_runs_archive_tabs() -> None:
-    """Plans and Runs lists have Active/Archive tabs on terminal statuses."""
+    """Plans and Runs lists filter boxes over their terminal statuses."""
     js = _read("app.js")
-    assert '<a href="#/plans">Active</a>' in js
-    assert '<a href="#/plans?status=archive">Archive</a>' in js
+    assert 'filterBoxes("plans-filters"' in js
     assert 'p.status === "complete"' in js
-    assert '<a href="#/runs">Active</a>' in js
-    assert '<a href="#/runs?status=archive">Archive</a>' in js
-    assert '["completed", "cancelled", "merged"]' in js
+    assert 'filterBoxes("runs-filters"' in js
+    assert '"failed,running,queued,paused,waiting,approved"' in js
 
 
 def test_help_view_and_nav_link() -> None:
@@ -682,15 +679,15 @@ def test_inbox_close_form_and_reopen_markers() -> None:
     assert 'id="reopen-btn"' in js
     assert "/reopen" in js
     assert "<h3>Outcome</h3>" in js
-    assert 'box("closed", "Closed"' in js
+    assert '["closed", "Closed"' in js
 
 
 def test_inbox_checkbox_filters_default_human_attention() -> None:
     """Inbox mixes Who/State checkboxes; default is human attention."""
     js = _read("app.js")
-    assert 'id="inbox-filters"' in js
+    assert 'filterBoxes("inbox-filters"' in js
     assert '"human,open,followup"' in js
-    assert 'data-f="${token}"' in js
+    assert 'data-f="${t}"' in js
     for token, label in (
         ("human", "Human"),
         ("ai", "AI"),
@@ -699,7 +696,7 @@ def test_inbox_checkbox_filters_default_human_attention() -> None:
         ("followup", "Needs follow-up"),
         ("closed", "Closed"),
     ):
-        assert f'box("{token}", "{label}"' in js
+        assert f'["{token}", "{label}"' in js
     assert "status=queue" not in js
     assert "status=attention" not in js
 
@@ -707,9 +704,8 @@ def test_inbox_checkbox_filters_default_human_attention() -> None:
 def test_e2e_checkbox_filters_default_attention_no_ai() -> None:
     """E2E mixes checklist/report checkboxes; default open/draft/failed."""
     js = _read("app.js")
-    assert 'id="e2e-filters"' in js
+    assert 'filterBoxes("e2e-filters"' in js
     assert '"open,draft,fail"' in js
-    assert 'data-s="${token}"' in js
     for token, label in (
         ("open", "Open"),
         ("draft", "Drafts"),
@@ -717,8 +713,31 @@ def test_e2e_checkbox_filters_default_attention_no_ai() -> None:
         ("fail", "Failed"),
         ("pass", "Passed"),
     ):
-        assert f'box("{token}", "{label}"' in js
-    assert js.count('box("ai"') == 1  # inbox only; E2E is human by design
+        assert f'["{token}", "{label}"' in js
+    assert js.count('["ai", "AI"') == 1  # inbox only; E2E is human by design
+
+
+def test_all_list_tabs_share_filter_helper() -> None:
+    """Every tabbed list uses filterBoxes with an attention default."""
+    js = _read("app.js")
+    assert "function filterBoxes(id, groups, picked)" in js
+    assert "function bindFilterBoxes(id, base, param)" in js
+    assert "function pickedTokens(param, fallback)" in js
+    for view, default in (
+        ("inbox", "human,open,followup"),
+        ("e2e", "open,draft,fail"),
+        ("plans", "active"),
+        ("runs", "failed,running,queued,paused,waiting,approved"),
+        ("ideas", "new,reviewing"),
+        ("backlog", "proposed,ready,doing,blocked"),
+        ("workflows", "active"),
+        ("documents", "current"),
+    ):
+        assert f'filterBoxes("{view}-filters"' in js
+        assert f'"{default}"' in js
+    assert "status=archive" not in js
+    css = _read("app.css")
+    assert ".fgroup" in css
 
 
 def test_system_retains_spend_card() -> None:
