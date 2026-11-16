@@ -1786,6 +1786,10 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                         "task_title": task.get("title"),
                         "item_id": entry.get("id"),
                         "behavior": entry.get("behavior"),
+                        # Live steps, same source the checklist renders — never
+                        # a second copy. Legacy how/expected stay as fallback
+                        # for stepless items only.
+                        "steps": entry.get("steps", []),
                         "how": entry.get("how", []),
                         "expected": entry.get("expected", ""),
                         "draft_notes": entry.get("draft_notes", ""),

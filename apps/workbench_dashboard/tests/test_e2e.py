@@ -127,6 +127,7 @@ def test_by_view_matches_area_and_saves_drafts(dashboard_server) -> None:
                     "files": [],
                     "goals": [],
                     "status": "pending",
+                    "steps": [{"action": "Click send", "expected": "Confirm shows"}],
                     "how": ["open it"],
                     "expected": "renders",
                 }
@@ -137,6 +138,7 @@ def test_by_view_matches_area_and_saves_drafts(dashboard_server) -> None:
     home = get_json(dashboard_server, "/api/e2e/by-view?view=home")
     assert home["total"] == 1 if "total" in home else len(home["items"]) == 1
     assert home["items"][0]["behavior"] == "dashboard views"
+    assert home["items"][0]["steps"] == [{"action": "Click send", "expected": "Confirm shows"}]
     assert home["items"][0]["how"] == ["open it"]
     elsewhere = get_json(dashboard_server, "/api/e2e/by-view?view=chat")
     assert elsewhere["items"] == []
