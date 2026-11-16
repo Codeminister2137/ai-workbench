@@ -6,6 +6,18 @@ A provider-neutral agent loop plus the repo coding assistant CLI that runs at
 or above commercial quality: tools, permissions, delegation, streaming
 progress, reviewable runs with receipts.
 
+## Vision (owner, 2026-11-16)
+
+Mai is our intended agent, built upon `ai_provider` and `ai_orchestrator`,
+with user interaction through the Dashboard or the CLI. We retain full
+transcripts and control over it, and use that record to continuously
+improve it and make it learn on our development. Everything vendor
+agents can do is the baseline: we may do features better or add more,
+but Mai must never stay behind commercial products. Interactive Mai
+(dashboard chat as a conversational agentic loop, not single-shot Q&A)
+was ordered as part of the larger plans and remains queued after the
+Mai-as-service batch resume slice.
+
 ## Non-goals
 
 Model contracts (provider), routing policy (orchestrator), dashboard

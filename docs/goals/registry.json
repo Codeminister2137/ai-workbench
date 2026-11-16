@@ -21,7 +21,7 @@
       "repo": "ai-workbench",
       "owner": "Jakub",
       "health": "on-track",
-      "relations": {"uses": ["provider"]}
+      "relations": {"uses": ["provider", "orchestrator"]}
     },
     "dashboard": {
       "goal": "docs/goals/dashboard.md",
