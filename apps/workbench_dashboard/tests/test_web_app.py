@@ -355,6 +355,138 @@ def test_run_report_request_unknown_run_is_404(dashboard_server) -> None:
     raised.value.close()
 
 
+def _agent_check_task(tmp_path, steps) -> None:
+    import json as json_module
+
+    tasks_dir = tmp_path / "data" / "e2e_tasks"
+    tasks_dir.mkdir(parents=True, exist_ok=True)
+    (tasks_dir / "t1.json").write_text(
+        json_module.dumps(
+            {
+                "id": "t1",
+                "title": "t",
+                "status": "open",
+                "items": [{"id": "behavior:x", "status": "pending", "steps": steps}],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def test_agent_check_runs_exact_command_and_stores_evidence(
+    dashboard_server, tmp_path, monkeypatch
+) -> None:
+    import e2e_agent_checks
+
+    seen: dict = {}
+
+    def fake_runner(argv, repo_root):
+        seen["argv"] = list(argv)
+        return 0, "proof output"
+
+    monkeypatch.setattr(e2e_agent_checks, "_default_runner", fake_runner)
+    _agent_check_task(
+        tmp_path,
+        [
+            {
+                "action": "Run `.venv/Scripts/python.exe -m pytest x -q` now",
+                "expected": "green",
+                "grounded": True,
+                "agent_runnable": True,
+            }
+        ],
+    )
+    out = post_json(
+        dashboard_server,
+        "/api/e2e/tasks/t1/agent-check",
+        {"item_id": "behavior:x", "step_index": 0},
+    )
+    assert out["ok"] is True
+    assert out["evidence"]["evidence"] == "proof output"
+    assert out["evidence"]["evidence_exit"] == 0
+    assert seen["argv"] == [".venv/Scripts/python.exe", "-m", "pytest", "x", "-q"]
+
+
+def test_agent_check_live_help_command(dashboard_server, tmp_path) -> None:
+    _agent_check_task(
+        tmp_path,
+        [
+            {
+                "action": "Run `python --help` now",
+                "expected": "help",
+                "grounded": True,
+                "agent_runnable": True,
+            }
+        ],
+    )
+    out = post_json(
+        dashboard_server,
+        "/api/e2e/tasks/t1/agent-check",
+        {"item_id": "behavior:x", "step_index": 0},
+    )
+    assert out["ok"] is True
+    assert out["evidence"]["evidence_exit"] == 0
+    assert "usage" in out["evidence"]["evidence"].lower()
+
+
+def test_agent_check_refuses_unrunnable_and_unknown(dashboard_server, tmp_path) -> None:
+    _agent_check_task(
+        tmp_path,
+        [{"action": "Look at it", "expected": "seen", "grounded": True}],
+    )
+    with pytest.raises(HTTPError) as raised:
+        post_json(
+            dashboard_server,
+            "/api/e2e/tasks/t1/agent-check",
+            {"item_id": "behavior:x", "step_index": 0},
+        )
+    assert raised.value.code == 422
+    raised.value.close()
+    with pytest.raises(HTTPError) as raised:
+        post_json(
+            dashboard_server, "/api/e2e/tasks/nope/agent-check", {"item_id": "x", "step_index": 0}
+        )
+    assert raised.value.code == 404
+    raised.value.close()
+
+
+def test_agent_check_records_missing_binary_as_evidence(dashboard_server, tmp_path) -> None:
+    tasks_dir = tmp_path / "data" / "e2e_tasks"
+    tasks_dir.mkdir(parents=True)
+    (tasks_dir / "t1.json").write_text(
+        json.dumps(
+            {
+                "id": "t1",
+                "title": "t",
+                "status": "open",
+                "items": [
+                    {
+                        "id": "behavior:x",
+                        "status": "pending",
+                        "steps": [
+                            {
+                                "action": "Run `missing-dir-entirely/python.exe --help` now",
+                                "expected": "usage",
+                                "grounded": True,
+                                "agent_runnable": True,
+                            }
+                        ],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    out = post_json(
+        dashboard_server,
+        "/api/e2e/tasks/t1/agent-check",
+        {"item_id": "behavior:x", "step_index": 0},
+    )
+    assert out["ok"] is True
+    assert out["evidence"]["evidence_exit"] == 127
+    assert "NOT RUNNABLE HERE" in out["evidence"]["evidence"]
+
+
 def test_chat_rename_and_delete_endpoints(dashboard_server) -> None:
     created = post_json(dashboard_server, "/api/chat/sessions", {"title": "Typo"})
     session_id = created["id"]

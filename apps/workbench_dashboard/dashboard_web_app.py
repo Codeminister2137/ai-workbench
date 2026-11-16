@@ -1115,6 +1115,9 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             if path.startswith("/api/e2e/tasks/") and path.endswith("/finalize"):
                 task_id = path[len("/api/e2e/tasks/") : -len("/finalize")]
                 return self._finalize_e2e_task(task_id, payload)
+            if path.startswith("/api/e2e/tasks/") and path.endswith("/agent-check"):
+                task_id = path[len("/api/e2e/tasks/") : -len("/agent-check")]
+                return self._run_agent_check(task_id, payload)
             if path == "/api/documents/pins":
                 return self._set_document_pin(payload)
             if path == "/api/ideas":
@@ -1781,6 +1784,44 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             status = 404 if "not found" in str(exc).lower() else 400
             return self._send_json({"ok": False, "error": str(exc)}, status=status)
         self._send_json({"ok": True, "id": record["id"], "status": record["status"]})
+
+    def _run_agent_check(self, task_id: str, payload: dict) -> None:
+        from e2e_agent_checks import execute_check
+
+        stores = self._stores()
+        record = stores.e2e_tasks.get(task_id)
+        if record is None:
+            return self._send_json({"ok": False, "error": "E2E task not found"}, status=404)
+        if record.get("status") != "open":
+            return self._send_json(
+                {"ok": False, "error": "Agent checks run only on open checklists"}, status=409
+            )
+        item = next(
+            (
+                entry
+                for entry in record.get("items", [])
+                if entry.get("id") == payload.get("item_id")
+            ),
+            None,
+        )
+        index = payload.get("step_index")
+        steps = (item or {}).get("steps") or []
+        if (
+            item is None
+            or type(index) is not int
+            or not (0 <= index < len(steps))
+            or not steps[index].get("agent_runnable")
+        ):
+            return self._send_json({"ok": False, "error": "Step is not agent-runnable"}, status=422)
+        try:
+            result = execute_check(str(steps[index].get("action") or ""), self.repo_root)
+        except ValueError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=422)
+        steps[index]["evidence"] = result["output"]
+        steps[index]["evidence_utc"] = datetime.now(UTC).isoformat()
+        steps[index]["evidence_exit"] = result["exit_code"]
+        stores.e2e_tasks.put(task_id, record)
+        self._send_json({"ok": True, "evidence": steps[index]})
 
     def _send_e2e_tasks(self, query: str) -> None:
         params = parse_qs(query)

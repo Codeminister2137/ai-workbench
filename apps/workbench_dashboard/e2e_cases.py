@@ -190,13 +190,16 @@ def _command_steps(
                     f"Run `.venv/Scripts/python.exe -m pytest {path} -q` "
                     "(via pytest, never by executing the file directly)"
                 )
+                runnable = True
             else:
                 action = action_template.format(symbol=symbol, path=path)
+                runnable = False
             steps.append(
                 {
                     "action": action,
                     "expected": expected,
                     "grounded": True,
+                    "agent_runnable": runnable,
                 }
             )
     return steps
