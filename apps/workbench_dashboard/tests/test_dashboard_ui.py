@@ -67,8 +67,8 @@ def test_dynamic_buttons_have_titles() -> None:
     js = _read("app.js")
     buttons = re.findall(r"<button\b[^>]*>", js)
     assert (
-        len(buttons) == 50
-    )  # +fanout apply; +delete-inbox-btn +e2e submit +chat mode/apply/approve +notes save
+        len(buttons) == 51
+    )  # +doc pin; +fanout apply; +delete-inbox-btn +e2e submit +chat mode/apply/approve +notes save
     for tag in buttons:
         assert "title=" in tag, f"button without title: {tag}"
 
@@ -501,6 +501,15 @@ def test_chat_agent_mode_toggle_and_staged() -> None:
     assert "chat-working-line" in js
     assert "Agent working in scratch worktree" in js
     assert "prefers-reduced-motion" in js
+
+
+def test_documents_view_key_pins() -> None:
+    """Documents rows carry pin toggles wired to the pins endpoint."""
+    js = _read("app.js")
+    assert 'data-pin-doc="${esc(d.id)}"' in js
+    assert '"/api/documents/pins"' in js
+    assert "Key documents updated" in js
+    assert "Pin as key document" in js
 
 
 def test_documents_view_lists_and_previews() -> None:

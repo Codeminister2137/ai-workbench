@@ -2068,7 +2068,8 @@ async function renderDocuments(id) {
   const shownDocs = payload.documents.filter((d) => picked.has(docState(d)));
   const items = shownDocs.length
     ? shownDocs.map((d) =>
-        `<li><a href="#/documents/${encodeURIComponent(d.id)}">${esc(d.title)}</a>
+        `<li><button type="button" data-pin-doc="${esc(d.id)}" title="${d.pinned ? "Unpin from key documents" : "Pin as key document"}">${d.pinned ? "★" : "☆"}</button>
+         <a href="#/documents/${encodeURIComponent(d.id)}">${esc(d.title)}</a>
          <span class="muted">${esc(d.root)} · ${esc((d.modified_utc || "").slice(0, 10))}</span>
          <span class="pill st-${esc(d.sensitivity)}">${esc(d.sensitivity)}</span>
          ${d.project ? `<span class="pill" title="Linked project">${esc(d.project)}</span>` : ""}</li>`).join("")
@@ -2083,6 +2084,19 @@ async function renderDocuments(id) {
     <ul class="plain" id="documents-list">${items}</ul>`;
   document.getElementById("filter-documents").addEventListener("input", (ev) => filterList("documents-list", ev.target.value));
   bindFilterBoxes("documents-filters", "documents", "f");
+  document.querySelectorAll("[data-pin-doc]").forEach((btn) => btn.addEventListener("click", async () => {
+    try {
+      await api("/api/documents/pins", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({id: btn.dataset.pinDoc, pinned: btn.textContent !== "★"}),
+      });
+      toast("Key documents updated", true);
+      render();
+    } catch (err) {
+      toast(err.message, false);
+    }
+  }));
 }
 
 async function renderIntake() {

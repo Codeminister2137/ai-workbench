@@ -936,7 +936,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                     filterable=("project_id", "plan_id"),
                 )
             if path == "/api/documents":
-                return self._send_json({"ok": True, "documents": self._library().list_documents()})
+                return self._send_documents()
             if path.startswith("/api/documents/") and path.endswith("/file"):
                 doc_id = unquote(path[len("/api/documents/") : -len("/file")])
                 return self._send_document_file(doc_id)
@@ -1115,6 +1115,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             if path.startswith("/api/e2e/tasks/") and path.endswith("/finalize"):
                 task_id = path[len("/api/e2e/tasks/") : -len("/finalize")]
                 return self._finalize_e2e_task(task_id, payload)
+            if path == "/api/documents/pins":
+                return self._set_document_pin(payload)
             if path == "/api/ideas":
                 return self._create_idea(payload)
             if path == "/api/backlog":
@@ -2292,6 +2294,32 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         except ValueError as exc:
             return self._send_json({"ok": False, "error": str(exc)}, status=400)
         self._send_json({"ok": True, "scope": scope, "policy": saved})
+
+    def _send_documents(self) -> None:
+        from doc_pins import load_pinned
+
+        pinned = load_pinned(self.data_dir)
+        documents = self._library().list_documents()
+        for entry in documents:
+            entry["pinned"] = entry.get("id") in pinned
+        documents.sort(key=lambda entry: (not entry["pinned"], entry.get("modified_utc") or ""))
+        self._send_json({"ok": True, "documents": documents})
+
+    def _set_document_pin(self, payload: dict) -> None:
+        from doc_pins import save_pin
+
+        doc_id = payload.get("id")
+        pinned = payload.get("pinned")
+        if not isinstance(doc_id, str) or not isinstance(pinned, bool):
+            return self._send_json(
+                {"ok": False, "error": "id must be a string and pinned a boolean"},
+                status=400,
+            )
+        try:
+            current = save_pin(self.data_dir, doc_id, pinned)
+        except ValueError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        self._send_json({"ok": True, "pinned": sorted(current)})
 
     def _bridge_inbox_runs(self) -> None:
         from inbox_bridge import bridge_agent_queue, resolve_bridge_fanout
