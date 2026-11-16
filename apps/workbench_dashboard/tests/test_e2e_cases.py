@@ -79,6 +79,12 @@ def test_template_braces_are_not_routes() -> None:
     assert evidence["x.js"]["routes"] == ["/api/e2e/tasks"]
 
 
+def test_nested_view_prefixes_ground_no_steps() -> None:
+    evidence = {"x.js": {"symbols": [], "routes": [], "views": ["#/e2e", "#/e2e/report/"]}}
+    steps = e2e_cases.draft_steps("dashboard", evidence, ["s"])
+    assert [s["action"] for s in steps] == ["Open the e2e view (#/e2e)"]
+
+
 def test_agent_cli_steps_do_not_claim_help_flags() -> None:
     evidence = {
         "packages/ai_agent/src/ai_agent/repo_coding_assistant.py": {
