@@ -42,6 +42,25 @@ def doc_server(tmp_path):
         server.server_close()
 
 
+def test_document_pins_round_trip_and_sort_first(doc_server) -> None:
+    from dashboard_test_http import get_json, post_json
+
+    before = get_json(doc_server, "/api/documents")["documents"]
+    assert all(not doc.get("pinned") for doc in before)
+    target = next(doc for doc in before if doc["id"].endswith("note.pdf"))["id"]
+    updated = post_json(doc_server, "/api/documents/pins", {"id": target, "pinned": True})
+    assert updated["ok"] is True
+    after = get_json(doc_server, "/api/documents")["documents"]
+    assert after[0]["id"] == target
+    assert after[0]["pinned"] is True
+    post_json(doc_server, "/api/documents/pins", {"id": target, "pinned": False})
+    reread = get_json(doc_server, "/api/documents")["documents"]
+    assert all(not doc.get("pinned") for doc in reread)
+    with pytest.raises(urllib.error.HTTPError) as exc:
+        post_json(doc_server, "/api/documents/pins", {"id": "", "pinned": True})
+    assert exc.value.code == 400
+
+
 def _get(base: str, path: str):
     with urllib.request.urlopen(base + path, timeout=10) as response:
         return response.status, dict(response.headers), response.read()
