@@ -160,6 +160,37 @@ def save_supervision(path: Path, supervision: str) -> str:
     return supervision
 
 
+def save_fanout_default(path: Path, scope: str, policy: str) -> str:
+    """Persist a fan-out default (chat or bridge runs), preserving other keys.
+
+    A missing config file is created; other keys round-trip untouched.
+    Raises ``ValueError`` for an unknown scope, policy, or unreadable file.
+    """
+    from ai_agent.fanout import FanoutPolicy
+
+    key = {"chat": "chat_fanout_policy", "bridge": "bridge_fanout_policy"}.get(scope)
+    if key is None:
+        raise ValueError("scope must be chat or bridge")
+    try:
+        value = FanoutPolicy.coerce(policy).value
+    except ValueError:
+        raise ValueError("policy must be one of: allowed, restricted, denied") from None
+    payload: dict[str, object] = {}
+    if path.exists():
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+        except (ValueError, UnicodeError) as exc:
+            raise ValueError(f"Dashboard config is not valid JSON: {path}") from exc
+        if not isinstance(raw, dict):
+            raise ValueError("Dashboard config must be a JSON object")
+        payload = raw
+    payload[key] = value
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    tmp.replace(path)
+    return value
+
+
 def save_modules(path: Path, modules: object, landing: object) -> None:
     """Save validated activation preferences while preserving unrelated settings."""
     enabled, destination = validate_preferences(modules, landing)

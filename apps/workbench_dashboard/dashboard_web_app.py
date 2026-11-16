@@ -886,7 +886,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                     {"ok": True, "spend": spend_status(self.data_dir, self.spend_ledger)}
                 )
             if path == "/api/restrictions":
-                return self._restrictions_with_toggles()
+                return self._restrictions_with_toggles(config)
             if path == "/api/knowme":
                 return self._send_knowme(parsed.query)
             if path == "/api/providers":
@@ -1143,6 +1143,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 return self._save_settings(payload)
             if path == "/api/restrictions/toggles":
                 return self._set_restriction_toggle(payload)
+            if path == "/api/restrictions/fanout":
+                return self._set_fanout_default(payload)
             if path.startswith("/api/inbox/") and path.endswith("/answer"):
                 item_id = path[len("/api/inbox/") : -len("/answer")]
                 return self._answer_inbox_task(item_id, payload)
@@ -2248,11 +2250,15 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             return self._send_json({"ok": False, "error": str(exc)}, status=code)
         self._send_json({"ok": True, "id": record["id"], "status": record["status"]})
 
-    def _restrictions_with_toggles(self) -> None:
+    def _restrictions_with_toggles(self, config: DashboardConfig) -> None:
         from restrictions import describe_toggles, load_toggles
 
         status = restrictions_status(self._stores())
         status["toggles"] = describe_toggles(load_toggles(self.data_dir))
+        status["fanout"] = {
+            "chat": config.chat_fanout_policy,
+            "bridge": config.bridge_fanout_policy,
+        }
         self._send_json(status)
 
     def _set_restriction_toggle(self, payload: dict) -> None:
@@ -2270,6 +2276,22 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         except ValueError as exc:
             return self._send_json({"ok": False, "error": str(exc)}, status=400)
         self._send_json({"ok": True, "toggles": describe_toggles(toggles)})
+
+    def _set_fanout_default(self, payload: dict) -> None:
+        from dashboard_config import save_fanout_default
+
+        scope = payload.get("scope")
+        policy = payload.get("policy")
+        if not isinstance(scope, str) or not isinstance(policy, str):
+            return self._send_json(
+                {"ok": False, "error": "scope and policy must be strings"},
+                status=400,
+            )
+        try:
+            saved = save_fanout_default(self.config_path, scope, policy)
+        except ValueError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        self._send_json({"ok": True, "scope": scope, "policy": saved})
 
     def _bridge_inbox_runs(self) -> None:
         from inbox_bridge import bridge_agent_queue, resolve_bridge_fanout

@@ -997,6 +997,31 @@ def test_restriction_toggles_round_trip(dashboard_server) -> None:
         post_json(dashboard_server, "/api/restrictions/toggles", {"name": "nope", "enabled": True})
 
 
+def test_restriction_fanout_defaults_round_trip(dashboard_server, tmp_path) -> None:
+    status = get_json(dashboard_server, "/api/restrictions")
+    assert status["fanout"] == {"chat": "restricted", "bridge": "restricted"}
+    updated = post_json(
+        dashboard_server,
+        "/api/restrictions/fanout",
+        {"scope": "bridge", "policy": "allowed"},
+    )
+    assert updated["ok"] is True
+    assert updated["policy"] == "allowed"
+    reread = get_json(dashboard_server, "/api/restrictions")
+    assert reread["fanout"]["bridge"] == "allowed"
+    assert reread["fanout"]["chat"] == "restricted"
+    with pytest.raises(HTTPError) as exc:
+        post_json(
+            dashboard_server, "/api/restrictions/fanout", {"scope": "bridge", "policy": "sometimes"}
+        )
+    assert exc.value.code == 400
+    with pytest.raises(HTTPError) as exc:
+        post_json(
+            dashboard_server, "/api/restrictions/fanout", {"scope": "fleet", "policy": "allowed"}
+        )
+    assert exc.value.code == 400
+
+
 def test_knowme_empty_bank_is_honest(dashboard_server) -> None:
     payload = get_json(dashboard_server, "/api/knowme")
     assert payload["ok"] is True
