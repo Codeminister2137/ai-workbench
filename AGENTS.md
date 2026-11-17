@@ -843,6 +843,11 @@ Never hard-code:
 
 Use approved environment/configuration mechanisms.
 
+Never claim a credential is missing without first checking configured names
+(repo `.env` via the names-only loader plus process env); stale docs are not
+evidence of absence. When a record says "blocked on account/key" and the names
+exist, correct the record instead of repeating the claim.
+
 Do not send user data to cloud providers unless the architecture and task permit it.
 
 Treat third-party AI gateways as external processors.

@@ -50,3 +50,15 @@ Queued (owner-approved 2026-11-14): Mai-as-service batch resume first
 (unattended drain driver + boot reconciliation), then interactive Mai —
 dashboard chat was always meant to be agentic, not single-shot Q&A
 (needs conversational loop + scope-based approvals + presence routing).
+
+Update 2026-11-17: supervision placement decided (inbox 8962425c, option A:
+fleet probe now, in-CLI later); the fleet probe merged. Remaining
+supervision work is unscheduled, not owner-blocked.
+
+## Mai-switch acceptance bar (owner 2026-11-17)
+
+Mai becomes the primary interface when it reaches same-or-higher
+capabilities as the Muse CLI and is reliably wired into the Dashboard
+and the workbench system. No switch before the readiness checklist
+(empty-completion guard, instruction budget, stuck detection, redeploy
+reliability, mail discipline) is verified green.
