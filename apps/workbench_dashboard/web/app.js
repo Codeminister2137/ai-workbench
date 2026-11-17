@@ -511,7 +511,7 @@ function spendPolicyRuleRow(r, idx) {
     ? "" : r.max_prepaid_cents_per_day;
   return `<div class="policy-row" data-idx="${idx}">
     <input name="scope" value="${esc(r.scope || "")}" placeholder="global or provider route" title="Rule scope: global or a provider route" size="18">
-    <label title="Allow prepaid spend under this rule"><input type="checkbox" name="prepaid" ${r.prepaid_allowed ? "checked" : ""}> prepaid</label>
+    <label><input type="checkbox" name="prepaid" title="Allow prepaid spend under this rule" ${r.prepaid_allowed ? "checked" : ""}> prepaid</label>
     <input name="cap" value="${esc(cap)}" placeholder="cap ¢/day" title="Max prepaid cents per day (empty = no cap)" size="10" inputmode="numeric">
     <button type="button" data-remove="${idx}" title="Remove this rule">remove</button>
   </div>`;
@@ -525,8 +525,8 @@ function spendCardHtml(spend) {
   const editor = `<form id="spend-policy-form">
       <p class="muted">Spend policy — prepaid is blocked unless a rule allows it. Scope is global or a provider route. Saving applies immediately.</p>
       <div id="spend-policy-rows">${editorRows}</div>
-      <p><button type="button" id="spend-policy-add">Add rule</button>
-      <button type="submit" id="spend-policy-save">Save policy</button></p>
+      <p><button type="button" id="spend-policy-add" title="Add a prepaid-permission rule">Add rule</button>
+      <button type="submit" id="spend-policy-save" title="Save the spend policy (applies immediately)">Save policy</button></p>
     </form>`;
   const bucketList = (spend.buckets || []).length
     ? `<ul class="plain">${spend.buckets.map((b) =>
