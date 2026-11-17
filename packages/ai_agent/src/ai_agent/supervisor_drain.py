@@ -101,7 +101,9 @@ def _completion_note(run: dict) -> str:
                 break
     if len(findings) > REPORT_NOTE_CHARS:
         findings = findings[:REPORT_NOTE_CHARS] + "\n[... full findings on the run record]"
-    return f"Run '{title}' ({run_id[:8]}) completed.\n\nFindings:\n{findings or '(see run report)'}\n"
+    return (
+        f"Run '{title}' ({run_id[:8]}) completed.\n\nFindings:\n{findings or '(see run report)'}\n"
+    )
 
 
 class RunDrain:
