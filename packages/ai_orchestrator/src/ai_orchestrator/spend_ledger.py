@@ -723,6 +723,46 @@ class SpendLedger:
         }
 
 
+def record_measured_usage(
+    ledger: SpendLedger,
+    summary: dict,
+    *,
+    task_id: str,
+    task_class: str,
+    provider: str = "unknown",
+    model_id: str = "",
+) -> int:
+    """Book one zero-cost record per provider-reported call (counts phase).
+
+    Attribution comes from each call when the adapter reported identity,
+    else from the fallbacks. Dollars land in the price phase; these
+    records carry tokens with ``provider_reported`` source and $0.
+    Returns the number of records booked.
+    """
+    booked = 0
+    calls = summary.get("calls")
+    if not isinstance(calls, list):
+        return 0
+    for call in calls:
+        if not isinstance(call, dict):
+            continue
+        input_tokens = call.get("input_tokens")
+        output_tokens = call.get("output_tokens")
+        if not isinstance(input_tokens, int) and not isinstance(output_tokens, int):
+            continue
+        ledger.settle_local(
+            task_id=task_id,
+            task_class=task_class,
+            model_id=str(call.get("model") or model_id or ""),
+            provider=str(call.get("provider") or provider),
+            input_tokens=input_tokens if isinstance(input_tokens, int) else None,
+            output_tokens=output_tokens if isinstance(output_tokens, int) else None,
+            usage_source="provider_reported",
+        )
+        booked += 1
+    return booked
+
+
 __all__ = [
     "Admission",
     "Allowance",
@@ -732,6 +772,7 @@ __all__ = [
     "ReservationState",
     "SpendLedger",
     "TaskSpendRecord",
+    "record_measured_usage",
     "allowance_fingerprint",
     "allowance_from_file",
     "policy_from_file",

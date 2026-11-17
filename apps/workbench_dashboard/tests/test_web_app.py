@@ -1056,6 +1056,60 @@ def test_spend_adjust_rejects_over_balance(dashboard_server, tmp_path) -> None:
     raised.value.close()
 
 
+def test_meeting_analysis_books_measured_usage(dashboard_server, tmp_path, monkeypatch) -> None:
+    from datetime import datetime
+    from types import SimpleNamespace
+
+    from ai_orchestrator.spend_ledger import SpendLedger
+    from ai_provider.contracts import UsageMetadata, UsageSource
+    from ai_provider.turn_usage import observe_completion, observe_usage
+    from dashboard_web_app import DashboardRequestHandler
+    from meeting_notes import store_meeting
+
+    meta = store_meeting(
+        tmp_path / "data",
+        transcript="[00:00] hello",
+        segments=[{"start_s": 0.0, "text": "hello"}],
+        consent=True,
+        retention_days=30,
+        engine_id="fake",
+        source_name="m.wav",
+        recorded_at=datetime.fromisoformat("2026-11-10T10:00:00+00:00"),
+    )
+
+    class FakeClient:
+        @observe_completion
+        def complete(self, request):
+            observe_usage(
+                UsageMetadata(
+                    source=UsageSource.PROVIDER_REPORTED, input_tokens=10, output_tokens=2
+                )
+            )
+            return SimpleNamespace(
+                message=SimpleNamespace(content="- [ ] x"), usage=UsageMetadata()
+            )
+
+    monkeypatch.setattr(
+        DashboardRequestHandler,
+        "analysis_client_factory",
+        staticmethod(lambda: (FakeClient(), "m", "r")),
+    )
+    ledger = SpendLedger()
+    monkeypatch.setattr(DashboardRequestHandler, "spend_ledger", ledger)
+    out = post_json(
+        dashboard_server,
+        f"/api/meetings/{meta['id']}/analyze",
+        {"confirm_external": True},
+    )
+    assert out["ok"] is True
+    (record,) = ledger.records()
+    assert (record.input_tokens, record.output_tokens) == (10, 2)
+    assert (record.provider, record.model_id) == ("r", "m")
+    assert record.task_class == "meeting_analysis"
+    assert record.actual_cents == 0
+    assert record.usage_source == "provider_reported"
+
+
 def test_spend_policy_rejects_invalid(dashboard_server, tmp_path) -> None:
     with pytest.raises(HTTPError) as raised:
         post_json(

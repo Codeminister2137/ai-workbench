@@ -3107,14 +3107,39 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         except ValueError as exc:
             return self._send_json({"ok": False, "error": str(exc)}, status=503)
         try:
-            outcome = analyze_meeting(
-                self.data_dir,
-                meeting_id,
-                client=client,
-                model_id=model_id,
-                route_id=route_id,
-                confirm_external=True,
-            )
+            ledger = self.spend_ledger
+            if ledger is not None:
+                from ai_orchestrator.spend_ledger import record_measured_usage
+                from ai_provider.turn_usage import measured_calls
+
+                def _sink(summary: dict, context: dict) -> None:
+                    record_measured_usage(
+                        ledger,
+                        summary,
+                        task_id=f"meeting-{meeting_id}",
+                        task_class="meeting_analysis",
+                        provider=str(route_id or ""),
+                        model_id=str(model_id or ""),
+                    )
+
+                with measured_calls(sink=_sink, context={}):
+                    outcome = analyze_meeting(
+                        self.data_dir,
+                        meeting_id,
+                        client=client,
+                        model_id=model_id,
+                        route_id=route_id,
+                        confirm_external=True,
+                    )
+            else:
+                outcome = analyze_meeting(
+                    self.data_dir,
+                    meeting_id,
+                    client=client,
+                    model_id=model_id,
+                    route_id=route_id,
+                    confirm_external=True,
+                )
         except KeyError:
             return self._send_json({"ok": False, "error": "Not found"}, status=404)
         except ValueError as exc:

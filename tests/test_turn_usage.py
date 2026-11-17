@@ -90,7 +90,7 @@ def test_multiple_calls_failure_and_isolated_turns(monkeypatch, capsys):
     summary = turn()
     assert summary["attempts"] == 3 and summary["responses"] == 2
     assert summary["total_tokens"]["coverage"] == "partial"
-    assert summary["calls"][-1] == {}
+    assert summary["calls"][-1] == {"provider": "requesty", "model": "test"}
     output = capsys.readouterr().out
     assert "primary_total_tokens: 23" in output
     assert "primary_usage_scope: final_response" in output
@@ -269,3 +269,41 @@ def test_broken_fallback_output_cannot_mask_host_failure_or_cleanup(monkeypatch,
     with pytest.raises(RuntimeError, match="original host failure"):
         cli._main([], parsed_args=Namespace(_transcript_cleanup=lambda: cleaned.append(True)))
     assert cleaned == [True] and ACTIVE_USAGE.get() is None
+
+
+def test_calls_carry_provider_and_model_identity(monkeypatch):
+    from ai_provider.turn_usage import measured_calls
+
+    def post(self, payload):
+        return raw({"prompt_tokens": 10, "completion_tokens": 2, "total_tokens": 12})
+
+    monkeypatch.setattr(OpenAICompatibleChatClient, "_post_chat", post)
+    seen = {}
+
+    def sink(summary, context):
+        seen["summary"] = summary
+        seen["context"] = context
+
+    with measured_calls(sink=sink, context={"task_id": "t1"}):
+        adapter().complete(REQUEST)
+    (call,) = seen["summary"]["calls"]
+    assert call["provider"] == "requesty"
+    assert call["model"] == "test"
+    assert call["input_tokens"] == 10
+    assert seen["context"] == {"task_id": "t1"}
+
+
+def test_measured_calls_sink_failure_never_breaks_call(monkeypatch, capsys):
+    from ai_provider.turn_usage import measured_calls
+
+    def post(self, payload):
+        return raw({"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2})
+
+    monkeypatch.setattr(OpenAICompatibleChatClient, "_post_chat", post)
+
+    def bad_sink(summary, context):
+        raise RuntimeError("telemetry down")
+
+    with measured_calls(sink=bad_sink, context={}):
+        adapter().complete(REQUEST)
+    assert "telemetry down" in capsys.readouterr().err

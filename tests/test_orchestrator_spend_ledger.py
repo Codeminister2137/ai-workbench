@@ -14,6 +14,7 @@ from ai_orchestrator.spend_ledger import (
     allowance_fingerprint,
     allowance_from_file,
     policy_from_file,
+    record_measured_usage,
 )
 
 
@@ -334,6 +335,22 @@ class TestPolicyFiles:
         assert second.decision == "deferred"
         spent = cast("dict[str, Any]", ledger.status()["policy"])
         assert spent["prepaid_spent_total_cents"] == 100
+
+    def test_record_measured_usage_books_token_counts(self):
+        ledger = SpendLedger()
+        summary = {
+            "calls": [
+                {"input_tokens": 10, "output_tokens": 2, "provider": "requesty", "model": "m"},
+                {"provider": "requesty"},
+                "junk",
+            ]
+        }
+        assert record_measured_usage(ledger, summary, task_id="t1", task_class="analysis") == 1
+        (record,) = ledger.records()
+        assert (record.input_tokens, record.output_tokens) == (10, 2)
+        assert (record.provider, record.model_id) == ("requesty", "m")
+        assert record.actual_cents == 0
+        assert record.usage_source == "provider_reported"
 
     def test_status_reports_policy_and_order(self):
         ledger = SpendLedger(clock=lambda: 1_700_000_000.0)
