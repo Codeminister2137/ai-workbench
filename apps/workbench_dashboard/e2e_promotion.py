@@ -24,6 +24,8 @@ import uuid
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
 
 WARNING_TEMPLATE = "passed on {commit}, code untouched since — not re-tested"
 
@@ -726,9 +728,11 @@ def pointer_mission(merge: str, task_id: str, unclear: list[dict]) -> str:
         "inspect the merge diff and the served dashboard if needed; change no code.\n\n"
         f"Merge: {merge}\nTask: {task_id}\n\n"
         + pointer_body(merge, unclear)
-        + "\n\nReply in your run summary, FIRST LINE ONLY, one of:\n"
-        'STEPS:{"<item-id>": [{"action": "...", "expected": "..."}], ...}\n'
-        "DECLINE:<one-line reason>\n"
+        + "\n\nReply BOTH ways so the result survives truncation:\n"
+        "1. Write pointers.json at your worktree root: "
+        '{"<item-id>": [{"action": "...", "expected": "..."}], ...} '
+        'or {"declined": "reason"}.\n'
+        "2. Also emit STEPS:{...} (same JSON) or DECLINE:<reason> in output.\n"
         "Every unclear item id needs at least one step; keep actions concrete "
         "(view hashes, control names, commands). If the change is not "
         "verifiable from any user surface, DECLINE instead of guessing."
@@ -776,15 +780,62 @@ def file_owner_pointers(stores, merge: str, unclear: list[dict]) -> dict:
     )
 
 
-def _pointer_steps(summary: str) -> dict | None:
-    """Parse the agent's first-line verdict; None means escalate to the owner."""
-    first = (summary or "").splitlines()[0] if (summary or "").strip() else ""
-    if first.startswith("STEPS:"):
-        try:
-            steps = json.loads(first[len("STEPS:") :])
-        except ValueError:
+POINTER_VERDICT_MAX_BYTES = 65536
+
+
+def _pointer_steps_from_text(text: str) -> dict | None:
+    """Find a STEPS:{...} verdict anywhere; None means no parseable verdict.
+
+    Tries every marker occurrence: agents sometimes emit a broken draft
+    before the final verdict.
+    """
+    decoder = json.JSONDecoder(strict=False)
+    start = 0
+    while True:
+        index = (text or "").find("STEPS:", start)
+        if index < 0:
             return None
-        return steps if isinstance(steps, dict) else None
+        try:
+            steps, _end = decoder.raw_decode(text, index + len("STEPS:"))
+        except ValueError:
+            start = index + len("STEPS:")
+            continue
+        if isinstance(steps, dict):
+            return steps
+        start = index + len("STEPS:")
+
+
+def _pointer_steps_from_file(worktree: str) -> dict | None:
+    """Read pointers.json from the executor-recorded worktree (truncation-proof).
+
+    The path comes from our own executor receipt, never from agent input;
+    only the file *content* is agent-crafted (validated downstream).
+    """
+    if not worktree:
+        return None
+    try:
+        path = Path(worktree) / "pointers.json"
+        if not path.is_file() or path.stat().st_size > POINTER_VERDICT_MAX_BYTES:
+            return None
+        steps = json.loads(path.read_text(encoding="utf-8"), strict=False)
+    except (OSError, ValueError):
+        return None
+    if not isinstance(steps, dict) or "declined" in steps:
+        return None
+    return steps
+
+
+def _pointer_steps(receipt: dict) -> dict | None:
+    """Parse the agent's verdict: file channel first, stdout/summary fallback."""
+    if not isinstance(receipt, dict):
+        return None
+    steps = _pointer_steps_from_file(receipt.get("worktree") or "")
+    if steps is not None:
+        return steps
+    for key in ("stdout_tail", "summary"):
+        steps = _pointer_steps_from_text(receipt.get(key) or "")
+        if steps is not None:
+            return steps
     return None
 
 
@@ -809,24 +860,77 @@ def route_pointer_runs(stores) -> list[dict]:
         merge = metadata.get("merge", "")
         unclear = metadata.get("unclear") or []
         record = stores.e2e_tasks.get(task_id) if task_id else None
+        outcome: dict[str, Any] = {"run_id": run["id"], "task_id": task_id}
         if record is None or record.get("status") != "draft":
-            action = "stale"
+            outcome["action"] = "stale"
         else:
             action = "escalated"
             if run.get("status") == "completed":
                 receipts = run.get("receipts") or []
-                summary = receipts[-1].get("summary", "") if receipts else ""
-                steps = _pointer_steps(summary)
+                receipt = receipts[-1] if receipts else {}
+                steps = _pointer_steps(receipt if isinstance(receipt, dict) else {})
                 if steps:
                     try:
                         stores.finalize_e2e_task(task_id, steps)
                         action = "finalized"
                     except Exception:  # noqa: BLE001 - bad steps escalate, never crash drain
                         pass
-            if action == "escalated":
+                if action == "escalated" and steps:
+                    if _apply_covered_pointer_steps(stores, task_id, steps):
+                        try:
+                            stores.open_resolved_draft(task_id)
+                            action = "finalized"
+                        except Exception:  # noqa: BLE001 - rest still unclear, escalate it
+                            outcome["partial"] = True
+                            covered = _covered_pointer_ids(stores, task_id)
+                            rest = [u for u in unclear if u.get("id") not in covered]
+                            file_owner_pointers(stores, merge, rest or unclear)
+                    else:
+                        file_owner_pointers(stores, merge, unclear)
+                elif action == "escalated":
+                    file_owner_pointers(stores, merge, unclear)
+            else:
                 file_owner_pointers(stores, merge, unclear)
-        metadata["routed"] = action
+            outcome["action"] = action
+        metadata["routed"] = outcome["action"]
         run["metadata"] = metadata
         stores.runs.put(run["id"], run)
-        outcomes.append({"run_id": run["id"], "action": action, "task_id": task_id})
+        outcomes.append(outcome)
     return outcomes
+
+
+def _covered_pointer_ids(stores, task_id: str) -> set[str]:
+    """Item ids whose pointers flag cleared on a draft (partial progress)."""
+    record = stores.e2e_tasks.get(task_id)
+    if record is None:
+        return set()
+    return {
+        str(item.get("id", ""))
+        for item in record.get("items", [])
+        if isinstance(item, dict) and not item.get("needs_pointers", True)
+    }
+
+
+def _apply_covered_pointer_steps(stores, task_id: str, steps: dict) -> bool:
+    """Apply valid steps for covered items; False when nothing applied."""
+    from e2e_cases import validate_steps
+
+    record = stores.e2e_tasks.get(task_id)
+    if record is None or record.get("status") != "draft":
+        return False
+    applied = False
+    for item in record.get("items", []):
+        if not isinstance(item, dict) or item.get("status") == "auto-pass":
+            continue
+        item_id = str(item.get("id", ""))
+        if item_id not in steps or not item.get("needs_pointers", True):
+            continue
+        try:
+            item["steps"] = validate_steps(steps[item_id])
+        except (ValueError, TypeError):
+            return False
+        item["needs_pointers"] = False
+        applied = True
+    if applied:
+        stores.e2e_tasks.put(task_id, record)
+    return applied
