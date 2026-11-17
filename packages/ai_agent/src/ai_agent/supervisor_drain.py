@@ -38,6 +38,7 @@ from ai_agent.run_tracking import (
     TERMINAL_RUN_STATUSES,
     append_run_event,
     ensure_run_not_cancelled,
+    run_cancelled,
 )
 
 APPROVAL_ANSWER = "Approve"
@@ -174,7 +175,9 @@ class RunDrain:
             run = _read_json(path)
             if run is None or run.get("status") not in {"queued", "paused"}:
                 continue
-            if run.get("status") == "queued":
+            # Cancelled runs bypass approval: they must reach terminal
+            # state via the claim path instead of parking forever.
+            if run.get("status") == "queued" and not run_cancelled(run):
                 allowed, reason = self._approval_allows(run)
                 if not allowed:
                     outcomes.append(
@@ -293,15 +296,6 @@ class RunDrain:
                     "action": "skipped",
                     "reason": f"unexpected status {status!r}",
                 }
-            if status == "queued":
-                allowed, reason = self._approval_allows(run)
-                if not allowed:
-                    return {
-                        "run_id": run_id,
-                        "status": "queued",
-                        "action": "parked",
-                        "reason": reason,
-                    }
             try:
                 ensure_run_not_cancelled(run)
             except ValueError:
@@ -314,6 +308,15 @@ class RunDrain:
                 self._publish(path, claim, run)
                 self._notify_terminal(run, "cancelled")
                 return {"run_id": run_id, "status": "cancelled"}
+            if status == "queued":
+                allowed, reason = self._approval_allows(run)
+                if not allowed:
+                    return {
+                        "run_id": run_id,
+                        "status": "queued",
+                        "action": "parked",
+                        "reason": reason,
+                    }
             run["status"] = "running"
             run["attempts"] = int(run.get("attempts", 0)) + 1
             run["updated_at_utc"] = self._iso_now()
