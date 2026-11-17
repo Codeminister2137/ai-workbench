@@ -2611,9 +2611,13 @@ async function renderKnowme() {
   const sections = groups.map((c) => {
     const members = entries.filter((e) => e.category === c);
     if (!members.length) return "";
-    const items = members.map((e) =>
-      `<li><div class="knowme-text">${esc(e.text)}</div>
-       <small class="muted">Source: ${esc(e.source)}</small></li>`).join("");
+    const items = members.map((e) => {
+      const file = e.source_file ? ` (${esc(e.source_file)})` : "";
+      const origin = e.origin_text && e.origin_text !== e.text
+        ? `<br>From: ${esc(e.origin_text.length > 160 ? e.origin_text.slice(0, 160) + "…" : e.origin_text)}` : "";
+      return `<li><div class="knowme-text">${esc(e.text)}</div>
+       <small class="muted">Source: ${esc(e.source)}${file}${origin}</small></li>`;
+    }).join("");
     return `<section class="card"><h2>${esc(labels[c] || c)} (${members.length})</h2>
       <ul class="knowme-entries">${items}</ul></section>`;
   }).join("") || '<p class="muted">No entries in this view — run the know-me interview to bank facts.</p>';

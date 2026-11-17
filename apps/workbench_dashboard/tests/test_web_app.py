@@ -1470,6 +1470,26 @@ def test_knowme_lists_banked_entries(dashboard_server, tmp_path) -> None:
         get_json(dashboard_server, "/api/knowme?category=nope")
 
 
+def test_knowme_propagates_provenance(dashboard_server, tmp_path) -> None:
+    from knowme_bank import KnowMeStore
+
+    store = KnowMeStore(tmp_path / "data" / "knowme.sqlite3")
+    store.add(
+        "skills",
+        "Python",
+        "import",
+        source_file="cv.txt",
+        origin_text="Python, Django",
+    )
+    store.add("skills", "Old blob.", "import")
+    payload = get_json(dashboard_server, "/api/knowme?category=skills")
+    rows = {entry["text"]: entry for entry in payload["entries"]}
+    assert rows["Python"]["source_file"] == "cv.txt"
+    assert rows["Python"]["origin_text"] == "Python, Django"
+    assert rows["Old blob."]["source_file"] is None
+    assert rows["Old blob."]["origin_text"] is None
+
+
 def test_module_activation_roundtrip_and_route_gates(dashboard_server, tmp_path):
     from knowme_bank import KnowMeStore
 
