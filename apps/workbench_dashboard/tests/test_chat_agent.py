@@ -214,6 +214,7 @@ def test_yolo_auto_applies_staged(tmp_path, git_repo, stores) -> None:
         session.session_id, "do it", stores=stores, mode="agent", agent_executor=fake_execute
     )
     assert outcome.execution_status == "completed"
+    assert outcome.response_text is not None
     assert "auto-applied 1" in outcome.response_text
     assert (git_repo / "app.py").read_text(encoding="utf-8") == "v2"
 
@@ -283,8 +284,6 @@ def test_progress_api_disabled(dashboard_server):
 
 
 def test_progress_api_existing_worktree(tmp_path, monkeypatch):
-    from types import SimpleNamespace
-
     from chat_agent import ProgressWriter, progress_path
     from dashboard_web_app import DashboardRequestHandler
 
@@ -296,7 +295,7 @@ def test_progress_api_existing_worktree(tmp_path, monkeypatch):
     monkeypatch.setattr(handler, "_stores", lambda: stores)
     responses = []
     monkeypatch.setattr(handler, "_send_json", responses.append)
-    config = SimpleNamespace(chat_agent_enabled=True)
+    config = DashboardConfig(chat_agent_enabled=True)
     handler._send_chat_progress(config, "s", "m")
     assert responses[-1]["lines"] == []
     assert not (tmp_path / ".tmp").exists()

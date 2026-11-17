@@ -3373,12 +3373,16 @@ def build_run_drain(
             backend=getattr(config, "mai_backend", "subprocess"),
             isolate=True,
         )
+
+    def _notify(summary: dict) -> None:
+        report_run_terminal(stores, summary)
+
     return RunDrain(
         runs_dir=data_dir / "runs",
         get_inbox=lambda inbox_id: stores.inbox.get(inbox_id),
         executor=executor,
         worker_epoch=worker_epoch or datetime.now(UTC).isoformat(),
-        on_terminal=lambda summary: report_run_terminal(stores, summary),
+        on_terminal=_notify,
     )
 
 

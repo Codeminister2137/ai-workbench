@@ -437,7 +437,8 @@ def test_pointer_file_channel_beats_stdout(tmp_path) -> None:
     )
     outcomes = route_pointer_runs(stores)
     assert outcomes[0]["action"] == "finalized"
-    assert stores.e2e_tasks.get(task["id"])["status"] == "open"
+    opened = stores.e2e_tasks.get(task["id"])
+    assert opened is not None and opened["status"] == "open"
 
 
 def test_pointer_stdout_fallback_scans_anywhere(stores) -> None:

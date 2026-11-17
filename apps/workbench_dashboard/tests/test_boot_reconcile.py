@@ -29,6 +29,7 @@ def test_startup_reconcile_requeues_orphans(tmp_path) -> None:
     outcomes = reconcile_runs_at_startup(config, data_dir, tmp_path, stores, "boot-2")
     assert outcomes == [{"run_id": "orphan", "action": "requeued"}]
     stored = stores.runs.get("orphan")
+    assert stored is not None
     assert stored["status"] == "queued"
     assert stored["events"][-1]["payload"]["reconciled_by_epoch"] == "boot-2"
 

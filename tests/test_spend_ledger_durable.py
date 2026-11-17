@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any, cast
+
 from ai_orchestrator.spend_ledger import (
     Allowance,
     AllowanceKind,
@@ -95,7 +97,8 @@ def test_legacy_daily_prepaid_upgrades_to_total(tmp_path) -> None:
     connection.commit()
     connection.close()
     ledger = SpendLedger(path, clock=lambda: 1500.0)
-    assert ledger.status()["policy"]["prepaid_spent_total_cents"] == 150
+    policy = cast("dict[str, Any]", ledger.status()["policy"])
+    assert policy["prepaid_spent_total_cents"] == 150
 
 
 def test_pre_token_schema_migrates_in_place(tmp_path) -> None:

@@ -861,7 +861,7 @@ def route_pointer_runs(stores) -> list[dict]:
         unclear = metadata.get("unclear") or []
         record = stores.e2e_tasks.get(task_id) if task_id else None
         outcome: dict[str, Any] = {"run_id": run["id"], "task_id": task_id}
-        if record is None or record.get("status") != "draft":
+        if record is None or record.get("status") != "draft" or not isinstance(task_id, str):
             outcome["action"] = "stale"
         else:
             action = "escalated"

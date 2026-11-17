@@ -36,6 +36,7 @@ def test_execute_check_uses_runner_and_truncates(tmp_path: Path) -> None:
     )
     assert result["command"] == ".venv/Scripts/python.exe -m pytest x -q"
     assert result["exit_code"] == 3
+    assert isinstance(result["output"], str)
     assert len(result["output"]) == e2e_agent_checks.EVIDENCE_CHARS
     assert seen["argv"][0] == ".venv/Scripts/python.exe"
     assert seen["root"] == tmp_path

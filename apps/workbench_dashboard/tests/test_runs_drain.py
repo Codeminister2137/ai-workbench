@@ -165,6 +165,7 @@ def test_terminal_report_appends_outcome_note(tmp_path) -> None:
     )
     assert outcome["action"] == "noted"
     item = stores.inbox.get("in1")
+    assert item is not None
     assert "run1" in (item.get("note") or "")
     assert "completed" in (item.get("note") or "")
     assert item["status"] == "open"
@@ -178,7 +179,8 @@ def test_terminal_report_flags_failures_and_dedupes(tmp_path) -> None:
     _report_run(stores, "run1", "in1")
     summary = {"run_id": "run1", "status": "failed", "title": "t", "error": "boom"}
     assert report_run_terminal(stores, summary)["action"] == "noted"
-    assert "boom" in (stores.inbox.get("in1").get("note") or "")
+    noted = stores.inbox.get("in1")
+    assert noted is not None and "boom" in (noted.get("note") or "")
     assert report_run_terminal(stores, summary)["action"] == "skipped"
 
 
