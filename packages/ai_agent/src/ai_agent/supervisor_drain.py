@@ -33,7 +33,11 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
-from ai_agent.run_reports import render_run_report, render_shareable_report
+from ai_agent.run_reports import (
+    render_run_report,
+    render_shareable_report,
+    report_has_substance,
+)
 from ai_agent.run_tracking import (
     TERMINAL_RUN_STATUSES,
     append_run_event,
@@ -49,7 +53,11 @@ TMP_SUFFIX = ".json.tmp"
 
 Executor = Callable[[dict], dict]
 InboxGet = Callable[[str], dict | None]
+InboxNote = Callable[[str, str], None]
 TerminalHook = Callable[[dict], None]
+
+NEEDS_ATTENTION = "needs-attention"
+REPORT_NOTE_CHARS = 2000
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +78,32 @@ def _append_receipt(run: dict, receipt: dict) -> None:
     receipts.append(receipt)
 
 
+def _completion_note(run: dict) -> str:
+    """Human-readable completion findings for the linked inbox item.
+
+    Leads with the run title (never a bare id) plus the summary or
+    session output excerpt; the full report stays on the run record.
+    """
+    title = run.get("title") if isinstance(run.get("title"), str) else "untitled"
+    run_id = run.get("id") if isinstance(run.get("id"), str) else "?"
+    findings = ""
+    receipts = run.get("receipts")
+    if isinstance(receipts, list):
+        for entry in reversed(receipts):
+            if not isinstance(entry, dict):
+                continue
+            for key in ("summary", "stdout_tail"):
+                candidate = entry.get(key)
+                if isinstance(candidate, str) and candidate.strip():
+                    findings = candidate.strip()
+                    break
+            if findings:
+                break
+    if len(findings) > REPORT_NOTE_CHARS:
+        findings = findings[:REPORT_NOTE_CHARS] + "\n[... full findings on the run record]"
+    return f"Run '{title}' ({run_id[:8]}) completed.\n\nFindings:\n{findings or '(see run report)'}\n"
+
+
 class RunDrain:
     """Drain queued runs from ``runs_dir`` against injected inbox and executor.
 
@@ -79,6 +113,9 @@ class RunDrain:
     ``failed`` or ``paused`` on request); anything else fails the run.
     ``on_terminal`` is an optional observer for terminal outcomes
     (completed/failed/cancelled); it never breaks the drain.
+    ``inbox_note`` posts the completion findings back to the linked
+    inbox item (report-or-escalate: a linked run whose note cannot be
+    delivered escalates instead of reading ``completed``).
     """
 
     def __init__(
@@ -90,6 +127,7 @@ class RunDrain:
         now: Callable[[], float] | None = None,
         on_terminal: TerminalHook | None = None,
         worker_epoch: str | None = None,
+        inbox_note: InboxNote | None = None,
     ) -> None:
         self._runs_dir = runs_dir
         self._get_inbox = get_inbox
@@ -97,6 +135,7 @@ class RunDrain:
         self._now = now or time.time
         self._on_terminal = on_terminal
         self._worker_epoch = worker_epoch
+        self._inbox_note = inbox_note
 
     def _notify_terminal(self, run: dict, status: str) -> None:
         if self._on_terminal is None:
@@ -397,6 +436,24 @@ class RunDrain:
             )
         run.setdefault("report", render_run_report(run))
         run.setdefault("shareable_report", render_shareable_report(run))
+        if status == "completed" and not report_has_substance(run):
+            status = NEEDS_ATTENTION
+            run["status"] = status
+            error = (
+                "completed but the report is hollow: no summary, session "
+                "output, staged files, owner tasks, or tool calls"
+            )
+            run["error"] = error
+        if status == "completed":
+            linked = run.get("inbox_id") or run.get("bridged_from")
+            if linked and isinstance(linked, str) and self._inbox_note is not None:
+                try:
+                    self._inbox_note(linked, _completion_note(run))
+                except Exception as exc:
+                    status = NEEDS_ATTENTION
+                    run["status"] = status
+                    error = f"completion write-back failed: {exc}"
+                    run["error"] = error
         append_run_event(run, "run_finished", {"status": status})
         self._publish(path, claim, run)
         self._notify_terminal(run, status)

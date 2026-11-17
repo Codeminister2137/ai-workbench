@@ -636,3 +636,19 @@ def test_i4_flags_agent_item_idle_after_terminal_run() -> None:
     assert stale["fileable"] is True
     assert "completed" in stale["title"]
     assert SWEEP.collect_inbox(inbox, NOW) == [f for f in findings if not f["key"].startswith("I4")]
+
+
+def test_flags_needs_attention_runs() -> None:
+    runs = [
+        {
+            "id": "na1",
+            "title": "Hollow finish",
+            "status": "needs-attention",
+            "created_at_utc": _ts(100),
+            "inbox_id": None,
+            "error": "completed but the report is hollow",
+        },
+    ]
+    findings, _resolved = SWEEP.collect_runs(runs, [], NOW)
+    by_key = {f["key"]: f for f in findings}
+    assert by_key["R1:na1"]["fileable"] is True

@@ -11,6 +11,7 @@ from ai_agent.run_reports import (
     render_report,
     render_run_report,
     render_shareable_report,
+    report_has_substance,
 )
 from ai_agent.supervisor_drain import RunDrain
 
@@ -305,3 +306,14 @@ def test_finish_attaches_both_flavors(tmp_path: Path) -> None:
     }
     drain._finish(path2, claim2, run2, "completed", error=None, receipt={"status": "completed"})
     assert run2["shareable_report"] == "hand-written client note"
+
+
+def test_report_substance_flags_hollow_runs() -> None:
+    assert report_has_substance({}) is False
+    assert report_has_substance({"id": "r", "receipts": [{"status": "completed"}]}) is False
+    assert report_has_substance({"receipts": [{"summary": "  "}]}) is False
+    assert report_has_substance({"receipts": [{"summary": "did it"}]}) is True
+    assert report_has_substance({"receipts": [{"stdout_tail": "out"}]}) is True
+    assert report_has_substance({"staged": ["a.txt"], "receipts": [{}]}) is True
+    assert report_has_substance({"receipts": [{"tool_calls": ["read_file"]}]}) is True
+    assert report_has_substance({"receipts": [{"owner_tasks": ["i1"]}]}) is True

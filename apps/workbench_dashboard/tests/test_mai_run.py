@@ -6,8 +6,10 @@ from pathlib import Path
 
 from mai_run import (
     MAI_INSTRUCTION_BUDGET_CHARS,
+    TAIL_CHARS,
     build_mai_argv,
     build_mai_executor,
+    capture_tail,
     classify_failure,
     mai_receipt,
     run_mai_session,
@@ -316,3 +318,16 @@ def test_progress_arrives_before_process_exit(tmp_path):
         finally:
             release.touch()
         assert future.result(timeout=10).exit_code == 0
+
+
+def test_capture_tail_marks_truncation_at_line_boundary() -> None:
+    body = "".join(f"line {i:04d} with enough padding to fill bytes\n" for i in range(500))
+    assert len(body) > TAIL_CHARS
+    tail = capture_tail(body)
+    assert "truncated" in tail.splitlines()[0]
+    assert tail.splitlines()[1].startswith("line ")  # no mid-line start
+    assert tail.endswith(body[-200:])
+
+
+def test_capture_tail_passthrough_short_output() -> None:
+    assert capture_tail("short\n") == "short\n"

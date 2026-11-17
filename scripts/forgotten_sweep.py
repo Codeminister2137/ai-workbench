@@ -346,7 +346,7 @@ def collect_runs(
         age = _age_h(created, now)
         if age is None:
             continue
-        if status == "failed":
+        if status in ("failed", "needs-attention"):
             if run.get("superseded_by"):
                 resolved.append({"key": f"R1:{rid}", "reason": "superseded_by stamp"})
                 continue
@@ -380,11 +380,16 @@ def collect_runs(
             members += _done_elsewhere_evidence(
                 title, str(run.get("inbox_id") or ""), inbox, merged_branches
             )
+            label = (
+                "Failed run with no follow-up"
+                if status == "failed"
+                else "Run finished without a deliverable report"
+            )
             findings.append(
                 _finding(
                     f"R1:{rid}",
                     "R1",
-                    f"Failed run with no follow-up: {title[:70]}",
+                    f"{label}: {title[:70]}",
                     "agent",
                     _verify_first_action(
                         "Investigate the error; queue a fix run, or stamp the run "
