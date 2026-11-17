@@ -282,6 +282,7 @@ FLEET_TASKS = (
     "WakeSelfTest",
     "PrivateBackup",
     "WorkbenchWeeklyDigest",
+    "WorkbenchAllowanceCheck",
     "OpeningsWeb",
     "OpeningsCollect",
 )
