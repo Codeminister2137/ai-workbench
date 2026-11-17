@@ -497,8 +497,9 @@ per-run chat approval. Prepare fresh named bounds and preserve failed/consumed
 runs; the name identifies a finite allowance rather than requiring a new owner
 grant each time. Hosted/paid inference and new provider/data/scope decisions keep
 their existing authorization requirements. When the owner announces "gaming
-mode" or says they need PC resources, do not start resource-heavy local tests and
-safely wind down owned test work. This is a conversational resource constraint,
+mode" or says they need PC resources, do not start GPU-bound local-model work
+(local inference saturates their GPU) and safely wind it down; ordinary CPU test
+suites remain fine on a capable PC. This is a conversational resource constraint,
 not a new automatic machine mode, scheduler or background service. For synthetic
 pilots, Codex may take the user role through the existing checkpoint callback;
 label these answers as automated pilot continuations, never physical human input.
