@@ -461,8 +461,15 @@ class DashboardStores:
         body: str,
         source: str = "owner",
         ref: str | None = None,
+        gate: dict | None = None,
+        task_spec: dict | None = None,
     ) -> dict:
-        """Capture one backlog item; ``ref`` cites the origin (ledger doc, idea id)."""
+        """Capture one backlog item; ``ref`` cites the origin (ledger doc, idea id).
+
+        ``gate`` stores the machine-readable execution condition
+        (``manual``/``date``/``inbox_decision``); ``task_spec`` is the
+        prepared agent-task plan used when the gate opens.
+        """
         title = title.strip()
         if not title:
             raise StoreError("Backlog item needs a title")
@@ -471,6 +478,9 @@ class DashboardStores:
         ref = (ref or "").strip() or None
         if ref is not None and len(ref) > 200:
             raise StoreError("Backlog ref must be 1-200 characters")
+        gate = self._checked_gate(gate)
+        if task_spec is not None:
+            self._checked_task_spec(task_spec)
         now = _utc_now()
         record = {
             "id": uuid.uuid4().hex,
@@ -483,9 +493,123 @@ class DashboardStores:
             "created_at": now,
             "reviewed_at": None,
             "decision": None,
+            "gate": gate,
+            "task_spec": task_spec,
         }
         self.backlog.put(record["id"], record)
         return record
+
+    @staticmethod
+    def _checked_gate(gate: dict | None) -> dict | None:
+        if gate is None:
+            return None
+        if not isinstance(gate, dict):
+            raise StoreError("Backlog gate must be an object")
+        kind = gate.get("kind")
+        if kind == "manual":
+            return {"kind": "manual", "condition": str(gate.get("condition") or "")}
+        if kind == "date":
+            try:
+                moment = datetime.fromisoformat(str(gate.get("not_before") or ""))
+            except ValueError:
+                raise StoreError("Backlog date gate needs ISO not_before") from None
+            if moment.tzinfo is None:
+                raise StoreError("Backlog date gate needs a timezone-aware ISO time")
+            return {"kind": "date", "not_before": moment.isoformat()}
+        if kind == "inbox_decision":
+            item_id = gate.get("item_id")
+            if not isinstance(item_id, str) or not item_id.strip():
+                raise StoreError("Backlog decision gate needs an inbox item_id")
+            return {"kind": "inbox_decision", "item_id": item_id.strip()}
+        raise StoreError(f"Unknown backlog gate kind: {kind!r}")
+
+    @staticmethod
+    def _checked_task_spec(task_spec: dict) -> None:
+        if not isinstance(task_spec, dict):
+            raise StoreError("Backlog task_spec must be an object")
+        if not str(task_spec.get("title") or "").strip() or not isinstance(
+            task_spec.get("body"), str
+        ):
+            raise StoreError("Backlog task_spec needs a title and a string body")
+
+    def backlog_gate_open(self, item_id: str) -> tuple[bool, str]:
+        """True when a backlog item's gate currently permits promotion."""
+        record = self.backlog.get(item_id)
+        if record is None:
+            raise StoreError("Backlog item not found")
+        gate = record.get("gate") or {"kind": "manual"}
+        kind = gate.get("kind")
+        if kind == "manual":
+            return True, "manual gate opens on owner click"
+        if kind == "date":
+            moment = datetime.fromisoformat(gate["not_before"])
+            now = datetime.now(UTC)
+            if now >= moment:
+                return True, f"date gate passed {gate['not_before']}"
+            return False, f"date gate opens {gate['not_before']}"
+        if kind == "inbox_decision":
+            linked = self.inbox.get(gate.get("item_id", ""))
+            if linked is not None and linked.get("status") in ("answered", "closed"):
+                return True, f"decision {gate['item_id'][:8]} resolved"
+            return False, f"awaiting decision {gate.get('item_id', '')[:8]}"
+        return False, f"unknown gate kind {kind!r}"
+
+    def promote_backlog_to_task(self, item_id: str) -> dict:
+        """Promote a gated backlog item straight to an agent task (no brief).
+
+        Refuses closed gates and re-promotion while the linked task is
+        still open; the created task flows through the normal bridge.
+        """
+        record = self.backlog.get(item_id)
+        if record is None:
+            raise StoreError("Backlog item not found")
+        if record.get("status") in ("doing", "done", "dropped"):
+            raise StoreError(f"Backlog item is {record.get('status')}")
+        task_spec = record.get("task_spec")
+        if task_spec is None:
+            raise StoreError("Backlog item has no task_spec to promote")
+        open_now, reason = self.backlog_gate_open(item_id)
+        if not open_now:
+            raise StoreError(f"Backlog gate closed: {reason}")
+        if record.get("inbox_id") is not None:
+            linked = self.inbox.get(record["inbox_id"])
+            if linked is not None and linked.get("status") == "open":
+                raise StoreError("Backlog item already has an open task")
+        task = self.create_inbox_task(
+            title=str(task_spec.get("title")),
+            body=str(task_spec.get("body", "")),
+            task_type="task",
+            created_by="supervisor",
+            assignee="agent",
+            metadata={"backlog_id": item_id},
+        )
+        record["inbox_id"] = task["id"]
+        record["status"] = "doing"
+        record["reviewed_at"] = _utc_now()
+        self.backlog.put(item_id, record)
+        return {"item": record, "task": task}
+
+    def promote_open_backlog(self) -> list[dict]:
+        """Auto-promote backlog items whose non-manual gates opened."""
+        promoted = []
+        items, _total = self.backlog.list(limit=1000)
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            if item.get("status") in ("doing", "done", "dropped"):
+                continue
+            gate = item.get("gate") or {"kind": "manual"}
+            if gate.get("kind") == "manual" or item.get("task_spec") is None:
+                continue
+            open_now, _reason = self.backlog_gate_open(item["id"])
+            if not open_now:
+                continue
+            try:
+                result = self.promote_backlog_to_task(item["id"])
+            except StoreError:
+                continue
+            promoted.append(result["item"])
+        return promoted
 
     def set_backlog_status(self, item_id: str, *, status: str, decision: str | None = None) -> dict:
         """Groom one backlog item; the record stays as the audit trail."""

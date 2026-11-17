@@ -260,6 +260,48 @@ def test_backlog_capture_filter_groom_promote(dashboard_server) -> None:
         post_json(dashboard_server, f"/api/backlog/{made['id']}/promote", {})
 
 
+def test_backlog_to_task_creates_agent_task(dashboard_server) -> None:
+    made = post_json(
+        dashboard_server,
+        "/api/backlog",
+        {
+            "title": "Probe X",
+            "body": "plan",
+            "source": "agent",
+            "gate": {"kind": "manual", "condition": "owner click"},
+            "task_spec": {"title": "Probe X now", "body": "do it"},
+        },
+    )
+    assert made["ok"] is True
+    out = post_json(dashboard_server, f"/api/backlog/{made['id']}/to-task", {})
+    assert out["task_id"]
+    task = get_json(dashboard_server, f"/api/inbox/{out['task_id']}")
+    assert task["item"]["assignee"] == "agent"
+    assert task["item"]["status"] == "open"
+    with pytest.raises(HTTPError) as raised:
+        post_json(dashboard_server, f"/api/backlog/{made['id']}/to-task", {})
+    assert raised.value.code in (400, 409)
+    raised.value.close()
+
+
+def test_backlog_to_task_refuses_closed_gate(dashboard_server) -> None:
+    made = post_json(
+        dashboard_server,
+        "/api/backlog",
+        {
+            "title": "Later",
+            "body": "b",
+            "source": "agent",
+            "gate": {"kind": "date", "not_before": "2999-01-01T00:00:00+00:00"},
+            "task_spec": {"title": "t", "body": "b"},
+        },
+    )
+    with pytest.raises(HTTPError) as raised:
+        post_json(dashboard_server, f"/api/backlog/{made['id']}/to-task", {})
+    assert raised.value.code == 409
+    raised.value.close()
+
+
 def test_review_refuses_dangling_plan_link(dashboard_server) -> None:
     """Review with a ghost plan_id fails; stores tests cover the link itself."""
     made = post_json(

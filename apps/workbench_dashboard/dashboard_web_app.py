@@ -1230,6 +1230,9 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             if path.startswith("/api/backlog/") and path.endswith("/promote"):
                 item_id = path[len("/api/backlog/") : -len("/promote")]
                 return self._promote_backlog_item(item_id, payload)
+            if path.startswith("/api/backlog/") and path.endswith("/to-task"):
+                item_id = path[len("/api/backlog/") : -len("/to-task")]
+                return self._promote_backlog_to_task(item_id)
             if path.startswith("/api/invoices/") and path.endswith("/review"):
                 item_id = path[len("/api/invoices/") : -len("/review")]
                 return self._review_invoice(item_id, payload)
@@ -2270,7 +2273,12 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             return self._send_json({"ok": False, "error": "ref must be a string"}, status=400)
         try:
             record = self._stores().create_backlog_item(
-                title=title, body=body, source=source, ref=ref
+                title=title,
+                body=body,
+                source=source,
+                ref=ref,
+                gate=payload.get("gate"),
+                task_spec=payload.get("task_spec"),
             )
         except StoreError as exc:
             return self._send_json({"ok": False, "error": str(exc)}, status=400)
@@ -2408,6 +2416,20 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             code = 404 if "not found" in str(exc).lower() else 400
             return self._send_json({"ok": False, "error": str(exc)}, status=code)
         self._send_json({"ok": True, "id": result["item"]["id"], "inbox_id": result["inbox"]["id"]})
+
+    def _promote_backlog_to_task(self, item_id: str) -> None:
+        try:
+            result = self._stores().promote_backlog_to_task(item_id)
+        except StoreError as exc:
+            message = str(exc).lower()
+            if "not found" in message:
+                code = 404
+            elif "gate closed" in message or "open task" in message:
+                code = 409
+            else:
+                code = 400
+            return self._send_json({"ok": False, "error": str(exc)}, status=code)
+        self._send_json({"ok": True, "id": result["item"]["id"], "task_id": result["task"]["id"]})
 
     def _review_idea(self, item_id: str, payload: dict) -> None:
         status = payload.get("status", "")
@@ -3368,6 +3390,13 @@ def maybe_start_drain_scheduler(
             bridged = []
         if bridged:
             print(f"Workbench dashboard: bridged {len(bridged)} inbox tasks to runs")
+        try:
+            promoted = stores.promote_open_backlog()
+        except Exception as exc:  # noqa: BLE001 - tick failures are never fatal
+            print(f"Workbench dashboard: backlog auto-promote failed: {exc}")
+            promoted = []
+        if promoted:
+            print(f"Workbench dashboard: auto-promoted {len(promoted)} backlog items")
         paused = drain_pause_state(stores)
         if paused is not None:
             print(f"Workbench dashboard: scheduled drain paused: {paused['reason']}")

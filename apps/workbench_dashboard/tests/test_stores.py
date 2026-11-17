@@ -321,6 +321,52 @@ def test_pointer_router_stale_when_task_gone(stores) -> None:
     assert stores.attention_inbox_count() == 0
 
 
+def test_backlog_gate_manual_promotes_to_agent_task(stores) -> None:
+    item = stores.create_backlog_item(
+        title="Probe X",
+        body="plan",
+        gate={"kind": "manual", "condition": "owner says go"},
+        task_spec={"title": "Probe X now", "body": "do it"},
+    )
+    assert item["gate"]["kind"] == "manual"
+    result = stores.promote_backlog_to_task(item["id"])
+    assert result["item"]["status"] == "doing"
+    task = stores.inbox.get(result["item"]["inbox_id"])
+    assert task["assignee"] == "agent" and task["status"] == "open"
+    assert task["title"] == "Probe X now"
+
+
+def test_backlog_gate_date_and_decision(stores) -> None:
+    future = stores.create_backlog_item(
+        title="F",
+        body="b",
+        gate={"kind": "date", "not_before": "2999-01-01T00:00:00+00:00"},
+        task_spec={"title": "t", "body": "b"},
+    )
+    with pytest.raises(StoreError, match="gate closed"):
+        stores.promote_backlog_to_task(future["id"])
+    past = stores.create_backlog_item(
+        title="P",
+        body="b",
+        gate={"kind": "date", "not_before": "2020-01-01T00:00:00+00:00"},
+        task_spec={"title": "t", "body": "b"},
+    )
+    promoted = stores.promote_open_backlog()
+    assert [p["id"] for p in promoted] == [past["id"]]
+    assert stores.backlog.get(past["id"])["status"] == "doing"
+    assert stores.backlog.get(future["id"])["status"] == "proposed"
+
+
+def test_backlog_gate_rejects_bad_gates(stores) -> None:
+    with pytest.raises(StoreError, match="gate"):
+        stores.create_backlog_item(title="X", body="b", gate={"kind": "nope"})
+    with pytest.raises(StoreError, match="gate"):
+        stores.create_backlog_item(title="X", body="b", gate={"kind": "date"})
+    item = stores.create_backlog_item(title="X", body="b")
+    with pytest.raises(StoreError, match="task_spec"):
+        stores.promote_backlog_to_task(item["id"])
+
+
 def test_queue_pointer_run_prefiled_and_runnable(stores) -> None:
     from e2e_promotion import queue_pointer_run
 
