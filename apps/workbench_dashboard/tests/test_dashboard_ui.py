@@ -1250,3 +1250,10 @@ assert.match(drainSchedulerText({started: true, errors: 2, last_error: 'RuntimeE
     js = _read("app.js")
     assert 'drainStatus = (await api("/api/status")).drain_scheduler' in js
     assert "${esc(drainSchedulerText(drainStatus))}" in js
+
+
+def test_projects_goals_carry_registry_provenance() -> None:
+    """Goals section names its source so static entries don't look hard-coded."""
+    js = _read("app.js")
+    assert "docs/goals/registry.json" in js
+    assert "registered project directories appear under Work roots" in js
