@@ -120,7 +120,7 @@ def test_add_rejects_bad_provenance(tmp_path) -> None:
     with pytest.raises(ValueError, match="source_file"):
         store.add("skills", "Python", "import", source_file="   ")
     with pytest.raises(ValueError, match="source_file"):
-        store.add("skills", "Python", "import", source_file=123)
+        store.add("skills", "Python", "import", source_file=123)  # type: ignore[arg-type]
     blank_origin = store.add("skills", "Python", "import", origin_text="  ")
     assert blank_origin.origin_text is None
     assert store.count() == 1
