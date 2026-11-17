@@ -1261,6 +1261,16 @@ def test_projects_goals_carry_registry_provenance() -> None:
     assert "registered project directories appear under Work roots" in js
 
 
+def test_inbox_project_filter_lives_in_url() -> None:
+    """Project filter is URL state so bare #/inbox shows the badge set."""
+    js = _read("app.js")
+    assert "inboxProjectFilter" not in js
+    assert 'get("project")' in js
+    assert 'params.set("project"' in js
+    assert "params.delete" in js
+    assert "params.toString()" in js
+
+
 def test_allowance_empty_states_are_honest() -> None:
     """Empty buckets explain themselves instead of rendering blank."""
     js = _read("app.js")

@@ -169,16 +169,19 @@ function filterBoxes(id, groups, picked) {
 function bindFilterBoxes(id, base, param) {
   view.querySelectorAll(`#${id} input[data-f]`).forEach((b) => b.addEventListener("change", () => {
     const on = [...view.querySelectorAll(`#${id} input[data-f]:checked`)].map((x) => x.dataset.f);
-    location.hash = "#/" + base + "?" + param + "=" + on.join(",");
+    const params = new URLSearchParams(location.hash.split("?")[1] || "");
+    params.set(param, on.join(","));
+    location.hash = "#/" + base + "?" + params.toString();
   }));
 }
 function pickedTokens(param, fallback) {
   return new Set(((new URLSearchParams(location.hash.split("?")[1] || "").get(param) ?? fallback).split(",").filter(Boolean)));
 }
 
-/* Project filter shared by the Runs and Inbox list views. */
+/* Project filter shared by the Runs and Inbox list views. Runs keeps
+   module state; inbox carries it in the URL so a bare #/inbox link —
+   including the nav badge — always shows the badge-matching set. */
 let runsProjectFilter = "";
-let inboxProjectFilter = "";
 async function projectOptions(selected) {
   try {
     const data = await api("/api/projects");
@@ -1703,7 +1706,8 @@ async function renderInbox(id) {
     return;
   }
   const picked = pickedTokens("f", "human,open,followup");
-  const inboxUrl = inboxProjectFilter ? "/api/inbox?project_id=" + encodeURIComponent(inboxProjectFilter) : "/api/inbox";
+  const inboxProj = new URLSearchParams(location.hash.split("?")[1] || "").get("project") || "";
+  const inboxUrl = inboxProj ? "/api/inbox?project_id=" + encodeURIComponent(inboxProj) : "/api/inbox";
   const payload = await api(inboxUrl);
   const isFollowup = (t) => (t.resolution_kind || "final") !== "final";
   const who = (t) => t.assignee === "agent" ? "ai" : "human";
@@ -1725,11 +1729,15 @@ async function renderInbox(id) {
   view.innerHTML = `<h1>Inbox</h1>
     ${filterBoxes("inbox-filters", groups, picked)}
     <p><input type="text" id="filter-inbox" placeholder="Filter tasks..." title="Filter inbox by text">
-    <select id="filter-inbox-project" title="Show inbox tasks for one project">${await projectOptions(inboxProjectFilter)}</select></p>
+    <select id="filter-inbox-project" title="Show inbox tasks for one project">${await projectOptions(inboxProj)}</select></p>
     <ul class="plain" id="inbox-list">${items}</ul>`;
   document.getElementById("filter-inbox").addEventListener("input", (ev) => filterList("inbox-list", ev.target.value));
   document.getElementById("filter-inbox-project").addEventListener("change", (ev) => {
-    inboxProjectFilter = ev.target.value; renderInbox();
+    const params = new URLSearchParams(location.hash.split("?")[1] || "");
+    if (ev.target.value) params.set("project", ev.target.value);
+    else params.delete("project");
+    const query = params.toString();
+    location.hash = "#/inbox" + (query ? "?" + query : "");
   });
   bindFilterBoxes("inbox-filters", "inbox", "f");
 }
