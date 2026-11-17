@@ -35,6 +35,7 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/logging-artifact-inventory.md | KNOWLEDGE | Artifact inventory. |
 | docs/mail-digest.md | KNOWLEDGE | Mail digest reference. |
 | docs/muse-code-workbench-parity.md | KNOWLEDGE | Parity verdict (kept). |
+| docs/muse-window-recovery.md | KNOWLEDGE | Window-loss capture/recovery runbook; watchdog section predates v2 auto-restore (fa064c4). |
 | docs/overlap-analysis-20261110.md | KNOWLEDGE | Measured package graph + clone dispositions; layering decision open, AGENTS.md diagram contradiction noted. |
 | docs/parallel-pilot-20261101.md | KNOWLEDGE | Two-worker pilot record. |
 | docs/pivot-20261106-redundancy-automation.md | ACTED | Both briefs closed (11878f14, 98ea222c). |

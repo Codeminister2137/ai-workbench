@@ -1,5 +1,23 @@
 # Session History
 
+## 2026-11-17 ~01:35 - STOPPED with push blocked on red gate (01a1e5ab)
+
+Owner ordered stop (sleep); resume per CURRENT_CONTEXT.md. Shipped since
+delegation C: restrictions fan-out defaults (48aae57), schedule copy
+(fdba3f1), spend→fleet merge (662a24f), regression behavior-matching per
+brief-B (2ccd4c6), doc pins per filter UX (1219fb6, last pushed), agent-
+verified CLI checks per brief 492fc69a-A (b11935d, UNPUSHED), test-group
+registration f2a5cc7 (UNPUSHED; pre-push hook rejects unassigned test
+modules — tests/test_forgotten_sweep.py + tests/test_window_watch_restore.py
+were committed without GROUPS entries). Push of 4 commits FAILED: full-
+suite hook `workspace 286 FAIL(1)` in 772s; failing test unknown (cli
+bisect terminated by stop order). Standalone gates green (dashboard 601,
+pyright, ruff, node --check). E2E meta-analysis: 48-note corpus triaged;
+8 agent follow-up runs completed EMPTY (no min-work guard in
+agent_executor.py), 20 queued, badge 5v4 = filter artifact, diacritics =
+generic Mai exit-1, receipt readability unaddressed, re-test loop ~unmet.
+Brief 73276c85 answered B (defer; models first). Serve @1219fb6.
+
 ## 2026-11-16 - Delegation C approved + implemented (01a1e5ab cont.)
 
 Owner chose C from the grill brief. Shipped e17d73d (Tier 3): bridge
