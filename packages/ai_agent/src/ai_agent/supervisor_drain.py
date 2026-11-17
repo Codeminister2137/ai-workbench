@@ -84,8 +84,10 @@ def _completion_note(run: dict) -> str:
     Leads with the run title (never a bare id) plus the summary or
     session output excerpt; the full report stays on the run record.
     """
-    title = run.get("title") if isinstance(run.get("title"), str) else "untitled"
-    run_id = run.get("id") if isinstance(run.get("id"), str) else "?"
+    raw_title = run.get("title")
+    title = raw_title if isinstance(raw_title, str) else "untitled"
+    raw_id = run.get("id")
+    run_id = raw_id if isinstance(raw_id, str) else "?"
     findings = ""
     receipts = run.get("receipts")
     if isinstance(receipts, list):
