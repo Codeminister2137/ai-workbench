@@ -14,6 +14,57 @@ def _read(name: str) -> str:
     return (WEB_DIR / name).read_text(encoding="utf-8")
 
 
+def test_knowme_groups_entries_without_rewriting_facts() -> None:
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node is required for KnowMe rendering")
+    driver = r"""
+const assert = require('assert');
+const source = require('fs').readFileSync(process.argv[1], 'utf8');
+const renderer = source.slice(source.indexOf('async function renderKnowme()'),
+  source.indexOf('async function renderRestrictions()'));
+const esc = eval('(' + source.slice(source.indexOf('function esc('),
+  source.indexOf('\n}', source.indexOf('function esc(')) + 2) + ')');
+const view = {innerHTML: ''};
+const location = {hash: '#/knowme'};
+let entries = [
+  {category: 'career', text: 'Earlier role', source: 'import'},
+  {category: 'skills', text: 'Python\nSQL <script>', source: '<import>'},
+  {category: 'note', text: 'Unclassified fact', source: 'note'},
+  {category: 'skills', text: 'Testing', source: 'interview'},
+];
+let requested;
+const api = async (path) => {requested = path; return {count: 70, entries};};
+eval(renderer);
+(async () => {
+  await renderKnowme();
+  const html = view.innerHTML;
+  assert(html.indexOf('<h2>Skills (2)') < html.indexOf('<h2>Career path (1)'));
+  assert(html.indexOf('<h2>Career path (1)') < html.indexOf('<h2>Notes (1)'));
+  assert(html.indexOf('Python') < html.indexOf('Testing'));
+  assert(html.includes('Python\nSQL &lt;script&gt;'));
+  assert(html.includes('Source: &lt;import&gt;'));
+  assert(html.includes('Showing 4 of 70'));
+  assert.equal((html.match(/<li>/g) || []).length, 4);
+  location.hash = '#/knowme?category=skills';
+  entries = entries.filter(e => e.category === 'skills');
+  await renderKnowme();
+  assert.equal(requested, '/api/knowme?category=skills');
+  assert(view.innerHTML.includes('aria-current="page">Skills'));
+  assert(!view.innerHTML.includes('<h2>Career path'));
+  entries = [];
+  await renderKnowme();
+  assert(view.innerHTML.includes('No entries in this view'));
+  assert(!view.innerHTML.includes('<section'));
+})().catch(error => {console.error(error); process.exitCode = 1;});
+"""
+    result = subprocess.run(
+        [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
+    )
+    assert result.returncode == 0, result.stderr
+    assert "white-space: pre-wrap" in _read("app.css")
+
+
 def test_create_menu_hidden_rule_collapses_menu() -> None:
     """The author `display: flex` must not override the `hidden` attribute."""
     css = _read("app.css")

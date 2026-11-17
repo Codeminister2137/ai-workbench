@@ -4,6 +4,12 @@ Local-first personal knowledge bank. One SQLite store holds training notes,
 diet logs, preferences, and other self-knowledge; consumers (trainer, diet,
 career) read it instead of keeping private copies.
 
+The dashboard groups entries into labelled lists, with Skills and Career path
+first. Filters select a single category. Saved text and line breaks are preserved;
+entries within each section remain newest-added first, not a dated career timeline.
+Existing notes are not automatically reclassified. The view reports how many
+entries are shown out of the bank total (the API returns up to 50 by default).
+
 No network, no accounts, no telemetry. The database lives where you point it
 (default: `data/knowme.sqlite3` under the current directory).
 
