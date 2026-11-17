@@ -1825,6 +1825,12 @@ async function renderInbox(id) {
     return s;
   };
   const shown = payload.items.filter((t) => picked.has(who(t)) && states(t).some((s) => picked.has(s)));
+  const isAttention = (t) => who(t) === "human"
+    && ((t.status || "open") === "open" || t.status === "answered" || isFollowup(t));
+  const hiddenCount = payload.items.filter((t) => isAttention(t) && !shown.includes(t)).length;
+  const divergence = hiddenCount || inboxProj
+    ? `<p class="muted"><strong>${hiddenCount ? hiddenCount + " attention item" + (hiddenCount === 1 ? "" : "s") + " hidden by filters. " : ""}${inboxProj ? "Project filter active — the badge counts all projects. " : ""}</strong><a href="#/inbox">Show all</a></p>`
+    : "";
   const items = shown.length
     ? shown.map((t) =>
         `<li><a href="#/inbox/${esc(t.id)}">${gtext(t.title)}</a>
@@ -1835,6 +1841,7 @@ async function renderInbox(id) {
     ["State", [["open", "Open", "Not yet answered"], ["answered", "Answered", "Answered, awaiting close"], ["followup", "Needs follow-up", "Closed or open with follow-up requested"], ["closed", "Closed", "Archived tasks"]]],
   ];
   view.innerHTML = `<h1>Inbox</h1>
+    ${divergence}
     ${filterBoxes("inbox-filters", groups, picked)}
     <p><input type="text" id="filter-inbox" placeholder="Filter tasks..." title="Filter inbox by text">
     <select id="filter-inbox-project" title="Show inbox tasks for one project">${await projectOptions(inboxProj)}</select></p>
