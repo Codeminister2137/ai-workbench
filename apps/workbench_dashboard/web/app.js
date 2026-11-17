@@ -1004,6 +1004,7 @@ async function renderProjects(id) {
      <span class="muted">${esc(a.project)} · ${(a.reasons || []).map(esc).join("; ")}</span></li>`).join("");
   view.innerHTML = `<h1>Projects</h1>
     <h2>Goals</h2>
+    <p class="muted">Curated repository goals from docs/goals/registry.json and their goal documents. These describe roadmap work; registered project directories appear under Work roots.</p>
     <ul class="plain" id="goals-list">${goals || '<li class="muted">No goal registry found.</li>'}</ul>
     ${attention ? `<h2>Plan attention</h2><ul class="plain" id="attention-list">${attention}</ul>` : ""}
     <h2>Work roots</h2>
