@@ -1,5 +1,18 @@
 # Session History
 
+## 2026-11-17 loop 09:20-11:35 UTC - Queue repair + E2E strengthening, pushed 45 (01a1e5ab)
+
+Gaming loop (owner: GPU models are the constraint, CPU tests fine; corrected mid-loop).
+Shipped+pushed 7d3b2cd (hook green): Mai budget 96k, session-output reports, loop no-work
+guard, worktree retry-reuse, company-site E2E area, workflow stuck fix (null node-choice),
+spend→Providers reversal (owner correction), run-name cut, filter-memory URL (agent),
+dedup --retest, KnowMe grouping (agent, reviewed), drain status line (agent), roundtrip
+test, provenance line, fleet cache (4.2s→0s), md reports, sweep R1/E1 holes, drain
+cancel-before-approval, finalize runnable derivation, submit auto-checks (brief A),
+loop_status encoding. Triaged 09:27 + 11:08 owner verdicts live. R5: 5 cancels.
+7 stale sweep items closed. Queue cleared to 0. Owner correction recorded: report
+completion, never park-to-cutoff (watcher removed); AGENTS.md gaming rule fixed.
+
 ## 2026-11-17 morning - Gate green, brief-B models, E2E dispositions, loop plan (01a1e5ab)
 
 Red gate was pre-existing: docs/muse-window-recovery.md lacked a ledger row
