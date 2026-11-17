@@ -9,6 +9,17 @@ def stores(tmp_path):
     return DashboardStores(tmp_path / "data")
 
 
+def test_attention_inbox_counts_answered_owner(stores) -> None:
+    record = stores.create_inbox_task(
+        title="Q?", body="b", task_type="decision", options=["A", "B"], assignee="owner"
+    )
+    assert stores.attention_inbox_count() == 1
+    stores.answer_inbox_task(record["id"], answer="", option_index=0)
+    assert stores.attention_inbox_count() == 1
+    stores.create_inbox_task(title="work", body="b", task_type="task", assignee="agent")
+    assert stores.attention_inbox_count() == 1
+
+
 def test_attention_e2e_counts_open_only_not_drafts(stores) -> None:
     items = [{"id": "a", "behavior": "b", "kind": "behavior", "area": "dashboard"}]
     open_task = stores.create_e2e_task(merge_commit="aaa", title="open", items=items)
@@ -86,6 +97,20 @@ def test_idea_capture_and_triage(stores) -> None:
     assert reviewed["status"] == "adopted"
     assert reviewed["decision"] == "Prototype it"
     assert stores.new_idea_count() == 0
+
+
+def test_idea_count_includes_stale_reviewing(stores) -> None:
+    from datetime import UTC, datetime, timedelta
+
+    fresh = stores.create_idea(title="fresh", body="b", source="owner")
+    stores.set_idea_status(fresh["id"], status="reviewing")
+    assert stores.new_idea_count() == 0
+    old = stores.create_idea(title="old", body="b", source="owner")
+    record = stores.ideas.get(old["id"])
+    record["created_at"] = (datetime.now(UTC) - timedelta(days=9)).isoformat()
+    record["status"] = "reviewing"
+    stores.ideas.put(old["id"], record)
+    assert stores.new_idea_count() == 1
 
 
 def test_idea_create_validates_source_and_title(stores) -> None:

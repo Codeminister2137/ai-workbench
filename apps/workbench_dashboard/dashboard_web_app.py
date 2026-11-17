@@ -1756,6 +1756,17 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 for item in self._stores().attention_inbox_items()
                 if item.get("id") not in seen
             ]
+        runs, _total = self._stores().runs.list(limit=1000)
+        latest: dict[str, str] = {}
+        for run in runs:
+            if not isinstance(run, dict):
+                continue
+            key = run.get("bridged_from") or run.get("inbox_id")
+            if key and key not in latest:
+                latest[key] = str(run.get("status") or "")
+        for item in items:
+            if isinstance(item, dict):
+                item["run_status"] = latest.get(item.get("id", "")) or None
         self._send_json({"ok": True, "items": items, "total": len(items)})
 
     @staticmethod

@@ -165,6 +165,20 @@ def test_inbox_flow_and_token_gate(dashboard_server, tmp_path) -> None:
     assert gated["ok"] is True
 
 
+def test_inbox_list_carries_run_status(dashboard_server, tmp_path) -> None:
+    from dashboard_stores import DashboardStores
+
+    stores = DashboardStores(tmp_path / "data")
+    item = stores.create_inbox_task(title="work", body="b", task_type="task", assignee="agent")
+    stores.runs.put(
+        "run-1",
+        {"id": "run-1", "title": "t", "status": "running", "bridged_from": item["id"]},
+    )
+    payload = get_json(dashboard_server, "/api/inbox")
+    rows = {entry["id"]: entry for entry in payload["items"]}
+    assert rows[item["id"]]["run_status"] == "running"
+
+
 def test_inbox_list_includes_attention_beyond_newest_cutoff(dashboard_server, tmp_path) -> None:
     from dashboard_stores import DashboardStores
 
