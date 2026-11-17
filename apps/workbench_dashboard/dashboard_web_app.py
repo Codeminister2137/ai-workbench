@@ -2761,7 +2761,13 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         except StagedEditError as exc:
             return self._send_json({"ok": False, "error": str(exc)}, status=400)
         outcomes = drain.drain(max_runs=max_runs)
-        self._send_json({"ok": True, "outcomes": outcomes})
+        try:
+            from e2e_promotion import route_pointer_runs
+
+            routed = route_pointer_runs(stores)
+        except Exception as exc:  # noqa: BLE001 - routing never breaks drain
+            routed = [{"action": "error", "error": str(exc)[:200]}]
+        self._send_json({"ok": True, "outcomes": outcomes, "routed": routed})
 
     def _cancel_run(self, run_id: str) -> None:
         try:
@@ -3369,6 +3375,15 @@ def maybe_start_drain_scheduler(
         drain = build_run_drain(config, data_dir, drain_root, stores)
         outcomes = drain.drain(max_runs=SCHEDULER_DRAIN_MAX_RUNS)
         print(f"Workbench dashboard: scheduled drain: {outcomes}")
+        try:
+            from e2e_promotion import route_pointer_runs
+
+            routed = route_pointer_runs(stores)
+        except Exception as exc:  # noqa: BLE001 - tick failures are never fatal
+            print(f"Workbench dashboard: pointer routing failed: {exc}")
+            routed = []
+        if routed:
+            print(f"Workbench dashboard: routed pointer runs: {routed}")
 
     scheduler = DrainScheduler(tick, config.drain_interval_seconds)
     scheduler.start()

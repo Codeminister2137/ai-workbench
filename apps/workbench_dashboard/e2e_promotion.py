@@ -18,7 +18,9 @@ per-merge theater for Tier 1 changes.
 from __future__ import annotations
 
 import hashlib
+import json
 import subprocess
+import uuid
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -694,3 +696,137 @@ def promotion_verdict(merge_commit: str, reports: Sequence[dict]) -> GateVerdict
     if latest.get("overall") == "pass":
         return GateVerdict(True, f"E2E passed for {merge_commit}")
     return GateVerdict(False, f"E2E {latest.get('overall')} for {merge_commit}")
+
+
+POINTER_RUN_KIND = "e2e-pointers"
+POINTER_TERMINAL = frozenset({"completed", "failed", "cancelled"})
+
+
+def pointer_body(merge: str, unclear: list[dict]) -> str:
+    """Clarification text for unclear behaviors (owner or agent prompt tail)."""
+    lines = [
+        f"The E2E generator could not determine concrete checks for {merge}.",
+        "Reply with what to verify for each behavior (what to click, what to expect);",
+        "the draft checklist finalizes once pointers land. Evidence the generator saw:",
+        "",
+    ]
+    for item in unclear:
+        lines.append(f"- {item.get('behavior')} ({item.get('id')})")
+        for subject in item.get("what", [])[:4]:
+            lines.append(f"  what: {subject}")
+        for path in item.get("files", [])[:8]:
+            lines.append(f"  file: {path}")
+    return "\n".join(lines)
+
+
+def pointer_mission(merge: str, task_id: str, unclear: list[dict]) -> str:
+    """Read-only pointers mission for the agent run (first, before the owner)."""
+    return (
+        "Author checkable E2E steps for the draft checklist below. READ-ONLY: "
+        "inspect the merge diff and the served dashboard if needed; change no code.\n\n"
+        f"Merge: {merge}\nTask: {task_id}\n\n"
+        + pointer_body(merge, unclear)
+        + "\n\nReply in your run summary, FIRST LINE ONLY, one of:\n"
+        'STEPS:{"<item-id>": [{"action": "...", "expected": "..."}], ...}\n'
+        "DECLINE:<one-line reason>\n"
+        "Every unclear item id needs at least one step; keep actions concrete "
+        "(view hashes, control names, commands). If the change is not "
+        "verifiable from any user surface, DECLINE instead of guessing."
+    )
+
+
+def queue_pointer_run(stores, merge: str, task_id: str, unclear: list[dict]) -> dict:
+    """Queue a preapproved agent run to author pointers (human escalation last)."""
+    run_id = uuid.uuid4().hex
+    now = datetime.now(UTC).isoformat()
+    run = {
+        "id": run_id,
+        "title": f"E2E pointers: {merge}",
+        "status": "queued",
+        "body": pointer_mission(merge, task_id, unclear),
+        "origin": POINTER_RUN_KIND,
+        "fanout_policy": "restricted",
+        "fanout_effective": "restricted",
+        "approval_mode": "e2e-followup",
+        "inbox_id": None,
+        "project_id": None,
+        "plan_id": None,
+        "created_at_utc": now,
+        "updated_at_utc": now,
+        "metadata": {
+            "kind": POINTER_RUN_KIND,
+            "task_id": task_id,
+            "merge": merge,
+            "unclear": unclear,
+        },
+    }
+    stores.runs.put(run_id, run)
+    return run
+
+
+def file_owner_pointers(stores, merge: str, unclear: list[dict]) -> dict:
+    """File the owner pointer request (agent declined, failed, or invalid)."""
+    return stores.create_inbox_task(
+        title=f"E2E pointers needed: {merge}",
+        body=pointer_body(merge, unclear),
+        task_type="clarification",
+        created_by="supervisor",
+        assignee="owner",
+        metadata={"merge_commit": merge, "kind": "e2e-pointers"},
+    )
+
+
+def _pointer_steps(summary: str) -> dict | None:
+    """Parse the agent's first-line verdict; None means escalate to the owner."""
+    first = (summary or "").splitlines()[0] if (summary or "").strip() else ""
+    if first.startswith("STEPS:"):
+        try:
+            steps = json.loads(first[len("STEPS:") :])
+        except ValueError:
+            return None
+        return steps if isinstance(steps, dict) else None
+    return None
+
+
+def route_pointer_runs(stores) -> list[dict]:
+    """Route terminal pointer runs: finalize on valid steps, else escalate.
+
+    Called after every drain (manual + scheduled). Each run routes once
+    (metadata.routed); invalid agent output escalates like a decline —
+    the owner path is today's behavior, never a new failure mode.
+    """
+    outcomes = []
+    runs, _total = stores.runs.list(limit=1000)
+    for run in runs:
+        if not isinstance(run, dict):
+            continue
+        metadata = run.get("metadata") or {}
+        if metadata.get("kind") != POINTER_RUN_KIND:
+            continue
+        if run.get("status") not in POINTER_TERMINAL or metadata.get("routed"):
+            continue
+        task_id = metadata.get("task_id")
+        merge = metadata.get("merge", "")
+        unclear = metadata.get("unclear") or []
+        record = stores.e2e_tasks.get(task_id) if task_id else None
+        if record is None or record.get("status") != "draft":
+            action = "stale"
+        else:
+            action = "escalated"
+            if run.get("status") == "completed":
+                receipts = run.get("receipts") or []
+                summary = receipts[-1].get("summary", "") if receipts else ""
+                steps = _pointer_steps(summary)
+                if steps:
+                    try:
+                        stores.finalize_e2e_task(task_id, steps)
+                        action = "finalized"
+                    except Exception:  # noqa: BLE001 - bad steps escalate, never crash drain
+                        pass
+            if action == "escalated":
+                file_owner_pointers(stores, merge, unclear)
+        metadata["routed"] = action
+        run["metadata"] = metadata
+        stores.runs.put(run["id"], run)
+        outcomes.append({"run_id": run["id"], "action": action, "task_id": task_id})
+    return outcomes

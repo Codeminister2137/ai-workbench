@@ -216,3 +216,126 @@ def test_close_marks_followup_kind_and_defaults_final(stores) -> None:
 
     with pytest.raises(StoreError, match="resolution kind"):
         stores.close_inbox_task(other["id"], resolution="Again.", resolution_kind="bogus")
+
+
+def _pointer_draft(stores):
+    return stores.create_e2e_task(
+        merge_commit="abc123",
+        title="t",
+        items=[
+            {
+                "id": "behavior:dashboard",
+                "kind": "behavior",
+                "area": "dashboard",
+                "status": "pending",
+                "steps": [{"action": "x", "expected": "y", "grounded": False}],
+                "needs_pointers": True,
+            }
+        ],
+        draft=True,
+    )
+
+
+def _pointer_run(stores, task_id, *, status, summary):
+    run_id = "run-pointer-1"
+    stores.runs.put(
+        run_id,
+        {
+            "id": run_id,
+            "title": "E2E pointers: abc123",
+            "status": status,
+            "approval_mode": "e2e-followup",
+            "metadata": {
+                "kind": "e2e-pointers",
+                "task_id": task_id,
+                "merge": "abc123",
+                "unclear": [
+                    {
+                        "id": "behavior:dashboard",
+                        "behavior": "dashboard views and actions",
+                        "what": ["sub"],
+                        "files": ["apps/workbench_dashboard/web/app.js"],
+                    }
+                ],
+            },
+            "receipts": [{"status": "completed", "summary": summary}],
+        },
+    )
+    return run_id
+
+
+def test_pointer_run_completed_finalizes_task(stores) -> None:
+    from e2e_promotion import route_pointer_runs
+
+    task = _pointer_draft(stores)
+    steps = {"behavior:dashboard": [{"action": "Open X", "expected": "Y renders"}]}
+    import json
+
+    _pointer_run(stores, task["id"], status="completed", summary=f"STEPS:{json.dumps(steps)}")
+    outcomes = route_pointer_runs(stores)
+    assert outcomes == [{"run_id": "run-pointer-1", "action": "finalized", "task_id": task["id"]}]
+    assert stores.e2e_tasks.get(task["id"])["status"] == "open"
+    assert stores.attention_inbox_count() == 0
+
+
+def test_pointer_run_declined_files_owner_item(stores) -> None:
+    from e2e_promotion import route_pointer_runs
+
+    task = _pointer_draft(stores)
+    _pointer_run(stores, task["id"], status="completed", summary="DECLINE: needs human eyes")
+    outcomes = route_pointer_runs(stores)
+    assert outcomes[0]["action"] == "escalated"
+    assert stores.e2e_tasks.get(task["id"])["status"] == "draft"
+    assert stores.attention_inbox_count() == 1
+
+
+def test_pointer_run_failed_files_owner_item(stores) -> None:
+    from e2e_promotion import route_pointer_runs
+
+    task = _pointer_draft(stores)
+    _pointer_run(stores, task["id"], status="failed", summary="")
+    outcomes = route_pointer_runs(stores)
+    assert outcomes[0]["action"] == "escalated"
+    assert stores.attention_inbox_count() == 1
+
+
+def test_pointer_router_skips_routed_and_running(stores) -> None:
+    from e2e_promotion import route_pointer_runs
+
+    task = _pointer_draft(stores)
+    run_id = _pointer_run(stores, task["id"], status="completed", summary="DECLINE: x")
+    assert len(route_pointer_runs(stores)) == 1
+    assert route_pointer_runs(stores) == []
+    run = stores.runs.get(run_id)
+    assert run["metadata"]["routed"] == "escalated"
+
+
+def test_pointer_router_stale_when_task_gone(stores) -> None:
+    from e2e_promotion import route_pointer_runs
+
+    task = _pointer_draft(stores)
+    _pointer_run(stores, task["id"], status="completed", summary="DECLINE: x")
+    stores.e2e_tasks.delete(task["id"])
+    outcomes = route_pointer_runs(stores)
+    assert outcomes[0]["action"] == "stale"
+    assert stores.attention_inbox_count() == 0
+
+
+def test_queue_pointer_run_prefiled_and_runnable(stores) -> None:
+    from e2e_promotion import queue_pointer_run
+
+    task = _pointer_draft(stores)
+    unclear = [
+        {
+            "id": "behavior:dashboard",
+            "behavior": "dashboard views and actions",
+            "what": ["sub"],
+            "files": ["apps/workbench_dashboard/web/app.js"],
+        }
+    ]
+    run = queue_pointer_run(stores, "abc123", task["id"], unclear)
+    assert run["status"] == "queued"
+    assert run["approval_mode"] == "e2e-followup"
+    assert run["metadata"]["kind"] == "e2e-pointers"
+    assert run["metadata"]["task_id"] == task["id"]
+    assert "STEPS:" in run["body"] and "DECLINE:" in run["body"]

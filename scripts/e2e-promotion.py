@@ -48,6 +48,7 @@ from e2e_promotion import (  # noqa: E402
     merge_diff_files,
     merges_between,
     promotion_verdict,
+    queue_pointer_run,
     run_git,
     uncovered_merges,
 )
@@ -245,59 +246,12 @@ def resolve_base(repo: str, merge: str, base: str | None) -> str:
     return run_git(repo, "rev-parse", f"{merge}^1").decode("utf-8").strip()
 
 
-def pointer_body(merge: str, unclear: list[dict]) -> str:
-    """Owner-readable pointer request for behaviors the generator could not ground."""
-    lines = [
-        f"The E2E generator could not determine concrete checks for {merge}.",
-        "Reply with what to verify for each behavior (what to click, what to expect);",
-        "the draft checklist finalizes once pointers land. Evidence the generator saw:",
-        "",
-    ]
-    for item in unclear:
-        lines.append(f"- {item.get('behavior')} ({item.get('id')})")
-        for subject in item.get("what", [])[:4]:
-            lines.append(f"  what: {subject}")
-        for path in item.get("files", [])[:8]:
-            lines.append(f"  file: {path}")
-    return "\n".join(lines)
+def queue_agent_pointers(data_dir: Path, merge: str, task_id: str, unclear: list[dict]) -> str:
+    """Queue the agent pointers run (owner escalation only if it declines)."""
+    from dashboard_stores import DashboardStores
 
-
-def file_pointers(
-    url: str, token: str | None, data_dir: Path, merge: str, unclear: list[dict]
-) -> str:
-    """File one clarification asking the owner how to test unclear behaviors."""
-    payload = {
-        "title": f"E2E pointers needed: {merge}",
-        "body": pointer_body(merge, unclear),
-        "type": "clarification",
-        "created_by": "supervisor",
-        "assignee": "owner",
-        "metadata": {"merge_commit": merge, "kind": "e2e-pointers"},
-    }
-    body = json.dumps(payload).encode("utf-8")
-    request = urllib.request.Request(
-        f"{url.rstrip('/')}/api/inbox",
-        data=body,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    if token:
-        request.add_header("X-Supervisor-Token", token)
-    try:
-        with urllib.request.urlopen(request, timeout=30) as response:
-            return str(json.loads(response.read().decode("utf-8"))["id"])
-    except OSError:
-        from dashboard_stores import DashboardStores
-
-        record = DashboardStores(data_dir).create_inbox_task(
-            title=str(payload["title"]),
-            body=str(payload["body"]),
-            task_type="clarification",
-            created_by="supervisor",
-            assignee="owner",
-            metadata=dict(payload["metadata"]),
-        )
-        return str(record["id"])
+    run = queue_pointer_run(DashboardStores(data_dir), merge, task_id, unclear)
+    return str(run["id"])
 
 
 def cmd_generate(args: argparse.Namespace) -> int:
@@ -357,11 +311,11 @@ def cmd_generate(args: argparse.Namespace) -> int:
     print(f"task: {task_id} pending={pending} items={len(matched['items'])}")
     if unclear:
         try:
-            inbox_id = file_pointers(args.url, args.token, data_dir, args.merge, unclear)
-        except Exception as exc:  # noqa: BLE001 - pointer filing must not lose the draft
-            print(f"error: could not file pointer request: {exc}")
+            run_id = queue_agent_pointers(data_dir, args.merge, task_id, unclear)
+        except Exception as exc:  # noqa: BLE001 - queue failure must not lose the draft
+            print(f"error: could not queue pointers run: {exc}")
             return 1
-        print(f"pointers: {inbox_id} unclear={len(unclear)} (task stays draft)")
+        print(f"pointers: agent run {run_id} unclear={len(unclear)} (task stays draft)")
         return 0
     if pending == 0:
         submitted = submit_task(args.url, task_id, data_dir)
