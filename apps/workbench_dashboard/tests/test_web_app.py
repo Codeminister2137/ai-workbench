@@ -994,6 +994,86 @@ def test_fleet_services_openings_reports_checkout_sha(tmp_path: Path) -> None:
     assert rows["version"] == expect
 
 
+def test_fleet_tasks_caches_live_probes(monkeypatch) -> None:
+    import dashboard_web_app as web
+
+    calls: list[int] = []
+    row = {
+        "name": "T",
+        "present": True,
+        "state": "Ready",
+        "last_run": None,
+        "next_run": None,
+        "last_result": 0,
+    }
+
+    class Done:
+        returncode = 0
+        stdout = json.dumps([row])
+
+    monkeypatch.setattr(web.subprocess, "run", lambda *a, **k: (calls.append(1), Done())[1])
+    web._reset_fleet_tasks_cache()
+    try:
+        first = web.fleet_tasks()
+        second = web.fleet_tasks()
+        assert calls == [1]
+        assert first == second
+        assert len(first) == len(web.FLEET_TASKS)
+        assert first is not second and first[0] is not second[0]
+        first[0]["detail"] = "MUT"
+        assert web.fleet_tasks()[0]["detail"] == "not registered"
+    finally:
+        web._reset_fleet_tasks_cache()
+
+
+def test_fleet_tasks_cache_expires(monkeypatch) -> None:
+    import time
+
+    import dashboard_web_app as web
+
+    calls: list[int] = []
+
+    class Done:
+        returncode = 0
+        stdout = "[]"
+
+    now = [1000.0]
+    monkeypatch.setattr(time, "monotonic", lambda: now[0])
+    monkeypatch.setattr(web.subprocess, "run", lambda *a, **k: (calls.append(1), Done())[1])
+    web._reset_fleet_tasks_cache()
+    try:
+        web.fleet_tasks()
+        web.fleet_tasks()
+        assert calls == [1]
+        now[0] += 61.0
+        web.fleet_tasks()
+        assert calls == [1, 1]
+    finally:
+        web._reset_fleet_tasks_cache()
+
+
+def test_fleet_tasks_explicit_runner_bypasses_cache() -> None:
+    import dashboard_web_app as web
+
+    calls: list[int] = []
+
+    class Done:
+        returncode = 0
+        stdout = "[]"
+
+    def runner(*args, **kwargs):
+        calls.append(1)
+        return Done()
+
+    web._reset_fleet_tasks_cache()
+    try:
+        web.fleet_tasks(runner=runner)
+        web.fleet_tasks(runner=runner)
+        assert calls == [1, 1]
+    finally:
+        web._reset_fleet_tasks_cache()
+
+
 def test_fleet_watches_weekly_digest() -> None:
     assert "WorkbenchWeeklyDigest" in FLEET_TASKS
 
