@@ -371,3 +371,53 @@ def test_run_writes_receipt_and_skips(tmp_path: Path) -> None:
     assert receipt["counts"]["skipped_manual"] == 1
     assert receipt["counts"]["fileable_new"] == 0
     assert (out / receipt["receipt"]).exists()
+
+
+def test_r1_skips_run_with_prior_sweep_resolution() -> None:
+    runs = [
+        {
+            "id": "e84ef642012f42e9929e6fc1ea3e6480",
+            "title": "Top bar in mobile",
+            "status": "failed",
+            "created_at_utc": _ts(100),
+            "inbox_id": None,
+            "error": "stuck",
+        }
+    ]
+    inbox = [
+        {
+            "id": "6c233cc6e11d4884bddb71aa310dcc6b",
+            "title": "[sweep] Failed run with no follow-up: Top bar in mobile",
+            "status": "closed",
+            "body": "Members: e84ef642012f42e9929e6fc1ea3e6480",
+            "resolution": "Resolved-first confirmed: fixed by merged branch.",
+        }
+    ]
+    findings, resolved = SWEEP.collect_runs(runs, inbox, NOW)
+    assert findings == []
+    assert [r["key"] for r in resolved] == ["R1:e84ef642012f42e9929e6fc1ea3e6480"]
+
+
+def test_r1_still_files_when_prior_resolution_tracks_open_work() -> None:
+    runs = [
+        {
+            "id": "abc123",
+            "title": "Old fail",
+            "status": "failed",
+            "created_at_utc": _ts(100),
+            "inbox_id": None,
+            "error": "boom",
+        }
+    ]
+    inbox = [
+        {
+            "id": "sweep1",
+            "title": "[sweep] Failed run with no follow-up: Old fail",
+            "status": "closed",
+            "body": "abc123",
+            "resolution": "Tracked elsewhere, still open, see tracker abcdef123456.",
+        },
+        {"id": "abcdef1234567890", "title": "Tracker", "status": "open"},
+    ]
+    findings, _resolved = SWEEP.collect_runs(runs, inbox, NOW)
+    assert [f["key"] for f in findings] == ["R1:abc123"]

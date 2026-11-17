@@ -248,6 +248,38 @@ def _done_elsewhere_evidence(
     return evidence
 
 
+def _prior_sweep_resolution(inbox: list[dict[str, Any]], rid: str) -> str | None:
+    """Closed sweep item already adjudicating this run id, if any.
+
+    Runs without an inbox link (inbox_id None) never match _closed_loop;
+    a prior closed sweep finding that names the run id is the same
+    closed loop. Tracked-still-open resolutions don't count.
+    """
+    needles = {rid.lower(), rid[:8].lower()}
+    for item in inbox:
+        if str(item.get("status", "")) != "closed":
+            continue
+        if "[sweep]" not in str(item.get("title", "")):
+            continue
+        blob = (
+            f"{item.get('title', '')} {item.get('body', '')} "
+            f"{item.get('resolution', '')} {item.get('note', '')}".lower()
+        )
+        if not any(needle and needle in blob for needle in needles):
+            continue
+        resolution = f"{item.get('resolution', '')} {item.get('answer', '')}"
+        if STILL_OPEN_RE.search(resolution):
+            for ref in TRACKER_RE.findall(resolution):
+                tracker = next(
+                    (entry for entry in inbox if str(entry.get("id", "")).startswith(ref[:12])),
+                    None,
+                )
+                if tracker is not None and str(tracker.get("status", "")) != "closed":
+                    return None  # tracked elsewhere and still open
+        return str(item.get("id", ""))[:8]
+    return None
+
+
 def collect_runs(
     runs: list[dict[str, Any]],
     inbox: list[dict[str, Any]],
@@ -322,6 +354,10 @@ def collect_runs(
                         "reason": f"linked approval closed: {str(linked.get('resolution', ''))[:120]}",
                     }
                 )
+                continue
+            prior = _prior_sweep_resolution(inbox, rid)
+            if prior is not None:
+                resolved.append({"key": f"R1:{rid}", "reason": f"prior sweep resolution: {prior}"})
                 continue
             siblings = [r for r in by_inbox.get(str(run.get("inbox_id") or ""), []) if r is not run]
             newer_ok = any(
