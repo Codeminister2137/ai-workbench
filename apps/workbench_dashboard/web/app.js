@@ -1275,9 +1275,10 @@ async function renderRuns(id) {
   startRunsPoll();
 }
 
-let lastE2EListHash = "#/e2e";
-
 async function renderE2E(id) {
+  // Keep the list selection in detail URLs so return links also survive reloads.
+  const selection = new URLSearchParams(location.hash.split("?")[1] || "").get("s");
+  const listQuery = selection === null ? "" : "?s=" + encodeURIComponent(selection);
   if (id && id.startsWith("report/")) {
     const reportId = id.slice("report/".length);
     const payload = await api("/api/e2e/reports/" + encodeURIComponent(reportId));
@@ -1302,7 +1303,7 @@ async function renderE2E(id) {
         ${entry.notes ? `<p>${esc(entry.notes)}</p>` : ""}
         <p class="muted">Merge ${esc(report.commit || "")}${testedOn} · built ${fmtTime(report.built_utc)}</p></li>`;
     }).join("");
-    view.innerHTML = `<h1>E2E report</h1><p><a href="${esc(lastE2EListHash)}">All checklists</a></p>
+    view.innerHTML = `<h1>E2E report</h1><p><a href="#/e2e${esc(listQuery)}">All checklists</a></p>
       <div class="card"><h2>${gtext(report.title || "")}</h2>
       <p class="muted">Merge ${esc(report.commit || "")} ·
       <span class="pill st-${report.overall === "pass" ? "pass" : "fail"}">${esc(report.overall || "")}</span>
@@ -1381,12 +1382,12 @@ async function renderE2E(id) {
         ${controls}</li>`;
     }).join("");
     const isDraft = task.status === "draft";
-    view.innerHTML = `<h1>E2E checklist</h1><p><a href="${esc(lastE2EListHash)}">All checklists</a></p>
+    view.innerHTML = `<h1>E2E checklist</h1><p><a href="#/e2e${esc(listQuery)}">All checklists</a></p>
       <div class="card"><h2>${gtext(task.title || "")}</h2>
       <p class="muted">Merge ${esc(task.merge_commit || "")} · ${esc(task.status || "")}</p>
       ${submitted
         ? `<p class="muted">Submitted; verdicts are immutable.</p>
-           ${task.report_id ? `<p><a href="#/e2e/report/${esc(task.report_id)}">Open the report</a></p>` : ""}`
+           ${task.report_id ? `<p><a href="#/e2e/report/${esc(task.report_id)}${esc(listQuery)}">Open the report</a></p>` : ""}`
         : isDraft
           ? `<p class="muted">Draft — waiting on pointers. No verdicts yet; the checklist opens once concrete steps are finalized.</p><ul class="plain">${blocks}</ul>`
           : `<form id="e2e-form"><ul class="plain">${blocks}</ul>
@@ -1467,12 +1468,12 @@ async function renderE2E(id) {
   const shownTasks = (tasks.items || []).filter((t) => picked.has(t.status || "open"));
   const rows = shownTasks.length
     ? shownTasks.map((t) =>
-        `<li><a href="#/e2e/${esc(t.id)}">${gtext(t.title)}</a>
+        `<li><a href="#/e2e/${esc(t.id)}${esc(listQuery)}">${gtext(t.title)}</a>
          <span class="pill st-${esc(t.status)}">${esc(t.status)} · ${esc(t.merge_commit || "")}</span></li>`).join("")
     : '<li class="muted">No checklists match these filters.</li>';
   const shownReports = (reports.items || []).filter((r) => picked.has(r.overall || ""));
   const reportRows = shownReports.slice(0, 10).map((r) =>
-    `<li><a href="#/e2e/report/${esc(r.id)}">${gtext(r.title || r.id)}</a>
+    `<li><a href="#/e2e/report/${esc(r.id)}${esc(listQuery)}">${gtext(r.title || r.id)}</a>
      <span class="pill st-${r.overall === "pass" ? "pass" : "fail"}">${esc(r.overall || "")}</span></li>`).join("");
   const groups = [
     ["Checklists", [["open", "Open", "Checklists awaiting your tests"], ["draft", "Drafts", "Awaiting pointers before testing opens"], ["submitted", "Submitted", "Finished checklists"]]],
@@ -1484,7 +1485,6 @@ async function renderE2E(id) {
     <h2>Checklists</h2><ul class="plain">${rows}</ul>
     <h2>Recent reports</h2><ul class="plain">${reportRows || '<li class="muted">No reports match these filters.</li>'}</ul>`;
   bindFilterBoxes("e2e-filters", "e2e", "s");
-  lastE2EListHash = location.hash || "#/e2e";
 }
 
 async function renderInbox(id) {
