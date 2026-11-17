@@ -1,3 +1,13 @@
+## Spend card lives on Providers, not Fleet (adopted) - owner 2026-11-17
+
+**Status:** Accepted (chat; owner self-corrected in a 44b6eec E2E verdict:
+"they live in Providers tab, and that's where spend should be moved").
+
+Reverses the 11-17 fleet merge (662a24f): the spend policy/buckets card
+moved to Providers (per-provider allowances were already there);
+`#/spend` now redirects to `#/providers`. Fleet keeps servers, tasks,
+sleep, runs. Shipped as fix/spend-to-providers during the gaming loop.
+
 ## Pre-approve all agent-queue runs + budget backstops (adopted) - owner 2026-11-16
 
 **Status:** Accepted (chat; owner chose C "I approve C" from the
