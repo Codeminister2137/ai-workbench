@@ -95,3 +95,54 @@ def test_promote_refuses_uncovered_merges(cli, repo: Path, capsys, monkeypatch) 
     code = cli.main(["promote", "--target", "master", "--data-dir", str(repo / "data")])
     assert code == 3
     assert "lack a passing E2E report" in capsys.readouterr().out
+
+
+def _task_file(data: Path, name: str, merge: str, status: str) -> None:
+    tasks = data / "e2e_tasks"
+    tasks.mkdir(parents=True, exist_ok=True)
+    (tasks / name).write_text(
+        json.dumps({"id": name[:-5], "merge_commit": merge, "status": status}),
+        encoding="utf-8",
+    )
+
+
+def test_covering_task_blocks_open_and_submitted_but_not_drafts(cli, tmp_path: Path) -> None:
+    data = tmp_path / "data"
+    _task_file(data, "open.json", "aaa", "open")
+    _task_file(data, "done.json", "bbb", "submitted")
+    _task_file(data, "draft.json", "ccc", "draft")
+    assert cli._existing_covering_task(data, "aaa")["id"] == "open"
+    assert cli._existing_covering_task(data, "bbb")["id"] == "done"
+    assert cli._existing_covering_task(data, "ccc") is None
+    assert cli._existing_covering_task(data, "zzz") is None
+    assert cli._existing_covering_task(tmp_path / "missing", "aaa") is None
+
+
+def test_covering_task_matches_short_hashes(cli, tmp_path: Path) -> None:
+    data = tmp_path / "data"
+    _task_file(data, "full.json", "abcdef1234567890", "submitted")
+    assert cli._existing_covering_task(data, "abcdef1")["id"] == "full"
+
+
+def test_generate_refuses_covered_merge_without_retest(
+    cli, repo: Path, tmp_path: Path, capsys, monkeypatch
+) -> None:
+    (repo / "second.py").write_text("two", encoding="utf-8")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-qm", "two")
+    head = _git(repo, "rev-parse", "HEAD")
+    data = tmp_path / "data"
+    _task_file(data, "old.json", head, "submitted")
+    monkeypatch.setattr(cli, "REPO_ROOT", repo)
+    filed: list = []
+    monkeypatch.setattr(
+        cli, "file_task", lambda *args: filed.append(args) or {"ok": True, "id": "new"}
+    )
+    code = cli.main(["generate", head, "--data-dir", str(data)])
+    assert code == 1
+    assert filed == []
+    assert "already covers" in capsys.readouterr().out
+    monkeypatch.setattr(cli, "submit_task", lambda *args: {"report_id": "r"})
+    code = cli.main(["generate", head, "--retest", "--data-dir", str(data)])
+    assert code == 0
+    assert len(filed) == 1

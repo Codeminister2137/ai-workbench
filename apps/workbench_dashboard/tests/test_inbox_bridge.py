@@ -129,3 +129,23 @@ def test_endpoint_bridges_and_reports(server) -> None:
     result = post_json(base, "/api/inbox/bridge-runs", {})
     assert result["ok"] is True
     assert result["bridged"] == []
+
+
+def test_run_title_cuts_at_word_boundary(tmp_path) -> None:
+    stores = DashboardStores(tmp_path)
+    long_title = "We need to confirm Mai works properly, so generate a small probe task now"
+    _agent_task(stores, title=long_title)
+    (receipt,) = bridge_agent_queue(stores)
+    title = stores.runs.get(receipt["run_id"])["title"]
+    assert len(title) <= 60
+    assert title.endswith("…")
+    stem = title[:-1]
+    assert long_title.startswith(stem)
+    assert long_title[len(stem)] == " "  # cut between words, never mid-word
+
+
+def test_run_title_short_and_nospace(tmp_path) -> None:
+    from inbox_bridge import _short_title
+
+    assert _short_title("Do the thing") == "Do the thing"
+    assert _short_title("x" * 70) == "x" * 59 + "…"

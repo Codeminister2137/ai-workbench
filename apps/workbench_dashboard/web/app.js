@@ -1275,6 +1275,8 @@ async function renderRuns(id) {
   startRunsPoll();
 }
 
+let lastE2EListHash = "#/e2e";
+
 async function renderE2E(id) {
   if (id && id.startsWith("report/")) {
     const reportId = id.slice("report/".length);
@@ -1300,7 +1302,7 @@ async function renderE2E(id) {
         ${entry.notes ? `<p>${esc(entry.notes)}</p>` : ""}
         <p class="muted">Merge ${esc(report.commit || "")}${testedOn} · built ${fmtTime(report.built_utc)}</p></li>`;
     }).join("");
-    view.innerHTML = `<h1>E2E report</h1><p><a href="#/e2e">All checklists</a></p>
+    view.innerHTML = `<h1>E2E report</h1><p><a href="${esc(lastE2EListHash)}">All checklists</a></p>
       <div class="card"><h2>${gtext(report.title || "")}</h2>
       <p class="muted">Merge ${esc(report.commit || "")} ·
       <span class="pill st-${report.overall === "pass" ? "pass" : "fail"}">${esc(report.overall || "")}</span>
@@ -1379,7 +1381,7 @@ async function renderE2E(id) {
         ${controls}</li>`;
     }).join("");
     const isDraft = task.status === "draft";
-    view.innerHTML = `<h1>E2E checklist</h1><p><a href="#/e2e">All checklists</a></p>
+    view.innerHTML = `<h1>E2E checklist</h1><p><a href="${esc(lastE2EListHash)}">All checklists</a></p>
       <div class="card"><h2>${gtext(task.title || "")}</h2>
       <p class="muted">Merge ${esc(task.merge_commit || "")} · ${esc(task.status || "")}</p>
       ${submitted
@@ -1482,6 +1484,7 @@ async function renderE2E(id) {
     <h2>Checklists</h2><ul class="plain">${rows}</ul>
     <h2>Recent reports</h2><ul class="plain">${reportRows || '<li class="muted">No reports match these filters.</li>'}</ul>`;
   bindFilterBoxes("e2e-filters", "e2e", "s");
+  lastE2EListHash = location.hash || "#/e2e";
 }
 
 async function renderInbox(id) {
