@@ -881,6 +881,19 @@ def test_spend_unconfigured_empty(dashboard_server) -> None:
     assert payload["spend"]["records"] == 0
 
 
+def test_spend_lists_policy_scopes(dashboard_server) -> None:
+    payload = get_json(dashboard_server, "/api/spend")
+    assert payload["spend"]["policy_scopes"] == [
+        "global",
+        "openrouter",
+        "requesty",
+        "meta",
+        "opencode_go",
+        "ollama",
+        "codex",
+    ]
+
+
 def test_spend_lists_grant_buckets(dashboard_server, tmp_path) -> None:
     _write_grants(
         tmp_path,

@@ -51,6 +51,9 @@ Register/remove: `scripts/register-openings-service.ps1 [-At HH:mm] [-Unregister
 
 - Personalize `scoring.keywords/weights` + queries once the owner supplies
   criteria; `openings rescore --dry-run` previews the effect.
+  (Done 11-16/11-17: queries + keywords from owner criteria; profile filled
+  incl. Q7 seniority; dry-run distributions identical. Open: weights-ratio
+  evidence; contract rank UoP>B2B>>mandate has no settings knob — limitation.)
 - Polish-board gap stands (Just Join IT, Pracuj.pl, RocketJobs need adapters).
 - MCP surface + our `openings_api.py` bridge + dashboard UI build (npm)
   remain unwired; API verified read-path only.

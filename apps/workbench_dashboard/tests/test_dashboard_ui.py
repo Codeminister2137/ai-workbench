@@ -129,14 +129,14 @@ def test_dynamic_inputs_and_selects_have_titles() -> None:
     js = _read("app.js")
     inputs = [tag for tag in re.findall(r"<input\b[^>]*>", js) if 'type="radio"' not in tag]
     assert (
-        len(inputs) == 59
-    )  # +bad-test checkbox; +agent-enable checkbox; +spend-policy scope/prepaid/cap; step radios excluded
+        len(inputs) == 58
+    )  # +bad-test checkbox; +agent-enable checkbox; +spend-policy prepaid/cap (scope is a select); step radios excluded
     for tag in inputs:
         assert "title=" in tag, f"input without title: {tag}"
     selects = re.findall(r"<select\b[^>]*>", js)
     assert (
-        len(selects) == 22
-    )  # +restrictions fan-out; +run fanout; +landing-page select; +agent policy
+        len(selects) == 23
+    )  # +restrictions fan-out; +run fanout; +landing-page select; +agent policy; +spend-policy scope
     for tag in selects:
         assert "title=" in tag, f"select without title: {tag}"
 
