@@ -182,6 +182,11 @@ Do not claim a check was run if it was not.
 Use [component suites](test-workflow.md) while iterating, then
 `python scripts/run-tests.py full` for the complete offline workspace gate.
 The runner includes Council in a separate process and keeps live tests opt-in.
+`run-tests.py full --cov` additionally enforces the total-coverage ratchet
+(89%, raise-only). For fast local iteration, `pytest -n 4` parallelizes,
+but the gate stays serial: load-sensitive process tests flake under
+parallel load, so a parallel red must be confirmed serially before it
+counts as a regression.
 
 ## 6. AI evaluation workflow
 Before starting live performance tests, tell the owner so they can defer the

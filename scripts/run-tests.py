@@ -193,6 +193,10 @@ GROUPS = {
 # Their tests belong to upstream, not to this gate.
 EXTERNAL_TREES = ("apps/job_search/openings-svc",)
 
+COV_TARGETS = ("apps/workbench_dashboard", "packages")
+COV_FAIL_UNDER = 89
+"""Coverage ratchet (total %): measured 89.8 on 2026-11-17; raise, never lower."""
+
 
 def _is_external(relative_posix: str) -> bool:
     return any(
@@ -297,6 +301,11 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("groups", nargs="*", choices=["full", *GROUPS])
     parser.add_argument("--list", action="store_true")
+    parser.add_argument(
+        "--cov",
+        action="store_true",
+        help="measure coverage across groups and enforce the ratchet",
+    )
     args = parser.parse_args(arguments[:separator])
     try:
         if args.list:
@@ -305,9 +314,16 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         status = 0
         rows: list[tuple[str, int, int, float]] = []
-        for command in test_commands(args.groups or ["full"], extra):
+        commands = test_commands(args.groups or ["full"], extra)
+        counts = [len(command) - 3 - len(extra) for command in commands]
+        cov_data = ROOT / ".coverage"
+        if args.cov:
+            cov_data.unlink(missing_ok=True)
+            for command in commands:
+                command += [f"--cov={target}" for target in COV_TARGETS]
+                command += ["--cov-append", "--cov-report="]
+        for command, modules in zip(commands, counts, strict=True):
             label = command_label(command)
-            modules = len(command) - 3 - len(extra)
             print(f"Running {label}: {modules} test modules", flush=True)
             started = time.monotonic()
             result = subprocess.run(command, cwd=ROOT, env=test_environment(), check=False)
@@ -319,6 +335,16 @@ def main(argv: list[str] | None = None) -> int:
         for label, modules, code, elapsed in rows:
             outcome = "ok" if code == 0 else f"FAIL({code})"
             print(f"{label:<10} {modules:<7} {outcome:<8} {elapsed:.1f}")
+        if args.cov:
+            full_run = not args.groups or "full" in args.groups
+            report_args = [sys.executable, "-m", "coverage", "report"]
+            if full_run:
+                report_args.append(f"--fail-under={COV_FAIL_UNDER}")
+            else:
+                print("(partial groups: coverage reported, ratchet enforced on full only)")
+            report = subprocess.run(report_args, cwd=ROOT, env=test_environment(), check=False)
+            if report.returncode and not status:
+                status = report.returncode
         return status
     except ValueError as exc:
         parser.error(str(exc))
