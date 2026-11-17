@@ -67,9 +67,34 @@ def test_missing_config_fails_closed_without_leftovers(tmp_path: Path) -> None:
     assert _git(repo, "branch", "--list", "run/abc123") == ""
 
 
-def test_duplicate_run_id_fails_closed(tmp_path: Path) -> None:
+def test_same_run_reuses_scratch_worktree(tmp_path: Path) -> None:
+    # Retries reuse their own scratch space (evidence preserved); only
+    # foreign shapes fail closed. See the two tests below.
     repo = _repo(tmp_path)
-    create_run_worktree(repo, "abc123")
+    first = create_run_worktree(repo, "abc123")
+    (first.path / "attempt1.txt").write_text("evidence\n", encoding="utf-8")
+    (repo / "user-config.toml").write_text("[new]\n", encoding="utf-8")
+    second = create_run_worktree(repo, "abc123")
+    assert second == first
+    assert (second.path / "attempt1.txt").read_text(encoding="utf-8") == "evidence\n"
+    assert (second.path / "user-config.toml").read_text(encoding="utf-8") == "[new]\n"
+
+
+def test_foreign_dir_at_target_fails_closed(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    target = repo / ".tmp" / "run-worktrees" / "abc123"
+    target.mkdir(parents=True)
+    (target / "junk.txt").write_text("not a worktree\n", encoding="utf-8")
+    with pytest.raises(IsolationError, match="already exists"):
+        create_run_worktree(repo, "abc123")
+    assert (target / "junk.txt").exists()  # never touched
+
+
+def test_worktree_on_wrong_branch_fails_closed(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    target = repo / ".tmp" / "run-worktrees" / "abc123"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    _git(repo, "worktree", "add", "-b", "run/other", str(target), "develop")
     with pytest.raises(IsolationError, match="already exists"):
         create_run_worktree(repo, "abc123")
 

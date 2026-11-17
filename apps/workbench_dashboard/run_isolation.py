@@ -48,13 +48,38 @@ def _git(repo: Path, *args: str) -> str:
     return proc.stdout.strip()
 
 
+def _attached_branch(repo: Path, target: Path) -> str | None:
+    """Branch of the registered worktree at ``target``; None when not attached."""
+    try:
+        listing = _git(repo, "worktree", "list", "--porcelain")
+    except IsolationError:
+        return None
+    current: str | None = None
+    for line in listing.splitlines():
+        if line.startswith("worktree "):
+            current = line[len("worktree ") :]
+        elif line.startswith("branch refs/heads/") and current is not None:
+            try:
+                same = Path(current).resolve() == target.resolve()
+            except OSError:
+                same = False
+            if same:
+                return line[len("branch refs/heads/") :]
+            current = None
+    return None
+
+
 def create_run_worktree(
     repo_root: Path | str,
     run_id: str,
     *,
     base_branch: str = ISOLATION_BASE_BRANCH,
 ) -> IsolatedRun:
-    """Create the scratch worktree + branch for one run (fail-closed)."""
+    """Create the scratch worktree + branch for one run (fail-closed).
+
+    A retry reuses its own attached worktree (evidence preserved, config
+    refreshed); anything else at the target path still fails closed.
+    """
     repo = Path(repo_root).resolve()
     if not (repo / ".git").exists():
         raise IsolationError(f"not a git checkout: {repo}")
@@ -64,7 +89,13 @@ def create_run_worktree(
     branch = f"run/{short}"
     target = repo / WORKTREE_DIRNAME / short
     if target.exists():
-        raise IsolationError(f"scratch worktree already exists: {target}")
+        if _attached_branch(repo, target) != branch:
+            raise IsolationError(f"scratch worktree already exists: {target}")
+        config_src = repo / CONFIG_FILENAME
+        if not config_src.is_file():
+            raise IsolationError(f"{CONFIG_FILENAME} missing in {repo}; cannot isolate run")
+        shutil.copy2(config_src, target / CONFIG_FILENAME)
+        return IsolatedRun(path=target, branch=branch)
     existing = _git(repo, "branch", "--list", branch)
     if existing:
         raise IsolationError(f"scratch branch already exists: {branch}")
