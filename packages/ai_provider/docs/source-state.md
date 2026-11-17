@@ -52,6 +52,12 @@ model); the periodic pre-refresh check itself is deferred per the brief.
   Live-probed 2026-11-17: 403 Forbidden with our key on zen/go/v1/usage
   plus inference/go/v1/usage and api/usage variants (scope or drift) —
   neither free-tier daily nor subscription windows are readable today.
+  Web research same day: API keys (Zen or Go) cannot read Go 5h/weekly/
+  monthly windows or the Zen balance — console only (openusage.sh);
+  console RPCs (queryBilling) need browser-session auth. Local
+  opencode.db inspected read-only (schema only): account tables empty
+  (no Console sign-in stored), so the console path needs an owner login
+  + credential-handling decision before any integration.
 
 Gap (owner case-by-case per brief note): API-billed providers
 (OpenRouter/Requesty/…) have no subscription-refresh model here — owner
