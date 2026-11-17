@@ -595,6 +595,19 @@ def collect_e2e(
         age = _age_h(_record_ts(report), now)
         if age is None:
             continue
+        commit = str(report.get("commit", "") or "")
+        if commit:
+            own_ts = _parse_ts(_record_ts(report))
+            covered = any(
+                str(other.get("commit", "") or "") == commit
+                and str(other.get("id", "")) != rid
+                and str(other.get("overall", "")) in ("pass", "passed")
+                and (_parse_ts(_record_ts(other)) or now) > (own_ts or now)
+                for other in reports
+            )
+            if covered:
+                resolved.append({"key": f"E1:{rid}", "reason": "covered by a newer passing report"})
+                continue
         shorts = {s[:12].lower() for s in SHORT_RE.findall(title)}
         commit = str(report.get("commit", "") or "").lower()
         if len(commit) >= 7:
