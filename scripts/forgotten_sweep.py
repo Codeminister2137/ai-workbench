@@ -49,6 +49,7 @@ GATE_H = {
     "I1": 24,  # answered-never-closed inbox
     "I2": 48,  # open agent inbox rotting
     "I3": 168,  # open owner inbox backlog (7d)
+    "I4": 24,  # agent item idle after its run finished
     "E1": 24,  # fail E2E report, no follow-up action
     "E2": 24,  # fail E2E report, follow-up itself failed
     "E3": 48,  # open E2E task (owner testing backlog)
@@ -464,7 +465,11 @@ def collect_runs(
     return findings, resolved
 
 
-def collect_inbox(inbox: list[dict[str, Any]], now: datetime) -> list[dict[str, Any]]:
+def collect_inbox(
+    inbox: list[dict[str, Any]],
+    now: datetime,
+    runs: list[dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
     findings: list[dict[str, Any]] = []
     for item in inbox:
         iid = str(item.get("id", "?"))
@@ -509,6 +514,36 @@ def collect_inbox(inbox: list[dict[str, Any]], now: datetime) -> list[dict[str, 
                     "Owner decision/action pending.",
                     [_member(iid, title, age)],
                     age,
+                )
+            )
+    if runs is not None:
+        by_id = {str(run.get("id", "")): run for run in runs if isinstance(run, dict)}
+        for item in inbox:
+            if str(item.get("status", "")) != "open":
+                continue
+            if str(item.get("assignee", "owner")) != "agent":
+                continue
+            metadata = item.get("metadata")
+            rid = str((metadata or {}).get("bridge_run_id", "") or "")
+            run = by_id.get(rid)
+            if run is None:
+                continue
+            run_status = str(run.get("status", ""))
+            if run_status not in ("completed", "failed", "cancelled", "merged"):
+                continue
+            iid = str(item.get("id", "?"))
+            title = str(item.get("title", ""))
+            ended = run.get("finished_at_utc") or run.get("updated_at_utc") or _record_ts(run)
+            run_age = _age_h(ended, now)
+            findings.append(
+                _finding(
+                    f"I4:{iid}",
+                    "I4",
+                    f"Agent item idle after run {run_status}: {title[:70]}",
+                    "agent",
+                    "Close with the run outcome, or re-queue a follow-up run.",
+                    [_member(f"run:{rid[:8]}", title, run_age, f"run {run_status}")],
+                    run_age if run_age is not None else 0.0,
                 )
             )
     return findings
@@ -971,7 +1006,7 @@ def run(
     findings: list[dict[str, Any]] = []
     run_findings, resolved = collect_runs(runs, inbox, now, merged_branches)
     findings += run_findings
-    findings += collect_inbox(inbox, now)
+    findings += collect_inbox(inbox, now, runs)
     e2e_findings, e2e_resolved = collect_e2e(tasks, reports, runs, inbox, now)
     findings += e2e_findings
     resolved += e2e_resolved
@@ -984,7 +1019,7 @@ def run(
         key = finding["key"]
         if key[:3] in ("R1:", "R2:", "R3:", "R4:"):
             finding["link"] = _dash_link("runs", key[3:])
-        elif key[:3] in ("I1:", "I2:", "I3:"):
+        elif key[:3] in ("I1:", "I2:", "I3:", "I4:"):
             finding["link"] = _dash_link("inbox", key[3:])
     findings.sort(key=lambda f: (f["category"], f["key"]))
 

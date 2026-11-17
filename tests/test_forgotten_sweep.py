@@ -516,3 +516,41 @@ def test_g4_skips_missing_version_file(tmp_path: Path) -> None:
     repo = _git_repo_with_remote(tmp_path)
     findings = SWEEP.collect_git(repo, tmp_path / "runs", NOW)
     assert [f["key"] for f in findings if f["key"].startswith("G4")] == []
+
+
+def test_i4_flags_agent_item_idle_after_terminal_run() -> None:
+    inbox = [
+        {
+            "id": "stale",
+            "title": "Follow-up",
+            "status": "open",
+            "assignee": "agent",
+            "created_at": _ts(60),
+            "metadata": {"bridge_run_id": "r-done"},
+        },
+        {
+            "id": "live",
+            "title": "Working",
+            "status": "open",
+            "assignee": "agent",
+            "created_at": _ts(60),
+            "metadata": {"bridge_run_id": "r-run"},
+        },
+        {
+            "id": "unlinked",
+            "title": "No run",
+            "status": "open",
+            "assignee": "agent",
+            "created_at": _ts(60),
+        },
+    ]
+    runs = [
+        {"id": "r-done", "status": "completed", "finished_at_utc": _ts(30)},
+        {"id": "r-run", "status": "queued"},
+    ]
+    findings = SWEEP.collect_inbox(inbox, NOW, runs)
+    assert [f["key"] for f in findings if f["key"].startswith("I4")] == ["I4:stale"]
+    stale = next(f for f in findings if f["key"] == "I4:stale")
+    assert stale["fileable"] is True
+    assert "completed" in stale["title"]
+    assert SWEEP.collect_inbox(inbox, NOW) == [f for f in findings if not f["key"].startswith("I4")]
