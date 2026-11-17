@@ -329,3 +329,44 @@ def test_validate_steps_rejects_blanks() -> None:
         except ValueError:
             continue
         raise AssertionError(f"accepted bad steps: {bad!r}")
+
+
+SITE_DIFF = """diff --git a/company-site/style.css b/company-site/style.css
+index 111..222 100644
+--- a/company-site/style.css
++++ b/company-site/style.css
+@@ -1,4 +1,8 @@ body {
++@media (prefers-color-scheme: dark) {
++  body { background: #111; }
++}
+"""
+
+
+def test_evidence_keeps_company_site_files_without_symbols() -> None:
+    evidence = e2e_cases.extract_diff_evidence(
+        "repo", "base", "head", ["company-site/style.css"], runner=_runner(SITE_DIFF)
+    )
+    assert "company-site/style.css" in evidence
+
+
+def _site_evidence(*paths: str) -> dict:
+    return {path: {"symbols": [], "routes": [], "views": []} for path in paths}
+
+
+def test_site_steps_ground_pages_and_assets() -> None:
+    evidence = _site_evidence("company-site/kontakt.html", "company-site/style.css")
+    steps = e2e_cases.draft_steps("company-site", evidence, ["dark mode"])
+    assert steps
+    assert all(step["grounded"] for step in steps)
+    actions = " ".join(step["action"] for step in steps)
+    assert "company-site/kontakt.html" in actions
+    assert "company-site/style.css" in actions
+    assert "dark mode" in actions
+    assert not e2e_cases.needs_pointers(steps)
+
+
+def test_site_schema_only_needs_pointers() -> None:
+    evidence = _site_evidence("company-site/intake/schema.json")
+    steps = e2e_cases.draft_steps("company-site", evidence, ["intake schema"])
+    assert steps
+    assert e2e_cases.needs_pointers(steps)

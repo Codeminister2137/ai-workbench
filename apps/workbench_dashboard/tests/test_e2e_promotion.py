@@ -70,6 +70,15 @@ def test_generate_marks_docs_nonbehavioral() -> None:
     assert [(i["kind"], i["status"]) for i in checklist["items"]] == [("nonbehavioral", "pending")]
 
 
+def test_generate_maps_company_site_to_behavior() -> None:
+    checklist = generate_checklist("abc123", ["company-site/index.html"])
+    assert len(checklist["items"]) == 1
+    (item,) = checklist["items"]
+    assert (item["kind"], item["area"]) == ("behavior", "company-site")
+    assert item["goals"] == ["docs/goals/company-site.md"]
+    assert item["how"] and item["where"]
+
+
 def test_generate_empty_diff_yields_no_items() -> None:
     assert generate_checklist("abc123", [])["items"] == []
 

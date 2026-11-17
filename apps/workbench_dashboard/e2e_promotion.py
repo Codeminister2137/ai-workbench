@@ -57,6 +57,13 @@ AREA_TABLE: tuple[tuple[str, str, str, str, tuple[str, ...]], ...] = (
     ),
     ("apps/ai_council/", "council", "council deliberation", "docs/goals/council.md", ()),
     ("apps/job_search/", "job-search", "job search flows", "docs/goals/job-search.md", ()),
+    (
+        "company-site/",
+        "company-site",
+        "company website pages and intake",
+        "docs/goals/company-site.md",
+        (),
+    ),
     ("apps/", "apps", "application behavior", "docs/goals/dashboard.md", ()),
     ("packages/", "packages", "shared package behavior", "docs/goals/provider.md", ()),
     ("scripts/", "tooling", "repo tooling", "docs/goals/meta.md", ()),
@@ -145,6 +152,15 @@ TEST_GUIDANCE: dict[str, tuple[list[str], str, str]] = {
         "Tests green and the entry point behaves as documented.",
         "Pytest output.",
     ),
+    "company-site": (
+        [
+            "Open each changed page on the served company site, PL and EN.",
+            "For shared assets, spot-check the PL index plus one EN page.",
+            "Submit the intake form once when kontakt/contact or form.js changed.",
+        ],
+        "Pages render per the change; no broken layout, links, or form wiring.",
+        "Served company site (keepalive-served from the serve tree).",
+    ),
 }
 
 REGRESSION_LEAD = (
@@ -163,6 +179,7 @@ AREA_VIEWS: dict[str, list[str]] = {
     "job-search": ["home"],
     "apps": ["home"],
     "packages": ["home"],
+    "company-site": ["home"],
     "tooling": ["home"],
     "tests": ["home"],
     "docs": ["home"],
