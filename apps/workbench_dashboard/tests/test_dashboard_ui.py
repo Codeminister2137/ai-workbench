@@ -65,6 +65,93 @@ eval(renderer);
     assert "white-space: pre-wrap" in _read("app.css")
 
 
+def _node_driver() -> str:
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node is required for card rendering")
+    return node
+
+
+def test_spend_card_renders_dollars_policy_editor_and_adjust() -> None:
+    node = _node_driver()
+    driver = r"""
+const assert = require('assert');
+const source = require('fs').readFileSync(process.argv[1], 'utf8');
+const esc = eval('(' + source.slice(source.indexOf('function esc('),
+  source.indexOf('\n}', source.indexOf('function esc(')) + 2) + ')');
+const fns = source.slice(source.indexOf('function spendDollars'),
+  source.indexOf('function collectSpendPolicyRules'));
+eval(fns);
+const spend = {configured: true, open_reservations: 0, records: 1,
+  buckets: [{id: 'g', provider: 'meta', kind: 'allowance_expiring',
+    balance_cents: 8836, granted_cents: 15000, status: 'active'}],
+  policy_scopes: ['global', 'meta'],
+  policy: {rules: [{scope: 'meta', prepaid_allowed: true, max_prepaid_cents: 500}],
+    prepaid_spent_total_cents: 100}};
+const html = spendCardHtml(spend);
+assert(html.includes('$88.36 left of $150.00'), 'buckets in dollars');
+assert(html.includes('meta: prepaid allowed, cap $5.00 total'), 'rule dollars');
+assert(html.includes('Prepaid spent: $1.00 total'), 'prepaid total');
+assert(html.includes('id="spend-policy-form"'), 'policy form');
+assert(html.includes('<option value="meta" selected>meta</option>'), 'scope select');
+assert(html.includes('value="5.00"'), 'cap input dollars');
+assert(html.includes('id="spend-adjust-form"'), 'adjust form');
+assert(html.includes('name="remaining"'), 'remaining input');
+const off = spendCardHtml({configured: false});
+assert(off.includes('denied by default'), 'unconfigured denial');
+"""
+    result = subprocess.run(
+        [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_provider_card_renders_quota_windows() -> None:
+    node = _node_driver()
+    driver = r"""
+const assert = require('assert');
+const source = require('fs').readFileSync(process.argv[1], 'utf8');
+const esc = eval('(' + source.slice(source.indexOf('function esc('),
+  source.indexOf('\n}', source.indexOf('function esc(')) + 2) + ')');
+const dollars = source.slice(source.indexOf('function spendDollars'),
+  source.indexOf('function spendPolicyScopes'));
+const cards = source.slice(source.indexOf('function providerStatusPill'),
+  source.indexOf('async function renderProviders'));
+eval(dollars + '\n' + cards);
+const codex = {route: 'codex', display: 'Codex', blurb: '', site_url: '',
+  account_required: true, key_configured: true, reachable: true, auth_ok: true,
+  model_count: null, sample_ids: [], latency_ms: null,
+  checked_at: '2026-11-17T18:00:00+00:00', error: null,
+  allowance_windows: [
+    {bucket_id: 'codex', window: 'primary', used_percent: 9, resets_at_unix_seconds: 1794940759},
+    {bucket_id: 'codex', window: 'secondary', used_percent: 17, resets_at_unix_seconds: 1795123314},
+  ]};
+const html = providerCardHtml(codex, []);
+assert(html.includes('quota read'), 'codex pill');
+assert(html.includes('5-hour'), 'primary label');
+assert(html.includes('weekly'), 'secondary label');
+assert(html.includes('9% used'), 'used percent');
+assert(html.includes('Codex CLI login detected'), 'login line');
+const down = providerCardHtml({...codex, reachable: false, key_configured: false,
+  checked_at: '2026-11-17T18:00:00+00:00', allowance_windows: [], error: 'client_unavailable'}, []);
+assert(down.includes('CLI unreachable'), 'down pill');
+assert(down.includes('Quota windows: none reported'), 'empty quota');
+const occ = {route: 'opencode_go', display: 'OpenCode', blurb: '', site_url: '',
+  account_required: true, key_configured: true, reachable: true, auth_ok: true,
+  model_count: 5, sample_ids: [], latency_ms: null, checked_at: '2026-11-17T18:00:00+00:00',
+  error: null, allowance_windows: [
+    {bucket_id: 'go_weekly', window: 'weekly', used_percent: 17, resets_at: '2026-11-24T00:00:00+00:00'},
+  ]};
+const ohtml = providerCardHtml(occ, []);
+assert(ohtml.includes('weekly'), 'opencode label');
+assert(ohtml.includes('17% used'), 'opencode used');
+"""
+    result = subprocess.run(
+        [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
+    )
+    assert result.returncode == 0, result.stderr
+
+
 def test_create_menu_hidden_rule_collapses_menu() -> None:
     """The author `display: flex` must not override the `hidden` attribute."""
     css = _read("app.css")
