@@ -9,6 +9,16 @@ def stores(tmp_path):
     return DashboardStores(tmp_path / "data")
 
 
+def test_attention_e2e_counts_open_only_not_drafts(stores) -> None:
+    items = [{"id": "a", "behavior": "b", "kind": "behavior", "area": "dashboard"}]
+    open_task = stores.create_e2e_task(merge_commit="aaa", title="open", items=items)
+    assert open_task["status"] == "open"
+    draft_task = stores.create_e2e_task(merge_commit="bbb", title="draft", items=items, draft=True)
+    assert draft_task["status"] == "draft"
+    assert stores.attention_e2e_count() == 1
+    assert stores.open_e2e_count() == 1
+
+
 def test_create_answer_close_inbox_task(stores) -> None:
     record = stores.create_inbox_task(
         title="Pick a model",

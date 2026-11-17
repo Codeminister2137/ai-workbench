@@ -157,21 +157,26 @@ class DashboardStores:
         items, _total = self.inbox.list(limit=MAX_OPEN_TASKS + 1)
         return sum(1 for item in items if item.get("status") == "open")
 
-    def attention_inbox_count(self) -> int:
-        """Human attention items: the badge mirrors the default filter.
+    def attention_inbox_items(self) -> list[dict]:
+        """Human attention items: what the inbox default view must show.
 
-        Counts what the inbox default view shows (human assignee with
-        open or follow-up state), never the AI queue.
+        Human assignee with open or follow-up state, never the AI queue.
+        The badge counts this set; the list endpoint unions it in so the
+        default view can never hide a badged item past the newest cutoff.
         """
         items, _total = self.inbox.list(limit=1000)
-        return sum(
-            1
+        return [
+            item
             for item in items
             if item.get("assignee") != "agent"
             and (
                 item.get("status") == "open" or (item.get("resolution_kind") or "final") != "final"
             )
-        )
+        ]
+
+    def attention_inbox_count(self) -> int:
+        """Human attention items: the badge mirrors the default filter."""
+        return len(self.attention_inbox_items())
 
     def create_inbox_task(
         self,
@@ -529,9 +534,14 @@ class DashboardStores:
         return sum(1 for item in items if item.get("status") == "open")
 
     def attention_e2e_count(self) -> int:
-        """E2E attention tasks: open plus drafts awaiting owner pointers."""
+        """E2E attention tasks: open checklists awaiting owner tests.
+
+        Drafts are excluded by design: the default E2E view hides them
+        (owner verdict) and their pointer request already counts toward
+        the inbox badge, so counting them here double-represents them.
+        """
         items, _total = self.e2e_tasks.list(limit=1000)
-        return sum(1 for item in items if item.get("status") in ("open", "draft"))
+        return sum(1 for item in items if item.get("status") == "open")
 
     def create_e2e_task(
         self,

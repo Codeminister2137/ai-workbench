@@ -165,6 +165,24 @@ def test_inbox_flow_and_token_gate(dashboard_server, tmp_path) -> None:
     assert gated["ok"] is True
 
 
+def test_inbox_list_includes_attention_beyond_newest_cutoff(dashboard_server, tmp_path) -> None:
+    from dashboard_stores import DashboardStores
+
+    stores = DashboardStores(tmp_path / "data")
+    attention = stores.create_inbox_task(
+        title="Old but needs you", body="b", task_type="decision", assignee="owner"
+    )
+    for index in range(101):
+        filler = stores.create_inbox_task(
+            title=f"filler {index}", body="b", task_type="decision", assignee="agent"
+        )
+        stores.close_inbox_task(filler["id"], resolution="done")
+    payload = get_json(dashboard_server, "/api/inbox")
+    assert attention["id"] in {item["id"] for item in payload["items"]}
+    status = get_json(dashboard_server, "/api/status")
+    assert status["attention_inbox"] == 1
+
+
 def test_ideas_capture_filter_and_triage(dashboard_server) -> None:
     mine = post_json(
         dashboard_server,
