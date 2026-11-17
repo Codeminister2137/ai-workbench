@@ -70,6 +70,7 @@ GROUPS = {
         "tests/test_adapter_body_bounds.py",
         "tests/test_metadata_scrub.py",
         "tests/test_allowance_cli.py",
+        "tests/test_allowance_windows.py",
     ),
     "orchestrator": (
         "tests/test_orchestrator_*.py",

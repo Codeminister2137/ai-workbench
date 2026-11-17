@@ -21,6 +21,35 @@ routing configuration. The [model catalog](../../ai_orchestrator/examples/model_
 contains declared route capabilities; native readers report supported account
 observations. Neither establishes coding quality by itself.
 
+## Subscription refresh audit — 2026-11-17 (code-derived, brief 73276c85-B)
+
+Scope: the four native subscription readers only. Normalized into
+`ai_provider.allowance_windows.AllowanceWindow` (one `resets_at_utc` ISO
+model); the periodic pre-refresh check itself is deferred per the brief.
+
+- **Codex** (`codex_app_server` RPC `rateLimits`, native auth, no model
+  turns): reset is `resetsAt` unix int per (limit, primary/secondary)
+  window; `usedPercent` 0-100. No public protocol doc cited — observed,
+  not documented.
+- **Copilot** (`account.getQuota` RPC over headless CLI stdio): reset is
+  `resetDate`, ISO date or datetime, naive or zoned; naive assumed UTC.
+  `remainingPercentage` measured; request counts carried as details. Env
+  override (`COPILOT_PROVIDER_*`) reports `subscription_billing_overridden`
+  — refresh data inapplicable under BYOK.
+- **Kiro** (CLI text `Estimated Usage | resets on YYYY-MM-DD`): day
+  granularity only. Assumption flagged for owner case-by-case review: the
+  reported `Z%` reads as the plan-covered (remaining) share; raw credits
+  kept in details either way.
+- **opencode-go** (`GET opencode.ai/zen/go/v1/usage`, Go inference key):
+  rolling 5h / weekly / monthly percents plus `resetsAt` ISO-Z. Observed
+  endpoint, absent from public Console API pages — drift risk; the
+  normalizer keeps unparsed resets in details instead of failing.
+  Per-model USD caps (`model_limits_usd`) are a separate documented limit.
+
+Gap (owner case-by-case per brief note): API-billed providers
+(OpenRouter/Requesty/…) have no subscription-refresh model here — owner
+checks site/API data per provider or judges it incompatible.
+
 ## Ollama context lengths verified — 2026-11-13 (runtime)
 
 `ollama show` on this box confirms the catalog values exactly:
