@@ -65,6 +65,18 @@ def test_generate_adds_regression_neighbors() -> None:
     assert ("regression", "dashboard") in kinds
 
 
+def test_regression_items_are_runnable_or_absent() -> None:
+    checklist = generate_checklist("abc123", ["packages/ai_provider/a.py"])
+    kinds = {(item["kind"], item["area"]) for item in checklist["items"]}
+    assert ("regression", "orchestrator") in kinds
+    for item in checklist["items"]:
+        if item["kind"] != "regression":
+            continue
+        assert len(item["steps"]) == 1
+        assert item["steps"][0]["agent_runnable"] is True
+        assert "run-tests.py" in item["steps"][0]["action"]
+
+
 def test_generate_marks_docs_nonbehavioral() -> None:
     checklist = generate_checklist("abc123", ["docs/notes.md"])
     assert [(i["kind"], i["status"]) for i in checklist["items"]] == [("nonbehavioral", "pending")]

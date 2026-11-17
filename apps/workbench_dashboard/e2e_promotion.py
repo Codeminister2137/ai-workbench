@@ -281,6 +281,9 @@ def generate_checklist(
     for area in sorted(neighbors - set(by_area)):
         behavior = next(b for _p, a, b, _g, _n in AREA_TABLE if a == area)
         goal = next(g for _p, a, _b, g, _n in AREA_TABLE if a == area)
+        area_steps = regression_steps(area)
+        if not area_steps:
+            continue
         items.append(
             {
                 "id": _item_id("regression", area),
@@ -292,7 +295,7 @@ def generate_checklist(
                 "what": list(subjects),
                 "goals": [goal],
                 "status": "pending",
-                "steps": regression_steps(area),
+                "steps": area_steps,
                 "needs_pointers": False,
                 **_guidance_for(area, "regression"),
             }
@@ -728,13 +731,27 @@ def pointer_mission(merge: str, task_id: str, unclear: list[dict]) -> str:
         "inspect the merge diff and the served dashboard if needed; change no code.\n\n"
         f"Merge: {merge}\nTask: {task_id}\n\n"
         + pointer_body(merge, unclear)
-        + "\n\nReply BOTH ways so the result survives truncation:\n"
+        + "\n\nStep rules (violations fail review):\n"
+        "- Steps run on the LIVE served dashboard as-is: no synthetic fixtures, "
+        "no test dashboards, no invented setup. Read-only inspection preferred; "
+        "mutations must be reversible, with the undo as the final step.\n"
+        "- Each step is atomic and independent: verifiable alone in under 2 "
+        "minutes. No run IDs, no cross-step choreography ('after X completes'), "
+        "no meta-orchestration of runs or drains.\n"
+        "- Every runnable step carries its exact backticked command "
+        "(`.venv/Scripts/python.exe -m pytest <path> -q`, "
+        "`.venv/Scripts/python.exe scripts/run-tests.py <group>`, "
+        "`<tool> --help`, `scripts/<name>.py --dry-run`, "
+        "`scripts/e2e-http-get.py <path> <status>`). A pytest/command step "
+        "without backticks is a defect.\n"
+        "- One behavior per step; concrete inputs plus the exact text or "
+        "state to observe. Never emit generic standing checks.\n"
+        "\nReply BOTH ways so the result survives truncation:\n"
         "1. Write pointers.json at your worktree root: "
         '{"<item-id>": [{"action": "...", "expected": "..."}], ...} '
         'or {"declined": "reason"}.\n'
         "2. Also emit STEPS:{...} (same JSON) or DECLINE:<reason> in output.\n"
-        "Every unclear item id needs at least one step; keep actions concrete "
-        "(view hashes, control names, commands). If the change is not "
+        "Every unclear item id needs at least one step. If the change is not "
         "verifiable from any user surface, DECLINE instead of guessing."
     )
 

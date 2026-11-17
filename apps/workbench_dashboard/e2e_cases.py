@@ -446,22 +446,36 @@ def draft_steps(
     return steps
 
 
+# Neighbor area -> exact regression command. Areas without an entry get
+# NO regression item: a generic standing check is worse than none
+# (owner verdict: "generic, so useless to me").
+REGRESSION_COMMANDS: dict[str, str] = {
+    "dashboard": ".venv/Scripts/python.exe scripts/run-tests.py dashboard",
+    "agent-cli": ".venv/Scripts/python.exe scripts/run-tests.py agent",
+    "provider": ".venv/Scripts/python.exe scripts/run-tests.py provider",
+    "orchestrator": ".venv/Scripts/python.exe scripts/run-tests.py orchestrator",
+    "council": ".venv/Scripts/python.exe scripts/run-tests.py council",
+    "job-search": ".venv/Scripts/python.exe scripts/run-tests.py job-search",
+    "company-site": ".venv/Scripts/python.exe -m pytest tests/test_company_site.py -q",
+}
+
+
 def regression_steps(area: str) -> list[dict]:
-    """Standing regression checks for an untouched neighbor area.
+    """One agent-runnable suite check for an untouched neighbor area.
 
-    These re-run the area's standard checks rather than guessing at
-    this diff, so they are grounded by definition and need no pointers.
+    Empty when the area has no exact command: the generator skips the
+    item instead of emitting generic standing text.
     """
-    from e2e_promotion import REGRESSION_LEAD, TEST_GUIDANCE
-
-    how, expected, _where = TEST_GUIDANCE.get(area, ([], "", ""))
+    command = REGRESSION_COMMANDS.get(area)
+    if command is None:
+        return []
     return [
         {
-            "action": step,
-            "expected": expected or "Behaves as before with no errors.",
+            "action": f"Run `{command}` from the repo root.",
+            "expected": "Exit 0: the untouched neighbor still passes its suite.",
             "grounded": True,
+            "agent_runnable": True,
         }
-        for step in [REGRESSION_LEAD, *how]
     ]
 
 

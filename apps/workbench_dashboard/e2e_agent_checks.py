@@ -25,6 +25,10 @@ _PYTEST_RE = re.compile(r"^\.venv/Scripts/python\.exe -m pytest \S+ -q$")
 _HELP_RE = re.compile(r"^\S+ --help$")
 _DRYRUN_RE = re.compile(r"^\.venv/Scripts/python\.exe scripts/\S+\.py --dry-run$")
 _HTTP_GET_RE = re.compile(r"^\.venv/Scripts/python\.exe scripts/e2e-http-get\.py /\S* \d+$")
+_RUN_TESTS_RE = re.compile(
+    r"^\.venv/Scripts/python\.exe scripts/run-tests\.py "
+    r"(provider|orchestrator|agent|cli|research|council|dashboard|job-search)$"
+)
 
 
 def extract_command(action: str) -> str | None:
@@ -38,6 +42,7 @@ def extract_command(action: str) -> str | None:
             or _HELP_RE.match(candidate)
             or _DRYRUN_RE.match(candidate)
             or _HTTP_GET_RE.match(candidate)
+            or _RUN_TESTS_RE.match(candidate)
         ):
             return candidate
     return None
