@@ -40,6 +40,36 @@ def _stub(_credentials):
     ]
 
 
+def _codex_available():
+    return {
+        "status": "available",
+        "source": "codex_app_server",
+        "reason": "available",
+        "observed_at_utc": "2026-11-08T13:00:00+00:00",
+        "windows": [
+            {
+                "bucket_id": "primary",
+                "window": "primary",
+                "used_percent": 12.5,
+                "window_duration_minutes": 300,
+                "resets_at_unix_seconds": 1794182400,
+            }
+        ],
+        "cleanup_verified": True,
+    }
+
+
+def _codex_unavailable():
+    return {
+        "status": "unknown",
+        "source": "codex_app_server",
+        "reason": "client_unavailable",
+        "observed_at_utc": None,
+        "windows": [],
+        "cleanup_verified": True,
+    }
+
+
 def test_uncached_status_returns_unchecked_skeleton(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     monkeypatch.delenv("REQUESTY_API_KEY", raising=False)
@@ -54,6 +84,7 @@ def test_uncached_status_returns_unchecked_skeleton(tmp_path: Path, monkeypatch)
         "meta",
         "opencode_go",
         "ollama",
+        "codex",
     ]
     assert all(p["checked_at"] is None for p in view["providers"])
     assert all(p["key_configured"] is False for p in view["providers"])
@@ -61,7 +92,7 @@ def test_uncached_status_returns_unchecked_skeleton(tmp_path: Path, monkeypatch)
 
 def test_refresh_caches_and_serves_snapshot(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("OPENROUTER_API_KEY", "secret-value")
-    view = refresh_provider_status(tmp_path, probe=_stub)
+    view = refresh_provider_status(tmp_path, probe=_stub, codex_probe=_codex_unavailable)
     assert view["ok"] is True
     assert view["cached"] is False
     assert (tmp_path / "providers.json").exists()
@@ -77,11 +108,45 @@ def test_refresh_caches_and_serves_snapshot(tmp_path: Path, monkeypatch) -> None
 
 def test_snapshot_never_carries_secret_values(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("OPENROUTER_API_KEY", "sk-secret-abc123")
-    view = refresh_provider_status(tmp_path, probe=_stub)
+    view = refresh_provider_status(tmp_path, probe=_stub, codex_probe=_codex_unavailable)
     dumped = json.dumps(view)
     assert "sk-secret-abc123" not in dumped
     dumped_cache = (tmp_path / "providers.json").read_text(encoding="utf-8")
     assert "sk-secret-abc123" not in dumped_cache
+
+
+def test_refresh_appends_codex_row_with_quota_windows(tmp_path: Path) -> None:
+    view = refresh_provider_status(tmp_path, probe=_stub, codex_probe=_codex_available)
+    rows = {p["route"]: p for p in view["providers"]}
+    assert "codex" in rows
+    codex = rows["codex"]
+    assert codex["reachable"] is True
+    assert codex["auth_ok"] is True
+    assert codex["key_configured"] is True
+    assert codex["checked_at"] == "2026-11-08T13:00:00+00:00"
+    assert codex["allowance_windows"] == _codex_available()["windows"]
+    served = provider_status(tmp_path)
+    assert served["cached"] is True
+    assert {p["route"]: p for p in served["providers"]}["codex"] == codex
+
+
+def test_refresh_codex_unavailable_degrades_row(tmp_path: Path) -> None:
+    view = refresh_provider_status(tmp_path, probe=_stub, codex_probe=_codex_unavailable)
+    rows = {p["route"]: p for p in view["providers"]}
+    codex = rows["codex"]
+    assert codex["reachable"] is False
+    assert codex["auth_ok"] is None
+    assert codex["key_configured"] is False
+    assert codex["error"] == "client_unavailable"
+    assert codex["allowance_windows"] == []
+
+
+def test_uncached_status_includes_unchecked_codex(tmp_path: Path) -> None:
+    view = provider_status(tmp_path)
+    rows = {p["route"]: p for p in view["providers"]}
+    assert "codex" in rows
+    assert rows["codex"]["checked_at"] is None
+    assert rows["codex"]["allowance_windows"] == []
 
 
 def test_corrupt_cache_falls_back_to_skeleton(tmp_path: Path) -> None:
@@ -98,6 +163,9 @@ def test_every_route_has_metadata() -> None:
         meta = PROVIDER_META[route]
         assert meta["display"] and meta["site_url"] and meta["blurb"]
         assert meta["site_url"].startswith("https://")
+    codex_meta = PROVIDER_META["codex"]
+    assert codex_meta["display"] and codex_meta["site_url"] and codex_meta["blurb"]
+    assert codex_meta["site_url"].startswith("https://")
 
 
 def test_handler_routes_registered() -> None:

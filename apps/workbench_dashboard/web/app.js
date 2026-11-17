@@ -506,10 +506,28 @@ async function renderModules() {
   });
 }
 
+function spendPolicyRuleRow(r, idx) {
+  const cap = r.max_prepaid_cents_per_day === null || r.max_prepaid_cents_per_day === undefined
+    ? "" : r.max_prepaid_cents_per_day;
+  return `<div class="policy-row" data-idx="${idx}">
+    <input name="scope" value="${esc(r.scope || "")}" placeholder="global or provider route" title="Rule scope: global or a provider route" size="18">
+    <label title="Allow prepaid spend under this rule"><input type="checkbox" name="prepaid" ${r.prepaid_allowed ? "checked" : ""}> prepaid</label>
+    <input name="cap" value="${esc(cap)}" placeholder="cap ¢/day" title="Max prepaid cents per day (empty = no cap)" size="10" inputmode="numeric">
+    <button type="button" data-remove="${idx}" title="Remove this rule">remove</button>
+  </div>`;
+}
+
 function spendCardHtml(spend) {
   const policy = spend.policy || { rules: [], prepaid_spent_today_cents: 0 };
   const policyRules = policy.rules.map((r) =>
     `<li>${esc(r.scope)}: prepaid ${r.prepaid_allowed ? "allowed" : "blocked"}` + (r.max_prepaid_cents_per_day == null ? "" : `, cap ${esc(r.max_prepaid_cents_per_day)}&#162;/day`) + `</li>`).join("");
+  const editorRows = policy.rules.map((r, i) => spendPolicyRuleRow(r, i)).join("");
+  const editor = `<form id="spend-policy-form">
+      <p class="muted">Spend policy — prepaid is blocked unless a rule allows it. Scope is global or a provider route. Saving applies immediately.</p>
+      <div id="spend-policy-rows">${editorRows}</div>
+      <p><button type="button" id="spend-policy-add">Add rule</button>
+      <button type="submit" id="spend-policy-save">Save policy</button></p>
+    </form>`;
   const bucketList = (spend.buckets || []).length
     ? `<ul class="plain">${spend.buckets.map((b) =>
         `<li><span class="pill" title="Allowance status">${esc(b.status)}</span> ${esc(b.provider)} ${esc(b.kind)} — ${esc(b.balance_cents)}/${esc(b.granted_cents)}¢</li>`).join("")}</ul>`
@@ -518,9 +536,46 @@ function spendCardHtml(spend) {
     ? `${bucketList}
       <p class="muted">${esc(spend.open_reservations)} open reservation(s), ${esc(spend.records)} record(s).</p>
       <p class="muted">Order: free &#8594; expiring &#8594; prepaid-if-allowed. Prepaid today: ${esc(policy.prepaid_spent_today_cents)}&#162;.</p>
-      <ul class="plain">${policyRules}</ul>`
+      <ul class="plain">${policyRules}</ul>
+      ${editor}`
     : '<p class="muted">No spend grants configured — billable calls are denied by default.</p>';
   return `<div class="card"><h2>Spend</h2>${body}</div>`;
+}
+
+function collectSpendPolicyRules() {
+  return Array.from(document.querySelectorAll("#spend-policy-rows .policy-row")).map((row) => {
+    const capRaw = row.querySelector('input[name="cap"]').value.trim();
+    return {
+      scope: row.querySelector('input[name="scope"]').value.trim(),
+      prepaid_allowed: row.querySelector('input[name="prepaid"]').checked,
+      max_prepaid_cents_per_day: capRaw === "" ? null : Number(capRaw),
+    };
+  });
+}
+
+function wireSpendPolicyForm() {
+  const form = document.getElementById("spend-policy-form");
+  if (!form) return;
+  document.getElementById("spend-policy-add").addEventListener("click", () => {
+    const rows = document.getElementById("spend-policy-rows");
+    const idx = rows.children.length;
+    rows.insertAdjacentHTML("beforeend", spendPolicyRuleRow({scope: "global", prepaid_allowed: false}, idx));
+  });
+  form.addEventListener("click", (event) => {
+    const btn = event.target.closest("[data-remove]");
+    if (btn) btn.closest(".policy-row").remove();
+  });
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      await api("/api/spend/policy", {method: "POST", headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({rules: collectSpendPolicyRules()})});
+      toast("Spend policy saved", true);
+      await renderProviders();
+    } catch (err) {
+      toast(err.message, false);
+    }
+  });
 }
 
 async function renderHome() {
@@ -2635,6 +2690,10 @@ function providerStatusPill(p) {
   if (p.reachable === null || p.reachable === undefined || p.checked_at === null) {
     return '<span class="pill">not checked yet</span>';
   }
+  if (p.route === "codex") {
+    if (!p.reachable) return '<span class="pill st-down">CLI unreachable</span>';
+    return '<span class="pill st-ok">ok &#183; quota read</span>';
+  }
   if (p.account_required && !p.key_configured) {
     return '<span class="pill st-missing">key missing</span>';
   }
@@ -2661,17 +2720,31 @@ function providerCardHtml(p, allowances) {
   const site = p.site_url
     ? `<p><a href="${esc(p.site_url)}" target="_blank" rel="noopener">` +
       `Log in / register at ${esc(p.display)}</a></p>` : "";
-  const keyLine = !p.account_required
-    ? '<p class="muted">No account or key needed (local).</p>'
-    : (p.key_configured
-      ? '<p class="muted">API key is configured.</p>'
-      : '<p class="muted">No API key configured - add one to use this provider.</p>');
+  const keyLine = p.route === "codex"
+    ? (p.key_configured
+      ? '<p class="muted">Codex CLI login detected.</p>'
+      : '<p class="muted">Codex CLI login not detected — log in so quota reads work.</p>')
+    : (!p.account_required
+      ? '<p class="muted">No account or key needed (local).</p>'
+      : (p.key_configured
+        ? '<p class="muted">API key is configured.</p>'
+        : '<p class="muted">No API key configured - add one to use this provider.</p>'));
+  const quotaRows = (p.allowance_windows || [])
+    .map((w) => `<li>${esc(w.bucket_id || "?")}/${esc(w.window || "?")} — ` +
+      `${w.used_percent === null || w.used_percent === undefined ? "?" : esc(w.used_percent) + "%"} used` +
+      (w.resets_at_unix_seconds ? `, resets ${esc(new Date(w.resets_at_unix_seconds * 1000).toLocaleString())}` : "") + `</li>`)
+    .join("");
+  const quotaBlock = p.route === "codex"
+    ? (quotaRows
+      ? `<p class="muted">Quota windows:</p><ul class="plain">${quotaRows}</ul>`
+      : `<p class="muted">Quota windows: none reported.</p>`)
+    : "";
   const allowanceRows = (allowances || [])
     .map((b) => `<li><span class="pill" title="Allowance status">${esc(b.status)}</span> ${esc(b.kind)} — ${esc(b.balance_cents)}/${esc(b.granted_cents)}¢</li>`)
     .join("");
-  const allowanceBlock = (allowances || []).length
+  const allowanceBlock = p.route === "codex" ? quotaBlock : ((allowances || []).length
     ? `<p class="muted">Allowances:</p><ul class="plain">${allowanceRows}</ul>`
-    : `<p class="muted">Allowances: no usage recorded yet.</p>`;
+    : `<p class="muted">Allowances: no usage recorded yet.</p>`);
   return `<div class="card"><h2>${esc(p.display)}</h2>
     <p>${providerStatusPill(p)}</p>
     <p class="muted">${esc(p.blurb || "")}</p>
@@ -2710,6 +2783,7 @@ async function renderProviders() {
       toast(err.message, false);
     }
   });
+  wireSpendPolicyForm();
 }
 
 async function render() {

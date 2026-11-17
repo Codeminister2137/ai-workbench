@@ -35,6 +35,7 @@ from ai_orchestrator.spend_ledger import (
     SpendLedger,
     allowance_from_file,
     policy_from_file,
+    policy_rules_from_doc,
 )
 from ai_provider.adapters.meta_asr import MetaAsrEngine
 from ai_provider.chat_transcripts import SQLiteChatTranscriptStore
@@ -1148,6 +1149,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 return self._draft_plan_from_chat(config, session_id, payload)
             if path == "/api/providers/refresh":
                 return self._send_json(refresh_provider_status(self.data_dir, self.repo_root))
+            if path == "/api/spend/policy":
+                return self._save_spend_policy(payload)
             if path == "/api/inbox":
                 return self._create_inbox_task(payload)
             if path == "/api/e2e/tasks":
@@ -2479,6 +2482,41 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         except ValueError as exc:
             return self._send_json({"ok": False, "error": str(exc)}, status=400)
         self._send_json({"ok": True, "pinned": sorted(current)})
+
+    def _save_spend_policy(self, payload: dict) -> None:
+        import os
+        import tempfile
+
+        try:
+            rules = policy_rules_from_doc(payload)
+        except ValueError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        policy_path = self.data_dir / "spend" / "policy.json"
+        policy_path.parent.mkdir(parents=True, exist_ok=True)
+        document = {
+            "rules": [
+                {
+                    "scope": rule.scope,
+                    "prepaid_allowed": rule.prepaid_allowed,
+                    "max_prepaid_cents_per_day": rule.max_prepaid_cents_per_day,
+                }
+                for rule in rules
+            ]
+        }
+        fd, tmp_name = tempfile.mkstemp(dir=str(policy_path.parent), prefix="policy")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                json.dump(document, handle, indent=2, sort_keys=True)
+            os.replace(tmp_name, policy_path)
+        except BaseException:
+            try:
+                os.unlink(tmp_name)
+            except OSError:
+                pass
+            raise
+        if self.spend_ledger is not None:
+            self.spend_ledger.set_rules(rules)
+        self._send_json({"ok": True, "spend": spend_status(self.data_dir, self.spend_ledger)})
 
     def _bridge_inbox_runs(self) -> None:
         from inbox_bridge import bridge_agent_queue, resolve_bridge_fanout

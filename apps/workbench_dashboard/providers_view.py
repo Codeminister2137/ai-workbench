@@ -56,6 +56,13 @@ PROVIDER_META: Mapping[str, Mapping[str, Any]] = {
         "account_required": False,
         "blurb": "Local models on this PC; no account or key needed.",
     },
+    "codex": {
+        "display": "Codex",
+        "env": None,
+        "site_url": "https://openai.com",
+        "account_required": True,
+        "blurb": "Codex CLI via native login; quota windows only, no model turns.",
+    },
 }
 
 
@@ -76,6 +83,7 @@ class ProviderView:
     latency_ms: int | None
     checked_at: str | None
     error: str | None
+    allowance_windows: tuple[Mapping[str, Any], ...] = ()
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -92,6 +100,7 @@ class ProviderView:
             "latency_ms": self.latency_ms,
             "checked_at": self.checked_at,
             "error": self.error,
+            "allowance_windows": [dict(window) for window in self.allowance_windows],
         }
 
     @classmethod
@@ -182,6 +191,47 @@ def _serialize(probes: list[RouteProbe], repo_root: Path | None = None) -> dict[
     return {"providers": rows}
 
 
+def codex_view(report: Mapping[str, Any]) -> ProviderView:
+    """Map one native Codex allowance report onto a provider row.
+
+    Codex is a CLI subscription, not an HTTP route, so it never goes
+    through probe_all; availability means the CLI ran and native login
+    answered with quota windows.
+    """
+    from datetime import UTC, datetime
+
+    meta = PROVIDER_META.get("codex", {})
+    available = report.get("status") == "available"
+    windows = report.get("windows") or []
+    checked_at = report.get("observed_at_utc") or datetime.now(UTC).isoformat()
+    return ProviderView(
+        route="codex",
+        display=str(meta.get("display", "codex")),
+        account_required=bool(meta.get("account_required", True)),
+        key_configured=available,
+        site_url=str(meta.get("site_url", "")),
+        blurb=str(meta.get("blurb", "")),
+        reachable=True if available else False,
+        auth_ok=True if available else None,
+        model_count=None,
+        sample_ids=(),
+        latency_ms=None,
+        checked_at=checked_at,
+        error=None if available else str(report.get("reason") or "unknown"),
+        allowance_windows=tuple(windows),
+    )
+
+
+def read_codex_report() -> Mapping[str, Any]:
+    """Read one live Codex allowance report; never raises (degrades)."""
+    from ai_provider.codex_usage import read_codex_allowance
+
+    try:
+        return read_codex_allowance()
+    except Exception as error:  # noqa: BLE001 - one route must not kill the sweep
+        return {"status": "unknown", "reason": type(error).__name__, "windows": []}
+
+
 def load_cached(data_dir: Path) -> dict[str, Any] | None:
     """Return the cached snapshot, or None when missing/unreadable."""
     try:
@@ -206,6 +256,7 @@ def provider_status(data_dir: Path, repo_root: Path | None = None) -> dict[str, 
                 route, key_configured=bool(env_name and presence.get(env_name))
             ).to_json()
         )
+    rows.append(ProviderView.unchecked("codex", key_configured=False).to_json())
     return {"ok": True, "providers": rows, "cached": False}
 
 
@@ -214,12 +265,15 @@ def refresh_provider_status(
     repo_root: Path | None = None,
     *,
     probe: Callable[[Mapping[str, str | None]], list[RouteProbe]] | None = None,
+    codex_probe: Callable[[], Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Run one live probe sweep, cache it atomically, and return the view."""
     from ai_provider.route_probe import probe_all
 
     sweep = probe or probe_all
     snapshot = _serialize(list(sweep(_credentials(repo_root))), repo_root)
+    codex_sweep = codex_probe or read_codex_report
+    snapshot["providers"].append(codex_view(codex_sweep()).to_json())
     path = _cache_path(data_dir)
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp_name = tempfile.mkstemp(dir=str(path.parent), prefix=path.name)
