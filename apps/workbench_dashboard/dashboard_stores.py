@@ -669,6 +669,7 @@ class DashboardStores:
         fails = []
         noted = []
         bad_tests = []
+        mismatched = []
         for entry in report.get("items", []):
             if entry.get("status") != "tested":
                 continue
@@ -679,7 +680,9 @@ class DashboardStores:
                 fails.append(entry)
             elif notes:
                 noted.append(entry)
-        if not fails and not noted and not bad_tests:
+            if entry.get("agent_check_mismatches"):
+                mismatched.append(entry)
+        if not fails and not noted and not bad_tests and not mismatched:
             return None
         merge = str(record.get("merge_commit") or "")
         parts = [f"{len(fails)} failed"] if fails else []
@@ -687,6 +690,8 @@ class DashboardStores:
             parts.append(f"{len(noted)} noted")
         if bad_tests:
             parts.append(f"{len(bad_tests)} bad-test")
+        if mismatched:
+            parts.append(f"{len(mismatched)} mismatched")
         lines = [f"E2E report {report.get('id')} for merge {merge} needs action.", ""]
         for entry in fails:
             lines.append(f"FAIL {entry.get('id')} ({entry.get('behavior') or ''}):")
@@ -699,6 +704,12 @@ class DashboardStores:
         for entry in noted:
             lines.append(f"NOTE on {entry.get('id')} (passed):")
             lines.append(str(entry.get("notes", "") or "").strip()[:2000])
+            lines.append("")
+        for entry in mismatched:
+            lines.append(f"MISMATCH on {entry.get('id')} (owner passed, agent check failed):")
+            lines.append(
+                "; ".join(str(action) for action in entry.get("agent_check_mismatches", []))[:2000]
+            )
             lines.append("")
         try:
             filed = self.create_inbox_task(

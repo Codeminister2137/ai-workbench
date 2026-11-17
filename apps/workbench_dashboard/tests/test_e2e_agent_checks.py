@@ -41,6 +41,14 @@ def test_execute_check_uses_runner_and_truncates(tmp_path: Path) -> None:
     assert seen["root"] == tmp_path
 
 
+def test_default_runner_honors_timeout_override(tmp_path) -> None:
+    code, output = e2e_agent_checks._default_runner(
+        ["python", "-c", "import time; time.sleep(30)"], tmp_path, timeout_seconds=1
+    )
+    assert code == 124
+    assert output.endswith("[TIMEOUT]")
+
+
 def test_execute_check_refuses_unrunnable(tmp_path: Path) -> None:
     import pytest
 

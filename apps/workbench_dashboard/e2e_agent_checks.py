@@ -35,14 +35,16 @@ def extract_command(action: str) -> str | None:
     return None
 
 
-def _default_runner(argv: Sequence[str], repo_root: Path) -> tuple[int, str]:
+def _default_runner(
+    argv: Sequence[str], repo_root: Path, timeout_seconds: float = CHECK_TIMEOUT_SECONDS
+) -> tuple[int, str]:
     try:
         proc = subprocess.run(
             list(argv),
             cwd=repo_root,
             capture_output=True,
             text=True,
-            timeout=CHECK_TIMEOUT_SECONDS,
+            timeout=timeout_seconds,
         )
     except subprocess.TimeoutExpired as exc:
         tail = str(exc.stdout or "") + str(exc.stderr or "")
@@ -57,12 +59,19 @@ def execute_check(
     action: str,
     repo_root: Path,
     runner: Callable[[Sequence[str], Path], tuple[int, str]] | None = None,
+    timeout_seconds: float = CHECK_TIMEOUT_SECONDS,
 ) -> dict[str, object]:
-    """Run one exact-command step; raises ValueError when not runnable."""
+    """Run one exact-command step; raises ValueError when not runnable.
+
+    ``timeout_seconds`` bounds the default runner only; injected runners
+    manage their own timeouts.
+    """
     command = extract_command(action)
     if command is None:
         raise ValueError("step carries no exact runnable command")
-    call = runner or _default_runner
     argv = shlex.split(command, posix=False)
-    code, output = call(argv, repo_root)
+    if runner is not None:
+        code, output = runner(argv, repo_root)
+    else:
+        code, output = _default_runner(argv, repo_root, timeout_seconds)
     return {"command": command, "exit_code": code, "output": output[-EVIDENCE_CHARS:]}

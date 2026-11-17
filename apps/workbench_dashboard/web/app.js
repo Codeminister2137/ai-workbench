@@ -1340,14 +1340,25 @@ async function renderE2E(id) {
         : entry.verdict_by === "ancestor" ? "ancestor approval"
         : "no user-visible behavior";
       const testedOn = entry.tested_on ? ` · tested on ${esc(entry.tested_on)}` : "";
-      const stepRows = (entry.step_results || []).map((s) => {
+      const stepRows = (entry.step_results || []).map((s, si) => {
         const mark = s.verdict
           ? `<span class="pill st-${esc(s.verdict)}">${esc(s.verdict)}</span>`
           : "[done]";
-        return `<li>${mark} ${esc(s.action || "")}<br><span class="muted">Expected: ${esc(s.expected || "")}</span></li>`;
+        const st = ((entry.steps || [])[si]) || {};
+        let agent = "";
+        if (st.evidence_exit !== undefined || st.evidence) {
+          agent = `<br><span class="muted">Agent check exit: ${esc(String(st.evidence_exit ?? "?"))}</span>`;
+          if (st.evidence) {
+            agent += `<details><summary>Agent output</summary><pre>${esc(st.evidence)}</pre></details>`;
+          }
+        }
+        return `<li>${mark} ${esc(s.action || "")}${agent}<br><span class="muted">Expected: ${esc(s.expected || "")}</span></li>`;
       }).join("");
+      const mismatch = (entry.agent_check_mismatches || []).length
+        ? ` <span class="pill st-fail" title="Owner passed but the agent check failed">agent mismatch</span>`
+        : "";
       return `<li><strong>${esc(entry.behavior || entry.id)}</strong>
-        <span class="pill st-${verdict}">${verdict} · ${esc(by)}</span>
+        <span class="pill st-${verdict}">${verdict} · ${esc(by)}</span>${mismatch}
         ${entry.warning ? `<p class="muted">Warning: ${esc(entry.warning)}</p>` : ""}
         ${stepRows ? `<ol>${stepRows}</ol>` : ""}
         ${entry.notes ? `<p>${esc(entry.notes)}</p>` : ""}

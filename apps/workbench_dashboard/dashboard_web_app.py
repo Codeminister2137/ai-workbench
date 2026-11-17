@@ -86,6 +86,7 @@ REPO_ROOT = ROOT.parent.parent
 MAX_REQUEST_BYTES = 512_000
 REQUEST_TIMEOUT_SECONDS = 5.0
 DEFAULT_PORT = 8766
+SUBMIT_AUTOCHECK_BUDGET_SECONDS = 300.0
 
 # Served inline in the dashboard origin: active types would execute with
 # full API access, so they are downgraded to inert text (audit 2026-11-06).
@@ -1820,8 +1821,24 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             return self._send_json({"ok": False, "error": str(exc)}, status=status)
         self._send_json({"ok": True, "id": record["id"], "status": record["status"]})
 
-    def _run_agent_check(self, task_id: str, payload: dict) -> None:
+    def _attach_step_evidence(
+        self, steps: list, index: int, timeout_seconds: float
+    ) -> dict[str, object]:
+        """Run one agent-runnable step and stamp its evidence; may raise ValueError."""
         from e2e_agent_checks import execute_check
+
+        result = execute_check(
+            str(steps[index].get("action") or ""),
+            self.repo_root,
+            timeout_seconds=timeout_seconds,
+        )
+        steps[index]["evidence"] = result["output"]
+        steps[index]["evidence_utc"] = datetime.now(UTC).isoformat()
+        steps[index]["evidence_exit"] = result["exit_code"]
+        return steps[index]
+
+    def _run_agent_check(self, task_id: str, payload: dict) -> None:
+        from e2e_agent_checks import CHECK_TIMEOUT_SECONDS
 
         stores = self._stores()
         record = stores.e2e_tasks.get(task_id)
@@ -1849,14 +1866,53 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         ):
             return self._send_json({"ok": False, "error": "Step is not agent-runnable"}, status=422)
         try:
-            result = execute_check(str(steps[index].get("action") or ""), self.repo_root)
+            step = self._attach_step_evidence(steps, index, CHECK_TIMEOUT_SECONDS)
         except ValueError as exc:
             return self._send_json({"ok": False, "error": str(exc)}, status=422)
-        steps[index]["evidence"] = result["output"]
-        steps[index]["evidence_utc"] = datetime.now(UTC).isoformat()
-        steps[index]["evidence_exit"] = result["exit_code"]
         stores.e2e_tasks.put(task_id, record)
-        self._send_json({"ok": True, "evidence": steps[index]})
+        self._send_json({"ok": True, "evidence": step})
+
+    def _auto_run_pending_checks(self, task_id: str) -> None:
+        """Run evidence-less agent steps before submit (brief 24b004b6-A).
+
+        Bounded by SUBMIT_AUTOCHECK_BUDGET_SECONDS across all steps; never
+        raises (submit must not fail because evidence gathering hiccuped).
+        """
+        from e2e_agent_checks import CHECK_TIMEOUT_SECONDS
+
+        try:
+            stores = self._stores()
+            record = stores.e2e_tasks.get(task_id)
+            if record is None or record.get("status") != "open":
+                return
+            started = time.monotonic()
+            touched = False
+            for item in record.get("items", []):
+                if not isinstance(item, dict):
+                    continue
+                for index, step in enumerate(item.get("steps") or []):
+                    if not isinstance(step, dict):
+                        continue
+                    if not step.get("agent_runnable") or step.get("evidence"):
+                        continue
+                    remaining = SUBMIT_AUTOCHECK_BUDGET_SECONDS - (time.monotonic() - started)
+                    if remaining <= 0:
+                        step["evidence"] = "[auto-check skipped: submit time budget spent]"
+                        step["evidence_utc"] = datetime.now(UTC).isoformat()
+                        step["evidence_exit"] = None
+                        touched = True
+                        continue
+                    try:
+                        self._attach_step_evidence(
+                            item["steps"], index, min(remaining, CHECK_TIMEOUT_SECONDS)
+                        )
+                    except ValueError:
+                        continue
+                    touched = True
+            if touched:
+                stores.e2e_tasks.put(task_id, record)
+        except Exception as exc:  # noqa: BLE001 - evidence never breaks submit
+            print(f"Workbench dashboard: submit auto-checks skipped: {exc}")
 
     def _send_e2e_tasks(self, query: str) -> None:
         params = parse_qs(query)
@@ -1967,6 +2023,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         results = payload.get("results")
         if not isinstance(results, list):
             return self._send_json({"ok": False, "error": "Invalid submit payload"}, status=400)
+        self._auto_run_pending_checks(task_id)
         try:
             outcome = self._stores().submit_e2e_task(task_id, results)
         except StoreError as exc:
