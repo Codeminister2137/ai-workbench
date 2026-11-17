@@ -950,6 +950,14 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 return self._send_json({"ok": True, "files": list_intake(self.repo_root)})
             if path == "/api/chat/sessions":
                 return self._send_chat_sessions(config)
+            if path == "/api/chat/agent-config":
+                return self._send_json(
+                    {
+                        "ok": True,
+                        "enabled": config.chat_agent_enabled,
+                        "approval": config.chat_agent_approval,
+                    }
+                )
             if path.startswith("/api/chat/sessions/") and path.endswith("/progress"):
                 session_id = path[len("/api/chat/sessions/") : -len("/progress")]
                 message_id = parse_qs(parsed.query).get("message_id", [""])[0]
@@ -1106,6 +1114,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 return self._analyze_meeting_endpoint(config, meeting_id, payload)
             if path == "/api/chat/sessions":
                 return self._create_chat_session(config, payload)
+            if path == "/api/chat/agent-config":
+                return self._save_chat_agent_config(payload)
             if path.startswith("/api/chat/sessions/") and path.endswith("/messages"):
                 session_id = path[len("/api/chat/sessions/") : -len("/messages")]
                 return self._post_chat_message(config, session_id, payload)
@@ -1431,6 +1441,17 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         except StoreError as exc:
             return self._send_json({"ok": False, "error": str(exc)}, status=400)
         self._send_json({"ok": True, "id": session_id, "mode": record["mode"]})
+
+    def _save_chat_agent_config(self, payload: dict) -> None:
+        from dashboard_config import save_chat_agent
+
+        try:
+            saved = save_chat_agent(
+                self.config_path, payload.get("enabled"), payload.get("approval")
+            )
+        except ValueError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        self._send_json({"ok": True, **saved})
 
     def _apply_chat_staged(self, session_id: str, payload: dict) -> None:
         from chat_agent import ChatAgentError, apply_staged, ensure_chat_worktree

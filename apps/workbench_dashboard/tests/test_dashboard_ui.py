@@ -118,8 +118,8 @@ def test_dynamic_buttons_have_titles() -> None:
     js = _read("app.js")
     buttons = re.findall(r"<button\b[^>]*>", js)
     assert (
-        len(buttons) == 52
-    )  # +doc pin; +fanout apply; +delete-inbox-btn +e2e submit +chat mode/apply/approve +notes save +agent-check run
+        len(buttons) == 53
+    )  # +doc pin; +fanout apply; +delete-inbox-btn +e2e submit +chat mode/apply/approve +notes save +agent-check run +agent-config save
     for tag in buttons:
         assert "title=" in tag, f"button without title: {tag}"
 
@@ -128,11 +128,13 @@ def test_dynamic_inputs_and_selects_have_titles() -> None:
     """Text inputs/selects in templates have titles (radios use labels)."""
     js = _read("app.js")
     inputs = [tag for tag in re.findall(r"<input\b[^>]*>", js) if 'type="radio"' not in tag]
-    assert len(inputs) == 55  # +bad-test checkbox; step radios excluded
+    assert len(inputs) == 56  # +bad-test checkbox; +agent-enable checkbox; step radios excluded
     for tag in inputs:
         assert "title=" in tag, f"input without title: {tag}"
     selects = re.findall(r"<select\b[^>]*>", js)
-    assert len(selects) == 21  # +restrictions fan-out; +run fanout; +landing-page select
+    assert (
+        len(selects) == 22
+    )  # +restrictions fan-out; +run fanout; +landing-page select; +agent policy
     for tag in selects:
         assert "title=" in tag, f"select without title: {tag}"
 
@@ -1266,6 +1268,17 @@ def test_e2e_report_shows_agent_evidence_and_mismatch() -> None:
     assert "Agent output" in js
     assert "agent_check_mismatches" in js
     assert "agent mismatch" in js
+
+
+def test_chat_agent_controls_present() -> None:
+    """Chat thread exposes the agent enable switch and policy selector."""
+    js = _read("app.js")
+    assert "Agent mode is off" in js
+    assert 'id="agent-enable"' in js
+    assert 'id="agent-policy"' in js
+    assert 'id="agent-save-btn"' in js
+    assert "/api/chat/agent-config" in js
+    assert '"scoped", "ask-always", "yolo"' in js
 
 
 def test_run_report_renders_readable_markdown() -> None:

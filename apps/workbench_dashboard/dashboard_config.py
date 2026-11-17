@@ -160,6 +160,34 @@ def save_supervision(path: Path, supervision: str) -> str:
     return supervision
 
 
+def save_chat_agent(path: Path, enabled: object, approval: object) -> dict[str, object]:
+    """Persist the Agent-mode master switch and policy, preserving other keys.
+
+    A missing config file is created; other keys round-trip untouched.
+    Raises ``ValueError`` for a non-bool switch, an unknown policy, or an
+    unreadable file.
+    """
+    if not isinstance(enabled, bool):
+        raise ValueError("enabled must be true or false")
+    if approval not in ("scoped", "ask-always", "yolo"):
+        raise ValueError("approval must be scoped, ask-always, or yolo")
+    payload: dict[str, object] = {}
+    if path.exists():
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+        except (ValueError, UnicodeError) as exc:
+            raise ValueError(f"Dashboard config is not valid JSON: {path}") from exc
+        if not isinstance(raw, dict):
+            raise ValueError("Dashboard config must be a JSON object")
+        payload = raw
+    payload["chat_agent_enabled"] = enabled
+    payload["chat_agent_approval"] = approval
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    tmp.replace(path)
+    return {"enabled": enabled, "approval": approval}
+
+
 def save_fanout_default(path: Path, scope: str, policy: str) -> str:
     """Persist a fan-out default (chat or bridge runs), preserving other keys.
 
