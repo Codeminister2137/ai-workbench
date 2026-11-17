@@ -1257,3 +1257,27 @@ def test_projects_goals_carry_registry_provenance() -> None:
     js = _read("app.js")
     assert "docs/goals/registry.json" in js
     assert "registered project directories appear under Work roots" in js
+
+
+def test_run_report_renders_readable_markdown() -> None:
+    """Run reports render headers/lists/bold, never raw markdown or markup."""
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node is required to execute the report renderer")
+    driver = r"""
+const assert = require('assert');
+const source = require('fs').readFileSync(process.argv[1], 'utf8');
+eval(source.slice(source.indexOf('function esc('), source.indexOf('/* Readable local')));
+const html = mdHtml('# Title (r1)\nStatus: **completed**\n\n## Tools used\n- read_file\n- grep\n\n<script>alert(1)</script>');
+assert(html.includes('<h4>Title (r1)</h4>'));
+assert(html.includes('<h5>Tools used</h5>'));
+assert(html.includes('<strong>completed</strong>'));
+assert(html.includes('<li>read_file</li>'));
+assert(!html.includes('<script>'));
+assert(html.includes('&lt;script&gt;'));
+"""
+    result = subprocess.run(
+        [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
+    )
+    assert result.returncode == 0, result.stderr
+    assert "mdHtml(run.report)" in _read("app.js")

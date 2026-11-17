@@ -41,6 +41,38 @@ function esc(text) {
   ));
 }
 
+/* Minimal markdown for run reports: escape first, then headers, bold, lists. */
+function mdHtml(src) {
+  const lines = String(src || "").split("\n");
+  const html = [];
+  let list = [];
+  const flush = () => {
+    if (list.length) {
+      html.push("<ul>" + list.map((item) => `<li>${item}</li>`).join("") + "</ul>");
+      list = [];
+    }
+  };
+  const inline = (text) => esc(text).replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  for (const raw of lines) {
+    const line = raw.trimEnd();
+    const heading = line.match(/^(#{1,3}) /);
+    if (heading) {
+      flush();
+      const level = 3 + heading[1].length;
+      html.push(`<h${level}>${inline(line.replace(/^#+ /, ""))}</h${level}>`);
+    } else if (/^[-*] /.test(line)) {
+      list.push(inline(line.replace(/^[-*] /, "")));
+    } else if (!line.trim()) {
+      flush();
+    } else {
+      flush();
+      html.push(`<p>${inline(line)}</p>`);
+    }
+  }
+  flush();
+  return html.join("\n");
+}
+
 /* Readable local timestamps; falls back to the raw value when unparseable. */
 function fmtTime(value) {
   if (!value) return "?";
@@ -1157,7 +1189,7 @@ async function renderRuns(id) {
         <button id="fanout-apply-btn" title="Apply fan-out policy to this run">Apply</button>`
       : "";
     const report = run.report
-      ? `<h3>Report</h3><pre>${gtext(run.report)}</pre>`
+      ? `<h3>Report</h3>${mdHtml(run.report)}`
       : run.report_request_id
         ? `<p class="muted">Report requested — see the inbox task.</p>`
         : `<p><button id="report-btn" title="Ask for a completion report for this run">Generate report</button></p>`;
