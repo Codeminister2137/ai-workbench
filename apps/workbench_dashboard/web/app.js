@@ -516,9 +516,13 @@ function spendPolicyScopes() {
   }
 }
 
+function spendDollars(cents) {
+  return "$" + (Number(cents) / 100).toFixed(2);
+}
+
 function spendPolicyRuleRow(r, idx, scopes) {
-  const cap = r.max_prepaid_cents_per_day === null || r.max_prepaid_cents_per_day === undefined
-    ? "" : r.max_prepaid_cents_per_day;
+  const cap = r.max_prepaid_cents === null || r.max_prepaid_cents === undefined
+    ? "" : (Number(r.max_prepaid_cents) / 100).toFixed(2);
   const known = scopes || spendPolicyScopes();
   const options = known.includes(r.scope) ? known : [...known, r.scope];
   const scopeOpts = options.map((s) =>
@@ -526,15 +530,15 @@ function spendPolicyRuleRow(r, idx, scopes) {
   return `<div class="policy-row" data-idx="${idx}">
     <select name="scope" title="Rule scope: global or one provider route">${scopeOpts}</select>
     <label><input type="checkbox" name="prepaid" title="Allow prepaid spend under this rule" ${r.prepaid_allowed ? "checked" : ""}> prepaid</label>
-    <input name="cap" value="${esc(cap)}" placeholder="cap ¢/day" title="Max prepaid cents per day (empty = no cap)" size="10" inputmode="numeric">
+    <input name="cap" value="${esc(cap)}" placeholder="cap $" title="Max prepaid spend in dollars, total (empty = no cap)" size="10" inputmode="decimal">
     <button type="button" data-remove="${idx}" title="Remove this rule">remove</button>
   </div>`;
 }
 
 function spendCardHtml(spend) {
-  const policy = spend.policy || { rules: [], prepaid_spent_today_cents: 0 };
+  const policy = spend.policy || { rules: [], prepaid_spent_total_cents: 0 };
   const policyRules = policy.rules.map((r) =>
-    `<li>${esc(r.scope)}: prepaid ${r.prepaid_allowed ? "allowed" : "blocked"}` + (r.max_prepaid_cents_per_day == null ? "" : `, cap ${esc(r.max_prepaid_cents_per_day)}&#162;/day`) + `</li>`).join("");
+    `<li>${esc(r.scope)}: prepaid ${r.prepaid_allowed ? "allowed" : "blocked"}` + (r.max_prepaid_cents == null ? "" : `, cap ${esc(spendDollars(r.max_prepaid_cents))} total`) + `</li>`).join("");
   const scopes = spend.policy_scopes && spend.policy_scopes.length ? spend.policy_scopes : ["global"];
   const editorRows = policy.rules.map((r, i) => spendPolicyRuleRow(r, i, scopes)).join("");
   const editor = `<form id="spend-policy-form">
@@ -545,14 +549,23 @@ function spendCardHtml(spend) {
     </form>`;
   const bucketList = (spend.buckets || []).length
     ? `<ul class="plain">${spend.buckets.map((b) =>
-        `<li><span class="pill" title="Allowance status">${esc(b.status)}</span> ${esc(b.provider)} ${esc(b.kind)} — ${esc(b.balance_cents)}/${esc(b.granted_cents)}¢</li>`).join("")}</ul>`
+        `<li><span class="pill" title="Allowance status">${esc(b.status)}</span> ${esc(b.provider)} ${esc(b.kind)} — ${esc(spendDollars(b.balance_cents))} left of ${esc(spendDollars(b.granted_cents))}</li>`).join("")}</ul>`
     : `<p class="muted">No spend buckets yet — usage appears here once runs settle spend.</p>`;
+  const adjustOpts = (spend.buckets || []).map((b) =>
+    `<option value="${esc(b.id)}">${esc(b.provider)} ${esc(b.kind)} (${esc(spendDollars(b.balance_cents))} left)</option>`).join("");
+  const adjust = `<form id="spend-adjust-form">
+      <p class="muted">Record pre-ledger spend: enter what the provider console says is left; the ledger books the difference as one manual record.</p>
+      <p><select name="allowance" title="Bucket to adjust">${adjustOpts}</select>
+      <input name="remaining" placeholder="left $" title="Remaining balance in dollars, from the provider console" size="10" inputmode="decimal">
+      <button type="submit" title="Book the difference as manual spend">Record spend</button></p>
+    </form>`;
   const body = spend.configured
     ? `${bucketList}
       <p class="muted">${esc(spend.open_reservations)} open reservation(s), ${esc(spend.records)} record(s).</p>
-      <p class="muted">Order: free &#8594; expiring &#8594; prepaid-if-allowed. Prepaid today: ${esc(policy.prepaid_spent_today_cents)}&#162;.</p>
+      <p class="muted">Order: free &#8594; expiring &#8594; prepaid-if-allowed. Prepaid spent: ${esc(spendDollars(policy.prepaid_spent_total_cents || 0))} total.</p>
       <ul class="plain">${policyRules}</ul>
-      ${editor}`
+      ${editor}
+      ${adjust}`
     : '<p class="muted">No spend grants configured — billable calls are denied by default.</p>';
   return `<div class="card"><h2>Spend</h2>${body}</div>`;
 }
@@ -563,8 +576,33 @@ function collectSpendPolicyRules() {
     return {
       scope: row.querySelector('select[name="scope"]').value,
       prepaid_allowed: row.querySelector('input[name="prepaid"]').checked,
-      max_prepaid_cents_per_day: capRaw === "" ? null : Number(capRaw),
+      max_prepaid_cents: capRaw === "" ? null : Math.round(Number(capRaw) * 100),
     };
+  });
+}
+
+function wireSpendAdjustForm() {
+  const form = document.getElementById("spend-adjust-form");
+  if (!form) return;
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const remainingRaw = form.querySelector('input[name="remaining"]').value.trim();
+    const remaining = Math.round(Number(remainingRaw) * 100);
+    if (!remainingRaw || Number.isNaN(remaining) || remaining < 0) {
+      toast("Enter the remaining balance in dollars (0 or more)", false);
+      return;
+    }
+    try {
+      await api("/api/spend/adjust", {method: "POST", headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+          allowance_id: form.querySelector('select[name="allowance"]').value,
+          remaining_cents: remaining,
+        })});
+      toast("Manual spend recorded", true);
+      await renderProviders();
+    } catch (err) {
+      toast(err.message, false);
+    }
   });
 }
 
@@ -2763,7 +2801,7 @@ function providerCardHtml(p, allowances) {
       : `<p class="muted">Quota windows: none reported.</p>`)
     : "";
   const allowanceRows = (allowances || [])
-    .map((b) => `<li><span class="pill" title="Allowance status">${esc(b.status)}</span> ${esc(b.kind)} — ${esc(b.balance_cents)}/${esc(b.granted_cents)}¢</li>`)
+    .map((b) => `<li><span class="pill" title="Allowance status">${esc(b.status)}</span> ${esc(b.kind)} — ${esc(spendDollars(b.balance_cents))} left of ${esc(spendDollars(b.granted_cents))}</li>`)
     .join("");
   const allowanceBlock = p.route === "codex" ? quotaBlock : ((allowances || []).length
     ? `<p class="muted">Allowances:</p><ul class="plain">${allowanceRows}</ul>`
@@ -2807,6 +2845,7 @@ async function renderProviders() {
     }
   });
   wireSpendPolicyForm();
+  wireSpendAdjustForm();
 }
 
 async function render() {

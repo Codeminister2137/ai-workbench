@@ -118,8 +118,8 @@ def test_dynamic_buttons_have_titles() -> None:
     js = _read("app.js")
     buttons = re.findall(r"<button\b[^>]*>", js)
     assert (
-        len(buttons) == 56
-    )  # +doc pin; +fanout apply; +delete-inbox-btn +e2e submit +chat mode/apply/approve +notes save +agent-check run +agent-config save +spend-policy add/save/remove
+        len(buttons) == 57
+    )  # +doc pin; +fanout apply; +delete-inbox-btn +e2e submit +chat mode/apply/approve +notes save +agent-check run +agent-config save +spend-policy add/save/remove +spend-adjust record
     for tag in buttons:
         assert "title=" in tag, f"button without title: {tag}"
 
@@ -129,14 +129,14 @@ def test_dynamic_inputs_and_selects_have_titles() -> None:
     js = _read("app.js")
     inputs = [tag for tag in re.findall(r"<input\b[^>]*>", js) if 'type="radio"' not in tag]
     assert (
-        len(inputs) == 58
-    )  # +bad-test checkbox; +agent-enable checkbox; +spend-policy prepaid/cap (scope is a select); step radios excluded
+        len(inputs) == 59
+    )  # +bad-test checkbox; +agent-enable checkbox; +spend-policy prepaid/cap (scope is a select); +spend-adjust remaining; step radios excluded
     for tag in inputs:
         assert "title=" in tag, f"input without title: {tag}"
     selects = re.findall(r"<select\b[^>]*>", js)
     assert (
-        len(selects) == 23
-    )  # +restrictions fan-out; +run fanout; +landing-page select; +agent policy; +spend-policy scope
+        len(selects) == 24
+    )  # +restrictions fan-out; +run fanout; +landing-page select; +agent policy; +spend-policy scope; +spend-adjust allowance
     for tag in selects:
         assert "title=" in tag, f"select without title: {tag}"
 
@@ -891,11 +891,11 @@ def test_inbox_and_idea_bodies_preserve_line_breaks() -> None:
 
 
 def test_spend_card_renders_policy() -> None:
-    """Spend card shows order, prepaid-today, and rules."""
+    """Spend card shows order, prepaid total, and rules."""
     js = _read("app.js")
     assert "spend.policy" in js
     assert "prepaid-if-allowed" in js
-    assert "Prepaid today" in js
+    assert "Prepaid spent" in js
 
 
 def test_providers_view_markers_present() -> None:

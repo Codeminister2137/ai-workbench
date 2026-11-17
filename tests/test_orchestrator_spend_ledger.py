@@ -236,7 +236,7 @@ class TestPolicyFiles:
                         {
                             "scope": "meta",
                             "prepaid_allowed": True,
-                            "max_prepaid_cents_per_day": 500,
+                            "max_prepaid_cents": 500,
                         },
                     ]
                 }
@@ -245,7 +245,7 @@ class TestPolicyFiles:
         )
         rules = policy_from_file(path)
         assert [rule.scope for rule in rules] == ["global", "meta"]
-        assert rules[1].max_prepaid_cents_per_day == 500
+        assert rules[1].max_prepaid_cents == 500
 
     def test_unknown_keys_refused(self, tmp_path):
         path = tmp_path / "policy.json"
@@ -258,9 +258,7 @@ class TestPolicyFiles:
         assert ledger.status()["policy"]["rules"][0]["prepaid_allowed"] is True
         ledger.set_rules([])
         rules = ledger.status()["policy"]["rules"]
-        assert rules == [
-            {"scope": "global", "prepaid_allowed": False, "max_prepaid_cents_per_day": None}
-        ]
+        assert rules == [{"scope": "global", "prepaid_allowed": False, "max_prepaid_cents": None}]
 
     def test_unknown_rule_keys_refused(self, tmp_path):
         path = tmp_path / "policy.json"
@@ -308,6 +306,32 @@ class TestPolicyFiles:
         )
         assert admission.decision == "admitted"
 
+    def test_prepaid_cap_is_total_not_daily(self):
+        now = [1_700_000_000.0]
+        ledger = SpendLedger(
+            clock=lambda: now[0],
+            rules=[PolicyRule(scope="global", prepaid_allowed=True, max_prepaid_cents=150)],
+        )
+        ledger.add_allowance(
+            Allowance(
+                id="pp",
+                provider="meta",
+                kind=AllowanceKind.PREPAID,
+                balance_cents=1000,
+                granted_cents=1000,
+                granted_at=1_600_000_000.0,
+                expires_at=None,
+            )
+        )
+        first = ledger.admit(task_id="t1", task_class="eval", estimated_cents=100, provider="meta")
+        assert first.decision == "admitted"
+        assert first.reservation is not None
+        ledger.settle(first.reservation.id, actual_cents=100)
+        now[0] += 86400  # next day: the same total still binds, no reset
+        second = ledger.admit(task_id="t2", task_class="eval", estimated_cents=100, provider="meta")
+        assert second.decision == "deferred"
+        assert ledger.status()["policy"]["prepaid_spent_total_cents"] == 100
+
     def test_status_reports_policy_and_order(self):
         ledger = SpendLedger(clock=lambda: 1_700_000_000.0)
         view = ledger.status()
@@ -318,7 +342,7 @@ class TestPolicyFiles:
             {
                 "scope": "global",
                 "prepaid_allowed": False,
-                "max_prepaid_cents_per_day": None,
+                "max_prepaid_cents": None,
             }
         ]
-        assert policy["prepaid_spent_today_cents"] == 0
+        assert policy["prepaid_spent_total_cents"] == 0
