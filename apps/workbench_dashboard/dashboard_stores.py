@@ -920,6 +920,32 @@ class DashboardStores:
         self.e2e_tasks.put(task_id, record)
         return record
 
+    def open_resolved_draft(self, task_id: str) -> dict:
+        """Open a draft whose items no longer need pointers.
+
+        Used after partial agent verdicts complete the set: grounded
+        generator steps plus validated agent steps are all checkable.
+        Refuses drafts with remaining needs_pointers items.
+        """
+        record = self.e2e_tasks.get(task_id)
+        if record is None:
+            raise StoreError("E2E task not found")
+        if record.get("status") != "draft":
+            raise StoreError("Only draft E2E tasks can be opened")
+        pending = [
+            item
+            for item in record.get("items", [])
+            if isinstance(item, dict)
+            and item.get("status") != "auto-pass"
+            and item.get("needs_pointers", True)
+        ]
+        if pending:
+            raise StoreError("Draft still needs pointers for open items")
+        record["status"] = "open"
+        record["finalized_at"] = _utc_now()
+        self.e2e_tasks.put(task_id, record)
+        return record
+
     def reauthor_e2e_items(
         self, task_id: str, items: list[dict], reauthored_by: str = "agent"
     ) -> dict:

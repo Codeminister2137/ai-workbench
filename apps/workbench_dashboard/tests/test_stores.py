@@ -280,7 +280,13 @@ def _pointer_run(stores, task_id, *, status, summary):
                         "behavior": "dashboard views and actions",
                         "what": ["sub"],
                         "files": ["apps/workbench_dashboard/web/app.js"],
-                    }
+                    },
+                    {
+                        "id": "behavior:agent-cli",
+                        "behavior": "CLI agent runs and chat",
+                        "what": ["sub"],
+                        "files": ["packages/ai_agent/src/ai_agent/loop.py"],
+                    },
                 ],
             },
             "receipts": [{"status": "completed", "summary": summary}],
@@ -390,6 +396,129 @@ def test_backlog_gate_rejects_bad_gates(stores) -> None:
     item = stores.create_backlog_item(title="X", body="b")
     with pytest.raises(StoreError, match="task_spec"):
         stores.promote_backlog_to_task(item["id"])
+
+
+def test_pointer_file_channel_beats_stdout(tmp_path) -> None:
+    from dashboard_stores import DashboardStores
+    from e2e_promotion import route_pointer_runs
+
+    stores = DashboardStores(tmp_path / "data")
+    task = stores.create_e2e_task(
+        merge_commit="abc123",
+        title="t",
+        items=[
+            {
+                "id": "behavior:dashboard",
+                "kind": "behavior",
+                "area": "dashboard",
+                "status": "pending",
+                "steps": [{"action": "x", "expected": "y", "grounded": False}],
+                "needs_pointers": True,
+            }
+        ],
+        draft=True,
+    )
+    worktree = tmp_path / "wt"
+    worktree.mkdir()
+    import json
+
+    steps = {"behavior:dashboard": [{"action": "Open X", "expected": "Y renders"}]}
+    (worktree / "pointers.json").write_text(json.dumps(steps), encoding="utf-8")
+    stores.runs.put(
+        "run-file",
+        {
+            "id": "run-file",
+            "title": "t",
+            "status": "completed",
+            "approval_mode": "e2e-followup",
+            "metadata": {"kind": "e2e-pointers", "task_id": task["id"], "merge": "abc123"},
+            "receipts": [{"status": "completed", "worktree": str(worktree)}],
+        },
+    )
+    outcomes = route_pointer_runs(stores)
+    assert outcomes[0]["action"] == "finalized"
+    assert stores.e2e_tasks.get(task["id"])["status"] == "open"
+
+
+def test_pointer_stdout_fallback_scans_anywhere(stores) -> None:
+    from e2e_promotion import route_pointer_runs
+
+    task = _pointer_draft(stores)
+    import json
+
+    steps = {"behavior:dashboard": [{"action": "Open X", "expected": "Y renders"}]}
+    body = "## **SUMMARY**\n- Changed: STEPS:" + json.dumps(steps) + "\n"
+    _pointer_run(stores, task["id"], status="completed", summary="")
+    run = stores.runs.get("run-pointer-1")
+    run["receipts"] = [{"status": "completed", "stdout_tail": body}]
+    stores.runs.put("run-pointer-1", run)
+    outcomes = route_pointer_runs(stores)
+    assert outcomes[0]["action"] == "finalized"
+
+
+def test_open_resolved_draft_opens_only_when_clear(stores) -> None:
+    task = _pointer_draft(stores)
+    with pytest.raises(StoreError, match="still needs pointers"):
+        stores.open_resolved_draft(task["id"])
+    record = stores.e2e_tasks.get(task["id"])
+    record["items"][0]["needs_pointers"] = False
+    stores.e2e_tasks.put(task["id"], record)
+    opened = stores.open_resolved_draft(task["id"])
+    assert opened["status"] == "open"
+
+
+def test_pointer_stdout_tolerates_multiline_json(stores) -> None:
+    from e2e_promotion import route_pointer_runs
+
+    task = _pointer_draft(stores)
+    body = 'STEPS:{"behavior:dashboard": [{"action": "Open X\nand Y", "expected": "ok"}]}'
+    _pointer_run(stores, task["id"], status="completed", summary="")
+    run = stores.runs.get("run-pointer-1")
+    run["receipts"] = [{"status": "completed", "stdout_tail": body}]
+    stores.runs.put("run-pointer-1", run)
+    outcomes = route_pointer_runs(stores)
+    assert outcomes[0]["action"] == "finalized"
+
+
+def test_pointer_partial_verdict_applies_covered_escalates_rest(stores) -> None:
+    from e2e_promotion import route_pointer_runs
+
+    task = stores.create_e2e_task(
+        merge_commit="abc123",
+        title="t",
+        items=[
+            {
+                "id": "behavior:dashboard",
+                "kind": "behavior",
+                "area": "dashboard",
+                "status": "pending",
+                "steps": [{"action": "x", "expected": "y", "grounded": False}],
+                "needs_pointers": True,
+            },
+            {
+                "id": "behavior:agent-cli",
+                "kind": "behavior",
+                "area": "agent-cli",
+                "status": "pending",
+                "steps": [{"action": "x", "expected": "y", "grounded": False}],
+                "needs_pointers": True,
+            },
+        ],
+        draft=True,
+    )
+    import json
+
+    steps = {"behavior:dashboard": [{"action": "Open X", "expected": "Y renders"}]}
+    _pointer_run(stores, task["id"], status="completed", summary=f"STEPS:{json.dumps(steps)}")
+    outcomes = route_pointer_runs(stores)
+    assert outcomes[0]["action"] == "escalated"
+    assert outcomes[0].get("partial") is True
+    record = stores.e2e_tasks.get(task["id"])
+    assert record["status"] == "draft"
+    by_id = {item["id"]: item for item in record["items"]}
+    assert by_id["behavior:dashboard"]["needs_pointers"] is False
+    assert by_id["behavior:agent-cli"]["needs_pointers"] is True
+    assert stores.attention_inbox_count() == 1
 
 
 def test_queue_pointer_run_prefiled_and_runnable(stores) -> None:
