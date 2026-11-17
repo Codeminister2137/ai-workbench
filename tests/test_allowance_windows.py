@@ -210,7 +210,9 @@ def test_read_allowance_windows_uses_existing_reader(monkeypatch):
 
     monkeypatch.setattr(account_usage, "read_execution_allowance", fake_reader)
     target = _target(AccessMethod.CODEX_CLI, BillingSource.CHATGPT_SUBSCRIPTION_ALLOWANCE)
-    (window,) = windows.read_allowance_windows(target)
+    found = windows.read_allowance_windows(target)
+    assert found is not None
+    (window,) = found
     assert seen["target"] is target
     assert window.used_percent == 10.0
     assert window.remaining_percent == 90.0

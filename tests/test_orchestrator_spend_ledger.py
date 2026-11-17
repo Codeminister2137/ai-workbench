@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from typing import Any, cast
 
 import pytest
 from ai_orchestrator.spend_ledger import (
@@ -255,9 +256,10 @@ class TestPolicyFiles:
 
     def test_set_rules_empty_restores_default_block(self):
         ledger = _ledger(rules=[PolicyRule(scope="global", prepaid_allowed=True)])
-        assert ledger.status()["policy"]["rules"][0]["prepaid_allowed"] is True
+        policy = cast("dict[str, Any]", ledger.status()["policy"])
+        assert policy["rules"][0]["prepaid_allowed"] is True
         ledger.set_rules([])
-        rules = ledger.status()["policy"]["rules"]
+        rules = cast("dict[str, Any]", ledger.status()["policy"])["rules"]
         assert rules == [{"scope": "global", "prepaid_allowed": False, "max_prepaid_cents": None}]
 
     def test_unknown_rule_keys_refused(self, tmp_path):
@@ -330,7 +332,8 @@ class TestPolicyFiles:
         now[0] += 86400  # next day: the same total still binds, no reset
         second = ledger.admit(task_id="t2", task_class="eval", estimated_cents=100, provider="meta")
         assert second.decision == "deferred"
-        assert ledger.status()["policy"]["prepaid_spent_total_cents"] == 100
+        spent = cast("dict[str, Any]", ledger.status()["policy"])
+        assert spent["prepaid_spent_total_cents"] == 100
 
     def test_status_reports_policy_and_order(self):
         ledger = SpendLedger(clock=lambda: 1_700_000_000.0)

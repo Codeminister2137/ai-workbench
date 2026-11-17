@@ -30,9 +30,13 @@ def test_timeout_override_flows_to_run(tmp_path) -> None:
     stores = DashboardStores(tmp_path)
     _agent_task(stores, created_by="supervisor", metadata={"mai_timeout_seconds": 1200})
     (receipt,) = bridge_agent_queue(stores)
-    assert stores.runs.get(receipt["run_id"])["mai_timeout_seconds"] == 1200
+    run = stores.runs.get(receipt["run_id"])
+    assert run is not None
+    assert run["mai_timeout_seconds"] == 1200
     _agent_task(stores, created_by="supervisor", metadata={"mai_timeout_seconds": "soon"})
-    assert "mai_timeout_seconds" not in stores.runs.get(bridge_agent_queue(stores)[0]["run_id"])
+    rerun = stores.runs.get(bridge_agent_queue(stores)[0]["run_id"])
+    assert rerun is not None
+    assert "mai_timeout_seconds" not in rerun
 
 
 def test_supervisor_filed_task_is_preapproved_as_agent_queue(tmp_path) -> None:
@@ -136,7 +140,10 @@ def test_run_title_cuts_at_word_boundary(tmp_path) -> None:
     long_title = "We need to confirm Mai works properly, so generate a small probe task now"
     _agent_task(stores, title=long_title)
     (receipt,) = bridge_agent_queue(stores)
-    title = stores.runs.get(receipt["run_id"])["title"]
+    bridged = stores.runs.get(receipt["run_id"])
+    assert bridged is not None
+    title = bridged["title"]
+    assert isinstance(title, str)
     assert len(title) <= 60
     assert title.endswith("…")
     stem = title[:-1]

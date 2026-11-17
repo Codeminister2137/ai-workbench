@@ -68,7 +68,7 @@ def serve_dashboard(
 
             return fake_executor
 
-        TestHandler.drain_executor_factory = staticmethod(fake_factory)
+        TestHandler.drain_executor_factory = staticmethod(fake_factory)  # pyright: ignore[reportAttributeAccessIssue]
     server = ThreadingHTTPServer(("127.0.0.1", 0), TestHandler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
