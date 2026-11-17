@@ -1813,7 +1813,7 @@ async function renderInbox(id) {
     });
     return;
   }
-  const picked = pickedTokens("f", "human,open,followup");
+  const picked = pickedTokens("f", "human,open,answered,followup");
   const inboxProj = new URLSearchParams(location.hash.split("?")[1] || "").get("project") || "";
   const inboxUrl = inboxProj ? "/api/inbox?project_id=" + encodeURIComponent(inboxProj) : "/api/inbox";
   const payload = await api(inboxUrl);
@@ -1828,7 +1828,7 @@ async function renderInbox(id) {
   const items = shown.length
     ? shown.map((t) =>
         `<li><a href="#/inbox/${esc(t.id)}">${gtext(t.title)}</a>
-         <span class="pill st-${esc((t.status || "none").replace(/\s+/g, "-"))}">${esc(t.type)} · ${esc(t.status)}${t.assignee === "agent" ? " · for AI" : ""}${isFollowup(t) ? " · needs follow-up" : ""}</span></li>`).join("")
+         <span class="pill st-${esc((t.status || "none").replace(/\s+/g, "-"))}">${esc(t.type)} · ${esc(t.status)}${t.assignee === "agent" ? " · for AI" : ""}${isFollowup(t) ? " · needs follow-up" : ""}${t.run_status ? " · run " + esc(t.run_status) : ""}</span></li>`).join("")
     : '<li class="muted">Nothing matches these filters. Tick more boxes, or tick Closed to see the archive.</li>';
   const groups = [
     ["Who", [["human", "Human", "Tasks assigned to you"], ["ai", "AI", "Tasks assigned to the agent"]]],

@@ -160,9 +160,10 @@ class DashboardStores:
     def attention_inbox_items(self) -> list[dict]:
         """Human attention items: what the inbox default view must show.
 
-        Human assignee with open or follow-up state, never the AI queue.
-        The badge counts this set; the list endpoint unions it in so the
-        default view can never hide a badged item past the newest cutoff.
+        Human assignee with open, answered, or follow-up state, never the
+        AI queue. Answered-owner items await close-out. The badge counts
+        this set; the list endpoint unions it in so the default view can
+        never hide a badged item past the newest cutoff.
         """
         items, _total = self.inbox.list(limit=1000)
         return [
@@ -170,7 +171,8 @@ class DashboardStores:
             for item in items
             if item.get("assignee") != "agent"
             and (
-                item.get("status") == "open" or (item.get("resolution_kind") or "final") != "final"
+                item.get("status") in ("open", "answered")
+                or (item.get("resolution_kind") or "final") != "final"
             )
         ]
 
@@ -445,9 +447,28 @@ class DashboardStores:
         return record
 
     def new_idea_count(self) -> int:
-        """Count untriaged ideas for the Home badge."""
+        """Count untriaged ideas for the Home badge.
+
+        New ideas plus reviewing items older than 7 days: a review that
+        sits undecided is as invisible as an untriaged one.
+        """
         items, _total = self.ideas.list(limit=1000)
-        return sum(1 for item in items if item.get("status") == "new")
+        now = datetime.now(UTC)
+        count = 0
+        for item in items:
+            status = item.get("status")
+            if status == "new":
+                count += 1
+            elif status == "reviewing":
+                try:
+                    created = datetime.fromisoformat(str(item.get("created_at") or ""))
+                except ValueError:
+                    continue
+                if created.tzinfo is None:
+                    continue
+                if (now - created).days >= 7:
+                    count += 1
+        return count
 
     def open_backlog_count(self) -> int:
         """Count groomed-but-unfinished backlog items for the Home badge."""

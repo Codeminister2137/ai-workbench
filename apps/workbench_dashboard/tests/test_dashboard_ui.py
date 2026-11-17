@@ -775,7 +775,7 @@ def test_inbox_checkbox_filters_default_human_attention() -> None:
     """Inbox mixes Who/State checkboxes; default is human attention."""
     js = _read("app.js")
     assert 'filterBoxes("inbox-filters"' in js
-    assert '"human,open,followup"' in js
+    assert '"human,open,answered,followup"' in js
     assert 'data-f="${t}"' in js
     for token, label in (
         ("human", "Human"),
@@ -814,7 +814,7 @@ def test_all_list_tabs_share_filter_helper() -> None:
     assert "function bindFilterBoxes(id, base, param)" in js
     assert "function pickedTokens(param, fallback)" in js
     for view, default in (
-        ("inbox", "human,open,followup"),
+        ("inbox", "human,open,answered,followup"),
         ("e2e", "open,fail"),
         ("plans", "active"),
         ("runs", "failed,running,queued,paused,waiting,approved"),
