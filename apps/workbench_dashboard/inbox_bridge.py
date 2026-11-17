@@ -51,6 +51,20 @@ def _mai_timeout_override(metadata: dict) -> dict[str, float]:
     return {"mai_timeout_seconds": min(seconds, 1500.0)}
 
 
+RUN_TITLE_CHARS = 60
+
+
+def _short_title(title: str, limit: int = RUN_TITLE_CHARS) -> str:
+    """Cut run titles at a word boundary with an ellipsis, never mid-word."""
+    text = title.strip()
+    if len(text) <= limit:
+        return text
+    cut = text[: limit - 1].rsplit(" ", 1)[0].strip()
+    if not cut:
+        cut = text[: limit - 1].strip()
+    return cut + "…"
+
+
 def bridge_agent_queue(stores, *, fanout_policy: str = "restricted") -> list[dict[str, Any]]:
     """Propose one queued run per unbridged open agent task.
 
@@ -78,7 +92,7 @@ def bridge_agent_queue(stores, *, fanout_policy: str = "restricted") -> list[dic
         run_id = uuid.uuid4().hex
         timeout_override = _mai_timeout_override(metadata)
         now = datetime.now(UTC).isoformat()
-        run_title = title[:60]
+        run_title = _short_title(title)
         if str(item.get("created_by") or "") == "owner":
             approval_mode = "owner-filed"
         elif metadata.get("kind") == "e2e-followup":
