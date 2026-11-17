@@ -1409,3 +1409,52 @@ assert(html.includes('&lt;script&gt;'));
     )
     assert result.returncode == 0, result.stderr
     assert "mdHtml(run.report)" in _read("app.js")
+
+
+def test_inbox_divergence_banner_explains_badge_gap() -> None:
+    node = _node_driver()
+    driver = r"""
+const assert = require('assert');
+const source = require('fs').readFileSync(process.argv[1], 'utf8');
+const grab = (name) => eval('(' + source.slice(source.indexOf('function ' + name + '('),
+  source.indexOf('\n}', source.indexOf('function ' + name + '(')) + 2) + ')');
+const esc = grab('esc');
+const gtext = grab('gtext');
+const filterBoxes = grab('filterBoxes');
+const pickedTokens = grab('pickedTokens');
+const bindFilterBoxes = grab('bindFilterBoxes');
+const projectOptions = async () => '<option value="">All projects</option>';
+const renderer = source.slice(source.indexOf('async function renderInbox('),
+  source.indexOf('async function markIdeaSeen('));
+eval(renderer);
+const view = {innerHTML: '', querySelectorAll: () => []};
+const location = {hash: '#/inbox'};
+const document = {getElementById: () => ({addEventListener() {}})};
+const items = [
+  {id: 'o1', title: 'Open one', type: 'task', status: 'open', assignee: 'owner'},
+  {id: 'a1', title: 'Answered one', type: 'task', status: 'answered', assignee: 'owner'},
+  {id: 'a2', title: 'Answered two', type: 'task', status: 'answered', assignee: 'owner'},
+  {id: 'f1', title: 'Follow-up', type: 'task', status: 'closed', assignee: 'owner', resolution_kind: 'followup'},
+  {id: 'x1', title: 'AI job', type: 'task', status: 'open', assignee: 'agent'},
+  {id: 'x2', title: 'Archived', type: 'task', status: 'closed', assignee: 'owner'},
+];
+const api = async (path) => ({items});
+const shown = (html) => (html.match(/<li>/g) || []).length;
+(async () => {
+  await renderInbox(undefined);
+  assert(!view.innerHTML.includes('hidden by filters'), 'default shows all: ' + view.innerHTML.length);
+  assert.equal(shown(view.innerHTML), 4);
+  location.hash = '#/inbox?f=human,open,followup';
+  await renderInbox(undefined);
+  assert.equal(shown(view.innerHTML), 2);
+  assert(view.innerHTML.includes('2 attention items hidden by filters'), 'banner counts hidden');
+  assert(view.innerHTML.includes('href="#/inbox">Show all'), 'banner resets');
+  location.hash = '#/inbox?project=p1';
+  await renderInbox(undefined);
+  assert(view.innerHTML.includes('Project filter active'), 'project divergence noted');
+})().catch(error => {console.error(error); process.exitCode = 1;});
+"""
+    result = subprocess.run(
+        [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
+    )
+    assert result.returncode == 0, result.stderr
