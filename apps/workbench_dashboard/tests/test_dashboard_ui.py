@@ -1222,3 +1222,31 @@ eval(source.slice(source.indexOf('async function renderE2E('), source.indexOf('a
         [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
     )
     assert result.returncode == 0, result.stderr
+
+
+def test_runs_explains_scheduler_cadence_and_failure_states() -> None:
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node is required to execute the scheduler renderer")
+    driver = r"""
+const assert = require('assert');
+const fs = require('fs');
+const source = fs.readFileSync(process.argv[1], 'utf8');
+eval(source.slice(source.indexOf('function drainSchedulerText('), source.indexOf('async function renderRuns(')));
+assert.match(drainSchedulerText(undefined), /status unavailable/);
+assert.match(drainSchedulerText({started: false}), /Automatic drain is off.*Drain now/);
+const active = drainSchedulerText({started: true, interval_seconds: 300, ticks: 7, errors: 0});
+assert.match(active, /up to one queued run per tick/);
+assert.match(active, /First tick after 300s/);
+assert.match(active, /wait 300s after the previous drain finishes/);
+assert.match(active, /Finished ticks: 7; tick errors: 0/);
+assert.match(active, /Drain paused/);
+assert.match(drainSchedulerText({started: true, errors: 2, last_error: 'RuntimeError: boom'}), /tick errors: 2. Last error: RuntimeError: boom/);
+"""
+    result = subprocess.run(
+        [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
+    )
+    assert result.returncode == 0, result.stderr
+    js = _read("app.js")
+    assert 'drainStatus = (await api("/api/status")).drain_scheduler' in js
+    assert "${esc(drainSchedulerText(drainStatus))}" in js

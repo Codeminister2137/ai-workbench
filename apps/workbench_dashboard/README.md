@@ -110,7 +110,11 @@ available Mai output; it does not stream model tokens or add heartbeats.
 - Runs drain manually (Runs "Drain now" / `POST /api/runs/drain`,
   one run per call) or on a schedule (`drain_interval_seconds` ≥ 60
   in `dashboard.json` + restart; default off). No UI/API toggle yet;
-  one run per tick; tick failures are logged, not mailed.
+  one run per tick; tick failures are logged, not mailed. The Runs page shows
+  whether the scheduler is running, its interval, finished ticks and errors.
+  The first tick waits one interval after startup; later ticks wait one
+  interval after the previous drain finishes, so long runs delay the next tick.
+  Allowance/config failures may pause execution with an owner inbox alert.
 - Transcription/translation need owner-wired keys and metering; the
   endpoints answer 409 until then. No per-project data isolation yet:
   runs/inbox stay global with per-run project refs (G6 owner question).
