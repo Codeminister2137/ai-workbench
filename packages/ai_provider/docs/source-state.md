@@ -3,7 +3,11 @@
 **Checked:** 2026-10-13; Gemini individual-access retirement verified 2026-10-14.
 Published limits and account observations can expire.
 
-**Latest scoped update:** 2026-10-29, Meta Standard pricing rechecked and live
+**Latest scoped update:** 2026-11-17, Meta Model API has no usage/balance
+endpoint (4 independent public sources agree; balance lives in the
+dev.meta.ai dashboard) and OpenCode usage endpoints 403 with our inference
+key (live-probed: zen/go/v1/usage + 2 variants); 2026-10-29, Meta Standard
+pricing rechecked and live
 Meta/public-source coding with bounded Modal CPU validation; Baseten management metadata/key-scope
 documentation; 2026-10-28,
 Modal/Qwen tool-calling prerequisites and
@@ -45,6 +49,9 @@ model); the periodic pre-refresh check itself is deferred per the brief.
   endpoint, absent from public Console API pages — drift risk; the
   normalizer keeps unparsed resets in details instead of failing.
   Per-model USD caps (`model_limits_usd`) are a separate documented limit.
+  Live-probed 2026-11-17: 403 Forbidden with our key on zen/go/v1/usage
+  plus inference/go/v1/usage and api/usage variants (scope or drift) —
+  neither free-tier daily nor subscription windows are readable today.
 
 Gap (owner case-by-case per brief note): API-billed providers
 (OpenRouter/Requesty/…) have no subscription-refresh model here — owner
@@ -70,6 +77,15 @@ Expiry **unknown**: owner guesses the Nov16 judging-leg end, or never.
 Recorded conservatively with a Nov16 cutoff in the user spending exemption;
 **re-confirm balance and expiry on or before 2026-11-16**, and never assume
 spend past the balance stays free (overage would bill the key).
+
+Update 2026-11-17: owner corrected the grant to **$150, no known expiry**
+(grant file + ledger re-bootstrapped; expiry cutoff dropped). The $112
+figure is stale (11-10); current remaining is owner-to-fill (no API).
+Programmatic balance confirmed unavailable: Meta Model API exposes no
+usage/billing/credits endpoint (only GET /v1/models + GET /v1/status) —
+4 independent public sources agree 11-17; balance lives in the
+dev.meta.ai dashboard. Rate-limit headers (per-minute request/token
+limits) may arrive on responses — unsurveyed, opportunistic only.
 
 ## Full L3 ladder (T0–T3) — 2026-11-02
 
