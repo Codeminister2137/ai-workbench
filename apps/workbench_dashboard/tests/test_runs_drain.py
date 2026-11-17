@@ -127,3 +127,77 @@ def test_drain_rejects_bad_max_runs(drain_server) -> None:
     assert _drain_status(base, {"max_runs": 101}) == 400
     assert _drain_status(base, {"max_runs": "many"}) == 400
     assert _drain_status(base, {"max_runs": True}) == 400
+
+
+def _report_stores(tmp_path):
+    from dashboard_stores import DashboardStores
+
+    return DashboardStores(tmp_path / "data")
+
+
+def _report_run(stores, run_id, inbox_id, **over):
+    record = {
+        "id": run_id,
+        "title": "t",
+        "status": "completed",
+        "bridged_from": inbox_id,
+    }
+    record.update(over)
+    stores.runs.put(run_id, record)
+    return record
+
+
+def _report_item(stores, inbox_id, **over):
+    record = {"id": inbox_id, "status": "open", "title": "t", "body": "b"}
+    record.update(over)
+    stores.inbox.put(inbox_id, record)
+    return record
+
+
+def test_terminal_report_appends_outcome_note(tmp_path) -> None:
+    from dashboard_web_app import report_run_terminal
+
+    stores = _report_stores(tmp_path)
+    _report_item(stores, "in1")
+    _report_run(stores, "run1", "in1")
+    outcome = report_run_terminal(
+        stores, {"run_id": "run1", "status": "completed", "title": "t", "error": None}
+    )
+    assert outcome["action"] == "noted"
+    item = stores.inbox.get("in1")
+    assert "run1" in (item.get("note") or "")
+    assert "completed" in (item.get("note") or "")
+    assert item["status"] == "open"
+
+
+def test_terminal_report_flags_failures_and_dedupes(tmp_path) -> None:
+    from dashboard_web_app import report_run_terminal
+
+    stores = _report_stores(tmp_path)
+    _report_item(stores, "in1")
+    _report_run(stores, "run1", "in1")
+    summary = {"run_id": "run1", "status": "failed", "title": "t", "error": "boom"}
+    assert report_run_terminal(stores, summary)["action"] == "noted"
+    assert "boom" in (stores.inbox.get("in1").get("note") or "")
+    assert report_run_terminal(stores, summary)["action"] == "skipped"
+
+
+def test_terminal_report_skips_unlinked_and_closed(tmp_path) -> None:
+    from dashboard_web_app import report_run_terminal
+
+    stores = _report_stores(tmp_path)
+    _report_run(stores, "run1", None)
+    assert (
+        report_run_terminal(
+            stores, {"run_id": "run1", "status": "completed", "title": "t", "error": None}
+        )["action"]
+        == "skipped"
+    )
+    _report_item(stores, "in2", status="closed")
+    _report_run(stores, "run2", "in2")
+    assert (
+        report_run_terminal(
+            stores, {"run_id": "run2", "status": "completed", "title": "t", "error": None}
+        )["action"]
+        == "skipped"
+    )

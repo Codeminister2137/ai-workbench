@@ -79,6 +79,35 @@ def test_p4_silent_without_keys_or_claims(tmp_path: Path) -> None:
     assert SWEEP.collect_stale_blockers(repo2) == []
 
 
+def test_r6_flags_terminal_runs_never_reported_back() -> None:
+    runs = [
+        {
+            "id": "orphan1",
+            "title": "Done silently",
+            "status": "completed",
+            "created_at_utc": _ts(100),
+            "finished_at_utc": _ts(90),
+            "bridged_from": "in1",
+        },
+        {
+            "id": "noted1",
+            "title": "Done loudly",
+            "status": "completed",
+            "created_at_utc": _ts(100),
+            "finished_at_utc": _ts(90),
+            "bridged_from": "in2",
+        },
+    ]
+    inbox = [
+        {"id": "in1", "title": "t", "status": "open", "note": ""},
+        {"id": "in2", "title": "t", "status": "open", "note": "Run noted1 completed"},
+    ]
+    findings, _resolved = SWEEP.collect_runs(runs, inbox, NOW, ())
+    r6 = [f for f in findings if f["category"] == "R6"]
+    assert len(r6) == 1
+    assert r6[0]["members"][0]["id"] == "orphan1"
+
+
 def test_r1_flags_failed_without_followup_and_skips_superseded() -> None:
     runs = [
         {

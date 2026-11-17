@@ -46,6 +46,7 @@ GATE_H = {
     "R3": 48,  # branch-ready run awaiting merge
     "R4": 12,  # live run stuck
     "R5": 0,  # stale run records with closed approvals
+    "R6": 24,  # terminal run, source item open, no outcome note
     "I1": 24,  # answered-never-closed inbox
     "I2": 48,  # open agent inbox rotting
     "I3": 168,  # open owner inbox backlog (7d)
@@ -461,6 +462,33 @@ def collect_runs(
                 "Cancel the stale records (work already decided/done); loops are closed.",
                 stale_records,
                 oldest,
+            )
+        )
+    orphans: list[dict[str, Any]] = []
+    for run in runs:
+        if str(run.get("status", "")) not in TERMINAL_RUN:
+            continue
+        source_id = str(run.get("bridged_from") or run.get("inbox_id") or "")
+        if not source_id:
+            continue
+        source = inbox_by_id.get(source_id)
+        if source is None or str(source.get("status", "")) != "open":
+            continue
+        if str(run.get("id", "?")) in str(source.get("note") or ""):
+            continue
+        age = _age_h(run.get("finished_at_utc"), now)
+        orphans.append(_member(str(run.get("id", "?")), str(run.get("title", "")), age))
+    if orphans:
+        ages = [m["age_h"] for m in orphans if m["age_h"] is not None]
+        findings.append(
+            _finding(
+                _aggregate_key("R6", orphans),
+                "R6",
+                f"Terminal runs never reported back ({len(orphans)})",
+                "agent",
+                "Post each run's outcome to its source item (report-back gap or regression).",
+                orphans,
+                max(ages) if ages else 0.0,
             )
         )
     return findings, resolved
