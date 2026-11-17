@@ -1740,6 +1740,13 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             runs, _total = self._stores().runs.list(limit=100)
             project_runs = {run.get("id") for run in runs if run.get("project_id") == project_id}
             items = [item for item in items if self._inbox_item_in_project(item, project_runs)]
+        elif wanted is None and for_agent is None:
+            seen = {item.get("id") for item in items}
+            items = items + [
+                item
+                for item in self._stores().attention_inbox_items()
+                if item.get("id") not in seen
+            ]
         self._send_json({"ok": True, "items": items, "total": len(items)})
 
     @staticmethod
