@@ -2321,13 +2321,6 @@ async function renderFleet() {
   try {
     const payload = await api("/api/fleet");
     const f = payload.fleet;
-    let spendCard = "";
-    try {
-      const sp = await api("/api/spend");
-      spendCard = spendCardHtml(sp.spend);
-    } catch (err) {
-      spendCard = '<div class="card"><h2>Spend</h2><p class="muted">Spend unavailable: ' + esc(err.message) + "</p></div>";
-    }
     let ownerSleep = {active: false};
     try {
       ownerSleep = await api("/api/sleep");
@@ -2372,8 +2365,7 @@ async function renderFleet() {
         <button type="button" id="sleep-cancel" title="Cancel your scheduled sleep (agent timers untouched)">Cancel sleep</button>
       </form></div>
       <div class="card"><h2>Active runs</h2><ul class="plain">${runRows}</ul></div>
-      <div class="card"><h2>Supervised runs</h2><ul class="plain">${agentRows}</ul>${f.agents.explain ? `<p class="muted">${esc(f.agents.explain)}</p>` : ""}</div>
-      ${spendCard}`;
+      <div class="card"><h2>Supervised runs</h2><ul class="plain">${agentRows}</ul>${f.agents.explain ? `<p class="muted">${esc(f.agents.explain)}</p>` : ""}</div>`;
     view.innerHTML = `<h1>Fleet</h1><p class="muted">Probed live on open. Watchdogs, servers, sleep guard, active and supervised runs.</p>${body}`;
     document.getElementById("sleep-form").addEventListener("submit", async (ev) => {
       ev.preventDefault();
@@ -2574,10 +2566,14 @@ function providerCardHtml(p, allowances) {
 async function renderProviders() {
   const data = await api("/api/providers");
   let buckets = [];
+  let spendCard = "";
   try {
     const sp = await api("/api/spend");
     buckets = (sp.spend && sp.spend.buckets) || [];
-  } catch (err) { /* allowances stay hidden when spend is unavailable */ }
+    spendCard = spendCardHtml(sp.spend);
+  } catch (err) {
+    spendCard = '<div class="card"><h2>Spend</h2><p class="muted">Spend unavailable: ' + esc(err.message) + "</p></div>";
+  }
   const cards = (data.providers || []).map((p) =>
     providerCardHtml(p, buckets.filter((b) => b.provider === p.route))).join("");
   const note = data.cached
@@ -2587,6 +2583,7 @@ async function renderProviders() {
     <h1>Providers</h1>
     <p class="muted">Connection status only - checks are free model-list probes, never inference. ${esc(note)}</p>
     <p><button id="providers-refresh" title="Probe all providers now (free list checks)">Refresh now</button></p>
+    ${spendCard}
     <div class="columns" id="providers-list">${cards}</div>`;
   document.getElementById("providers-refresh").addEventListener("click", async () => {
     try {
@@ -2620,7 +2617,7 @@ async function render() {
       return;
     }
     if (name === "modules") await renderModules();
-    else if (name === "spend") { location.hash = "#/fleet"; return; }
+    else if (name === "spend") { location.hash = "#/providers"; return; }
     else if (name === "home") await renderHome();
     else if (name === "chat" && id) {
       const q = new URLSearchParams(query || "").get("q");

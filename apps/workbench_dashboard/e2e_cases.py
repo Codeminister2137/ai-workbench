@@ -100,7 +100,7 @@ ROUTE_UI: tuple[tuple[str, str, str], ...] = (
     ("/api/knowme", "KnowMe", "#/knowme"),
     ("/api/providers", "Providers", "#/providers"),
     ("/api/fleet", "Fleet", "#/fleet"),
-    ("/api/spend", "Spend", "#/spend"),
+    ("/api/spend", "Providers", "#/providers"),
     ("/api/invoices", "Invoices", "#/invoices"),
     ("/api/intake", "Intake", "#/intake"),
     ("/api/modules", "Modules", "#/modules"),
