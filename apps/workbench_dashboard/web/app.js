@@ -2018,12 +2018,14 @@ async function renderBacklog(id) {
       <p class="inbox-body">${gtext(item.body || "")}</p>
       ${item.decision ? `<p><strong>Decision:</strong> ${esc(item.decision)}</p>` : ""}
       ${item.inbox_id ? `<p><a href="#/inbox/${esc(item.inbox_id)}" title="Open the inbox brief for this item">Inbox brief: ${esc(item.inbox_id)}</a></p>` : ""}
+      ${item.gate ? `<p class="muted">Gate: ${esc(item.gate.kind)}${item.gate.condition ? " — " + esc(item.gate.condition) : ""}${item.gate.not_before ? " — opens " + esc(item.gate.not_before) : ""}${item.gate.item_id ? " — waits on " + esc(item.gate.item_id.slice(0, 8)) : ""}${item.task_spec ? "" : " (no prepared task)"}</p>` : ""}
       <form id="review-form" class="inline">
         <select name="status" title="Grooming status">${opts}</select>
         <input type="text" name="decision" placeholder="Decision note..." title="Decision note (optional)" value="${esc(item.decision || "")}">
         <button type="submit" title="Save grooming status and note">Save grooming</button>
       </form>
-      <p><button id="promote-btn" title="File this item as an inbox decision (take into run, or hold)">Propose inbox brief</button></p></div>`;
+      <p><button id="promote-btn" title="File this item as an inbox decision (take into run, or hold)">Propose inbox brief</button>
+      <button id="to-task-btn" title="Open the gate now: create the prepared agent task immediately">Promote to AI task</button></p></div>`;
     document.getElementById("review-form").addEventListener("submit", async (ev) => {
       ev.preventDefault();
       try {
@@ -2047,6 +2049,19 @@ async function renderBacklog(id) {
         });
         toast("Inbox brief filed", true);
         location.hash = "#/inbox/" + out.inbox_id;
+      } catch (err) {
+        toast(err.message, false);
+      }
+    });
+    document.getElementById("to-task-btn").addEventListener("click", async () => {
+      try {
+        const out = await api("/api/backlog/" + encodeURIComponent(id) + "/to-task", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: "{}",
+        });
+        toast("Agent task created", true);
+        location.hash = "#/inbox/" + out.task_id;
       } catch (err) {
         toast(err.message, false);
       }

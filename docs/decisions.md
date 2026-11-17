@@ -115,6 +115,12 @@ as ai_provider. Trial blocked on account creation (follow-up inbox
 b275fe4d, open). ContactSource protocol + manual source implemented
 on feature/loop10; vendor adapters wait for keys.
 
+Update 2026-11-17: accounts were created (inbox b275fe4d closed) and
+`PROSPEO_API_KEY` + `APOLLO_API_KEY` are configured in `.env` (names
+verified; values never read). The blocker was recording, not access:
+no code references either key yet. Next step is building the vendor
+adapters (job-search track), not account creation.
+
 ## Ideas elaborated: local-only assistant, fiction editor, test declined - owner 2026-11-08
 
 **Status:** Accepted by the owner (inbox e81561d8 answered; closed by

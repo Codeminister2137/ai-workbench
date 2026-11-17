@@ -118,8 +118,8 @@ def test_dynamic_buttons_have_titles() -> None:
     js = _read("app.js")
     buttons = re.findall(r"<button\b[^>]*>", js)
     assert (
-        len(buttons) == 57
-    )  # +doc pin; +fanout apply; +delete-inbox-btn +e2e submit +chat mode/apply/approve +notes save +agent-check run +agent-config save +spend-policy add/save/remove +spend-adjust record
+        len(buttons) == 58
+    )  # +doc pin; +fanout apply; +delete-inbox-btn +e2e submit +chat mode/apply/approve +notes save +agent-check run +agent-config save +spend-policy add/save/remove +spend-adjust record +backlog to-task
     for tag in buttons:
         assert "title=" in tag, f"button without title: {tag}"
 
