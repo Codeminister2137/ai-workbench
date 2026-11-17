@@ -1901,10 +1901,12 @@ function wfReadNodes(root) {
     const choice = row.querySelector('[name="node-choice"]');
     const text = row.querySelector('[name="node-text"]');
     const config = {};
-    if (type === "skill") config.skill = choice.value;
-    else if (type === "agent_run") { config.mode = choice.value; config.route_policy = text.value; }
-    else if (type === "scrutiny") config.focus = text.value;
-    else config.question = text.value;
+    // Null-safe: right after a type change, the select shows the new type
+    // while the config inputs are still the old type's (choice may be null).
+    if (type === "skill") config.skill = choice ? choice.value : "";
+    else if (type === "agent_run") { config.mode = choice ? choice.value : ""; config.route_policy = text ? text.value : ""; }
+    else if (type === "scrutiny") config.focus = text ? text.value : "";
+    else config.question = text ? text.value : "";
     return {
       id: row.querySelector('[name="node-id"]').value,
       type,
@@ -2000,6 +2002,11 @@ async function renderWorkflows(id) {
   document.getElementById("wf-nodes").addEventListener("change", (ev) => {
     if (ev.target.name !== "node-type") return;
     syncGraph();
+    // A new type starts with a clean config; stale inputs from the old
+    // type must not leak across (e.g. a focus string becoming a route policy).
+    const row = ev.target.closest("[data-node]");
+    const node = row ? graph.nodes[Number(row.dataset.node)] : undefined;
+    if (node) node.config = {};
     renderRows();
   });
   document.getElementById("wf-add").addEventListener("click", () => {
