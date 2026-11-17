@@ -16,12 +16,16 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 IMPORT_RE = re.compile(r"^from (ai_provider|ai_orchestrator|ai_agent)\b", re.M)
 
 # ai_provider modules with runtime up-imports (2026-11-10 survey).
+# allowance_windows.py added 2026-11-17: brief-B models import neutral
+# orchestrator contracts (AccessMethod/BillingSource/ExecutionTarget),
+# the same precedent as codex_usage.py; landed in 0b8371e.
 PROVIDER_UP_IMPORTERS = frozenset(
     {
         "acceptance_harness.py",
         "acceptance_jobs.py",
         "account_usage.py",
         "agent_readiness.py",
+        "allowance_windows.py",
         "codex_usage.py",
         "coding_assist.py",
         "coding_sessions.py",
