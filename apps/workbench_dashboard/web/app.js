@@ -1133,6 +1133,16 @@ async function renderMeetings(id) {
   });
 }
 
+function drainSchedulerText(scheduler) {
+  if (!scheduler) return "Automatic drain status unavailable.";
+  const cadence = scheduler.started
+    ? `Automatic drain is running: up to one queued run per tick. First tick after ${scheduler.interval_seconds}s; subsequent ticks wait ${scheduler.interval_seconds}s after the previous drain finishes. Long runs delay the next tick.`
+    : "Automatic drain is off. Queued runs wait for Drain now or a configured scheduler (drain_interval_seconds >= 60, then restart).";
+  return cadence + ` Finished ticks: ${scheduler.ticks || 0}; tick errors: ${scheduler.errors || 0}.` +
+    (scheduler.errors ? " Last error: " + (scheduler.last_error || "unavailable") + "." : "") +
+    " Allowance/config failures can pause automatic execution; check the owner inbox for a Drain paused task.";
+}
+
 async function renderRuns(id) {
   if (id) {
     stopRunsPoll();
@@ -1217,6 +1227,12 @@ async function renderRuns(id) {
   const runsUrl = runsProjectFilter ? "/api/runs?project_id=" + encodeURIComponent(runsProjectFilter) : "/api/runs";
   const picked = pickedTokens("f", "failed,running,queued,paused,waiting,approved");
   const payload = await api(runsUrl);
+  let drainStatus;
+  try {
+    drainStatus = (await api("/api/status")).drain_scheduler;
+  } catch (err) {
+    // Keep the queue usable when scheduler status cannot be fetched.
+  }
   const shownRuns = payload.items.filter((r) => picked.has(r.status || ""));
   const items = shownRuns.length
     ? shownRuns.map((r) =>
@@ -1243,6 +1259,7 @@ async function renderRuns(id) {
     ["Streams", [["live", "Live", "Live stream runs"], ["merged", "Merged", "Merged stream runs"], ["branch-ready", "Branch-ready", "Streams with a branch ready"]]],
   ];
   view.innerHTML = `<h1>Runs</h1>
+    <p class="muted" id="drain-status" role="status">${esc(drainSchedulerText(drainStatus))}</p>
     ${filterBoxes("runs-filters", groups, picked)}
     <p><input type="text" id="filter-runs" placeholder="Filter runs..." title="Filter runs by text">
     <select id="filter-runs-project" title="Show runs for one project">${await projectOptions(runsProjectFilter)}</select>
