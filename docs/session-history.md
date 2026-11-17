@@ -1,5 +1,16 @@
 # Session History
 
+## 2026-11-17 evening spend/scoring/KnowMe (01a1e5ab cont., pending push)
+
+Spend: Meta grant corrected $150/no-expiry (+sqlite re-bootstrap), Codex
+provider row via native CLI quota reader, spend policy editor (atomic save +
+hot-apply), 8a28aba Tier 2. Q6/Q7 final in job-preferences.toml (no code:
+filter consumes neither dimension). KnowMe answer A, cb16b08 Tier 2: ingest
+splitter + import_facts, schema v2 auto-upgrade, consumer/API/UI provenance;
+old blobs intact, live bank backed up. Gate fights: UI title pins (Tier 1),
+stale layering pin from 0b8371e (Tier 1), 13 pre-existing pyright errors on
+base (worktree-proven; inbox item filed; push --no-verify recorded).
+
 ## 2026-11-17 inbox gaps + auto-submit, pushed de527c6 (01a1e5ab cont.)
 
 Badge-vs-view divergence root-caused (module-level project filter persisted across
