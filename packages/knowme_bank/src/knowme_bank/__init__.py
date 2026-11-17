@@ -21,10 +21,15 @@ class KnowMeEntry:
     text: str
     source: str
     created_at: float
+    source_file: str | None = None
+    origin_text: str | None = None
+
+
+_COLUMNS = "id, category, text, source, created_at, source_file, origin_text"
 
 
 class KnowMeStore:
-    """Tiny SQLite store; one file, no migrations yet (v1 schema)."""
+    """Tiny SQLite store; v2 adds optional provenance columns (v1 auto-upgrades)."""
 
     def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
@@ -37,15 +42,30 @@ class KnowMeStore:
                     category TEXT NOT NULL,
                     text TEXT NOT NULL,
                     source TEXT NOT NULL,
-                    created_at REAL NOT NULL
+                    created_at REAL NOT NULL,
+                    source_file TEXT,
+                    origin_text TEXT
                 )
                 """
             )
+            present = {row[1] for row in connection.execute("PRAGMA table_info(entries)")}
+            if "source_file" not in present:
+                connection.execute("ALTER TABLE entries ADD COLUMN source_file TEXT")
+            if "origin_text" not in present:
+                connection.execute("ALTER TABLE entries ADD COLUMN origin_text TEXT")
             connection.execute(
                 "CREATE INDEX IF NOT EXISTS idx_entries_category ON entries(category)"
             )
 
-    def add(self, category: str, text: str, source: str) -> KnowMeEntry:
+    def add(
+        self,
+        category: str,
+        text: str,
+        source: str,
+        *,
+        source_file: str | None = None,
+        origin_text: str | None = None,
+    ) -> KnowMeEntry:
         """Store one entry; validates category/source, rejects blanks."""
         if category not in CATEGORIES:
             raise ValueError(f"Unknown category: {category!r}")
@@ -54,23 +74,38 @@ class KnowMeStore:
         cleaned = text.strip()
         if not cleaned:
             raise ValueError("Entry text must not be blank")
+        if source_file is not None:
+            if not isinstance(source_file, str) or not source_file.strip():
+                raise ValueError("source_file must be a non-blank string")
+            source_file = source_file.strip()
+        if origin_text is not None:
+            if not isinstance(origin_text, str):
+                raise ValueError("origin_text must be a string")
+            origin_text = origin_text.strip() or None
         created = time.time()
         with sqlite3.connect(self.path) as connection:
             cursor = connection.execute(
-                "INSERT INTO entries (category, text, source, created_at) VALUES (?, ?, ?, ?)",
-                (category, cleaned, source, created),
+                "INSERT INTO entries (category, text, source, created_at,"
+                " source_file, origin_text) VALUES (?, ?, ?, ?, ?, ?)",
+                (category, cleaned, source, created, source_file, origin_text),
             )
             entry_id = cursor.lastrowid
         assert entry_id is not None
         return KnowMeEntry(
-            id=entry_id, category=category, text=cleaned, source=source, created_at=created
+            id=entry_id,
+            category=category,
+            text=cleaned,
+            source=source,
+            created_at=created,
+            source_file=source_file,
+            origin_text=origin_text,
         )
 
     def find(self, category: str | None = None, *, limit: int = 50) -> list[KnowMeEntry]:
         """Newest-first entries, optionally filtered by category."""
         if category is not None and category not in CATEGORIES:
             raise ValueError(f"Unknown category: {category!r}")
-        query = "SELECT id, category, text, source, created_at FROM entries"
+        query = f"SELECT {_COLUMNS} FROM entries"
         params: tuple[object, ...] = ()
         if category is not None:
             query += " WHERE category = ?"
@@ -89,8 +124,6 @@ class KnowMeStore:
     def iter_all(self) -> Iterator[KnowMeEntry]:
         """Stream every entry, oldest first (exports, reviews)."""
         with sqlite3.connect(self.path) as connection:
-            rows = connection.execute(
-                "SELECT id, category, text, source, created_at FROM entries ORDER BY id ASC"
-            ).fetchall()
+            rows = connection.execute(f"SELECT {_COLUMNS} FROM entries ORDER BY id ASC").fetchall()
         for row in rows:
             yield KnowMeEntry(*row)

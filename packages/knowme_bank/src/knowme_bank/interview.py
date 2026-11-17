@@ -6,6 +6,7 @@ import argparse
 from pathlib import Path
 
 from knowme_bank import KnowMeStore
+from knowme_bank.ingest import propose_facts
 
 QUESTIONS: tuple[tuple[str, str, str], ...] = (
     (
@@ -52,8 +53,8 @@ def run_interview(store: KnowMeStore, *, seed_demo: bool = False) -> list[int]:
         for category, question, source in QUESTIONS:
             print(question)
             answer = input("> ").strip()
-            if answer:
-                ids.append(store.add(category, answer, source).id)
+            for fact in propose_facts(answer):
+                ids.append(store.add(category, fact, source).id)
     except (KeyboardInterrupt, EOFError):
         print("\nStopped; kept what was answered.")
     print(f"Banked {len(ids)} entries.")

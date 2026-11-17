@@ -2523,6 +2523,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                         "category": entry.category,
                         "text": entry.text,
                         "source": entry.source,
+                        "source_file": entry.source_file,
+                        "origin_text": entry.origin_text,
                     }
                     for entry in entries
                 ],

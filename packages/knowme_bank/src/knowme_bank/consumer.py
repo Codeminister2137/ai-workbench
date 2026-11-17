@@ -16,5 +16,6 @@ def plan_context(store: KnowMeStore, category: str, *, limit: int = 10) -> str:
         return f"# {category} bank: empty (interview the owner first)"
     lines = [f"# {category} bank ({len(entries)} entries)"]
     for entry in reversed(entries):
-        lines.append(f"- [{entry.source}] {entry.text}")
+        tag = entry.source + (f":{entry.source_file}" if entry.source_file else "")
+        lines.append(f"- [{tag}] {entry.text}")
     return "\n".join(lines)
