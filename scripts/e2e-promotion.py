@@ -69,6 +69,37 @@ def load_reports(data_dir: Path) -> list[dict]:
     return reports
 
 
+def _same_merge(stored: object, merge: str) -> bool:
+    """Match full/short hashes either way; branch names match exactly."""
+    if not isinstance(stored, str) or not stored or not merge:
+        return False
+    if stored == merge:
+        return True
+    return (len(merge) >= 7 and stored.startswith(merge)) or (
+        len(stored) >= 7 and merge.startswith(stored)
+    )
+
+
+def _existing_covering_task(data_dir: Path, merge: str) -> dict | None:
+    """Newest open/submitted task for a merge; drafts regenerate in place."""
+    tasks_dir = data_dir / "e2e_tasks"
+    if not tasks_dir.is_dir():
+        return None
+    found: dict | None = None
+    for path in sorted(tasks_dir.glob("*.json")):
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (ValueError, UnicodeError):
+            continue
+        if (
+            isinstance(payload, dict)
+            and _same_merge(payload.get("merge_commit"), merge)
+            and payload.get("status") in ("open", "submitted")
+        ):
+            found = payload
+    return found
+
+
 def file_task(url: str, payload: dict, token: str | None, data_dir: Path) -> dict:
     """File the task via the dashboard API, else write the store directly."""
     body = json.dumps(payload).encode("utf-8")
@@ -205,6 +236,14 @@ def cmd_generate(args: argparse.Namespace) -> int:
     if args.dry_run:
         print(json.dumps(matched, indent=2))
         return 0
+    if not args.retest:
+        blocker = _existing_covering_task(data_dir, args.merge)
+        if blocker is not None:
+            print(
+                f"error: E2E task {blocker.get('id')} ({blocker.get('status')}) "
+                f"already covers {args.merge}; use --retest to file again"
+            )
+            return 1
     unclear = [
         item
         for item in matched["items"]
@@ -340,6 +379,11 @@ def build_parser() -> argparse.ArgumentParser:
     gen.add_argument("--url", default=DEFAULT_URL)
     gen.add_argument("--token", default=None)
     gen.add_argument("--dry-run", action="store_true")
+    gen.add_argument(
+        "--retest",
+        action="store_true",
+        help="File even when an open/submitted task already covers the merge.",
+    )
     gen.set_defaults(func=cmd_generate)
     fin = sub.add_parser("finalize", help="Open a draft with authored steps.")
     fin.add_argument("task_id", help="Draft E2E task id.")
