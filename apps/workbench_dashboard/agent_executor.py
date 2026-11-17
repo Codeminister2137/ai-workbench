@@ -333,6 +333,14 @@ def build_executor(
         iterations = result.iterations
         tool_calls = [item.name for item in result.tool_results]
         staged = _collect_staged(result)
+        if not iterations and not tool_calls and not staged and not filed:
+            return {
+                "status": "failed",
+                "error": (
+                    "Run performed no work: 0 iterations, no tool calls, "
+                    "no staged files, no owner tasks."
+                ),
+            }
         if not summary.strip():
             logger.info("run %s blank summary; fallback from receipts", run_id)
             tools_str = ", ".join(tool_calls) if tool_calls else "none"

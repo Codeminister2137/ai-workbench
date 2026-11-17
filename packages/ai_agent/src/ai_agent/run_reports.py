@@ -140,6 +140,40 @@ def _receipt_summary(receipt: dict | None) -> str | None:
     return _text(receipt.get("summary"))
 
 
+def _session_output_lines(receipt: dict | None) -> list[str] | None:
+    """External-session evidence (Mai receipts); None when absent.
+
+    Full flavor only: tails can carry paths and local detail that the
+    shareable flavor must not leak.
+    """
+    if not isinstance(receipt, dict):
+        return None
+    if receipt.get("source") not in ("mai-session", "external-agent"):
+        stdout = _text(receipt.get("stdout_tail"))
+        stderr = _text(receipt.get("stderr_tail"))
+        if stdout is None and stderr is None:
+            return None
+    lines: list[str] = []
+    for label, keys in (
+        ("session", ("mai_session_id", "session_id")),
+        ("route", ("effective_route_id", "route_id")),
+        ("branch", ("branch",)),
+        ("worktree", ("worktree",)),
+    ):
+        value = _first_text(receipt, keys)
+        if value is not None:
+            lines.append(f"- {label}: {value}")
+    stdout = _text(receipt.get("stdout_tail"))
+    if stdout is not None:
+        lines.append("- stdout:")
+        lines.extend(f"  {line}" for line in stdout.splitlines()[:80])
+    stderr = _text(receipt.get("stderr_tail"))
+    if stderr is not None:
+        lines.append("- stderr:")
+        lines.extend(f"  {line}" for line in stderr.splitlines()[:40])
+    return lines or None
+
+
 def render_run_report(run: dict) -> str:
     """Render a deterministic markdown report for ``run``; never raises."""
     try:
@@ -189,6 +223,11 @@ def render_run_report(run: dict) -> str:
             lines.append("")
             lines.append("## Error")
             lines.append(error)
+        session = _session_output_lines(receipt)
+        if session is not None:
+            lines.append("")
+            lines.append("## Session output")
+            lines.extend(session)
         if summary is not None:
             lines.append("")
             lines.append("## Summary")

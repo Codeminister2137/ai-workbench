@@ -686,3 +686,45 @@ def test_grant_bootstrap_is_sticky_and_guarded(tmp_path) -> None:
     )
     with pytest.raises(ValueError, match="re-bootstrap"):
         load_spend_ledger(tmp_path)
+
+
+def _execute_with_result(tmp_path, result):
+    FakeLoop.instances = []
+
+    def factory_loop(client, registry, context, **kwargs):
+        loop = FakeLoop(client, registry, context, **kwargs)
+        loop.result = result
+        return loop
+
+    config = DashboardConfig(provider="ollama", model="fake")
+    return build_executor(
+        config,
+        ProjectRoots(()),
+        tmp_path,
+        client_factory=lambda backend: object(),
+        loop_factory=factory_loop,
+    )
+
+
+def test_failed_when_loop_performs_no_work(tmp_path) -> None:
+    """An empty loop return fails loudly instead of completing silently."""
+    execute = _execute_with_result(
+        tmp_path, AgentResult(response=_response(""), tool_results=(), iterations=0)
+    )
+    receipt = execute({"id": "r1", "title": "t", "body": "b"})
+    assert receipt["status"] == "failed"
+    assert "no work" in receipt["error"].lower()
+
+
+def test_tools_without_staged_still_completes(tmp_path) -> None:
+    """Investigation-only runs (tools, no staged files) stay completed."""
+    execute = _execute_with_result(
+        tmp_path,
+        AgentResult(
+            response=_response("inspected, nothing to change"),
+            tool_results=(ToolResult(name="read_file", output="ok"),),
+            iterations=2,
+        ),
+    )
+    receipt = execute({"id": "r1", "title": "t", "body": "b"})
+    assert receipt["status"] == "completed"

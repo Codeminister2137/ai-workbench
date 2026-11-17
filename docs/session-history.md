@@ -1,5 +1,21 @@
 # Session History
 
+## 2026-11-17 morning - Gate green, brief-B models, E2E dispositions, loop plan (01a1e5ab)
+
+Red gate was pre-existing: docs/muse-window-recovery.md lacked a ledger row
+(Tier-1 fix cfa7058); earlier pushes must have bypassed the hook. Full gate
+green (workspace 286 + council + job-search). Push saga: 3 hook-then-push
+transfer drops (closed by remote host, mechanism unknown; fsck/GitHub/
+negotiation all fine) — immediate retries succeed; pushed 88707d2 then
+af7bc1a (rev-list 0 + ls-remote match; —no-verify used only after the hook
+passed on the identical tree). Brief-B shipped (af7bc1a Tier-2):
+AllowanceWindow normalizer over 4 native readers + refresh audit in
+source-state.md; periodic check stays deferred. Serve redeployed to af7bc1a
+via supervisor tick. E2E dispositions: brief 24b004b6 (scheduler-gating),
+3 re-tests issued (fan-out/badge/routes), 5 closes, 13 noted. Queue health
+worsened overnight: 10 empty completes, Mai exit-1 x4+, stale worktrees x2.
+Delivered day closeout + 4h gaming-light loop plan (no pushes during gaming).
+
 ## 2026-11-17 ~01:35 - STOPPED with push blocked on red gate (01a1e5ab)
 
 Owner ordered stop (sleep); resume per CURRENT_CONTEXT.md. Shipped since

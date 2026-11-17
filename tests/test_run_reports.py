@@ -255,6 +255,34 @@ def test_render_report_dispatcher() -> None:
         render_report(run, "owner-plus")
 
 
+def test_mai_receipt_renders_session_output() -> None:
+    run = {
+        "id": "r-mai",
+        "title": "Mai run",
+        "status": "completed",
+        "receipts": [
+            {
+                "status": "completed",
+                "source": "mai-session",
+                "mai_session_id": "sess-1",
+                "route_id": "openai/codex",
+                "worktree": "C:/x/.tmp/run-worktrees/abc",
+                "branch": "run/abc",
+                "stdout_tail": "item.completed: did the thing",
+                "stderr_tail": "",
+            }
+        ],
+    }
+    report = render_run_report(run)
+    assert "## Session output" in report
+    assert "sess-1" in report
+    assert "did the thing" in report
+    assert "run/abc" in report
+    shareable = render_shareable_report(run)
+    assert "## Session output" not in shareable
+    assert "did the thing" not in shareable
+
+
 def test_finish_attaches_both_flavors(tmp_path: Path) -> None:
     drain = _make_drain(tmp_path)
     runs_dir = tmp_path / "runs"

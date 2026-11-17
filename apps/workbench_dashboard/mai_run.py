@@ -21,6 +21,10 @@ from pathlib import Path
 
 TAIL_CHARS = 4000
 
+# Root AGENTS.md alone exceeds Mai's 64000 default; every full-instruction
+# run failed until this override. Guarded by a test against AGENTS.md growth.
+MAI_INSTRUCTION_BUDGET_CHARS = 96_000
+
 _ALLOWANCE_RE = re.compile(r"allowance|denied|cost polic|budget|quota|exhaust", re.IGNORECASE)
 _CONFIG_RE = re.compile(r"instruction.?budget", re.IGNORECASE)
 _PROVIDER_RE = re.compile(
@@ -88,6 +92,8 @@ def build_mai_argv(
         # interactive prompts would hang forever without a TTY.
         "--approval-policy",
         "trusted_local",
+        "--instruction-budget-chars",
+        str(MAI_INSTRUCTION_BUDGET_CHARS),
     ]
     if provider:
         argv += ["--provider", provider]

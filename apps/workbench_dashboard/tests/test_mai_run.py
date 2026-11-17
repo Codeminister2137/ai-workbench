@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from mai_run import (
+    MAI_INSTRUCTION_BUDGET_CHARS,
     build_mai_argv,
     build_mai_executor,
     classify_failure,
@@ -234,6 +237,17 @@ def test_classify_failure_prefers_allowance_then_provider() -> None:
         classify_failure("Required instructions exceed instruction_budget_chars=64000: AGENTS.md")
         == "config"
     )
+
+
+def test_argv_carries_raised_instruction_budget(tmp_path) -> None:
+    argv = build_mai_argv(_run(), repo_root=tmp_path, user_config=tmp_path / "user.toml")
+    assert argv[argv.index("--instruction-budget-chars") + 1] == str(MAI_INSTRUCTION_BUDGET_CHARS)
+
+
+def test_instruction_budget_covers_repo_agents_md() -> None:
+    # Regression: every Mai run failed once root AGENTS.md outgrew 64000.
+    agents = Path(__file__).resolve().parents[3] / "AGENTS.md"
+    assert MAI_INSTRUCTION_BUDGET_CHARS > agents.stat().st_size
 
 
 def test_progress_subprocess_and_executor(tmp_path):
