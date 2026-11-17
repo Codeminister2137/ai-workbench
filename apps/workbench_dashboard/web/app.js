@@ -1708,9 +1708,12 @@ async function renderInbox(id) {
       : "";
     const decision = item.answer || item.note
       ? `${item.answer ? `<p><strong>Answer:</strong> ${esc(item.answer)}</p>` : ""}
-         ${item.note ? `<p><strong>Note:</strong> ${esc(item.note)}</p>` : ""}
+         ${item.note ? `<p class="inbox-body"><strong>Note:</strong> ${esc(item.note)}</p>` : ""}
          ${item.answered_at ? `<p class="muted">Answered ${stamp(item.answered_at)}</p>` : ""}`
       : '<p class="muted">No answer recorded yet.</p>';
+    const notes = item.notes
+      ? `<h3>Notes</h3><p class="inbox-body">${esc(item.notes)}</p>`
+      : "";
     view.innerHTML = `<h1>Inbox task</h1><p><a href="#/inbox">All tasks</a></p>
       <div class="card"><h2>${gtext(item.title)}</h2>
       <p class="muted">${esc(item.type)} · ${esc(item.status)}${(item.resolution_kind || "final") !== "final" ? " · needs follow-up" : ""} · from ${esc(item.created_by || "")} · opened ${stamp(item.created_at)}</p>
@@ -1722,6 +1725,7 @@ async function renderInbox(id) {
       <h3>Decision record</h3>
       ${decision}
       ${outcome}
+      ${notes}
       ${item.status === "closed"
         ? `<p class="muted">Closed; answers are immutable.</p>`
           + `<p><button id="reopen-btn" title="Return this task to the active list">Reopen task</button></p>`
