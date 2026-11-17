@@ -116,14 +116,14 @@ def test_mapped_routes_name_the_tab() -> None:
     assert e2e_cases.needs_pointers(steps) is False
 
 
-def test_unmapped_routes_fall_back_to_pointers() -> None:
+def test_mapped_status_route_grounds_home_step() -> None:
     evidence = {
         "x.js": {"symbols": [], "routes": ["/api/status"], "views": []},
     }
     (step,) = e2e_cases.draft_steps("dashboard", evidence, ["s"])
-    assert step["grounded"] is False
-    assert "/api/status" in step["action"]
-    assert e2e_cases.needs_pointers([step]) is True
+    assert step["grounded"] is True
+    assert "#/" in step["action"]
+    assert e2e_cases.needs_pointers([step]) is False
 
 
 def test_agent_cli_steps_do_not_claim_help_flags() -> None:
@@ -377,6 +377,75 @@ def test_site_steps_ground_pages_and_assets() -> None:
     assert "company-site/style.css" in actions
     assert "dark mode" in actions
     assert not e2e_cases.needs_pointers(steps)
+
+
+def test_route_table_covers_app_routes_or_known() -> None:
+    import re
+    from pathlib import Path
+
+    from e2e_cases import KNOWN_UNMAPPED, ROUTE_UI
+
+    src = (Path(__file__).resolve().parent.parent / "dashboard_web_app.py").read_text(
+        encoding="utf-8"
+    )
+    routes = sorted(set(re.findall(r'"/api/[a-z0-9/_-]+"', src)))
+    assert routes, "audit found no routes to check"
+    for quoted in routes:
+        path = quoted.strip('"')
+        mapped = any(path == p.rstrip("/") or path.startswith(p) for p, _, _ in ROUTE_UI)
+        assert mapped or path in KNOWN_UNMAPPED, f"unmapped route: {path}"
+
+
+def test_symbol_registry_replaces_generic_step() -> None:
+    steps = e2e_cases.draft_steps(
+        "dashboard",
+        {
+            "apps/workbench_dashboard/web/app.js": {
+                "symbols": ["spendPolicyRuleRow"],
+                "routes": ["/api/spend/policy"],
+                "views": [],
+            }
+        },
+        ["dashboard surface"],
+    )
+    assert len(steps) == 2
+    assert "add a policy rule" in steps[0]["action"]
+    assert "remove the rule" in steps[1]["action"]
+    assert all(step["grounded"] for step in steps)
+
+
+def test_symbol_registry_entries_valid_and_routed() -> None:
+    import re
+    from pathlib import Path
+
+    from e2e_cases import SYMBOL_STEPS, validate_steps
+
+    router = (Path(__file__).resolve().parent.parent / "web" / "app.js").read_text(encoding="utf-8")
+    names = set(re.findall(r'name === "([a-z0-9_-]+)"', router)) | {"home"}
+    assert SYMBOL_STEPS, "registry must not be empty"
+    for symbol, entry in SYMBOL_STEPS.items():
+        assert entry["label"] and entry["view_hash"].startswith("#/")
+        view = entry["view_hash"].removeprefix("#/").split("/")[0] or "home"
+        assert view in names, f"{symbol} points at missing view {view}"
+        validate_steps([{"action": entry["action"], "expected": entry["expected"]}])
+
+
+def test_unmapped_route_gets_probe_step() -> None:
+    steps = e2e_cases.draft_steps(
+        "dashboard",
+        {
+            "apps/workbench_dashboard/dashboard_web_app.py": {
+                "symbols": [],
+                "routes": ["/api/settings"],
+                "views": [],
+            }
+        },
+        ["dashboard surface"],
+    )
+    assert len(steps) == 1
+    assert "e2e-http-get.py /api/settings 200" in steps[0]["action"]
+    assert steps[0]["grounded"] is True
+    assert steps[0]["agent_runnable"] is True
 
 
 def test_site_schema_only_needs_pointers() -> None:
