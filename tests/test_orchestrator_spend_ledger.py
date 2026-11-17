@@ -352,6 +352,36 @@ class TestPolicyFiles:
         assert record.actual_cents == 0
         assert record.usage_source == "provider_reported"
 
+    def test_record_measured_usage_prices_reported_then_estimated(self):
+        ledger = SpendLedger()
+        summary = {
+            "calls": [
+                {
+                    "input_tokens": 100,
+                    "output_tokens": 10,
+                    "provider": "meta",
+                    "model": "m",
+                    "reported_cost_usd": 0.05,
+                },
+                {"input_tokens": 1000, "output_tokens": 100, "provider": "meta", "model": "m"},
+                {"input_tokens": 100, "output_tokens": 10, "provider": "mystery", "model": "m"},
+            ]
+        }
+        assert (
+            record_measured_usage(
+                ledger,
+                summary,
+                task_id="t1",
+                task_class="analysis",
+                estimate_cost_usd=lambda p, i, o: 0.02 if p == "meta" else None,
+            )
+            == 3
+        )
+        records = ledger.records()
+        assert (records[0].actual_cents, records[0].usage_source) == (5, "provider_reported")
+        assert (records[1].actual_cents, records[1].usage_source) == (2, "estimated")
+        assert (records[2].actual_cents, records[2].usage_source) == (0, "provider_reported")
+
     def test_status_reports_policy_and_order(self):
         ledger = SpendLedger(clock=lambda: 1_700_000_000.0)
         view = ledger.status()

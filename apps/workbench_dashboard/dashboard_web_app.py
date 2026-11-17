@@ -3110,6 +3110,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             ledger = self.spend_ledger
             if ledger is not None:
                 from ai_orchestrator.spend_ledger import record_measured_usage
+                from ai_provider.route_eval import estimate_cost_usd
                 from ai_provider.turn_usage import measured_calls
 
                 def _sink(summary: dict, context: dict) -> None:
@@ -3120,6 +3121,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                         task_class="meeting_analysis",
                         provider=str(route_id or ""),
                         model_id=str(model_id or ""),
+                        estimate_cost_usd=estimate_cost_usd,
                     )
 
                 with measured_calls(sink=_sink, context={}):

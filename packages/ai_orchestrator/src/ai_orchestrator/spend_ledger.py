@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 import sqlite3
 import time
@@ -652,11 +653,14 @@ class SpendLedger:
         input_tokens: int | None = None,
         output_tokens: int | None = None,
         usage_source: str = "unavailable",
+        actual_cents: int = 0,
     ) -> TaskSpendRecord:
-        """Record one zero-marginal-cost call that admitted without a grant.
+        """Record one call that admitted without a grant.
 
         ``model_id``/``provider`` attribute the record (free/allowance routes);
-        measured token usage rides along when the caller has it.
+        measured token usage rides along when the caller has it. ``actual_cents``
+        stays 0 for counts; callers with priced usage (provider-reported cost
+        or a planning estimate) pass it explicitly.
         """
         record = TaskSpendRecord(
             task_id=task_id,
@@ -665,7 +669,7 @@ class SpendLedger:
             provider=provider,
             allowance_id=None,
             estimated_cents=0,
-            actual_cents=0,
+            actual_cents=actual_cents,
             duration_ms=0,
             timestamp=self._clock(),
             input_tokens=input_tokens,
@@ -723,6 +727,15 @@ class SpendLedger:
         }
 
 
+def _priced_cents(value: object) -> int | None:
+    """Provider-reported dollars to integer cents; None when unusable."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    if not math.isfinite(float(value)) or float(value) < 0:
+        return None
+    return int(round(float(value) * 100))
+
+
 def record_measured_usage(
     ledger: SpendLedger,
     summary: dict,
@@ -731,13 +744,14 @@ def record_measured_usage(
     task_class: str,
     provider: str = "unknown",
     model_id: str = "",
+    estimate_cost_usd=None,
 ) -> int:
-    """Book one zero-cost record per provider-reported call (counts phase).
+    """Book one record per provider-reported call (counts + priced dollars).
 
     Attribution comes from each call when the adapter reported identity,
-    else from the fallbacks. Dollars land in the price phase; these
-    records carry tokens with ``provider_reported`` source and $0.
-    Returns the number of records booked.
+    else from the fallbacks. Dollars prefer provider-reported cost, then
+    the injected planning estimate (marked ``estimated``); calls with
+    neither book tokens at $0. Returns the number of records booked.
     """
     booked = 0
     calls = summary.get("calls")
@@ -750,14 +764,30 @@ def record_measured_usage(
         output_tokens = call.get("output_tokens")
         if not isinstance(input_tokens, int) and not isinstance(output_tokens, int):
             continue
+        call_provider = str(call.get("provider") or provider)
+        actual_cents = _priced_cents(call.get("reported_cost_usd"))
+        source = "provider_reported"
+        if actual_cents is None and estimate_cost_usd is not None:
+            try:
+                estimate = estimate_cost_usd(
+                    call_provider,
+                    input_tokens if isinstance(input_tokens, int) else None,
+                    output_tokens if isinstance(output_tokens, int) else None,
+                )
+            except Exception:  # noqa: BLE001 - estimator failure degrades to counts
+                estimate = None
+            actual_cents = _priced_cents(estimate)
+            if actual_cents is not None:
+                source = "estimated"
         ledger.settle_local(
             task_id=task_id,
             task_class=task_class,
             model_id=str(call.get("model") or model_id or ""),
-            provider=str(call.get("provider") or provider),
+            provider=call_provider,
             input_tokens=input_tokens if isinstance(input_tokens, int) else None,
             output_tokens=output_tokens if isinstance(output_tokens, int) else None,
-            usage_source="provider_reported",
+            usage_source=source,
+            actual_cents=actual_cents or 0,
         )
         booked += 1
     return booked
