@@ -58,6 +58,8 @@ model); the periodic pre-refresh check itself is deferred per the brief.
   opencode.db inspected read-only (schema only): account tables empty
   (no Console sign-in stored), so the console path needs an owner login
   + credential-handling decision before any integration.
+  Owner 11-17: Extra Usage is OFF — over-limit calls block rather than
+  drawing balance, so window headroom reads literally.
 
 Gap (owner case-by-case per brief note): API-billed providers
 (OpenRouter/Requesty/…) have no subscription-refresh model here — owner

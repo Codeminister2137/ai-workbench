@@ -2802,15 +2802,27 @@ function providerCardHtml(p, allowances) {
         ? '<p class="muted">API key is configured.</p>'
         : '<p class="muted">No API key configured - add one to use this provider.</p>'));
   const quotaLabel = (w) => {
-    const names = {primary: "5-hour", secondary: "weekly"};
+    const names = {primary: "5-hour", secondary: "weekly", rolling: "5-hour (rolling)",
+      weekly: "weekly", monthly: "monthly"};
     return names[w.window] || `${w.bucket_id || "?"}/${w.window || "?"}`;
   };
+  const quotaReset = (w) => {
+    if (w.resets_at_unix_seconds) return new Date(w.resets_at_unix_seconds * 1000).toLocaleString();
+    if (w.resets_at) {
+      const d = new Date(w.resets_at);
+      if (!Number.isNaN(d.getTime())) return d.toLocaleString();
+      return w.resets_at;
+    }
+    return "";
+  };
   const quotaRows = (p.allowance_windows || [])
-    .map((w) => `<li>${esc(quotaLabel(w))} — ` +
-      `${w.used_percent === null || w.used_percent === undefined ? "?" : esc(w.used_percent) + "%"} used` +
-      (w.resets_at_unix_seconds ? `, resets ${esc(new Date(w.resets_at_unix_seconds * 1000).toLocaleString())}` : "") + `</li>`)
-    .join("");
-  const quotaBlock = p.route === "codex"
+    .map((w) => {
+      const reset = quotaReset(w);
+      return `<li>${esc(quotaLabel(w))} — ` +
+        `${w.used_percent === null || w.used_percent === undefined ? "?" : esc(w.used_percent) + "%"} used` +
+        (reset ? `, resets ${esc(reset)}` : "") + `</li>`;
+    }).join("");
+  const quotaBlock = (p.route === "codex" || p.route === "opencode_go")
     ? (quotaRows
       ? `<p class="muted">Quota windows:</p><ul class="plain">${quotaRows}</ul>`
       : `<p class="muted">Quota windows: none reported.</p>`)
@@ -2818,9 +2830,11 @@ function providerCardHtml(p, allowances) {
   const allowanceRows = (allowances || [])
     .map((b) => `<li><span class="pill" title="Allowance status">${esc(b.status)}</span> ${esc(b.kind)} — ${esc(spendDollars(b.balance_cents))} left of ${esc(spendDollars(b.granted_cents))}</li>`)
     .join("");
-  const allowanceBlock = p.route === "codex" ? quotaBlock : ((allowances || []).length
+  const hasQuota = p.route === "codex" || p.route === "opencode_go";
+  const bucketBlock = (allowances || []).length
     ? `<p class="muted">Allowances:</p><ul class="plain">${allowanceRows}</ul>`
-    : `<p class="muted">Allowances: no usage recorded yet.</p>`);
+    : (hasQuota ? "" : `<p class="muted">Allowances: no usage recorded yet.</p>`);
+  const allowanceBlock = (hasQuota ? quotaBlock : "") + bucketBlock;
   return `<div class="card"><h2>${esc(p.display)}</h2>
     <p>${providerStatusPill(p)}</p>
     <p class="muted">${esc(p.blurb || "")}</p>
