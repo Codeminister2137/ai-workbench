@@ -454,8 +454,12 @@ def tested_commit(report: dict, item_id: str) -> str:
     return str(report.get("commit"))
 
 
-def build_report(task: dict, submissions: dict[str, dict]) -> dict:
-    """Assemble the E2E report from owner submissions plus auto-passes.
+def build_report(task: dict, submissions: dict[str, dict], verdict_by: str = "owner") -> dict:
+    """Assemble the E2E report from submissions plus auto-passes.
+
+    ``verdict_by`` is "owner" for human verdicts or "agent" for
+    machine-verdicted all-agent checklists (brief ff9b255d-A).
+
 
     Verdicts are per step: every checkable step needs its own
     ``pass``/``fail``, and the item verdict derives fail-closed (any
@@ -502,7 +506,7 @@ def build_report(task: dict, submissions: dict[str, dict]) -> dict:
                 **item,
                 "status": "tested",
                 "verdict": verdict,
-                "verdict_by": "owner",
+                "verdict_by": verdict_by,
                 "notes": str(submission.get("notes", "") or ""),
                 "tested_on": str(task.get("merge_commit")),
                 "step_results": step_results,

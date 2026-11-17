@@ -616,13 +616,14 @@ class DashboardStores:
             if not str(step.get("action", "")).strip() or not str(step.get("expected", "")).strip():
                 raise StoreError("E2E steps need an action and an expected result")
 
-    def submit_e2e_task(self, task_id: str, results: list[dict]) -> dict:
-        """Submit owner verdicts; submitting auto-builds the E2E report.
+    def submit_e2e_task(self, task_id: str, results: list[dict], verdict_by: str = "owner") -> dict:
+        """Submit verdicts; submitting auto-builds the E2E report.
 
         Every pending item needs exactly one pass/fail verdict; the
         report (including carried ancestor approvals with warnings) is
         stored alongside the task. Submitted tasks are immutable, and
-        drafts finalize before they can take verdicts.
+        drafts finalize before they can take verdicts. ``verdict_by``
+        is "owner" or "agent" (machine-verdicted all-agent checklists).
         """
         from e2e_promotion import build_report
 
@@ -644,8 +645,10 @@ class DashboardStores:
                 "notes": entry.get("notes", ""),
                 "steps": entry.get("steps"),
             }
+        if verdict_by not in ("owner", "agent"):
+            raise StoreError("verdict_by must be owner or agent")
         try:
-            report = build_report(record, submissions)
+            report = build_report(record, submissions, verdict_by=verdict_by)
         except ValueError as exc:
             raise StoreError(str(exc)) from exc
         report["id"] = uuid.uuid4().hex

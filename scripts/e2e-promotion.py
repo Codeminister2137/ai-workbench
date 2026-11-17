@@ -127,6 +127,93 @@ def file_task(url: str, payload: dict, token: str | None, data_dir: Path) -> dic
         return {"ok": True, "id": record["id"], "direct": True}
 
 
+def _post_json(url: str, payload: dict, token: str | None) -> dict:
+    body = json.dumps(payload).encode("utf-8")
+    request = urllib.request.Request(
+        url,
+        data=body,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    if token:
+        request.add_header("X-Supervisor-Token", token)
+    with urllib.request.urlopen(request, timeout=300) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+def _all_agent_steps(checklist: dict) -> list[tuple[str, int]] | None:
+    """(item_id, step) pairs when every pending check is agent-runnable.
+
+    Returns None when the checklist needs human eyes: no behavior items,
+    pending regression items (standing human checks), unknown kinds, or
+    any step without the agent-runnable flag.
+    """
+    steps: list[tuple[str, int]] = []
+    found = False
+    for item in checklist.get("items", []):
+        if not isinstance(item, dict) or item.get("status") == "auto-pass":
+            continue
+        if item.get("kind") == "regression":
+            return None
+        if item.get("kind") != "behavior":
+            return None
+        item_steps = item.get("steps") or []
+        if not item_steps:
+            return None
+        for index, step in enumerate(item_steps):
+            if not isinstance(step, dict) or not step.get("agent_runnable"):
+                return None
+            steps.append((str(item.get("id")), index))
+        found = True
+    return steps if found else None
+
+
+def auto_submit_agent_task(
+    url: str,
+    token: str | None,
+    task_id: str,
+    checklist: dict,
+    poster=_post_json,
+) -> str:
+    """Run agent checks, then machine-submit on all-green (brief ff9b255d-A).
+
+    Returns a human-readable outcome line. Raises RuntimeError when the
+    checklist is not fully agent-runnable or any check fails; in both
+    cases the task stays open for the owner.
+    """
+    steps = _all_agent_steps(checklist)
+    if steps is None:
+        raise RuntimeError("checklist needs human eyes; leaving open")
+    failures: list[str] = []
+    for item_id, index in steps:
+        outcome = poster(
+            f"{url.rstrip('/')}/api/e2e/tasks/{task_id}/agent-check",
+            {"item_id": item_id, "step_index": index},
+            token,
+        )
+        if not outcome.get("ok"):
+            raise RuntimeError(f"agent check failed to run for {item_id} step {index}")
+        if (outcome.get("evidence") or {}).get("evidence_exit") != 0:
+            failures.append(f"{item_id} step {index}")
+    if failures:
+        raise RuntimeError(f"agent checks red, leaving open: {', '.join(failures)}")
+    by_item: dict[str, list[str]] = {}
+    for item_id, _index in steps:
+        by_item.setdefault(item_id, []).append("pass")
+    submitted = poster(
+        f"{url.rstrip('/')}/api/e2e/tasks/{task_id}/submit",
+        {
+            "results": [
+                {"item_id": item_id, "steps": verdicts, "notes": ""}
+                for item_id, verdicts in sorted(by_item.items())
+            ],
+            "verdict_by": "agent",
+        },
+        token,
+    )
+    return f"auto-submitted overall={submitted.get('overall')} report={submitted.get('report_id')}"
+
+
 def submit_task(url: str, task_id: str, data_dir: Path) -> dict:
     """Submit (possibly empty) results; direct store fallback included."""
     body = json.dumps({"results": []}).encode("utf-8")
@@ -279,6 +366,14 @@ def cmd_generate(args: argparse.Namespace) -> int:
     if pending == 0:
         submitted = submit_task(args.url, task_id, data_dir)
         print(f"report: {submitted.get('report_id')} overall={submitted.get('overall')}")
+        return 0
+    if args.auto_submit and not filed.get("direct"):
+        try:
+            print(auto_submit_agent_task(args.url, args.token, task_id, matched))
+        except RuntimeError as exc:
+            print(f"auto-submit skipped: {exc}")
+    elif args.auto_submit:
+        print("auto-submit skipped: task filed direct (API unreachable)")
     return 0
 
 
@@ -383,6 +478,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--retest",
         action="store_true",
         help="File even when an open/submitted task already covers the merge.",
+    )
+    gen.add_argument(
+        "--auto-submit",
+        action="store_true",
+        help="Machine-submit when every pending check is agent-runnable and green.",
     )
     gen.set_defaults(func=cmd_generate)
     fin = sub.add_parser("finalize", help="Open a draft with authored steps.")
