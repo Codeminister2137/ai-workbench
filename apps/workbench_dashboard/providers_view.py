@@ -237,6 +237,33 @@ def read_codex_report() -> Mapping[str, Any]:
         return {"status": "unknown", "reason": type(error).__name__, "windows": []}
 
 
+OPENCODE_USAGE_ENV = "OPENCODE_USAGE_KEY"
+
+
+def read_opencode_report(repo_root: Path | None = None) -> Mapping[str, Any]:
+    """Read Go usage via the scoped key; never raises (degrades).
+
+    The inference key cannot read usage (403); this needs the separate
+    least-privilege Usage-Read key. Absent key degrades with a reason.
+    """
+    import os
+
+    from ai_provider.go_source_info import read_opencode_go_allowance
+
+    key = os.environ.get(OPENCODE_USAGE_ENV) or load_dotenv_values(repo_root).get(
+        OPENCODE_USAGE_ENV
+    )
+    if not key:
+        return {"status": "unknown", "reason": "usage_key_not_configured", "windows": []}
+    try:
+        report = read_opencode_go_allowance(api_key=key)
+    except Exception as error:  # noqa: BLE001 - one route must not kill the sweep
+        return {"status": "unknown", "reason": type(error).__name__, "windows": []}
+    if not isinstance(report, dict) or report.get("status") != "observed":
+        return {"status": "unknown", "reason": "usage_unavailable", "windows": []}
+    return report
+
+
 def load_cached(data_dir: Path) -> dict[str, Any] | None:
     """Return the cached snapshot, or None when missing/unreadable."""
     try:
@@ -265,12 +292,24 @@ def provider_status(data_dir: Path, repo_root: Path | None = None) -> dict[str, 
     return {"ok": True, "providers": rows, "cached": False}
 
 
+def _attach_opencode_windows(rows: list[dict[str, Any]], report: Mapping[str, Any]) -> None:
+    """Attach Go usage windows to the opencode row (usage failure never hides probe)."""
+    for row in rows:
+        if row.get("route") != "opencode_go":
+            continue
+        windows = report.get("windows") or []
+        row["allowance_windows"] = [dict(window) for window in windows if isinstance(window, dict)]
+        if not row["allowance_windows"] and not row.get("error"):
+            row["error"] = f"usage: {report.get('reason') or 'unknown'}"
+
+
 def refresh_provider_status(
     data_dir: Path,
     repo_root: Path | None = None,
     *,
     probe: Callable[[Mapping[str, str | None]], list[RouteProbe]] | None = None,
     codex_probe: Callable[[], Mapping[str, Any]] | None = None,
+    opencode_probe: Callable[[], Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Run one live probe sweep, cache it atomically, and return the view."""
     from ai_provider.route_probe import probe_all
@@ -279,6 +318,8 @@ def refresh_provider_status(
     snapshot = _serialize(list(sweep(_credentials(repo_root))), repo_root)
     codex_sweep = codex_probe or read_codex_report
     snapshot["providers"].append(codex_view(codex_sweep()).to_json())
+    opencode_sweep = opencode_probe or (lambda: read_opencode_report(repo_root))
+    _attach_opencode_windows(snapshot["providers"], opencode_sweep())
     path = _cache_path(data_dir)
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp_name = tempfile.mkstemp(dir=str(path.parent), prefix=path.name)

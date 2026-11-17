@@ -70,6 +70,27 @@ def _codex_unavailable():
     }
 
 
+def _opencode_available():
+    return {
+        "status": "observed",
+        "source": "opencode_go_usage",
+        "windows": [
+            {
+                "bucket_id": "go_weekly",
+                "window": "weekly",
+                "used_percent": 17,
+                "remaining_percent": 83,
+                "resets_at": "2026-11-24T00:00:00+00:00",
+            }
+        ],
+        "observed_at_utc": "2026-11-17T18:00:00+00:00",
+    }
+
+
+def _opencode_unavailable():
+    return {"status": "unknown", "reason": "usage_key_not_configured", "windows": []}
+
+
 def test_uncached_status_returns_unchecked_skeleton(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     monkeypatch.delenv("REQUESTY_API_KEY", raising=False)
@@ -92,7 +113,9 @@ def test_uncached_status_returns_unchecked_skeleton(tmp_path: Path, monkeypatch)
 
 def test_refresh_caches_and_serves_snapshot(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("OPENROUTER_API_KEY", "secret-value")
-    view = refresh_provider_status(tmp_path, probe=_stub, codex_probe=_codex_unavailable)
+    view = refresh_provider_status(
+        tmp_path, probe=_stub, codex_probe=_codex_unavailable, opencode_probe=_opencode_unavailable
+    )
     assert view["ok"] is True
     assert view["cached"] is False
     assert (tmp_path / "providers.json").exists()
@@ -108,7 +131,9 @@ def test_refresh_caches_and_serves_snapshot(tmp_path: Path, monkeypatch) -> None
 
 def test_snapshot_never_carries_secret_values(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("OPENROUTER_API_KEY", "sk-secret-abc123")
-    view = refresh_provider_status(tmp_path, probe=_stub, codex_probe=_codex_unavailable)
+    view = refresh_provider_status(
+        tmp_path, probe=_stub, codex_probe=_codex_unavailable, opencode_probe=_opencode_unavailable
+    )
     dumped = json.dumps(view)
     assert "sk-secret-abc123" not in dumped
     dumped_cache = (tmp_path / "providers.json").read_text(encoding="utf-8")
@@ -116,7 +141,9 @@ def test_snapshot_never_carries_secret_values(tmp_path: Path, monkeypatch) -> No
 
 
 def test_refresh_appends_codex_row_with_quota_windows(tmp_path: Path) -> None:
-    view = refresh_provider_status(tmp_path, probe=_stub, codex_probe=_codex_available)
+    view = refresh_provider_status(
+        tmp_path, probe=_stub, codex_probe=_codex_available, opencode_probe=_opencode_unavailable
+    )
     rows = {p["route"]: p for p in view["providers"]}
     assert "codex" in rows
     codex = rows["codex"]
@@ -131,7 +158,9 @@ def test_refresh_appends_codex_row_with_quota_windows(tmp_path: Path) -> None:
 
 
 def test_refresh_codex_unavailable_degrades_row(tmp_path: Path) -> None:
-    view = refresh_provider_status(tmp_path, probe=_stub, codex_probe=_codex_unavailable)
+    view = refresh_provider_status(
+        tmp_path, probe=_stub, codex_probe=_codex_unavailable, opencode_probe=_opencode_unavailable
+    )
     rows = {p["route"]: p for p in view["providers"]}
     codex = rows["codex"]
     assert codex["reachable"] is False
@@ -139,6 +168,25 @@ def test_refresh_codex_unavailable_degrades_row(tmp_path: Path) -> None:
     assert codex["key_configured"] is False
     assert codex["error"] == "client_unavailable"
     assert codex["allowance_windows"] == []
+
+
+def test_refresh_attaches_opencode_windows(tmp_path: Path) -> None:
+    view = refresh_provider_status(
+        tmp_path, probe=_stub, codex_probe=_codex_unavailable, opencode_probe=_opencode_available
+    )
+    rows = {p["route"]: p for p in view["providers"]}
+    assert rows["opencode_go"]["allowance_windows"] == _opencode_available()["windows"]
+    assert rows["opencode_go"]["error"] is None
+
+
+def test_refresh_opencode_usage_failure_surfaces_without_hiding_probe(tmp_path: Path) -> None:
+    view = refresh_provider_status(
+        tmp_path, probe=_stub, codex_probe=_codex_unavailable, opencode_probe=_opencode_unavailable
+    )
+    rows = {p["route"]: p for p in view["providers"]}
+    assert rows["opencode_go"]["allowance_windows"] == []
+    assert rows["opencode_go"]["reachable"] is True
+    assert "usage" in (rows["opencode_go"]["error"] or "")
 
 
 def test_uncached_status_includes_unchecked_codex(tmp_path: Path) -> None:
