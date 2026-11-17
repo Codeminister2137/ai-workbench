@@ -253,6 +253,15 @@ class TestPolicyFiles:
         with pytest.raises(ValueError, match="Unknown spend policy keys"):
             policy_from_file(path)
 
+    def test_set_rules_empty_restores_default_block(self):
+        ledger = _ledger(rules=[PolicyRule(scope="global", prepaid_allowed=True)])
+        assert ledger.status()["policy"]["rules"][0]["prepaid_allowed"] is True
+        ledger.set_rules([])
+        rules = ledger.status()["policy"]["rules"]
+        assert rules == [
+            {"scope": "global", "prepaid_allowed": False, "max_prepaid_cents_per_day": None}
+        ]
+
     def test_unknown_rule_keys_refused(self, tmp_path):
         path = tmp_path / "policy.json"
         path.write_text(
