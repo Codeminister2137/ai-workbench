@@ -1369,6 +1369,32 @@ def test_restriction_fanout_defaults_round_trip(dashboard_server, tmp_path) -> N
     assert exc.value.code == 400
 
 
+def test_chat_agent_config_round_trip(dashboard_server) -> None:
+    state = get_json(dashboard_server, "/api/chat/agent-config")
+    assert state["ok"] is True
+    assert state["enabled"] is False
+    assert state["approval"] == "scoped"
+    updated = post_json(
+        dashboard_server, "/api/chat/agent-config", {"enabled": True, "approval": "yolo"}
+    )
+    assert updated == {"ok": True, "enabled": True, "approval": "yolo"}
+    reread = get_json(dashboard_server, "/api/chat/agent-config")
+    assert reread["enabled"] is True
+    assert reread["approval"] == "yolo"
+    sessions = get_json(dashboard_server, "/api/chat/sessions")
+    assert sessions["agent_enabled"] is True
+    with pytest.raises(HTTPError) as exc:
+        post_json(
+            dashboard_server, "/api/chat/agent-config", {"enabled": True, "approval": "sometimes"}
+        )
+    assert exc.value.code == 400
+    with pytest.raises(HTTPError) as exc:
+        post_json(
+            dashboard_server, "/api/chat/agent-config", {"enabled": "yes", "approval": "scoped"}
+        )
+    assert exc.value.code == 400
+
+
 def test_knowme_empty_bank_is_honest(dashboard_server) -> None:
     payload = get_json(dashboard_server, "/api/knowme")
     assert payload["ok"] is True

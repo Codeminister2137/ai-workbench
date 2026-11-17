@@ -569,11 +569,25 @@ async function renderChatThread(id, initial) {
      <div>${esc(m.content)}</div></div>`).join("");
   const sessions = await api("/api/chat/sessions");
   const found = (sessions.sessions || []).find((s) => s.id === id) || {};
-  const agentOn = sessions.agent_enabled === true;
+  let agentCfg = {enabled: sessions.agent_enabled === true, approval: "scoped"};
+  try {
+    agentCfg = await api("/api/chat/agent-config");
+  } catch (err) { /* keep the sessions flag when config is unreadable */ }
+  const agentOn = agentCfg.enabled === true;
   const mode = found.mode === "agent" ? "agent" : "ask";
-  const modeBar = !agentOn ? "" : `<p>Mode:
+  const policyOpts = ["scoped", "ask-always", "yolo"].map((p) =>
+    `<option value="${p}"${agentCfg.approval === p ? " selected" : ""}>${p}</option>`).join("");
+  const agentCtl = `<label><input type="checkbox" id="agent-enable" title="Enable agent mode: Mai edits in a scratch worktree"${agentOn ? " checked" : ""}> Enable agent mode</label>
+    <label>Policy: <select id="agent-policy" title="Agent turn policy: scoped stages edits for review, ask-always parks each turn, yolo auto-applies">${policyOpts}</select></label>
+    <button type="button" id="agent-save-btn" title="Save agent mode switch and policy">Save</button>`;
+  const modeBar = !agentOn
+    ? `<div class="card"><h3>Agent mode is off</h3>
+       <p class="muted">Agent turns run Mai in a scratch worktree; edits stage for your review.</p>
+       <p>${agentCtl}</p></div>`
+    : `<p>Mode:
     <button type="button" id="mode-ask-btn" title="Ask mode: read-only answers, no edits"${mode === "ask" ? " disabled" : ""}>Ask</button>
     <button type="button" id="mode-agent-btn" title="Agent mode: Mai edits in a scratch worktree, staged for your review"${mode === "agent" ? " disabled" : ""}>Agent</button>
+    ${agentCtl}
     <span class="muted">Agent turns stage edits; nothing lands without Apply.</span></p>`;
   let stagedBar = "";
   if (agentOn && mode === "agent") {
@@ -674,6 +688,22 @@ async function renderChatThread(id, initial) {
   if (askBtn) askBtn.addEventListener("click", () => setMode("ask"));
   const agentBtn = document.getElementById("mode-agent-btn");
   if (agentBtn) agentBtn.addEventListener("click", () => setMode("agent"));
+  const agentSave = document.getElementById("agent-save-btn");
+  if (agentSave) agentSave.addEventListener("click", async () => {
+    const box = document.getElementById("agent-enable");
+    const policy = document.getElementById("agent-policy");
+    try {
+      await api("/api/chat/agent-config", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({enabled: box ? box.checked : false, approval: policy ? policy.value : "scoped"}),
+      });
+      toast("Agent chat saved", true);
+      render();
+    } catch (err) {
+      toast(err.message, false);
+    }
+  });
   async function applyPaths(paths) {
     try {
       const out = await api("/api/chat/sessions/" + encodeURIComponent(id) + "/apply", {
