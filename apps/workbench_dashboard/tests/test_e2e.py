@@ -162,7 +162,10 @@ def test_attention_counts_mirror_default_filters(stores) -> None:
     ]
     stores.create_e2e_task(merge_commit="def", title="t", items=draft_items, draft=True)
     assert stores.open_e2e_count() == 1
-    assert stores.attention_e2e_count() == 2
+    # Drafts stay out of the badge: the default view hides them (owner
+    # verdict, pinned UI default) and their pointer request already
+    # counts toward the inbox badge.
+    assert stores.attention_e2e_count() == 1
 
 
 def test_submit_stamps_followup_refusal(stores) -> None:
