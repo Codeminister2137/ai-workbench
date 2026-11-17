@@ -174,6 +174,7 @@ GROUPS = {
         "tests/test_company_templates.py",
         "tests/test_p7_intake.py",
         "tests/test_forgotten_sweep.py",
+        "tests/test_allowance_healthcheck.py",
         "tests/test_window_watch_restore.py",
     ),
     "research": (

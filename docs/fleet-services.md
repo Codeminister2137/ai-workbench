@@ -52,6 +52,13 @@ Every 5 minutes: redeploys the served dashboard when origin moves
 (fast-forward a clean serve worktree, restart, health-check). Skips
 when up to date; raises the maintenance banner around restarts.
 
+## WorkbenchAllowanceCheck
+
+Daily 07:30: reads native allowance windows, flags exhausted windows
+and failed codex reads, lists stale models, and files one owner task
+per new problem set. Receipts land under `.tmp/allowance-health/`.
+Registered by `scripts/register-allowance-healthcheck.ps1`.
+
 ## dashboard
 
 This server: the dashboard web app serving these pages on loopback. It
