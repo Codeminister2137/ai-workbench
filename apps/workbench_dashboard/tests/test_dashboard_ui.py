@@ -1261,6 +1261,13 @@ def test_projects_goals_carry_registry_provenance() -> None:
     assert "registered project directories appear under Work roots" in js
 
 
+def test_allowance_empty_states_are_honest() -> None:
+    """Empty buckets explain themselves instead of rendering blank."""
+    js = _read("app.js")
+    assert "Allowances: no usage recorded yet." in js
+    assert "No spend buckets yet" in js
+
+
 def test_e2e_report_shows_agent_evidence_and_mismatch() -> None:
     """Report view renders per-step agent evidence plus mismatch pills."""
     js = _read("app.js")

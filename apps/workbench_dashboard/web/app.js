@@ -507,9 +507,12 @@ function spendCardHtml(spend) {
   const policy = spend.policy || { rules: [], prepaid_spent_today_cents: 0 };
   const policyRules = policy.rules.map((r) =>
     `<li>${esc(r.scope)}: prepaid ${r.prepaid_allowed ? "allowed" : "blocked"}` + (r.max_prepaid_cents_per_day == null ? "" : `, cap ${esc(r.max_prepaid_cents_per_day)}&#162;/day`) + `</li>`).join("");
-  const body = spend.configured
+  const bucketList = (spend.buckets || []).length
     ? `<ul class="plain">${spend.buckets.map((b) =>
-        `<li><span class="pill" title="Allowance status">${esc(b.status)}</span> ${esc(b.provider)} ${esc(b.kind)} — ${esc(b.balance_cents)}/${esc(b.granted_cents)}¢</li>`).join("")}</ul>
+        `<li><span class="pill" title="Allowance status">${esc(b.status)}</span> ${esc(b.provider)} ${esc(b.kind)} — ${esc(b.balance_cents)}/${esc(b.granted_cents)}¢</li>`).join("")}</ul>`
+    : `<p class="muted">No spend buckets yet — usage appears here once runs settle spend.</p>`;
+  const body = spend.configured
+    ? `${bucketList}
       <p class="muted">${esc(spend.open_reservations)} open reservation(s), ${esc(spend.records)} record(s).</p>
       <p class="muted">Order: free &#8594; expiring &#8594; prepaid-if-allowed. Prepaid today: ${esc(policy.prepaid_spent_today_cents)}&#162;.</p>
       <ul class="plain">${policyRules}</ul>`
@@ -2659,7 +2662,8 @@ function providerCardHtml(p, allowances) {
     .map((b) => `<li><span class="pill" title="Allowance status">${esc(b.status)}</span> ${esc(b.kind)} — ${esc(b.balance_cents)}/${esc(b.granted_cents)}¢</li>`)
     .join("");
   const allowanceBlock = (allowances || []).length
-    ? `<p class="muted">Allowances:</p><ul class="plain">${allowanceRows}</ul>` : "";
+    ? `<p class="muted">Allowances:</p><ul class="plain">${allowanceRows}</ul>`
+    : `<p class="muted">Allowances: no usage recorded yet.</p>`;
   return `<div class="card"><h2>${esc(p.display)}</h2>
     <p>${providerStatusPill(p)}</p>
     <p class="muted">${esc(p.blurb || "")}</p>
