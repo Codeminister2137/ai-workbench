@@ -421,3 +421,32 @@ def test_r1_still_files_when_prior_resolution_tracks_open_work() -> None:
     ]
     findings, _resolved = SWEEP.collect_runs(runs, inbox, NOW)
     assert [f["key"] for f in findings] == ["R1:abc123"]
+
+
+def _report(rid, commit, overall, hours_ago):
+    return {
+        "id": rid,
+        "title": f"E2E promotion for {commit}",
+        "commit": commit,
+        "overall": overall,
+        "built_utc": _ts(hours_ago),
+    }
+
+
+def test_e1_skips_fail_covered_by_newer_pass() -> None:
+    reports = [
+        _report("old-fail", "d16ed73", "fail", 20),
+        _report("new-pass", "d16ed73", "pass", 2),
+    ]
+    findings, resolved = SWEEP.collect_e2e([], reports, [], [], NOW)
+    assert findings == []
+    assert [r["key"] for r in resolved] == ["E1:old-fail"]
+
+
+def test_e1_still_files_when_pass_predates_fail() -> None:
+    reports = [
+        _report("old-pass", "d16ed73", "pass", 20),
+        _report("new-fail", "d16ed73", "fail", 2),
+    ]
+    findings, _resolved = SWEEP.collect_e2e([], reports, [], [], NOW)
+    assert [f["key"] for f in findings] == ["E1:new-fail"]
