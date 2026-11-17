@@ -142,6 +142,11 @@ class ProviderView:
         )
 
 
+def route_ids() -> list[str]:
+    """Provider route ids in display order, codex last (no HTTP probe)."""
+    return [route for route, _url, _env in ROUTES] + ["codex"]
+
+
 def _cache_path(data_dir: Path) -> Path:
     return data_dir / CACHE_FILENAME
 

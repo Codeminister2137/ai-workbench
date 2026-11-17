@@ -216,8 +216,11 @@ def spend_status(data_dir: Path, ledger: SpendLedger | None = None) -> dict[str,
     A passed ledger keeps STT spend and the spend view on the same buckets;
     None loads a fresh view (tests, unconfigured servers).
     """
+    from providers_view import route_ids
+
     view = (ledger or load_spend_ledger(data_dir)).status()
     view["configured"] = bool(view["buckets"])
+    view["policy_scopes"] = ["global", *route_ids()]
     return view
 
 

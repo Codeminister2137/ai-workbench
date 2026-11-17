@@ -506,11 +506,25 @@ async function renderModules() {
   });
 }
 
-function spendPolicyRuleRow(r, idx) {
+function spendPolicyScopes() {
+  try {
+    const raw = document.getElementById("spend-policy-rows").dataset.scopes;
+    const parsed = JSON.parse(raw || "[]");
+    return Array.isArray(parsed) && parsed.length ? parsed : ["global"];
+  } catch (err) {
+    return ["global"];
+  }
+}
+
+function spendPolicyRuleRow(r, idx, scopes) {
   const cap = r.max_prepaid_cents_per_day === null || r.max_prepaid_cents_per_day === undefined
     ? "" : r.max_prepaid_cents_per_day;
+  const known = scopes || spendPolicyScopes();
+  const options = known.includes(r.scope) ? known : [...known, r.scope];
+  const scopeOpts = options.map((s) =>
+    `<option value="${esc(s)}"${s === r.scope ? " selected" : ""}>${esc(s)}</option>`).join("");
   return `<div class="policy-row" data-idx="${idx}">
-    <input name="scope" value="${esc(r.scope || "")}" placeholder="global or provider route" title="Rule scope: global or a provider route" size="18">
+    <select name="scope" title="Rule scope: global or one provider route">${scopeOpts}</select>
     <label><input type="checkbox" name="prepaid" title="Allow prepaid spend under this rule" ${r.prepaid_allowed ? "checked" : ""}> prepaid</label>
     <input name="cap" value="${esc(cap)}" placeholder="cap ¢/day" title="Max prepaid cents per day (empty = no cap)" size="10" inputmode="numeric">
     <button type="button" data-remove="${idx}" title="Remove this rule">remove</button>
@@ -521,10 +535,11 @@ function spendCardHtml(spend) {
   const policy = spend.policy || { rules: [], prepaid_spent_today_cents: 0 };
   const policyRules = policy.rules.map((r) =>
     `<li>${esc(r.scope)}: prepaid ${r.prepaid_allowed ? "allowed" : "blocked"}` + (r.max_prepaid_cents_per_day == null ? "" : `, cap ${esc(r.max_prepaid_cents_per_day)}&#162;/day`) + `</li>`).join("");
-  const editorRows = policy.rules.map((r, i) => spendPolicyRuleRow(r, i)).join("");
+  const scopes = spend.policy_scopes && spend.policy_scopes.length ? spend.policy_scopes : ["global"];
+  const editorRows = policy.rules.map((r, i) => spendPolicyRuleRow(r, i, scopes)).join("");
   const editor = `<form id="spend-policy-form">
-      <p class="muted">Spend policy — prepaid is blocked unless a rule allows it. Scope is global or a provider route. Saving applies immediately.</p>
-      <div id="spend-policy-rows">${editorRows}</div>
+      <p class="muted">Spend policy — prepaid is blocked unless a rule allows it. Scope is global or one provider route (e.g. meta for the free grant). Saving applies immediately.</p>
+      <div id="spend-policy-rows" data-scopes="${esc(JSON.stringify(scopes))}">${editorRows}</div>
       <p><button type="button" id="spend-policy-add" title="Add a prepaid-permission rule">Add rule</button>
       <button type="submit" id="spend-policy-save" title="Save the spend policy (applies immediately)">Save policy</button></p>
     </form>`;
@@ -546,7 +561,7 @@ function collectSpendPolicyRules() {
   return Array.from(document.querySelectorAll("#spend-policy-rows .policy-row")).map((row) => {
     const capRaw = row.querySelector('input[name="cap"]').value.trim();
     return {
-      scope: row.querySelector('input[name="scope"]').value.trim(),
+      scope: row.querySelector('select[name="scope"]').value,
       prepaid_allowed: row.querySelector('input[name="prepaid"]').checked,
       max_prepaid_cents_per_day: capRaw === "" ? null : Number(capRaw),
     };
@@ -2733,8 +2748,12 @@ function providerCardHtml(p, allowances) {
       : (p.key_configured
         ? '<p class="muted">API key is configured.</p>'
         : '<p class="muted">No API key configured - add one to use this provider.</p>'));
+  const quotaLabel = (w) => {
+    const names = {primary: "5-hour", secondary: "weekly"};
+    return names[w.window] || `${w.bucket_id || "?"}/${w.window || "?"}`;
+  };
   const quotaRows = (p.allowance_windows || [])
-    .map((w) => `<li>${esc(w.bucket_id || "?")}/${esc(w.window || "?")} — ` +
+    .map((w) => `<li>${esc(quotaLabel(w))} — ` +
       `${w.used_percent === null || w.used_percent === undefined ? "?" : esc(w.used_percent) + "%"} used` +
       (w.resets_at_unix_seconds ? `, resets ${esc(new Date(w.resets_at_unix_seconds * 1000).toLocaleString())}` : "") + `</li>`)
     .join("");
