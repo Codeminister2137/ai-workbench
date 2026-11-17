@@ -2,6 +2,7 @@
 
 ## Functional
 - [ ] Requested behavior implemented.
+- [ ] Requested behavior is reachable by the owner (enabled, routed, UI-surfaced; no dark flags).
 - [ ] Existing behavior that should remain unchanged still works.
 - [ ] Relevant edge cases considered.
 - [ ] Error handling is appropriate.

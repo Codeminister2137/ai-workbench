@@ -450,3 +450,69 @@ def test_e1_still_files_when_pass_predates_fail() -> None:
     ]
     findings, _resolved = SWEEP.collect_e2e([], reports, [], [], NOW)
     assert [f["key"] for f in findings] == ["E1:new-fail"]
+
+
+def _git_repo_with_remote(tmp_path: Path):
+    import subprocess
+
+    def git(*args: str, cwd: Path | None = None) -> str:
+        completed = subprocess.run(
+            ["git", "-c", "user.email=t@t", "-c", "user.name=t", *args],
+            cwd=cwd or tmp_path,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        assert completed.returncode == 0, completed.stderr
+        return completed.stdout.strip()
+
+    remote = tmp_path / "remote"
+    repo = tmp_path / "repo"
+    git("init", "--bare", "-q", str(remote))
+    git("init", "-q", "-b", "develop", str(repo))
+    (repo / "f.txt").write_text("one", encoding="utf-8")
+    git("add", ".", cwd=repo)
+    git("commit", "-qm", "one", cwd=repo)
+    git("remote", "add", "origin", str(remote), cwd=repo)
+    git("push", "-q", "origin", "develop", cwd=repo)
+    return repo
+
+
+def _write_serve_version(repo: Path, commit: str) -> None:
+    target = repo / "apps" / "workbench_dashboard" / "data" / "serve-version.json"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps({"commit": commit}), encoding="utf-8")
+
+
+def test_g4_flags_serve_lagging_origin(tmp_path: Path) -> None:
+    import subprocess
+
+    def git(*args: str, cwd: Path) -> str:
+        completed = subprocess.run(
+            ["git", "-c", "user.email=t@t", "-c", "user.name=t", *args],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        assert completed.returncode == 0, completed.stderr
+        return completed.stdout.strip()
+
+    repo = _git_repo_with_remote(tmp_path)
+    old = git("rev-parse", "HEAD", cwd=repo)
+    _write_serve_version(repo, old)
+    (repo / "f.txt").write_text("two", encoding="utf-8")
+    git("add", ".", cwd=repo)
+    git("commit", "-qm", "two", cwd=repo)
+    git("push", "-q", "origin", "develop", cwd=repo)
+    findings = SWEEP.collect_git(repo, tmp_path / "runs", NOW)
+    assert [f["key"] for f in findings if f["key"].startswith("G4")] != []
+    _write_serve_version(repo, git("rev-parse", "HEAD", cwd=repo))
+    findings = SWEEP.collect_git(repo, tmp_path / "runs", NOW)
+    assert [f["key"] for f in findings if f["key"].startswith("G4")] == []
+
+
+def test_g4_skips_missing_version_file(tmp_path: Path) -> None:
+    repo = _git_repo_with_remote(tmp_path)
+    findings = SWEEP.collect_git(repo, tmp_path / "runs", NOW)
+    assert [f["key"] for f in findings if f["key"].startswith("G4")] == []

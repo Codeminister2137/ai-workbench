@@ -55,6 +55,7 @@ GATE_H = {
     "G1": 0,  # merged local branches (housekeeping; always actionable)
     "G2": 0,  # merged remote branches
     "G3": 0,  # prunable run worktrees (7d+ terminal, via prune script)
+    "G4": 0,  # serve tree lags origin (redeploy verification)
     "P1": 0,  # plans without registry project header
     "P2": 0,  # registry projects off on-track
     "P3": 0,  # registry goal docs missing
@@ -752,7 +753,62 @@ def collect_git(repo: Path, runs_dir: Path, now: datetime) -> list[dict[str, Any
                 24 * 7.0,
             )
         )
+    drift = _serve_drift(repo)
+    if drift is not None:
+        served, origin, age = drift
+        members = [
+            _member(
+                served[:12],
+                f"serve @ {served[:12]} vs origin @ {origin[:12]}",
+                age,
+            )
+        ]
+        findings.append(
+            _finding(
+                _aggregate_key("G4", members),
+                "G4",
+                "Serve tree lags origin/develop",
+                "agent",
+                "Let the supervisor tick redeploy, then verify serve-version.json.",
+                members,
+                age or 0.0,
+            )
+        )
     return findings
+
+
+def _serve_drift(repo: Path) -> tuple[str, str, float | None] | None:
+    """(served, origin, age_hours) when serve lags origin; else None.
+
+    Fail-soft: a missing version file, unknown commits, or git trouble
+    means no finding, never a crash.
+    """
+    try:
+        version_file = repo / "apps" / "workbench_dashboard" / "data" / "serve-version.json"
+        payload = json.loads(version_file.read_text(encoding="utf-8"))
+        served = str(payload.get("commit", "") or "")
+        origin = _git(repo, "rev-parse", "origin/develop").strip()
+        if not served or not origin:
+            return None
+        if served == origin or origin.startswith(served) or served.startswith(origin):
+            return None
+        behind = subprocess.run(
+            ["git", "merge-base", "--is-ancestor", served, origin],
+            cwd=repo,
+            capture_output=True,
+            timeout=60,
+        )
+        if behind.returncode != 0:
+            return None  # serve ahead or diverged: not drift
+        try:
+            serve_ts = int(_git(repo, "log", "-1", "--format=%ct", served))
+            origin_ts = int(_git(repo, "log", "-1", "--format=%ct", origin))
+            age: float | None = max(0.0, (origin_ts - serve_ts) / 3600.0)
+        except RuntimeError:
+            age = None
+        return served, origin, age
+    except (OSError, ValueError, RuntimeError):
+        return None
 
 
 def collect_plans(repo: Path) -> list[dict[str, Any]]:
