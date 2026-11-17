@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from urllib.error import HTTPError
+
 import pytest
 from dashboard_stores import DashboardStores, StoreError
 from dashboard_test_http import get_json, post_json
@@ -175,7 +177,9 @@ def test_submit_stamps_followup_refusal(stores) -> None:
     assert "followup_error" in outcome["task"]
 
 
-def test_e2e_http_roundtrip(dashboard_server) -> None:
+@pytest.mark.parametrize("verdict", ["pass", "fail"])
+def test_e2e_http_roundtrip(dashboard_server, verdict) -> None:
+    """Submission preserves the owner's evidence and cannot be overwritten."""
     created = post_json(
         dashboard_server,
         "/api/e2e/tasks",
@@ -189,12 +193,35 @@ def test_e2e_http_roundtrip(dashboard_server) -> None:
     submitted = post_json(
         dashboard_server,
         f"/api/e2e/tasks/{created['id']}/submit",
-        {"results": [{"item_id": "behavior:dashboard", "verdict": "fail", "notes": "broken"}]},
+        {"results": [{"item_id": "behavior:dashboard", "verdict": verdict, "notes": "probe"}]},
     )
-    assert submitted["overall"] == "fail"
+    assert submitted["overall"] == verdict
     assert submitted["report_id"]
     report = get_json(dashboard_server, f"/api/e2e/reports/{submitted['report_id']}")
-    assert report["item"]["overall"] == "fail"
+    assert report["item"]["overall"] == verdict
+    assert report["item"]["commit"] == "abc"
+    behavior = next(i for i in report["item"]["items"] if i["id"] == "behavior:dashboard")
+    assert behavior["verdict"] == verdict
+    assert behavior["verdict_by"] == "owner"
+    assert behavior["notes"] == "probe"
+    docs = next(i for i in report["item"]["items"] if i["id"] == "nonbehavioral:docs")
+    assert docs["verdict"] == "pass"
+    assert docs["verdict_by"] == "nonbehavioral"
+    stored = get_json(dashboard_server, f"/api/e2e/tasks/{created['id']}")["item"]
+    assert stored["status"] == "submitted"
+    assert stored["report_id"] == submitted["report_id"]
+    with pytest.raises(HTTPError) as rejected:
+        post_json(
+            dashboard_server,
+            f"/api/e2e/tasks/{created['id']}/submit",
+            {
+                "results": [
+                    {"item_id": "behavior:dashboard", "verdict": "fail", "notes": "overwrite"}
+                ]
+            },
+        )
+    assert rejected.value.code == 400
+    assert get_json(dashboard_server, f"/api/e2e/reports/{submitted['report_id']}") == report
     status = get_json(dashboard_server, "/api/status")
     assert status["open_e2e"] == 0
 
