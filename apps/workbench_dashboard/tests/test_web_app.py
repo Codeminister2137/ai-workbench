@@ -380,8 +380,9 @@ def test_agent_check_runs_exact_command_and_stores_evidence(
 
     seen: dict = {}
 
-    def fake_runner(argv, repo_root):
+    def fake_runner(argv, repo_root, timeout_seconds=None):
         seen["argv"] = list(argv)
+        seen["timeout"] = timeout_seconds
         return 0, "proof output"
 
     monkeypatch.setattr(e2e_agent_checks, "_default_runner", fake_runner)
@@ -485,6 +486,140 @@ def test_agent_check_records_missing_binary_as_evidence(dashboard_server, tmp_pa
     assert out["ok"] is True
     assert out["evidence"]["evidence_exit"] == 127
     assert "NOT RUNNABLE HERE" in out["evidence"]["evidence"]
+
+
+def _submit_results(*verdicts):
+    return {"results": [{"item_id": "behavior:x", "steps": list(verdicts), "notes": ""}]}
+
+
+def test_submit_auto_runs_evidence_less_agent_steps(
+    dashboard_server, tmp_path, monkeypatch
+) -> None:
+    import e2e_agent_checks
+
+    calls: list = []
+
+    def fake_execute(action, repo_root, timeout_seconds=None):
+        calls.append(action)
+        return {"command": "c", "exit_code": 0, "output": "auto proof"}
+
+    monkeypatch.setattr(e2e_agent_checks, "execute_check", fake_execute)
+    _agent_check_task(
+        tmp_path,
+        [
+            {
+                "action": "Run `python --help` now",
+                "expected": "help",
+                "grounded": True,
+                "agent_runnable": True,
+            }
+        ],
+    )
+    out = post_json(dashboard_server, "/api/e2e/tasks/t1/submit", _submit_results("pass"))
+    assert out["ok"] is True
+    assert len(calls) == 1
+    stored = json.loads((tmp_path / "data" / "e2e_tasks" / "t1.json").read_text(encoding="utf-8"))
+    step = stored["items"][0]["steps"][0]
+    assert step["evidence"] == "auto proof"
+    assert step["evidence_exit"] == 0
+
+
+def test_submit_skips_steps_with_evidence(dashboard_server, tmp_path, monkeypatch) -> None:
+    import e2e_agent_checks
+
+    calls: list = []
+
+    def fake_execute(action, repo_root, timeout_seconds=None):
+        calls.append(action)
+        return {"command": "c", "exit_code": 0, "output": "x"}
+
+    monkeypatch.setattr(e2e_agent_checks, "execute_check", fake_execute)
+    _agent_check_task(
+        tmp_path,
+        [
+            {
+                "action": "Run `python --help` now",
+                "expected": "help",
+                "grounded": True,
+                "agent_runnable": True,
+                "evidence": "manual proof",
+                "evidence_utc": "2026-11-17T00:00:00+00:00",
+                "evidence_exit": 0,
+            }
+        ],
+    )
+    out = post_json(dashboard_server, "/api/e2e/tasks/t1/submit", _submit_results("pass"))
+    assert out["ok"] is True
+    assert calls == []
+
+
+def test_submit_marks_skipped_when_budget_spent(dashboard_server, tmp_path, monkeypatch) -> None:
+    import dashboard_web_app
+    import e2e_agent_checks
+
+    calls: list = []
+
+    def fake_execute(action, repo_root, timeout_seconds=None):
+        calls.append(action)
+        return {"command": "c", "exit_code": 0, "output": "x"}
+
+    monkeypatch.setattr(e2e_agent_checks, "execute_check", fake_execute)
+    monkeypatch.setattr(dashboard_web_app, "SUBMIT_AUTOCHECK_BUDGET_SECONDS", 0)
+    _agent_check_task(
+        tmp_path,
+        [
+            {
+                "action": "Run `python --help` now",
+                "expected": "help",
+                "grounded": True,
+                "agent_runnable": True,
+            }
+        ],
+    )
+    out = post_json(dashboard_server, "/api/e2e/tasks/t1/submit", _submit_results("pass"))
+    assert out["ok"] is True
+    assert calls == []
+    stored = json.loads((tmp_path / "data" / "e2e_tasks" / "t1.json").read_text(encoding="utf-8"))
+    step = stored["items"][0]["steps"][0]
+    assert "budget spent" in step["evidence"]
+    assert step["evidence_exit"] is None
+
+
+def test_submit_flags_mismatch_and_files_followup(dashboard_server, tmp_path, monkeypatch) -> None:
+    import e2e_agent_checks
+
+    def fake_execute(action, repo_root, timeout_seconds=None):
+        return {"command": "c", "exit_code": 3, "output": "FAILED"}
+
+    monkeypatch.setattr(e2e_agent_checks, "execute_check", fake_execute)
+    _agent_check_task(
+        tmp_path,
+        [
+            {
+                "action": "Run `python --help` now",
+                "expected": "help",
+                "grounded": True,
+                "agent_runnable": True,
+            }
+        ],
+    )
+    out = post_json(dashboard_server, "/api/e2e/tasks/t1/submit", _submit_results("pass"))
+    assert out["ok"] is True
+    assert out["overall"] == "pass"
+    assert out["followup_id"]
+    report = json.loads(
+        (tmp_path / "data" / "e2e_reports" / f"{out['report_id']}.json").read_text(encoding="utf-8")
+    )
+    (item,) = report["items"]
+    assert item["verdict"] == "pass"
+    assert len(item["agent_check_mismatches"]) == 1
+    followup = None
+    for path in (tmp_path / "data" / "inbox").glob("*.json"):
+        record = json.loads(path.read_text(encoding="utf-8"))
+        if record["id"] == out["followup_id"]:
+            followup = record
+    assert followup is not None
+    assert "mismatched" in followup["title"]
 
 
 def test_chat_rename_and_delete_endpoints(dashboard_server) -> None:

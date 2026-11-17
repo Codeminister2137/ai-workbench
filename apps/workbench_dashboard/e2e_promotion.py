@@ -496,6 +496,7 @@ def build_report(task: dict, submissions: dict[str, dict]) -> dict:
             if verdict not in ("pass", "fail"):
                 raise ValueError(f"Verdict for {item_id} must be pass or fail")
             step_results = []
+        mismatches = _agent_mismatches(item, step_results)
         items.append(
             {
                 **item,
@@ -505,6 +506,7 @@ def build_report(task: dict, submissions: dict[str, dict]) -> dict:
                 "notes": str(submission.get("notes", "") or ""),
                 "tested_on": str(task.get("merge_commit")),
                 "step_results": step_results,
+                "agent_check_mismatches": mismatches,
             }
         )
     overall = "pass" if items and all(e.get("verdict") == "pass" for e in items) else "fail"
@@ -538,6 +540,28 @@ def _step_results_for(item: dict, submission: dict, item_id: str) -> list[dict]:
             }
         )
     return results
+
+
+def _agent_mismatches(item: dict, step_results: list[dict]) -> list[str]:
+    """Owner-passed steps whose agent evidence reports failure.
+
+    Owner verdicts always stand; a mismatch flags the step for the
+    follow-up agent instead of silently trusting either side.
+    """
+    steps = item.get("steps") or []
+    if len(steps) != len(step_results):
+        return []
+    mismatched: list[str] = []
+    for step, result in zip(steps, step_results, strict=True):
+        if not isinstance(step, dict) or not isinstance(result, dict):
+            continue
+        if result.get("verdict") != "pass":
+            continue
+        code = step.get("evidence_exit")
+        if code is None or code == 0:
+            continue
+        mismatched.append(str(step.get("action", "")))
+    return mismatched
 
 
 def tested_on_for(item: dict) -> str:

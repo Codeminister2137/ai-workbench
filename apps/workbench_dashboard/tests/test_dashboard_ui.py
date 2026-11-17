@@ -1259,6 +1259,15 @@ def test_projects_goals_carry_registry_provenance() -> None:
     assert "registered project directories appear under Work roots" in js
 
 
+def test_e2e_report_shows_agent_evidence_and_mismatch() -> None:
+    """Report view renders per-step agent evidence plus mismatch pills."""
+    js = _read("app.js")
+    assert "Agent check exit:" in js
+    assert "Agent output" in js
+    assert "agent_check_mismatches" in js
+    assert "agent mismatch" in js
+
+
 def test_run_report_renders_readable_markdown() -> None:
     """Run reports render headers/lists/bold, never raw markdown or markup."""
     node = shutil.which("node")
