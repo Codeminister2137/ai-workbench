@@ -73,7 +73,8 @@ def extract_diff_evidence(
     return {
         path: {key: sorted(values) for key, values in entry.items()}
         for path, entry in sorted(evidence.items())
-        if any(entry.values())
+        # Site files carry no code symbols; the file list itself grounds steps.
+        if any(entry.values()) or path.startswith("company-site/")
     }
 
 
@@ -174,6 +175,57 @@ def _dashboard_steps(evidence: dict[str, dict[str, list[str]]]) -> list[dict]:
     return steps
 
 
+def _site_steps(evidence: dict[str, dict[str, list[str]]], subjects: Sequence[str]) -> list[dict]:
+    subject = subjects[0] if subjects else "this change"
+    steps: list[dict] = []
+    for path in sorted(evidence):
+        if path.endswith(".html"):
+            steps.append(
+                {
+                    "action": f"Open {path} on the served company site and verify: {subject}.",
+                    "expected": "Page renders per the change; layout, links, and form wiring intact.",
+                    "grounded": True,
+                }
+            )
+    assets = [path for path in sorted(evidence) if path.rsplit(".", 1)[-1] in {"css", "js"}]
+    if assets:
+        steps.append(
+            {
+                "action": (
+                    f"Spot-check the PL index and one EN page ({', '.join(assets)} changed) "
+                    f"and verify: {subject}."
+                ),
+                "expected": "Shared-asset change renders correctly in both languages; no broken layout.",
+                "grounded": True,
+            }
+        )
+    others = [
+        path
+        for path in sorted(evidence)
+        if not path.endswith(".html") and path.rsplit(".", 1)[-1] not in {"css", "js"}
+    ]
+    if others:
+        steps.append(
+            {
+                "action": (
+                    f"Non-page site files changed ({', '.join(others)}) — pointers needed: "
+                    "what verifies them?"
+                ),
+                "expected": "Owner pointers say how to check non-renderable files.",
+                "grounded": False,
+            }
+        )
+    if not steps:
+        steps.append(
+            {
+                "action": "Site files changed but named no checkable surface — pointers needed.",
+                "expected": "Owner pointers say what to verify.",
+                "grounded": False,
+            }
+        )
+    return steps
+
+
 def _is_test_path(path: str) -> bool:
     normalized = path.replace("\\", "/")
     return "/tests/" in normalized or normalized.split("/")[-1].startswith("test_")
@@ -238,6 +290,9 @@ def draft_steps(
             "Run the scoped pytest for the touched module, trigger one decision through {symbol}, read the reasoning",
             "Sensible decision with visible reasoning; no gate bypass.",
         )
+    elif area == "company-site":
+        steps = _site_steps(evidence, subjects)
+        return steps
     else:
         steps = [
             {
