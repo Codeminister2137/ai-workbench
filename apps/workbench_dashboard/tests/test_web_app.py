@@ -585,6 +585,33 @@ def test_submit_marks_skipped_when_budget_spent(dashboard_server, tmp_path, monk
     assert step["evidence_exit"] is None
 
 
+def test_submit_accepts_agent_verdict_and_rejects_junk(dashboard_server, tmp_path) -> None:
+    _agent_check_task(
+        tmp_path,
+        [{"action": "Look at the view", "expected": "seen", "grounded": True}],
+    )
+    out = post_json(
+        dashboard_server,
+        "/api/e2e/tasks/t1/submit",
+        {
+            "results": [{"item_id": "behavior:x", "steps": ["pass"], "notes": ""}],
+            "verdict_by": "agent",
+        },
+    )
+    assert out["ok"] is True
+    report = json.loads(
+        (tmp_path / "data" / "e2e_reports" / f"{out['report_id']}.json").read_text(encoding="utf-8")
+    )
+    assert [item["verdict_by"] for item in report["items"]] == ["agent"]
+    with pytest.raises(HTTPError) as exc:
+        post_json(
+            dashboard_server,
+            "/api/e2e/tasks/t1/submit",
+            {"results": [], "verdict_by": "supervisor"},
+        )
+    assert exc.value.code == 400
+
+
 def test_submit_flags_mismatch_and_files_followup(dashboard_server, tmp_path, monkeypatch) -> None:
     import e2e_agent_checks
 

@@ -2044,9 +2044,14 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         results = payload.get("results")
         if not isinstance(results, list):
             return self._send_json({"ok": False, "error": "Invalid submit payload"}, status=400)
+        verdict_by = payload.get("verdict_by", "owner")
+        if verdict_by not in ("owner", "agent"):
+            return self._send_json(
+                {"ok": False, "error": "verdict_by must be owner or agent"}, status=400
+            )
         self._auto_run_pending_checks(task_id)
         try:
-            outcome = self._stores().submit_e2e_task(task_id, results)
+            outcome = self._stores().submit_e2e_task(task_id, results, verdict_by=verdict_by)
         except StoreError as exc:
             status = 404 if "not found" in str(exc).lower() else 400
             return self._send_json({"ok": False, "error": str(exc)}, status=status)

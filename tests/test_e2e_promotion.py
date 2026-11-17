@@ -118,6 +118,70 @@ def test_covering_task_blocks_open_and_submitted_but_not_drafts(cli, tmp_path: P
     assert cli._existing_covering_task(tmp_path / "missing", "aaa") is None
 
 
+def _agent_checklist() -> dict:
+    runnable = {"action": "Run `x`", "expected": "y", "agent_runnable": True}
+    return {
+        "items": [
+            {"id": "behavior:a", "kind": "behavior", "status": "pending", "steps": [runnable]},
+            {
+                "id": "behavior:b",
+                "kind": "behavior",
+                "status": "pending",
+                "steps": [dict(runnable)],
+            },
+            {"id": "nonbehavioral:docs", "kind": "nonbehavioral", "status": "auto-pass"},
+        ]
+    }
+
+
+def test_all_agent_steps_accepts_and_rejects(cli) -> None:
+    assert cli._all_agent_steps(_agent_checklist()) == [("behavior:a", 0), ("behavior:b", 0)]
+    mixed = _agent_checklist()
+    mixed["items"][0]["steps"][0]["agent_runnable"] = False
+    assert cli._all_agent_steps(mixed) is None
+    regressed = _agent_checklist()
+    regressed["items"].append(
+        {
+            "id": "regression:c",
+            "kind": "regression",
+            "status": "pending",
+            "steps": [{"agent_runnable": True}],
+        }
+    )
+    assert cli._all_agent_steps(regressed) is None
+    assert cli._all_agent_steps({"items": []}) is None
+
+
+def test_auto_submit_posts_checks_then_agent_verdict(cli) -> None:
+    calls: list = []
+
+    def poster(url, payload, token):
+        calls.append((url, payload))
+        if url.endswith("/agent-check"):
+            return {"ok": True, "evidence": {"evidence_exit": 0}}
+        return {"ok": True, "overall": "pass", "report_id": "r1"}
+
+    line = cli.auto_submit_agent_task("http://x", None, "t1", _agent_checklist(), poster=poster)
+    assert "auto-submitted overall=pass" in line
+    assert [url for url, _payload in calls].count("http://x/api/e2e/tasks/t1/submit") == 1
+    submit_payload = calls[-1][1]
+    assert submit_payload["verdict_by"] == "agent"
+    assert submit_payload["results"] == [
+        {"item_id": "behavior:a", "steps": ["pass"], "notes": ""},
+        {"item_id": "behavior:b", "steps": ["pass"], "notes": ""},
+    ]
+
+
+def test_auto_submit_leaves_open_on_red_check(cli) -> None:
+    def poster(url, payload, token):
+        if url.endswith("/agent-check"):
+            return {"ok": True, "evidence": {"evidence_exit": 3}}
+        raise AssertionError("must not submit on red")
+
+    with pytest.raises(RuntimeError, match="leaving open"):
+        cli.auto_submit_agent_task("http://x", None, "t1", _agent_checklist(), poster=poster)
+
+
 def test_covering_task_matches_short_hashes(cli, tmp_path: Path) -> None:
     data = tmp_path / "data"
     _task_file(data, "full.json", "abcdef1234567890", "submitted")
