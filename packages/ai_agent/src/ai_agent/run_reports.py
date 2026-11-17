@@ -174,6 +174,28 @@ def _session_output_lines(receipt: dict | None) -> list[str] | None:
     return lines or None
 
 
+def report_has_substance(run: dict) -> bool:
+    """Return whether a finished run carries any deliverable evidence.
+
+    A run whose report renders every section as ``(none)`` is hollow:
+    ``completed`` would be a claim without bytes. Substance is any of
+    a model summary, external-session output, staged files, filed
+    owner tasks, or tool calls.
+    """
+    if not isinstance(run, dict):
+        return False
+    receipt = _last_receipt(run)
+    if _receipt_summary(receipt) is not None:
+        return True
+    if _session_output_lines(receipt) is not None:
+        return True
+    if _staged_paths(run) is not None:
+        return True
+    if _owner_task_ids(receipt) is not None:
+        return True
+    return _tool_names(receipt) is not None
+
+
 def render_run_report(run: dict) -> str:
     """Render a deterministic markdown report for ``run``; never raises."""
     try:

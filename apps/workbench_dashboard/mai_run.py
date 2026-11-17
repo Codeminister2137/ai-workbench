@@ -33,6 +33,21 @@ _PROVIDER_RE = re.compile(
 )
 
 
+def capture_tail(text: str) -> str:
+    """Keep the last TAIL_CHARS, marked and line-aligned when truncated.
+
+    An unmarked mid-line cut reads as a hollow report downstream; the
+    marker plus line boundary keeps the evidence honest.
+    """
+    if len(text) <= TAIL_CHARS:
+        return text
+    tail = text[-TAIL_CHARS:]
+    newline = tail.find("\n")
+    if newline != -1:
+        tail = tail[newline + 1 :]
+    return f"[truncated: showing last {len(tail)} of {len(text)} chars]\n{tail}"
+
+
 @dataclass(slots=True)
 class MaiRunOutcome:
     """Observed result of one Mai session invocation."""
@@ -153,15 +168,15 @@ def run_mai_session(
     except Exception as exc:  # noqa: BLE001 - receipts carry failures, never raise
         return MaiRunOutcome(
             exit_code=3,
-            stdout_tail=stdout.getvalue()[-TAIL_CHARS:],
-            stderr_tail=stderr.getvalue()[-TAIL_CHARS:],
+            stdout_tail=capture_tail(stdout.getvalue()),
+            stderr_tail=capture_tail(stderr.getvalue()),
             error=f"{type(exc).__name__}: {exc}",
             facts=parse_mai_facts(stdout.getvalue()),
         )
     return MaiRunOutcome(
         exit_code=exit_code,
-        stdout_tail=stdout.getvalue()[-TAIL_CHARS:],
-        stderr_tail=stderr.getvalue()[-TAIL_CHARS:],
+        stdout_tail=capture_tail(stdout.getvalue()),
+        stderr_tail=capture_tail(stderr.getvalue()),
         facts=parse_mai_facts(stdout.getvalue()),
     )
 
@@ -298,15 +313,15 @@ def run_mai_subprocess(
             stdout, stderr = "", ""
         return MaiRunOutcome(
             exit_code=3,
-            stdout_tail=(stdout or "")[-TAIL_CHARS:],
-            stderr_tail=(stderr or "")[-TAIL_CHARS:],
+            stdout_tail=capture_tail(stdout or ""),
+            stderr_tail=capture_tail(stderr or ""),
             error=f"Mai session timed out after {timeout_seconds:.0f}s (killed)",
             facts=parse_mai_facts(stdout or ""),
         )
     return MaiRunOutcome(
         exit_code=int(proc.returncode or 0),
-        stdout_tail=(stdout or "")[-TAIL_CHARS:],
-        stderr_tail=(stderr or "")[-TAIL_CHARS:],
+        stdout_tail=capture_tail(stdout or ""),
+        stderr_tail=capture_tail(stderr or ""),
         facts=parse_mai_facts(stdout or ""),
     )
 

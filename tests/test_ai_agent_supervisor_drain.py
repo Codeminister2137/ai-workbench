@@ -202,7 +202,7 @@ def test_pause_resumes_on_next_drain(stores, calls) -> None:
         calls.append(run)
         if len(calls) == 1:
             return {"status": "paused", "note": "transport wobbled"}
-        return {"status": "completed"}
+        return {"status": "completed", "summary": "resumed and done"}
 
     drain = RunDrain(runs_dir=stores.data_dir / "runs", get_inbox=stores.inbox.get, executor=flaky)
     assert drain.drain() == [{"run_id": "run1", "status": "paused"}]
@@ -212,7 +212,7 @@ def test_pause_resumes_on_next_drain(stores, calls) -> None:
     assert stored["attempts"] == 2
     assert stored["receipts"] == [
         {"status": "paused", "note": "transport wobbled"},
-        {"status": "completed"},
+        {"status": "completed", "summary": "resumed and done"},
     ]
     assert [entry["kind"] for entry in stored["events"]] == [
         "run_started",
@@ -316,7 +316,7 @@ def test_drain_stamps_worker_epoch(stores) -> None:
     drain = RunDrain(
         runs_dir=stores.data_dir / "runs",
         get_inbox=stores.inbox.get,
-        executor=lambda run: seen.update(run) or {"status": "completed"},
+        executor=lambda run: seen.update(run) or {"status": "completed", "summary": "stamped"},
         worker_epoch="epoch-1",
     )
     assert drain.drain() == [{"run_id": run_id, "status": "completed"}]
@@ -368,7 +368,7 @@ def test_terminal_hook_fires_on_completed(stores, calls) -> None:
     drain = RunDrain(
         runs_dir=stores.data_dir / "runs",
         get_inbox=stores.inbox.get,
-        executor=lambda run: {"status": "completed"},
+        executor=lambda run: {"status": "completed", "summary": "done"},
         on_terminal=seen.append,
     )
     assert drain.drain() == [{"run_id": "run1", "status": "completed"}]
@@ -419,7 +419,7 @@ def test_terminal_hook_failure_never_breaks_drain(stores) -> None:
     drain = RunDrain(
         runs_dir=stores.data_dir / "runs",
         get_inbox=stores.inbox.get,
-        executor=lambda run: {"status": "completed"},
+        executor=lambda run: {"status": "completed", "summary": "done"},
         on_terminal=bad_hook,
     )
     assert drain.drain() == [{"run_id": "run1", "status": "completed"}]
@@ -458,7 +458,7 @@ def test_non_list_staged_ignored(stores) -> None:
     drain = RunDrain(
         runs_dir=stores.data_dir / "runs",
         get_inbox=stores.inbox.get,
-        executor=lambda run: {"status": "completed", "staged": "bogus"},
+        executor=lambda run: {"status": "completed", "summary": "done", "staged": "bogus"},
     )
     assert drain.drain() == [{"run_id": "run1", "status": "completed"}]
     assert "staged" not in stores.runs.get("run1")
@@ -483,3 +483,85 @@ def test_owner_filed_run_executes_without_approval(drain, stores, calls) -> None
     assert drain.drain() == [{"run_id": "own1", "status": "completed"}]
     assert [call["id"] for call in calls] == ["own1"]
     assert stores.runs.get("own1")["status"] == "completed"
+
+
+def _note_hook(stores, posted):
+    def hook(inbox_id, note):
+        posted.append((inbox_id, note))
+        item = stores.inbox.get(inbox_id)
+        item["notes"] = (item.get("notes") or "") + note
+        stores.inbox.put(inbox_id, item)
+
+    return hook
+
+
+def test_hollow_completed_run_escalates(stores) -> None:
+    run_id, _inbox_id = _queue_chat_run(stores, answer="Approve")
+    drain = RunDrain(
+        runs_dir=stores.data_dir / "runs",
+        get_inbox=stores.inbox.get,
+        executor=lambda _run: {"status": "completed"},
+    )
+    assert drain.drain() == [{"run_id": run_id, "status": "needs-attention"}]
+    stored = stores.runs.get(run_id)
+    assert stored["status"] == "needs-attention"
+    assert "hollow" in (stored.get("error") or "").lower()
+
+
+def test_completed_run_posts_findings_to_linked_inbox(stores) -> None:
+    posted: list = []
+    run_id, inbox_id = _queue_chat_run(stores, answer="Approve")
+    drain = RunDrain(
+        runs_dir=stores.data_dir / "runs",
+        get_inbox=stores.inbox.get,
+        executor=lambda _run: {"status": "completed", "summary": "found three names"},
+        inbox_note=_note_hook(stores, posted),
+    )
+    assert drain.drain() == [{"run_id": run_id, "status": "completed"}]
+    assert len(posted) == 1
+    assert posted[0][0] == inbox_id
+    assert "test" in posted[0][1]  # human-readable run title, not a bare id
+    assert "found three names" in posted[0][1]
+    assert "found three names" in (stores.inbox.get(inbox_id).get("notes") or "")
+
+
+def test_writeback_failure_escalates(stores) -> None:
+    run_id, _inbox_id = _queue_chat_run(stores, answer="Approve")
+
+    def boom(_inbox_id, _note):
+        raise RuntimeError("store down")
+
+    drain = RunDrain(
+        runs_dir=stores.data_dir / "runs",
+        get_inbox=stores.inbox.get,
+        executor=lambda _run: {"status": "completed", "summary": "done"},
+        inbox_note=boom,
+    )
+    assert drain.drain() == [{"run_id": run_id, "status": "needs-attention"}]
+    assert "write-back" in (stores.runs.get(run_id).get("error") or "").lower()
+
+
+def test_unlinked_substance_run_completes_without_hook(stores) -> None:
+    posted: list = []
+    stores.runs.put(
+        "own2",
+        {
+            "id": "own2",
+            "title": "owner task",
+            "status": "queued",
+            "body": "do it",
+            "origin": "inbox",
+            "inbox_id": None,
+            "approval_mode": "owner-filed",
+            "created_at_utc": "2026-11-05T00:00:00+00:00",
+            "updated_at_utc": "2026-11-05T00:00:00+00:00",
+        },
+    )
+    drain = RunDrain(
+        runs_dir=stores.data_dir / "runs",
+        get_inbox=stores.inbox.get,
+        executor=lambda _run: {"status": "completed", "summary": "done"},
+        inbox_note=_note_hook(stores, posted),
+    )
+    assert drain.drain() == [{"run_id": "own2", "status": "completed"}]
+    assert posted == []

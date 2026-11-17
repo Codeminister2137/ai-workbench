@@ -3404,12 +3404,20 @@ def build_run_drain(
     def _notify(summary: dict) -> None:
         report_run_terminal(stores, summary)
 
+    def _note(inbox_id: str, note: str) -> None:
+        item = stores.inbox.get(inbox_id)
+        if item is None:
+            raise KeyError(f"inbox item gone: {inbox_id}")
+        item["notes"] = (item.get("notes") or "") + note
+        stores.inbox.put(inbox_id, item)
+
     return RunDrain(
         runs_dir=data_dir / "runs",
         get_inbox=lambda inbox_id: stores.inbox.get(inbox_id),
         executor=executor,
         worker_epoch=worker_epoch or datetime.now(UTC).isoformat(),
         on_terminal=_notify,
+        inbox_note=_note,
     )
 
 
