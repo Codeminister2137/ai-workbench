@@ -336,6 +336,17 @@ def test_cancel_race_marks_cancelled_without_executing(drain, stores, calls) -> 
     assert stored["finished_at_utc"]
 
 
+def test_cancelled_run_reaches_terminal_despite_rejection(drain, stores, calls) -> None:
+    """Cancellation wins over approval gating; rejected+cancelled never parks."""
+    run_id, _inbox_id = _queue_chat_run(stores, answer="Reject")
+    record = stores.runs.get(run_id)
+    request_run_cancel(record)
+    stores.runs.put(run_id, record)
+    assert drain.drain() == [{"run_id": run_id, "status": "cancelled"}]
+    assert calls == []
+    assert stores.runs.get(run_id)["status"] == "cancelled"
+
+
 def test_max_runs_budgets_claims_not_parks(drain, stores, calls) -> None:
     _queue_chat_run(stores, run_id="0-parked")
     _queue_chat_run(stores, run_id="a-one", answer="Approve")
