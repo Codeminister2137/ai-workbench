@@ -9,6 +9,7 @@ import socket
 import subprocess
 import sys
 import threading
+import time
 import urllib.request
 import uuid
 from collections.abc import Callable
@@ -403,8 +404,42 @@ def _fleet_task_script() -> str:
     )
 
 
+_FLEET_TASKS_TTL_SECONDS = 60.0
+_fleet_tasks_cache: tuple[float, list[dict[str, Any]]] | None = None
+_fleet_tasks_lock = threading.Lock()
+
+
+def _reset_fleet_tasks_cache() -> None:
+    """Drop the cached task probe (tests only)."""
+    global _fleet_tasks_cache
+    with _fleet_tasks_lock:
+        _fleet_tasks_cache = None
+
+
 def fleet_tasks(runner=None) -> list[dict[str, Any]]:
-    """Probe owned Windows scheduled tasks; fail-soft (a gap is data)."""
+    """Probe owned Windows scheduled tasks; fail-soft (a gap is data).
+
+    Live probes are cached for 60s: the COM query costs ~4s and task
+    states move on minute scale. Callers mutate rows, so the cache
+    hands out copies. An explicit runner always probes fresh.
+    """
+    global _fleet_tasks_cache
+    if runner is None:
+        with _fleet_tasks_lock:
+            cached = _fleet_tasks_cache
+        if cached is not None:
+            probed_at, rows = cached
+            if time.monotonic() - probed_at < _FLEET_TASKS_TTL_SECONDS:
+                return [dict(row) for row in rows]
+    rows = _probe_fleet_tasks(runner)
+    if runner is None:
+        with _fleet_tasks_lock:
+            _fleet_tasks_cache = (time.monotonic(), [dict(row) for row in rows])
+    return rows
+
+
+def _probe_fleet_tasks(runner=None) -> list[dict[str, Any]]:
+    """Run one task probe (see fleet_tasks for the cached entry point)."""
 
     def _missing(detail: str) -> list[dict[str, Any]]:
         return [{"name": name, "present": False, "detail": detail} for name in FLEET_TASKS]
