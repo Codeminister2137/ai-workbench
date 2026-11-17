@@ -22,6 +22,8 @@ form.inline { display: flex; gap: var(--wb-gap-flex); margin-top: var(--wb-space
 input[type="text"], textarea { flex: 1; font: inherit; }
 button { font: inherit; cursor: pointer; }
 ul.plain { list-style: none; padding-left: 0; }
+.knowme-entries li { margin-bottom: var(--wb-space-4); }
+.knowme-text { white-space: pre-wrap; overflow-wrap: anywhere; }
 ul.plain li { margin-bottom: var(--wb-space-2); }
 @media (max-width: 700px) {
   .columns { grid-template-columns: 1fr; }

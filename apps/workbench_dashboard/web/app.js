@@ -2443,18 +2443,28 @@ async function renderKnowme() {
     view.innerHTML = `<h1>KnowMe</h1><p class="muted">Bank unavailable: ${esc(err.message)}</p>`;
     return;
   }
-  const cats = ["", "training", "diet", "preference", "health", "note", "skills", "career"];
+  const labels = {skills: "Skills", career: "Career path", training: "Training",
+    diet: "Diet", preference: "Preferences", health: "Health", note: "Notes"};
+  const cats = ["", ...Object.keys(labels)];
   const tabs = cats.map((c) =>
-    `<a href="#/knowme${c ? ("?category=" + c) : ""}">${c || "all"}</a>`).join(" · ");
-  const items = (payload.entries || []).length
-    ? payload.entries.map((e) =>
-        `<li><span class="pill">${esc(e.category)}</span>
-         <span class="muted">[${esc(e.source)}]</span> ${esc(e.text)}</li>`).join("")
-    : '<li class="muted">No entries yet — run the know-me interview to bank facts.</li>';
+    `<a href="#/knowme${c ? ("?category=" + c) : ""}"${c === category ? ' aria-current="page"' : ""}>${labels[c] || "All"}</a>`).join(" · ");
+  const entries = payload.entries || [];
+  const groups = [...Object.keys(labels), ...new Set(entries.map((e) => e.category)
+    .filter((c) => !Object.hasOwn(labels, c)))];
+  const sections = groups.map((c) => {
+    const members = entries.filter((e) => e.category === c);
+    if (!members.length) return "";
+    const items = members.map((e) =>
+      `<li><div class="knowme-text">${esc(e.text)}</div>
+       <small class="muted">Source: ${esc(e.source)}</small></li>`).join("");
+    return `<section class="card"><h2>${esc(labels[c] || c)} (${members.length})</h2>
+      <ul class="knowme-entries">${items}</ul></section>`;
+  }).join("") || '<p class="muted">No entries in this view — run the know-me interview to bank facts.</p>';
   view.innerHTML = `<h1>KnowMe</h1>
     <p class="muted">${esc(payload.count)} entr${payload.count === 1 ? "y" : "ies"} banked.</p>
     <p>${tabs}</p>
-    <div class="card"><ul class="plain">${items}</ul></div>`;
+    <p class="muted">Showing ${entries.length} of ${esc(payload.count)} banked entries. Entries within each section are newest added first.</p>
+    ${sections}`;
 }
 async function renderRestrictions() {
   let sub = null;
