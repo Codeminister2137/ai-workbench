@@ -199,12 +199,8 @@ POLICY_FILE_MAX_BYTES = 8192
 POLICY_RULE_KEYS = frozenset({"scope", "prepaid_allowed", "max_prepaid_cents_per_day"})
 
 
-def policy_from_file(path: str | Path) -> list[PolicyRule]:
-    """Read user prepaid-permission rules; unknown keys fail closed."""
-    path = Path(path)
-    if path.stat().st_size > POLICY_FILE_MAX_BYTES:
-        raise ValueError("Spend policy exceeds 8192 bytes")
-    configuration = json.loads(path.read_text(encoding="utf-8"))
+def policy_rules_from_doc(configuration: object) -> list[PolicyRule]:
+    """Validate one parsed spend-policy document; unknown keys fail closed."""
     if not isinstance(configuration, dict):
         raise ValueError("Spend policy must be a JSON object")
     unknown_doc = sorted(set(configuration) - {"rules"})
@@ -239,6 +235,14 @@ def policy_from_file(path: str | Path) -> list[PolicyRule]:
     return rules
 
 
+def policy_from_file(path: str | Path) -> list[PolicyRule]:
+    """Read user prepaid-permission rules; unknown keys fail closed."""
+    path = Path(path)
+    if path.stat().st_size > POLICY_FILE_MAX_BYTES:
+        raise ValueError("Spend policy exceeds 8192 bytes")
+    return policy_rules_from_doc(json.loads(path.read_text(encoding="utf-8")))
+
+
 class SpendLedger:
     """Single-writer P5 spend enforcement for one orchestrator process.
 
@@ -264,6 +268,10 @@ class SpendLedger:
         if self._path is not None:
             self._path.parent.mkdir(parents=True, exist_ok=True)
             self._load()
+
+    def set_rules(self, rules: list[PolicyRule] | None) -> None:
+        """Hot-replace prepaid-permission rules; empty restores the default block."""
+        self._rules = list(rules) if rules else [PolicyRule()]
 
     def _connect(self) -> sqlite3.Connection:
         assert self._path is not None
@@ -729,4 +737,5 @@ __all__ = [
     "allowance_fingerprint",
     "allowance_from_file",
     "policy_from_file",
+    "policy_rules_from_doc",
 ]

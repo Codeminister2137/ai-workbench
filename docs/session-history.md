@@ -1,5 +1,15 @@
 # Session History
 
+## 2026-11-17 inbox gaps + auto-submit, pushed de527c6 (01a1e5ab cont.)
+
+Badge-vs-view divergence root-caused (module-level project filter persisted across
+navigation); filter moved into URL. 27 stale agent items triaged (8 closed, rest
+noted; streams left for owner); sweep I4 rule closes the loop going forward. Brief
+ff9b255d answered A -> generate --auto-submit implemented (machine verdicts,
+verdict_by agent). KnowMe agent filed an ingest-vs-display brief (owner decision).
+Scoring items correctly visible pending Q6/Q7. Owner's "3 drafts" = stale UI (API:
+0 drafts, 78/78 submitted). Direct develop commit 0b478a3 (missed branch; owned).
+
 ## 2026-11-17 Mai surface + delivery gaps, pushed f5dd014 (01a1e5ab cont.)
 
 Owner: no watch-to-cutoff (report completion; watcher removed), gaming rule = GPU

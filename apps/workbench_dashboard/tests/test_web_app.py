@@ -925,6 +925,31 @@ def test_spend_duplicate_grant_id_is_400(dashboard_server, tmp_path) -> None:
     raised.value.close()
 
 
+def test_spend_policy_save_applies_and_hot_reloads(dashboard_server, tmp_path, monkeypatch) -> None:
+    from dashboard_web_app import DashboardRequestHandler
+
+    ledger = SpendLedger()
+    monkeypatch.setattr(DashboardRequestHandler, "spend_ledger", ledger)
+    rules = [{"scope": "global", "prepaid_allowed": True, "max_prepaid_cents_per_day": 500}]
+    payload = post_json(dashboard_server, "/api/spend/policy", {"rules": rules})
+    assert payload["ok"] is True
+    policy_file = tmp_path / "data" / "spend" / "policy.json"
+    assert json.loads(policy_file.read_text(encoding="utf-8")) == {"rules": rules}
+    assert payload["spend"]["policy"]["rules"] == rules
+
+
+def test_spend_policy_rejects_invalid(dashboard_server, tmp_path) -> None:
+    with pytest.raises(HTTPError) as raised:
+        post_json(
+            dashboard_server,
+            "/api/spend/policy",
+            {"rules": [{"scope": "global", "prepaid_allowed": "yes"}]},
+        )
+    assert raised.value.code == 400
+    raised.value.close()
+    assert not (tmp_path / "data" / "spend" / "policy.json").exists()
+
+
 def _wav_silence(seconds: float = 1.0) -> bytes:
     import io
     import wave
