@@ -87,3 +87,18 @@ def test_render_lists_remaining_and_open_inbox(tmp_path) -> None:
     assert "blocked-pending:" in text and "needs owner call" in text
     assert "open inbox: 1" in text
     assert "Pick me [decision]" in text
+
+
+def test_main_survives_non_utf8_console(tmp_path, monkeypatch) -> None:
+    import io
+
+    plan = tmp_path / "plan.md"
+    plan.write_text(
+        PLAN + "| 5 | A \u2194 B | Owner | Local | 5 min | Done | READY |\n", encoding="utf-8"
+    )
+    buf = io.BytesIO()
+    strict = io.TextIOWrapper(buf, encoding="cp1252", errors="strict")
+    monkeypatch.setattr(sys, "stdout", strict)
+    assert loop_status.main(["--plan", str(plan), "--data-dir", str(tmp_path)]) == 0
+    strict.flush()
+    assert b"Do research" in buf.getvalue()

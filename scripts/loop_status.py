@@ -122,6 +122,13 @@ def main(argv: list[str] | None = None) -> int:
         default=REPO_ROOT / "apps" / "workbench_dashboard" / "data",
     )
     args = parser.parse_args(argv)
+    stdout = sys.stdout
+    reconfig = getattr(stdout, "reconfigure", None)
+    if callable(reconfig):
+        try:
+            reconfig(encoding="utf-8", errors="replace")
+        except (ValueError, OSError):
+            pass
     print(render(args.plan, args.data_dir))
     return 0
 
