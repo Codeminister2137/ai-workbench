@@ -1,5 +1,16 @@
 # Session History
 
+## 2026-11-17 Mai surface + delivery gaps, pushed f5dd014 (01a1e5ab cont.)
+
+Owner: no watch-to-cutoff (report completion; watcher removed), gaming rule = GPU
+models not tests (AGENTS.md fixed). Mai chat was built-but-invisible (switch off,
+no UI): shipped enable switch + policy selector in chat (GET+POST
+/api/chat/agent-config), enabled live (scoped), verified. Delivery-gap system:
+DoD surfaced-line, sweep G4 serve drift, serve-smoke script. Triaged 5 owner
+verdicts live: 3 bad-tests -> auto-verdict brief ff9b255d; KnowMe ingest -> agent
+task; spend empty states fixed; goals->projects idea filed; diacritics+dark-mode
+PASS. Dead-feature sweep clean (1 flag surfaced, 0 TODOs, 52/52 routes).
+
 ## 2026-11-17 loop 09:20-11:35 UTC - Queue repair + E2E strengthening, pushed 45 (01a1e5ab)
 
 Gaming loop (owner: GPU models are the constraint, CPU tests fine; corrected mid-loop).
