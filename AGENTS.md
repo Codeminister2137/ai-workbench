@@ -668,6 +668,8 @@ If Codex discovers that a claimed or intended change did not happen, it must say
 
 Do not rely on intention, patch output, or memory alone as proof that the final state matches the report.
 
+When claiming an agent run finished work, cite the run id plus its receipt or re-rendered report — never the status field alone. A `completed` status without evidenced output is a hollow completion: investigate before reporting it as done.
+
 ### Investigate unexplained errors immediately
 
 Owner direction (2026-10-17): whenever an encountered error has no established

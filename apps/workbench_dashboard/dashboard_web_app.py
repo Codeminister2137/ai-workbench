@@ -3301,6 +3301,39 @@ def should_start_drain_scheduler(config: DashboardConfig) -> bool:
     return config.drain_interval_seconds >= DRAIN_SCHEDULER_MIN_INTERVAL_SECONDS
 
 
+def report_run_terminal(stores: DashboardStores, summary: dict) -> dict:
+    """Append a terminal run's outcome to its source inbox item (report-back).
+
+    The bridge files runs from inbox items; this closes the loop so no
+    finished work orphans its request. Notes only — items stay open for
+    owner review; repeats dedupe on the run id. Never raises.
+    """
+    try:
+        run_id = str(summary.get("run_id") or "")
+        run = stores.runs.get(run_id) if run_id else None
+        source_id = (run or {}).get("bridged_from") or (run or {}).get("inbox_id")
+        if not run or not source_id:
+            return {"action": "skipped", "reason": "no linked source item"}
+        item = stores.inbox.get(source_id)
+        if item is None or item.get("status") != "open":
+            return {"action": "skipped", "reason": "source not open"}
+        note = item.get("note") or ""
+        if run_id and run_id in note:
+            return {"action": "skipped", "reason": "already noted"}
+        status = summary.get("status", "?")
+        error = summary.get("error")
+        line = f"Run {run_id[:8]} {status}"
+        if error:
+            line += f": {error}"[:300]
+        else:
+            line += " — see the run report for results."
+        item["note"] = (note + "\n" + line).strip() if note else line
+        stores.inbox.put(source_id, item)
+        return {"action": "noted", "run_id": run_id}
+    except Exception as exc:  # noqa: BLE001 - report-back never breaks drain
+        return {"action": "skipped", "reason": f"{type(exc).__name__}: {exc}"[:200]}
+
+
 def build_run_drain(
     config: DashboardConfig,
     data_dir: Path,
@@ -3334,6 +3367,7 @@ def build_run_drain(
         get_inbox=lambda inbox_id: stores.inbox.get(inbox_id),
         executor=executor,
         worker_epoch=worker_epoch or datetime.now(UTC).isoformat(),
+        on_terminal=lambda summary: report_run_terminal(stores, summary),
     )
 
 
