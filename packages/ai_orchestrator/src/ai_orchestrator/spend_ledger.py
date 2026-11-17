@@ -83,7 +83,7 @@ class PolicyRule:
 
     scope: str = "global"
     prepaid_allowed: bool = False
-    max_prepaid_cents_per_day: int | None = None
+    max_prepaid_cents: int | None = None
 
 
 @dataclass(slots=True)
@@ -196,7 +196,7 @@ def allowance_from_file(path: str | Path) -> Allowance:
 
 
 POLICY_FILE_MAX_BYTES = 8192
-POLICY_RULE_KEYS = frozenset({"scope", "prepaid_allowed", "max_prepaid_cents_per_day"})
+POLICY_RULE_KEYS = frozenset({"scope", "prepaid_allowed", "max_prepaid_cents"})
 
 
 def policy_rules_from_doc(configuration: object) -> list[PolicyRule]:
@@ -222,14 +222,14 @@ def policy_rules_from_doc(configuration: object) -> list[PolicyRule]:
         allowed = raw.get("prepaid_allowed", False)
         if not isinstance(allowed, bool):
             raise ValueError(f"Rule #{index} prepaid_allowed must be boolean")
-        cap = raw.get("max_prepaid_cents_per_day")
+        cap = raw.get("max_prepaid_cents")
         if cap is not None and (not isinstance(cap, int) or cap < 0):
             raise ValueError(f"Rule #{index} cap must be a non-negative integer")
         rules.append(
             PolicyRule(
                 scope=scope,
                 prepaid_allowed=allowed,
-                max_prepaid_cents_per_day=cap,
+                max_prepaid_cents=cap,
             )
         )
     return rules
@@ -258,12 +258,12 @@ class SpendLedger:
         clock: Callable[[], float] = time.time,
     ) -> None:
         self._rules = list(rules) if rules else [PolicyRule()]
+        self._prepaid_spent_total = 0
         self._clock = clock
         self._allowances: dict[str, Allowance] = {}
         self._reservations: dict[str, Reservation] = {}
         self._records: list[TaskSpendRecord] = []
         self._reservation_seq = 0
-        self._prepaid_spent_by_day: dict[str, int] = {}
         self._path = Path(path) if path is not None else None
         if self._path is not None:
             self._path.parent.mkdir(parents=True, exist_ok=True)
@@ -385,10 +385,10 @@ class SpendLedger:
             )
             connection.execute(
                 "INSERT OR REPLACE INTO meta VALUES "
-                "('reservation_seq', ?), ('prepaid_spent_by_day', ?)",
+                "('reservation_seq', ?), ('prepaid_spent_total', ?)",
                 (
                     str(self._reservation_seq),
-                    json.dumps(self._prepaid_spent_by_day, sort_keys=True),
+                    str(self._prepaid_spent_total),
                 ),
             )
         connection.close()
@@ -438,10 +438,11 @@ class SpendLedger:
                 self._records.append(TaskSpendRecord(*row))
             meta = dict(connection.execute("SELECT key, value FROM meta").fetchall())
             self._reservation_seq = int(meta.get("reservation_seq", "0"))
-            self._prepaid_spent_by_day = {
-                day: int(cents)
-                for day, cents in json.loads(meta.get("prepaid_spent_by_day", "{}")).items()
-            }
+            if "prepaid_spent_total" in meta:
+                self._prepaid_spent_total = int(meta["prepaid_spent_total"])
+            else:
+                legacy = json.loads(meta.get("prepaid_spent_by_day", "{}"))
+                self._prepaid_spent_total = sum(int(cents) for cents in legacy.values())
         finally:
             connection.close()
 
@@ -465,15 +466,14 @@ class SpendLedger:
         return tuple(self._records)
 
     def _prepaid_permitted(self, provider: str, estimated_cents: int) -> bool:
-        """True when any matching rule allows prepaid within its day cap."""
-        day = time.strftime("%Y-%m-%d", time.gmtime(self._clock()))
-        spent = self._prepaid_spent_by_day.get(day, 0)
+        """True when any matching rule allows prepaid within its total cap."""
+        spent = self._prepaid_spent_total
         for rule in self._rules:
             if not rule.prepaid_allowed:
                 continue
             if rule.scope not in ("global", provider):
                 continue
-            cap = rule.max_prepaid_cents_per_day
+            cap = rule.max_prepaid_cents
             if cap is not None and spent + estimated_cents > cap:
                 continue
             return True
@@ -608,8 +608,7 @@ class SpendLedger:
         reservation.state = ReservationState.COMMITTED
         reservation.settled_at = self._clock()
         if row.kind is AllowanceKind.PREPAID:
-            day = time.strftime("%Y-%m-%d", time.gmtime(self._clock()))
-            self._prepaid_spent_by_day[day] = self._prepaid_spent_by_day.get(day, 0) + actual_cents
+            self._prepaid_spent_total += actual_cents
         record = TaskSpendRecord(
             task_id=reservation.task_id,
             task_class=reservation.task_class,
@@ -700,7 +699,6 @@ class SpendLedger:
             slot = by_operation.setdefault(record.task_class, {"calls": 0, "actual_cents": 0})
             slot["calls"] += 1
             slot["actual_cents"] += record.actual_cents
-        day = time.strftime("%Y-%m-%d", time.gmtime(self._clock()))
         return {
             "buckets": buckets,
             "open_reservations": open_count,
@@ -716,11 +714,11 @@ class SpendLedger:
                     {
                         "scope": rule.scope,
                         "prepaid_allowed": rule.prepaid_allowed,
-                        "max_prepaid_cents_per_day": rule.max_prepaid_cents_per_day,
+                        "max_prepaid_cents": rule.max_prepaid_cents,
                     }
                     for rule in self._rules
                 ],
-                "prepaid_spent_today_cents": self._prepaid_spent_by_day.get(day, 0),
+                "prepaid_spent_total_cents": self._prepaid_spent_total,
             },
         }
 

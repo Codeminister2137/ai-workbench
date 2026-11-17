@@ -82,6 +82,22 @@ def test_measured_tokens_round_trip(tmp_path) -> None:
     assert records[1].usage_source == "estimated"
 
 
+def test_legacy_daily_prepaid_upgrades_to_total(tmp_path) -> None:
+    import sqlite3
+
+    path = tmp_path / "legacy.sqlite3"
+    SpendLedger(path, clock=lambda: 1500.0)
+    connection = sqlite3.connect(path)
+    connection.execute(
+        "INSERT OR REPLACE INTO meta VALUES ('prepaid_spent_by_day', ?)",
+        ('{"2026-11-16": 100, "2026-11-17": 50}',),
+    )
+    connection.commit()
+    connection.close()
+    ledger = SpendLedger(path, clock=lambda: 1500.0)
+    assert ledger.status()["policy"]["prepaid_spent_total_cents"] == 150
+
+
 def test_pre_token_schema_migrates_in_place(tmp_path) -> None:
     import sqlite3
 

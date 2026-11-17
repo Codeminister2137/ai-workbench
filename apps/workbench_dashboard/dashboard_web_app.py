@@ -1154,6 +1154,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 return self._send_json(refresh_provider_status(self.data_dir, self.repo_root))
             if path == "/api/spend/policy":
                 return self._save_spend_policy(payload)
+            if path == "/api/spend/adjust":
+                return self._adjust_spend_balance(payload)
             if path == "/api/inbox":
                 return self._create_inbox_task(payload)
             if path == "/api/e2e/tasks":
@@ -2508,7 +2510,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 {
                     "scope": rule.scope,
                     "prepaid_allowed": rule.prepaid_allowed,
-                    "max_prepaid_cents_per_day": rule.max_prepaid_cents_per_day,
+                    "max_prepaid_cents": rule.max_prepaid_cents,
                 }
                 for rule in rules
             ]
@@ -2526,6 +2528,57 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             raise
         if self.spend_ledger is not None:
             self.spend_ledger.set_rules(rules)
+        self._send_json({"ok": True, "spend": spend_status(self.data_dir, self.spend_ledger)})
+
+    def _adjust_spend_balance(self, payload: dict) -> None:
+        import datetime
+
+        allowance_id = payload.get("allowance_id")
+        remaining = payload.get("remaining_cents")
+        if not isinstance(allowance_id, str) or not allowance_id.strip():
+            return self._send_json(
+                {"ok": False, "error": "allowance_id must be a non-blank string"},
+                status=400,
+            )
+        if not isinstance(remaining, int) or remaining < 0:
+            return self._send_json(
+                {"ok": False, "error": "remaining_cents must be a non-negative integer"},
+                status=400,
+            )
+        ledger = self.spend_ledger or load_spend_ledger(self.data_dir)
+        try:
+            balance = ledger.get_allowance(allowance_id).balance_cents
+        except KeyError:
+            return self._send_json(
+                {"ok": False, "error": f"Unknown allowance: {allowance_id}"}, status=404
+            )
+        if remaining > balance:
+            return self._send_json(
+                {"ok": False, "error": "remaining exceeds current balance"}, status=400
+            )
+        amount = balance - remaining
+        if amount == 0:
+            self._send_json({"ok": True, "spend": spend_status(self.data_dir, self.spend_ledger)})
+            return
+        day = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d")
+        admission = ledger.admit(
+            task_id=f"manual-{day}-{allowance_id}",
+            task_class="manual_adjustment",
+            estimated_cents=amount,
+            provider=ledger.get_allowance(allowance_id).provider,
+        )
+        if admission.decision != "admitted" or admission.reservation is None:
+            return self._send_json(
+                {"ok": False, "error": admission.reason or "adjustment not admitted"},
+                status=409,
+            )
+        if admission.allowance_id != allowance_id:
+            ledger.refund(admission.reservation.id)
+            return self._send_json(
+                {"ok": False, "error": "spend order drew another bucket; retry"},
+                status=409,
+            )
+        ledger.settle(admission.reservation.id, actual_cents=amount, usage_source="manual")
         self._send_json({"ok": True, "spend": spend_status(self.data_dir, self.spend_ledger)})
 
     def _bridge_inbox_runs(self) -> None:
