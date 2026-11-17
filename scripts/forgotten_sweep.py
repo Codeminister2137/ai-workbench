@@ -60,6 +60,7 @@ GATE_H = {
     "P1": 0,  # plans without registry project header
     "P2": 0,  # registry projects off on-track
     "P3": 0,  # registry goal docs missing
+    "P4": 0,  # stale credential-blocker claims (key already configured)
     "D1": 0,  # stale TEMP E2E drafts (7d+)
 }
 
@@ -916,6 +917,87 @@ def collect_plans(repo: Path) -> list[dict[str, Any]]:
     return findings
 
 
+def _env_names(env_path: Path) -> set[str]:
+    """Configured variable names only; values are never read."""
+    try:
+        text = env_path.read_text(encoding="utf-8")
+    except OSError:
+        return set()
+    names = set()
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        name = line.split("=", 1)[0].strip().strip("'\"")
+        if name:
+            names.add(name)
+    return names
+
+
+def collect_stale_blockers(repo: Path) -> list[dict[str, Any]]:
+    """Flag credential-blocker claims whose keys are already configured (P4).
+
+    Matches "blocked on/waiting for account/keys/credentials" sentences in
+    decisions + goal docs, then checks capitalized service tokens against
+    .env variable NAMES (values never read). A match means the record is
+    stale: correct it instead of repeating the claim.
+    """
+    import re
+
+    claim_re = re.compile(
+        r"[^.\n]{0,120}?(?:blocked on|waiting for|waits? for|needs?|requires?)\s+"
+        r"[^.\n]{0,120}?(?:account creation|accounts?|api ?keys?|credentials?|secrets?)"
+        r"[^.\n]{0,120}",
+        re.IGNORECASE,
+    )
+    token_re = re.compile(r"\b([A-Z][a-zA-Z]{3,})\b")
+    skip = {"Account", "Creation", "Keys", "Credentials", "Secrets", "Trial", "Vendor"}
+    names = _env_names(repo / ".env")
+    if not names:
+        return []
+    upper = {name.upper(): name for name in names}
+    members: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    docs = [repo / "docs" / "decisions.md", *(repo / "docs" / "goals").glob("*.md")]
+    for path in sorted(docs):
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        sections = re.split(r"(?m)^## ", text)
+        for section in sections:
+            if re.search(r"(?m)^Update \d{4}-\d{2}-\d{2}", section):
+                continue  # reviewed record; the Update line carries the correction
+            if not claim_re.search(section):
+                continue
+            for token in token_re.findall(section):
+                if token in skip:
+                    continue
+                hit = next(
+                    (orig for up, orig in upper.items() if token.upper() in up),
+                    None,
+                )
+                if hit is None or (str(path), hit) in seen:
+                    continue
+                seen.add((str(path), hit))
+                rel = path.relative_to(repo).as_posix()
+                members.append(_member(f"{rel}:{hit}", f"{rel} claims blocker, {hit} set", None))
+    if not members:
+        return []
+    keys = sorted({m["id"].split(":")[-1] for m in members})
+    return [
+        _finding(
+            _aggregate_key("P4", members),
+            "P4",
+            f"Stale credential blockers ({len(members)}): {', '.join(keys)}",
+            "agent",
+            "Correct the record (accounts/keys exist); build the gated work instead of re-filing the block.",
+            members,
+            0.0,
+        )
+    ]
+
+
 def collect_drafts(now: datetime) -> list[dict[str, Any]]:
     stale: list[dict[str, Any]] = []
     tmp = Path(tempfile.gettempdir())
@@ -1012,6 +1094,7 @@ def run(
     resolved += e2e_resolved
     findings += collect_git(repo, data_dir / "runs", now)
     findings += collect_plans(repo)
+    findings += collect_stale_blockers(repo)
     findings += collect_drafts(now)
     for finding in findings:
         if finding.get("link"):

@@ -26,6 +26,59 @@ def _ts(hours_ago: float) -> str:
     return (NOW - timedelta(hours=hours_ago)).isoformat()
 
 
+def _repo_with(tmp_path: Path, files: dict[str, str]) -> Path:
+    for rel, text in files.items():
+        path = tmp_path / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+    return tmp_path
+
+
+def test_p4_flags_stale_credential_blockers(tmp_path: Path) -> None:
+    repo = _repo_with(
+        tmp_path,
+        {
+            ".env": "PROSPEO_API_KEY=x\nOTHER=1\n",
+            "docs/decisions.md": "Trial blocked on account creation for Prospeo.\n",
+        },
+    )
+    findings = SWEEP.collect_stale_blockers(repo)
+    assert len(findings) == 1
+    assert findings[0]["category"] == "P4"
+    assert "PROSPEO_API_KEY" in findings[0]["title"]
+
+
+def test_p4_silent_on_corrected_records(tmp_path: Path) -> None:
+    repo = _repo_with(
+        tmp_path,
+        {
+            ".env": "PROSPEO_API_KEY=x\n",
+            "docs/decisions.md": (
+                "## Vendor trial: Prospeo\n\n"
+                "Trial blocked on account creation.\n\n"
+                "Update 2026-11-17: accounts created, key configured.\n"
+            ),
+        },
+    )
+    assert SWEEP.collect_stale_blockers(repo) == []
+
+
+def test_p4_silent_without_keys_or_claims(tmp_path: Path) -> None:
+    repo = _repo_with(
+        tmp_path,
+        {
+            ".env": "OTHER=1\n",
+            "docs/decisions.md": "Trial blocked on account creation for Prospeo.\n",
+        },
+    )
+    assert SWEEP.collect_stale_blockers(repo) == []
+    repo2 = _repo_with(
+        tmp_path / "b",
+        {".env": "PROSPEO_API_KEY=x\n", "docs/decisions.md": "All good.\n"},
+    )
+    assert SWEEP.collect_stale_blockers(repo2) == []
+
+
 def test_r1_flags_failed_without_followup_and_skips_superseded() -> None:
     runs = [
         {
