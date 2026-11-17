@@ -83,8 +83,8 @@ def _view_label(view: str) -> str:
 
 
 # API route prefix -> (tab label, tab hash). Verified against the app.js
-# router; routes without a mapped tab cannot ground a UI step and fall
-# back to owner pointers instead of an unactionable "trigger from the UI".
+# router; routes without a mapped tab get agent-runnable API probe
+# steps instead of unactionable UI guesses (owner decision: package A).
 ROUTE_UI: tuple[tuple[str, str, str], ...] = (
     ("/api/e2e/", "E2E", "#/e2e"),
     ("/api/chat/", "Chat", "#/chat"),
@@ -107,7 +107,102 @@ ROUTE_UI: tuple[tuple[str, str, str], ...] = (
     ("/api/restrictions", "Restrictions", "#/restrictions"),
     ("/api/tasks/propose", "Schedule", "#/schedule"),
     ("/api/overview", "Home", "#/"),
+    ("/api/evidence", "E2E", "#/e2e"),
+    ("/api/stt/", "Chat", "#/chat"),
+    ("/api/sleep", "Fleet", "#/fleet"),
+    ("/api/status", "Home", "#/"),
+    ("/api/version", "Home", "#/"),
+    ("/api/maintenance", "Home", "#/"),
+    ("/api/work-roots", "Projects", "#/projects"),
+    ("/api/agent-status", "Fleet", "#/fleet"),
 )
+
+# Routes with no UI surface by design (machine-consumed); they get
+# agent-runnable API probe steps instead of tab steps or pointers.
+KNOWN_UNMAPPED: tuple[str, ...] = ("/api/settings",)
+
+# Code symbol -> exact control check. When diff evidence names a
+# registered symbol, the generator emits this precise step INSTEAD OF
+# the generic tab step for that path (the generic badges/counts tail
+# is preserved inside each entry). Entries whose view hash leaves the
+# app router fail the coverage test — UI drift breaks loudly.
+SYMBOL_STEPS: dict[str, dict[str, str]] = {
+    "spendPolicyRuleRow": {
+        "label": "Spend policy editor",
+        "view_hash": "#/providers",
+        "action": (
+            "On the Providers spend card, add a policy rule (scope meta, "
+            "prepaid on, cap $5.00), Save, and confirm the rules list shows it"
+        ),
+        "expected": (
+            "Saved toast; rule persists across refresh; badges and counts update; no error toast."
+        ),
+    },
+    "spendPolicyRuleRow:remove": {
+        "label": "Spend policy editor",
+        "view_hash": "#/providers",
+        "action": (
+            "On the Providers spend card, remove the rule just added, Save, "
+            "and confirm the rules list is back to one global rule"
+        ),
+        "expected": "Saved toast; single global rule; no error toast.",
+    },
+    "wireSpendAdjustForm": {
+        "label": "Spend adjust form",
+        "view_hash": "#/providers",
+        "action": (
+            "On the Providers spend card, enter the console-remaining figure "
+            "in the adjust form, Record spend, and confirm the bucket balance "
+            "matches the console"
+        ),
+        "expected": "Recorded toast; balance and record count update; no error toast.",
+    },
+    "providerCardHtml:codex": {
+        "label": "Codex quota card",
+        "view_hash": "#/providers",
+        "action": (
+            "On Providers, Refresh, and read the Codex card quota windows "
+            "(5-hour and weekly used percents plus reset times)"
+        ),
+        "expected": "Quota read pill; both windows with sane percents; no error toast.",
+    },
+    "providerCardHtml:opencode": {
+        "label": "OpenCode quota card",
+        "view_hash": "#/providers",
+        "action": (
+            "On Providers, Refresh, and read the OpenCode card quota windows "
+            "(5-hour rolling, weekly, monthly)"
+        ),
+        "expected": "Windows render or an honest usage-key error; no error toast.",
+    },
+    "attention_inbox_count": {
+        "label": "Inbox badge",
+        "view_hash": "#/inbox",
+        "action": (
+            "Compare the nav inbox badge with the default Inbox view: same "
+            "items, including answered and follow-up states"
+        ),
+        "expected": "Badge count equals visible items; no hidden attention.",
+    },
+    "attention_e2e_count": {
+        "label": "E2E badge",
+        "view_hash": "#/e2e",
+        "action": (
+            "Compare the nav E2E badge with the default E2E view: open "
+            "checklists only, drafts excluded"
+        ),
+        "expected": "Badge count equals visible open checklists.",
+    },
+    "renderKnowme:provenance": {
+        "label": "KnowMe provenance",
+        "view_hash": "#/knowme",
+        "action": (
+            "On KnowMe, confirm entries show Source with filename and a "
+            "From line when the fact was extracted"
+        ),
+        "expected": "Provenance visible; old blobs show no invented source.",
+    },
+}
 
 
 def _route_ui(route: str) -> tuple[str, str] | None:
@@ -136,7 +231,33 @@ def _dashboard_steps(evidence: dict[str, dict[str, list[str]]]) -> list[dict]:
                     "grounded": True,
                 }
             )
-        symbols = ", ".join(sorted(set(evidence[path]["symbols"])))
+        path_symbols = set(evidence[path]["symbols"])
+        hits = [
+            (symbol, entry)
+            for symbol, entry in SYMBOL_STEPS.items()
+            for touched in path_symbols
+            if symbol == touched or symbol.startswith(touched + ":")
+        ]
+        for symbol, entry in hits:
+            key = f"symbol:{symbol}"
+            if key in seen:
+                continue
+            seen.add(key)
+            steps.append(
+                {
+                    "action": entry["action"],
+                    "expected": entry["expected"],
+                    "grounded": True,
+                }
+            )
+        if hits:
+            for route in evidence[path]["routes"]:
+                key = f"route:{route}"
+                if key not in seen and _route_ui(route) is None:
+                    seen.add(key)
+                    unmapped.append(route)
+            continue
+        symbols = ", ".join(sorted(path_symbols))
         touched = f" (touched: {symbols})" if symbols else ""
         for route in evidence[path]["routes"]:
             key = f"route:{route}"
@@ -158,16 +279,16 @@ def _dashboard_steps(evidence: dict[str, dict[str, list[str]]]) -> list[dict]:
                     "grounded": True,
                 }
             )
-    if unmapped:
+    for route in sorted(set(unmapped)):
         steps.append(
             {
                 "action": (
-                    "Route(s) without a mapped UI surface: "
-                    + ", ".join(sorted(set(unmapped)))
-                    + " — pointers needed"
+                    f"Probe the unmapped route: "
+                    f"`.venv/Scripts/python.exe scripts/e2e-http-get.py {route} 200`"
                 ),
-                "expected": "N/A: the owner names what to verify.",
-                "grounded": False,
+                "expected": "Probe exits 0: status 200 with ok:true JSON shape.",
+                "grounded": True,
+                "agent_runnable": True,
             }
         )
     # Note: _send_* symbols are API handlers, not views — views ground

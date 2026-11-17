@@ -23,6 +23,68 @@ def test_extract_command_rejects_prose_and_shell() -> None:
     assert e2e_agent_checks.extract_command("Run `$(evil) --help`") is None
 
 
+def test_extract_command_allows_dryrun_and_http_get() -> None:
+    assert (
+        e2e_agent_checks.extract_command(
+            "Rehearse `.venv/Scripts/python.exe scripts/allowance_healthcheck.py --dry-run`"
+        )
+        == ".venv/Scripts/python.exe scripts/allowance_healthcheck.py --dry-run"
+    )
+    assert (
+        e2e_agent_checks.extract_command(
+            "Probe `.venv/Scripts/python.exe scripts/e2e-http-get.py /api/settings 200`"
+        )
+        == ".venv/Scripts/python.exe scripts/e2e-http-get.py /api/settings 200"
+    )
+    assert e2e_agent_checks.extract_command("Run `scripts/x.py --dry-run`") is None
+    assert (
+        e2e_agent_checks.extract_command("Probe `scripts/e2e-http-get.py /api/x notanum`") is None
+    )
+
+
+def test_http_get_probe_checks_status_and_shape() -> None:
+    import importlib.util
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    root = Path(__file__).resolve().parents[3]
+    spec = importlib.util.spec_from_file_location(
+        "e2e_http_get", root / "scripts" / "e2e-http-get.py"
+    )
+    assert spec is not None and spec.loader is not None
+    probe = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(probe)
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):  # noqa: N802 - stdlib name
+            if self.path == "/api/ok":
+                body = b'{"ok": true}'
+            elif self.path == "/api/plain":
+                body = b"not json"
+            else:
+                self.send_response(404)
+                self.end_headers()
+                return
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):  # noqa: ANN002, ANN003 - stdlib shape
+            pass
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        base = f"http://127.0.0.1:{server.server_port}"
+        assert probe.check(base, "/api/ok", 200)[0] is True
+        assert probe.check(base, "/api/plain", 200)[0] is False
+        assert probe.check(base, "/api/missing", 404)[0] is True
+        assert probe.check(base, "/api/ok", 404)[0] is False
+    finally:
+        server.shutdown()
+
+
 def test_execute_check_uses_runner_and_truncates(tmp_path: Path) -> None:
     seen: dict = {}
 

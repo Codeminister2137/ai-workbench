@@ -2,7 +2,8 @@
 
 Steps carrying an exact backticked command can run agent-side: the
 owner reviews attached evidence instead of a terminal. Execution is
-narrowly allowlisted (venv pytest on one path, `--help` probes),
+narrowly allowlisted (venv pytest on one path, `--help` probes,
+script `--dry-run` rehearsals, served-dashboard GET checks),
 timeout-bounded, and repo-rooted; anything else is rejected, never
 guessed. The runner is injectable so tests stay offline.
 """
@@ -22,6 +23,8 @@ _BACKTICKED = re.compile(r"`([^`]+)`")
 _SHELL_CHARS = re.compile(r"[&|;$`()<>]")
 _PYTEST_RE = re.compile(r"^\.venv/Scripts/python\.exe -m pytest \S+ -q$")
 _HELP_RE = re.compile(r"^\S+ --help$")
+_DRYRUN_RE = re.compile(r"^\.venv/Scripts/python\.exe scripts/\S+\.py --dry-run$")
+_HTTP_GET_RE = re.compile(r"^\.venv/Scripts/python\.exe scripts/e2e-http-get\.py /\S* \d+$")
 
 
 def extract_command(action: str) -> str | None:
@@ -30,7 +33,12 @@ def extract_command(action: str) -> str | None:
         candidate = " ".join(match.group(1).split())
         if _SHELL_CHARS.search(candidate):
             continue
-        if _PYTEST_RE.match(candidate) or _HELP_RE.match(candidate):
+        if (
+            _PYTEST_RE.match(candidate)
+            or _HELP_RE.match(candidate)
+            or _DRYRUN_RE.match(candidate)
+            or _HTTP_GET_RE.match(candidate)
+        ):
             return candidate
     return None
 
