@@ -1173,3 +1173,52 @@ eval(source.slice(source.indexOf('function receiptHtml('), source.indexOf('/* Pr
         [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
     )
     assert result.returncode == 0, result.stderr
+
+
+def test_e2e_detail_return_preserves_list_selection():
+    """Checklist/report navigation retains filters, including an empty selection."""
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node is required for E2E navigation execution")
+    driver = r"""
+const assert = require('assert');
+const source = require('fs').readFileSync(process.argv[1], 'utf8');
+const location = {hash: ''};
+const view = {innerHTML: '', querySelectorAll: () => []};
+const document = {getElementById: () => null, querySelectorAll: () => []};
+const esc = String, gtext = String, fmtTime = String;
+const filterBoxes = () => '', bindFilterBoxes = () => {};
+const task = {id: 'task', title: 'Checklist', status: 'submitted', report_id: 'report', items: []};
+const report = {id: 'report', title: 'Report', overall: 'pass', items: []};
+const api = async path => path.endsWith('/tasks') ? {items: [task]} :
+  path.endsWith('/reports') ? {items: [report]} :
+  {item: path.includes('/reports/') ? report : task};
+eval(source.slice(source.indexOf('function pickedTokens('), source.indexOf('/* Project filter')));
+eval(source.slice(source.indexOf('async function renderE2E('), source.indexOf('async function renderInbox(')));
+(async () => {
+  for (const query of ['', '?s=submitted,pass', '?s=']) {
+    const suffix = query ? '?s=' + encodeURIComponent(query.slice(3)) : '';
+    location.hash = '#/e2e' + query;
+    await renderE2E();
+    if (query.includes('submitted')) {
+      assert(view.innerHTML.includes('href="#/e2e/task' + suffix + '"'));
+      assert(view.innerHTML.includes('href="#/e2e/report/report' + suffix + '"'));
+    }
+    location.hash = '#/e2e/task' + suffix;
+    await renderE2E('task');
+    assert(view.innerHTML.includes('href="#/e2e' + suffix + '">All checklists'));
+    assert(view.innerHTML.includes('href="#/e2e/report/report' + suffix + '"'));
+    location.hash = '#/e2e/report/report' + suffix;
+    await renderE2E('report/report');
+    assert(view.innerHTML.includes('href="#/e2e' + suffix + '">All checklists'));
+    location.hash = '#/e2e' + suffix;
+    await renderE2E();
+    assert.deepEqual([...pickedTokens('s', 'open,fail')],
+      query === '' ? ['open', 'fail'] : query === '?s=' ? [] : ['submitted', 'pass']);
+  }
+})().catch(error => {console.error(error); process.exitCode = 1;});
+"""
+    result = subprocess.run(
+        [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
+    )
+    assert result.returncode == 0, result.stderr

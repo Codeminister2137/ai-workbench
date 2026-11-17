@@ -62,6 +62,8 @@ inspect the owned process only.
   back as record updates. Creation requires the supervisor token when
   `data/supervisor.token` exists. The nav badge counts human-assigned open or follow-up tasks, independent of
   the selected list filters; agent tasks are excluded.
+ - E2E: checklist and report links carry the selected list filters in the URL;
+   All checklists restores that selection, including after a detail-page reload.
 - Voice/language: the chat Dictate button posts microphone clips to
   `POST /api/stt/transcribe`; messages accept a `language` tag and
   translate at ingestion with source provenance. Both fail closed
