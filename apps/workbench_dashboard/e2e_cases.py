@@ -351,6 +351,8 @@ def needs_pointers(steps: Sequence[dict]) -> bool:
 
 def validate_steps(steps: object) -> list[dict]:
     """Normalize finalized steps; agent-authored steps are understood."""
+    from e2e_agent_checks import extract_command
+
     if not isinstance(steps, list) or not steps:
         raise ValueError("Steps must be a non-empty list")
     normalized: list[dict] = []
@@ -361,5 +363,12 @@ def validate_steps(steps: object) -> list[dict]:
         expected = str(step.get("expected", "")).strip()
         if not action or not expected:
             raise ValueError("Each step needs a non-blank action and expected result")
-        normalized.append({"action": action, "expected": expected, "grounded": True})
+        normalized.append(
+            {
+                "action": action,
+                "expected": expected,
+                "grounded": True,
+                "agent_runnable": extract_command(action) is not None,
+            }
+        )
     return normalized

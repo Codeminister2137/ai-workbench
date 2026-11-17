@@ -321,7 +321,7 @@ def test_history_trail_names_tested_commits(tmp_path) -> None:
 
 def test_validate_steps_rejects_blanks() -> None:
     assert e2e_cases.validate_steps([{"action": " Click x ", "expected": " Y "}]) == [
-        {"action": "Click x", "expected": "Y", "grounded": True}
+        {"action": "Click x", "expected": "Y", "grounded": True, "agent_runnable": False}
     ]
     for bad in ([], [{"action": "", "expected": "y"}], [{"action": "x"}], "nope"):
         try:
@@ -329,6 +329,20 @@ def test_validate_steps_rejects_blanks() -> None:
         except ValueError:
             continue
         raise AssertionError(f"accepted bad steps: {bad!r}")
+
+
+def test_validate_steps_derives_agent_runnable() -> None:
+    (runnable,) = e2e_cases.validate_steps(
+        [
+            {
+                "action": "Run `.venv/Scripts/python.exe -m pytest apps/x/tests/test_y.py -q` now",
+                "expected": "green",
+            }
+        ]
+    )
+    assert runnable["agent_runnable"] is True
+    (prose,) = e2e_cases.validate_steps([{"action": "Look at the view", "expected": "seen"}])
+    assert prose["agent_runnable"] is False
 
 
 SITE_DIFF = """diff --git a/company-site/style.css b/company-site/style.css
