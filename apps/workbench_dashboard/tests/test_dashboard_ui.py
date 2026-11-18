@@ -1138,7 +1138,12 @@ def test_chat_live_progress_pins():
     js = _read("app.js")
     assert "setInterval(pollProgress, 2000)" in js
     assert "/progress?message_id=" in js
-    assert "/^Tool (\\w+)/" in js
+    # Raw stdout dump + /^Tool (\w+)/ checklist replaced 2026-11-18: Mai
+    # emits external_agent_activity lines, so the feed humanizes those.
+    assert "/^Tool (\\w+)/" not in js
+    assert "humanizeActivity" in js
+    assert "activity-feed" in js
+    assert "aria-live" in js
     assert "Live staged files" in js
     assert "Live progress paused (reduced motion)." in js
     assert 'mode === "agent" && !reduceMotion' in js
@@ -1528,6 +1533,85 @@ const document = {getElementById: () => ({addEventListener() {}})};
   assert(html.includes('id="jobs-form"'), 'form renders');
   assert(html.includes('name="required_skills"'), 'skills field renders');
   assert(html.includes('id="jobs-result"'), 'result target renders');
+})().catch(error => {console.error(error); process.exitCode = 1;});
+"""
+    result = subprocess.run(
+        [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_humanize_activity_translates_mai_lines() -> None:
+    node = _node_driver()
+    driver = r"""
+const assert = require('assert');
+const source = require('fs').readFileSync(process.argv[1], 'utf8');
+const grab = (name) => eval('(' + source.slice(source.indexOf('function ' + name + '('),
+  source.indexOf('\n}', source.indexOf('function ' + name + '(')) + 2) + ')');
+const humanizeActivity = grab('humanizeActivity');
+const truncate = grab('truncate');
+assert.equal(
+  humanizeActivity('external_agent_activity: command_execution completed - command: "git status"'),
+  'Done: git status');
+assert.equal(
+  humanizeActivity('external_agent_activity item.completed: Checked the tree.'),
+  'Checked the tree.');
+assert.equal(humanizeActivity('external_agent_activity: turn.started'), 'Turn started.');
+assert.equal(humanizeActivity('coding_session_id: abc'), null);
+assert.equal(humanizeActivity('route_id: openai/x'), null);
+assert.equal(humanizeActivity('Some plain narration.'), 'Some plain narration.');
+assert.equal(truncate('abcdef', 4), 'abcd…');
+"""
+    result = subprocess.run(
+        [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_chat_thread_renders_agent_turn_commands_above_report() -> None:
+    node = _node_driver()
+    driver = r"""
+const assert = require('assert');
+const source = require('fs').readFileSync(process.argv[1], 'utf8');
+const grab = (name) => eval('(' + source.slice(source.indexOf('function ' + name + '('),
+  source.indexOf('\n}', source.indexOf('function ' + name + '(')) + 2) + ')');
+const esc = grab('esc');
+const gtext = grab('gtext');
+const truncate = grab('truncate');
+const renderer = source.slice(source.indexOf('async function renderChatThread('),
+  source.indexOf('async function renderInbox('));
+eval(renderer);
+const view = {innerHTML: '', querySelectorAll: () => []};
+const location = {hash: '#/chat/x1'};
+const el = () => ({addEventListener() {}, dataset: {}, value: '', checked: false});
+const document = {getElementById: el, createElement: () => ({})};
+const window = {};
+const setInterval = () => 0;
+const clearInterval = () => {};
+const toast = () => {};
+const render = () => {};
+const loadProjectPicker = async () => {};
+const loadPlanPicker = async () => {};
+const api = async (path) => {
+  if (path.includes('/messages')) return {messages: [
+    {role: 'user', content: 'do it'},
+    {role: 'assistant', content: 'noise\n### Agent report\nAll clean.', provider: 'mai', model: 'm',
+     agent_turn: {report: '### Agent report\nAll clean.',
+       commands: [{command: 'git status', status: 'completed'}]}},
+  ], pending_turn: null};
+  if (path === '/api/plans') return {items: []};
+  if (path === '/api/chat/agent-config') return {enabled: false, approval: 'scoped'};
+  return {sessions: [{id: 'x1', title: 'T', mode: 'ask'}], agent_enabled: false};
+};
+(async () => {
+  await renderChatThread('x1');
+  const html = view.innerHTML;
+  const cmds = html.indexOf('Commands (1)');
+  const report = html.indexOf('All clean.');
+  const full = html.indexOf('<details><summary>Full transcript (');
+  assert(cmds !== -1 && report !== -1 && full !== -1, 'commands, report, transcript render');
+  assert(cmds < report && report < full, 'commands above report above transcript toggle');
+  assert(html.includes('git status'), 'command text renders');
 })().catch(error => {console.error(error); process.exitCode = 1;});
 """
     result = subprocess.run(
