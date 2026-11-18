@@ -696,11 +696,14 @@ def test_supervise_tick_busy_on_lock_contention(tmp_path, monkeypatch) -> None:
     data.mkdir()
     lock = sup._TickLock(data)
     assert lock.__enter__() is True
+    sleeps: list[float] = []
+    monkeypatch.setattr(sup.time, "sleep", sleeps.append)
     try:
         outcome = sup.supervise_tick(_mail_throttle_config(tmp_path))
     finally:
         lock.__exit__()
     assert outcome["action"] == "busy"
+    assert sleeps == [15, 15, 15]
 
 
 def test_reconcile_reaps_old_strays_keeps_server(tmp_path, monkeypatch) -> None:
