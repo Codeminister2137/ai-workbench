@@ -677,10 +677,32 @@ async function renderChatList() {
 
 async function renderChatThread(id, initial) {
   const payload = await api("/api/chat/sessions/" + encodeURIComponent(id) + "/messages");
-  const msgs = payload.messages.map((m) =>
-    `<div class="msg"><span class="role">${esc(m.role)}</span>
-     <span class="muted">${m.provider ? esc(m.provider + "/" + (m.model || "")) : ""}</span>
-     <div>${esc(m.content)}</div></div>`).join("");
+  // P4 rec 1: long assistant turns collapse; first paragraph (the synthesis)
+  // stays visible, the rest opens on demand. Threshold keeps short chats flat.
+  const renderMsg = (m) => {
+    const head = `<span class="role">${esc(m.role)}</span>
+     <span class="muted">${m.provider ? esc(m.provider + "/" + (m.model || "")) : ""}</span>`;
+    const body = String(m.content || "");
+    if (m.role !== "assistant" || body.length <= 600) {
+      return `<div class="msg">${head}<div>${esc(body)}</div></div>`;
+    }
+    const cut = body.indexOf("\n\n");
+    const lead = cut === -1 ? body.slice(0, 300) : body.slice(0, cut);
+    const rest = cut === -1 ? body.slice(300) : body.slice(cut);
+    return `<div class="msg">${head}<div>${esc(lead)}</div>
+     <details><summary>Full turn (${body.length} chars)</summary><div>${esc(rest)}</div></details></div>`;
+  };
+  const msgs = payload.messages.map(renderMsg).join("");
+  let planBanner = "";
+  try {
+    const plans = await api("/api/plans");
+    const linked = (plans.items || []).filter((p) => p.source === "chat:" + id);
+    if (linked.length) {
+      const latest = linked[linked.length - 1];
+      planBanner = `<p class="muted">Plan: <a href="#/plans/${esc(latest.id)}">${gtext(latest.title || latest.id)}</a>
+        <span class="pill st-${esc((latest.status || "none").replace(/\s+/g, "-"))}">${esc(latest.status || "")}</span></p>`;
+    }
+  } catch (err) { planBanner = ""; }
   const sessions = await api("/api/chat/sessions");
   const found = (sessions.sessions || []).find((s) => s.id === id) || {};
   let agentCfg = {enabled: sessions.agent_enabled === true, approval: "scoped"};
@@ -727,6 +749,7 @@ async function renderChatThread(id, initial) {
     <button type="submit" title="Rename this chat">Rename</button></form>
     <p><button id="delete-btn" title="Delete this chat and its transcript">Delete chat</button>
     <button type="button" id="draft-plan-btn" title="Draft a proposed plan from this chat transcript">Draft plan</button></p>
+    ${planBanner}
     ${modeBar}${stagedBar}${pendingBar}
     <div id="thread">${msgs || '<p class="muted">No messages yet.</p>'}</div>
     <form class="inline" id="chat-form"><input type="text" name="text" placeholder="Message..." title="Message the supervisor" required>
@@ -1910,6 +1933,67 @@ async function markIdeaSeen(id, item) {
   }
 }
 
+async function renderJobs() {
+  view.innerHTML = `<h1>Job match review</h1>
+    <p class="muted">Paste a vacancy, get the M2 match report: preferences verdict, score, verdicts, CV suggestion, warnings.</p>
+    <div class="card"><h2>Vacancy</h2>
+    <form id="jobs-form">
+      <p><input type="text" name="title" placeholder="Job title..." title="Job title (required)">
+      <input type="text" name="company" placeholder="Company..." title="Company (required)"></p>
+      <p><input type="text" name="location" placeholder="Location..." title="Location">
+      <select name="work_mode" title="Work mode">
+        <option value="unspecified">any mode</option><option value="remote">remote</option>
+        <option value="hybrid">hybrid</option><option value="onsite">onsite</option>
+      </select>
+      <select name="employment_type" title="Employment type">
+        <option value="unspecified">any type</option><option value="b2b">B2B</option>
+        <option value="permanent">permanent</option><option value="contract">contract</option>
+      </select></p>
+      <p><input type="text" name="required_skills" placeholder="Required skills, comma separated..." title="Required skills, comma separated">
+      <input type="text" name="preferred_skills" placeholder="Preferred skills..." title="Preferred skills, comma separated"></p>
+      <p><input type="text" name="experience_requirement" placeholder="Experience requirement..." title="Experience requirement (optional)"></p>
+      <p><button type="submit" title="Run the match report">Review match</button></p>
+    </form></div>
+    <div id="jobs-result"></div>`;
+  document.getElementById("jobs-form").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const f = ev.target;
+    const split = (s) => s.split(",").map((x) => x.trim()).filter(Boolean);
+    const out = document.getElementById("jobs-result");
+    try {
+      const r = await api("/api/jobs/review", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+          title: f.title.value, company: f.company.value, location: f.location.value,
+          work_mode: f.work_mode.value, employment_type: f.employment_type.value,
+          required_skills: split(f.required_skills.value),
+          preferred_skills: split(f.preferred_skills.value),
+          experience_requirement: f.experience_requirement.value || null,
+        }),
+      });
+      const verdictRows = (r.match.verdicts || []).map((v) =>
+        `<li><strong>${esc(v.requirement)}</strong>
+         <span class="pill st-${esc(v.verdict)}">${esc(v.verdict)}</span>
+         <span class="muted">${esc((v.matched_skills || []).join(", "))}</span></li>`).join("");
+      const suggRows = (r.match.suggestions || []).map((s) =>
+        `<li><strong>${esc(s.requirement)}</strong>: ${esc(s.suggestion)}</li>`).join("");
+      const warnRows = (r.match.warnings || []).map((w) => `<li>${esc(w)}</li>`).join("");
+      out.innerHTML = `<div class="card"><h2>${esc(r.vacancy.title)} @ ${esc(r.vacancy.company)}</h2>
+        <p>Score <strong>${esc(String(r.match.match_score))}</strong>
+        <span class="pill st-${r.preferences.passes ? "ready" : "blocked"}">${r.preferences.passes ? "preferences pass" : "preferences fail"}</span></p>
+        ${r.preferences.passes ? "" : `<p class="muted">Failed: ${esc(r.preferences.reasons.join(", "))}</p>`}
+        <p>Suggested CV: <strong>${esc(r.match.suggested_cv_variant || "none")}</strong>
+        <span class="muted">${esc(r.match.variant_basis || "")}</span></p>
+        <h3>Verdicts</h3><ul class="plain">${verdictRows}</ul>
+        <h3>Suggestions</h3><ul class="plain">${suggRows}</ul>
+        ${warnRows ? `<h3>Warnings</h3><ul class="plain">${warnRows}</ul>` : ""}</div>`;
+    } catch (err) {
+      out.innerHTML = `<p><strong>Review failed:</strong> ${esc(err.message)}</p>`;
+    }
+  });
+}
+
 async function renderInvoices(id) {
   if (id) {
     const payload = await api("/api/invoices/" + encodeURIComponent(id));
@@ -2958,6 +3042,7 @@ async function render() {
     else if (name === "e2e") await renderE2E(id);
     else if (name === "ideas") await renderIdeas(id);
     else if (name === "invoices") await renderInvoices(id);
+    else if (name === "jobs") await renderJobs();
     else if (name === "backlog") await renderBacklog(id);
     else if (name === "workflows") await renderWorkflows(id);
     else if (name === "projects") await renderProjects(id);

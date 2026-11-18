@@ -154,7 +154,12 @@ def build_chat_prompt(transcript_digest: str, turn_text: str) -> str:
         "Edit files directly in your workspace when the request needs code; "
         "the host diffs your worktree afterwards and the owner reviews "
         "before anything lands in the shared checkout. Never push, merge, "
-        "publish, send mail, or touch credentials.\n\n"
+        "publish, send mail, or touch credentials.\n"
+        "Close every turn with a synthesis block in exactly this shape:\n"
+        "Did: <what changed this turn>\n"
+        "Found: <key findings>\n"
+        "Next: <immediate next step>\n"
+        "Needs owner: <decisions/inputs needed, or 'nothing'>\n\n"
         f"Conversation so far (digest):\n{transcript_digest}\n\n"
         f"Current request:\n{turn_text}\n"
     )

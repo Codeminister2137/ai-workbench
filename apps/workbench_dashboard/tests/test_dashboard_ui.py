@@ -195,7 +195,7 @@ def test_static_controls_have_titles() -> None:
     for tag in re.findall(r"<button\b[^>]*>", html):
         assert "title=" in tag, f"button without title: {tag}"
     nav_links = re.findall(r"<a\b[^>]*data-view[^>]*>", html)
-    assert len(nav_links) == 21  # 19 + modules tab + E2E tab (spend merged into providers)
+    assert len(nav_links) == 22  # 19 + modules tab + E2E tab + jobs (spend merged into providers)
     for tag in nav_links:
         assert "title=" in tag, f"nav link without title: {tag}"
 
@@ -205,8 +205,8 @@ def test_dynamic_buttons_have_titles() -> None:
     js = _read("app.js")
     buttons = re.findall(r"<button\b[^>]*>", js)
     assert (
-        len(buttons) == 58
-    )  # +doc pin; +fanout apply; +delete-inbox-btn +e2e submit +chat mode/apply/approve +notes save +agent-check run +agent-config save +spend-policy add/save/remove +spend-adjust record +backlog to-task
+        len(buttons) == 59
+    )  # +doc pin; +fanout apply; +delete-inbox-btn +e2e submit +chat mode/apply/approve +notes save +agent-check run +agent-config save +spend-policy add/save/remove +spend-adjust record +backlog to-task +jobs submit
     for tag in buttons:
         assert "title=" in tag, f"button without title: {tag}"
 
@@ -216,14 +216,14 @@ def test_dynamic_inputs_and_selects_have_titles() -> None:
     js = _read("app.js")
     inputs = [tag for tag in re.findall(r"<input\b[^>]*>", js) if 'type="radio"' not in tag]
     assert (
-        len(inputs) == 59
-    )  # +bad-test checkbox; +agent-enable checkbox; +spend-policy prepaid/cap (scope is a select); +spend-adjust remaining; step radios excluded
+        len(inputs) == 65
+    )  # +bad-test checkbox; +agent-enable checkbox; +spend-policy prepaid/cap (scope is a select); +spend-adjust remaining; step radios excluded; +jobs form (6)
     for tag in inputs:
         assert "title=" in tag, f"input without title: {tag}"
     selects = re.findall(r"<select\b[^>]*>", js)
     assert (
-        len(selects) == 24
-    )  # +restrictions fan-out; +run fanout; +landing-page select; +agent policy; +spend-policy scope; +spend-adjust allowance
+        len(selects) == 26
+    )  # +restrictions fan-out; +run fanout; +landing-page select; +agent policy; +spend-policy scope; +spend-adjust allowance; +jobs work-mode/type
     for tag in selects:
         assert "title=" in tag, f"select without title: {tag}"
 
@@ -1499,6 +1499,88 @@ const api = async (path) => ({item});
   assert(html.includes('alpha\nbeta'), 'notes keep line breaks');
   assert(html.includes('<p class="inbox-body"><strong>Note:</strong> first\nsecond</p>'),
     'answer note preserves breaks');
+})().catch(error => {console.error(error); process.exitCode = 1;});
+"""
+    result = subprocess.run(
+        [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_jobs_view_renders_review_form() -> None:
+    node = _node_driver()
+    driver = r"""
+const assert = require('assert');
+const source = require('fs').readFileSync(process.argv[1], 'utf8');
+const grab = (name) => eval('(' + source.slice(source.indexOf('function ' + name + '('),
+  source.indexOf('\n}', source.indexOf('function ' + name + '(')) + 2) + ')');
+const esc = grab('esc');
+const gtext = grab('gtext');
+const renderer = source.slice(source.indexOf('async function renderJobs('),
+  source.indexOf('async function renderInvoices('));
+eval(renderer);
+const view = {innerHTML: '', querySelectorAll: () => []};
+const document = {getElementById: () => ({addEventListener() {}})};
+(async () => {
+  await renderJobs();
+  const html = view.innerHTML;
+  assert(html.includes('<h1>Job match review</h1>'), 'title renders');
+  assert(html.includes('id="jobs-form"'), 'form renders');
+  assert(html.includes('name="required_skills"'), 'skills field renders');
+  assert(html.includes('id="jobs-result"'), 'result target renders');
+})().catch(error => {console.error(error); process.exitCode = 1;});
+"""
+    result = subprocess.run(
+        [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_chat_thread_collapses_long_turns_and_links_plan() -> None:
+    node = _node_driver()
+    driver = r"""
+const assert = require('assert');
+const source = require('fs').readFileSync(process.argv[1], 'utf8');
+const grab = (name) => eval('(' + source.slice(source.indexOf('function ' + name + '('),
+  source.indexOf('\n}', source.indexOf('function ' + name + '(')) + 2) + ')');
+const esc = grab('esc');
+const gtext = grab('gtext');
+const renderer = source.slice(source.indexOf('async function renderChatThread('),
+  source.indexOf('async function renderInbox('));
+eval(renderer);
+const view = {innerHTML: '', querySelectorAll: () => []};
+const location = {hash: '#/chat/x1'};
+const el = () => ({addEventListener() {}, dataset: {}, value: '', checked: false});
+const document = {getElementById: el, createElement: () => ({})};
+const window = {};
+const setInterval = () => 0;
+const clearInterval = () => {};
+const toast = () => {};
+const render = () => {};
+const loadProjectPicker = async () => {};
+const loadPlanPicker = async () => {};
+const longBody = 'Lead paragraph here.\n\n' + 'x'.repeat(700);
+const api = async (path) => {
+  if (path.includes('/messages')) return {messages: [
+    {role: 'user', content: 'do it'},
+    {role: 'assistant', content: 'short answer', provider: 'ollama', model: 'm'},
+    {role: 'assistant', content: longBody, provider: 'ollama', model: 'm'},
+  ], pending_turn: null};
+  if (path === '/api/plans') return {items: [
+    {id: 'p1', title: 'Chat plan', status: 'active', source: 'chat:x1'},
+    {id: 'p2', title: 'Other', status: 'active', source: 'manual'},
+  ]};
+  if (path === '/api/chat/agent-config') return {enabled: false, approval: 'scoped'};
+  return {sessions: [{id: 'x1', title: 'T', mode: 'ask'}], agent_enabled: false};
+};
+(async () => {
+  await renderChatThread('x1');
+  const html = view.innerHTML;
+  assert(html.includes('<details><summary>Full turn ('), 'long turn collapses');
+  assert(html.includes('Lead paragraph here.'), 'lead stays visible');
+  assert(!html.includes('<details><summary>Full turn (12 chars)'), 'short stays flat');
+  assert(html.includes('href="#/plans/p1"'), 'plan banner links chat plan');
+  assert(!html.includes('#/plans/p2'), 'unrelated plans excluded');
 })().catch(error => {console.error(error); process.exitCode = 1;});
 """
     result = subprocess.run(

@@ -148,6 +148,8 @@ def test_build_chat_prompt_states_convention() -> None:
     prompt = build_chat_prompt("digest", "do it")
     assert "do it" in prompt and "digest" in prompt
     assert "never push" in prompt.lower()
+    for marker in ("Did:", "Found:", "Next:", "Needs owner:"):
+        assert marker in prompt
 
 
 def test_ask_always_parks_then_approves(tmp_path, git_repo, stores) -> None:
