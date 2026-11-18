@@ -28,6 +28,33 @@ effort behavior, 24-task dual-arm eval: local 13/24, grant 12/24).
 - `deepseek-coder-v2:16b`: BLOCKED (Q4: 4/5 fail). Re-test only
   on new weights with the same 5-task probe.
 
+### Re-probe admission check — 2026-11-18
+
+Run `40ba79a98efc4112986c24fbc178c5eb`: **BLOCKED before inference**;
+the existing model block remains. This is not a new quality-test failure.
+
+- Live `GET http://127.0.0.1:11434/api/tags` reported
+  `deepseek-coder-v2:16b` manifest digest
+  `63fb193b3a9b4322a18e8c6b250ca2e70a5ff531e962dbf95ba089b2566f2fa5`,
+  size `8905126121`, quantization `Q4_0`, and modified time
+  `2026-09-21T00:36:27.0710143+02:00`. The timestamp predates the
+  2026-11-09 blocked run; it does not establish new weights. The digest
+  identifies the current manifest, not an independently hashed weight blob.
+- The private `docs/plans/local-model-queue.md` Q4 entry records five
+  fixed instruction prompts, mechanical grading, and four failures, but
+  references `C:\Users\Jakub\AppData\Local\Temp\q4-deepseek.json` for
+  evidence. That file was absent at inspection. Neither this policy nor
+  that plan supplies the exact five prompts, graders, inference settings,
+  or blocked-run digest. Targeted repository/history searches did not
+  recover the original probe or digest.
+- Consequently, changed weights cannot be verified and the same probe
+  cannot yet be reproduced. No model-inference calls were initiated by
+  this re-probe's tools. No replacement probe was substituted.
+
+Next: recover the original Q4 probe/settings and blocked-run weight identity,
+then verify a different installed weight identity before admitting a fresh
+bounded five-task run. Routing is unchanged by this documentation update.
+
 ## Required tooling (shipped)
 
 - `thinker_output_budget` + `ensure_complete` + LENGTH →
