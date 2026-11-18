@@ -27,12 +27,25 @@ def test_fixtures_deterministic() -> None:
     assert first[0]["AAA"] > 0
 
 
+def _stub_profile(name: str):
+    from investor.profiles import InvestorProfile
+
+    return InvestorProfile(
+        name=name,
+        model="stub",
+        temperature=0.0,
+        system_prompt="stub",
+        risk_posture="balanced",
+        horizon="short_term",
+    )
+
+
 def test_evaluate_compares_profiles() -> None:
     prices = generate(symbols=("AAA", "BBB"), ticks=20, seed=7)
     judges = StubJudge({"bull": {"AAA": 1.0}, "bear": {"BBB": 1.0}})
     decisions = [
         {
-            name: judges.decide(type("P", (), {"name": name})(), "", ("AAA", "BBB")).weights
+            name: judges.decide(_stub_profile(name), "", ("AAA", "BBB")).weights
             for name in ("bull", "bear")
         }
         for _ in prices
