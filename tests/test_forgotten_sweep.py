@@ -654,6 +654,53 @@ def test_flags_needs_attention_runs() -> None:
     assert by_key["R1:na1"]["fileable"] is True
 
 
+def test_i5_files_uncovered_owner_gates() -> None:
+    gates = [
+        {
+            "id": "g1",
+            "title": "Gate one",
+            "body": "Decide X.",
+            "type": "decision",
+            "options": ["A", "B"],
+        },
+        {"id": "g2", "title": "Gate two", "body": "Do Y.", "type": "task", "options": ["Done"]},
+    ]
+    inbox = [
+        {
+            "id": "covered",
+            "title": "Gate one",
+            "status": "open",
+            "assignee": "owner",
+            "created_at_utc": _ts(5),
+            "metadata": {"owner_gate": "g1"},
+        },
+        {
+            "id": "shut",
+            "title": "Gate two",
+            "status": "closed",
+            "assignee": "owner",
+            "created_at_utc": _ts(50),
+            "metadata": {"owner_gate": "g2"},
+        },
+    ]
+    findings = SWEEP.collect_inbox(inbox, NOW, [], gates)
+    by_key = {f["key"]: f for f in findings if f["key"].startswith("I5:")}
+    assert by_key == {}  # open covers g1; closed-with-record covers g2
+    del inbox[1]
+    gates.append(
+        {"id": "g3", "title": "Gate three", "body": "Do Z.", "type": "task", "options": ["Done"]}
+    )
+    findings = SWEEP.collect_inbox(inbox, NOW, [], gates)
+    by_key = {f["key"]: f for f in findings if f["key"].startswith("I5:")}
+    assert set(by_key) == {"I5:g2", "I5:g3"}  # missing items re-file
+    assert by_key["I5:g2"]["fileable"] is True
+    assert by_key["I5:g2"]["assignee"] == "owner"
+    assert by_key["I5:g2"]["gate_body"] == "Do Y."
+    assert SWEEP.collect_inbox([], NOW, [], None) == [
+        f for f in SWEEP.collect_inbox([], NOW, []) if not f["key"].startswith("I5:")
+    ]
+
+
 def test_r3_flags_lost_staged_branch(tmp_path: Path) -> None:
     import subprocess
 

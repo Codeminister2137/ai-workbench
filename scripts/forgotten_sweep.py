@@ -51,6 +51,7 @@ GATE_H = {
     "I2": 48,  # open agent inbox rotting
     "I3": 168,  # open owner inbox backlog (7d)
     "I4": 24,  # agent item idle after its run finished
+    "I5": 0,  # standing owner gate with no open item
     "E1": 24,  # fail E2E report, no follow-up action
     "E2": 24,  # fail E2E report, follow-up itself failed
     "E3": 48,  # open E2E task (owner testing backlog)
@@ -541,8 +542,35 @@ def collect_inbox(
     inbox: list[dict[str, Any]],
     now: datetime,
     runs: list[dict[str, Any]] | None = None,
+    gates: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     findings: list[dict[str, Any]] = []
+    for gate in gates or []:
+        if not isinstance(gate, dict) or not gate.get("id"):
+            continue
+        # Any status covers: a closed gate item carries its resolution, so
+        # re-filing on close would nag forever. I5 fires only when the
+        # gate has no item at all (deleted or never filed).
+        covered = any(
+            isinstance(item, dict)
+            and str((item.get("metadata") or {}).get("owner_gate", "")) == gate["id"]
+            for item in inbox
+        )
+        if not covered:
+            finding = _finding(
+                f"I5:{gate['id']}",
+                "I5",
+                str(gate.get("title") or gate["id"]),
+                "owner",
+                "Standing owner gate lost its dashboard item; re-filed from the registry.",
+                [],
+                0.0,
+            )
+            finding["gate_id"] = gate["id"]
+            finding["gate_body"] = str(gate.get("body") or "")
+            finding["gate_type"] = str(gate.get("type") or "decision")
+            finding["gate_options"] = list(gate.get("options") or [])
+            findings.append(finding)
     for item in inbox:
         iid = str(item.get("id", "?"))
         title = str(item.get("title", ""))
@@ -1113,6 +1141,18 @@ def _load_file_brief() -> Any:
     return module
 
 
+def _load_owner_gates(repo: Path) -> list[dict[str, Any]]:
+    """Standing owner gates; missing/unreadable registry reads empty (fail-soft)."""
+    try:
+        payload = json.loads(
+            (repo / "apps" / "workbench_dashboard" / "owner_gates.json").read_text(encoding="utf-8")
+        )
+    except (OSError, ValueError):
+        return []
+    gates = payload.get("gates") if isinstance(payload, dict) else None
+    return [g for g in gates if isinstance(g, dict)] if isinstance(gates, list) else []
+
+
 def _filing_body(finding: dict[str, Any], receipt_name: str) -> str:
     lines = [
         f"Forgotten-sweep finding {finding['key']} (gate {finding['gate_h']}h).",
@@ -1159,7 +1199,7 @@ def run(
     findings: list[dict[str, Any]] = []
     run_findings, resolved = collect_runs(runs, inbox, now, merged_branches, repo)
     findings += run_findings
-    findings += collect_inbox(inbox, now, runs)
+    findings += collect_inbox(inbox, now, runs, _load_owner_gates(repo))
     e2e_findings, e2e_resolved = collect_e2e(tasks, reports, runs, inbox, now)
     findings += e2e_findings
     resolved += e2e_resolved
@@ -1199,15 +1239,26 @@ def run(
     if file and fileable and not dry_run:
         brief = _load_file_brief()
         for finding in fileable:
-            payload = brief.build_payload(
-                title=f"[sweep] {finding['title']}",
-                body=_filing_body(finding, receipt_name),
-                options=None,  # type: ignore[arg-type] - store defaults tasks to ["Done"]
-                item_type="task",
-                created_by="supervisor",
-                assignee=finding["assignee"],
-            )
             try:
+                if finding.get("category") == "I5":
+                    payload = brief.build_payload(
+                        title=finding["title"],
+                        body=finding.get("gate_body") or finding["title"],
+                        options=finding.get("gate_options") or ["Done"],
+                        item_type=finding.get("gate_type") or "decision",
+                        created_by="supervisor",
+                        assignee="owner",
+                        metadata={"owner_gate": finding.get("gate_id")},
+                    )
+                else:
+                    payload = brief.build_payload(
+                        title=f"[sweep] {finding['title']}",
+                        body=_filing_body(finding, receipt_name),
+                        options=None,  # type: ignore[arg-type] - store defaults tasks to ["Done"]
+                        item_type="task",
+                        created_by="supervisor",
+                        assignee=finding["assignee"],
+                    )
                 record = brief.send(url, payload)
                 filed[finding["key"]] = str(record.get("id", "?"))
             except urllib.error.HTTPError as exc:
