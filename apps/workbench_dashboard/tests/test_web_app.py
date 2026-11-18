@@ -1114,9 +1114,7 @@ def test_meeting_analysis_books_measured_usage(dashboard_server, tmp_path, monke
             )
             return AIResponse(
                 message=AIMessage(role=MessageRole.ASSISTANT, content="- [ ] x"),
-                backend=BackendInfo(
-                    provider="r", model="m", location=BackendLocation.EXTERNAL
-                ),
+                backend=BackendInfo(provider="r", model="m", location=BackendLocation.EXTERNAL),
                 usage=UsageMetadata(),
             )
 

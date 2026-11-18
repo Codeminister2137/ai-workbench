@@ -43,9 +43,7 @@ def test_extract_command_allows_dryrun_and_http_get() -> None:
         == ".venv/Scripts/python.exe scripts/run-tests.py dashboard"
     )
     assert (
-        e2e_agent_checks.extract_command(
-            "Run `.venv/Scripts/python.exe scripts/run-tests.py full`"
-        )
+        e2e_agent_checks.extract_command("Run `.venv/Scripts/python.exe scripts/run-tests.py full`")
         is None
     )
     assert e2e_agent_checks.extract_command("Run `scripts/x.py --dry-run`") is None
