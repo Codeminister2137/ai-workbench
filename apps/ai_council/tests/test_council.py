@@ -168,7 +168,47 @@ def test_ask_rounds_three_synthesizes_with_chair(tmp_path, monkeypatch) -> None:
     assert synthesis["member"] == "Analyst:synthesis"
     assert synthesis["answer"] == "synthesis of 4 positions"
     assert synthesis["round"] == "3"
+    assert synthesis["verdict"]["parse_ok"] is False  # free prose, no contract
     store.close()
+
+
+def test_ask_attaches_structured_verdict(tmp_path, monkeypatch) -> None:
+    class VerdictAgent(FakeAgent):
+        def synthesize(self, conversation, answers):
+            return (
+                "AGREED:\n- Ship it\nDISAGREEMENTS:\n- Bob: too risky\n"
+                "NEXT:\n- Pilot\nCONSENSUS: partial\n"
+            )
+
+    council, store = _council(tmp_path, monkeypatch, agent=VerdictAgent)
+    synthesis = council.ask("Question?", rounds=3)[-1]
+    store.close()
+    assert synthesis["verdict"] == {
+        "agreed": ["Ship it"],
+        "disagreements": [{"holders": ["Bob"], "point": "too risky"}],
+        "next_actions": ["Pilot"],
+        "consensus": "partial",
+        "parse_ok": True,
+    }
+
+
+def test_ask_events_marks_synthesis_partial_on_cap(tmp_path, monkeypatch) -> None:
+    import json
+
+    from tests.helpers import write_config
+
+    config_path = tmp_path / "council.json"
+    write_config(config_path)
+    raw = json.loads(config_path.read_text(encoding="utf-8"))
+    raw["max_tokens_per_question"] = 1
+    config_path.write_text(json.dumps(raw), encoding="utf-8")
+    council = LocalCouncil(load_config(config_path), ConversationStore(tmp_path / "c.sqlite3"))
+    monkeypatch.setattr("council.LocalAgent", FakeAgent)
+    events = list(council.ask_events("Question?", rounds=3))
+    finished = [e for e in events if e["type"] == "synthesis_finished"]
+    assert len(finished) == 1
+    assert finished[0]["partial"] is True
+    assert ("round_started", 3) not in [(e["type"], e.get("round")) for e in events]
 
 
 def test_token_cap_marks_synthesis_partial(tmp_path, monkeypatch) -> None:

@@ -93,10 +93,16 @@ class LocalAgent:
             *self._messages(conversation),
             AIMessage(
                 MessageRole.USER,
-                "As chair, synthesize the council positions below into one "
-                "answer: agreed points, open disagreements (name who holds "
-                "them), and what the asker should do next. Never invent "
-                f"consensus that is not there.\n\n{positions}",
+                "As chair, synthesize the council positions below. Reply in "
+                "exactly this shape (headers verbatim, one bullet per line, "
+                "disagreements named as 'Name: point'):\n"
+                "AGREED:\n- <agreed point>\n"
+                "DISAGREEMENTS:\n- <Name[, Name]: point>\n"
+                "NEXT:\n- <what the asker should do next>\n"
+                "CONSENSUS: <full|partial|none>\n"
+                "Never invent consensus that is not there; use 'none' "
+                "rather than forcing agreement.\n\n"
+                f"{positions}",
             ),
         )
 
