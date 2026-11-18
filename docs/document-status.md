@@ -112,6 +112,7 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/plans/product-roadmap-20261031.md | KNOWLEDGE | P1-P9 direction; schedule section stale (hackathon windows passed). |
 | docs/plans/repo-assistant-cli-parity-plan.md | ACTED | Consumed into CLI/ADRs (one narrow Oct-19 PENDING likely moot). |
 | docs/plans/research-review-orchestration-plan.md | KNOWLEDGE | Retained findings index for reanalysis. |
+| docs/mai-switch-readiness.md | PENDING | Checklist draft 2026-11-18; owner sign-off open. |
 | docs/plans/remote-offers-20261118.md | PENDING | Remote-first lines E–I draft; owner picks first two. |
 | docs/plans/repo-gap-assessment-20261117.md | KNOWLEDGE | Research sweep 2026-11-17 (state+gaps+phases); partly executed since. |
 | docs/plans/push-transfer-investigation-20261118.md | KNOWLEDGE | Idle-SSH + red-hook-bypass root causes; keepalive applied, verified. |
