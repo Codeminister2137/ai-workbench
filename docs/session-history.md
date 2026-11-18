@@ -1,5 +1,15 @@
 # Session History
 
+## 2026-11-18 assessment remainder, pushed 02df801 (01a1e5ab cont.)
+
+Owner-gate enforcement (registry + I5 + AGENTS rule; 5 missing items
+filed), OpenCode row live off service-account key (monthly 97%, UA 403
+finding recorded), hollow-with-iterations guard, c8 dropped with
+verified reason, council structured verdicts + events cap parity,
+boundary-drift brief filed (21 modules), ideas hygienic (0 reviewing).
+Full gate green (1 transient flake, unreproduced); hook fully green;
+keepalive 4/4 clean pushes.
+
 ## 2026-11-18 work-tabs unification, pushed 2acbbb9 (01a1e5ab cont.)
 
 Relations (project_id + related + backfill), attention unification
