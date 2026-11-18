@@ -11,7 +11,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from pathlib import Path
 
-from dashboard_stores import WORKBENCH_PROJECT_ID, DashboardStores, StoreError
+from dashboard_stores import DashboardStores, StoreError
 
 
 def _utc_now() -> str:
@@ -25,9 +25,13 @@ def sync_plan(
     title: str,
     source_file: Path,
     status: str,
-    project_id: str = WORKBENCH_PROJECT_ID,
+    project_id: str | None = None,
+    kind: str = "plan",
+    parent_plan_id: str | None = None,
 ) -> dict:
     """Store one markdown plan file as a dashboard plan (upsert by id)."""
+    if kind not in ("roadmap", "plan"):
+        raise StoreError("Plan kind must be roadmap or plan")
     try:
         body = source_file.read_text(encoding="utf-8")
     except (OSError, UnicodeError) as exc:
@@ -36,8 +40,10 @@ def sync_plan(
         "id": plan_id,
         "title": title,
         "status": status,
+        "kind": kind,
+        "parent_plan_id": parent_plan_id,
         "body": body,
-        "project_id": project_id,
+        "project_id": project_id or stores.default_project_id(),
         "source": str(source_file),
         "updated_at_utc": _utc_now(),
     }
@@ -56,14 +62,14 @@ def sync_run(
     commit: str | None = None,
     validation: str | None = None,
     report: str | None = None,
-    project_id: str = WORKBENCH_PROJECT_ID,
+    project_id: str | None = None,
 ) -> dict:
     """Store one work-slice run record (upsert by id)."""
     record = {
         "id": run_id,
         "title": title,
         "status": status,
-        "project_id": project_id,
+        "project_id": project_id or stores.default_project_id(),
         "body": body,
         "branch": branch,
         "commit": commit,

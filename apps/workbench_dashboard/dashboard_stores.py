@@ -26,7 +26,6 @@ BACKLOG_SOURCES = ("owner", "agent")
 BACKLOG_STATUSES = ("proposed", "ready", "doing", "blocked", "done", "dropped")
 BACKLOG_OPEN = ("proposed", "ready", "doing", "blocked")
 WORKFLOW_STATUSES = ("active", "archived")
-WORKBENCH_PROJECT_ID = "workbench"
 RELATED_LIMIT = 1000
 
 
@@ -196,13 +195,23 @@ class DashboardStores:
         """Human attention items: the badge mirrors the default filter."""
         return len(self.attention_inbox_items())
 
-    @staticmethod
-    def _project_of(record: dict) -> str:
+    def default_project_id(self) -> str:
+        """Registry id of the workbench root on this machine.
+
+        The data dir always sits at <repo>/apps/workbench_dashboard/data,
+        so the repo root is two levels up; its digest is the default
+        project for records without a better home.
+        """
+        from dashboard_projects import repo_project_id
+
+        return repo_project_id(self.data_dir.parent.parent)
+
+    def project_of(self, record: dict) -> str:
         """Owning project; records predating relations belong to workbench."""
         value = record.get("project_id")
         if isinstance(value, str) and value.strip():
             return value.strip()
-        return WORKBENCH_PROJECT_ID
+        return self.default_project_id()
 
     def related(self, project_id: str) -> dict[str, list[dict]]:
         """Cross-tab links for one project (plans, inbox, runs, E2E tasks).
@@ -211,7 +220,7 @@ class DashboardStores:
         index pays for itself. Slim dicts (id/title/status) keep the
         project view fast.
         """
-        want = (project_id or "").strip() or WORKBENCH_PROJECT_ID
+        want = (project_id or "").strip() or self.default_project_id()
         linked: dict[str, list[dict]] = {"plans": [], "inbox": [], "runs": [], "e2e_tasks": []}
         for key, collection in (
             ("plans", self.plans),
@@ -221,7 +230,7 @@ class DashboardStores:
         ):
             items, _total = collection.list(limit=RELATED_LIMIT)
             for item in items:
-                if not isinstance(item, dict) or self._project_of(item) != want:
+                if not isinstance(item, dict) or self.project_of(item) != want:
                     continue
                 linked[key].append(
                     {
@@ -232,8 +241,9 @@ class DashboardStores:
                 )
         return linked
 
-    def backfill_project_ids(self, default: str = WORKBENCH_PROJECT_ID) -> dict[str, int]:
+    def backfill_project_ids(self, default: str | None = None) -> dict[str, int]:
         """Stamp records missing project_id; returns per-collection counts."""
+        default = default or self.default_project_id()
         filled: dict[str, int] = {}
         for key, collection in (
             ("plans", self.plans),
@@ -271,7 +281,7 @@ class DashboardStores:
         metadata: dict | None = None,
         created_by: str = "supervisor",
         assignee: str = "owner",
-        project_id: str = WORKBENCH_PROJECT_ID,
+        project_id: str | None = None,
     ) -> dict:
         """Create one inbox task; tasks default to a single Done choice.
 
@@ -305,7 +315,7 @@ class DashboardStores:
             "created_by": created_by,
             "assignee": assignee,
             "waiting_on": "agent" if assignee == "agent" else "owner",
-            "project_id": project_id,
+            "project_id": project_id or self.default_project_id(),
             "created_at": now,
             "answered_at": None,
             "answer": None,
@@ -383,7 +393,7 @@ class DashboardStores:
                 task_type="task",
                 created_by="supervisor",
                 assignee="agent",
-                project_id=str(record.get("project_id") or WORKBENCH_PROJECT_ID),
+                project_id=str(record.get("project_id") or self.default_project_id()),
                 metadata={"closeout_for": record.get("id")},
                 context_refs=[f"inbox:{record.get('id')}"],
             )
@@ -434,6 +444,30 @@ class DashboardStores:
         record["status"] = "open"
         record["waiting_on"] = "owner"
         self.inbox.put(item_id, record)
+        return record
+
+    def append_plan_evolution(self, plan_id: str, entry: str) -> dict:
+        """Append one timestamped entry to a plan's Evolutions log.
+
+        Closeouts call this so Roadmaps stay live surfaces instead of
+        stale documents. Creates the section when absent.
+        """
+        record = self.plans.get(plan_id)
+        if record is None:
+            raise StoreError("Plan not found")
+        entry = entry.strip()
+        if not entry:
+            raise StoreError("Evolution entry needs text")
+        stamp = _utc_now()[:10]
+        body = record.get("body") or ""
+        line = f"- {stamp}: {entry}"
+        if "## Evolutions" not in body:
+            body = body.rstrip() + "\n\n## Evolutions\n" + line + "\n"
+        else:
+            body = body.rstrip() + "\n" + line + "\n"
+        record["body"] = body
+        record["updated_at_utc"] = _utc_now()
+        self.plans.put(plan_id, record)
         return record
 
     def decide_plan(self, plan_id: str, *, approved: bool) -> dict:
@@ -817,7 +851,7 @@ class DashboardStores:
         created_by: str = "supervisor",
         range_base: str | None = None,
         draft: bool = False,
-        project_id: str = WORKBENCH_PROJECT_ID,
+        project_id: str | None = None,
     ) -> dict:
         """File one E2E task for a merge; one open task per merge commit.
 
@@ -855,7 +889,7 @@ class DashboardStores:
             "items": items,
             "status": "draft" if draft else "open",
             "created_by": created_by,
-            "project_id": project_id,
+            "project_id": project_id or self.default_project_id(),
             "created_at": now,
             "submitted_at": None,
             "report_id": None,

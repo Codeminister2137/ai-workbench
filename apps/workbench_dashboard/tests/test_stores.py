@@ -1,12 +1,7 @@
 from __future__ import annotations
 
 import pytest
-from dashboard_stores import (
-    WORKBENCH_PROJECT_ID,
-    DashboardStores,
-    StoreError,
-    effective_fanout_policy,
-)
+from dashboard_stores import DashboardStores, StoreError, effective_fanout_policy
 
 
 @pytest.fixture
@@ -620,7 +615,7 @@ def test_related_links_cross_tab_records(stores) -> None:
     assert [i["id"] for i in linked["runs"]] == ["r1"]
     assert len(linked["e2e_tasks"]) == 1
     assert linked["plans"] == []
-    bench = stores.related(WORKBENCH_PROJECT_ID)
+    bench = stores.related(stores.default_project_id())
     assert any(i["id"] == "r2" for i in bench["runs"])  # missing id, treated as workbench
 
 
@@ -630,17 +625,17 @@ def test_backfill_stamps_missing_project_ids(stores) -> None:
     stores.inbox.put("i1", {"id": "i1", "title": "t", "status": "open", "project_id": None})
     filled = stores.backfill_project_ids()
     assert filled == {"plans": 0, "inbox": 1, "runs": 1, "e2e_tasks": 0}
-    assert stores.runs.get("r1")["project_id"] == WORKBENCH_PROJECT_ID
+    assert stores.runs.get("r1")["project_id"] == stores.default_project_id()
     assert stores.runs.get("r2")["project_id"] == "x"
-    assert stores.inbox.get("i1")["project_id"] == WORKBENCH_PROJECT_ID
+    assert stores.inbox.get("i1")["project_id"] == stores.default_project_id()
 
 
 def test_creators_default_to_workbench_project(stores) -> None:
     item = stores.create_inbox_task(title="Q?", body="b", task_type="task", assignee="agent")
-    assert item["project_id"] == WORKBENCH_PROJECT_ID
+    assert item["project_id"] == stores.default_project_id()
     items = [{"id": "a", "behavior": "b", "kind": "behavior", "area": "dashboard"}]
     task = stores.create_e2e_task(merge_commit="aaa", title="e2e", items=items)
-    assert task["project_id"] == WORKBENCH_PROJECT_ID
+    assert task["project_id"] == stores.default_project_id()
 
 
 def test_pointer_run_inherits_task_project(stores) -> None:
@@ -652,3 +647,18 @@ def test_pointer_run_inherits_task_project(stores) -> None:
     )
     run = queue_pointer_run(stores, "aaa", task["id"], [{"id": "a"}])
     assert run["project_id"] == "dashboard"
+
+
+def test_append_plan_evolution_logs_entries(stores) -> None:
+    stores.plans.put(
+        "r1",
+        {"id": "r1", "title": "R", "status": "active", "kind": "roadmap", "body": "# R\n"},
+    )
+    stores.append_plan_evolution("r1", "shipped the thing")
+    body = stores.plans.get("r1")["body"]
+    assert "## Evolutions" in body
+    assert "shipped the thing" in body
+    stores.append_plan_evolution("r1", "second wave")
+    body = stores.plans.get("r1")["body"]
+    assert body.count("## Evolutions") == 1
+    assert body.index("shipped the thing") < body.index("second wave")

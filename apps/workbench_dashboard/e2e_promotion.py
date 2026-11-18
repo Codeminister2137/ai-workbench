@@ -27,8 +27,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from dashboard_stores import WORKBENCH_PROJECT_ID
-
 WARNING_TEMPLATE = "passed on {commit}, code untouched since — not re-tested"
 
 # Path prefix -> (area id, user-visible behavior, goal doc, regression neighbors).
@@ -771,7 +769,7 @@ def queue_pointer_run(
     run_id = uuid.uuid4().hex
     now = datetime.now(UTC).isoformat()
     task = stores.e2e_tasks.get(task_id) or {}
-    project_id = task.get("project_id") or WORKBENCH_PROJECT_ID
+    project_id = task.get("project_id") or stores.default_project_id()
     body = pointer_mission(merge, task_id, unclear)
     if note.strip():
         body += f"\n\nPrevious attempt declined: {note.strip()}\nAnswer it with concrete live evidence (view hashes, API probes, suite commands) instead of declining again."

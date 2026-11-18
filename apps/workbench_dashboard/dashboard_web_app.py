@@ -70,12 +70,7 @@ from dashboard_projects import (
     list_projects,
     set_project_manuscript,
 )
-from dashboard_stores import (
-    WORKBENCH_PROJECT_ID,
-    DashboardStores,
-    StoreError,
-    effective_fanout_policy,
-)
+from dashboard_stores import DashboardStores, StoreError, effective_fanout_policy
 from document_library import DocumentLibrary
 from drain_scheduler import DrainScheduler
 from nl_tasks import ORDER_OPTIONS, SCHEDULE_ANSWER, propose_task, scheduled_run_record
@@ -979,7 +974,11 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 session_id = path[len("/api/chat/sessions/") : -len("/staged")]
                 return self._send_chat_staged(session_id)
             if path == "/api/plans":
-                return self._send_collection(self._stores().plans, parsed.query)
+                return self._send_collection(
+                    self._stores().plans,
+                    parsed.query,
+                    filterable=("project_id", "kind", "parent_plan_id"),
+                )
             if path.startswith("/api/plans/"):
                 return self._send_item(self._stores().plans, path[len("/api/plans/") :])
             if path == "/api/runs":
@@ -1754,6 +1753,13 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             runs, _total = self._stores().runs.list(limit=100)
             project_runs = {run.get("id") for run in runs if run.get("project_id") == project_id}
             items = [item for item in items if self._inbox_item_in_project(item, project_runs)]
+            seen = {item.get("id") for item in items}
+            items = items + [
+                item
+                for item in self._stores().attention_inbox_items()
+                if item.get("id") not in seen
+                and self._stores().project_of(item) == project_id
+            ]
         elif wanted is None and for_agent is None:
             seen = {item.get("id") for item in items}
             items = items + [
@@ -1815,6 +1821,9 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         metadata = payload.get("metadata")
         if metadata is not None and not isinstance(metadata, dict):
             return self._send_json({"ok": False, "error": "metadata must be an object"}, status=400)
+        project_id = payload.get("project_id")
+        if project_id is not None and not isinstance(project_id, str):
+            return self._send_json({"ok": False, "error": "project_id must be a string"}, status=400)
         record = stores.create_inbox_task(
             title=title,
             body=body,
@@ -1826,6 +1835,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             context_refs=payload.get("context_refs"),
             options=payload.get("options"),
             metadata=metadata,
+            project_id=project_id,
         )
         self._send_json({"ok": True, "id": record["id"]})
 
@@ -2124,7 +2134,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         except ValueError as exc:
             print(f"Workbench dashboard: skip NL scheduling: {exc}")
             return None
-        run["project_id"] = record.get("project_id") or WORKBENCH_PROJECT_ID
+        run["project_id"] = record.get("project_id") or self._stores().default_project_id()
         stores = self._stores()
         try:
             if stores.runs.get(run["id"]) is not None:
@@ -2722,6 +2732,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         root = payload.get("root")
         description = payload.get("description", "")
         project_type = payload.get("type", "general")
+        explainer = payload.get("explainer", "")
         if not isinstance(name, str) or not isinstance(root, str):
             return self._send_json(
                 {"ok": False, "error": "name and root must be strings"}, status=400
@@ -2730,6 +2741,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             return self._send_json(
                 {"ok": False, "error": "description and type must be strings"}, status=400
             )
+        if not isinstance(explainer, str):
+            return self._send_json({"ok": False, "error": "explainer must be a string"}, status=400)
         try:
             project = create_project(
                 self.data_dir,
@@ -2737,6 +2750,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 root=root,
                 description=description,
                 project_type=project_type,
+                explainer=explainer,
             )
         except StagedEditError as exc:
             return self._send_json({"ok": False, "error": str(exc)}, status=400)

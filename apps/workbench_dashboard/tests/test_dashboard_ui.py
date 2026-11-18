@@ -515,6 +515,14 @@ def test_plan_detail_renders_phase_checklist() -> None:
     assert ".checklist" in css
 
 
+def test_plans_list_shows_kind_and_linked_plans() -> None:
+    """Roadmaps sort first with a kind pill; detail links child plans."""
+    js = _read("app.js")
+    assert 'kindOf(a) === "roadmap"' in js
+    assert "<h3>Linked plans</h3>" in js
+    assert "/api/plans?parent_plan_id=" in js
+
+
 def test_run_detail_renders_synthesis_and_diff() -> None:
     """Run detail shows Did/Found/Next synthesis and the diff when present."""
     js = _read("app.js")
