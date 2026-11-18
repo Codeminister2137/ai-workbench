@@ -364,6 +364,33 @@ def test_blank_summary_falls_back_to_receipt(tmp_path) -> None:
     assert "a.py" in receipt["summary"]
 
 
+def test_blank_summary_without_effect_fails(tmp_path) -> None:
+    """Iterations alone are not evidence: blank + no tools/staged/filed fails."""
+    FakeLoop.instances = []
+    loop_result = AgentResult(
+        response=_response("   "),
+        tool_results=(),
+        iterations=3,
+    )
+
+    def factory_loop(client, registry, context, **kwargs):
+        loop = FakeLoop(client, registry, context, **kwargs)
+        loop.result = loop_result
+        return loop
+
+    config = DashboardConfig(provider="ollama", model="fake")
+    execute = build_executor(
+        config,
+        ProjectRoots(()),
+        tmp_path,
+        client_factory=lambda backend: object(),
+        loop_factory=factory_loop,
+    )
+    receipt = execute({"id": "r1", "title": "t", "body": "b"})
+    assert receipt["status"] == "failed"
+    assert "no evidenced output" in receipt["error"]
+
+
 def test_reconstruction_budgets_flow_to_loop(harness) -> None:
     execute, _factory, _project = harness
     execute({"id": "r1", "title": "t", "body": "b"})
