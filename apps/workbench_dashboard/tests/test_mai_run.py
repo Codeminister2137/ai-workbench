@@ -341,3 +341,95 @@ def test_executor_refuses_empty_task_body() -> None:
     assert "empty task body" in receipt["error"]
     blank = build_mai_executor(".", "u")(_run(body="   "))
     assert blank["status"] == "failed"
+
+
+def test_receipt_surfaces_mai_failure_reason() -> None:
+    from mai_run import MaiRunOutcome, mai_failure_reason
+
+    tail = "Notes: status=failed; failure_reason=External agent timed out after 180 seconds; category=unknown"
+    assert mai_failure_reason(tail) == "External agent timed out after 180 seconds"
+    assert mai_failure_reason("nothing here") is None
+    outcome = MaiRunOutcome(exit_code=1, stdout_tail=tail, stderr_tail="")
+    receipt = mai_receipt(outcome, ["prompt"])
+    assert receipt["error"] == (
+        "Mai session exited with code 1: External agent timed out after 180 seconds"
+    )
+    assert receipt["failure_class"] == "provider"
+    bare = mai_receipt(MaiRunOutcome(exit_code=1, stdout_tail="", stderr_tail=""), ["p"])
+    assert bare["error"] == "Mai session exited with code 1"
+
+
+def test_retrying_executor_retries_provider_timeouts_once() -> None:
+    from mai_run import build_retrying_executor
+
+    calls: list = []
+
+    def flaky(run: dict) -> dict:
+        calls.append(run)
+        if len(calls) == 1:
+            return {
+                "status": "failed",
+                "error": "Mai session exited with code 1: External agent timed out after 180 seconds",
+                "failure_class": "provider",
+            }
+        return {"status": "completed", "stdout_tail": "recovered"}
+
+    receipt = build_retrying_executor(flaky)({"id": "r1"})
+    assert len(calls) == 2
+    assert receipt["status"] == "completed"
+    assert receipt["attempt"] == 2
+    assert "timed out" in receipt["retry_of"]["error"]
+
+
+def test_retrying_executor_passes_through_other_failures() -> None:
+    from mai_run import build_retrying_executor
+
+    seen: list = []
+
+    def inner(run: dict) -> dict:
+        seen.append(run)
+        return dict(run["canned"])
+
+    cases = [
+        {"status": "completed"},
+        {"status": "failed", "error": "Mai session exited with code 1", "failure_class": "unknown"},
+        {"status": "failed", "error": "allowance exhausted", "failure_class": "allowance"},
+    ]
+    for canned in cases:
+        seen.clear()
+        receipt = build_retrying_executor(inner)({"id": "r", "canned": canned})
+        assert len(seen) == 1
+        assert "attempt" not in receipt
+        assert receipt["status"] == canned["status"]
+
+
+def test_subprocess_is_unbuffered_and_streams_per_run(tmp_path) -> None:
+    import sys
+
+    from chat_agent import read_progress
+
+    env_probe = [sys.executable, "-c", "import os; print(os.environ.get('PYTHONUNBUFFERED'))"]
+    receipt = build_mai_executor(
+        tmp_path, tmp_path / "u.toml", mai_cmd_prefix=env_probe, progress_dir=tmp_path / "prog"
+    )(_run(id="r-9"))
+    assert receipt["stdout_tail"].strip() == "1"
+    stream = tmp_path / "prog" / "r-9.jsonl"
+    assert stream.is_file()
+    assert read_progress(stream) == ["1"]
+    assert receipt["progress_path"] == str(stream)
+
+
+def test_explicit_progress_path_wins_over_dir(tmp_path) -> None:
+    import sys
+
+    direct = tmp_path / "direct.jsonl"
+    receipt = build_mai_executor(
+        tmp_path,
+        tmp_path / "u.toml",
+        mai_cmd_prefix=[sys.executable, "-c", "print('hi')"],
+        progress_path=direct,
+        progress_dir=tmp_path / "prog",
+    )(_run())
+    assert receipt["progress_path"] == str(direct)
+    assert direct.is_file()
+    assert not (tmp_path / "prog").exists()

@@ -31,6 +31,17 @@ _PROVIDER_RE = re.compile(
     r"ProviderError|provider|authenticat|timeout|timed out|connect|model|route",
     re.IGNORECASE,
 )
+_FAILURE_REASON_RE = re.compile(r"failure_reason=([^;\n]+)")
+_RETRYABLE_TIMEOUT_RE = re.compile(r"timed?\s*out", re.IGNORECASE)
+
+
+def mai_failure_reason(*texts: str) -> str | None:
+    """Pull Mai's own failure_reason from captured tails (None when absent)."""
+    for text in texts:
+        match = _FAILURE_REASON_RE.search(text or "")
+        if match is not None and match.group(1).strip():
+            return match.group(1).strip()[:300]
+    return None
 
 
 def capture_tail(text: str) -> str:
@@ -219,6 +230,10 @@ def mai_receipt(outcome: MaiRunOutcome, argv: Sequence[str]) -> dict:
             "source": "mai-session",
         }
     error = outcome.error or f"Mai session exited with code {outcome.exit_code}"
+    if outcome.error is None:
+        reason = mai_failure_reason(outcome.stdout_tail, outcome.stderr_tail)
+        if reason is not None:
+            error = f"{error}: {reason}"
     return {
         "status": "failed",
         "error": error,
@@ -267,7 +282,9 @@ def run_mai_subprocess(
             encoding="utf-8",
             errors="replace",
             cwd=str(cwd) if cwd is not None else None,
-            env={**os.environ, "PYTHONUNBUFFERED": "1"} if progress_path is not None else None,
+            # Always unbuffered: block-buffered stdout is lost when Mai is
+            # killed, which produced the silent exit-1 run class (2026-11-18).
+            env={**os.environ, "PYTHONUNBUFFERED": "1"},
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
     except OSError as exc:
@@ -340,6 +357,7 @@ def build_mai_executor(
     provider: str | None = None,
     model: str | None = None,
     progress_path: Path | str | None = None,
+    progress_dir: Path | str | None = None,
 ) -> Callable[[dict], dict]:
     """Build a drain ``Executor`` handing runs to Mai sessions.
 
@@ -349,7 +367,9 @@ def build_mai_executor(
     runs Mai in a per-run scratch worktree (``run/<id>``) instead of the
     shared checkout; setup failures fail the run instead of falling back.
     ``coding_session`` resumes a bound Mai session (chat turns); runs
-    always start fresh.
+    always start fresh. ``progress_dir`` streams each run's stdout to
+    ``<run-id>.jsonl`` there so a killed Mai still leaves evidence;
+    explicit ``progress_path`` wins when both are set.
     """
 
     def execute(run: dict) -> dict:
@@ -360,6 +380,10 @@ def build_mai_executor(
                 "failure_class": "unknown",
                 "source": "mai-session",
             }
+        stream_path = progress_path
+        if stream_path is None and progress_dir is not None:
+            safe_id = re.sub(r"[^A-Za-z0-9_-]", "", str(run.get("id", "?")))[:64]
+            stream_path = Path(progress_dir) / f"{safe_id or 'run'}.jsonl"
         root = Path(repo_root)
         isolated = None
         if isolate:
@@ -391,7 +415,7 @@ def build_mai_executor(
                 cmd_prefix=mai_cmd_prefix,
                 timeout_seconds=subprocess_timeout_seconds,
                 cwd=root,
-                **({"progress_path": progress_path} if progress_path is not None else {}),
+                **({"progress_path": stream_path} if stream_path is not None else {}),
             )
         else:
             outcome = run_mai_session(argv, runner=runner)
@@ -399,6 +423,47 @@ def build_mai_executor(
         if isolated is not None:
             receipt["worktree"] = str(isolated.path)
             receipt["branch"] = isolated.branch
+        if stream_path is not None and backend == "subprocess":
+            receipt["progress_path"] = str(stream_path)
         return receipt
 
     return execute
+
+
+def build_retrying_executor(
+    inner: Callable[[dict], dict],
+    *,
+    max_attempts: int = 2,
+) -> Callable[[dict], dict]:
+    """Retry a Mai executor once on provider-side timeouts, nothing else.
+
+    The 180s external-agent inactivity timeout is transient often enough
+    to deserve one fresh session; every other failure passes through
+    untouched so retries never multiply real spend or mask real errors.
+    The final receipt carries ``attempt`` plus the first failure under
+    ``retry_of`` when a retry happened.
+    """
+
+    def execute(run: dict) -> dict:
+        first = inner(run)
+        if max_attempts < 2 or not _retryable_timeout(first):
+            return first
+        second = inner(run)
+        second["attempt"] = 2
+        second["retry_of"] = {
+            "error": first.get("error"),
+            "failure_class": first.get("failure_class"),
+        }
+        return second
+
+    return execute
+
+
+def _retryable_timeout(receipt: dict) -> bool:
+    """True for failed provider receipts whose text names a timeout."""
+    if receipt.get("status") != "failed":
+        return False
+    if receipt.get("failure_class") != "provider":
+        return False
+    blob = "\n".join(str(receipt.get(key) or "") for key in ("error", "stdout_tail", "stderr_tail"))
+    return _RETRYABLE_TIMEOUT_RE.search(blob) is not None
