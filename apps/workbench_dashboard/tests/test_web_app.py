@@ -1849,3 +1849,50 @@ def test_jobs_review_missing_profile_is_conflict(dashboard_server) -> None:
             {"title": "Python Dev", "company": "Acme", "required_skills": []},
         )
     assert error.value.code == 409
+
+
+def test_messages_attach_agent_turn_view(tmp_path: Path) -> None:
+    from ai_provider.chat_transcripts import SQLiteChatTranscriptStore
+    from dashboard_chat import DashboardChat
+    from dashboard_config import DashboardConfig
+
+    data_dir = tmp_path / "data"
+    store = SQLiteChatTranscriptStore(data_dir / "chats.sqlite3")
+    chat = DashboardChat(store, DashboardConfig(provider="ollama", model="fake"), tmp_path)
+    session = chat.create_session(title="agent")
+    store.append_message(session.session_id, role="user", content="Investigate.")
+    store.append_message(
+        session.session_id,
+        role="assistant",
+        content=(
+            "external_agent_activity: turn.started\n"
+            'external_agent_activity: command_execution completed - command: "git status"\n'
+            "\n### Agent report\nAll clean.\n"
+        ),
+    )
+
+    config_path = tmp_path / "dashboard.json"
+    config_path.write_text(json.dumps({"provider": "ollama", "model": "fake"}), encoding="utf-8")
+
+    class TestHandler(DashboardRequestHandler):
+        def log_message(self, format, *args):  # noqa: ANN001, ANN202 - stdlib signature
+            return
+
+    TestHandler.config_path = config_path
+    TestHandler.data_dir = data_dir
+    TestHandler.repo_root = tmp_path
+    server = ThreadingHTTPServer(("127.0.0.1", 0), TestHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        payload = get_json(
+            f"http://127.0.0.1:{server.server_port}",
+            f"/api/chat/sessions/{session.session_id}/messages",
+        )
+    finally:
+        server.shutdown()
+        server.server_close()
+    assistant = [m for m in payload["messages"] if m["role"] == "assistant"][0]
+    assert assistant["agent_turn"]["report"] == "### Agent report\nAll clean."
+    assert assistant["agent_turn"]["commands"] == [{"command": "git status", "status": "completed"}]
+    assert [m for m in payload["messages"] if m["role"] == "user"][0].get("agent_turn") is None

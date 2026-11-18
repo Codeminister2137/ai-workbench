@@ -16,6 +16,7 @@ and presence routing are slice B.
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 from collections import deque
@@ -70,6 +71,85 @@ def read_progress(path: Path | str) -> list[str]:
 
 class ChatAgentError(RuntimeError):
     """Agent turn setup failed; nothing executed."""
+
+
+REPORT_MARKERS = ("### Agent report", "## **SUMMARY**")
+_COMMAND_RE = re.compile(
+    r"external_agent_activity:\s+command_execution\s+"
+    r"(?P<status>in_progress|completed|failed)\s+-\s+command:\s+(?P<rest>.+)$"
+)
+_QUOTED_HEAD_RE = re.compile(r'\s*("(?:[^"\\]|\\.)*")\s*(?P<tail>.*)$')
+
+
+def _clean_command(rest: str) -> str:
+    """Decode Mai's command rendering: a JSON-quoted exe plus raw args."""
+    match = _QUOTED_HEAD_RE.match(rest)
+    if match is None:
+        return rest.strip()
+    try:
+        head = json.loads(match.group(1))
+    except ValueError:
+        return rest.strip()
+    if not isinstance(head, str):
+        return rest.strip()
+    tail = match.group("tail").strip()
+    return f"{head} {tail}".strip() if tail else head.strip()
+
+
+_ACTIVITY_PREFIXES = (
+    "external_agent_activity",
+    "=== Repo Coding Assistant ===",
+    "=== External agent diagnostics ===",
+    "coding_session_id:",
+)
+
+
+@dataclass(slots=True, frozen=True)
+class AgentTurnView:
+    """Readable split of one agent-turn transcript for the chat UI."""
+
+    report: str
+    commands: tuple[dict[str, str], ...]
+    has_agent_markers: bool
+
+
+def split_agent_transcript(content: str) -> AgentTurnView:
+    """Split Mai stdout into a clean report plus the executed commands.
+
+    The report is Mai's own closing section (``### Agent report`` or the
+    ``## **SUMMARY**`` closeout); without either marker the full text is
+    the report. Commands come from Mai's ``command_execution`` activity
+    lines, collapsed to the last status seen per command. Anything
+    unrecognized stays in the full transcript, never dropped.
+    """
+    text = content or ""
+    report = text
+    marker_seen = False
+    for marker in REPORT_MARKERS:
+        index = text.find(marker)
+        if index != -1:
+            report = text[index:].strip()
+            marker_seen = True
+            break
+    seen: dict[str, str] = {}
+    activity_seen = marker_seen
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not activity_seen and stripped.startswith(_ACTIVITY_PREFIXES):
+            activity_seen = True
+        match = _COMMAND_RE.search(line)
+        if match is None:
+            continue
+        command = _clean_command(match.group("rest"))
+        if not command:
+            continue
+        seen[command] = match.group("status")
+    commands = tuple({"command": command, "status": status} for command, status in seen.items())
+    return AgentTurnView(
+        report=report.strip(),
+        commands=commands,
+        has_agent_markers=activity_seen or bool(commands),
+    )
 
 
 @dataclass(slots=True, frozen=True)

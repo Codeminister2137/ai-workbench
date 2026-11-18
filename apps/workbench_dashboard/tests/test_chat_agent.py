@@ -14,6 +14,7 @@ from chat_agent import (
     apply_staged,
     build_chat_prompt,
     ensure_chat_worktree,
+    split_agent_transcript,
 )
 from dashboard_chat import DashboardChat
 from dashboard_config import DashboardConfig, load_config
@@ -63,7 +64,13 @@ def test_agent_turn_binds_session_and_lists_staged(chat, stores, git_repo) -> No
     (worktree.path / "app.py").write_text("v2", encoding="utf-8")
 
     def fake_execute(run: dict) -> dict:
-        assert "user request" in run["instruction"]
+        # build_mai_argv renders Task from "body": an "instruction"-only
+        # run used to deliver an empty task to Mai (2026-11-18).
+        assert "user request" in run["body"]
+        from mai_run import build_mai_argv
+
+        prompt = build_mai_argv(run, repo_root=git_repo, user_config="u")[0]
+        assert "Task:\n" in prompt and "user request" in prompt.split("Task:\n", 1)[1]
         return {"status": "completed", "stdout_tail": "Done.", "mai_session_id": "mai-1"}
 
     outcome = chat.send(
@@ -313,3 +320,73 @@ def test_progress_api_existing_worktree(tmp_path, monkeypatch):
     stores.set_chat_mode("s", mode="ask")
     handler._send_chat_progress(config, "s", "m")
     assert responses[-1] == {"ok": True, "lines": [], "staged": []}
+
+
+AGENT_TRANSCRIPT = """\
+coding_session_id: abc123
+=== Repo Coding Assistant ===
+mode: implement
+external_agent_activity: thread.started
+external_agent_activity: turn.started
+external_agent_activity: command_execution in_progress - command: "git status"
+external_agent_activity: command_execution completed - command: "git status"
+external_agent_activity item.completed: The task text is empty. I will check state.
+=== External agent diagnostics ===
+external_agent_returncode: 0
+
+### Agent report
+Branch is clean. What should this run implement?
+"""
+
+
+def test_splitter_extracts_report_and_collapses_commands() -> None:
+    view = split_agent_transcript(AGENT_TRANSCRIPT)
+    assert view.has_agent_markers is True
+    assert view.report == "### Agent report\nBranch is clean. What should this run implement?"
+    assert view.commands == ({"command": "git status", "status": "completed"},)
+
+
+def test_splitter_falls_back_without_markers() -> None:
+    view = split_agent_transcript("Just a plain answer.")
+    assert view.has_agent_markers is False
+    assert view.report == "Just a plain answer."
+    assert view.commands == ()
+
+
+def test_splitter_accepts_summary_closeout_and_keeps_raw_commands() -> None:
+    text = (
+        "external_agent_activity: turn.started\n"
+        "external_agent_activity: command_execution completed - command: not-json\n"
+        "## **SUMMARY**\n- Changed: x\n"
+    )
+    view = split_agent_transcript(text)
+    assert view.has_agent_markers is True
+    assert view.report == "## **SUMMARY**\n- Changed: x"
+    assert view.commands == ({"command": "not-json", "status": "completed"},)
+
+
+def test_splitter_keeps_args_outside_quoted_exe() -> None:
+    text = (
+        "external_agent_activity: command_execution completed - command: "
+        "\"C:\\\\Windows\\\\powershell.exe\" -Command 'git status --short'\n"
+    )
+    view = split_agent_transcript(text)
+    assert view.commands == (
+        {
+            "command": "C:\\Windows\\powershell.exe -Command 'git status --short'",
+            "status": "completed",
+        },
+    )
+
+
+def test_splitter_keeps_last_status_per_command() -> None:
+    text = (
+        'external_agent_activity: command_execution in_progress - command: "a"\n'
+        'external_agent_activity: command_execution completed - command: "b"\n'
+        'external_agent_activity: command_execution failed - command: "a"\n'
+    )
+    view = split_agent_transcript(text)
+    assert view.commands == (
+        {"command": "a", "status": "failed"},
+        {"command": "b", "status": "completed"},
+    )

@@ -352,7 +352,10 @@ class DashboardChat:
         receipt = execute(
             {
                 "id": f"chat-{request.message_id}",
-                "instruction": build_chat_prompt(request.history, request.text),
+                "title": f"Chat turn {session_id}",
+                # build_mai_argv renders Task from "body"; "instruction" is
+                # silently dropped, which used to deliver empty tasks to Mai.
+                "body": build_chat_prompt(request.history, request.text),
             }
         )
         if receipt.get("status") != "completed":

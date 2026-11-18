@@ -17,6 +17,9 @@ nav a.active { font-weight: bold; text-decoration: underline; }
 .toast.err { border-color: var(--wb-color-red); }
 .msg { border-top: var(--wb-border-thin); padding: var(--wb-pad-msg); white-space: pre-wrap; }
 .msg .role { font-weight: bold; }
+.agent-cmds { font-family: monospace; }
+.agent-cmds li { overflow-wrap: anywhere; }
+.activity-feed { white-space: pre-wrap; }
 .inbox-body { white-space: pre-wrap; }
 form.inline { display: flex; gap: var(--wb-gap-flex); margin-top: var(--wb-space-3); }
 input[type="text"], textarea { flex: 1; font: inherit; }
