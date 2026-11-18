@@ -88,7 +88,7 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/plans/interactive-mai-plan.md | PENDING | Draft 2026-11-14; owner decision on approval model open. |
 | docs/plans/l3-eval-ladder-design.md | ACTED | Ladder shipped (route_eval.py + l3_ladder.py). |
 | docs/plans/local-model-queue.md | ACTED | Q1-Q4 all consumed into quality-policy v1. |
-| docs/plans/mai-supervision-design.md | PENDING | Draft 2026-11-12; owner decision on placement/authority/paging open. |
+| docs/plans/mai-supervision-design.md | PENDING | Placement/authority/paging accepted in ADR-090 (2026-11-18); broader fallback draft remains future work. |
 | docs/plans/p4-agent-ux-research.md | KNOWLEDGE | P4 loop-UX research 2026-11-12 (R1-R5 queued, no implementation). |
 | docs/plans/local-model-pilot-20261112.md | KNOWLEDGE | Local model micro-pilot + tool eval + ask-bloat findings 2026-11-12. |
 | docs/plans/mai-dashboard-wiring-plan.md | PENDING | Blocked: awaits owner verdict-A. |
