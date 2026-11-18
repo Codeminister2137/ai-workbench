@@ -10,13 +10,13 @@ billing_source = "local_free"
 cost_policy_tier = "local_only"
 quality = "standard"
 latency = "interactive"
-notes = "Local coding model installed in Ollama. Latency is measured locally; quality is not yet evaluated."
+notes = "Local coding model installed in Ollama. Latency is measured locally; quality is not yet evaluated. Capabilities measured 2026-11-18 (capability_eval)."
 
 [models.capabilities]
 chat = true
 streaming = true
 tools = false
-structured_output = false
+structured_output = true
 multimodal_input = false
 embeddings = false
 
@@ -42,13 +42,13 @@ billing_source = "local_free"
 cost_policy_tier = "local_only"
 quality = "standard"
 latency = "interactive"
-notes = "Local Ollama model. Latency is measured locally; quality is not yet evaluated. Runtime budget 65536 covers implement-mode overhead; num_ctx is requested per call."
+notes = "Local Ollama model. Latency is measured locally; quality is not yet evaluated. Runtime budget 65536 covers implement-mode overhead; num_ctx is requested per call. Capabilities measured 2026-11-18 (capability_eval)."
 
 [models.capabilities]
 chat = true
 streaming = true
 tools = true
-structured_output = false
+structured_output = true
 multimodal_input = false
 embeddings = false
 
@@ -77,13 +77,13 @@ billing_source = "local_free"
 cost_policy_tier = "local_only"
 quality = "standard"
 latency = "interactive"
-notes = "Local coding model installed in Ollama. Latency is measured locally; quality is not yet evaluated."
+notes = "Local coding model installed in Ollama. Latency is measured locally; quality is not yet evaluated. Capabilities measured 2026-11-18 (capability_eval)."
 
 [models.capabilities]
 chat = true
 streaming = true
 tools = false
-structured_output = false
+structured_output = true
 multimodal_input = false
 embeddings = false
 
@@ -109,13 +109,13 @@ billing_source = "local_free"
 cost_policy_tier = "local_only"
 quality = "standard"
 latency = "interactive"
-notes = "Local Ollama model. Latency is measured locally; quality is not yet evaluated."
+notes = "Local Ollama model. Latency is measured locally; quality is not yet evaluated. Capabilities measured 2026-11-18 (capability_eval)."
 
 [models.capabilities]
 chat = true
 streaming = true
 tools = true
-structured_output = false
+structured_output = true
 multimodal_input = false
 embeddings = false
 
