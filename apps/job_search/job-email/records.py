@@ -10,10 +10,11 @@ access and requires no third-party dependencies.
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
-from models import ApplicationPackage, ApplicationStatus, SendReceipt
+from models import ApplicationPackage, ApplicationStatus, SendReceipt, utc_now_iso
 
 DEFAULT_RECORDS_FILE = "application_records.jsonl"
 """Default local ledger name, resolved like the sent-file against the working directory."""
@@ -46,6 +47,9 @@ def application_record_to_dict(package: ApplicationPackage) -> dict[str, Any]:
         "approval_notes": package.approval_notes,
         "approved_materials_sha256": package.approved_materials_sha256,
         "send_receipt": receipt,
+        "outcome_by": package.outcome_by,
+        "outcome_notes": package.outcome_notes,
+        "outcome_at_utc": package.outcome_at_utc,
     }
 
 
@@ -74,7 +78,25 @@ def application_record_from_dict(data: dict[str, Any]) -> ApplicationPackage:
         approval_notes=_optional_str(data, "approval_notes"),
         approved_materials_sha256=_optional_str(data, "approved_materials_sha256"),
         send_receipt=_parse_receipt(receipt_data),
+        outcome_by=_optional_str(data, "outcome_by"),
+        outcome_notes=_optional_str(data, "outcome_notes"),
+        outcome_at_utc=_optional_str(data, "outcome_at_utc"),
     )
+
+
+OUTCOME_TRANSITIONS: dict[ApplicationStatus, frozenset[ApplicationStatus]] = {
+    ApplicationStatus.SENT: frozenset({ApplicationStatus.RESPONDED, ApplicationStatus.REJECTED}),
+    ApplicationStatus.RESPONDED: frozenset(
+        {ApplicationStatus.INTERVIEW, ApplicationStatus.REJECTED}
+    ),
+    ApplicationStatus.INTERVIEW: frozenset({ApplicationStatus.OFFER, ApplicationStatus.REJECTED}),
+    ApplicationStatus.OFFER: frozenset(),
+    ApplicationStatus.REJECTED: frozenset(),
+}
+"""Legal outcome moves; anything else (incl. pre-send states) is rejected."""
+
+MIN_REPORT_SAMPLE = 5
+"""Fewer sent applications than this: counts only, no rates."""
 
 
 def append_application_record(path: str | Path, package: ApplicationPackage) -> None:
@@ -152,3 +174,63 @@ def _parse_receipt(data: Any) -> SendReceipt | None:
         error_message=_optional_str(data, "error_message"),
         transport_name=_require_str(data, "transport_name"),
     )
+
+
+def record_outcome(
+    path: str | Path,
+    application_id: str,
+    status: ApplicationStatus,
+    *,
+    by: str | None = None,
+    notes: str | None = None,
+) -> ApplicationPackage:
+    """Append an outcome transition for one application (M4).
+
+    Only forward moves from sent-or-later states are legal; anything
+    else raises ValueError and writes nothing. Returns the new record.
+    """
+    latest: dict[str, ApplicationPackage] = {}
+    for package in read_application_records(path):
+        latest[package.application_id] = package
+    current = latest.get(application_id)
+    if current is None:
+        raise ValueError(f"unknown application: {application_id!r}")
+    if status not in OUTCOME_TRANSITIONS.get(current.status, frozenset()):
+        raise ValueError(f"illegal outcome move: {current.status.value} -> {status.value}")
+    updated = replace(
+        current, status=status, outcome_by=by, outcome_notes=notes, outcome_at_utc=utc_now_iso()
+    )
+    append_application_record(path, updated)
+    return updated
+
+
+def outcomes_report(packages: list[ApplicationPackage]) -> dict[str, Any]:
+    """Descriptive outcome counts; rates only with a sufficient sample.
+
+    Deduplicates by application id (latest wins). Below MIN_REPORT_SAMPLE
+    sent applications the report carries counts and an insufficient-data
+    flag instead of rates — no statistics on tiny samples.
+    """
+    latest: dict[str, ApplicationPackage] = {}
+    for package in packages:
+        latest[package.application_id] = package
+    by_status: dict[str, int] = {}
+    by_variant: dict[str, int] = {}
+    for package in latest.values():
+        by_status[package.status.value] = by_status.get(package.status.value, 0) + 1
+        by_variant[package.cv_variant_id] = by_variant.get(package.cv_variant_id, 0) + 1
+    responded = sum(by_status.get(status, 0) for status in ("responded", "interview", "offer"))
+    sent_total = sum(
+        by_status.get(status, 0)
+        for status in ("sent", "responded", "interview", "offer", "rejected")
+    )
+    report: dict[str, Any] = {
+        "applications": len(latest),
+        "by_status": by_status,
+        "by_variant": by_variant,
+        "response_rate": None,
+        "insufficient_data": sent_total < MIN_REPORT_SAMPLE,
+    }
+    if sent_total >= MIN_REPORT_SAMPLE:
+        report["response_rate"] = round(responded / sent_total, 3)
+    return report

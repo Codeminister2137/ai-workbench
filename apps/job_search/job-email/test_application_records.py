@@ -265,3 +265,42 @@ def test_extra_fields_are_ignored_for_forward_compatibility(
     record = application_record_to_dict(package)
     record["future_field"] = {"nested": [1, 2, 3]}
     assert application_record_from_dict(record) == package
+
+
+def test_outcome_moves_forward_only(
+    synthetic_profile: CandidateProfile, synthetic_vacancy: JobVacancy, tmp_path
+) -> None:
+    from records import record_outcome
+
+    ledger = tmp_path / "ledger.jsonl"
+    package = prepare_application(synthetic_profile, synthetic_vacancy)
+    append_application_record(ledger, replace(package, status=ApplicationStatus.SENT))
+    with pytest.raises(ValueError, match="illegal outcome move"):
+        record_outcome(ledger, package.application_id, ApplicationStatus.OFFER)
+    moved = record_outcome(ledger, package.application_id, ApplicationStatus.RESPONDED, by="owner")
+    assert moved.status is ApplicationStatus.RESPONDED
+    assert moved.outcome_by == "owner"
+    assert moved.outcome_at_utc
+    with pytest.raises(ValueError, match="unknown application"):
+        record_outcome(ledger, "nope", ApplicationStatus.REJECTED)
+
+
+def test_outcomes_report_guards_tiny_samples(
+    synthetic_profile: CandidateProfile, synthetic_vacancy: JobVacancy
+) -> None:
+    from records import outcomes_report
+
+    package = prepare_application(synthetic_profile, synthetic_vacancy)
+    sent = replace(package, status=ApplicationStatus.SENT)
+    responded = replace(package, application_id="b", status=ApplicationStatus.RESPONDED)
+    small = outcomes_report([sent, responded])
+    assert small["insufficient_data"] is True
+    assert small["response_rate"] is None
+    assert small["by_status"] == {"sent": 1, "responded": 1}
+    cohort = [
+        replace(package, application_id=f"a{i}", status=ApplicationStatus.SENT) for i in range(4)
+    ]
+    cohort.append(responded)
+    full = outcomes_report(cohort)
+    assert full["insufficient_data"] is False
+    assert full["response_rate"] == 0.2

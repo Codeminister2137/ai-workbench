@@ -41,6 +41,10 @@ class ApplicationStatus(StrEnum):
     SENT = "sent"
     FAILED = "failed"
     SKIPPED = "skipped"
+    RESPONDED = "responded"
+    INTERVIEW = "interview"
+    OFFER = "offer"
+    REJECTED = "rejected"
 
 
 def utc_now_iso() -> str:
@@ -174,6 +178,9 @@ class ApplicationPackage:
     approval_notes: str | None = None
     send_receipt: SendReceipt | None = None
     approved_materials_sha256: str | None = None
+    outcome_by: str | None = None
+    outcome_notes: str | None = None
+    outcome_at_utc: str | None = None
 
     def materials_digest(self, attachment: bytes) -> str:
         """Bind review to recipient, message, attachment identity and exact bytes."""
