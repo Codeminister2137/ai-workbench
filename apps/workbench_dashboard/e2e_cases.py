@@ -119,7 +119,8 @@ ROUTE_UI: tuple[tuple[str, str, str], ...] = (
 
 # Routes with no UI surface by design (machine-consumed); they get
 # agent-runnable API probe steps instead of tab steps or pointers.
-KNOWN_UNMAPPED: tuple[str, ...] = ("/api/settings",)
+# /api/orchestrator/routes is API-only until a dashboard surface lands.
+KNOWN_UNMAPPED: tuple[str, ...] = ("/api/settings", "/api/orchestrator/routes")
 
 # Code symbol -> exact control check. When diff evidence names a
 # registered symbol, the generator emits this precise step INSTEAD OF
