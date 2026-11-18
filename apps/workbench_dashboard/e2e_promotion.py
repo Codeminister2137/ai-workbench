@@ -27,6 +27,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from dashboard_stores import WORKBENCH_PROJECT_ID
+
 WARNING_TEMPLATE = "passed on {commit}, code untouched since — not re-tested"
 
 # Path prefix -> (area id, user-visible behavior, goal doc, regression neighbors).
@@ -760,6 +762,8 @@ def queue_pointer_run(stores, merge: str, task_id: str, unclear: list[dict]) -> 
     """Queue a preapproved agent run to author pointers (human escalation last)."""
     run_id = uuid.uuid4().hex
     now = datetime.now(UTC).isoformat()
+    task = stores.e2e_tasks.get(task_id) or {}
+    project_id = task.get("project_id") or WORKBENCH_PROJECT_ID
     run = {
         "id": run_id,
         "title": f"E2E pointers: {merge}",
@@ -770,7 +774,7 @@ def queue_pointer_run(stores, merge: str, task_id: str, unclear: list[dict]) -> 
         "fanout_effective": "restricted",
         "approval_mode": "e2e-followup",
         "inbox_id": None,
-        "project_id": None,
+        "project_id": project_id,
         "plan_id": None,
         "created_at_utc": now,
         "updated_at_utc": now,

@@ -26,6 +26,8 @@ BACKLOG_SOURCES = ("owner", "agent")
 BACKLOG_STATUSES = ("proposed", "ready", "doing", "blocked", "done", "dropped")
 BACKLOG_OPEN = ("proposed", "ready", "doing", "blocked")
 WORKFLOW_STATUSES = ("active", "archived")
+WORKBENCH_PROJECT_ID = "workbench"
+RELATED_LIMIT = 1000
 
 
 class StoreError(ValueError):
@@ -180,6 +182,68 @@ class DashboardStores:
         """Human attention items: the badge mirrors the default filter."""
         return len(self.attention_inbox_items())
 
+    @staticmethod
+    def _project_of(record: dict) -> str:
+        """Owning project; records predating relations belong to workbench."""
+        value = record.get("project_id")
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+        return WORKBENCH_PROJECT_ID
+
+    def related(self, project_id: str) -> dict[str, list[dict]]:
+        """Cross-tab links for one project (plans, inbox, runs, E2E tasks).
+
+        Full-collection scans: volumes are tiny and single-user, so no
+        index pays for itself. Slim dicts (id/title/status) keep the
+        project view fast.
+        """
+        want = (project_id or "").strip() or WORKBENCH_PROJECT_ID
+        linked: dict[str, list[dict]] = {"plans": [], "inbox": [], "runs": [], "e2e_tasks": []}
+        for key, collection in (
+            ("plans", self.plans),
+            ("inbox", self.inbox),
+            ("runs", self.runs),
+            ("e2e_tasks", self.e2e_tasks),
+        ):
+            items, _total = collection.list(limit=RELATED_LIMIT)
+            for item in items:
+                if not isinstance(item, dict) or self._project_of(item) != want:
+                    continue
+                linked[key].append(
+                    {
+                        "id": item.get("id"),
+                        "title": item.get("title") or item.get("name") or item.get("id"),
+                        "status": item.get("status"),
+                    }
+                )
+        return linked
+
+    def backfill_project_ids(self, default: str = WORKBENCH_PROJECT_ID) -> dict[str, int]:
+        """Stamp records missing project_id; returns per-collection counts."""
+        filled: dict[str, int] = {}
+        for key, collection in (
+            ("plans", self.plans),
+            ("inbox", self.inbox),
+            ("runs", self.runs),
+            ("e2e_tasks", self.e2e_tasks),
+        ):
+            count = 0
+            items, _total = collection.list(limit=RELATED_LIMIT)
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                value = item.get("project_id")
+                if isinstance(value, str) and value.strip():
+                    continue
+                item_id = item.get("id")
+                if not isinstance(item_id, str) or not item_id.strip():
+                    continue
+                item["project_id"] = default
+                collection.put(item_id, item)
+                count += 1
+            filled[key] = count
+        return filled
+
     def create_inbox_task(
         self,
         *,
@@ -193,6 +257,7 @@ class DashboardStores:
         metadata: dict | None = None,
         created_by: str = "supervisor",
         assignee: str = "owner",
+        project_id: str = WORKBENCH_PROJECT_ID,
     ) -> dict:
         """Create one inbox task; tasks default to a single Done choice.
 
@@ -225,6 +290,7 @@ class DashboardStores:
             "status": "open",
             "created_by": created_by,
             "assignee": assignee,
+            "project_id": project_id,
             "created_at": now,
             "answered_at": None,
             "answer": None,
@@ -697,6 +763,7 @@ class DashboardStores:
         created_by: str = "supervisor",
         range_base: str | None = None,
         draft: bool = False,
+        project_id: str = WORKBENCH_PROJECT_ID,
     ) -> dict:
         """File one E2E task for a merge; one open task per merge commit.
 
@@ -734,6 +801,7 @@ class DashboardStores:
             "items": items,
             "status": "draft" if draft else "open",
             "created_by": created_by,
+            "project_id": project_id,
             "created_at": now,
             "submitted_at": None,
             "report_id": None,

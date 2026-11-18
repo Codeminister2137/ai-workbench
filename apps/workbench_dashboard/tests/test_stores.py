@@ -1,7 +1,12 @@
 from __future__ import annotations
 
 import pytest
-from dashboard_stores import DashboardStores, StoreError, effective_fanout_policy
+from dashboard_stores import (
+    WORKBENCH_PROJECT_ID,
+    DashboardStores,
+    StoreError,
+    effective_fanout_policy,
+)
 
 
 @pytest.fixture
@@ -540,3 +545,53 @@ def test_queue_pointer_run_prefiled_and_runnable(stores) -> None:
     assert run["metadata"]["kind"] == "e2e-pointers"
     assert run["metadata"]["task_id"] == task["id"]
     assert "STEPS:" in run["body"] and "DECLINE:" in run["body"]
+
+
+def test_related_links_cross_tab_records(stores) -> None:
+    inbox_item = stores.create_inbox_task(
+        title="Q?", body="b", task_type="task", assignee="agent", project_id="job-search"
+    )
+    stores.create_inbox_task(title="other", body="b", task_type="task", assignee="agent")
+    stores.runs.put(
+        "r1", {"id": "r1", "title": "t", "status": "queued", "project_id": "job-search"}
+    )
+    stores.runs.put("r2", {"id": "r2", "title": "t", "status": "queued"})
+    items = [{"id": "a", "behavior": "b", "kind": "behavior", "area": "dashboard"}]
+    stores.create_e2e_task(merge_commit="aaa", title="e2e", items=items, project_id="job-search")
+    linked = stores.related("job-search")
+    assert [i["id"] for i in linked["inbox"]] == [inbox_item["id"]]
+    assert [i["id"] for i in linked["runs"]] == ["r1"]
+    assert len(linked["e2e_tasks"]) == 1
+    assert linked["plans"] == []
+    bench = stores.related(WORKBENCH_PROJECT_ID)
+    assert any(i["id"] == "r2" for i in bench["runs"])  # missing id, treated as workbench
+
+
+def test_backfill_stamps_missing_project_ids(stores) -> None:
+    stores.runs.put("r1", {"id": "r1", "title": "t", "status": "queued"})
+    stores.runs.put("r2", {"id": "r2", "title": "t", "status": "queued", "project_id": "x"})
+    stores.inbox.put("i1", {"id": "i1", "title": "t", "status": "open", "project_id": None})
+    filled = stores.backfill_project_ids()
+    assert filled == {"plans": 0, "inbox": 1, "runs": 1, "e2e_tasks": 0}
+    assert stores.runs.get("r1")["project_id"] == WORKBENCH_PROJECT_ID
+    assert stores.runs.get("r2")["project_id"] == "x"
+    assert stores.inbox.get("i1")["project_id"] == WORKBENCH_PROJECT_ID
+
+
+def test_creators_default_to_workbench_project(stores) -> None:
+    item = stores.create_inbox_task(title="Q?", body="b", task_type="task", assignee="agent")
+    assert item["project_id"] == WORKBENCH_PROJECT_ID
+    items = [{"id": "a", "behavior": "b", "kind": "behavior", "area": "dashboard"}]
+    task = stores.create_e2e_task(merge_commit="aaa", title="e2e", items=items)
+    assert task["project_id"] == WORKBENCH_PROJECT_ID
+
+
+def test_pointer_run_inherits_task_project(stores) -> None:
+    from e2e_promotion import queue_pointer_run
+
+    items = [{"id": "a", "behavior": "b", "kind": "behavior", "area": "dashboard"}]
+    task = stores.create_e2e_task(
+        merge_commit="aaa", title="e2e", items=items, project_id="dashboard"
+    )
+    run = queue_pointer_run(stores, "aaa", task["id"], [{"id": "a"}])
+    assert run["project_id"] == "dashboard"

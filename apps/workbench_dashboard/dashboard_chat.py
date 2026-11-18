@@ -30,7 +30,7 @@ from ai_provider.errors import ProviderError
 from ai_provider.factory import create_chat_client
 from ai_provider.translation import Translator, normalize_input
 from dashboard_config import DashboardConfig
-from dashboard_stores import DashboardStores
+from dashboard_stores import WORKBENCH_PROJECT_ID, DashboardStores
 
 SUPERVISOR_SYSTEM_PROMPT = SUPERVISOR_CORE_INSTRUCTIONS
 
@@ -416,7 +416,12 @@ class DashboardChat:
         )
 
     def draft_plan(
-        self, session_id: str, *, stores: DashboardStores, title: str | None = None
+        self,
+        session_id: str,
+        *,
+        stores: DashboardStores,
+        title: str | None = None,
+        project: str | None = None,
     ) -> dict:
         """Draft a proposed plan deterministically from a chat transcript.
 
@@ -459,6 +464,7 @@ class DashboardChat:
             "title": plan_title[:200],
             "status": "proposed",
             "body": body,
+            "project_id": project or WORKBENCH_PROJECT_ID,
             "source": f"chat:{session_id}",
             "updated_at_utc": datetime.now(UTC).isoformat(),
         }

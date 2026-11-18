@@ -70,7 +70,12 @@ from dashboard_projects import (
     list_projects,
     set_project_manuscript,
 )
-from dashboard_stores import DashboardStores, StoreError, effective_fanout_policy
+from dashboard_stores import (
+    WORKBENCH_PROJECT_ID,
+    DashboardStores,
+    StoreError,
+    effective_fanout_policy,
+)
 from document_library import DocumentLibrary
 from drain_scheduler import DrainScheduler
 from nl_tasks import ORDER_OPTIONS, SCHEDULE_ANSWER, propose_task, scheduled_run_record
@@ -2112,6 +2117,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         except ValueError as exc:
             print(f"Workbench dashboard: skip NL scheduling: {exc}")
             return None
+        run["project_id"] = record.get("project_id") or WORKBENCH_PROJECT_ID
         stores = self._stores()
         try:
             if stores.runs.get(run["id"]) is not None:
@@ -2700,7 +2706,9 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             return self._send_json({"ok": False, "error": str(exc)}, status=500)
         if project is None:
             return self._send_json({"ok": False, "error": "Not found"}, status=404)
-        self._send_json({"ok": True, "project": project})
+        self._send_json(
+            {"ok": True, "project": project, "related": self._stores().related(project_id)}
+        )
 
     def _create_project(self, payload: dict) -> None:
         name = payload.get("name")

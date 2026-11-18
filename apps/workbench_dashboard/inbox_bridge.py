@@ -19,6 +19,8 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
+from dashboard_stores import WORKBENCH_PROJECT_ID
+
 MAX_BRIDGE_PER_CALL = 10
 
 
@@ -110,6 +112,7 @@ def bridge_agent_queue(stores, *, fanout_policy: str = "restricted") -> list[dic
                 "inbox_id": None,
                 "approval_mode": approval_mode,
                 "bridged_from": item["id"],
+                "project_id": item.get("project_id") or WORKBENCH_PROJECT_ID,
                 "fanout_policy": fanout_policy,
                 "fanout_effective": fanout_policy,
                 "created_at_utc": now,

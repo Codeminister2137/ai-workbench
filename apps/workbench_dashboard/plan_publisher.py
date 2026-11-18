@@ -11,7 +11,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from pathlib import Path
 
-from dashboard_stores import DashboardStores, StoreError
+from dashboard_stores import WORKBENCH_PROJECT_ID, DashboardStores, StoreError
 
 
 def _utc_now() -> str:
@@ -25,6 +25,7 @@ def sync_plan(
     title: str,
     source_file: Path,
     status: str,
+    project_id: str = WORKBENCH_PROJECT_ID,
 ) -> dict:
     """Store one markdown plan file as a dashboard plan (upsert by id)."""
     try:
@@ -36,6 +37,7 @@ def sync_plan(
         "title": title,
         "status": status,
         "body": body,
+        "project_id": project_id,
         "source": str(source_file),
         "updated_at_utc": _utc_now(),
     }
@@ -54,12 +56,14 @@ def sync_run(
     commit: str | None = None,
     validation: str | None = None,
     report: str | None = None,
+    project_id: str = WORKBENCH_PROJECT_ID,
 ) -> dict:
     """Store one work-slice run record (upsert by id)."""
     record = {
         "id": run_id,
         "title": title,
         "status": status,
+        "project_id": project_id,
         "body": body,
         "branch": branch,
         "commit": commit,
