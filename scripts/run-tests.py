@@ -62,6 +62,7 @@ GROUPS = {
         "tests/test_turn_usage.py",
         "tests/test_source_info.py",
         "tests/test_go_source_info.py",
+        "tests/test_source_claims.py",
         "tests/test_opencode_go_adapter.py",
         "tests/test_opencode_go_protocol_adapters.py",
         "tests/test_opencode_go_route.py",
