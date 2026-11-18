@@ -132,6 +132,7 @@ class RunDrain:
         on_terminal: TerminalHook | None = None,
         worker_epoch: str | None = None,
         inbox_note: InboxNote | None = None,
+        output_evidence: Callable[[str], bool] | None = None,
     ) -> None:
         self._runs_dir = runs_dir
         self._get_inbox = get_inbox
@@ -140,6 +141,7 @@ class RunDrain:
         self._on_terminal = on_terminal
         self._worker_epoch = worker_epoch
         self._inbox_note = inbox_note
+        self._output_evidence = output_evidence
 
     def _notify_terminal(self, run: dict, status: str) -> None:
         if self._on_terminal is None:
@@ -244,6 +246,12 @@ class RunDrain:
         run stamped with the live epoch is left alone so reconcile can
         never double-execute a running worker. Without an epoch, every
         ``running`` run requeues (legacy boot behavior).
+
+        Interruption cap (owner decision 2026-11-18): a dead-worker run
+        interrupted twice with no output evidence (per the optional
+        ``output_evidence`` callback) is cancelled with a terminal note
+        instead of requeued forever. Without the callback every
+        interruption requeues, preserving the old behavior.
         """
         self._runs_dir.mkdir(parents=True, exist_ok=True)
         outcomes = []
@@ -287,6 +295,26 @@ class RunDrain:
                 "worker_epoch": run.get("worker_epoch"),
                 "reconciled_by_epoch": epoch,
             }
+            interruptions = int(run.get("interruptions", 0) or 0) + 1
+            run["interruptions"] = interruptions
+            if interruptions >= 5:
+                cancel_reason = "interrupted repeatedly"
+            elif interruptions >= 2 and not self._has_output(run_id, run):
+                cancel_reason = "no output evidence"
+            else:
+                cancel_reason = ""
+            if cancel_reason:
+                run["status"] = "cancelled"
+                run["error"] = (
+                    f"cancelled by supervisor: {cancel_reason}; "
+                    "see the run-progress log and events for what the worker left behind"
+                )
+                run["updated_at_utc"] = self._iso_now()
+                append_run_event(run, "run_cancelled", evidence)
+                self._write_json(path, run)
+                self._notify_terminal(run, "cancelled")
+                outcomes.append({"run_id": run_id, "action": "cancelled", "reason": cancel_reason})
+                continue
             run["status"] = "queued"
             run["note"] = "Interrupted run reconciled; will resume"
             run["updated_at_utc"] = self._iso_now()
@@ -294,6 +322,22 @@ class RunDrain:
             self._write_json(path, run)
             outcomes.append({"run_id": run_id, "action": "requeued"})
         return outcomes
+
+    def _has_output(self, run_id: str, run: dict) -> bool:
+        """True when a run left usable output (receipts or streamed lines)."""
+        receipts = run.get("receipts")
+        if isinstance(receipts, list) and any(
+            isinstance(entry, dict)
+            and (str(entry.get("stdout_tail") or "").strip() or entry.get("staged"))
+            for entry in receipts
+        ):
+            return True
+        if self._output_evidence is None:
+            return True
+        try:
+            return bool(self._output_evidence(run_id))
+        except Exception:  # noqa: BLE001 - evidence probe failure keeps the retry
+            return True
 
     def _run_claimed(self, path: Path) -> dict:
         run_id = path.stem

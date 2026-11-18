@@ -82,7 +82,9 @@ class UserConfig:
     context_budget_chars: int = DEFAULT_CONTEXT_BUDGET_CHARS
     context_file_budget_chars: int = DEFAULT_CONTEXT_FILE_BUDGET_CHARS
     instruction_budget_chars: int = DEFAULT_INSTRUCTION_BUDGET_CHARS
-    timeout_seconds: float = 180.0
+    # Owner decision 2026-11-18 (inbox a54efbcf): keep in lockstep with
+    # --timeout-seconds; apply_user_defaults stamps this over CLI parsing.
+    timeout_seconds: float = 600.0
     validation_timeout_seconds: float = 300.0
     max_repair_cycles: int = 3
     configured_defaults: frozenset[str] = frozenset()

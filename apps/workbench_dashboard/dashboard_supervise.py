@@ -720,8 +720,12 @@ def _maybe_mail_failure(config: SuperviseConfig, reason: str) -> bool:
 
 def _mail_failure(config: SuperviseConfig, reason: str) -> None:
     try:
+        from dashboard_config import load_config
         from owner_mail import load_smtp_config, send_owner_mail
 
+        # Owner decision 2026-11-18: mail only during unattended sessions.
+        if load_config(config.config_path).supervision != "unattended":
+            return
         mail_config = load_smtp_config(root=config.main_root)
         send_owner_mail(
             to=mail_config["owner"],
