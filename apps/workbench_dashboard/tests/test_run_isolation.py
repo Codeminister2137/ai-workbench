@@ -69,7 +69,7 @@ def test_missing_config_fails_closed_without_leftovers(tmp_path: Path) -> None:
 
 def test_same_run_reuses_scratch_worktree(tmp_path: Path) -> None:
     # Retries reuse their own scratch space (evidence preserved); only
-    # foreign shapes fail closed. See the two tests below.
+    # foreign directories fail closed. Branch moves adopt (next tests).
     repo = _repo(tmp_path)
     first = create_run_worktree(repo, "abc123")
     (first.path / "attempt1.txt").write_text("evidence\n", encoding="utf-8")
@@ -90,13 +90,20 @@ def test_foreign_dir_at_target_fails_closed(tmp_path: Path) -> None:
     assert (target / "junk.txt").exists()  # never touched
 
 
-def test_worktree_on_wrong_branch_fails_closed(tmp_path: Path) -> None:
+def test_retry_adopts_first_attempt_branch(tmp_path: Path) -> None:
+    # Same target means the same run (ids are uuid hex): a first attempt
+    # that moved onto a feature branch must resume, not trap the retry
+    # (2026-11-18: naming + readiness close-outs died this way).
     repo = _repo(tmp_path)
     target = repo / ".tmp" / "run-worktrees" / "abc123"
     target.parent.mkdir(parents=True, exist_ok=True)
-    _git(repo, "worktree", "add", "-b", "run/other", str(target), "develop")
-    with pytest.raises(IsolationError, match="already exists"):
-        create_run_worktree(repo, "abc123")
+    _git(repo, "worktree", "add", "-b", "docs/attempt-branch", str(target), "develop")
+    (target / "attempt1.txt").write_text("evidence\n", encoding="utf-8")
+    resumed = create_run_worktree(repo, "abc123")
+    assert resumed.branch == "docs/attempt-branch"
+    assert resumed.path == target
+    assert (target / "attempt1.txt").read_text(encoding="utf-8") == "evidence\n"
+    assert (target / "user-config.toml").read_text(encoding="utf-8") == "[x]\n"
 
 
 def test_executor_runs_isolated_with_receipt_links(tmp_path: Path) -> None:
