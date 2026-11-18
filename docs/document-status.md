@@ -73,6 +73,7 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/plans/cli-development-readiness-review.md | ACTED | Oct 20-21 CLI working notes, consumed. |
 | docs/plans/company-backlog-20261102.md | ACTED | R1/R2/R3/E/J all produced. |
 | docs/plans/company-name-r2-draft.md | KNOWLEDGE | PL legality orientation; name eval superseded by R3/R4. |
+| docs/plans/company-names-consolidated.md | ACTED | Naming answer delivered; item f05e3226 closed 2026-11-18. |
 | docs/plans/company-naming-r3.md | ACTED | Fed R4 (Bench verdict revised there). |
 | docs/plans/company-naming-r4.md | ACTED | Fed R5 (owner D2 answered there). |
 | docs/plans/company-naming-r5.md | ACTED | Owner verdict recorded in R6 (none good enough). |
