@@ -177,6 +177,7 @@ GROUPS = {
         "tests/test_allowance_healthcheck.py",
         "tests/test_window_watch_restore.py",
         "tests/test_seed_projects.py",
+        "tests/test_ai_agent_loop_health.py",
     ),
     "research": (
         "tests/test_research_*.py",
