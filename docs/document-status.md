@@ -71,7 +71,7 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/plans/backlog.md | ACTED | All items DONE (fan-out, merge). |
 | docs/plans/branch-consolidation-checklist.md | PENDING | DO NOT EXECUTE — owner review gate (Nov-9 prune was develop-local only). |
 | docs/plans/cli-development-readiness-review.md | ACTED | Oct 20-21 CLI working notes, consumed. |
-| docs/plans/company-backlog-20261102.md | ACTED | R1/R2/R3/E/J all produced. |
+| docs/plans/company-backlog-20261102.md | ACTED | Dropped 2026-11-18: R1/R2/R3 absorbed by starting-company-checklist.md. |
 | docs/plans/company-name-r2-draft.md | KNOWLEDGE | PL legality orientation; name eval superseded by R3/R4. |
 | docs/plans/company-names-consolidated.md | ACTED | Naming answer delivered; item f05e3226 closed 2026-11-18. |
 | docs/plans/company-naming-r3.md | ACTED | Fed R4 (Bench verdict revised there). |
@@ -104,10 +104,11 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/plans/p6-dashboard-scouting.md | ACTED | Dashboard built; scouting consumed. |
 | docs/plans/p7-capability-analysis.md | KNOWLEDGE | P7 working reference. |
 | docs/plans/p7-company-scouting.md | ACTED | Scouting consumed; residue in P7 deliberation. |
+| docs/plans/p7-deliberation-pack-20261118.md | PENDING | Owner deliberation brief; answers recorded on 52ccc91a. |
 | docs/plans/p7-discovery-checklist.md | KNOWLEDGE | On-site discovery tool v1. |
 | docs/plans/p7-grounding-20261109.md | KNOWLEDGE | Pricing/positioning ground truth §§1-9. |
 | docs/plans/p7-knowledge-bank.md | KNOWLEDGE | Chatbot can/cannot bank. |
-| docs/plans/p7-paperwork-checklist.md | PENDING | OPEN checklist; phases filed as backlog, owner/accountant steps pending. |
+| docs/plans/p7-paperwork-checklist.md | ACTED | Dropped 2026-11-18: phases absorbed by starting-company-checklist.md. |
 | docs/plans/p7-project-file-format-proposal.md | ACTED | Approved D9e-A; schema+validator shipped (029c874). |
 | docs/plans/p8-templates-scouting.md | KNOWLEDGE | Greenfield note, correctly ordered after P7. |
 | docs/plans/product-roadmap-20261031.md | KNOWLEDGE | P1-P9 direction; schedule section stale (hackathon windows passed). |
