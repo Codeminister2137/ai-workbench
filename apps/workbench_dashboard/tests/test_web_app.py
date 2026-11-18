@@ -1078,10 +1078,17 @@ def test_spend_adjust_rejects_over_balance(dashboard_server, tmp_path) -> None:
 
 def test_meeting_analysis_books_measured_usage(dashboard_server, tmp_path, monkeypatch) -> None:
     from datetime import datetime
-    from types import SimpleNamespace
 
     from ai_orchestrator.spend_ledger import SpendLedger
-    from ai_provider.contracts import UsageMetadata, UsageSource
+    from ai_provider.contracts import (
+        AIMessage,
+        AIResponse,
+        BackendInfo,
+        BackendLocation,
+        MessageRole,
+        UsageMetadata,
+        UsageSource,
+    )
     from ai_provider.turn_usage import observe_completion, observe_usage
     from dashboard_web_app import DashboardRequestHandler
     from meeting_notes import store_meeting
@@ -1105,8 +1112,12 @@ def test_meeting_analysis_books_measured_usage(dashboard_server, tmp_path, monke
                     source=UsageSource.PROVIDER_REPORTED, input_tokens=10, output_tokens=2
                 )
             )
-            return SimpleNamespace(
-                message=SimpleNamespace(content="- [ ] x"), usage=UsageMetadata()
+            return AIResponse(
+                message=AIMessage(role=MessageRole.ASSISTANT, content="- [ ] x"),
+                backend=BackendInfo(
+                    provider="r", model="m", location=BackendLocation.EXTERNAL
+                ),
+                usage=UsageMetadata(),
             )
 
     monkeypatch.setattr(

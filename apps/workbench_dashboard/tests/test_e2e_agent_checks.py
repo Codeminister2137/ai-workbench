@@ -81,7 +81,7 @@ def test_http_get_probe_checks_status_and_shape() -> None:
             self.end_headers()
             self.wfile.write(body)
 
-        def log_message(self, *args):  # noqa: ANN002, ANN003 - stdlib shape
+        def log_message(self, format: str, *args: object) -> None:  # noqa: A002 - stdlib shape
             pass
 
     server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
