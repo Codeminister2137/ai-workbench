@@ -95,7 +95,8 @@ class LocalAgent:
                 MessageRole.USER,
                 "As chair, synthesize the council positions below. Reply in "
                 "exactly this shape (headers verbatim, one bullet per line, "
-                "disagreements named as 'Name: point'):\n"
+                "disagreements named as 'Name: point'). Keep every bullet "
+                "under 20 words and the whole reply under 150 words:\n"
                 "AGREED:\n- <agreed point>\n"
                 "DISAGREEMENTS:\n- <Name[, Name]: point>\n"
                 "NEXT:\n- <what the asker should do next>\n"

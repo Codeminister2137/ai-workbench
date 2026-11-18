@@ -118,6 +118,7 @@ def prepare_application(
     message_variant_id: str | None = None,
     explicit_claims: Sequence[str] = (),
     strict_evidence: bool = True,
+    match_report=None,
 ) -> ApplicationPackage:
     """Prepare a verified application package for a vacancy.
 
@@ -127,7 +128,9 @@ def prepare_application(
     variant raises ValueError rather than selecting another document. Message
     variants follow the same rule: an explicitly requested unknown message
     variant raises ValueError, while an omitted selection renders the first
-    registered variant or the built-in default message.
+    registered variant or the built-in default message. When a match report
+    suggests a CV variant and none was requested, the suggestion wins over
+    the first-variant default.
     """
     if explicit_claims:
         verification = verify_application_claims(explicit_claims, profile, strict=strict_evidence)
@@ -146,6 +149,10 @@ def prepare_application(
         variant = profile.cv_variants[cv_variant_id]
         cv_attachment = variant.file_path
         variant_key = cv_variant_id
+    elif match_report is not None and match_report.suggested_cv_variant in profile.cv_variants:
+        variant = profile.cv_variants[match_report.suggested_cv_variant]
+        cv_attachment = variant.file_path
+        variant_key = variant.variant_id
     elif profile.cv_variants:
         # Default to the first available variant
         first_variant = next(iter(profile.cv_variants.values()))
