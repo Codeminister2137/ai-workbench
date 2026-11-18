@@ -113,13 +113,15 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/plans/repo-assistant-cli-parity-plan.md | ACTED | Consumed into CLI/ADRs (one narrow Oct-19 PENDING likely moot). |
 | docs/plans/research-review-orchestration-plan.md | KNOWLEDGE | Retained findings index for reanalysis. |
 | docs/plans/repo-gap-assessment-20261117.md | KNOWLEDGE | Research sweep 2026-11-17 (state+gaps+phases); partly executed since. |
+| docs/plans/push-transfer-investigation-20261118.md | KNOWLEDGE | Idle-SSH + red-hook-bypass root causes; keepalive applied, verified. |
 | docs/plans/research-token-count-prototype.md | ACTED | Oct-4 checkpoint consumed. |
 | docs/plans/search-tooling-landscape-note-20261022.md | KNOWLEDGE | Captured for search-path revisit. |
 | docs/plans/shared-agent-capabilities-options.md | ACTED | Oct-4 checkpoint consumed. |
 | docs/plans/weekly-digest-design.md | ACTED | Digest 2.0 shipped (loop10). |
-| docs/plans/work-tabs-unification-20261117.md | PENDING | Executing 2026-11-18 (owner-approved). |
+| docs/plans/work-tabs-unification-20261117.md | ACTED | Shipped ce4959b 2026-11-18 (relations, attention, projects, roadmaps). |
 | docs/plans/workbench-remote-development-integration-20261027.md | ACTED | Decided 2026-10-27 (C now, B target, A rejected). |
 | docs/plans/workflow-builder-exploration.md | PENDING | Adoption proposal next, then owner decision. |
+| docs/projects/ | KNOWLEDGE | Product explainer files (7); per-file rows future scope. |
 | docs/plans/remote-ai-operator-2026/ | TRIAGE | Aggregate; per-file rows future scope. |
 | docs/api-reference/ | TRIAGE | Aggregate; per-file rows future scope. |
 | docs/artifacts/ | TRIAGE | Aggregate; per-file rows future scope. |
