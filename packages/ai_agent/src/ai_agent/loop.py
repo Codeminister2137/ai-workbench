@@ -613,6 +613,9 @@ class AgentLoop:
         # would poison the weakest-link source of every run.
         usage: UsageMetadata | None = None
         incomplete_states: Counter[tuple[tuple[str, ...], tuple[tuple[str, str], ...]]] = Counter()
+        toolless_streak = 0
+        last_batch_sig: tuple[tuple[str, str], ...] | None = None
+        repeat_batch_streak = 0
 
         for iteration in range(1, self.max_iterations + 1):
             self._check_deadline(messages)
@@ -689,6 +692,30 @@ class AgentLoop:
             messages.append(response.message)
             self._check_deadline(messages)
             tool_calls = response.tool_calls or response.message.tool_calls
+            if tool_calls:
+                toolless_streak = 0
+                batch_sig = tuple(
+                    sorted(
+                        (call.name, json.dumps(call.arguments, sort_keys=True, default=str))
+                        for call in tool_calls
+                    )
+                )
+                repeat_batch_streak = repeat_batch_streak + 1 if batch_sig == last_batch_sig else 1
+                last_batch_sig = batch_sig
+                if repeat_batch_streak == 3 and self.diagnostic:
+                    self.diagnostic(
+                        "repeat_tool_batch: n=3 identical consecutive tool batches; "
+                        "model may be stuck"
+                    )
+            else:
+                toolless_streak += 1
+                last_batch_sig = None
+                repeat_batch_streak = 0
+                if toolless_streak == 3 and self.diagnostic:
+                    self.diagnostic(
+                        "toolless_streak: n=3 iterations without tool calls; "
+                        "run may complete with no evidenced output"
+                    )
             if not tool_calls:
                 if (
                     self.completion_requirements

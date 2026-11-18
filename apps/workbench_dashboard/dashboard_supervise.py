@@ -794,11 +794,14 @@ def supervise_tick(config: SuperviseConfig, *, dry_run: bool = False, force: boo
         action, reason = decide(running_commit=running, origin_commit=origin)
         outcome.update(action=action, reason=reason, running=running, origin=origin)
         return outcome
-    with _TickLock(config.data_dir) as acquired:
-        if not acquired:
-            outcome.update(action="busy", reason="another supervisor tick holds the lock")
-            return outcome
-        return _supervised_tick(config, force=force, outcome=outcome)
+    for attempt in range(4):
+        with _TickLock(config.data_dir) as acquired:
+            if acquired:
+                return _supervised_tick(config, force=force, outcome=outcome)
+        if attempt < 3:
+            time.sleep(15)
+    outcome.update(action="busy", reason="another supervisor tick holds the lock after 3 retries")
+    return outcome
 
 
 def _supervised_tick(config: SuperviseConfig, *, force: bool, outcome: dict) -> dict:

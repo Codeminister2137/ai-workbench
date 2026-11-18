@@ -1,3 +1,14 @@
+## ADR-090 - Dashboard-native Mai supervision (2026-11-18)
+
+**Status:** Accepted by owner (inbox db16e0bd, accepted recommendation).
+
+The dashboard owns pause, run cancellation, and owner mail plus inbox
+escalation; Mai remains an execution engine. Sent receipts deduplicate repeat
+mail for the same run and terminal outcome. This keeps one authority in the
+existing dashboard, at the cost of requiring the supervised dashboard to run;
+Mai-side supervision would split authority, while scattered supervision leaves
+ownership gaps. See [ADR-090](decisions/ADR-090-dashboard-supervision-authority.md).
+
 ## JS coverage: c8 dropped, node render tests are the gate (decided) - 2026-11-18
 
 **Status:** Decided under the approved work-tabs follow-up plan (Step 3:

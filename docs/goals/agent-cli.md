@@ -30,7 +30,7 @@ Jakub.
 ## Health
 
 on-track — R1–R3 + R5 streaming merged; Mai runs via dashboard with
-pre-approval; supervision design pending owner placement decision.
+pre-approval; dashboard-native supervision authority accepted in ADR-090.
 
 ## Connected plans
 
@@ -45,7 +45,11 @@ pre-approval; supervision design pending owner placement decision.
 
 ## Next action
 
-Owner decision on Mai supervision placement/authority/paging, then implement.
+Supervision placement/authority/paging is decided and recorded in
+[ADR-090](../decisions/ADR-090-dashboard-supervision-authority.md): dashboard-native
+pause, run cancellation, and owner mail plus inbox escalation. Repeat terminal
+outcome mail is receipt-deduplicated. Broader fallback automation in the private
+design draft remains future work within separately granted authority.
 Queued (owner-approved 2026-11-14): Mai-as-service batch resume first
 (unattended drain driver + boot reconciliation), then interactive Mai —
 dashboard chat was always meant to be agentic, not single-shot Q&A

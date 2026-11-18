@@ -35,6 +35,16 @@ The projects form a small ecosystem:
 
 `Applications → AI Orchestrator decisions → execution adapter → Ollama / Requesty / direct providers`
 
+This is a conceptual responsibility flow, not the Python import graph.
+`ai_orchestrator` owns neutral contracts and policy and imports neither
+`ai_provider` nor `ai_agent`. Existing provider integration/composition helpers
+consume those contracts and policy helpers; `ai_agent` composes both packages.
+The owner accepted this placement exception rather than extracting shared
+contracts (decision B, 2026-11-18, inbox d9854413; see the Provider boundary
+section in AGENTS.md). The existing provider up-importer set remains
+bounded by `tests/test_package_layering.py`; new crossings need an explicit owner
+decision, not an automatic extension of the pin.
+
 Applications include the AI Council, Job Search Automation, and future automation/client applications.
 Applications should support official AI access routes, such as local Ollama,
 direct hosted provider APIs, Requesty-style gateways, subscription-backed

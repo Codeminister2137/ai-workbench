@@ -1,0 +1,46 @@
+{
+  "totals": {
+    "parse_ok": 0.8,
+    "holders_valid": 1.0,
+    "calibrated": 1.0,
+    "recall": 0.4,
+    "overall": 0.8
+  },
+  "per_question": {
+    "storage-choice": {
+      "parse_ok": 0.0,
+      "holders_valid": 1.0,
+      "calibrated": 1.0,
+      "recall": 0.2,
+      "overall": 0.55
+    },
+    "pricing-model": {
+      "parse_ok": 1.0,
+      "holders_valid": 1.0,
+      "calibrated": 1.0,
+      "recall": 0.4,
+      "overall": 0.85
+    },
+    "architecture-size": {
+      "parse_ok": 1.0,
+      "holders_valid": 1.0,
+      "calibrated": 1.0,
+      "recall": 0.6,
+      "overall": 0.9
+    },
+    "llm-privacy": {
+      "parse_ok": 1.0,
+      "holders_valid": 1.0,
+      "calibrated": 1.0,
+      "recall": 0.4,
+      "overall": 0.85
+    },
+    "review-cadence": {
+      "parse_ok": 1.0,
+      "holders_valid": 1.0,
+      "calibrated": 1.0,
+      "recall": 0.4,
+      "overall": 0.85
+    }
+  }
+}
