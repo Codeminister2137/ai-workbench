@@ -60,6 +60,13 @@ model); the periodic pre-refresh check itself is deferred per the brief.
   + credential-handling decision before any integration.
   Owner 11-17: Extra Usage is OFF — over-limit calls block rather than
   drawing balance, so window headroom reads literally.
+  2026-11-18: service-account key (Settings > Service accounts, Restricted
+  Usage/Read) returns 200 on zen/go/v1/usage with account-wide windows —
+  monthly 97% used / 3% left, resets 2026-11-22 (proves subscription
+  scope, not service-account budget). Endpoint 403s Python-urllib default
+  User-Agents; any real UA gets 200 — key suspected before UA. Official
+  roles/permissions verified at dev.opencode.ai/docs/console/api/ (All /
+  Restricted / Read only; keys shown once; expiry Never/1/7/30/Custom).
 
 Gap (owner case-by-case per brief note): API-billed providers
 (OpenRouter/Requesty/…) have no subscription-refresh model here — owner
