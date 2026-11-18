@@ -57,9 +57,7 @@ class _FakePort:
         self._verdict = verdict
         self.calls: list[tuple[str, list, int]] = []
 
-    def deliberate(
-        self, question: str, members: list[dict[str, Any]], *, rounds: int = 3
-    ) -> dict[str, Any]:
+    def deliberate(self, question: str, members: list[dict[str, Any]], *, rounds: int = 3) -> Any:
         self.calls.append((question, members, rounds))
         if isinstance(self._verdict, Exception):
             raise self._verdict
