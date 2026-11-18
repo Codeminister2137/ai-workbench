@@ -677,10 +677,32 @@ async function renderChatList() {
 
 async function renderChatThread(id, initial) {
   const payload = await api("/api/chat/sessions/" + encodeURIComponent(id) + "/messages");
-  const msgs = payload.messages.map((m) =>
-    `<div class="msg"><span class="role">${esc(m.role)}</span>
-     <span class="muted">${m.provider ? esc(m.provider + "/" + (m.model || "")) : ""}</span>
-     <div>${esc(m.content)}</div></div>`).join("");
+  // P4 rec 1: long assistant turns collapse; first paragraph (the synthesis)
+  // stays visible, the rest opens on demand. Threshold keeps short chats flat.
+  const renderMsg = (m) => {
+    const head = `<span class="role">${esc(m.role)}</span>
+     <span class="muted">${m.provider ? esc(m.provider + "/" + (m.model || "")) : ""}</span>`;
+    const body = String(m.content || "");
+    if (m.role !== "assistant" || body.length <= 600) {
+      return `<div class="msg">${head}<div>${esc(body)}</div></div>`;
+    }
+    const cut = body.indexOf("\n\n");
+    const lead = cut === -1 ? body.slice(0, 300) : body.slice(0, cut);
+    const rest = cut === -1 ? body.slice(300) : body.slice(cut);
+    return `<div class="msg">${head}<div>${esc(lead)}</div>
+     <details><summary>Full turn (${body.length} chars)</summary><div>${esc(rest)}</div></details></div>`;
+  };
+  const msgs = payload.messages.map(renderMsg).join("");
+  let planBanner = "";
+  try {
+    const plans = await api("/api/plans");
+    const linked = (plans.items || []).filter((p) => p.source === "chat:" + id);
+    if (linked.length) {
+      const latest = linked[linked.length - 1];
+      planBanner = `<p class="muted">Plan: <a href="#/plans/${esc(latest.id)}">${gtext(latest.title || latest.id)}</a>
+        <span class="pill st-${esc((latest.status || "none").replace(/\s+/g, "-"))}">${esc(latest.status || "")}</span></p>`;
+    }
+  } catch (err) { planBanner = ""; }
   const sessions = await api("/api/chat/sessions");
   const found = (sessions.sessions || []).find((s) => s.id === id) || {};
   let agentCfg = {enabled: sessions.agent_enabled === true, approval: "scoped"};
@@ -727,6 +749,7 @@ async function renderChatThread(id, initial) {
     <button type="submit" title="Rename this chat">Rename</button></form>
     <p><button id="delete-btn" title="Delete this chat and its transcript">Delete chat</button>
     <button type="button" id="draft-plan-btn" title="Draft a proposed plan from this chat transcript">Draft plan</button></p>
+    ${planBanner}
     ${modeBar}${stagedBar}${pendingBar}
     <div id="thread">${msgs || '<p class="muted">No messages yet.</p>'}</div>
     <form class="inline" id="chat-form"><input type="text" name="text" placeholder="Message..." title="Message the supervisor" required>
