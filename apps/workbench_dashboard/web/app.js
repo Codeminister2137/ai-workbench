@@ -1933,6 +1933,67 @@ async function markIdeaSeen(id, item) {
   }
 }
 
+async function renderJobs() {
+  view.innerHTML = `<h1>Job match review</h1>
+    <p class="muted">Paste a vacancy, get the M2 match report: preferences verdict, score, verdicts, CV suggestion, warnings.</p>
+    <div class="card"><h2>Vacancy</h2>
+    <form id="jobs-form">
+      <p><input type="text" name="title" placeholder="Job title..." title="Job title (required)">
+      <input type="text" name="company" placeholder="Company..." title="Company (required)"></p>
+      <p><input type="text" name="location" placeholder="Location..." title="Location">
+      <select name="work_mode" title="Work mode">
+        <option value="unspecified">any mode</option><option value="remote">remote</option>
+        <option value="hybrid">hybrid</option><option value="onsite">onsite</option>
+      </select>
+      <select name="employment_type" title="Employment type">
+        <option value="unspecified">any type</option><option value="b2b">B2B</option>
+        <option value="permanent">permanent</option><option value="contract">contract</option>
+      </select></p>
+      <p><input type="text" name="required_skills" placeholder="Required skills, comma separated..." title="Required skills, comma separated">
+      <input type="text" name="preferred_skills" placeholder="Preferred skills..." title="Preferred skills, comma separated"></p>
+      <p><input type="text" name="experience_requirement" placeholder="Experience requirement..." title="Experience requirement (optional)"></p>
+      <p><button type="submit" title="Run the match report">Review match</button></p>
+    </form></div>
+    <div id="jobs-result"></div>`;
+  document.getElementById("jobs-form").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const f = ev.target;
+    const split = (s) => s.split(",").map((x) => x.trim()).filter(Boolean);
+    const out = document.getElementById("jobs-result");
+    try {
+      const r = await api("/api/jobs/review", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+          title: f.title.value, company: f.company.value, location: f.location.value,
+          work_mode: f.work_mode.value, employment_type: f.employment_type.value,
+          required_skills: split(f.required_skills.value),
+          preferred_skills: split(f.preferred_skills.value),
+          experience_requirement: f.experience_requirement.value || null,
+        }),
+      });
+      const verdictRows = (r.match.verdicts || []).map((v) =>
+        `<li><strong>${esc(v.requirement)}</strong>
+         <span class="pill st-${esc(v.verdict)}">${esc(v.verdict)}</span>
+         <span class="muted">${esc((v.matched_skills || []).join(", "))}</span></li>`).join("");
+      const suggRows = (r.match.suggestions || []).map((s) =>
+        `<li><strong>${esc(s.requirement)}</strong>: ${esc(s.suggestion)}</li>`).join("");
+      const warnRows = (r.match.warnings || []).map((w) => `<li>${esc(w)}</li>`).join("");
+      out.innerHTML = `<div class="card"><h2>${esc(r.vacancy.title)} @ ${esc(r.vacancy.company)}</h2>
+        <p>Score <strong>${esc(String(r.match.match_score))}</strong>
+        <span class="pill st-${r.preferences.passes ? "ready" : "blocked"}">${r.preferences.passes ? "preferences pass" : "preferences fail"}</span></p>
+        ${r.preferences.passes ? "" : `<p class="muted">Failed: ${esc(r.preferences.reasons.join(", "))}</p>`}
+        <p>Suggested CV: <strong>${esc(r.match.suggested_cv_variant || "none")}</strong>
+        <span class="muted">${esc(r.match.variant_basis || "")}</span></p>
+        <h3>Verdicts</h3><ul class="plain">${verdictRows}</ul>
+        <h3>Suggestions</h3><ul class="plain">${suggRows}</ul>
+        ${warnRows ? `<h3>Warnings</h3><ul class="plain">${warnRows}</ul>` : ""}</div>`;
+    } catch (err) {
+      out.innerHTML = `<p><strong>Review failed:</strong> ${esc(err.message)}</p>`;
+    }
+  });
+}
+
 async function renderInvoices(id) {
   if (id) {
     const payload = await api("/api/invoices/" + encodeURIComponent(id));
@@ -2981,6 +3042,7 @@ async function render() {
     else if (name === "e2e") await renderE2E(id);
     else if (name === "ideas") await renderIdeas(id);
     else if (name === "invoices") await renderInvoices(id);
+    else if (name === "jobs") await renderJobs();
     else if (name === "backlog") await renderBacklog(id);
     else if (name === "workflows") await renderWorkflows(id);
     else if (name === "projects") await renderProjects(id);

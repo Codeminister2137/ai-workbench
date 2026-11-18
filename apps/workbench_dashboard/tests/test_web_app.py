@@ -1814,3 +1814,38 @@ def test_orchestrator_routes_query(dashboard_server, tmp_path) -> None:
     with pytest.raises(HTTPError) as error:
         get_json(dashboard_server, "/api/orchestrator/routes?capability=telepathy")
     assert error.value.code == 400
+
+
+def test_jobs_review_renders_match_report(dashboard_server, tmp_path) -> None:
+    profiles = tmp_path / "data" / "profiles"
+    profiles.mkdir(parents=True)
+    (profiles / "candidate.toml").write_text(
+        'applicant_name = "A"\napplicant_location = "B"\napplicant_summary = "C"\n'
+        'portfolio_url = "https://example.invalid"\nlinkedin_url = "https://example.invalid"\n\n'
+        '[[skills]]\nname = "Python"\nstatus = "demonstrated"\nnotes = ""\n'
+        'sources = ["cv"]\nsource_kinds = ["cv"]\n',
+        encoding="utf-8",
+    )
+    payload = post_json(
+        dashboard_server,
+        "/api/jobs/review",
+        {"title": "Python Dev", "company": "Acme", "required_skills": ["Python", "Go"]},
+    )
+    assert payload["ok"] is True
+    assert payload["match"]["match_score"] == 0.5
+    assert payload["preferences"]["passes"] is True
+    assert len(payload["match"]["verdicts"]) == 2
+    assert payload["match"]["suggested_cv_variant"] is None
+    with pytest.raises(HTTPError) as error:
+        post_json(dashboard_server, "/api/jobs/review", {"title": "", "company": ""})
+    assert error.value.code == 400
+
+
+def test_jobs_review_missing_profile_is_conflict(dashboard_server) -> None:
+    with pytest.raises(HTTPError) as error:
+        post_json(
+            dashboard_server,
+            "/api/jobs/review",
+            {"title": "Python Dev", "company": "Acme", "required_skills": []},
+        )
+    assert error.value.code == 409

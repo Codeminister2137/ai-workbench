@@ -115,6 +115,7 @@ ROUTE_UI: tuple[tuple[str, str, str], ...] = (
     ("/api/maintenance", "Home", "#/"),
     ("/api/work-roots", "Projects", "#/projects"),
     ("/api/agent-status", "Fleet", "#/fleet"),
+    ("/api/jobs/review", "Jobs", "#/jobs"),
 )
 
 # Routes with no UI surface by design (machine-consumed); they get

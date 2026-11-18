@@ -1118,6 +1118,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 return self._send_modules(load_config(self.config_path))
             if path == "/api/sleep":
                 return self._schedule_sleep(payload)
+            if path == "/api/jobs/review":
+                return self._review_job_vacancy(payload)
             if path == "/api/sleep/cancel":
                 return self._send_json({"ok": True, **cancel_owner_sleep(self.repo_root)})
             if path.startswith("/api/meetings/") and path.endswith("/analyze"):
@@ -1342,6 +1344,17 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             )
         except (ValueError, FileNotFoundError) as exc:
             return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        self._send_json({"ok": True, **result})
+
+    def _review_job_vacancy(self, payload: dict) -> None:
+        from jobs_view import review_vacancy
+
+        try:
+            result = review_vacancy(payload, self.repo_root)
+        except ValueError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        except FileNotFoundError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=409)
         self._send_json({"ok": True, **result})
 
     def _send_settings(self, config: DashboardConfig) -> None:
