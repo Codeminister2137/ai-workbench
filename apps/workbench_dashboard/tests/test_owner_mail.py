@@ -134,6 +134,20 @@ def test_mail_configured_probe(tmp_path) -> None:
     assert mail_configured({}, root=tmp_path) is False
 
 
+def test_notify_plan_dedupes_repeat_outcome(tmp_path, fake_smtp) -> None:
+    sender, _notify_on = notify_plan("unattended", tmp_path / "rcpt", dict(SMTP_ENV))
+    assert sender is not None
+    summary = {"run_id": "run1", "status": "failed", "title": "t"}
+    first = sender(summary)
+    assert first["sent"] is True
+    second = sender(summary)
+    assert second["sent"] is False
+    assert second["deduped"] is True
+    assert len(FakeSMTP.instances) == 1
+    other = sender({"run_id": "run1", "status": "completed", "title": "t"})
+    assert other["sent"] is True  # different outcome still pages
+
+
 def test_send_refuses_off_owner_address(tmp_path) -> None:
     config = load_smtp_config(dict(SMTP_ENV))
     with pytest.raises(ValueError, match="off the owner address"):

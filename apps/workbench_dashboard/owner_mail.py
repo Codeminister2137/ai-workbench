@@ -134,6 +134,7 @@ def send_owner_mail(
     config: dict,
     dry_run: bool = True,
     receipts_dir: Path,
+    dedupe_key: str | None = None,
 ) -> dict:
     """Send one owner notification; returns the persisted receipt."""
     if to != config["owner"]:
@@ -150,6 +151,8 @@ def send_owner_mail(
         "error": None,
         "finished": time.time(),
     }
+    if dedupe_key:
+        receipt["dedupe_key"] = dedupe_key
     if not dry_run:
         try:
             _deliver(config, to, subject, body)
@@ -230,6 +233,9 @@ def notify_plan(
 
     def _send(summary: Mapping[str, object]) -> dict:
         run_id = str(summary.get("run_id", "?"))
+        key = f"{run_id}:{summary.get('status', '?')}"
+        if _already_mailed(receipts_dir, key):
+            return {"to": config["owner"], "sent": False, "deduped": True, "dedupe_key": key}
         return send_owner_mail(
             to=config["owner"],
             subject=f"[workbench] run {summary.get('status', '?')}: {run_id[:8]}",
@@ -237,6 +243,27 @@ def notify_plan(
             config=config,
             dry_run=False,
             receipts_dir=receipts_dir,
+            dedupe_key=key,
         )
 
     return _send, notify_on
+
+
+def _already_mailed(receipts_dir: Path, dedupe_key: str) -> bool:
+    """True when a sent receipt already carries this outcome key."""
+    try:
+        files = sorted(receipts_dir.glob("notify-*.json"))
+    except OSError:
+        return False
+    for path in files:
+        try:
+            receipt = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if (
+            isinstance(receipt, dict)
+            and receipt.get("dedupe_key") == dedupe_key
+            and receipt.get("sent") is True
+        ):
+            return True
+    return False
