@@ -8,6 +8,7 @@ importing council code.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any, Protocol, TypedDict
 
 
@@ -41,9 +42,9 @@ class DeliberationPort(Protocol):
 CONSENSUS_VALUES = frozenset({"full", "partial", "none"})
 
 
-def validate_verdict(payload: dict[str, Any]) -> VerdictDict:
+def validate_verdict(payload: Mapping[str, Any]) -> VerdictDict:
     """Coerce raw adapter output to VerdictDict; raises ValueError when malformed."""
-    if not isinstance(payload, dict):
+    if not isinstance(payload, Mapping):
         raise ValueError("verdict must be an object")
     agreed = payload.get("agreed", [])
     disagreements = payload.get("disagreements", [])
@@ -73,3 +74,24 @@ def validate_verdict(payload: dict[str, Any]) -> VerdictDict:
         consensus=consensus,
         parse_ok=bool(payload.get("parse_ok", False)),
     )
+
+
+def request_verdict(
+    port: DeliberationPort,
+    question: str,
+    members: list[dict[str, Any]] | None = None,
+    *,
+    rounds: int = 3,
+) -> VerdictDict:
+    """Delegate one question to the injected council port (sync call).
+
+    The orchestrator never imports council code: the app layer injects
+    the adapter. Adapter output is re-validated at the seam so a
+    non-conformant adapter fails here instead of corrupting routing.
+    Consuming the verdict for routing decisions is follow-up work.
+    """
+    if not isinstance(question, str) or not question.strip():
+        raise ValueError("deliberation needs a non-empty question")
+    if not isinstance(rounds, int) or rounds < 1:
+        raise ValueError("deliberation needs at least one round")
+    return validate_verdict(port.deliberate(question, members or [], rounds=rounds))
