@@ -8,6 +8,7 @@ data/
 # Logs and runtime output
 logs/
 *.log
+evals/runs/
 
 # Python
 __pycache__/
