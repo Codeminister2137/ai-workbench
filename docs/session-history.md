@@ -1,5 +1,15 @@
 # Session History
 
+## 2026-11-18 work-tabs unification, pushed 2acbbb9 (01a1e5ab cont.)
+
+Relations (project_id + related + backfill), attention unification
+(waiting_on, AI close-out queue, verbatim default + attention_ids),
+pointer requeue-once + dedup + decline reasons, R3 staged-branch
+verification, 7 product projects + explainers + seed scripts, 7 Roadmaps
++ evolution log, digest-id refactor. Fixed 2 smuggled pyright errors
+(tail-check miss, owned). Push drops root-caused: idle negotiation SSH
+(no keepalive) + red-hook bypass; keepalive applied, 2/2 clean pushes.
+
 ## 2026-11-17 evening spend/scoring/KnowMe (01a1e5ab cont., pending push)
 
 Spend: Meta grant corrected $150/no-expiry (+sqlite re-bootstrap), Codex
