@@ -1,4 +1,4 @@
-from types import SimpleNamespace
+from collections.abc import Callable, Iterator
 
 import pytest
 from ai_provider.capability_eval import SchemaProbeOllamaClient, probe
@@ -8,6 +8,7 @@ from ai_provider.contracts import (
     AIRequest,
     AIResponse,
     AIStreamDelta,
+    AIStreamEvent,
     AIStreamFinal,
     AIToolCall,
     BackendInfo,
@@ -15,6 +16,28 @@ from ai_provider.contracts import (
     MessageRole,
 )
 from ai_provider.errors import ProviderError, ProviderErrorCategory
+
+
+class FakeClient:
+    """Typed stand-in satisfying the ChatClient protocol."""
+
+    backend = BackendInfo(provider="fake", model="test", location=BackendLocation.LOCAL)
+
+    def __init__(
+        self,
+        complete: Callable[[AIRequest], AIResponse] | None = None,
+        stream: Callable[[AIRequest], Iterator[AIStreamEvent]] | None = None,
+    ) -> None:
+        self._complete = complete
+        self._stream = stream
+
+    def complete(self, request: AIRequest) -> AIResponse:
+        assert self._complete is not None
+        return self._complete(request)
+
+    def stream(self, request: AIRequest) -> Iterator[AIStreamEvent]:
+        assert self._stream is not None
+        return self._stream(request)
 
 
 def response(text='{"answer":7}', calls=()):
@@ -32,7 +55,7 @@ def test_tools_require_exact_name_and_integer():
         ((AIToolCall("1", "wrong", {"answer": 7}),), "fail"),
         ((), "fail"),
     ]:
-        client = SimpleNamespace(complete=lambda request, calls=calls: response(calls=calls))
+        client = FakeClient(complete=lambda request, calls=calls: response(calls=calls))
         assert probe(client, "fixture", "tools").status == expected
 
 
@@ -46,7 +69,7 @@ def test_tools_require_exact_name_and_integer():
     ],
 )
 def test_stream_requires_matching_deltas_and_final(events, expected):
-    client = SimpleNamespace(stream=lambda request: iter(events))
+    client = FakeClient(stream=lambda request: iter(events))
     assert probe(client, "fixture", "streaming").status == expected
 
 
@@ -54,10 +77,10 @@ def test_errors_and_unavailable_schema_are_unknown():
     def fail(request):
         raise ProviderError("secret body", category=ProviderErrorCategory.TIMEOUT)
 
-    result = probe(SimpleNamespace(complete=fail), "fixture", "tools")
+    result = probe(FakeClient(complete=fail), "fixture", "tools")
     assert result.status == "unknown"
     assert "secret" not in result.detail
-    assert probe(SimpleNamespace(), "fixture", "structured_output").status == "unknown"
+    assert probe(FakeClient(), "fixture", "structured_output").status == "unknown"
 
 
 def test_schema_is_actually_sent_and_prompt_alone_is_not_enough(monkeypatch):

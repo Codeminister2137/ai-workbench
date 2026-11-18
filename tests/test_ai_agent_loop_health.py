@@ -6,30 +6,44 @@ from ai_agent import PermissionManager, ToolContext
 from ai_agent.contracts import ToolCategory, ToolDefinition, ToolResult
 from ai_agent.loop import AgentLoop
 from ai_agent.tools.base import BaseTool, ToolRegistry
-from ai_provider import AIToolCall
+from ai_provider import (
+    AIMessage,
+    AIResponse,
+    AIToolCall,
+    BackendInfo,
+    BackendLocation,
+    FinishReason,
+    MessageRole,
+    UsageMetadata,
+)
 
 
 class ScriptedClient:
-    backend = None
+    """Serve scripted assistant turns: tool-call lists or final text."""
+
+    backend = BackendInfo(provider="fake", model="test", location=BackendLocation.LOCAL)
 
     def __init__(self, turns: list) -> None:
-        from ai_provider import AIMessage, AIResponse, BackendInfo, BackendLocation, MessageRole
-
-        self._turns = list(turns)
-        self._factory = (AIMessage, AIResponse, BackendInfo, BackendLocation, MessageRole)
-        self.backend = BackendInfo(provider="fake", model="test", location=BackendLocation.LOCAL)
+        self.turns = list(turns)
+        self.requests = []
 
     def complete(self, request):
-        AIMessage, AIResponse, _BackendInfo, _Location, MessageRole = self._factory
-        assert self._turns, "client script exhausted"
-        turn = self._turns.pop(0)
+        self.requests.append(request)
+        assert self.turns, "client script exhausted"
+        turn = self.turns.pop(0)
         if isinstance(turn, str):
             message = AIMessage(MessageRole.ASSISTANT, turn)
         else:
             message = AIMessage(MessageRole.ASSISTANT, "", tool_calls=tuple(turn))
-        from ai_provider import UsageMetadata
+        return AIResponse(
+            message=message,
+            backend=self.backend,
+            finish_reason=FinishReason.STOP,
+            usage=UsageMetadata(),
+        )
 
-        return AIResponse(message=message, backend=self.backend, usage=UsageMetadata())
+    def stream(self, request):
+        raise NotImplementedError
 
 
 class EchoTool(BaseTool):
