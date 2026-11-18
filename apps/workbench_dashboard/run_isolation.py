@@ -77,8 +77,11 @@ def create_run_worktree(
 ) -> IsolatedRun:
     """Create the scratch worktree + branch for one run (fail-closed).
 
-    A retry reuses its own attached worktree (evidence preserved, config
-    refreshed); anything else at the target path still fails closed.
+    A retry resumes its own attached worktree (evidence preserved, config
+    refreshed), adopting whatever branch the first attempt left checked
+    out — attempts routinely move off ``run/<id>`` onto feature branches,
+    and refusing that trapped every retry (2026-11-18). A non-worktree
+    directory at the target path still fails closed.
     """
     repo = Path(repo_root).resolve()
     if not (repo / ".git").exists():
@@ -89,13 +92,15 @@ def create_run_worktree(
     branch = f"run/{short}"
     target = repo / WORKTREE_DIRNAME / short
     if target.exists():
-        if _attached_branch(repo, target) != branch:
+        # Same short id means the same run (ids are uuid hex): resume it.
+        attached = _attached_branch(repo, target)
+        if attached is None:
             raise IsolationError(f"scratch worktree already exists: {target}")
         config_src = repo / CONFIG_FILENAME
         if not config_src.is_file():
             raise IsolationError(f"{CONFIG_FILENAME} missing in {repo}; cannot isolate run")
         shutil.copy2(config_src, target / CONFIG_FILENAME)
-        return IsolatedRun(path=target, branch=branch)
+        return IsolatedRun(path=target, branch=attached)
     existing = _git(repo, "branch", "--list", branch)
     if existing:
         raise IsolationError(f"scratch branch already exists: {branch}")
