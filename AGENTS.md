@@ -455,6 +455,15 @@ Do not spread provider-specific assumptions through application code.
 
 Do not collapse the Orchestrator and provider infrastructure into one abstraction merely for convenience.
 
+Documented exception (owner decision B, 2026-11-18, inbox d9854413):
+`ai_provider` modules may import the Orchestrator's *neutral contracts*
+(`AccessMethod`, `BillingSource`, `ExecutionTarget`, catalog loading,
+scheduling, fallback vocabulary) — shared routing vocabulary, not
+orchestration behavior. The set is frozen by the layering ratchet
+(`tests/test_package_layering.py`): shrinking it is welcome, growing it
+fails loudly and needs a new decision. Provider logic must never depend
+on orchestrator *decisions* (routing outcomes, model selection, judging).
+
 Documented exception: provider-adjacent `ai_personal_assistant/local_capabilities` deliberately uses the shared local-Ollama query/download wrapper `packages/ollama_service` (its local backends also include direct `requests` calls); it is not a second execution layer (see `docs/overlap-analysis-20261110.md` D4, decision 0bd0a47d).
 
 Do not force package-to-package dependencies because the common workflow uses
