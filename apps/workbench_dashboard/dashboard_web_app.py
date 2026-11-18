@@ -3470,14 +3470,17 @@ def build_run_drain(
     if executor_factory is not None:
         executor = executor_factory()
     else:
-        from mai_run import build_mai_executor
+        from mai_run import build_mai_executor, build_retrying_executor
 
-        executor = build_mai_executor(
-            repo_root,
-            repo_root / "user-config.toml",
-            catalog=config.catalog_path or None,
-            backend=getattr(config, "mai_backend", "subprocess"),
-            isolate=True,
+        executor = build_retrying_executor(
+            build_mai_executor(
+                repo_root,
+                repo_root / "user-config.toml",
+                catalog=config.catalog_path or None,
+                backend=getattr(config, "mai_backend", "subprocess"),
+                isolate=True,
+                progress_dir=data_dir / "run-progress",
+            )
         )
 
     def _notify(summary: dict) -> None:
