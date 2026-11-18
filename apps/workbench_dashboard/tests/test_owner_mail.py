@@ -223,11 +223,12 @@ def test_notify_plan_silent_without_smtp(tmp_path) -> None:
     assert list(tmp_path.iterdir()) == []
 
 
-def test_notify_plan_attended_narrows_statuses(tmp_path, fake_smtp) -> None:
+def test_notify_plan_attended_mails_nothing(tmp_path, fake_smtp) -> None:
+    # Owner decision 2026-11-18: mail only during unattended sessions.
     sender, notify_on = notify_plan("attended", tmp_path, dict(SMTP_ENV))
     assert sender is not None
     assert notify_on == ATTENDED_NOTIFY_STATUSES
-    assert ATTENDED_NOTIFY_STATUSES == frozenset({"failed", "waiting_on_owner"})
+    assert ATTENDED_NOTIFY_STATUSES == frozenset()
     receipt = sender({"run_id": "run-12345678", "status": "failed", "title": "t"})
     assert receipt["sent"] is True
     assert "[workbench] run failed: run-1234" == receipt["subject"]

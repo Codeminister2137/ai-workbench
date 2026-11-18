@@ -565,3 +565,78 @@ def test_unlinked_substance_run_completes_without_hook(stores) -> None:
     )
     assert drain.drain() == [{"run_id": "own2", "status": "completed"}]
     assert posted == []
+
+
+def _interrupted(stores, run_id="stuck1", **overrides):
+    record = {"id": run_id, "title": "t", "status": "running", "attempts": 1}
+    record.update(overrides)
+    stores.runs.put(run_id, record)
+
+
+def _capped_drain(stores, terminal, evidence):
+    return RunDrain(
+        runs_dir=stores.data_dir / "runs",
+        get_inbox=stores.inbox.get,
+        executor=lambda run: {"status": "completed"},
+        on_terminal=lambda summary: terminal.append(summary),
+        output_evidence=evidence,
+    )
+
+
+def test_reconcile_cancels_twice_interrupted_without_output(stores) -> None:
+    terminal: list = []
+    drain = _capped_drain(stores, terminal, lambda _run_id: False)
+    _interrupted(stores)
+    assert drain.reconcile() == [{"run_id": "stuck1", "action": "requeued"}]
+    stored = stores.runs.get("stuck1")
+    stored["status"] = "running"
+    stores.runs.put("stuck1", stored)
+    assert drain.reconcile() == [
+        {"run_id": "stuck1", "action": "cancelled", "reason": "no output evidence"}
+    ]
+    cancelled = stores.runs.get("stuck1")
+    assert cancelled["status"] == "cancelled"
+    assert "cancelled by supervisor" in cancelled["error"]
+    assert cancelled["events"][-1]["kind"] == "run_cancelled"
+    assert terminal == [
+        {"run_id": "stuck1", "status": "cancelled", "title": "t", "error": cancelled["error"]}
+    ]
+
+
+def test_reconcile_requeues_when_output_evidence_exists(stores) -> None:
+    drain = _capped_drain(stores, [], lambda _run_id: True)
+    _interrupted(stores, interruptions=1)
+    assert drain.reconcile() == [{"run_id": "stuck1", "action": "requeued"}]
+    assert stores.runs.get("stuck1")["status"] == "queued"
+
+
+def test_reconcile_receipt_output_counts_as_evidence(stores) -> None:
+    drain = _capped_drain(stores, [], lambda _run_id: False)
+    _interrupted(
+        stores,
+        interruptions=1,
+        receipts=[{"status": "failed", "stdout_tail": "partial work"}],
+    )
+    assert drain.reconcile() == [{"run_id": "stuck1", "action": "requeued"}]
+
+
+def test_reconcile_without_callback_requeues_forever(stores) -> None:
+    drain = RunDrain(
+        runs_dir=stores.data_dir / "runs",
+        get_inbox=stores.inbox.get,
+        executor=lambda run: {"status": "completed"},
+    )
+    _interrupted(stores)
+    assert drain.reconcile() == [{"run_id": "stuck1", "action": "requeued"}]
+    stored = stores.runs.get("stuck1")
+    stored["status"] = "running"
+    stores.runs.put("stuck1", stored)
+    assert drain.reconcile() == [{"run_id": "stuck1", "action": "requeued"}]
+
+
+def test_reconcile_hard_cap_breaks_crash_loops(stores) -> None:
+    drain = _capped_drain(stores, [], lambda _run_id: True)
+    _interrupted(stores, interruptions=4)
+    assert drain.reconcile() == [
+        {"run_id": "stuck1", "action": "cancelled", "reason": "interrupted repeatedly"}
+    ]

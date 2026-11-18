@@ -1562,6 +1562,11 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         from datetime import datetime
 
         try:
+            from dashboard_config import load_config
+
+            # Owner decision 2026-11-18: mail only during unattended sessions.
+            if load_config(self.config_path).supervision != "unattended":
+                return
             record = self._stores().get_chat_mode(session_id)
             last_seen = record.get("last_seen_at") or ""
             seen = datetime.fromisoformat(str(last_seen)) if last_seen else None
@@ -3485,6 +3490,20 @@ def build_run_drain(
 
     def _notify(summary: dict) -> None:
         report_run_terminal(stores, summary)
+        try:
+            from owner_mail import notify_plan
+
+            sender, notify_on = notify_plan(
+                config.supervision, data_dir / "mail-receipts", root=repo_root
+            )
+        except Exception:  # noqa: BLE001 - terminal mail never breaks drain
+            return
+        if sender is None or summary.get("status") not in notify_on:
+            return
+        try:
+            sender(summary)
+        except Exception:  # noqa: BLE001 - terminal mail never breaks drain
+            pass
 
     def _note(inbox_id: str, note: str) -> None:
         item = stores.inbox.get(inbox_id)
@@ -3493,6 +3512,15 @@ def build_run_drain(
         item["notes"] = (item.get("notes") or "") + note
         stores.inbox.put(inbox_id, item)
 
+    def _run_has_output(run_id: str) -> bool:
+        import re
+
+        safe_id = re.sub(r"[^A-Za-z0-9_-]", "", run_id)[:64]
+        try:
+            return (data_dir / "run-progress" / f"{safe_id}.jsonl").stat().st_size > 0
+        except OSError:
+            return False
+
     return RunDrain(
         runs_dir=data_dir / "runs",
         get_inbox=lambda inbox_id: stores.inbox.get(inbox_id),
@@ -3500,6 +3528,7 @@ def build_run_drain(
         worker_epoch=worker_epoch or datetime.now(UTC).isoformat(),
         on_terminal=_notify,
         inbox_note=_note,
+        output_evidence=_run_has_output,
     )
 
 

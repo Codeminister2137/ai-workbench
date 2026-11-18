@@ -447,6 +447,8 @@ When a decision changes: supersede the old ADR, add the new ADR, then update arc
 
 Update local `CURRENT_CONTEXT.md` at the end of non-trivial work when present so the next session has the latest completed work, conflicts/risks, validation status, and next plan. `CURRENT_CONTEXT.md` carries only the **current** state; move superseded window blocks, old handoffs and completed-work history to `docs/session-history.md` instead of appending them there.
 
+Owner decision 2026-11-18 (inbox f06b15e4): every document the owner must read gets a corresponding inbox or backlog item pointing at it — documents never rely on mail or on the owner browsing for them. Mail fires only during unattended sessions.
+
 ## 8. Git
 Before the first repository edit, create or resume a focused branch from `develop`;
 this includes documentation and mechanical fixes. `develop` is the integration

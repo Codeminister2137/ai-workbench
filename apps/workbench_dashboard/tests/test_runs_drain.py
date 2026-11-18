@@ -203,3 +203,48 @@ def test_terminal_report_skips_unlinked_and_closed(tmp_path) -> None:
         )["action"]
         == "skipped"
     )
+
+
+def test_terminal_mail_follows_supervision(tmp_path, monkeypatch) -> None:
+    import owner_mail
+    from dashboard_config import DashboardConfig
+    from dashboard_stores import DashboardStores
+    from dashboard_web_app import build_run_drain
+
+    mailed: list = []
+    seen: list = []
+
+    def fake_notify_plan(supervision, receipts_dir, env=None, *, root=None):
+        seen.append(supervision)
+        notify_on = {"completed"} if supervision == "unattended" else set()
+        return (lambda summary: mailed.append(summary)), notify_on
+
+    monkeypatch.setattr(owner_mail, "notify_plan", fake_notify_plan)
+    for mode in ("attended", "unattended"):
+        mailed.clear()
+        data_dir = tmp_path / mode
+        stores = DashboardStores(data_dir)
+        stores.runs.put(
+            "r1",
+            {
+                "id": "r1",
+                "title": "t",
+                "status": "queued",
+                "body": "do",
+                "approval_mode": "agent-queue",
+            },
+        )
+        config = DashboardConfig(provider="ollama", model="fake", supervision=mode)
+        drain = build_run_drain(
+            config,
+            data_dir,
+            tmp_path,
+            stores,
+            executor_factory=lambda: (lambda run: {"status": "completed", "summary": "ok"}),
+        )
+        assert drain.drain() == [{"run_id": "r1", "status": "completed"}]
+        assert seen[-1] == mode
+        if mode == "unattended":
+            assert [m["run_id"] for m in mailed] == ["r1"]
+        else:
+            assert mailed == []

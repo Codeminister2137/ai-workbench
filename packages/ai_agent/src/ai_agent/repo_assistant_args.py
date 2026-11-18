@@ -440,7 +440,10 @@ def build_argument_parser() -> argparse.ArgumentParser:
         "--timeout-seconds",
         action=UserDefaultAction,
         type=_positive_finite_float,
-        default=180.0,
+        # Owner decision 2026-11-18 (inbox a54efbcf): 180s killed
+        # slow-but-functioning external agents; 600s keeps a bound while
+        # tolerating long quiet stretches (test suites, big builds).
+        default=600.0,
         help=(
             "Provider timeout. For external-agent routes, this is an inactivity "
             "timeout and model output resets the timer."

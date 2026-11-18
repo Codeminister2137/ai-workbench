@@ -38,9 +38,10 @@ MAX_SUBJECT_CHARS = 300
 MAX_BODY_CHARS = 50_000
 SUPERVISION_MODES = ("attended", "unattended")
 
-# Attended mails only the run events that need the owner; unattended mails
-# every terminal outcome. ``paused`` is never terminal and never mailed.
-ATTENDED_NOTIFY_STATUSES = frozenset({"failed", "waiting_on_owner"})
+# Owner decision 2026-11-18 (inbox f06b15e4): mail only during unattended
+# sessions; attended communication stays in chat, inbox items and documents.
+# ``paused`` is never terminal and never mailed.
+ATTENDED_NOTIFY_STATUSES = frozenset()
 UNATTENDED_NOTIFY_STATUSES = frozenset({"completed", "failed", "cancelled", "waiting_on_owner"})
 
 
