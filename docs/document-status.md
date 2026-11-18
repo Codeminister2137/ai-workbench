@@ -121,6 +121,7 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/plans/research-token-count-prototype.md | ACTED | Oct-4 checkpoint consumed. |
 | docs/plans/search-tooling-landscape-note-20261022.md | KNOWLEDGE | Captured for search-path revisit. |
 | docs/plans/shared-agent-capabilities-options.md | ACTED | Oct-4 checkpoint consumed. |
+| docs/plans/starting-company-checklist.md | PENDING | Single company checklist; absorbs R1/R2/R3 backlog + P7 phases. |
 | docs/plans/weekly-digest-design.md | ACTED | Digest 2.0 shipped (loop10). |
 | docs/plans/work-tabs-unification-20261117.md | ACTED | Shipped ce4959b 2026-11-18 (relations, attention, projects, roadmaps). |
 | docs/plans/workbench-remote-development-integration-20261027.md | ACTED | Decided 2026-10-27 (C now, B target, A rejected). |
