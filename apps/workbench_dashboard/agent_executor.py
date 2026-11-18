@@ -342,6 +342,14 @@ def build_executor(
                 ),
             }
         if not summary.strip():
+            if not tool_calls and not staged and not filed:
+                return {
+                    "status": "failed",
+                    "error": (
+                        f"Run produced no evidenced output in {iterations} iterations: "
+                        "blank summary, no tool calls, no staged files, no owner tasks."
+                    ),
+                }
             logger.info("run %s blank summary; fallback from receipts", run_id)
             tools_str = ", ".join(tool_calls) if tool_calls else "none"
             staged_str = ", ".join(r["relpath"] for r in staged) if staged else "none"

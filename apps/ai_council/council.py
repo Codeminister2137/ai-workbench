@@ -1,13 +1,30 @@
 from __future__ import annotations
 
+from typing import Any
+
 from agent import LocalAgent, to_provider_messages
 from config import CouncilConfig
+from domain import parse_synthesis
 from storage import ConversationStore
 
 
 def _estimate_tokens(texts: list[str]) -> int:
     """Rough token estimate (chars/4); documented, not a tokenizer."""
     return sum(len(text) for text in texts) // 4
+
+
+def _verdict_json(synthesis: str) -> dict:
+    """Parse chair prose into a JSON-safe verdict dict (slice 2)."""
+    verdict = parse_synthesis(synthesis)
+    return {
+        "agreed": list(verdict.agreed),
+        "disagreements": [
+            {"holders": list(item.holders), "point": item.point} for item in verdict.disagreements
+        ],
+        "next_actions": list(verdict.next_actions),
+        "consensus": verdict.consensus,
+        "parse_ok": verdict.parse_ok,
+    }
 
 
 class LocalCouncil:
@@ -31,13 +48,13 @@ class LocalCouncil:
         conversation_name: str | None = None,
         *,
         rounds: int = 1,
-    ) -> list[dict[str, str]]:
+    ) -> list[dict[str, Any]]:
         name = conversation_name or self.config.default_conversation
         conversation_id = self.store.get_or_create_conversation(name)
         self.store.add_message(conversation_id, role="user", content=prompt)
 
         history = to_provider_messages(self.store.list_messages(conversation_id))
-        answers: list[dict[str, str]] = []
+        answers: list[dict[str, Any]] = []
         spent = _estimate_tokens([prompt])
 
         for member in self.config.members:
@@ -92,7 +109,7 @@ class LocalCouncil:
                 return member.model
         return ""
 
-    def _react_round(self, conversation_id: int, history, answers: list[dict[str, str]]) -> None:
+    def _react_round(self, conversation_id: int, history, answers: list[dict[str, Any]]) -> None:
         by_member = {
             item["member"]: item.get("answer", "") for item in answers if not item.get("error")
         }
@@ -133,7 +150,7 @@ class LocalCouncil:
                 )
 
     def _synthesize_round(
-        self, conversation_id: int, history, answers: list[dict[str, str]]
+        self, conversation_id: int, history, answers: list[dict[str, Any]]
     ) -> None:
         chair = self._chair()
         member = next(item for item in self.config.members if item.name == chair)
@@ -157,6 +174,7 @@ class LocalCouncil:
                     "model": member.model,
                     "answer": synthesis,
                     "round": "3",
+                    "verdict": _verdict_json(synthesis),
                 }
             )
         except Exception as exc:
@@ -185,7 +203,8 @@ class LocalCouncil:
             ],
         }
 
-        answers: list[dict[str, str]] = []
+        answers: list[dict[str, Any]] = []
+        spent = _estimate_tokens([prompt])
         for member in self.config.members:
             yield {
                 "type": "member_started",
@@ -205,6 +224,7 @@ class LocalCouncil:
                     }
 
                 answer = "".join(answer_parts)
+                spent += _estimate_tokens([answer])
                 self.store.add_message(
                     conversation_id,
                     role="assistant",
@@ -256,27 +276,35 @@ class LocalCouncil:
                     yield {"type": "member_error", "member": member.name, "error": str(exc)}
 
         if wanted >= 3:
-            chair = self._chair()
-            member = next(item for item in self.config.members if item.name == chair)
-            positions = self._capped([(item["member"], item["answer"]) for item in answers])
-            yield {"type": "round_started", "round": 3}
-            parts = []
-            try:
-                agent = LocalAgent(member, ollama_base_url=self.config.ollama_base_url)
-                for chunk in agent.stream_synthesize(history, positions):
-                    parts.append(chunk)
-                    yield {"type": "synthesis_delta", "delta": chunk}
-                synthesis = "".join(parts)
-                self.store.add_message(
-                    conversation_id,
-                    role="assistant",
-                    content=synthesis,
-                    member_name=chair + ":synthesis",
-                    model=member.model,
-                    round=3,
-                )
-                yield {"type": "synthesis_finished", "answer": synthesis, "partial": False}
-            except Exception as exc:
-                yield {"type": "member_error", "member": chair, "error": str(exc)}
+            if self._over_cap(spent):
+                yield {"type": "synthesis_finished", "answer": "", "partial": True}
+            else:
+                chair = self._chair()
+                member = next(item for item in self.config.members if item.name == chair)
+                positions = self._capped([(item["member"], item["answer"]) for item in answers])
+                yield {"type": "round_started", "round": 3}
+                parts = []
+                try:
+                    agent = LocalAgent(member, ollama_base_url=self.config.ollama_base_url)
+                    for chunk in agent.stream_synthesize(history, positions):
+                        parts.append(chunk)
+                        yield {"type": "synthesis_delta", "delta": chunk}
+                    synthesis = "".join(parts)
+                    self.store.add_message(
+                        conversation_id,
+                        role="assistant",
+                        content=synthesis,
+                        member_name=chair + ":synthesis",
+                        model=member.model,
+                        round=3,
+                    )
+                    yield {
+                        "type": "synthesis_finished",
+                        "answer": synthesis,
+                        "partial": False,
+                        "verdict": _verdict_json(synthesis),
+                    }
+                except Exception as exc:
+                    yield {"type": "member_error", "member": chair, "error": str(exc)}
 
         yield {"type": "council_finished", "conversation": name}

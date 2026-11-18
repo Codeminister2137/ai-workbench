@@ -959,6 +959,20 @@ Unless explicitly waived:
 * final diff is reviewed;
 * known limitations and uncertainty are reported.
 
+## Owner-action surfacing
+
+Owner rule (2026-11-18): everything the owner is supposed to do must
+exist as a dashboard item — inbox primary, E2E or another tab only when
+that surface owns the action. A decision brief, approval, key paste,
+upload step, or deliberation that lives only in chat is a bug.
+
+Enforcement: standing owner gates live in
+`apps/workbench_dashboard/owner_gates.json` (id, title, brief, options).
+Every gate keeps a stamped inbox item (`metadata.owner_gate`); the
+forgotten sweep's I5 rule re-files any gate with no item at all. When a
+new standing owner action appears, file its item AND register the gate.
+Closing a gate item records its resolution; that closes the gate.
+
 ## Communication
 
 Be concise and technically precise.

@@ -1,0 +1,77 @@
+{
+  "gates": [
+    {
+      "body": "Decision needed: create the read-only service account so the dashboard can read Go usage windows.\n\nWhy it matters: the .env key is the Go INFERENCE key, proven 403 on all usage endpoints (2026-11-17). Only a console service-account key (or a browser-cookie session) can read the 5h/weekly/monthly windows. Extra Usage is OFF, so headroom reads literally once wired.\n\nSteps (verified against dev.opencode.ai/docs/console/api):\n1. Console > Settings > Service accounts > Add Service Account, name e.g. workbench-usage.\n2. Open it > Add API Key, name e.g. usage-read.\n3. Permissions: Restricted with Usage set to Read (tightest), or Read only. Expiry: Never (or 365d custom + rotation note).\n4. Copy the key ONCE (shown once, oc_sk_... prefix afterwards).\n\nThen paste it here as your answer (or add OPENCODE_USAGE_KEY=<key> to .env yourself). Do NOT overwrite OPENCODE_API_KEY. Read-only keys cannot call models; usage counts to the service account's own budget; revocable anytime.\n\nTechnical recommendation: Restricted + Usage/Read + Never expiry.\nQuestion: paste the key, or say cookie-path.",
+      "id": "opencode-key",
+      "title": "OpenCode: create usage-read service account",
+      "type": "task",
+      "options": [
+        "Key pasted",
+        "Cookie path"
+      ]
+    },
+    {
+      "body": "Decision needed: go/no-go on the bank-first trainer slice (first AI consumer of KnowMe facts).\n\nWhy it matters: storage + atomic ingest + grouped display are done and live; no consumer uses the bank yet. The slice wires trainer reads without changing ingest.\n\nOptions:\nA: Build the first slice (recommend). Pro: proves the bank end to end; small, reversible. Con: one session of build/test.\nB: Bank more facts first. Pro: richer data. Con: consumer design stays unvalidated.\nC: Defer trainer entirely. Pro: focus elsewhere. Con: KnowMe stays write-only.\n\nTechnical recommendation: A.\nQuestion: A, B, or C?",
+      "id": "trainer-go",
+      "title": "KnowMe AI trainer: approve first slice?",
+      "type": "decision",
+      "options": [
+        "A",
+        "B",
+        "C"
+      ]
+    },
+    {
+      "body": "Decision needed: how much to verify per-model capabilities in model_catalog.toml.\n\nWhy it matters: routing and fallback read these flags, but several are unmeasured declarations. A wrong flag misroutes real work.\n\nOptions:\nA: Verify key routes by eval (recommend), scoped to installed Ollama + live hosted routes. Pro: ground truth. Con: model calls + harness slice first.\nB: Trust declarations, verify on failure. Pro: zero upfront cost. Con: first failure hits real work.\nC: Defer. Pro: nothing now. Con: routing confidence stays flat.\n\nTechnical recommendation: A.\nQuestion: A, B, or C?",
+      "id": "capability-mapping",
+      "title": "Model-capability mapping: verify or trust declarations?",
+      "type": "decision",
+      "options": [
+        "A",
+        "B",
+        "C"
+      ]
+    },
+    {
+      "body": "Decision needed: where Mai supervision lives and what it may do unattended.\n\nWhy it matters: the drain executes queued runs while the owner is away, but supervision is scattered (supervisor tick, probe, mail notify, boot reconcile) with no single authority for pause/kill/page.\n\nOptions:\nA: Dashboard-native supervisor (recommend). Pro: single authority; tick + reconcile already there. Con: dashboard must run (supervised).\nB: Mai-side supervision. Pro: closer to the work. Con: split authority; new protocol.\nC: Keep scattered + document. Pro: nothing now. Con: gaps stay.\n\nAuthority sub-decision: pause-only, or pause + kill + page (needs mail-noise rules)?\n\nTechnical recommendation: A with full authority + mail-noise rules.\nQuestion: A, B, or C \u2014 and pause-only or full authority?",
+      "id": "mai-supervision",
+      "title": "Mai supervision: placement, authority, paging?",
+      "type": "decision",
+      "options": [
+        "A",
+        "B",
+        "C"
+      ]
+    },
+    {
+      "body": "Decision needed: unblock the company-site launch tracks or explicitly defer them.\n\nWhy it matters: shell + intake live, but launch is gated on deliberation: (1) public naming (R6; research on 'Company names' awaits CLOSE/RE-RUN), (2) offering details, (3) pricing.\n\nOptions:\nA: Deliberate now, track by track (recommend starting with naming). Pro: unblocks the top product. Con: owner time.\nB: Defer with a date. Pro: focus stays. Con: site stays a shell.\nC: Park P7 entirely. Pro: clarity. Con: drops the client channel.\n\nTechnical recommendation: A for naming, B with a date for offering/pricing if full.\nQuestion: A, B, or C \u2014 and if A, naming first?",
+      "id": "p7-unblock",
+      "title": "P7 unblock pack: deliberate or defer?",
+      "type": "decision",
+      "options": [
+        "A",
+        "B",
+        "C"
+      ]
+    },
+    {
+      "body": "Recovered research from completed run ba45d115 is posted on this item's notes (48 candidates, vocabulary territories, recommendation). Is this sufficient? Reply CLOSE to accept as the deliverable, or RE-RUN + what was missing.",
+      "id": "naming-research",
+      "title": "Company names",
+      "type": "task",
+      "options": [
+        "CLOSE",
+        "RE-RUN"
+      ]
+    },
+    {
+      "body": "Scoring answers applied to matching. Remaining owner actions: request the Xiaomi data copy, authorize Health Connect trickle, install Health Sync or FitMesh, drop the first export + training notes in one folder. Full runbook: docs/xiaomi-health-connect-runbook.md.",
+      "id": "training-upload",
+      "title": "Batch: scoring gaps + training-data upload guide",
+      "type": "task",
+      "options": [
+        "Done"
+      ]
+    }
+  ]
+}

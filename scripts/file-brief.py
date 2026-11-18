@@ -30,6 +30,7 @@ def build_payload(
     created_by: str = "supervisor",
     assignee: str = "owner",
     tier: str | None = None,
+    metadata: dict | None = None,
 ) -> dict:
     """Assemble the /api/inbox payload; decisions need >= 2 options."""
     if not title.strip():
@@ -44,10 +45,13 @@ def build_payload(
         "assignee": assignee,
         "options": options,
     }
+    merged = dict(metadata or {})
     if tier is not None:
         if tier not in MERGE_TIERS:
             raise ValueError(f"tier must be one of {MERGE_TIERS}")
-        payload["metadata"] = {"tier": tier}
+        merged["tier"] = tier
+    if merged:
+        payload["metadata"] = merged
     return payload
 
 

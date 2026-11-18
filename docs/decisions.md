@@ -1,3 +1,20 @@
+## JS coverage: c8 dropped, node render tests are the gate (decided) - 2026-11-18
+
+**Status:** Decided under the approved work-tabs follow-up plan (Step 3:
+implement or explicitly drop with reason).
+
+c8 reports 0% on this codebase by construction: `app.js` is an 8k-line
+DOM-bound classic script and the render tests execute eval-sliced
+functions, which V8 attributes to `evalmachine.<anonymous>` outside
+c8's file view (verified empirically 2026-11-18 with node v22: driver
+green, coverage all-zeros). Making c8 see the code needs a DOM harness
+or ESM refactor — cost without signal, since the render tests already
+assert behavior (what line coverage cannot).
+
+The JS gate stays: `node --check` for syntax plus a node-driver render
+test for every behavior-changing JS edit. Revisit only if a UI
+regression escapes both.
+
 ## Spend card lives on Providers, not Fleet (adopted) - owner 2026-11-17
 
 **Status:** Accepted (chat; owner self-corrected in a 44b6eec E2E verdict:
