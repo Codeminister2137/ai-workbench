@@ -43,9 +43,7 @@ def test_extract_command_allows_dryrun_and_http_get() -> None:
         == ".venv/Scripts/python.exe scripts/run-tests.py dashboard"
     )
     assert (
-        e2e_agent_checks.extract_command(
-            "Run `.venv/Scripts/python.exe scripts/run-tests.py full`"
-        )
+        e2e_agent_checks.extract_command("Run `.venv/Scripts/python.exe scripts/run-tests.py full`")
         is None
     )
     assert e2e_agent_checks.extract_command("Run `scripts/x.py --dry-run`") is None
@@ -81,7 +79,7 @@ def test_http_get_probe_checks_status_and_shape() -> None:
             self.end_headers()
             self.wfile.write(body)
 
-        def log_message(self, *args):  # noqa: ANN002, ANN003 - stdlib shape
+        def log_message(self, format: str, *args: object) -> None:  # noqa: A002 - stdlib shape
             pass
 
     server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
