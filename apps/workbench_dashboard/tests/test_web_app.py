@@ -1788,3 +1788,29 @@ def test_disabled_features_do_not_import_implementations(dashboard_server, monke
             get_json(dashboard_server, path)
         assert error.value.code == 409
     assert observed == []
+
+
+def test_orchestrator_routes_query(dashboard_server, tmp_path) -> None:
+    import shutil
+
+    catalog = tmp_path / "packages" / "ai_orchestrator" / "examples"
+    catalog.mkdir(parents=True)
+    shutil.copy(
+        Path("packages/ai_orchestrator/examples/model_catalog.toml"),
+        catalog / "model_catalog.toml",
+    )
+    payload = get_json(dashboard_server, "/api/orchestrator/routes?capability=tools")
+    assert payload["ok"] is True
+    assert payload["routes"]
+    assert payload["routes"][0]["selected"] is True
+    assert all("route_id" in route for route in payload["routes"])
+    narrow = get_json(
+        dashboard_server,
+        "/api/orchestrator/routes?capability=tools&cost_tier=local_only&privacy=local_only",
+    )
+    assert narrow["ok"] is True
+    assert len(narrow["routes"]) <= len(payload["routes"])
+    assert all("ollama" in route["route_id"] for route in narrow["routes"])
+    with pytest.raises(HTTPError) as error:
+        get_json(dashboard_server, "/api/orchestrator/routes?capability=telepathy")
+    assert error.value.code == 400

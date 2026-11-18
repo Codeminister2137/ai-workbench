@@ -922,6 +922,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 return self._send_json({"ok": True, **self._status(config)})
             if path == "/api/evidence":
                 return self._send_json({"ok": True, **evidence_snapshot(self.repo_root)})
+            if path == "/api/orchestrator/routes":
+                return self._send_orchestrator_routes(parsed.query)
             if path == "/api/spend":
                 return self._send_json(
                     {"ok": True, "spend": spend_status(self.data_dir, self.spend_ledger)}
@@ -1320,6 +1322,27 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 "core_views": CORE_VIEWS,
             }
         )
+
+    def _send_orchestrator_routes(self, query: str) -> None:
+        from orchestrator_view import query_routes
+
+        params = parse_qs(query)
+        config = load_config(self.config_path)
+        catalog_path = (
+            Path(config.catalog_path)
+            if config.catalog_path
+            else self.repo_root / "packages/ai_orchestrator/examples/model_catalog.toml"
+        )
+        try:
+            result = query_routes(
+                catalog_path,
+                capabilities=params.get("capability") or None,
+                cost_tier=params.get("cost_tier", ["prepaid_credits_allowed"])[0],
+                privacy=params.get("privacy", ["external_allowed"])[0],
+            )
+        except (ValueError, FileNotFoundError) as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        self._send_json({"ok": True, **result})
 
     def _send_settings(self, config: DashboardConfig) -> None:
         self._send_json(
@@ -1757,8 +1780,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             items = items + [
                 item
                 for item in self._stores().attention_inbox_items()
-                if item.get("id") not in seen
-                and self._stores().project_of(item) == project_id
+                if item.get("id") not in seen and self._stores().project_of(item) == project_id
             ]
         elif wanted is None and for_agent is None:
             seen = {item.get("id") for item in items}
@@ -1823,7 +1845,9 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             return self._send_json({"ok": False, "error": "metadata must be an object"}, status=400)
         project_id = payload.get("project_id")
         if project_id is not None and not isinstance(project_id, str):
-            return self._send_json({"ok": False, "error": "project_id must be a string"}, status=400)
+            return self._send_json(
+                {"ok": False, "error": "project_id must be a string"}, status=400
+            )
         record = stores.create_inbox_task(
             title=title,
             body=body,
