@@ -353,6 +353,13 @@ def build_mai_executor(
     """
 
     def execute(run: dict) -> dict:
+        if not str(run.get("body") or "").strip():
+            return {
+                "status": "failed",
+                "error": "Mai run refused: empty task body (nothing to execute).",
+                "failure_class": "unknown",
+                "source": "mai-session",
+            }
         root = Path(repo_root)
         isolated = None
         if isolate:

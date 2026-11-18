@@ -1590,22 +1590,35 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         except ValueError as exc:
             return self._send_json({"ok": False, "error": str(exc)}, status=404)
         pending = self._stores().get_chat_mode(session_id).get("pending_turn")
+        from chat_agent import split_agent_transcript
+
+        wire = []
+        for message in messages:
+            entry: dict = {
+                "id": message.message_id,
+                "order": message.message_order,
+                "role": message.role,
+                "content": message.content,
+                "provider": message.provider,
+                "model": message.model,
+                "metadata": message.metadata or {},
+            }
+            if message.role == "assistant":
+                try:
+                    view = split_agent_transcript(message.content or "")
+                except Exception:  # noqa: BLE001 - a bad transcript must not break chat
+                    view = None
+                if view is not None and view.has_agent_markers:
+                    entry["agent_turn"] = {
+                        "report": view.report,
+                        "commands": list(view.commands),
+                    }
+            wire.append(entry)
         self._send_json(
             {
                 "ok": True,
                 "pending_turn": pending if isinstance(pending, dict) else None,
-                "messages": [
-                    {
-                        "id": message.message_id,
-                        "order": message.message_order,
-                        "role": message.role,
-                        "content": message.content,
-                        "provider": message.provider,
-                        "model": message.model,
-                        "metadata": message.metadata or {},
-                    }
-                    for message in messages
-                ],
+                "messages": wire,
             }
         )
 

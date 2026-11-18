@@ -331,3 +331,13 @@ def test_capture_tail_marks_truncation_at_line_boundary() -> None:
 
 def test_capture_tail_passthrough_short_output() -> None:
     assert capture_tail("short\n") == "short\n"
+
+
+def test_executor_refuses_empty_task_body() -> None:
+    # An instruction-only run used to reach Mai with an empty Task section
+    # and burn a session answering nothing (2026-11-18 chat turn).
+    receipt = build_mai_executor(".", "u")({"id": "chat-x", "instruction": "lost"})
+    assert receipt["status"] == "failed"
+    assert "empty task body" in receipt["error"]
+    blank = build_mai_executor(".", "u")(_run(body="   "))
+    assert blank["status"] == "failed"

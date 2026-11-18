@@ -148,6 +148,31 @@ function gtext(s) {
     /\b(D4|W\d+|H\d+|M\d+|STT|R[1-3]|T[0-3]|L3|BYOK)\b/g,
     (m) => `<abbr title="${gloss(m)}">${m}</abbr>`);
 }
+function truncate(s, limit) {
+  const text = String(s || "");
+  return text.length <= limit ? text : text.slice(0, limit) + "…";
+}
+/* One Mai activity line -> a readable status line, or null when it is
+   machine noise (fact headers, usage blobs, diagnostics). */
+function humanizeActivity(line) {
+  const text = String(line || "").trim();
+  if (!text) return null;
+  let m = /command_execution\s+(in_progress|completed|failed)\s+-\s+command:\s+(.+)$/.exec(text);
+  if (m) {
+    let cmd = m[2].trim();
+    const head = /^\s*("(?:[^"\\]|\\.)*")\s*(.*)$/.exec(cmd);
+    if (head) {
+      try { cmd = (JSON.parse(head[1]) + " " + head[2]).trim(); } catch (_) { /* keep raw */ }
+    }
+    const verb = m[1] === "in_progress" ? "Running" : m[1] === "completed" ? "Done" : "Failed";
+    return verb + ": " + truncate(cmd, 160);
+  }
+  m = /item\.completed:\s*(.*)/.exec(text);
+  if (m) return truncate(m[1].trim(), 220);
+  if (/turn\.started/.test(text)) return "Turn started.";
+  if (/^(external_agent_activity|effective_route_id|execution_status|coding_session_id|delegation|fallback_|allowance_|route_id|product|provider|model|access_method|cost_policy|external_agent_|total_|process_|python_|primary_|instruction_|context|mode|status|===|[a-z_]+:)/.test(text)) return null;
+  return truncate(text, 220);
+}
 
 /* Client-side list filter over already-fetched items (no backend change). */
 function filterList(listId, query) {
@@ -683,6 +708,19 @@ async function renderChatThread(id, initial) {
     const head = `<span class="role">${esc(m.role)}</span>
      <span class="muted">${m.provider ? esc(m.provider + "/" + (m.model || "")) : ""}</span>`;
     const body = String(m.content || "");
+    if (m.role === "assistant" && m.agent_turn) {
+      const turn = m.agent_turn;
+      const cmds = (turn.commands || []).map((c) => {
+        const st = c.status === "completed" ? "complete" : c.status === "failed" ? "failed" : "reviewing";
+        return `<li><span class="pill st-${st}">${esc(c.status)}</span> `
+          + `<span title="${esc(c.command)}">${esc(truncate(c.command, 160))}</span></li>`;
+      }).join("");
+      const cmdBlock = cmds
+        ? `<p class="muted">Commands (${turn.commands.length})</p><ul class="plain agent-cmds">${cmds}</ul>`
+        : `<p class="muted">No commands ran this turn.</p>`;
+      return `<div class="msg">${head}${cmdBlock}<div>${esc(turn.report || body)}</div>`
+        + `<details><summary>Full transcript (${body.length} chars)</summary><div>${esc(body)}</div></details></div>`;
+    }
     if (m.role !== "assistant" || body.length <= 600) {
       return `<div class="msg">${head}<div>${esc(body)}</div></div>`;
     }
@@ -928,11 +966,10 @@ async function renderChatThread(id, initial) {
         }
         const progress = await api(base + "/progress?message_id=" + encodeURIComponent(progressMessage));
         if (progressStopped) return;
-        const lines = progress.lines || [];
-        const tools = lines.map((line) => /^Tool (\w+)/.exec(line)).filter(Boolean);
-        activity.innerHTML = `<pre>${esc(lines.join("\n"))}</pre>`
-          + `<ul aria-label="Tool checklist">${tools.map((m) => `<li>☑ ${esc(m[1])}</li>`).join("")}</ul>`
-          + `<ul aria-label="Live staged files">${(progress.staged || []).map((f) => `<li>${esc(f.path)} (${esc(f.status)})</li>`).join("")}</ul>`;
+        const feed = (progress.lines || []).map(humanizeActivity).filter(Boolean).slice(-12);
+        const staged = progress.staged || [];
+        activity.innerHTML = `<div class="activity-feed" aria-live="polite">${feed.map((line) => esc(line)).join("\n") || "Starting…"}</div>`
+          + (staged.length ? `<ul aria-label="Live staged files">${staged.map((f) => `<li>${esc(f.path)} (${esc(f.status)})</li>`).join("")}</ul>` : "");
       } catch (_) {
         // Activity is best-effort; the pending turn owns its result.
       } finally {
