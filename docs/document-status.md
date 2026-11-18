@@ -116,6 +116,7 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/plans/search-tooling-landscape-note-20261022.md | KNOWLEDGE | Captured for search-path revisit. |
 | docs/plans/shared-agent-capabilities-options.md | ACTED | Oct-4 checkpoint consumed. |
 | docs/plans/weekly-digest-design.md | ACTED | Digest 2.0 shipped (loop10). |
+| docs/plans/work-tabs-unification-20261117.md | PENDING | Executing 2026-11-18 (owner-approved). |
 | docs/plans/workbench-remote-development-integration-20261027.md | ACTED | Decided 2026-10-27 (C now, B target, A rejected). |
 | docs/plans/workflow-builder-exploration.md | PENDING | Adoption proposal next, then owner decision. |
 | docs/plans/remote-ai-operator-2026/ | TRIAGE | Aggregate; per-file rows future scope. |
