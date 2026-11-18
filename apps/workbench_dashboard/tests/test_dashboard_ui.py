@@ -1438,12 +1438,14 @@ const items = [
   {id: 'x1', title: 'AI job', type: 'task', status: 'open', assignee: 'agent'},
   {id: 'x2', title: 'Archived', type: 'task', status: 'closed', assignee: 'owner'},
 ];
-const api = async (path) => ({items});
+const api = async (path) => ({items, attention_ids: ['f1', 'o1', 'a1', 'a2']});
 const shown = (html) => (html.match(/<li>/g) || []).length;
 (async () => {
   await renderInbox(undefined);
   assert(!view.innerHTML.includes('hidden by filters'), 'default shows all: ' + view.innerHTML.length);
   assert.equal(shown(view.innerHTML), 4);
+  const html = view.innerHTML;
+  assert(html.indexOf('Follow-up') < html.indexOf('Open one'), 'attention order verbatim');
   location.hash = '#/inbox?f=human,open,followup';
   await renderInbox(undefined);
   assert.equal(shown(view.innerHTML), 2);

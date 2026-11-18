@@ -159,13 +159,26 @@ class DashboardStores:
         items, _total = self.inbox.list(limit=MAX_OPEN_TASKS + 1)
         return sum(1 for item in items if item.get("status") == "open")
 
+    @staticmethod
+    def waiting_on(item: dict) -> str:
+        """Whose move next: owner decides, agent closes out.
+
+        Records predating the field default by status: an unanswered
+        item waits on the owner; an answered one waits on AI close-out.
+        """
+        explicit = item.get("waiting_on")
+        if explicit in ("owner", "agent"):
+            return explicit
+        return "agent" if item.get("status") == "answered" else "owner"
+
     def attention_inbox_items(self) -> list[dict]:
         """Human attention items: what the inbox default view must show.
 
-        Human assignee with open, answered, or follow-up state, never the
-        AI queue. Answered-owner items await close-out. The badge counts
-        this set; the list endpoint unions it in so the default view can
-        never hide a badged item past the newest cutoff.
+        Human assignee with open, owner-waiting answered, or follow-up
+        state, never the AI queue. Answered items under AI close-out do
+        not badge the owner. The badge counts this set; the list
+        endpoint unions it in so the default view can never hide a
+        badged item past the newest cutoff.
         """
         items, _total = self.inbox.list(limit=1000)
         return [
@@ -173,7 +186,8 @@ class DashboardStores:
             for item in items
             if item.get("assignee") != "agent"
             and (
-                item.get("status") in ("open", "answered")
+                item.get("status") == "open"
+                or (item.get("status") == "answered" and self.waiting_on(item) == "owner")
                 or (item.get("resolution_kind") or "final") != "final"
             )
         ]
@@ -290,6 +304,7 @@ class DashboardStores:
             "status": "open",
             "created_by": created_by,
             "assignee": assignee,
+            "waiting_on": "agent" if assignee == "agent" else "owner",
             "project_id": project_id,
             "created_at": now,
             "answered_at": None,
@@ -338,10 +353,47 @@ class DashboardStores:
             record["answer"] = answer
             record["option_index"] = None
             record["note"] = None
+        first_answer = record.get("status") != "answered"
         record["status"] = "answered"
         record["answered_at"] = _utc_now()
+        record["waiting_on"] = "agent"
+        if first_answer and not (record.get("metadata") or {}).get("closeout_id"):
+            self._queue_closeout(record)
         self.inbox.put(item_id, record)
         return record
+
+    def _queue_closeout(self, record: dict) -> None:
+        """File the AI close-out task for an owner answer (implement→close).
+
+        Owner rule: the owner decides, never writes reports. Close-out
+        implements the recorded answer, proves it, resolves, and closes.
+        When the open-task cap refuses the filing, the item is flagged
+        so the sweep surfaces it instead of dropping the work silently.
+        """
+        try:
+            task = self.create_inbox_task(
+                title=f"Close out: {str(record.get('title') or record.get('id'))[:80]}",
+                body=(
+                    f"Owner answered '{record.get('id', '')[:8]}' "
+                    f"({record.get('title') or ''}): {record.get('answer') or ''}\n"
+                    f"Note: {record.get('note') or '(none)'}\n\n"
+                    "Implement the answer, run the proving checks, write the "
+                    "resolution on the source item, and close it."
+                ),
+                task_type="task",
+                created_by="supervisor",
+                assignee="agent",
+                project_id=str(record.get("project_id") or WORKBENCH_PROJECT_ID),
+                metadata={"closeout_for": record.get("id")},
+                context_refs=[f"inbox:{record.get('id')}"],
+            )
+        except StoreError:
+            record["closeout_pending"] = True
+            return
+        metadata = dict(record.get("metadata") or {})
+        metadata["closeout_id"] = task["id"]
+        record["metadata"] = metadata
+        record.pop("closeout_pending", None)
 
     def close_inbox_task(
         self,
@@ -368,6 +420,7 @@ class DashboardStores:
         record["resolution_kind"] = resolution_kind
         record["resolved_at"] = _utc_now()
         record["status"] = "closed"
+        record["waiting_on"] = None
         self.inbox.put(item_id, record)
         return record
 
@@ -379,6 +432,7 @@ class DashboardStores:
         if record.get("status") != "closed":
             raise StoreError("Only closed tasks can be reopened")
         record["status"] = "open"
+        record["waiting_on"] = "owner"
         self.inbox.put(item_id, record)
         return record
 

@@ -1817,8 +1817,10 @@ async function renderInbox(id) {
     });
     return;
   }
+  const params = new URLSearchParams(location.hash.split("?")[1] || "");
+  const explicitFilters = params.has("f");
   const picked = pickedTokens("f", "human,open,answered,followup");
-  const inboxProj = new URLSearchParams(location.hash.split("?")[1] || "").get("project") || "";
+  const inboxProj = params.get("project") || "";
   const inboxUrl = inboxProj ? "/api/inbox?project_id=" + encodeURIComponent(inboxProj) : "/api/inbox";
   const payload = await api(inboxUrl);
   const isFollowup = (t) => (t.resolution_kind || "final") !== "final";
@@ -1828,10 +1830,15 @@ async function renderInbox(id) {
     if (isFollowup(t)) s.push("followup");
     return s;
   };
-  const shown = payload.items.filter((t) => picked.has(who(t)) && states(t).some((s) => picked.has(s)));
-  const isAttention = (t) => who(t) === "human"
-    && ((t.status || "open") === "open" || t.status === "answered" || isFollowup(t));
-  const hiddenCount = payload.items.filter((t) => isAttention(t) && !shown.includes(t)).length;
+  // Default view renders the backend attention set verbatim (badge == view
+  // by construction); explicit filter tokens narrow it with the banner.
+  const attentionOrder = new Map((payload.attention_ids || []).map((id, i) => [id, i]));
+  const inAttention = (t) => attentionOrder.has(t.id);
+  const shown = (!explicitFilters && !inboxProj)
+    ? payload.items.filter(inAttention).sort((a, b) => attentionOrder.get(a.id) - attentionOrder.get(b.id))
+    : payload.items.filter((t) => picked.has(who(t)) && states(t).some((s) => picked.has(s)));
+  const shownIds = new Set(shown.map((t) => t.id));
+  const hiddenCount = (payload.attention_ids || []).filter((id) => !shownIds.has(id)).length;
   const divergence = hiddenCount || inboxProj
     ? `<p class="muted"><strong>${hiddenCount ? hiddenCount + " attention item" + (hiddenCount === 1 ? "" : "s") + " hidden by filters. " : ""}${inboxProj ? "Project filter active — the badge counts all projects. " : ""}</strong><a href="#/inbox">Show all</a></p>`
     : "";

@@ -758,17 +758,28 @@ def pointer_mission(merge: str, task_id: str, unclear: list[dict]) -> str:
     )
 
 
-def queue_pointer_run(stores, merge: str, task_id: str, unclear: list[dict]) -> dict:
+def queue_pointer_run(
+    stores,
+    merge: str,
+    task_id: str,
+    unclear: list[dict],
+    *,
+    attempt: int = 0,
+    note: str = "",
+) -> dict:
     """Queue a preapproved agent run to author pointers (human escalation last)."""
     run_id = uuid.uuid4().hex
     now = datetime.now(UTC).isoformat()
     task = stores.e2e_tasks.get(task_id) or {}
     project_id = task.get("project_id") or WORKBENCH_PROJECT_ID
+    body = pointer_mission(merge, task_id, unclear)
+    if note.strip():
+        body += f"\n\nPrevious attempt declined: {note.strip()}\nAnswer it with concrete live evidence (view hashes, API probes, suite commands) instead of declining again."
     run = {
         "id": run_id,
         "title": f"E2E pointers: {merge}",
         "status": "queued",
-        "body": pointer_mission(merge, task_id, unclear),
+        "body": body,
         "origin": POINTER_RUN_KIND,
         "fanout_policy": "restricted",
         "fanout_effective": "restricted",
@@ -783,17 +794,39 @@ def queue_pointer_run(stores, merge: str, task_id: str, unclear: list[dict]) -> 
             "task_id": task_id,
             "merge": merge,
             "unclear": unclear,
+            "attempt": attempt,
         },
     }
     stores.runs.put(run_id, run)
     return run
 
 
-def file_owner_pointers(stores, merge: str, unclear: list[dict]) -> dict:
-    """File the owner pointer request (agent declined, failed, or invalid)."""
+def file_owner_pointers(stores, merge: str, unclear: list[dict], reason: str | None = None) -> dict:
+    """File the owner pointer request (agent declined, failed, or invalid).
+
+    Deduped at file time: an open tracker for the same merge is reused
+    instead of paging the owner twice for one draft. A decline reason,
+    when known, is attached so the owner sees why AI gave up.
+    """
+    items, _total = stores.inbox.list(limit=1000)
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        if item.get("status") not in ("open", "answered"):
+            continue
+        if item.get("assignee") == "agent":
+            continue
+        metadata = item.get("metadata") or {}
+        if metadata.get("kind") == "e2e-pointers" and metadata.get("merge_commit") == merge:
+            return item
+        if item.get("title") == f"E2E pointers needed: {merge}":
+            return item  # legacy tracker without metadata
+    body = pointer_body(merge, unclear)
+    if isinstance(reason, str) and reason.strip():
+        body += f"\n\nAgent decline reason: {reason.strip()}"
     return stores.create_inbox_task(
         title=f"E2E pointers needed: {merge}",
-        body=pointer_body(merge, unclear),
+        body=body,
         task_type="clarification",
         created_by="supervisor",
         assignee="owner",
@@ -860,6 +893,30 @@ def _pointer_steps(receipt: dict) -> dict | None:
     return None
 
 
+def _pointer_decline(receipt: dict) -> str | None:
+    """Extract the agent's DECLINE reason, if it declined (either channel)."""
+    if not isinstance(receipt, dict):
+        return None
+    worktree = receipt.get("worktree") or ""
+    if worktree:
+        try:
+            path = Path(worktree) / "pointers.json"
+            if path.is_file() and path.stat().st_size <= POINTER_VERDICT_MAX_BYTES:
+                payload = json.loads(path.read_text(encoding="utf-8"), strict=False)
+                if isinstance(payload, dict) and str(payload.get("declined") or "").strip():
+                    return str(payload["declined"]).strip()[:500]
+        except (OSError, ValueError):
+            pass
+    for key in ("stdout_tail", "summary"):
+        text = str(receipt.get(key) or "")
+        index = text.find("DECLINE:")
+        if index != -1:
+            reason = text[index + len("DECLINE:") :].strip().splitlines()
+            if reason and reason[0].strip():
+                return reason[0].strip()[:500]
+    return None
+
+
 def route_pointer_runs(stores) -> list[dict]:
     """Route terminal pointer runs: finalize on valid steps, else escalate.
 
@@ -886,10 +943,12 @@ def route_pointer_runs(stores) -> list[dict]:
             outcome["action"] = "stale"
         else:
             action = "escalated"
+            reason: str | None = None
             if run.get("status") == "completed":
                 receipts = run.get("receipts") or []
                 receipt = receipts[-1] if receipts else {}
-                steps = _pointer_steps(receipt if isinstance(receipt, dict) else {})
+                receipt = receipt if isinstance(receipt, dict) else {}
+                steps = _pointer_steps(receipt)
                 if steps:
                     try:
                         stores.finalize_e2e_task(task_id, steps)
@@ -909,7 +968,16 @@ def route_pointer_runs(stores) -> list[dict]:
                     else:
                         file_owner_pointers(stores, merge, unclear)
                 elif action == "escalated":
-                    file_owner_pointers(stores, merge, unclear)
+                    reason = _pointer_decline(receipt)
+                    attempt = metadata.get("attempt", 0)
+                    if reason and (not isinstance(attempt, int) or attempt < 1):
+                        retry = queue_pointer_run(
+                            stores, merge, task_id, unclear, attempt=1, note=reason
+                        )
+                        outcome["retry_run_id"] = retry["id"]
+                        action = "requeued"
+                    else:
+                        file_owner_pointers(stores, merge, unclear, reason=reason)
             else:
                 file_owner_pointers(stores, merge, unclear)
             outcome["action"] = action

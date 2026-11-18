@@ -1772,7 +1772,14 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         for item in items:
             if isinstance(item, dict):
                 item["run_status"] = latest.get(item.get("id", "")) or None
-        self._send_json({"ok": True, "items": items, "total": len(items)})
+        attention_ids = [
+            item.get("id")
+            for item in self._stores().attention_inbox_items()
+            if isinstance(item, dict) and item.get("id")
+        ]
+        self._send_json(
+            {"ok": True, "items": items, "total": len(items), "attention_ids": attention_ids}
+        )
 
     @staticmethod
     def _inbox_item_in_project(item: dict, project_runs: set) -> bool:

@@ -14,15 +14,40 @@ def stores(tmp_path):
     return DashboardStores(tmp_path / "data")
 
 
-def test_attention_inbox_counts_answered_owner(stores) -> None:
+def test_attention_inbox_counts_owner_waiting_only(stores) -> None:
     record = stores.create_inbox_task(
         title="Q?", body="b", task_type="decision", options=["A", "B"], assignee="owner"
     )
     assert stores.attention_inbox_count() == 1
     stores.answer_inbox_task(record["id"], answer="", option_index=0)
+    assert stores.attention_inbox_count() == 0  # AI close-out owns it now
+    stored = stores.inbox.get(record["id"])
+    assert stored is not None
+    stored["waiting_on"] = "owner"  # AI re-asks: back to the owner
+    stores.inbox.put(record["id"], stored)
     assert stores.attention_inbox_count() == 1
     stores.create_inbox_task(title="work", body="b", task_type="task", assignee="agent")
     assert stores.attention_inbox_count() == 1
+
+
+def test_answer_queues_ai_closeout_once(stores) -> None:
+    record = stores.create_inbox_task(
+        title="Q?", body="b", task_type="decision", options=["A", "B"], assignee="owner"
+    )
+    stores.answer_inbox_task(record["id"], answer="", option_index=0)
+    stored = stores.inbox.get(record["id"])
+    assert stored is not None
+    assert stored["waiting_on"] == "agent"
+    closeout_id = (stored.get("metadata") or {}).get("closeout_id")
+    assert closeout_id
+    closeout = stores.inbox.get(closeout_id)
+    assert closeout is not None
+    assert closeout["assignee"] == "agent"
+    assert closeout["status"] == "open"
+    assert "A" in (closeout.get("body") or "")
+    stores.answer_inbox_task(record["id"], answer="changed")
+    items, _ = stores.inbox.list(limit=100)
+    assert sum(1 for i in items if (i.get("title") or "").startswith("Close out:")) == 1
 
 
 def test_attention_e2e_counts_open_only_not_drafts(stores) -> None:
@@ -314,15 +339,45 @@ def test_pointer_run_completed_finalizes_task(stores) -> None:
     assert stores.attention_inbox_count() == 0
 
 
-def test_pointer_run_declined_files_owner_item(stores) -> None:
+def test_pointer_run_first_decline_requeues_once(stores) -> None:
     from e2e_promotion import route_pointer_runs
 
     task = _pointer_draft(stores)
     _pointer_run(stores, task["id"], status="completed", summary="DECLINE: needs human eyes")
     outcomes = route_pointer_runs(stores)
-    assert outcomes[0]["action"] == "escalated"
+    assert outcomes[0]["action"] == "requeued"
     assert stores.e2e_tasks.get(task["id"])["status"] == "draft"
+    assert stores.attention_inbox_count() == 0
+    retry = stores.runs.get(outcomes[0]["retry_run_id"])
+    assert retry is not None
+    assert retry["metadata"]["attempt"] == 1
+    assert "needs human eyes" in retry["body"]
+
+
+def test_pointer_run_second_decline_escalates_with_reason(stores) -> None:
+    from e2e_promotion import route_pointer_runs
+
+    task = _pointer_draft(stores)
+    run_id = _pointer_run(stores, task["id"], status="completed", summary="DECLINE: x")
+    run = stores.runs.get(run_id)
+    assert run is not None
+    run["metadata"]["attempt"] = 1
+    stores.runs.put(run_id, run)
+    outcomes = route_pointer_runs(stores)
+    assert outcomes[0]["action"] == "escalated"
+    items, _ = stores.inbox.list(limit=10)
+    assert any("Agent decline reason: x" in (i.get("body") or "") for i in items)
     assert stores.attention_inbox_count() == 1
+
+
+def test_owner_pointers_deduped_per_merge(stores) -> None:
+    from e2e_promotion import file_owner_pointers
+
+    first = file_owner_pointers(stores, "abc123", [])
+    second = file_owner_pointers(stores, "abc123", [])
+    assert first["id"] == second["id"]
+    items, _ = stores.inbox.list(limit=100)
+    assert sum(1 for i in items if i.get("title") == "E2E pointers needed: abc123") == 1
 
 
 def test_pointer_run_failed_files_owner_item(stores) -> None:
@@ -340,10 +395,12 @@ def test_pointer_router_skips_routed_and_running(stores) -> None:
 
     task = _pointer_draft(stores)
     run_id = _pointer_run(stores, task["id"], status="completed", summary="DECLINE: x")
-    assert len(route_pointer_runs(stores)) == 1
+    first = route_pointer_runs(stores)
+    assert len(first) == 1
+    assert first[0]["action"] == "requeued"
     assert route_pointer_runs(stores) == []
     run = stores.runs.get(run_id)
-    assert run["metadata"]["routed"] == "escalated"
+    assert run["metadata"]["routed"] == "requeued"
 
 
 def test_pointer_router_stale_when_task_gone(stores) -> None:
