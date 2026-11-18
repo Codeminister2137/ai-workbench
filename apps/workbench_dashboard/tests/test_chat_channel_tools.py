@@ -150,9 +150,10 @@ def test_list_pending_inbox_without_secrets(
     tool = _channel_tool(stores, library, "list_pending_inbox")
     result = _run_guarded(tool, {}, tmp_path)
     assert not result.is_error
-    assert "2 open inbox items" in result.output
+    assert "3 open inbox items" in result.output  # + AI close-out for the answer
     assert first["id"] in result.output
     assert "Approve agent run: widget" in result.output
+    assert "Close out: Old task" in result.output
     assert secret not in result.output
     assert "hunter2" not in result.output
     assert "red or blue?" not in result.output

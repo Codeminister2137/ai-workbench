@@ -400,7 +400,27 @@ def test_filtered_totals_count_matches(dashboard_server) -> None:
     assert answered["total"] == 1
     assert len(answered["items"]) == 1
     still_open = get_json(dashboard_server, "/api/inbox?status=open")
-    assert still_open["total"] == 1
+    assert still_open["total"] == 2  # Two + AI close-out for the answer
+    assert any(i["title"].startswith("Close out:") for i in still_open["items"])
+
+
+def test_inbox_default_carries_attention_ids(dashboard_server) -> None:
+    """Badge == default view: attention_ids is the single backend truth."""
+    first = post_json(
+        dashboard_server,
+        "/api/inbox",
+        {"title": "One", "body": "1", "type": "decision", "options": ["A"]},
+    )
+    post_json(dashboard_server, "/api/inbox", {"title": "Two", "body": "2", "type": "task"})
+    payload = get_json(dashboard_server, "/api/inbox")
+    assert set(payload["attention_ids"]) == {i["id"] for i in payload["items"]}
+    status = get_json(dashboard_server, "/api/status")
+    assert status["attention_inbox"] == len(payload["attention_ids"])
+    post_json(dashboard_server, f"/api/inbox/{first['id']}/answer", {"answer": "A"})
+    payload = get_json(dashboard_server, "/api/inbox")
+    assert first["id"] not in payload["attention_ids"]  # AI close-out owns it
+    status = get_json(dashboard_server, "/api/status")
+    assert status["attention_inbox"] == len(payload["attention_ids"])
 
 
 def test_run_report_request_creates_order_task(dashboard_server, tmp_path) -> None:

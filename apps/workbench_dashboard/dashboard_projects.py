@@ -167,6 +167,11 @@ def list_goals(repo_root: Path) -> list[dict[str, Any]]:
     return goals
 
 
+def repo_project_id(repo_root: Path | str) -> str:
+    """Registry id the workbench root project carries on this machine."""
+    return root_id(Path(repo_root).resolve())
+
+
 def create_project(
     data_dir: Path,
     *,
@@ -174,6 +179,7 @@ def create_project(
     root: str,
     description: str = "",
     project_type: str = "general",
+    explainer: str = "",
 ) -> dict[str, Any]:
     """Register a project root; refuses duplicates, missing dirs, bad names."""
     if not isinstance(name, str) or not name.strip() or len(name) > MAX_NAME_CHARS:
@@ -184,6 +190,8 @@ def create_project(
         raise StagedEditError(f"Project type must be one of {PROJECT_TYPES}")
     if not isinstance(root, str) or not root.strip():
         raise StagedEditError("Project root is required")
+    if not isinstance(explainer, str):
+        raise StagedEditError("Project explainer must be a string")
     resolved = Path(root.strip()).resolve()
     if not resolved.is_dir():
         raise StagedEditError("Project root is not a directory")
@@ -197,6 +205,7 @@ def create_project(
         "root": str(resolved),
         "description": description.strip(),
         "type": project_type,
+        "explainer": explainer.strip(),
         "created_at_utc": _utc_now(),
     }
     registry[project_id] = record

@@ -652,3 +652,38 @@ def test_flags_needs_attention_runs() -> None:
     findings, _resolved = SWEEP.collect_runs(runs, [], NOW)
     by_key = {f["key"]: f for f in findings}
     assert by_key["R1:na1"]["fileable"] is True
+
+
+def test_r3_flags_lost_staged_branch(tmp_path: Path) -> None:
+    import subprocess
+
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.email", "t@t"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=tmp_path, check=True)
+    (tmp_path / "f.txt").write_text("x", encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "-qm", "init"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "branch", "live-branch"], cwd=tmp_path, check=True)
+    runs = [
+        {
+            "id": "gone",
+            "title": "Lost work",
+            "status": "branch-ready",
+            "created_at_utc": _ts(100),
+            "branch": "deleted-branch",
+            "commit": "deadbee",
+        },
+        {
+            "id": "here",
+            "title": "Live work",
+            "status": "branch-ready",
+            "created_at_utc": _ts(100),
+            "branch": "live-branch",
+        },
+    ]
+    findings, _resolved = SWEEP.collect_runs(runs, [], NOW, (), tmp_path)
+    by_key = {f["key"]: f for f in findings}
+    assert "lost staged branch" in by_key["R3:gone"]["title"]
+    assert "close the run record" in by_key["R3:gone"]["action"]
+    assert by_key["R3:gone"]["fileable"] is True
+    assert "awaiting merge" in by_key["R3:here"]["title"]

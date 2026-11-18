@@ -1075,23 +1075,36 @@ async function renderPlans(id) {
              <span class="pill st-${esc((r.status || "none").replace(/\s+/g, "-"))}">${esc(r.status || "")}</span></li>`).join("") + `</ul>`
         : "";
     } catch (err) { linkedRuns = ""; }
+    let linkedPlans = "";
+    try {
+      const kids = await api("/api/plans?parent_plan_id=" + encodeURIComponent(id));
+      linkedPlans = kids.items.length
+        ? `<h3>Linked plans</h3><ul class="plain">` + kids.items.map((k) =>
+            `<li><a href="#/plans/${esc(k.id)}">${gtext(k.title || k.id)}</a>
+             <span class="pill st-${esc((k.status || "none").replace(/\s+/g, "-"))}">${esc(k.status || "")}</span></li>`).join("") + `</ul>`
+        : "";
+    } catch (err) { linkedPlans = ""; }
     view.innerHTML = `<h1>Plan</h1><p><a href="#/plans">All plans</a></p>
       <div class="card"><h2>${gtext(plan.title || plan.id)}</h2>
       <p class="muted">${esc(plan.status || "")}${plan.updated_at_utc ? " · updated " + esc(plan.updated_at_utc) : ""}</p>
-      <p><strong>Phase:</strong> <span class="pill">${esc(plan.phase || plan.status || "unknown")}</span></p>
+      <p><strong>Phase:</strong> <span class="pill">${esc(plan.phase || plan.status || "unknown")}</span>
+      <span class="pill st-${esc(plan.kind || "plan")}">${esc(plan.kind || "plan")}</span></p>
       ${plan.source ? `<p class="muted">Source: ${esc(plan.source)}</p>` : ""}
       <h3>Phase checklist</h3>
       ${phaseChecklistHtml(plan)}
-      <pre>${gtext(plan.body || "(empty plan)")}</pre>${linkedRuns}</div>`;
+      <pre>${gtext(plan.body || "(empty plan)")}</pre>${linkedRuns}${linkedPlans}</div>`;
     return;
   }
   const picked = pickedTokens("f", "active");
   const payload = await api("/api/plans");
   const planState = (p) => p.status === "complete" ? "complete" : "active";
-  const shownPlans = payload.items.filter((p) => picked.has(planState(p)));
+  const kindOf = (p) => p.kind || "plan";
+  const shownPlans = payload.items.filter((p) => picked.has(planState(p)))
+    .sort((a, b) => (kindOf(a) === "roadmap" ? 0 : 1) - (kindOf(b) === "roadmap" ? 0 : 1));
   const items = shownPlans.length
     ? shownPlans.map((p) =>
         `<li><a href="#/plans/${esc(p.id)}">${gtext(p.title || p.id)}</a>
+         <span class="pill st-${esc(kindOf(p))}">${esc(kindOf(p))}</span>
          <span class="pill st-${esc((p.status || "none").replace(/\s+/g, "-"))}">${esc(p.status || "")}</span></li>`).join("")
     : '<li class="muted">No plans match these filters.</li>';
   const groups = [
@@ -1110,11 +1123,26 @@ async function renderProjects(id) {
     const payload = await api("/api/projects/" + encodeURIComponent(id));
     const p = payload.project;
     const isBook = moduleActive("books") && (p.type || "general") === "book";
+    const rel = payload.related || {};
+    const relSection = (key, label, hash) => {
+      const entries = rel[key] || [];
+      if (!entries.length) return "";
+      const rows = entries.slice(0, 20).map((e) =>
+        `<li><a href="#/${hash}/${esc(e.id)}">${gtext(e.title || e.id)}</a>
+         <span class="pill st-${esc((e.status || "none").replace(/\s+/g, "-"))}">${esc(e.status || "")}</span></li>`).join("");
+      const more = entries.length > 20 ? `<li class="muted">+${entries.length - 20} more</li>` : "";
+      return `<h3>${label} (${entries.length})</h3><ul class="plain">${rows}${more}</ul>`;
+    };
     view.innerHTML = `<h1>Project</h1><p><a href="#/projects">All projects</a></p>
       <div class="card"><h2>${gtext(p.name)}</h2>
       <p><span class="pill st-${esc(p.type || "general")}">${esc(p.type || "general")}</span></p>
       <p class="muted">${esc(p.root || "")}</p>
       ${p.description ? `<p class="inbox-body">${gtext(p.description)}</p>` : ""}
+      ${p.explainer ? `<p class="muted">About: <strong>${esc(p.explainer)}</strong></p>` : ""}
+      ${relSection("plans", "Plans", "plans")}
+      ${relSection("inbox", "Inbox", "inbox")}
+      ${relSection("runs", "Runs", "runs")}
+      ${relSection("e2e_tasks", "E2E checklists", "e2e")}
       ${isBook ? `<p>Manuscript: <strong>${esc(p.manuscript || "not set")}</strong></p>
       <form id="ms-form" class="inline">
         <input type="text" name="path" placeholder="draft.md (root-relative)..." title="Manuscript path, relative to the project root" value="${esc(p.manuscript || "")}">
@@ -1817,8 +1845,10 @@ async function renderInbox(id) {
     });
     return;
   }
+  const params = new URLSearchParams(location.hash.split("?")[1] || "");
+  const explicitFilters = params.has("f");
   const picked = pickedTokens("f", "human,open,answered,followup");
-  const inboxProj = new URLSearchParams(location.hash.split("?")[1] || "").get("project") || "";
+  const inboxProj = params.get("project") || "";
   const inboxUrl = inboxProj ? "/api/inbox?project_id=" + encodeURIComponent(inboxProj) : "/api/inbox";
   const payload = await api(inboxUrl);
   const isFollowup = (t) => (t.resolution_kind || "final") !== "final";
@@ -1828,10 +1858,15 @@ async function renderInbox(id) {
     if (isFollowup(t)) s.push("followup");
     return s;
   };
-  const shown = payload.items.filter((t) => picked.has(who(t)) && states(t).some((s) => picked.has(s)));
-  const isAttention = (t) => who(t) === "human"
-    && ((t.status || "open") === "open" || t.status === "answered" || isFollowup(t));
-  const hiddenCount = payload.items.filter((t) => isAttention(t) && !shown.includes(t)).length;
+  // Default view renders the backend attention set verbatim (badge == view
+  // by construction); explicit filter tokens narrow it with the banner.
+  const attentionOrder = new Map((payload.attention_ids || []).map((id, i) => [id, i]));
+  const inAttention = (t) => attentionOrder.has(t.id);
+  const shown = (!explicitFilters && !inboxProj)
+    ? payload.items.filter(inAttention).sort((a, b) => attentionOrder.get(a.id) - attentionOrder.get(b.id))
+    : payload.items.filter((t) => picked.has(who(t)) && states(t).some((s) => picked.has(s)));
+  const shownIds = new Set(shown.map((t) => t.id));
+  const hiddenCount = (payload.attention_ids || []).filter((id) => !shownIds.has(id)).length;
   const divergence = hiddenCount || inboxProj
     ? `<p class="muted"><strong>${hiddenCount ? hiddenCount + " attention item" + (hiddenCount === 1 ? "" : "s") + " hidden by filters. " : ""}${inboxProj ? "Project filter active — the badge counts all projects. " : ""}</strong><a href="#/inbox">Show all</a></p>`
     : "";

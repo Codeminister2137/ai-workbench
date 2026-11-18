@@ -22,6 +22,42 @@ def test_sync_plan_round_trip(tmp_path) -> None:
     assert stored["title"] == "Evening loop"
 
 
+def test_sync_plan_roadmap_kind_and_parent(tmp_path) -> None:
+    source = tmp_path / "r.md"
+    source.write_text("# Roadmap\n", encoding="utf-8")
+    stores = DashboardStores(tmp_path / "data")
+    record = sync_plan(
+        stores,
+        plan_id="roadmap-x",
+        title="X Roadmap",
+        source_file=source,
+        status="active",
+        kind="roadmap",
+    )
+    assert record["kind"] == "roadmap"
+    assert record["parent_plan_id"] is None
+    child = sync_plan(
+        stores,
+        plan_id="plan-1",
+        title="Slice",
+        source_file=source,
+        status="active",
+        parent_plan_id="roadmap-x",
+    )
+    assert child["kind"] == "plan"
+    assert child["parent_plan_id"] == "roadmap-x"
+    assert child["project_id"] == stores.default_project_id()
+    with pytest.raises(StoreError):
+        sync_plan(
+            stores,
+            plan_id="bad",
+            title="x",
+            source_file=source,
+            status="active",
+            kind="epic",
+        )
+
+
 def test_sync_plan_missing_file(tmp_path) -> None:
     stores = DashboardStores(tmp_path / "data")
     with pytest.raises(StoreError):

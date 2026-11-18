@@ -284,11 +284,32 @@ def _prior_sweep_resolution(inbox: list[dict[str, Any]], rid: str) -> str | None
     return None
 
 
+def _staged_refs_resolve(repo: Path | None, run: dict[str, Any]) -> bool:
+    """True when a branch-ready run's staged branch/commit still resolves.
+
+    Skipped (True) without a repo: unit tests without git keep the old
+    finding. A run naming neither ref keeps the old finding too — there
+    is nothing verifiable to check.
+    """
+    branch = str(run.get("branch") or "").strip()
+    commit = str(run.get("commit") or "").strip()
+    if repo is None or (not branch and not commit):
+        return True
+    for ref in [r for r in (branch, f"refs/heads/{branch}" if branch else "", commit) if r]:
+        try:
+            _git(repo, "rev-parse", "--verify", "--quiet", ref)
+            return True
+        except RuntimeError:
+            continue
+    return False
+
+
 def collect_runs(
     runs: list[dict[str, Any]],
     inbox: list[dict[str, Any]],
     now: datetime,
     merged_branches: tuple[str, ...] = (),
+    repo: Path | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Collect run findings; resolved-first: a closed loop never files.
 
@@ -433,17 +454,34 @@ def collect_runs(
                 )
             )
         elif status == "branch-ready":
-            findings.append(
-                _finding(
-                    f"R3:{rid}",
-                    "R3",
-                    f"Branch-ready run awaiting merge: {title[:70]}",
-                    "agent",
-                    "Review the staged branch and merge or close the run.",
-                    [_member(rid, title, age)],
-                    age,
+            if _staged_refs_resolve(repo, run):
+                findings.append(
+                    _finding(
+                        f"R3:{rid}",
+                        "R3",
+                        f"Branch-ready run awaiting merge: {title[:70]}",
+                        "agent",
+                        "Review the staged branch and merge or close the run.",
+                        [_member(rid, title, age)],
+                        age,
+                    )
                 )
-            )
+            else:
+                findings.append(
+                    _finding(
+                        f"R3:{rid}",
+                        "R3",
+                        f"Branch-ready run with lost staged branch: {title[:70]}",
+                        "agent",
+                        _verify_first_action(
+                            "Staged branch/commit resolve nowhere; verify the work "
+                            "landed elsewhere, then close the run record.",
+                            age,
+                        ),
+                        [_member(rid, title, age, str(run.get("branch") or ""))],
+                        age,
+                    )
+                )
         elif status == "live":
             findings.append(
                 _finding(
@@ -1119,7 +1157,7 @@ def run(
     except RuntimeError:
         merged_branches = ()
     findings: list[dict[str, Any]] = []
-    run_findings, resolved = collect_runs(runs, inbox, now, merged_branches)
+    run_findings, resolved = collect_runs(runs, inbox, now, merged_branches, repo)
     findings += run_findings
     findings += collect_inbox(inbox, now, runs)
     e2e_findings, e2e_resolved = collect_e2e(tasks, reports, runs, inbox, now)

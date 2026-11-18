@@ -416,7 +416,12 @@ class DashboardChat:
         )
 
     def draft_plan(
-        self, session_id: str, *, stores: DashboardStores, title: str | None = None
+        self,
+        session_id: str,
+        *,
+        stores: DashboardStores,
+        title: str | None = None,
+        project: str | None = None,
     ) -> dict:
         """Draft a proposed plan deterministically from a chat transcript.
 
@@ -459,6 +464,7 @@ class DashboardChat:
             "title": plan_title[:200],
             "status": "proposed",
             "body": body,
+            "project_id": project or stores.default_project_id(),
             "source": f"chat:{session_id}",
             "updated_at_utc": datetime.now(UTC).isoformat(),
         }

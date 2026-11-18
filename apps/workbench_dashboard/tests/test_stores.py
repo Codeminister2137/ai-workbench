@@ -9,15 +9,40 @@ def stores(tmp_path):
     return DashboardStores(tmp_path / "data")
 
 
-def test_attention_inbox_counts_answered_owner(stores) -> None:
+def test_attention_inbox_counts_owner_waiting_only(stores) -> None:
     record = stores.create_inbox_task(
         title="Q?", body="b", task_type="decision", options=["A", "B"], assignee="owner"
     )
     assert stores.attention_inbox_count() == 1
     stores.answer_inbox_task(record["id"], answer="", option_index=0)
+    assert stores.attention_inbox_count() == 0  # AI close-out owns it now
+    stored = stores.inbox.get(record["id"])
+    assert stored is not None
+    stored["waiting_on"] = "owner"  # AI re-asks: back to the owner
+    stores.inbox.put(record["id"], stored)
     assert stores.attention_inbox_count() == 1
     stores.create_inbox_task(title="work", body="b", task_type="task", assignee="agent")
     assert stores.attention_inbox_count() == 1
+
+
+def test_answer_queues_ai_closeout_once(stores) -> None:
+    record = stores.create_inbox_task(
+        title="Q?", body="b", task_type="decision", options=["A", "B"], assignee="owner"
+    )
+    stores.answer_inbox_task(record["id"], answer="", option_index=0)
+    stored = stores.inbox.get(record["id"])
+    assert stored is not None
+    assert stored["waiting_on"] == "agent"
+    closeout_id = (stored.get("metadata") or {}).get("closeout_id")
+    assert closeout_id
+    closeout = stores.inbox.get(closeout_id)
+    assert closeout is not None
+    assert closeout["assignee"] == "agent"
+    assert closeout["status"] == "open"
+    assert "A" in (closeout.get("body") or "")
+    stores.answer_inbox_task(record["id"], answer="changed")
+    items, _ = stores.inbox.list(limit=100)
+    assert sum(1 for i in items if (i.get("title") or "").startswith("Close out:")) == 1
 
 
 def test_attention_e2e_counts_open_only_not_drafts(stores) -> None:
@@ -309,15 +334,45 @@ def test_pointer_run_completed_finalizes_task(stores) -> None:
     assert stores.attention_inbox_count() == 0
 
 
-def test_pointer_run_declined_files_owner_item(stores) -> None:
+def test_pointer_run_first_decline_requeues_once(stores) -> None:
     from e2e_promotion import route_pointer_runs
 
     task = _pointer_draft(stores)
     _pointer_run(stores, task["id"], status="completed", summary="DECLINE: needs human eyes")
     outcomes = route_pointer_runs(stores)
-    assert outcomes[0]["action"] == "escalated"
+    assert outcomes[0]["action"] == "requeued"
     assert stores.e2e_tasks.get(task["id"])["status"] == "draft"
+    assert stores.attention_inbox_count() == 0
+    retry = stores.runs.get(outcomes[0]["retry_run_id"])
+    assert retry is not None
+    assert retry["metadata"]["attempt"] == 1
+    assert "needs human eyes" in retry["body"]
+
+
+def test_pointer_run_second_decline_escalates_with_reason(stores) -> None:
+    from e2e_promotion import route_pointer_runs
+
+    task = _pointer_draft(stores)
+    run_id = _pointer_run(stores, task["id"], status="completed", summary="DECLINE: x")
+    run = stores.runs.get(run_id)
+    assert run is not None
+    run["metadata"]["attempt"] = 1
+    stores.runs.put(run_id, run)
+    outcomes = route_pointer_runs(stores)
+    assert outcomes[0]["action"] == "escalated"
+    items, _ = stores.inbox.list(limit=10)
+    assert any("Agent decline reason: x" in (i.get("body") or "") for i in items)
     assert stores.attention_inbox_count() == 1
+
+
+def test_owner_pointers_deduped_per_merge(stores) -> None:
+    from e2e_promotion import file_owner_pointers
+
+    first = file_owner_pointers(stores, "abc123", [])
+    second = file_owner_pointers(stores, "abc123", [])
+    assert first["id"] == second["id"]
+    items, _ = stores.inbox.list(limit=100)
+    assert sum(1 for i in items if i.get("title") == "E2E pointers needed: abc123") == 1
 
 
 def test_pointer_run_failed_files_owner_item(stores) -> None:
@@ -335,10 +390,12 @@ def test_pointer_router_skips_routed_and_running(stores) -> None:
 
     task = _pointer_draft(stores)
     run_id = _pointer_run(stores, task["id"], status="completed", summary="DECLINE: x")
-    assert len(route_pointer_runs(stores)) == 1
+    first = route_pointer_runs(stores)
+    assert len(first) == 1
+    assert first[0]["action"] == "requeued"
     assert route_pointer_runs(stores) == []
     run = stores.runs.get(run_id)
-    assert run["metadata"]["routed"] == "escalated"
+    assert run["metadata"]["routed"] == "requeued"
 
 
 def test_pointer_router_stale_when_task_gone(stores) -> None:
@@ -540,3 +597,68 @@ def test_queue_pointer_run_prefiled_and_runnable(stores) -> None:
     assert run["metadata"]["kind"] == "e2e-pointers"
     assert run["metadata"]["task_id"] == task["id"]
     assert "STEPS:" in run["body"] and "DECLINE:" in run["body"]
+
+
+def test_related_links_cross_tab_records(stores) -> None:
+    inbox_item = stores.create_inbox_task(
+        title="Q?", body="b", task_type="task", assignee="agent", project_id="job-search"
+    )
+    stores.create_inbox_task(title="other", body="b", task_type="task", assignee="agent")
+    stores.runs.put(
+        "r1", {"id": "r1", "title": "t", "status": "queued", "project_id": "job-search"}
+    )
+    stores.runs.put("r2", {"id": "r2", "title": "t", "status": "queued"})
+    items = [{"id": "a", "behavior": "b", "kind": "behavior", "area": "dashboard"}]
+    stores.create_e2e_task(merge_commit="aaa", title="e2e", items=items, project_id="job-search")
+    linked = stores.related("job-search")
+    assert [i["id"] for i in linked["inbox"]] == [inbox_item["id"]]
+    assert [i["id"] for i in linked["runs"]] == ["r1"]
+    assert len(linked["e2e_tasks"]) == 1
+    assert linked["plans"] == []
+    bench = stores.related(stores.default_project_id())
+    assert any(i["id"] == "r2" for i in bench["runs"])  # missing id, treated as workbench
+
+
+def test_backfill_stamps_missing_project_ids(stores) -> None:
+    stores.runs.put("r1", {"id": "r1", "title": "t", "status": "queued"})
+    stores.runs.put("r2", {"id": "r2", "title": "t", "status": "queued", "project_id": "x"})
+    stores.inbox.put("i1", {"id": "i1", "title": "t", "status": "open", "project_id": None})
+    filled = stores.backfill_project_ids()
+    assert filled == {"plans": 0, "inbox": 1, "runs": 1, "e2e_tasks": 0}
+    assert stores.runs.get("r1")["project_id"] == stores.default_project_id()
+    assert stores.runs.get("r2")["project_id"] == "x"
+    assert stores.inbox.get("i1")["project_id"] == stores.default_project_id()
+
+
+def test_creators_default_to_workbench_project(stores) -> None:
+    item = stores.create_inbox_task(title="Q?", body="b", task_type="task", assignee="agent")
+    assert item["project_id"] == stores.default_project_id()
+    items = [{"id": "a", "behavior": "b", "kind": "behavior", "area": "dashboard"}]
+    task = stores.create_e2e_task(merge_commit="aaa", title="e2e", items=items)
+    assert task["project_id"] == stores.default_project_id()
+
+
+def test_pointer_run_inherits_task_project(stores) -> None:
+    from e2e_promotion import queue_pointer_run
+
+    items = [{"id": "a", "behavior": "b", "kind": "behavior", "area": "dashboard"}]
+    task = stores.create_e2e_task(
+        merge_commit="aaa", title="e2e", items=items, project_id="dashboard"
+    )
+    run = queue_pointer_run(stores, "aaa", task["id"], [{"id": "a"}])
+    assert run["project_id"] == "dashboard"
+
+
+def test_append_plan_evolution_logs_entries(stores) -> None:
+    stores.plans.put(
+        "r1",
+        {"id": "r1", "title": "R", "status": "active", "kind": "roadmap", "body": "# R\n"},
+    )
+    stores.append_plan_evolution("r1", "shipped the thing")
+    body = stores.plans.get("r1")["body"]
+    assert "## Evolutions" in body
+    assert "shipped the thing" in body
+    stores.append_plan_evolution("r1", "second wave")
+    body = stores.plans.get("r1")["body"]
+    assert body.count("## Evolutions") == 1
+    assert body.index("shipped the thing") < body.index("second wave")

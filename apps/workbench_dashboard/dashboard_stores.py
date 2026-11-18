@@ -26,6 +26,7 @@ BACKLOG_SOURCES = ("owner", "agent")
 BACKLOG_STATUSES = ("proposed", "ready", "doing", "blocked", "done", "dropped")
 BACKLOG_OPEN = ("proposed", "ready", "doing", "blocked")
 WORKFLOW_STATUSES = ("active", "archived")
+RELATED_LIMIT = 1000
 
 
 class StoreError(ValueError):
@@ -157,13 +158,26 @@ class DashboardStores:
         items, _total = self.inbox.list(limit=MAX_OPEN_TASKS + 1)
         return sum(1 for item in items if item.get("status") == "open")
 
+    @staticmethod
+    def waiting_on(item: dict) -> str:
+        """Whose move next: owner decides, agent closes out.
+
+        Records predating the field default by status: an unanswered
+        item waits on the owner; an answered one waits on AI close-out.
+        """
+        explicit = item.get("waiting_on")
+        if explicit in ("owner", "agent"):
+            return explicit
+        return "agent" if item.get("status") == "answered" else "owner"
+
     def attention_inbox_items(self) -> list[dict]:
         """Human attention items: what the inbox default view must show.
 
-        Human assignee with open, answered, or follow-up state, never the
-        AI queue. Answered-owner items await close-out. The badge counts
-        this set; the list endpoint unions it in so the default view can
-        never hide a badged item past the newest cutoff.
+        Human assignee with open, owner-waiting answered, or follow-up
+        state, never the AI queue. Answered items under AI close-out do
+        not badge the owner. The badge counts this set; the list
+        endpoint unions it in so the default view can never hide a
+        badged item past the newest cutoff.
         """
         items, _total = self.inbox.list(limit=1000)
         return [
@@ -171,7 +185,8 @@ class DashboardStores:
             for item in items
             if item.get("assignee") != "agent"
             and (
-                item.get("status") in ("open", "answered")
+                item.get("status") == "open"
+                or (item.get("status") == "answered" and self.waiting_on(item) == "owner")
                 or (item.get("resolution_kind") or "final") != "final"
             )
         ]
@@ -179,6 +194,79 @@ class DashboardStores:
     def attention_inbox_count(self) -> int:
         """Human attention items: the badge mirrors the default filter."""
         return len(self.attention_inbox_items())
+
+    def default_project_id(self) -> str:
+        """Registry id of the workbench root on this machine.
+
+        The data dir always sits at <repo>/apps/workbench_dashboard/data,
+        so the repo root is two levels up; its digest is the default
+        project for records without a better home.
+        """
+        from dashboard_projects import repo_project_id
+
+        return repo_project_id(self.data_dir.parent.parent)
+
+    def project_of(self, record: dict) -> str:
+        """Owning project; records predating relations belong to workbench."""
+        value = record.get("project_id")
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+        return self.default_project_id()
+
+    def related(self, project_id: str) -> dict[str, list[dict]]:
+        """Cross-tab links for one project (plans, inbox, runs, E2E tasks).
+
+        Full-collection scans: volumes are tiny and single-user, so no
+        index pays for itself. Slim dicts (id/title/status) keep the
+        project view fast.
+        """
+        want = (project_id or "").strip() or self.default_project_id()
+        linked: dict[str, list[dict]] = {"plans": [], "inbox": [], "runs": [], "e2e_tasks": []}
+        for key, collection in (
+            ("plans", self.plans),
+            ("inbox", self.inbox),
+            ("runs", self.runs),
+            ("e2e_tasks", self.e2e_tasks),
+        ):
+            items, _total = collection.list(limit=RELATED_LIMIT)
+            for item in items:
+                if not isinstance(item, dict) or self.project_of(item) != want:
+                    continue
+                linked[key].append(
+                    {
+                        "id": item.get("id"),
+                        "title": item.get("title") or item.get("name") or item.get("id"),
+                        "status": item.get("status"),
+                    }
+                )
+        return linked
+
+    def backfill_project_ids(self, default: str | None = None) -> dict[str, int]:
+        """Stamp records missing project_id; returns per-collection counts."""
+        default = default or self.default_project_id()
+        filled: dict[str, int] = {}
+        for key, collection in (
+            ("plans", self.plans),
+            ("inbox", self.inbox),
+            ("runs", self.runs),
+            ("e2e_tasks", self.e2e_tasks),
+        ):
+            count = 0
+            items, _total = collection.list(limit=RELATED_LIMIT)
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                value = item.get("project_id")
+                if isinstance(value, str) and value.strip():
+                    continue
+                item_id = item.get("id")
+                if not isinstance(item_id, str) or not item_id.strip():
+                    continue
+                item["project_id"] = default
+                collection.put(item_id, item)
+                count += 1
+            filled[key] = count
+        return filled
 
     def create_inbox_task(
         self,
@@ -193,6 +281,7 @@ class DashboardStores:
         metadata: dict | None = None,
         created_by: str = "supervisor",
         assignee: str = "owner",
+        project_id: str | None = None,
     ) -> dict:
         """Create one inbox task; tasks default to a single Done choice.
 
@@ -225,6 +314,8 @@ class DashboardStores:
             "status": "open",
             "created_by": created_by,
             "assignee": assignee,
+            "waiting_on": "agent" if assignee == "agent" else "owner",
+            "project_id": project_id or self.default_project_id(),
             "created_at": now,
             "answered_at": None,
             "answer": None,
@@ -272,10 +363,47 @@ class DashboardStores:
             record["answer"] = answer
             record["option_index"] = None
             record["note"] = None
+        first_answer = record.get("status") != "answered"
         record["status"] = "answered"
         record["answered_at"] = _utc_now()
+        record["waiting_on"] = "agent"
+        if first_answer and not (record.get("metadata") or {}).get("closeout_id"):
+            self._queue_closeout(record)
         self.inbox.put(item_id, record)
         return record
+
+    def _queue_closeout(self, record: dict) -> None:
+        """File the AI close-out task for an owner answer (implement→close).
+
+        Owner rule: the owner decides, never writes reports. Close-out
+        implements the recorded answer, proves it, resolves, and closes.
+        When the open-task cap refuses the filing, the item is flagged
+        so the sweep surfaces it instead of dropping the work silently.
+        """
+        try:
+            task = self.create_inbox_task(
+                title=f"Close out: {str(record.get('title') or record.get('id'))[:80]}",
+                body=(
+                    f"Owner answered '{record.get('id', '')[:8]}' "
+                    f"({record.get('title') or ''}): {record.get('answer') or ''}\n"
+                    f"Note: {record.get('note') or '(none)'}\n\n"
+                    "Implement the answer, run the proving checks, write the "
+                    "resolution on the source item, and close it."
+                ),
+                task_type="task",
+                created_by="supervisor",
+                assignee="agent",
+                project_id=str(record.get("project_id") or self.default_project_id()),
+                metadata={"closeout_for": record.get("id")},
+                context_refs=[f"inbox:{record.get('id')}"],
+            )
+        except StoreError:
+            record["closeout_pending"] = True
+            return
+        metadata = dict(record.get("metadata") or {})
+        metadata["closeout_id"] = task["id"]
+        record["metadata"] = metadata
+        record.pop("closeout_pending", None)
 
     def close_inbox_task(
         self,
@@ -302,6 +430,7 @@ class DashboardStores:
         record["resolution_kind"] = resolution_kind
         record["resolved_at"] = _utc_now()
         record["status"] = "closed"
+        record["waiting_on"] = None
         self.inbox.put(item_id, record)
         return record
 
@@ -313,7 +442,32 @@ class DashboardStores:
         if record.get("status") != "closed":
             raise StoreError("Only closed tasks can be reopened")
         record["status"] = "open"
+        record["waiting_on"] = "owner"
         self.inbox.put(item_id, record)
+        return record
+
+    def append_plan_evolution(self, plan_id: str, entry: str) -> dict:
+        """Append one timestamped entry to a plan's Evolutions log.
+
+        Closeouts call this so Roadmaps stay live surfaces instead of
+        stale documents. Creates the section when absent.
+        """
+        record = self.plans.get(plan_id)
+        if record is None:
+            raise StoreError("Plan not found")
+        entry = entry.strip()
+        if not entry:
+            raise StoreError("Evolution entry needs text")
+        stamp = _utc_now()[:10]
+        body = record.get("body") or ""
+        line = f"- {stamp}: {entry}"
+        if "## Evolutions" not in body:
+            body = body.rstrip() + "\n\n## Evolutions\n" + line + "\n"
+        else:
+            body = body.rstrip() + "\n" + line + "\n"
+        record["body"] = body
+        record["updated_at_utc"] = _utc_now()
+        self.plans.put(plan_id, record)
         return record
 
     def decide_plan(self, plan_id: str, *, approved: bool) -> dict:
@@ -697,6 +851,7 @@ class DashboardStores:
         created_by: str = "supervisor",
         range_base: str | None = None,
         draft: bool = False,
+        project_id: str | None = None,
     ) -> dict:
         """File one E2E task for a merge; one open task per merge commit.
 
@@ -734,6 +889,7 @@ class DashboardStores:
             "items": items,
             "status": "draft" if draft else "open",
             "created_by": created_by,
+            "project_id": project_id or self.default_project_id(),
             "created_at": now,
             "submitted_at": None,
             "report_id": None,

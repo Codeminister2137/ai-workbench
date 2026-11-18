@@ -62,6 +62,15 @@ def test_supervisor_filed_task_is_preapproved_as_agent_queue(tmp_path) -> None:
     assert bridge_agent_queue(stores) == []
 
 
+def test_bridged_run_inherits_project_id(tmp_path) -> None:
+    stores = DashboardStores(tmp_path)
+    _agent_task(stores, created_by="supervisor", project_id="job-search")
+    (receipt,) = bridge_agent_queue(stores)
+    run = stores.runs.get(receipt["run_id"])
+    assert run is not None
+    assert run["project_id"] == "job-search"
+
+
 def test_resolve_bridge_fanout_coerces_and_fails_closed() -> None:
     from inbox_bridge import resolve_bridge_fanout
 

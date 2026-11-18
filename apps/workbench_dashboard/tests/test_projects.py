@@ -228,6 +228,27 @@ def test_projects_endpoint_carries_goals(dashboard_server) -> None:
     assert isinstance(payload["goals"], list)
 
 
+def test_project_detail_carries_related_and_explainer(dashboard_server, tmp_path) -> None:
+    root = tmp_path / "proj"
+    root.mkdir()
+    created = post_json(
+        dashboard_server,
+        "/api/projects",
+        {"name": "Shop", "root": str(root), "explainer": "docs/projects/shop.md"},
+    )
+    project_id = created["project"]["id"]
+    assert created["project"]["explainer"] == "docs/projects/shop.md"
+    item = post_json(
+        dashboard_server,
+        "/api/inbox",
+        {"title": "Do it", "body": "b", "type": "task", "project_id": project_id},
+    )
+    detail = get_json(dashboard_server, f"/api/projects/{project_id}")
+    assert detail["project"]["explainer"] == "docs/projects/shop.md"
+    assert [i["id"] for i in detail["related"]["inbox"]] == [item["id"]]
+    assert detail["related"]["runs"] == []
+
+
 def test_plan_attention_flags_triage_and_stale(tmp_path) -> None:
     import os
     import time

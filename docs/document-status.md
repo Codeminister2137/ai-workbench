@@ -112,6 +112,7 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/plans/product-roadmap-20261031.md | KNOWLEDGE | P1-P9 direction; schedule section stale (hackathon windows passed). |
 | docs/plans/repo-assistant-cli-parity-plan.md | ACTED | Consumed into CLI/ADRs (one narrow Oct-19 PENDING likely moot). |
 | docs/plans/research-review-orchestration-plan.md | KNOWLEDGE | Retained findings index for reanalysis. |
+| docs/plans/repo-gap-assessment-20261117.md | KNOWLEDGE | Research sweep 2026-11-17 (state+gaps+phases); partly executed since. |
 | docs/plans/research-token-count-prototype.md | ACTED | Oct-4 checkpoint consumed. |
 | docs/plans/search-tooling-landscape-note-20261022.md | KNOWLEDGE | Captured for search-path revisit. |
 | docs/plans/shared-agent-capabilities-options.md | ACTED | Oct-4 checkpoint consumed. |
