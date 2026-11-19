@@ -11,6 +11,11 @@ handling stays behind `ai_provider`.
 
 ## Requirements
 
+Investor research policy and current implementation limits are documented in
+[ADR-093](../../docs/decisions/ADR-093-investor-coverage-and-paper-autonomy.md).
+The [coverage and geopolitical-event research](../../docs/research/investor-coverage-20261119.md)
+compares asset classes, broker access and approaches to learning from decisions.
+
 - Python dependencies from the workspace
 - `uv`
 - Ollama running locally
