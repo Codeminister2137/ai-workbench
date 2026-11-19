@@ -324,75 +324,77 @@ class SpendLedger:
         if self._path is None:
             return
         connection = self._connect()
-        with connection:
-            connection.execute("DELETE FROM allowances")
-            connection.executemany(
-                "INSERT INTO allowances VALUES (?, ?, ?, ?, ?, ?, ?)",
-                [
+        try:
+            with connection:
+                connection.execute("DELETE FROM allowances")
+                connection.executemany(
+                    "INSERT INTO allowances VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    [
+                        (
+                            row.id,
+                            row.provider,
+                            row.kind.value,
+                            row.balance_cents,
+                            row.granted_cents,
+                            row.granted_at,
+                            row.expires_at,
+                        )
+                        for row in self._allowances.values()
+                    ],
+                )
+                connection.execute("DELETE FROM reservations")
+                connection.executemany(
+                    "INSERT INTO reservations VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    [
+                        (
+                            item.id,
+                            item.task_id,
+                            item.task_class,
+                            item.allowance_id,
+                            item.allowance_fingerprint,
+                            item.estimated_cents,
+                            item.actual_cents,
+                            item.state.value,
+                            item.created_at,
+                            item.settled_at,
+                        )
+                        for item in self._reservations.values()
+                    ],
+                )
+                connection.execute("DELETE FROM records")
+                connection.executemany(
+                    "INSERT INTO records (task_id, task_class, model_id, provider,"
+                    " allowance_id, estimated_cents, actual_cents, duration_ms,"
+                    " timestamp, input_tokens, output_tokens, usage_source)"
+                    " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    [
+                        (
+                            record.task_id,
+                            record.task_class,
+                            record.model_id,
+                            record.provider,
+                            record.allowance_id,
+                            record.estimated_cents,
+                            record.actual_cents,
+                            record.duration_ms,
+                            record.timestamp,
+                            record.input_tokens,
+                            record.output_tokens,
+                            record.usage_source,
+                        )
+                        for record in self._records
+                    ],
+                )
+                connection.execute(
+                    "INSERT OR REPLACE INTO meta VALUES "
+                    "('reservation_seq', ?), ('prepaid_spent_total', ?)",
                     (
-                        row.id,
-                        row.provider,
-                        row.kind.value,
-                        row.balance_cents,
-                        row.granted_cents,
-                        row.granted_at,
-                        row.expires_at,
-                    )
-                    for row in self._allowances.values()
-                ],
-            )
-            connection.execute("DELETE FROM reservations")
-            connection.executemany(
-                "INSERT INTO reservations VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                [
-                    (
-                        item.id,
-                        item.task_id,
-                        item.task_class,
-                        item.allowance_id,
-                        item.allowance_fingerprint,
-                        item.estimated_cents,
-                        item.actual_cents,
-                        item.state.value,
-                        item.created_at,
-                        item.settled_at,
-                    )
-                    for item in self._reservations.values()
-                ],
-            )
-            connection.execute("DELETE FROM records")
-            connection.executemany(
-                "INSERT INTO records (task_id, task_class, model_id, provider,"
-                " allowance_id, estimated_cents, actual_cents, duration_ms,"
-                " timestamp, input_tokens, output_tokens, usage_source)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                [
-                    (
-                        record.task_id,
-                        record.task_class,
-                        record.model_id,
-                        record.provider,
-                        record.allowance_id,
-                        record.estimated_cents,
-                        record.actual_cents,
-                        record.duration_ms,
-                        record.timestamp,
-                        record.input_tokens,
-                        record.output_tokens,
-                        record.usage_source,
-                    )
-                    for record in self._records
-                ],
-            )
-            connection.execute(
-                "INSERT OR REPLACE INTO meta VALUES "
-                "('reservation_seq', ?), ('prepaid_spent_total', ?)",
-                (
-                    str(self._reservation_seq),
-                    str(self._prepaid_spent_total),
-                ),
-            )
-        connection.close()
+                        str(self._reservation_seq),
+                        str(self._prepaid_spent_total),
+                    ),
+                )
+        finally:
+            connection.close()
 
     def _load(self) -> None:
         assert self._path is not None
