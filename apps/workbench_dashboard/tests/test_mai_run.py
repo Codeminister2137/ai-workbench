@@ -187,6 +187,25 @@ def test_empty_output_on_exit_zero_is_provider_failure() -> None:
     assert "empty output" in receipt["error"]
 
 
+def test_reported_failure_on_exit_zero_is_failed_not_completed() -> None:
+    from mai_run import MaiRunOutcome
+
+    tail = (
+        "coding_session_id: s1\n"
+        "## **SUMMARY**\n"
+        "- Notes: status=failed; execution_status=failed; "
+        "failure_reason=No model candidate satisfied the task profile "
+        "(route requires cost policy allowances_allowed); "
+        "provider=unknown\n"
+    )
+    outcome = MaiRunOutcome(exit_code=0, stdout_tail=tail, stderr_tail="")
+    receipt = mai_receipt(outcome, ["prompt"])
+    assert receipt["status"] == "failed"
+    assert "No model candidate" in receipt["error"]
+    assert receipt["failure_class"] == "allowance"
+    assert receipt["source"] == "mai-session"
+
+
 def test_facts_survive_tail_truncation() -> None:
     def runner(argv):
         print("coding_session_id: s1")
