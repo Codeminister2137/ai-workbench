@@ -8,7 +8,7 @@ draft; this page holds structure + commands only.
 
 1. Client answers the guided chatbot (form-first v1; bot later).
 2. Brief lands as a project file under `p7-projects/` (gitignored:
-   client PII never committed).
+   client personally identifiable information (PII) never committed).
 3. Validate: dashboard → project → intake-approve button runs the
    validator (closed schema, secrets-reject, PII-flag, PL+EN v1).
 4. Owner approves a valid file → becomes a `proposed` plan.
@@ -27,7 +27,7 @@ Options, narrowest first:
   (read the script help for modes; approvals stay interactive).
 - Unattended loop: owner-scoped window with deadline, heartbeat
   mail, and sleep closeout (see `docs/workflow.md`).
-- Scheduled: NL proposal → inbox order → (slice 2 pending owner
+- Scheduled: natural language (NL) proposal → inbox order → (slice 2 pending owner
   choice of auto-run vs explicit start).
 
 ## 4. Verify
@@ -50,8 +50,8 @@ Per slice, before any push:
 
 ## 6. Invoice inputs
 
-- Accepted SOW/quote → draft invoice (auto-invoice idea: draft
-  only, founder reviews; KSeF-first; accountant-verified
+- Accepted Statement of Work (SOW)/quote → draft invoice (auto-invoice idea: draft
+  only, founder reviews; National e-Invoicing System (Krajowy System e-Faktur, KSeF)-first; accountant-verified
   template before first real use).
 
 ## Troubleshooting subset

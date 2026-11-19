@@ -1,10 +1,10 @@
-# Statement of Work (template) — DRAFT
+# Statement of Work (SOW) (template) — DRAFT
 
 [TO-VERIFY] Entire template: accountant/lawyer review before first use.
 
 ## Parties
 
-- Contractor: `[OWNER: full legal name + NIP/REGON + address]`
+- Contractor: `[OWNER: full legal name + tax identification number (NIP) / National Official Business Register number (REGON) + address]`
 - Client: `[OWNER: client legal name + identifiers + address]`
 - Date: `[OWNER: date]` · SOW ref: `[OWNER: e.g. SOW-2026-001]`
 - Parent contract (if any): `[OWNER: contract ref or "none — this SOW is standalone"]`
@@ -47,7 +47,7 @@ Failed acceptance returns ONE punch list; contractor fixes within
 - Schedule: `[OWNER: e.g. 40% start / 40% milestone / 20% acceptance]`
 - Method + details: `[OWNER: bank transfer to …]`
 - Term: `[OWNER: e.g. 14 days]` from correct invoice.
-- Late payment: `[TO-VERIFY: statutory interest wording for PL B2B]`.
+- Late payment: `[TO-VERIFY: statutory interest wording for Polish business-to-business (B2B) transactions]`.
 
 ## 7. Change control
 
@@ -55,13 +55,13 @@ Any scope/time/price change needs a written change note signed by both
 parties BEFORE work starts. Verbal "quick additions" are out of scope
 until written.
 
-## 8. IP & confidentiality
+## 8. Intellectual property (IP) & confidentiality
 
 - IP transfers to client on full payment `[TO-VERIFY: transfer wording +
-  moral-rights note under PL copyright law]`.
+  moral-rights note under Polish copyright law]`.
 - Pre-existing contractor tooling stays contractor property, licensed to
   client as needed to run the deliverables.
-- Mutual confidentiality per the NDA template (or §-level clause here).
+- Mutual confidentiality per the non-disclosure agreement (NDA) template (or §-level clause here).
 
 ## 9. Liability cap & warranty
 

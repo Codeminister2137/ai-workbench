@@ -42,20 +42,20 @@ No single site; affects all copy on flip.
 
 ## MASTER_TERMS_REVIEW
 
-Lawyer + accountant review of master terms before first real SOW,
+Lawyer + accountant review of master terms before first real Statement of Work (SOW),
 and one paid accountant hour before the first invoice (see
 billing.py docstring). Disclosed on uslugi.html terms section.
 Launch gate; not a copy change.
 
 ## SELLER_IDENTITY
 
-NIP/REGON/full registered address for footer identity and billing
+Tax identification number (NIP) / National Official Business Register number (REGON) / full registered address for footer identity and billing
 Party fields. P7 registration decision. Site shows only
 "Skoczów, Polska" until then.
 
 ## BRANDING
 
-Logo, favicon, og-image. No marks invented (P7 branding decision).
+Logo, favicon, Open Graph (OG) image. No marks invented (P7 branding decision).
 The draft ships without them; a missing favicon 404s harmlessly.
 
 ## DOMAIN_HOSTING

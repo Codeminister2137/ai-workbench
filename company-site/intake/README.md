@@ -9,7 +9,7 @@ intake; the format never auto-creates tasks or spend.
 - Producer: website chatbot (guided flow) or human contact form
   (`capture_method: "human"`). Consumer: owner review, then Workbench.
 - Files live in `p7-projects/<slug>-<YYYYMMDD>-<short-id>.json`, UTF-8,
-  max 32 KB, immutable after approval (edits create `v2` + `parent_id`).
+  max 32 kilobytes (KB), immutable after approval (edits create `v2` + `parent_id`).
 
 Validate:
 
@@ -18,7 +18,7 @@ Validate:
 ```
 
 Exit 0 = valid (warnings allowed, surfaced to owner); 1 = invalid with
-error list (chatbot re-prompts); 2 = usage/IO error. `--as-of` pins the
+error list (chatbot re-prompts); 2 = usage/input-output (IO) error. `--as-of` pins the
 30-day expiry check (default: today).
 
 Full contract: `docs/plans/p7-project-file-format-proposal.md` (approved

@@ -1,11 +1,11 @@
-# B2B services contract (template) — DRAFT
+# Business-to-business (B2B) services contract (template) — DRAFT
 
 [TO-VERIFY] Entire template: lawyer review before first use. Framework
-for repeated SOWs; each engagement gets its own SOW (see sow-template).
+for repeated statements of work (SOWs); each engagement gets its own SOW (see sow-template).
 
 ## Parties
 
-- Contractor: `[OWNER: full legal name + NIP/REGON + address]`
+- Contractor: `[OWNER: full legal name + tax identification number (NIP) / National Official Business Register number (REGON) + address]`
 - Client: `[OWNER: client legal name + identifiers + address]`
 - Effective date: `[OWNER]` · Term: `[OWNER: e.g. 12 months, auto-renew]`
 
@@ -13,7 +13,7 @@ for repeated SOWs; each engagement gets its own SOW (see sow-template).
 
 Contractor provides software services described in signed SOWs. In case
 of conflict, the SOW wins for its engagement; this contract wins on
-standing terms (IP, liability, confidentiality, payment defaults).
+standing terms (intellectual property (IP), liability, confidentiality, payment defaults).
 
 ## 2. SOW process
 
@@ -37,10 +37,10 @@ Work starts after countersignature + first payment per SOW schedule.
 
 ## 5. Confidentiality & data
 
-- Mutual confidentiality per NDA terms incorporated here by reference.
+- Mutual confidentiality per non-disclosure agreement (NDA) terms incorporated here by reference.
 - Personal data: each party is independent controller of its own data;
-  processing of client-provided personal data follows a DPA when required
-  `[TO-VERIFY: DPA trigger wording + RODO references]`.
+  processing of client-provided personal data follows a data processing agreement (DPA) when required
+  `[TO-VERIFY: DPA trigger wording + General Data Protection Regulation (GDPR, Polish: RODO) references]`.
 
 ## 6. Liability cap
 
@@ -64,7 +64,7 @@ IP indemnity, confidentiality breach, unpaid fees.
 
 ## 9. Governing law & disputes
 
-Polish law `[TO-VERIFY: venue/ADR wording]`.
+Polish law `[TO-VERIFY: venue/alternative dispute resolution (ADR) wording]`.
 
 ## 10. Signatures
 

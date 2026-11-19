@@ -22,7 +22,7 @@ take this to ANY vendor (including us) and get comparable quotes.
 |---|---|---|---|---|
 | `[OWNER]` | … | … | … | recommended / viable / rejected + why |
 
-## 4. Recommended scope (feeds SOW §2/§3)
+## 4. Recommended scope (feeds Statement of Work (SOW) §2/§3)
 
 - IN: `[OWNER: concrete deliverables]`
 - OUT: `[OWNER: explicit non-goals]`
