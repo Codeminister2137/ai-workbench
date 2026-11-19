@@ -179,3 +179,16 @@ def test_run_request_attaches_transcript_digest(chat_run_server) -> None:
     assert "We need a status page" in run["body"]
     assert "Drafted the layout" in run["body"]
     assert session_id in run["body"]
+
+
+def test_run_title_cuts_at_word_boundary() -> None:
+    from dashboard_chat import _run_title
+
+    assert _run_title(None, "short") == "short"
+    assert _run_title("  Explicit  ", "ignored text here") == "Explicit"
+    long_text = "We need to confirm Mai works properly, so generate a small probe run now please"
+    titled = _run_title(None, long_text)
+    assert titled.endswith("…")
+    assert titled.rsplit(" ", 1)[-1] == "small…"  # whole word, not "smal" (report 16f0927d)
+    assert titled == "We need to confirm Mai works properly, so generate a small…"
+    assert _run_title(None, "x" * 80) == "x" * 60 + "…"
