@@ -69,6 +69,10 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/plans/05_AI_Orchestrator_Project_Plan.txt | KNOWLEDGE | Founder source plan (capability evidence). |
 | docs/plans/ai-trainer-framing.md | PENDING | Blocked: needs owner go on first slice. |
 | docs/plans/accountant-investigation.md | PENDING | Owner action: paid hour before first invoice (D6). |
+| docs/plans/business-decision-20261119.md | PENDING | Business form/name/funding brief 2026-11-19 (run da1eb76c); personalization pending c1809752 closeout. |
+| docs/plans/business-funding-20261119.md | KNOWLEDGE | Funding options + acquisition prep 2026-11-19 (run da1eb76c). |
+| docs/plans/business-names-20261119.md | KNOWLEDGE | 15-name screening 2026-11-19 (run da1eb76c); none cleared. |
+| docs/plans/business-research-20261119.md | KNOWLEDGE | Business evidence + qualifications 2026-11-19 (run da1eb76c). |
 | docs/plans/backlog.md | ACTED | All items DONE (fan-out, merge). |
 | docs/plans/branch-consolidation-checklist.md | PENDING | DO NOT EXECUTE — owner review gate (Nov-9 prune was develop-local only). |
 | docs/plans/cli-development-readiness-review.md | ACTED | Oct 20-21 CLI working notes, consumed. |
