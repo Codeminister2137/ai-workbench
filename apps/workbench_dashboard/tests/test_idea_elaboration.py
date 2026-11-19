@@ -34,7 +34,9 @@ def test_adopt_files_elaboration_task(tmp_path) -> None:
     assert "An app that waters plants." in task["body"]
     assert "Prototype it" in task["body"]
     assert "plan-1" in task["body"]
-    assert stores.ideas.get(idea["id"]).get("elaboration_pending") is None
+    stored = stores.ideas.get(idea["id"])
+    assert stored is not None
+    assert stored.get("elaboration_pending") is None
 
 
 def test_adopt_without_plan_notes_no_plan_link(tmp_path) -> None:
@@ -86,6 +88,8 @@ def test_cap_refusal_flags_pending_without_raising(tmp_path) -> None:
 
     assert reviewed["status"] == "adopted"
     assert reviewed["elaboration_pending"] is True
-    assert stores.ideas.get(idea["id"])["elaboration_pending"] is True
+    stored = stores.ideas.get(idea["id"])
+    assert stored is not None
+    assert stored["elaboration_pending"] is True
     assert _elaboration_tasks(stores, idea["id"]) == []
     assert stores.open_inbox_count() == MAX_OPEN_TASKS
