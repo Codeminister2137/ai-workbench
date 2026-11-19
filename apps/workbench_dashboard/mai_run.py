@@ -33,6 +33,7 @@ _PROVIDER_RE = re.compile(
     re.IGNORECASE,
 )
 _FAILURE_REASON_RE = re.compile(r"failure_reason=([^;\n]+)")
+_EXECUTION_STATUS_RE = re.compile(r"execution_status\s*[=:]\s*([A-Za-z_]+)")
 _RETRYABLE_TIMEOUT_RE = re.compile(r"timed?\s*out", re.IGNORECASE)
 
 
@@ -43,6 +44,21 @@ def mai_failure_reason(*texts: str) -> str | None:
         if match is not None and match.group(1).strip():
             return match.group(1).strip()[:300]
     return None
+
+
+def mai_execution_completed(*texts: str) -> bool:
+    """True when Mai's envelope reports a completed execution.
+
+    A failure_reason beside ``execution_status=completed`` is an
+    intermediate failure with a complete final result (routine Codex
+    behavior), not a failed run. Missing status markers fail closed
+    elsewhere; here only an explicit completed counts.
+    """
+    for text in texts:
+        match = _EXECUTION_STATUS_RE.search(text or "")
+        if match is not None and match.group(1).strip().lower() == "completed":
+            return True
+    return False
 
 
 def capture_tail(text: str) -> str:
@@ -210,7 +226,9 @@ def mai_receipt(outcome: MaiRunOutcome, argv: Sequence[str]) -> dict:
     facts = outcome.facts or parse_mai_facts(outcome.stdout_tail)
     if outcome.error is None and outcome.exit_code == 0:
         reported = mai_failure_reason(outcome.stdout_tail, outcome.stderr_tail)
-        if reported is not None:
+        if reported is not None and not mai_execution_completed(
+            outcome.stdout_tail, outcome.stderr_tail
+        ):
             error = f"Mai reported failure: {reported}"
             return {
                 "status": "failed",
