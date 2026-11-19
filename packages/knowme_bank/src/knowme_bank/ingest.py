@@ -17,7 +17,13 @@ if TYPE_CHECKING:
     from knowme_bank import KnowMeEntry, KnowMeStore
 
 _LABEL_RE = re.compile(r"^[^:()\s]{1,32}:\s+")
+_LABEL_WITH_TAG_RE = re.compile(r"^[^:()\s]{1,32}\s*\([^()]*\):\s+")
 _LEADING_COLON_RE = re.compile(r"^:\s+")
+_PARENS_RE = re.compile(r"\([^()]*\)")
+# Comma segments this short (outside parens) are list items, not prose.
+# Keeps "Senior Engineer at ZF, 2024-2026" whole while splitting
+# "Pytest, integration testing, Clean Code" (owner verdict 2026-11-19).
+_LIST_SEGMENT_WORDS = 3
 
 
 def _top_level_split(line: str, separators: frozenset[str]) -> list[str]:
@@ -42,20 +48,31 @@ def _top_level_split(line: str, separators: frozenset[str]) -> list[str]:
 
 
 def _strip_label(line: str) -> str:
-    """Drop a leading `Label:` or bare `: ` prefix (category labels)."""
+    """Drop a leading `Label:`, `Label (tag):`, or bare `: ` prefix."""
     stripped = _LEADING_COLON_RE.sub("", line, count=1)
     if stripped != line:
         return stripped
+    tagged = _LABEL_WITH_TAG_RE.sub("", line, count=1)
+    if tagged != line:
+        return tagged
     return _LABEL_RE.sub("", line, count=1)
+
+
+def _is_list_segment(segment: str) -> bool:
+    """True for short list items; parenthetical detail doesn't count."""
+    bare = _PARENS_RE.sub("", segment).strip()
+    words = bare.split()
+    return 1 <= len(words) <= _LIST_SEGMENT_WORDS
 
 
 def propose_facts(text: str) -> list[str]:
     """Propose atomic facts for review; never raises on odd input.
 
-    Rules: blank lines separate; a leading label/colon is dropped;
-    top-level semicolons always split; top-level commas split only when
-    every segment is a single token (multi-word segments stay whole, so
-    dated career facts and ambiguous prose survive intact).
+    Rules: blank lines separate; a leading label (with or without a
+    parenthetical source tag) or colon is dropped; top-level semicolons
+    always split; top-level commas split only when every segment is a
+    short list item (dated career facts and ambiguous prose survive
+    intact).
     """
     facts: list[str] = []
     for raw_line in text.splitlines():
@@ -63,12 +80,12 @@ def propose_facts(text: str) -> list[str]:
         if not line:
             continue
         for chunk in _top_level_split(line, frozenset({";"})):
-            chunk = chunk.strip()
+            chunk = _strip_label(chunk.strip())
             if not chunk:
                 continue
             segments = [segment.strip() for segment in _top_level_split(chunk, frozenset({","}))]
             segments = [segment for segment in segments if segment]
-            if len(segments) > 1 and all(" " not in segment for segment in segments):
+            if len(segments) > 1 and all(_is_list_segment(segment) for segment in segments):
                 facts.extend(segments)
             else:
                 facts.append(chunk)

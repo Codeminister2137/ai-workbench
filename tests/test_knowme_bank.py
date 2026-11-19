@@ -98,6 +98,36 @@ def test_propose_facts_preserves_context_and_prose() -> None:
     assert propose_facts("Senior Engineer at ZF, 2024-2026") == ["Senior Engineer at ZF, 2024-2026"]
 
 
+def test_propose_facts_splits_skill_lists_with_tags() -> None:
+    from knowme_bank.ingest import propose_facts
+
+    assert propose_facts(
+        "Skills (CV import): Docker, AWS, CI/CD (Jenkins, CircleCI), Linux, Git, "
+        "GitLab, Agile/Scrum; testing: Pytest, integration testing, Clean Code, SOLID."
+    ) == [
+        "Docker",
+        "AWS",
+        "CI/CD (Jenkins, CircleCI)",
+        "Linux",
+        "Git",
+        "GitLab",
+        "Agile/Scrum",
+        "Pytest",
+        "integration testing",
+        "Clean Code",
+        "SOLID.",
+    ]
+    assert propose_facts("Skills (CV import 2026-11-14): Python 3+, Django") == [
+        "Python 3+",
+        "Django",
+    ]
+    assert propose_facts("Polish native, English C2/fluent, German basic") == [
+        "Polish native",
+        "English C2/fluent",
+        "German basic",
+    ]
+
+
 def test_add_roundtrips_provenance(tmp_path) -> None:
     store = KnowMeStore(tmp_path / "bank.sqlite3")
     entry = store.add(
