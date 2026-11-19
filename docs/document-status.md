@@ -70,7 +70,7 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/plans/ai-trainer-framing.md | PENDING | Blocked: needs owner go on first slice. |
 | docs/plans/accountant-investigation.md | PENDING | Owner action: paid hour before first invoice (D6). |
 | docs/plans/business-decision-20261119.md | PENDING | Business form/name/funding brief 2026-11-19 (run da1eb76c); personalization pending c1809752 closeout. |
-| docs/plans/eval-scheduling-20261119.md | PENDING | Route/model eval scheduling draft; owner brief bd5fa3a2 open. |
+| docs/plans/eval-scheduling-20261119.md | ACTED | Owner chose B full scope + observed-stop budgets (bd5fa3a2, 5a326594); P1-P3 implemented. |
 | docs/plans/business-funding-20261119.md | KNOWLEDGE | Funding options + acquisition prep 2026-11-19 (run da1eb76c). |
 | docs/plans/business-names-20261119.md | KNOWLEDGE | 15-name screening 2026-11-19 (run da1eb76c); none cleared. |
 | docs/plans/business-research-20261119.md | KNOWLEDGE | Business evidence + qualifications 2026-11-19 (run da1eb76c). |

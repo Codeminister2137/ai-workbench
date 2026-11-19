@@ -1,6 +1,16 @@
 {
   "gates": [
     {
+      "id": "eval-allowance-cap-enforcement",
+      "title": "Eval allowance budgets: strict cap or observed stop threshold?",
+      "type": "decision",
+      "body": "B is accepted from source bd5fa3a29bb143669ea084f5ef49f218: full evaluation scope with 10% per allowance bucket/cycle. Decision needed: how to enforce that cap when a provider exposes percentage usage/reset observations but no guaranteed per-request allowance charge. Why it matters: checking after a call can detect an overshoot only after consumption; concurrent product calls and delayed readings also make attribution uncertain. A: Keep a strict cap and fail closed on routes without a defensible pre-call upper bound; continue local harness/planner and grade storage independently. Pro: preserves the approved ceiling and product headroom. Con: some allowance routes remain unevaluated until a usable bound exists. B: Treat 10% as an observed stop threshold, with sequential bounded calls and fresh readings before/after each call; stop on missing/stale readings or threshold crossing. Pro: permits sampling percentage-only providers. Con: a call or reporting delay can overshoot 10%, and shared product consumption cannot reliably be separated. Recommendation: A, because B changes the approved allowance boundary. This does not reopen full-scope approval or authorize metered spend. Question: A (strict cap with unsupported routes deferred), or B (accept the overshoot risk of an observed threshold)?",
+      "options": [
+        "A: Strict cap; defer routes without bounds",
+        "B: Observed threshold; accept overshoot risk"
+      ]
+    },
+    {
       "id": "investor-asset-scope",
       "title": "Investor: choose asset scope and paper autonomy policy",
       "type": "decision",
