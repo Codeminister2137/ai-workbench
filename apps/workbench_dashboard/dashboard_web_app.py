@@ -1069,6 +1069,9 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 return self._send_project(path[len("/api/projects/") :])
             if path.startswith("/api/inbox/"):
                 return self._send_item(self._stores().inbox, path[len("/api/inbox/") :])
+            if path.startswith("/api/resolve/"):
+                token = unquote(path[len("/api/resolve/") :])
+                return self._send_json({"ok": True, "matches": self._stores().resolve_id(token)})
             if path.startswith("/api/ideas/"):
                 return self._send_item(self._stores().ideas, path[len("/api/ideas/") :])
             if path.startswith("/api/backlog/"):
