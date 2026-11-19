@@ -1671,3 +1671,76 @@ const api = async (path) => {
         [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
     )
     assert result.returncode == 0, result.stderr
+
+
+def test_inbox_detail_renders_acknowledge_for_reports() -> None:
+    node = _node_driver()
+    driver = r"""
+const assert = require('assert');
+const source = require('fs').readFileSync(process.argv[1], 'utf8');
+const grab = (name) => eval('(' + source.slice(source.indexOf('function ' + name + '('),
+  source.indexOf('\n}', source.indexOf('function ' + name + '(')) + 2) + ')');
+const esc = grab('esc');
+const gtext = grab('gtext');
+const filterBoxes = grab('filterBoxes');
+const pickedTokens = grab('pickedTokens');
+const bindFilterBoxes = grab('bindFilterBoxes');
+const projectOptions = async () => '<option value="">All projects</option>';
+const renderer = source.slice(source.indexOf('async function renderInbox('),
+  source.indexOf('async function markIdeaSeen('));
+eval(renderer);
+const view = {innerHTML: '', querySelectorAll: () => []};
+const location = {hash: '#/inbox/r1'};
+const document = {getElementById: () => ({addEventListener() {}})};
+const item = {id: 'r1', title: 'Chain report: X', type: 'report', status: 'open',
+  body: '## Initial\nsrc', created_by: 'supervisor', options: [], context_refs: []};
+const api = async (path) => ({item});
+(async () => {
+  await renderInbox('r1');
+  const html = view.innerHTML;
+  assert(html.includes('id="ack-btn"'), 'acknowledge button renders');
+  assert(!html.includes('id="answer-form"'), 'reports take no answers');
+  assert(!html.includes('id="close-form"'), 'reports take no closes');
+})().catch(error => {console.error(error); process.exitCode = 1;});
+"""
+    result = subprocess.run(
+        [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_fleet_flags_dead_end_runs() -> None:
+    node = _node_driver()
+    driver = r"""
+const assert = require('assert');
+const source = require('fs').readFileSync(process.argv[1], 'utf8');
+const grab = (name) => eval('(' + source.slice(source.indexOf('function ' + name + '('),
+  source.indexOf('\n}', source.indexOf('function ' + name + '(')) + 2) + ')');
+const esc = grab('esc');
+const fmtTime = grab('fmtTime');
+const renderer = source.slice(source.indexOf('async function renderFleet('),
+  source.indexOf('async function flipToggle('));
+eval(renderer);
+const view = {innerHTML: '', querySelectorAll: () => []};
+const location = {hash: '#/fleet'};
+const document = {getElementById: () => ({addEventListener() {}})};
+const fleet = {tasks: [], runs: [],
+  agents: {runs: [
+    {id: 'a', title: 'dead run', verdict: 'dead-end', reason: 'no triage task', status: 'failed'},
+    {id: 'b', title: 'ok run', verdict: 'ok', reason: '', status: 'running'},
+  ]},
+  sleep: {active: false}, services: [], dashboard: {}, ollama: {up: false}};
+const api = async (path) => path === '/api/sleep' ? {active: false} : {fleet};
+(async () => {
+  await renderFleet();
+  const html = view.innerHTML;
+  assert(html.includes('>dead-end<'), 'dead-end verdict renders');
+  assert(html.includes('no triage task'), 'dead-end reason renders');
+  assert(!html.includes('No stuck, broken, or dead-end runs.'), 'flagged list not empty');
+  assert(!html.includes('>ok<'), 'ok runs stay unflagged');
+})().catch(error => {console.error(error); process.exitCode = 1;});
+"""
+    result = subprocess.run(
+        [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
+    )
+    assert result.returncode == 0, result.stderr

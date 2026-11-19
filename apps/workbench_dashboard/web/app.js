@@ -1817,6 +1817,10 @@ async function renderInbox(id) {
       ${item.status === "closed"
         ? `<p class="muted">Closed; answers are immutable.</p>`
           + `<p><button id="reopen-btn" title="Return this task to the active list">Reopen task</button></p>`
+        : item.type === "report"
+        ? `<h3>Actions</h3>
+      <p class="muted">Reports are read-only records. Acknowledge archives this report out of the badge.</p>
+      <p><button type="button" id="ack-btn" title="Archive this chain report out of the badge">Acknowledge report</button></p>`
         : `
       <h3>Your choices</h3>
       <form id="answer-form">
@@ -1898,6 +1902,20 @@ async function renderInbox(id) {
           body: "{}",
         });
         toast("Task reopened", true);
+        render();
+      } catch (err) {
+        toast(err.message, false);
+      }
+    });
+    const ackBtn = document.getElementById("ack-btn");
+    if (ackBtn) ackBtn.addEventListener("click", async () => {
+      try {
+        await api("/api/inbox/" + encodeURIComponent(id) + "/acknowledge", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: "{}",
+        });
+        toast("Report acknowledged", true);
         render();
       } catch (err) {
         toast(err.message, false);
@@ -2731,10 +2749,10 @@ async function renderFleet() {
     const runRows = f.runs.length
       ? f.runs.map((r) => `<li><a href="#/runs/${esc(r.id)}">${esc(r.title || r.id)}</a> <span class="pill">${esc(r.status || "")}</span> <span class="muted">${esc(fmtTime(r.updated))}</span></li>`).join("")
       : '<li class="muted">No active runs.</li>';
-    const flagged = (f.agents.runs || []).filter((r) => r.verdict === "stuck" || r.verdict === "broken");
+    const flagged = (f.agents.runs || []).filter((r) => r.verdict === "stuck" || r.verdict === "broken" || r.verdict === "dead-end");
     const agentRows = flagged.length
       ? flagged.map((r) => `<li><a href="#/runs/${esc(r.id)}">${esc(r.title || r.id)}</a> <span class="pill st-${esc(r.verdict)}">${esc(r.verdict)}</span> <span class="muted">${esc(r.reason || r.status || "")} · ${esc(fmtTime(r.updated))}</span></li>`).join("")
-      : '<li class="muted">No stuck or broken runs.</li>';
+      : '<li class="muted">No stuck, broken, or dead-end runs.</li>';
     const sleep = f.sleep.active
       ? `Armed — due ${esc(fmtTime(f.sleep.due_utc))}, deadline ${esc(fmtTime(f.sleep.deadline_utc))} (PID ${esc(f.sleep.pid ?? "?")})${f.sleep.explain ? ` — ${esc(f.sleep.explain)}` : ""}`
       : `Idle (${esc(f.sleep.status || "no receipt")})`;

@@ -1,3 +1,11 @@
+## ADR-094 - Supervisor follow-up guarantee + chain reports (2026-11-19)
+
+Extends ADR-090 with no new service or tabs: event-time follow-up
+issuance per trigger, tick self-audit with pending retries, Fleet
+dead-end verdicts, and supervisor-issued inbox chain reports with
+acknowledge + immutability. See
+[ADR-094](decisions/ADR-094-supervisor-followup-guarantee.md).
+
 ## ADR-092 - Alpaca paper selected (2026-11-19)
 
 Owner selected Alpaca paper as the first investor broker. Asset scope,

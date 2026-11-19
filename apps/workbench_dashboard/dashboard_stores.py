@@ -15,7 +15,7 @@ from pathlib import Path
 
 MAX_RESPONSE_BYTES = 100_000
 MAX_OPEN_TASKS = 50
-INBOX_TYPES = ("decision", "clarification", "order", "task")
+INBOX_TYPES = ("decision", "clarification", "order", "task", "report")
 INBOX_STATUSES = ("open", "answered", "closed")
 INBOX_PARTIES = ("supervisor", "owner", "agent")
 INBOX_ASSIGNEES = ("owner", "agent")
@@ -184,6 +184,7 @@ class DashboardStores:
             item
             for item in items
             if item.get("assignee") != "agent"
+            and not (item.get("type") == "report" and item.get("acknowledged"))
             and (
                 item.get("status") == "open"
                 or (item.get("status") == "answered" and self.waiting_on(item) == "owner")
@@ -296,6 +297,8 @@ class DashboardStores:
             raise StoreError(f"Inbox creator must be one of {INBOX_PARTIES}")
         if assignee not in INBOX_ASSIGNEES:
             raise StoreError(f"Inbox assignee must be one of {INBOX_ASSIGNEES}")
+        if task_type == "report" and (created_by != "supervisor" or assignee != "owner"):
+            raise StoreError("Chain reports are supervisor-issued to the owner")
         if self.open_inbox_count() >= MAX_OPEN_TASKS:
             raise StoreError("Too many open inbox tasks")
         now = _utc_now()
@@ -347,6 +350,8 @@ class DashboardStores:
         record = self.inbox.get(item_id)
         if record is None:
             raise StoreError("Inbox task not found")
+        if record.get("type") == "report":
+            raise StoreError("Chain reports are acknowledged, not answered")
         if record.get("status") == "closed":
             raise StoreError("Closed inbox tasks cannot be re-answered")
         answer = answer.strip()
@@ -405,6 +410,46 @@ class DashboardStores:
         record["metadata"] = metadata
         record.pop("closeout_pending", None)
 
+    def retry_closeout(self, record: dict) -> bool:
+        """Re-attempt a cap-refused close-out filing; True when filed now."""
+        metadata = record.get("metadata") or {}
+        if not record.get("closeout_pending") or metadata.get("closeout_id"):
+            return False
+        self._queue_closeout(record)
+        self.inbox.put(record["id"], record)
+        return bool((record.get("metadata") or {}).get("closeout_id"))
+
+    def _report_close_to_source(self, record: dict) -> None:
+        """Report an agent close back to its linked source (best-effort).
+
+        Close-out tasks append one deduped line to their source item's
+        note so the answer thread shows its implementation outcome.
+        Run-bridged items already report via the drain terminal hook and
+        E2E follow-ups close into immutable verdict reports, so neither
+        is duplicated here. Never raises: reporting must not fail a close.
+        """
+        try:
+            metadata = record.get("metadata") or {}
+            source_id = metadata.get("closeout_for")
+            if not source_id:
+                return
+            source = self.inbox.get(str(source_id))
+            if source is None:
+                return
+            marker = f"closeout:{record.get('id')}"
+            note = source.get("note") or ""
+            if marker in note:
+                return
+            line = (
+                f"Close-out {str(record.get('id'))[:8]} "
+                f"({record.get('resolution_kind') or 'final'}): "
+                f"{(record.get('resolution') or '')[:300]} [{marker}]"
+            )
+            source["note"] = (note + "\n" + line).strip() if note else line
+            self.inbox.put(source["id"], source)
+        except Exception:  # noqa: BLE001 - report-back never breaks close
+            return
+
     def close_inbox_task(
         self,
         item_id: str,
@@ -421,6 +466,8 @@ class DashboardStores:
         record = self.inbox.get(item_id)
         if record is None:
             raise StoreError("Inbox task not found")
+        if record.get("type") == "report":
+            raise StoreError("Chain reports close via acknowledge, not close")
         if resolution is None or not resolution.strip():
             raise StoreError("Closing needs a resolution note")
         if resolution_kind not in ("final", "followup"):
@@ -431,6 +478,85 @@ class DashboardStores:
         record["resolved_at"] = _utc_now()
         record["status"] = "closed"
         record["waiting_on"] = None
+        self.inbox.put(item_id, record)
+        self._report_close_to_source(record)
+        self._maybe_finalize_chain(record)
+        return record
+
+    def _maybe_finalize_chain(self, record: dict) -> None:
+        """File the chain-end report once source and close-out both close.
+
+        Either close can land last; finalization is deduped on the
+        source, refuses the cap with a retry flag, and never raises.
+        """
+        try:
+            from supervisor_followups import finalize_chain_report
+
+            metadata = record.get("metadata") or {}
+            source_id = metadata.get("closeout_for") or (
+                record.get("id") if metadata.get("closeout_id") else None
+            )
+            if not source_id:
+                return
+            source = self.inbox.get(str(source_id))
+            if source is None or source.get("status") != "closed":
+                return
+            closeout_id = (source.get("metadata") or {}).get("closeout_id")
+            closeout = self.inbox.get(str(closeout_id)) if closeout_id else None
+            if closeout is None or closeout.get("status") != "closed":
+                return
+            finalize_chain_report(self, str(source_id))
+        except Exception:  # noqa: BLE001 - finalization never breaks close
+            return
+
+    def acknowledge_report(self, item_id: str) -> dict:
+        """Acknowledge a chain report: archived out of the badge, then immutable.
+
+        Only open, unacknowledged reports acknowledge. The record closes
+        with its achievement text intact; later edits are rejected except
+        append-only supersede links. Reopening stays the explicit
+        owner-override path.
+        """
+        record = self.inbox.get(item_id)
+        if record is None:
+            raise StoreError("Inbox task not found")
+        if record.get("type") != "report":
+            raise StoreError("Only chain reports acknowledge")
+        if record.get("status") == "closed" or record.get("acknowledged"):
+            raise StoreError("Chain report is already acknowledged")
+        record["acknowledged"] = True
+        record["acknowledged_at"] = _utc_now()
+        record["resolution"] = (
+            f"Acknowledged {record['acknowledged_at'][:10]}; "
+            "chain report archived, content immutable."
+        )
+        record["resolution_kind"] = "final"
+        record["resolved_at"] = record["acknowledged_at"]
+        record["status"] = "closed"
+        record["waiting_on"] = None
+        self.inbox.put(item_id, record)
+        return record
+
+    def supersede_report(self, item_id: str, *, by_id: str) -> dict:
+        """Append a supersede link to a closed report (the one allowed edit)."""
+        record = self.inbox.get(item_id)
+        if record is None:
+            raise StoreError("Inbox task not found")
+        if record.get("type") != "report" or record.get("status") != "closed":
+            raise StoreError("Only closed chain reports take supersede links")
+        target = self.inbox.get(by_id)
+        if target is None or target.get("type") != "report":
+            raise StoreError("Supersede target must be a chain report")
+        links = list((record.get("metadata") or {}).get("supersede_links") or [])
+        if by_id in links:
+            return record
+        links.append(by_id)
+        metadata = dict(record.get("metadata") or {})
+        metadata["supersede_links"] = links
+        record["metadata"] = metadata
+        line = f"Superseded by report {by_id}."
+        body = record.get("body") or ""
+        record["body"] = (body.rstrip() + "\n\n" + line) if body.strip() else line
         self.inbox.put(item_id, record)
         return record
 
@@ -1043,6 +1169,21 @@ class DashboardStores:
             self.e2e_tasks.put(record["id"], record)
             return None
         return str(filed["id"])
+
+    def retry_e2e_followup(self, task_id: str) -> str | None:
+        """Re-attempt a refused E2E follow-up filing; id of the filed task."""
+        record = self.e2e_tasks.get(task_id)
+        if record is None or not record.get("followup_error"):
+            return None
+        report_id = record.get("report_id")
+        report = self.e2e_reports.get(str(report_id)) if report_id else None
+        if report is None:
+            return None
+        filed_id = self._maybe_file_e2e_followup(record, report)
+        if filed_id is not None:
+            record.pop("followup_error", None)
+            self.e2e_tasks.put(task_id, record)
+        return filed_id
 
     def finalize_e2e_task(self, task_id: str, steps_by_item: dict) -> dict:
         """Turn a draft into an open task with finalized checkable steps.

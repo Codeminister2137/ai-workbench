@@ -557,16 +557,18 @@ def _run_failure_class(run: dict[str, Any]) -> str:
 
 
 def fleet_agents(stores, *, now: datetime | None = None) -> dict[str, Any]:
-    """Supervision verdicts over runs: stuck, broken, parked, or ok.
+    """Supervision verdicts over runs: stuck, broken, dead-end, parked, ok.
 
     Failed runs stay visible while fresh; running runs older than
     SUPERVISION_STUCK_MINUTES without an update are stuck; old queued
-    runs are parked. Fail-soft like every other Fleet probe.
+    runs are parked. A fresh failed run with no triage task is a
+    dead-end: terminal without follow-up. Fail-soft like every other
+    Fleet probe.
     """
     try:
         items, _total = stores.runs.list(limit=100)
     except Exception:  # noqa: BLE001 - health board never raises
-        return {"runs": [], "stuck": 0, "broken": 0, "attention": False}
+        return {"runs": [], "stuck": 0, "broken": 0, "dead_end": 0, "attention": False}
     moment = now or datetime.now(UTC)
     verdicts: list[dict[str, Any]] = []
     for run in items:
@@ -580,8 +582,13 @@ def fleet_agents(stores, *, now: datetime | None = None) -> dict[str, Any]:
         reason = ""
         if status == "failed":
             if age is None or age <= SUPERVISION_BROKEN_HOURS * 60:
-                verdict = "broken"
-                reason = _run_failure_class(run)
+                if _run_has_triage(stores, str(run.get("id") or "")):
+                    verdict = "broken"
+                    reason = _run_failure_class(run)
+                else:
+                    verdict = "dead-end"
+                    failure = _run_failure_class(run)
+                    reason = f"{failure}; no triage task" if failure else "no triage task"
             else:
                 continue
         elif status == "running" and age is not None and age > SUPERVISION_STUCK_MINUTES:
@@ -602,7 +609,30 @@ def fleet_agents(stores, *, now: datetime | None = None) -> dict[str, Any]:
         )
     stuck = sum(1 for item in verdicts if item["verdict"] == "stuck")
     broken = sum(1 for item in verdicts if item["verdict"] == "broken")
-    return {"runs": verdicts, "stuck": stuck, "broken": broken, "attention": bool(stuck or broken)}
+    dead_end = sum(1 for item in verdicts if item["verdict"] == "dead-end")
+    return {
+        "runs": verdicts,
+        "stuck": stuck,
+        "broken": broken,
+        "dead_end": dead_end,
+        "attention": bool(stuck or broken or dead_end),
+    }
+
+
+def _run_has_triage(stores, run_id: str) -> bool:
+    """True when an open triage task tracks this run (frozen T1 key)."""
+    if not run_id:
+        return False
+    try:
+        items, _total = stores.inbox.list(limit=1000)
+    except Exception:  # noqa: BLE001 - probe stays fail-soft
+        return True  # unknown: keep the established broken verdict
+    return any(
+        isinstance(item, dict)
+        and item.get("status") == "open"
+        and str((item.get("metadata") or {}).get("triage_for", "")) == run_id
+        for item in items
+    )
 
 
 def fleet_runs(stores) -> list[dict[str, Any]]:
@@ -1219,6 +1249,12 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             if path.startswith("/api/inbox/") and path.endswith("/close"):
                 item_id = path[len("/api/inbox/") : -len("/close")]
                 return self._close_inbox_task(item_id, payload)
+            if path.startswith("/api/inbox/") and path.endswith("/acknowledge"):
+                item_id = path[len("/api/inbox/") : -len("/acknowledge")]
+                return self._acknowledge_report(item_id)
+            if path.startswith("/api/inbox/") and path.endswith("/supersede"):
+                item_id = path[len("/api/inbox/") : -len("/supersede")]
+                return self._supersede_report(item_id, payload)
             if path.startswith("/api/inbox/") and path.endswith("/reopen"):
                 item_id = path[len("/api/inbox/") : -len("/reopen")]
                 return self._reopen_inbox_task(item_id)
@@ -2211,6 +2247,25 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             record = self._stores().close_inbox_task(
                 item_id, resolution=resolution, resolution_kind=kind
             )
+        except StoreError as exc:
+            status = 404 if "not found" in str(exc).lower() else 400
+            return self._send_json({"ok": False, "error": str(exc)}, status=status)
+        self._send_json({"ok": True, "id": record["id"], "status": record["status"]})
+
+    def _acknowledge_report(self, item_id: str) -> None:
+        try:
+            record = self._stores().acknowledge_report(item_id)
+        except StoreError as exc:
+            status = 404 if "not found" in str(exc).lower() else 400
+            return self._send_json({"ok": False, "error": str(exc)}, status=status)
+        self._send_json({"ok": True, "id": record["id"], "status": record["status"]})
+
+    def _supersede_report(self, item_id: str, payload: dict) -> None:
+        by_id = payload.get("by_id", "")
+        if not isinstance(by_id, str) or not by_id.strip():
+            return self._send_json({"ok": False, "error": "by_id is required"}, status=400)
+        try:
+            record = self._stores().supersede_report(item_id, by_id=by_id.strip())
         except StoreError as exc:
             status = 404 if "not found" in str(exc).lower() else 400
             return self._send_json({"ok": False, "error": str(exc)}, status=status)
@@ -3593,6 +3648,16 @@ def maybe_start_drain_scheduler(
             promoted = []
         if promoted:
             print(f"Workbench dashboard: auto-promoted {len(promoted)} backlog items")
+        try:
+            from supervisor_followups import supervisor_tick_audit
+
+            audit = supervisor_tick_audit(stores)
+        except Exception as exc:  # noqa: BLE001 - tick failures are never fatal
+            print(f"Workbench dashboard: supervisor self-audit failed: {exc}")
+            audit = {}
+        healed = (audit.get("healed") or {}) if isinstance(audit, dict) else {}
+        if any(healed.values()):
+            print(f"Workbench dashboard: self-audit healed {healed}")
         paused = drain_pause_state(stores)
         if paused is not None:
             print(f"Workbench dashboard: scheduled drain paused: {paused['reason']}")

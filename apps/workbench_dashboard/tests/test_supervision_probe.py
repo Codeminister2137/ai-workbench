@@ -25,7 +25,7 @@ def _put(stores, run_id, *, status, age_minutes=None, receipts=None):
     stores.runs.put(run_id, record)
 
 
-def test_verdicts_cover_stuck_broken_parked_and_ok(tmp_path) -> None:
+def test_verdicts_cover_stuck_broken_dead_end_parked_and_ok(tmp_path) -> None:
     stores = DashboardStores(tmp_path)
     _put(stores, "stale-run", status="running", age_minutes=45)
     _put(
@@ -35,6 +35,20 @@ def test_verdicts_cover_stuck_broken_parked_and_ok(tmp_path) -> None:
         age_minutes=10,
         receipts=[{"status": "failed", "failure_class": "provider"}],
     )
+    _put(
+        stores,
+        "triaged-fail",
+        status="failed",
+        age_minutes=10,
+        receipts=[{"status": "failed", "failure_class": "provider"}],
+    )
+    stores.create_inbox_task(
+        title="Triage failed run triaged",
+        body="triage",
+        task_type="task",
+        assignee="agent",
+        metadata={"triage_for": "triaged-fail"},
+    )
     _put(stores, "old-fail", status="failed", age_minutes=60 * 25)
     _put(stores, "parked", status="queued", age_minutes=90)
     _put(stores, "fresh", status="running", age_minutes=3)
@@ -43,23 +57,25 @@ def test_verdicts_cover_stuck_broken_parked_and_ok(tmp_path) -> None:
     by_id = {item["id"]: item for item in out["runs"]}
     assert by_id["stale-run"]["verdict"] == "stuck"
     assert "45 min" in by_id["stale-run"]["reason"]
-    assert by_id["fresh-fail"]["verdict"] == "broken"
-    assert by_id["fresh-fail"]["reason"] == "provider"
+    assert by_id["fresh-fail"]["verdict"] == "dead-end"
+    assert by_id["fresh-fail"]["reason"] == "provider; no triage task"
+    assert by_id["triaged-fail"]["verdict"] == "broken"
+    assert by_id["triaged-fail"]["reason"] == "provider"
     assert "old-fail" not in by_id
     assert by_id["parked"]["verdict"] == "parked"
     assert by_id["fresh"]["verdict"] == "ok"
     assert "done" not in by_id
-    assert (out["stuck"], out["broken"], out["attention"]) == (1, 1, True)
+    assert (out["stuck"], out["broken"], out["dead_end"], out["attention"]) == (1, 1, 1, True)
 
 
-def test_broken_without_class_and_unknown_age_stay_quiet(tmp_path) -> None:
+def test_dead_end_without_class_and_unknown_age_stays_visible(tmp_path) -> None:
     stores = DashboardStores(tmp_path)
     _put(stores, "bare-fail", status="failed")
     _put(stores, "undated", status="running")
     out = fleet_agents(stores, now=NOW)
     by_id = {item["id"]: item for item in out["runs"]}
-    assert by_id["bare-fail"]["verdict"] == "broken"
-    assert by_id["bare-fail"]["reason"] == "unknown"
+    assert by_id["bare-fail"]["verdict"] == "dead-end"
+    assert by_id["bare-fail"]["reason"] == "unknown; no triage task"
     assert by_id["undated"]["verdict"] == "ok"
     assert out["attention"] is True
 
@@ -76,5 +92,6 @@ def test_probe_is_fail_soft_on_broken_store() -> None:
         "runs": [],
         "stuck": 0,
         "broken": 0,
+        "dead_end": 0,
         "attention": False,
     }
