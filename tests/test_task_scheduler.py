@@ -346,3 +346,88 @@ def test_cli_plans_lists_and_defers_without_worker(tmp_path, monkeypatch, capsys
 def test_invalid_allocation_rejected(tmp_path, duration) -> None:
     with pytest.raises(ValueError):
         ResearchTask("invalid", tmp_path, "Topic", "local", duration)
+
+
+def _eval_catalog(tmp_path: Path) -> str:
+    name = "eval-catalog.toml"
+    (tmp_path / name).write_text("[models]\n", encoding="utf-8")
+    return name
+
+
+def test_route_eval_kind_validates_catalog_inside_repo(tmp_path: Path) -> None:
+    catalog = _eval_catalog(tmp_path)
+    task = ResearchTask("ev1", tmp_path, catalog, "ollama/qwen3:14b", 600, task_kind="route-eval")
+    assert task.task_kind == "route-eval"
+    with pytest.raises(ValueError, match="catalog"):
+        ResearchTask(
+            "ev2",
+            tmp_path,
+            "missing.toml",
+            "ollama/qwen3:14b",
+            600,
+            task_kind="route-eval",
+        )
+    with pytest.raises(ValueError, match="catalog"):
+        ResearchTask(
+            "ev3",
+            tmp_path,
+            "../outside.toml",
+            "ollama/qwen3:14b",
+            600,
+            task_kind="route-eval",
+        )
+
+
+def test_route_eval_command_is_fixed_and_local_only(tmp_path: Path) -> None:
+    from ai_provider.task_scheduler import eval_command
+
+    catalog = _eval_catalog(tmp_path)
+    store = ResearchTaskStore(tmp_path / "runs.sqlite3")
+    store.plan(
+        ResearchTask("ev1", tmp_path, catalog, "ollama/qwen3:14b", 600, task_kind="route-eval")
+    )
+    command = eval_command(store.get_task("ev1"), store.path)
+    assert command[1:3] == ["-m", "ai_provider.capability_eval"]
+    assert command[command.index("--route") + 1] == "ollama/qwen3:14b"
+    assert command[command.index("--catalog") + 1] == str(tmp_path / catalog)
+    assert "--allow-hosted" not in command
+    out = command[command.index("--output") + 1]
+    assert out.endswith("eval.json")
+    assert not Path(out).exists()
+
+
+def test_kind_check_migration_preserves_v2_rows(tmp_path: Path) -> None:
+    import sqlite3
+
+    path = tmp_path / "runs.sqlite3"
+    store = ResearchTaskStore(path)
+    store.plan(ResearchTask("old", tmp_path, "Topic", "local", 60))
+    # Rewrite the table with the historical v2 two-kind CHECK.
+    with sqlite3.connect(path) as connection:
+        definition = connection.execute(
+            "SELECT sql FROM sqlite_master WHERE name = 'scheduled_research_tasks'"
+        ).fetchone()[0]
+        assert "route-eval" in definition
+        old_definition = definition.replace(", 'route-eval'", "")
+        cols = ", ".join(
+            row[1] for row in connection.execute("PRAGMA table_info(scheduled_research_tasks)")
+        )
+        connection.execute("ALTER TABLE scheduled_research_tasks RENAME TO v2_tasks")
+        connection.execute(old_definition)
+        connection.execute(
+            f"INSERT INTO scheduled_research_tasks ({cols}) SELECT {cols} FROM v2_tasks"
+        )
+        connection.execute("DROP TABLE v2_tasks")
+        connection.execute("UPDATE scheduled_research_tasks SET schema_version = 2")
+    reopened = ResearchTaskStore(path)
+    assert reopened.get_task("old").status is Status.PLANNED
+    catalog = _eval_catalog(tmp_path)
+    reopened.plan(
+        ResearchTask("ev1", tmp_path, catalog, "ollama/qwen3:14b", 600, task_kind="route-eval")
+    )
+    assert reopened.get_task("ev1").task_kind == "route-eval"
+    with reopened._connect() as connection:
+        with pytest.raises(Exception, match="CHECK constraint failed"):
+            connection.execute(
+                "UPDATE scheduled_research_tasks SET task_kind = 'nope' WHERE task_id = 'ev1'"
+            )

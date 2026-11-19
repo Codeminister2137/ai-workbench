@@ -1,4 +1,4 @@
-"""Explicit foreground scheduling of supervised, local, uncharged research jobs."""
+"""Explicit foreground scheduling of supervised, local, uncharged research and eval jobs."""
 
 from __future__ import annotations
 
@@ -44,10 +44,18 @@ class ResearchTask:
             raise ValueError("Research prompt and local model must not be empty")
         if not isinstance(self.settings, ResearchTaskSettings):
             raise ValueError("Research tasks require validated typed settings")
-        if self.task_kind not in ("research", "acceptance"):
+        if self.task_kind not in ("research", "acceptance", "route-eval"):
             raise ValueError("Unsupported research task kind")
         if self.task_kind == "acceptance" and self.prompt != RESEARCH_ACCEPTANCE_PROMPT:
             raise ValueError("Acceptance tasks require the fixed public research prompt")
+        if self.task_kind == "route-eval":
+            catalog = (self.repo_root / self.prompt).resolve()
+            try:
+                catalog.relative_to(self.repo_root.resolve())
+            except ValueError:
+                raise ValueError("Eval catalog must stay inside the repo root") from None
+            if catalog.suffix != ".toml" or not catalog.is_file():
+                raise ValueError("Eval catalog must be an existing .toml file")
 
 
 class ResearchTaskStore(SQLiteOrchestratedRunStore):
@@ -75,11 +83,50 @@ class ResearchTaskStore(SQLiteOrchestratedRunStore):
                 connection.execute(
                     "ALTER TABLE scheduled_research_tasks ADD COLUMN "
                     "task_kind TEXT NOT NULL DEFAULT 'research' "
-                    "CHECK(task_kind IN ('research', 'acceptance'))"
+                    "CHECK(task_kind IN ('research', 'acceptance', 'route-eval'))"
                 )
             connection.execute(
                 "UPDATE scheduled_research_tasks SET schema_version = 2 WHERE schema_version = 1"
             )
+            self._migrate_kind_check_v3(connection)
+
+    @staticmethod
+    def _migrate_kind_check_v3(connection: sqlite3.Connection) -> None:
+        """Admit route-eval on v2 databases by rebuilding the kind CHECK (v3).
+
+        SQLite cannot alter a CHECK in place; copy the table with the
+        widened constraint. Definitions, states, and run records survive.
+        """
+        definition = connection.execute(
+            "SELECT sql FROM sqlite_master WHERE name = 'scheduled_research_tasks'"
+        ).fetchone()
+        if definition is None or "route-eval" in (definition[0] or ""):
+            return
+        cols = ", ".join(
+            row[1] for row in connection.execute("PRAGMA table_info(scheduled_research_tasks)")
+        )
+        connection.execute(
+            "CREATE TABLE scheduled_research_tasks_v3 ("
+            "task_id TEXT PRIMARY KEY, created_at_utc TEXT NOT NULL, "
+            "updated_at_utc TEXT NOT NULL, repo_root TEXT NOT NULL, prompt TEXT NOT NULL, "
+            "model TEXT NOT NULL, required_seconds REAL NOT NULL CHECK(required_seconds > 0), "
+            "status TEXT NOT NULL CHECK(status IN "
+            "('planned', 'running', 'completed', 'failed', 'deferred')), "
+            "exit_code INTEGER, reason TEXT, "
+            "settings_json TEXT NOT NULL DEFAULT '{}', "
+            "task_kind TEXT NOT NULL DEFAULT 'research' "
+            "CHECK(task_kind IN ('research', 'acceptance', 'route-eval')), "
+            "schema_version INTEGER NOT NULL)"
+        )
+        connection.execute(
+            f"INSERT INTO scheduled_research_tasks_v3 ({cols}) "
+            f"SELECT {cols} FROM scheduled_research_tasks"
+        )
+        connection.execute("DROP TABLE scheduled_research_tasks")
+        connection.execute(
+            "ALTER TABLE scheduled_research_tasks_v3 RENAME TO scheduled_research_tasks"
+        )
+        connection.execute("UPDATE scheduled_research_tasks SET schema_version = 3")
 
     def plan(self, task: ResearchTask) -> None:
         if task.status is not ScheduledTaskStatus.PLANNED or task.exit_code is not None:
@@ -90,7 +137,7 @@ class ResearchTaskStore(SQLiteOrchestratedRunStore):
                 """INSERT INTO scheduled_research_tasks
                 (task_id, created_at_utc, updated_at_utc, repo_root, prompt, model,
                  required_seconds, status, settings_json, task_kind, schema_version)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 2)""",
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 3)""",
                 (
                     task.task_id,
                     _utc_now(),
@@ -113,7 +160,7 @@ class ResearchTaskStore(SQLiteOrchestratedRunStore):
                 status, exit_code, reason, settings_json, task_kind, schema_version
                 FROM scheduled_research_tasks ORDER BY rowid"""
             ).fetchall()
-        if any(row[10] != 2 for row in rows):
+        if any(row[10] not in (2, 3) for row in rows):
             raise ValueError("Unsupported scheduled research schema version")
         return tuple(
             ResearchTask(
@@ -174,7 +221,7 @@ def task_artifact_directory(task: ResearchTask, database: Path) -> Path:
 
 
 def worker_database(task: ResearchTask, database: Path) -> Path:
-    if task.task_kind == "acceptance":
+    if task.task_kind in ("acceptance", "route-eval"):
         return (task.repo_root / task_artifact_directory(task, database) / "runs.sqlite3").resolve()
     return database.resolve()
 
@@ -224,8 +271,39 @@ def research_command(task: ResearchTask, database: Path) -> list[str]:
     ]
 
 
+def eval_command(task: ResearchTask, database: Path) -> list[str]:
+    """Fixed capability-eval flags for one explicit route; local-only by construction.
+
+    ``task.model`` is the route id; ``task.prompt`` is the catalog path
+    relative to the repo root (validated at planning). No --allow-hosted
+    flag is ever passed, so hosted routes refuse inside the eval itself.
+    """
+    catalog = (task.repo_root / task.prompt).resolve()
+    out = task.repo_root / task_artifact_directory(task, database) / "eval.json"
+    return [
+        sys.executable,
+        "-m",
+        "ai_provider.capability_eval",
+        "--catalog",
+        str(catalog),
+        "--route",
+        task.model,
+        "--output",
+        str(out),
+    ]
+
+
 def run_research_task(task: ResearchTask, database: Path, budget_seconds: float) -> int:
     run_database = worker_database(task, database)
+    if task.task_kind == "route-eval":
+        code = supervise_research(
+            eval_command(task, database),
+            root=task.repo_root,
+            database=run_database,
+            budget_seconds=budget_seconds,
+            log_path=task.repo_root / task_artifact_directory(task, database) / "assistant.log",
+        )
+        return code
     code = supervise_research(
         research_command(task, database),
         root=task.repo_root,
@@ -326,6 +404,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     plan.add_argument(
         "--acceptance", action="store_true", help="Use the fixed public acceptance task"
     )
+    plan.add_argument(
+        "--route-eval",
+        action="store_true",
+        help="Plan a local-only capability eval: --model is the route id, "
+        "--prompt is the catalog path relative to --repo-root",
+    )
     plan.add_argument("--repo-root", type=Path, default=Path.cwd())
     plan.add_argument("--model", required=True)
     plan.add_argument("--required-minutes", type=float, required=True)
@@ -350,9 +434,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.action == "plan":
             if args.acceptance and args.prompt is not None:
                 raise ValueError("Acceptance uses its fixed prompt; omit --prompt")
+            if args.route_eval and args.acceptance:
+                raise ValueError("Choose one of --route-eval or --acceptance")
             prompt = RESEARCH_ACCEPTANCE_PROMPT if args.acceptance else args.prompt
             if not prompt:
                 raise ValueError("Research tasks require --prompt")
+            kind = (
+                "acceptance" if args.acceptance else "route-eval" if args.route_eval else "research"
+            )
             root = args.repo_root.resolve()
             tokenizer = args.research_review_tokenizer_file
             settings = ResearchTaskSettings(
@@ -372,7 +461,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     args.model,
                     args.required_minutes * 60,
                     settings=settings,
-                    task_kind="acceptance" if args.acceptance else "research",
+                    task_kind=kind,
                 )
             )
             print(f"{args.task_id}: planned")
