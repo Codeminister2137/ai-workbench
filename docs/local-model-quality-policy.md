@@ -94,6 +94,20 @@ bounded five-task run. Routing is unchanged by this documentation update.
   not an adapter bug. No per-model multiplier change on one
   sample; re-probe before tuning.
 
+## Fleet tool-call support (verified 2026-11-19, `ollama show`)
+
+- `qwen2.5-coder:14b` (9GB): completion + tools + insert. The in-fleet
+  coder replacement for deepseek; already the policy pick for
+  deterministic local work.
+- `qwen3:14b`, `gpt-oss:20b`: completion + tools.
+- `deepseek-coder-v2:16b`: completion + insert only, no tools
+  (registry + live 400, twice). Out for agent work.
+
+Upgrade candidate (needs owner pull approval): `devstral:24b` — 14GB,
+128K, tools-tagged, Apache 2.0, agentic-tuned, 46.8% SWE-Bench Verified
+(ollama.com/library/devstral). Fits 16GB VRAM with context headroom;
+probe before routing.
+
 ## Review triggers
 
 Re-run the 24-task harness when: new local weights land, a new
