@@ -214,12 +214,16 @@ class RunDrain:
         self._runs_dir.mkdir(parents=True, exist_ok=True)
         outcomes = []
         started = 0
+        pending: list[tuple[str, Path, dict]] = []
         for path in sorted(self._runs_dir.glob("*.json")):
-            if started >= max_runs:
-                break
             run = _read_json(path)
             if run is None or run.get("status") not in {"queued", "paused"}:
                 continue
+            pending.append((str(run.get("created_at_utc") or ""), path, run))
+        pending.sort(key=lambda entry: (entry[0], entry[1].name))
+        for _, path, run in pending:
+            if started >= max_runs:
+                break
             # Cancelled runs bypass approval: they must reach terminal
             # state via the claim path instead of parking forever.
             if run.get("status") == "queued" and not run_cancelled(run):

@@ -347,6 +347,21 @@ def test_cancelled_run_reaches_terminal_despite_rejection(drain, stores, calls) 
     assert stores.runs.get(run_id)["status"] == "cancelled"
 
 
+def test_drain_runs_oldest_first_not_filename_order(drain, stores, calls) -> None:
+    _queue_chat_run(stores, run_id="z-newer", answer="Approve")
+    _queue_chat_run(stores, run_id="a-older", answer="Approve")
+    newer = stores.runs.get("z-newer")
+    older = stores.runs.get("a-older")
+    assert newer is not None and older is not None
+    newer["created_at_utc"] = "2026-11-06T00:00:00+00:00"
+    older["created_at_utc"] = "2026-11-05T00:00:00+00:00"
+    stores.runs.put("z-newer", newer)
+    stores.runs.put("a-older", older)
+    outcomes = drain.drain(max_runs=1)
+    assert [outcome["run_id"] for outcome in outcomes] == ["a-older"]
+    assert [call["id"] for call in calls] == ["a-older"]
+
+
 def test_max_runs_budgets_claims_not_parks(drain, stores, calls) -> None:
     _queue_chat_run(stores, run_id="0-parked")
     _queue_chat_run(stores, run_id="a-one", answer="Approve")
