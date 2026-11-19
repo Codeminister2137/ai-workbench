@@ -89,6 +89,7 @@ ROUTE_UI: tuple[tuple[str, str, str], ...] = (
     ("/api/e2e/", "E2E", "#/e2e"),
     ("/api/chat/", "Chat", "#/chat"),
     ("/api/inbox", "Inbox", "#/inbox"),
+    ("/api/resolve", "Inbox", "#/inbox"),
     ("/api/runs", "Runs", "#/runs"),
     ("/api/ideas", "Ideas", "#/ideas"),
     ("/api/backlog", "Backlog", "#/backlog"),
