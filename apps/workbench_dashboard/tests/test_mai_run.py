@@ -59,6 +59,16 @@ def test_argv_timeout_override_clamped(tmp_path) -> None:
     assert _run_timeout_seconds({"mai_timeout_seconds": 99999}) == 1740.0
 
 
+def test_invalid_timeout_overrides_fall_back_before_argv_construction(tmp_path) -> None:
+    from mai_run import _run_timeout_seconds
+
+    for raw in ("nan", float("nan"), "inf", "-inf", float("inf"), 10**1000):
+        timeout = _run_timeout_seconds({"mai_timeout_seconds": raw})
+        assert timeout is None
+        argv = build_mai_argv(_run(), repo_root=tmp_path, user_config="u", timeout_seconds=timeout)
+        assert "--timeout-seconds" not in argv
+
+
 def test_session_stdin_is_eof_not_a_hang() -> None:
     import sys
 

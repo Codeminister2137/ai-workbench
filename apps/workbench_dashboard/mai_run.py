@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import contextlib
 import io
+import math
 import os
 import re
 import sys
@@ -137,9 +138,9 @@ def _run_timeout_seconds(run: dict) -> float | None:
         return None
     try:
         seconds = float(raw)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return None
-    if seconds < 60:
+    if not math.isfinite(seconds) or seconds < 60:
         return None
     return min(seconds, SUBPROCESS_TIMEOUT_SECONDS - 60.0)
 
