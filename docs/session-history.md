@@ -1,5 +1,24 @@
 # Session History
 
+## 2026-11-19 loop v3 (01a1f396): supervisor evolution + battery + probe, pushed c332d2c
+
+Plan v3 executed (v1/v2/v3 recovered from 01a1e5ab transcript). Merges:
+investor-scope Tier 1, morning-closeouts Tier 2, timeout-validation Tier 2,
+hollow-completion Tier 2, supervisor-evolution Tier 2 (ADR-094, T1/T5
+adoption, handoff slice), probe-record Tier 1, 2 gate-fix Tier 1s. Full gate
+green via push hook (2 reds fixed: button pin, adopted-test typing);
+rev-list 0 + ls-remote verified; serve redeployed to c332d2c. Supervisor:
+event issuance, tick self-audit, Fleet dead-end verdict, report type +
+acknowledge + supersede + chain-end finalization; deepseek-saga proof
+report 06cacdc8 live-verified. Battery battery-parity-1119 frozen @d498eff44
+(T1/T5 real carve-outs): 5 Muse arms 18/20, 5 Mai arms routing-blocked
+(dev-HIGH vs all-STANDARD free routes; hollow completions preserved as
+evidence, drain defect fixed). Scores in docs/plans/mai-parity-battery/.
+Devstral Small 2 pulled + probed (digest 24277f07f6...b63c8; native tool +
+5/5 checks @100% GPU; Qwen text-JSON point). Fork brief b632b5aa open
+(recommend allowances re-run). 3 owner tasks arrived mid-loop (bridged,
+drain-owned). Open: df2a8d2c (fork), P7 (owner).
+
 ## 2026-11-18 assessment remainder, pushed 02df801 (01a1e5ab cont.)
 
 Owner-gate enforcement (registry + I5 + AGENTS rule; 5 missing items
