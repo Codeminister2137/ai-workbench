@@ -209,6 +209,20 @@ def mai_receipt(outcome: MaiRunOutcome, argv: Sequence[str]) -> dict:
     """Drain receipt for a Mai outcome; transcripts stay in the tails."""
     facts = outcome.facts or parse_mai_facts(outcome.stdout_tail)
     if outcome.error is None and outcome.exit_code == 0:
+        reported = mai_failure_reason(outcome.stdout_tail, outcome.stderr_tail)
+        if reported is not None:
+            error = f"Mai reported failure: {reported}"
+            return {
+                "status": "failed",
+                "error": error,
+                "failure_class": classify_failure(error, outcome.stdout_tail, outcome.stderr_tail),
+                "stdout_tail": outcome.stdout_tail,
+                "stderr_tail": outcome.stderr_tail,
+                "mai_argv": list(argv),
+                "mai_session_id": facts.get("coding_session_id"),
+                "route_id": facts.get("effective_route_id"),
+                "source": "mai-session",
+            }
         if not outcome.stdout_tail.strip() and not outcome.stderr_tail.strip():
             return {
                 "status": "failed",
