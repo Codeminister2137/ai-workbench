@@ -148,6 +148,29 @@ function gtext(s) {
     /\b(D4|W\d+|H\d+|M\d+|STT|R[1-3]|T[0-3]|L3|BYOK)\b/g,
     (m) => `<abbr title="${gloss(m)}">${m}</abbr>`);
 }
+const ID_ROUTES = {inbox: "#/inbox/", run: "#/runs/", idea: "#/ideas/", plan: "#/plans/", chat: "#/chat/"};
+function linkIds(html) {
+  return String(html || "").split(/(<a\b[^>]*>.*?<\/a>)/gis).map((part, i) => {
+    if (i % 2 === 1) return part;
+    return part.split(/(<[^>]*>)/g).map((chunk) => {
+      if (chunk.startsWith("<")) return chunk;
+      return chunk.replace(/\b(?:(inbox|run|idea|plan|chat):)?([0-9a-fA-F]{8,64})\b/g, (m, kind, id) => {
+        if (!kind && id.length < 12) return m;
+        const low = id.toLowerCase();
+        const href = kind ? ID_ROUTES[kind] + low : "#/lookup/" + low;
+        const title = kind ? `Open ${kind} ${id}` : "Look up this ID";
+        return `<a href="${href}" title="${title}">${m}</a>`;
+      });
+    }).join("");
+  }).join("");
+}
+function refLink(ref) {
+  const text = String(ref || "");
+  const known = text.match(/^(inbox|run|idea|plan|chat):([0-9a-fA-F]{8,64})$/);
+  if (known) return `<a href="${ID_ROUTES[known[1]]}${known[2].toLowerCase()}" title="Open ${known[1]} ${known[2]}">${esc(text)}</a>`;
+  if (/^[0-9a-fA-F]{8,64}$/.test(text)) return `<a href="#/lookup/${text.toLowerCase()}" title="Look up this ID">${esc(text)}</a>`;
+  return esc(text);
+}
 function truncate(s, limit) {
   const text = String(s || "");
   return text.length <= limit ? text : text.slice(0, limit) + "…";
@@ -1421,7 +1444,7 @@ async function renderRuns(id) {
         <button id="fanout-apply-btn" title="Apply fan-out policy to this run">Apply</button>`
       : "";
     const report = run.report
-      ? `<h3>Report</h3>${mdHtml(run.report)}`
+      ? `<h3>Report</h3>${linkIds(mdHtml(run.report))}`
       : run.report_request_id
         ? `<p class="muted">Report requested — see the inbox task.</p>`
         : `<p><button id="report-btn" title="Ask for a completion report for this run">Generate report</button></p>`;
@@ -1446,7 +1469,7 @@ async function renderRuns(id) {
       <p title="Whether this run may spawn subagent children"><strong>Fan-out:</strong> <span class="pill">${esc(fanout)}</span>${fanoutControl}</p>
       ${synthesisHtml(run)}
       ${run.validation ? `<p><strong>Validation:</strong> ${esc(run.validation)}</p>` : ""}
-      ${run.body ? `<pre>${gtext(run.body)}</pre>` : ""}
+      ${run.body ? `<pre>${linkIds(gtext(run.body))}</pre>` : ""}
       ${diff}
       <h3>Staged project changes</h3>
       <div id="staged-list" data-applied="${run.staged_applied ? "1" : ""}"><p class="muted">Loading staged changes...</p></div>
@@ -1786,27 +1809,27 @@ async function renderInbox(id) {
     const item = payload.item;
     const options = (item.options || []).map((opt, i) =>
       `<label><input type="radio" name="opt" value="${i}"> ${esc(opt)}</label><br>`).join("");
-    const refs = (item.context_refs || []).map((r) => `<li>${esc(r)}</li>`).join("");
+    const refs = (item.context_refs || []).map((r) => `<li>${refLink(r)}</li>`).join("");
     const stamp = (v) => v ? esc(v.slice(0, 16).replace("T", " ")) : "";
     const record = (item.options || []).length && item.status === "closed"
       ? `<h3>Choices offered</h3><ol>${item.options.map((o) => `<li>${esc(o)}</li>`).join("")}</ol>` : "";
     const outcome = item.resolution
-      ? `<h3>Outcome</h3><p class="inbox-body">${gtext(item.resolution)}</p>`
+      ? `<h3>Outcome</h3><p class="inbox-body">${linkIds(gtext(item.resolution))}</p>`
         + (item.resolved_at ? `<p class="muted">Resolved ${stamp(item.resolved_at)}</p>` : "")
       : "";
     const decision = item.answer || item.note
       ? `${item.answer ? `<p><strong>Answer:</strong> ${esc(item.answer)}</p>` : ""}
-         ${item.note ? `<p class="inbox-body"><strong>Note:</strong> ${esc(item.note)}</p>` : ""}
+         ${item.note ? `<p class="inbox-body"><strong>Note:</strong> ${linkIds(esc(item.note))}</p>` : ""}
          ${item.answered_at ? `<p class="muted">Answered ${stamp(item.answered_at)}</p>` : ""}`
       : '<p class="muted">No answer recorded yet.</p>';
     const notes = item.notes
-      ? `<h3>Notes</h3><p class="inbox-body">${esc(item.notes)}</p>`
+      ? `<h3>Notes</h3><p class="inbox-body">${linkIds(esc(item.notes))}</p>`
       : "";
     view.innerHTML = `<h1>Inbox task</h1><p><a href="#/inbox">All tasks</a></p>
       <div class="card"><h2>${gtext(item.title)}</h2>
       <p class="muted">${esc(item.type)} · ${esc(item.status)}${(item.resolution_kind || "final") !== "final" ? " · needs follow-up" : ""} · from ${esc(item.created_by || "")} · opened ${stamp(item.created_at)}</p>
       <h3>Request</h3>
-      <p class="inbox-body">${gtext(item.body || "")}</p>
+      <p class="inbox-body">${linkIds(gtext(item.body || ""))}</p>
       ${item.type === "task" ? '<p class="muted">Do the steps above, then answer Done with a note. Never paste secrets here — put keys in .env / User env.</p>' : ""}
       ${refs ? `<ul class="plain">${refs}</ul>` : ""}
       ${record}
@@ -1961,9 +1984,15 @@ async function renderInbox(id) {
     ${divergence}
     ${filterBoxes("inbox-filters", groups, picked)}
     <p><input type="text" id="filter-inbox" placeholder="Filter tasks..." title="Filter inbox by text">
-    <select id="filter-inbox-project" title="Show inbox tasks for one project">${await projectOptions(inboxProj)}</select></p>
+    <select id="filter-inbox-project" title="Show inbox tasks for one project">${await projectOptions(inboxProj)}</select>
+    <input type="text" id="lookup-id" placeholder="Find item by ID..." title="Look up any inbox, run, idea, or plan ID (full or unique prefix)">
+    <button type="button" id="lookup-go" title="Open the item with this ID">Go</button></p>
     <ul class="plain" id="inbox-list">${items}</ul>`;
   document.getElementById("filter-inbox").addEventListener("input", (ev) => filterList("inbox-list", ev.target.value));
+  document.getElementById("lookup-go").addEventListener("click", () => {
+    const token = document.getElementById("lookup-id").value.trim();
+    if (token) location.hash = "#/lookup/" + encodeURIComponent(token);
+  });
   document.getElementById("filter-inbox-project").addEventListener("change", (ev) => {
     const params = new URLSearchParams(location.hash.split("?")[1] || "");
     if (ev.target.value) params.set("project", ev.target.value);
@@ -1974,6 +2003,33 @@ async function renderInbox(id) {
   bindFilterBoxes("inbox-filters", "inbox", "f");
 }
 
+async function renderLookup(id) {
+  const token = String(id || "").trim();
+  if (!token) {
+    view.innerHTML = `<h1>Find item by ID</h1><p class="muted">Enter an inbox, run, idea, or plan ID (full or unique prefix) in the inbox search box.</p>`;
+    return;
+  }
+  let matches;
+  try {
+    const out = await api("/api/resolve/" + encodeURIComponent(token));
+    matches = out.matches || [];
+  } catch (err) {
+    view.innerHTML = `<h1>Find item by ID</h1><p>Lookup failed: ${esc(err.message)}</p>`;
+    return;
+  }
+  if (!matches.length) {
+    view.innerHTML = `<h1>Find item by ID</h1><p>No inbox, run, idea, or plan matches <code>${esc(token)}</code>.</p>`;
+    return;
+  }
+  if (matches.length === 1) {
+    location.hash = matches[0].url;
+    render();
+    return;
+  }
+  view.innerHTML = `<h1>Find item by ID</h1><p class="muted">${matches.length} matches for <code>${esc(token)}</code>:</p>
+    <ul class="plain">` + matches.map((m) =>
+      `<li><a href="${esc(m.url)}">${gtext(m.title || m.id)}</a> <span class="pill">${esc(m.kind)} · ${esc(m.status || "")}</span></li>`).join("") + `</ul>`;
+}
 async function markIdeaSeen(id, item) {
   if (!item || item.status !== "new") return;
   try {
@@ -2134,7 +2190,7 @@ async function renderIdeas(id) {
     view.innerHTML = `<h1>Idea</h1><p><a href="#/ideas">All ideas</a></p>
       <div class="card"><h2>${gtext(item.title)}</h2>
       <p class="muted">${esc(item.source)}${item.contact ? " · " + esc(item.contact) : ""} · ${esc(item.status)}</p>
-      <p class="inbox-body">${gtext(item.body || "")}</p>
+      <p class="inbox-body">${linkIds(gtext(item.body || ""))}</p>
       ${item.decision ? `<p><strong>Decision:</strong> ${esc(item.decision)}</p>` : ""}
       ${item.plan_id ? `<p><a href="#/plans/${esc(item.plan_id)}" title="Linked backlog plan">Linked plan: ${esc(item.plan_id)}</a></p>` : ""}
       ${item.status === "new" ? `<p><button id="mark-seen-btn" title="Mark this idea seen (moves it out of new)">Mark seen</button></p>` : ""}
@@ -2487,7 +2543,7 @@ async function renderDocuments(id) {
     if (item.renderable) {
       try {
         const full = await api("/api/documents/" + id.split("/").map(encodeURIComponent).join("/") + "?content=1");
-        body += `<div class="doc-body">${mdToHtml(full.content)}</div>`
+        body += `<div class="doc-body">${linkIds(mdToHtml(full.content))}</div>`
           + (full.truncated ? '<p class="muted">Preview truncated at 100 KB — open the file for the rest.</p>' : "");
       } catch (err) {
         body += `<p class="muted">Preview unavailable: ${esc(err.message)} — open the file instead.</p>`;
@@ -3094,6 +3150,7 @@ async function render() {
     else if (name === "plans") await renderPlans(id);
     else if (name === "runs") await renderRuns(id);
     else if (name === "inbox") await renderInbox(id);
+    else if (name === "lookup") await renderLookup(id);
     else if (name === "e2e") await renderE2E(id);
     else if (name === "ideas") await renderIdeas(id);
     else if (name === "invoices") await renderInvoices(id);

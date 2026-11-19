@@ -205,8 +205,8 @@ def test_dynamic_buttons_have_titles() -> None:
     js = _read("app.js")
     buttons = re.findall(r"<button\b[^>]*>", js)
     assert (
-        len(buttons) == 60
-    )  # +doc pin; +fanout apply; +delete-inbox-btn +e2e submit +chat mode/apply/approve +notes save +agent-check run +agent-config save +spend-policy add/save/remove +spend-adjust record +backlog to-task +jobs submit +report acknowledge
+        len(buttons) == 61
+    )  # +doc pin; +fanout apply; +delete-inbox-btn +e2e submit +chat mode/apply/approve +notes save +agent-check run +agent-config save +spend-policy add/save/remove +spend-adjust record +backlog to-task +jobs submit +report acknowledge +id lookup
     for tag in buttons:
         assert "title=" in tag, f"button without title: {tag}"
 
@@ -216,8 +216,8 @@ def test_dynamic_inputs_and_selects_have_titles() -> None:
     js = _read("app.js")
     inputs = [tag for tag in re.findall(r"<input\b[^>]*>", js) if 'type="radio"' not in tag]
     assert (
-        len(inputs) == 65
-    )  # +bad-test checkbox; +agent-enable checkbox; +spend-policy prepaid/cap (scope is a select); +spend-adjust remaining; step radios excluded; +jobs form (6)
+        len(inputs) == 66
+    )  # +bad-test checkbox; +agent-enable checkbox; +spend-policy prepaid/cap (scope is a select); +spend-adjust remaining; step radios excluded; +jobs form (6); +id lookup
     for tag in inputs:
         assert "title=" in tag, f"input without title: {tag}"
     selects = re.findall(r"<select\b[^>]*>", js)
@@ -1437,6 +1437,7 @@ const filterBoxes = grab('filterBoxes');
 const pickedTokens = grab('pickedTokens');
 const bindFilterBoxes = grab('bindFilterBoxes');
 const projectOptions = async () => '<option value="">All projects</option>';
+eval(source.slice(source.indexOf('const ID_ROUTES'), source.indexOf('function truncate(')));
 const renderer = source.slice(source.indexOf('async function renderInbox('),
   source.indexOf('async function markIdeaSeen('));
 eval(renderer);
@@ -1488,6 +1489,7 @@ const filterBoxes = grab('filterBoxes');
 const pickedTokens = grab('pickedTokens');
 const bindFilterBoxes = grab('bindFilterBoxes');
 const projectOptions = async () => '<option value="">All projects</option>';
+eval(source.slice(source.indexOf('const ID_ROUTES'), source.indexOf('function truncate(')));
 const renderer = source.slice(source.indexOf('async function renderInbox('),
   source.indexOf('async function markIdeaSeen('));
 eval(renderer);
@@ -1686,6 +1688,7 @@ const filterBoxes = grab('filterBoxes');
 const pickedTokens = grab('pickedTokens');
 const bindFilterBoxes = grab('bindFilterBoxes');
 const projectOptions = async () => '<option value="">All projects</option>';
+eval(source.slice(source.indexOf('const ID_ROUTES'), source.indexOf('function truncate(')));
 const renderer = source.slice(source.indexOf('async function renderInbox('),
   source.indexOf('async function markIdeaSeen('));
 eval(renderer);
@@ -1738,6 +1741,111 @@ const api = async (path) => path === '/api/sleep' ? {active: false} : {fleet};
   assert(html.includes('no triage task'), 'dead-end reason renders');
   assert(!html.includes('No stuck, broken, or dead-end runs.'), 'flagged list not empty');
   assert(!html.includes('>ok<'), 'ok runs stay unflagged');
+})().catch(error => {console.error(error); process.exitCode = 1;});
+"""
+    result = subprocess.run(
+        [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_link_ids_links_refs_and_bare_ids_without_nesting() -> None:
+    node = _node_driver()
+    driver = r"""
+const assert = require('assert');
+const source = require('fs').readFileSync(process.argv[1], 'utf8');
+const grab = (name) => eval('(' + source.slice(source.indexOf('function ' + name + '('),
+  source.indexOf('\n}', source.indexOf('function ' + name + '(')) + 2) + ')');
+const esc = grab('esc');
+eval(source.slice(source.indexOf('const ID_ROUTES'), source.indexOf('function refLink(')));
+const full = 'f05e3226dd8440fc816e03cd89c6c431';
+const out = linkIds('see run:8fad37897a5b and item ' + full + ' plus beefcake here');
+assert(out.includes('<a href="#/runs/8fad37897a5b"'), 'kind ref links directly');
+assert(out.includes('<a href="#/lookup/' + full + '"'), 'bare id links to lookup');
+assert(!out.includes('beefcake<'), 'short hex words stay text');
+const nested = linkIds('<a href="#/inbox/x">see ' + full + '</a>');
+assert.equal((nested.match(/<a /g) || []).length, 1, 'never nests anchors');
+const attr = linkIds('<span title="' + full + '">t</span>');
+assert(!attr.includes('#/lookup'), 'attributes stay untouched');
+"""
+    result = subprocess.run(
+        [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_inbox_detail_renders_ref_hyperlinks() -> None:
+    node = _node_driver()
+    driver = r"""
+const assert = require('assert');
+const source = require('fs').readFileSync(process.argv[1], 'utf8');
+const grab = (name) => eval('(' + source.slice(source.indexOf('function ' + name + '('),
+  source.indexOf('\n}', source.indexOf('function ' + name + '(')) + 2) + ')');
+const esc = grab('esc');
+const gtext = grab('gtext');
+const filterBoxes = grab('filterBoxes');
+const pickedTokens = grab('pickedTokens');
+const bindFilterBoxes = grab('bindFilterBoxes');
+const projectOptions = async () => '<option value="">All projects</option>';
+eval(source.slice(source.indexOf('const ID_ROUTES'), source.indexOf('function truncate(')));
+const renderer = source.slice(source.indexOf('async function renderInbox('),
+  source.indexOf('async function renderLookup('));
+eval(renderer);
+const view = {innerHTML: '', querySelectorAll: () => []};
+const location = {hash: '#/inbox/x1'};
+const document = {getElementById: () => ({addEventListener() {}})};
+const item = {id: 'x1', title: 'T', type: 'task', status: 'open', body: 'see f05e3226dd8440fc816e03cd89c6c431',
+  options: [], context_refs: ['inbox:abc12345', 'run:8fad37897a5b', 'branch:develop', 'bogus']};
+const api = async (path) => ({item});
+(async () => {
+  await renderInbox('x1');
+  const html = view.innerHTML;
+  assert(html.includes('<a href="#/inbox/abc12345"'), 'inbox ref links');
+  assert(html.includes('<a href="#/runs/8fad37897a5b"'), 'run ref links');
+  assert(html.includes('<li>branch:develop</li>'), 'unrouted ref stays text');
+  assert(html.includes('<li>bogus</li>'), 'bare word stays text');
+  assert(html.includes('<a href="#/lookup/f05e3226dd8440fc816e03cd89c6c431"'), 'body id links');
+  assert(html.includes('id="lookup-go"') === false, 'detail has no lookup field');
+})().catch(error => {console.error(error); process.exitCode = 1;});
+"""
+    result = subprocess.run(
+        [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_lookup_view_resolves_and_disambiguates() -> None:
+    node = _node_driver()
+    driver = r"""
+const assert = require('assert');
+const source = require('fs').readFileSync(process.argv[1], 'utf8');
+const grab = (name) => eval('(' + source.slice(source.indexOf('function ' + name + '('),
+  source.indexOf('\n}', source.indexOf('function ' + name + '(')) + 2) + ')');
+const esc = grab('esc');
+const gtext = grab('gtext');
+const renderer = source.slice(source.indexOf('async function renderLookup('),
+  source.indexOf('async function markIdeaSeen('));
+eval(renderer);
+const view = {innerHTML: '', querySelectorAll: () => []};
+const location = {hash: '#/lookup/abc'};
+let rendered = 0;
+const render = async () => { rendered++; };
+let matches = [];
+const api = async (path) => ({matches});
+(async () => {
+  await renderLookup('');
+  assert(view.innerHTML.includes('Find item by ID'), 'empty token explains');
+  await renderLookup('deadbeef');
+  assert(view.innerHTML.includes('No inbox, run, idea, or plan matches'), 'missing explains');
+  matches = [{kind: 'run', id: 'r1', title: 'R', status: 'queued', url: '#/runs/r1'}];
+  await renderLookup('r1');
+  assert.equal(location.hash, '#/runs/r1', 'single match navigates');
+  assert.equal(rendered, 1, 'navigation re-renders');
+  matches = [{kind: 'inbox', id: 'a', title: 'A', status: 'open', url: '#/inbox/a'},
+    {kind: 'run', id: 'b', title: 'B', status: 'failed', url: '#/runs/b'}];
+  await renderLookup('ab');
+  assert(view.innerHTML.includes('2 matches'), 'ambiguous lists');
+  assert(view.innerHTML.includes('#/inbox/a') && view.innerHTML.includes('#/runs/b'), 'both link');
 })().catch(error => {console.error(error); process.exitCode = 1;});
 """
     result = subprocess.run(

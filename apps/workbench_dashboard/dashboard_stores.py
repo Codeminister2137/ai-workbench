@@ -575,6 +575,59 @@ class DashboardStores:
         self.inbox.put(item_id, record)
         return record
 
+    def resolve_id(self, token: str) -> list[dict]:
+        """Resolve an id or unique prefix across inbox, runs, ideas and plans.
+
+        Exact full-id matches win; otherwise a case-insensitive unique
+        prefix (minimum 8 hex chars) resolves; ambiguous or missing
+        tokens return every candidate (possibly none) for display.
+        Read-only: powers the ID lookup and auto-link verification.
+        """
+        cleaned = (token or "").strip().lower()
+        if not cleaned or any(ch not in "0123456789abcdef" for ch in cleaned):
+            return []
+        if len(cleaned) < 8:
+            return []
+        pools = (
+            ("inbox", self.inbox, "#/inbox/"),
+            ("run", self.runs, "#/runs/"),
+            ("idea", self.ideas, "#/ideas/"),
+            ("plan", self.plans, "#/plans/"),
+        )
+        exact: list[dict] = []
+        prefixed: list[dict] = []
+        for kind, pool, route in pools:
+            try:
+                items, _total = pool.list(limit=5000)
+            except Exception:  # noqa: BLE001 - lookup skips unreadable pools
+                continue
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                ident = str(item.get("id") or "")
+                if not ident or not ident.lower().startswith(cleaned):
+                    continue
+                entry = {
+                    "kind": kind,
+                    "id": ident,
+                    "title": item.get("title") or ident,
+                    "status": item.get("status"),
+                    "url": f"{route}{ident}",
+                }
+                if ident.lower() == cleaned:
+                    exact.append(entry)
+                else:
+                    prefixed.append(entry)
+        if exact:
+            return exact
+        seen: set[str] = set()
+        unique: list[dict] = []
+        for entry in prefixed:
+            if entry["id"] not in seen:
+                seen.add(entry["id"])
+                unique.append(entry)
+        return unique
+
     def reopen_inbox_task(self, item_id: str) -> dict:
         """Reopen a closed inbox task; history is preserved."""
         record = self.inbox.get(item_id)
