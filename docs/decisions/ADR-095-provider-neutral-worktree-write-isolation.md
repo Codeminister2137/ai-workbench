@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-19
 
-**Status:** Accepted direction; backend selection pending; enforcement INCOMPLETE.
+**Status:** Accepted direction and Docker Linux backend prototype selection; enforcement INCOMPLETE.
 
 ## Owner decision and intent
 
@@ -73,7 +73,7 @@ that failure's evidence, with no unsandboxed fallback. Current execution behavio
 has not been changed by this ADR. ADR-067's temporary native-client sandbox bypass
 is not containment; the future outer OS boundary must contain such clients too.
 
-## Backend decision needed
+## Original backend alternatives (before owner answer)
 
 1. **Windows AppContainer prototype (technical recommendation).** Keeps Windows
    Python, PowerShell and native clients, avoids a guest installation and can use
@@ -93,12 +93,51 @@ workflow if it passes. This is a recommendation, not the owner's backend decisio
 If compatibility requires weakening containment, return the evidence for a VM
 decision rather than silently broadening privileges.
 
-Backend choice is filed as inbox `683ccfbf97b9422b927d1b1f2a41de76`, stamped
-with registered owner gate `worktree-os-isolation-backend`. Both original sources
-retain answered status and an INCOMPLETE resolution; neither is closed as implemented.
-Next action: obtain the backend choice and implement its bounded feasibility
-prototype. Completion requires the actual containment checks below, followed by
-production route integration and host-output mediation checks.
+## Backend selected on 2026-11-19
+
+Owner answer on inbox `683ccfbf97b9422b927d1b1f2a41de76` prefers familiar
+Docker/Kubernetes infrastructure if suitable, otherwise A (AppContainer).
+Docker is suitable for a bounded **Linux worker feasibility prototype** on
+Docker Desktop's Linux VM. Select Docker; Kubernetes is unnecessary for one
+local worker and is not selected. Owner rationale: existing Docker/Kubernetes
+experience. This supersedes the earlier AppContainer recommendation, not the
+provider-neutral containment requirements.
+
+Docker offers familiar packaging, reproducible toolchains and explicit mounts.
+Costs: Linux does not preserve native Windows executables, guest dependencies
+and client authentication need validation, and daemon access is privileged.
+AppContainer remains an alternative if Windows compatibility proves essential;
+it avoids a Linux toolchain migration but requires custom launcher/ACL work.
+A dedicated VM remains stronger kernel separation between workers with higher
+provisioning and lifecycle costs. Docker containers share their Linux VM kernel;
+selection is not proof of resistance to kernel/container-runtime exploits.
+
+Prototype contract: synthetic local inputs only; pinned existing image; private
+Git metadata and writable worker scratch; non-root user, dropped capabilities,
+no-new-privileges, read-only root, no network, bounded CPU/memory/PIDs/time.
+No Docker socket, host PID/network namespace, privileged mode, owner profile,
+credentials or shared Git mounts. Copy a synthetic checkout into private worker
+storage; host controls bounded result collection. Prove ordinary coding plus
+negative host-write/descendant/link/lifecycle cases before production integration.
+No image pull, installation, paid inference or credential provisioning occurred
+in this selection closeout. Production authentication/network mediation remains
+unimplemented and is not implicitly authorized by backend selection.
+
+Selection checks: `docker context show` returned `desktop-linux`; `docker version
+--format '{{json .Server}}'` returned null and a missing named-pipe error for
+`dockerDesktopLinuxEngine`. The selected engine endpoint is absent; the command
+did not reach a Docker server. This proves no usable server at that endpoint,
+not the underlying reason the engine is unavailable. Official troubleshooting
+search for that pipe name yielded no result. Do not reinterpret this as Docker
+being unsuitable or silently switch to AppContainer. No containment probe ran.
+Next action: establish Docker Desktop engine readiness, inspect existing image
+inventory, then implement/run the bounded synthetic prototype and preserve an
+independent host audit. Do not pull an unreviewed image as a readiness check.
+
+The backend-selection source may close as **decided**. Original enforcement
+sources `49413c4932ab454082060b3ad65229f4` and
+`bedd17b747a64506ad8358541c660cc5` stay answered/open and INCOMPLETE until the
+actual containment and full route/host mediation checks pass.
 
 Read-only capability observations on 2026-11-19: Docker and WSL commands are
 present, WSL lists Ubuntu and docker-desktop, Docker's selected context is
@@ -139,3 +178,10 @@ and final diff review establish the boundary. Until then it remains answered/ope
   describes a disposable VM, separate kernel, explicit guest software installation
   and the current single-instance limitation. That limits its fit for concurrent
   dashboard workers; generic VM isolation remains a viable alternative.
+
+- [Docker Desktop Windows permissions](https://docs.docker.com/desktop/setup/install/windows-permission-requirements/)
+  describes the Linux VM boundary and host sharing.
+- [Docker Engine security](https://docs.docker.com/engine/security/)
+  describes daemon authority and default isolation limitations.
+- [Docker bind mounts](https://docs.docker.com/engine/storage/bind-mounts/)
+  describes writable host sharing; broad bind mounts are excluded here.

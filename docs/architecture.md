@@ -131,7 +131,7 @@ Delegated implementation uses the supervisor's host-bound tools and live
 permissions, optional narrower grants and shared finite reply/tool/deadline
 bounds. Funded children retain the exact approved client and admission guards.
 The owner has selected provider-neutral OS isolation for worktree writes;
-backend selection and enforcement remain incomplete. Current scratch worktrees
+Docker Linux worker prototype is selected; enforcement remains incomplete. Current scratch worktrees
 do not enforce that boundary. See
 [ADR-095](decisions/ADR-095-provider-neutral-worktree-write-isolation.md).
 This is tool-level authority, not OS isolation; see
