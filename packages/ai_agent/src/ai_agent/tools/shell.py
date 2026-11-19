@@ -8,6 +8,7 @@ from typing import Any
 
 from ai_agent.contracts import ToolCategory, ToolDefinition, ToolParameter, ToolResult
 from ai_agent.tools.base import BaseTool, ToolContext
+from ai_agent.tools.shell_encoding import powershell_command
 from ai_agent.validation_process import run_validation_process
 
 
@@ -72,7 +73,7 @@ class RunCommandTool(BaseTool):
 
         # On Windows, run in powershell; on Unix, run with default shell
         if sys.platform == "win32":
-            shell_cmd = ["powershell", "-NoProfile", "-Command", command]
+            shell_cmd = powershell_command(command)
         else:
             shell_cmd = ["/bin/sh", "-c", command]
 
@@ -85,6 +86,7 @@ class RunCommandTool(BaseTool):
                 timeout=timeout_seconds,
                 env=env,
                 check=False,
+                encoding="utf-8" if sys.platform == "win32" else None,
             )
         except subprocess.TimeoutExpired as exc:
             # Keep useful progress bounded; never render the exception's command args.
