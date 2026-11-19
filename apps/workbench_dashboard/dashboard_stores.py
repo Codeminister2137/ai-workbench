@@ -666,6 +666,9 @@ class DashboardStores:
         ``plan_id`` optionally links the idea to backlog work; it must
         reference an existing plan. A linked idea influences the backlog;
         an unlinked archived idea is archive-only.
+
+        A transition to adopted files exactly one agent elaboration task;
+        re-reviews and other targets file nothing.
         """
         record = self.ideas.get(item_id)
         if record is None:
@@ -682,12 +685,51 @@ class DashboardStores:
                 raise StoreError("Idea plan link must reference an existing plan") from None
             if exists is None:
                 raise StoreError("Idea plan link must reference an existing plan")
+        previous = record.get("status")
         record["status"] = status
         record["decision"] = (decision or "").strip() or None
         record["plan_id"] = plan_id
         record["reviewed_at"] = _utc_now()
+        if status == "adopted" and previous != "adopted":
+            self._maybe_file_elaboration(record)
         self.ideas.put(item_id, record)
         return record
+
+    def _maybe_file_elaboration(self, record: dict) -> None:
+        """File the agent elaboration task for a newly adopted idea.
+
+        Dedupe: an already-open elaboration task for this idea files
+        nothing. A cap refusal never raises; the idea is flagged with
+        ``elaboration_pending`` instead so the work is not lost silently.
+        """
+        idea_id = str(record.get("id") or "")
+        items, _total = self.inbox.list(limit=1000)
+        for item in items:
+            if not isinstance(item, dict) or item.get("status") != "open":
+                continue
+            if (item.get("metadata") or {}).get("elaboration_for") == idea_id:
+                return
+        plan_id = record.get("plan_id")
+        body = (
+            f"Adopted idea '{record.get('title') or ''}': {record.get('body') or ''}\n\n"
+            f"Decision: {record.get('decision') or '(no decision)'}\n"
+            f"Plan: {plan_id if plan_id else 'no plan link'}\n\n"
+            "Elaborate this adopted idea into actionable next steps."
+        )
+        try:
+            self.create_inbox_task(
+                title=f"Elaborate adopted idea: {record.get('title') or ''}",
+                body=body,
+                task_type="task",
+                created_by="supervisor",
+                assignee="agent",
+                context_refs=[f"idea:{idea_id}"],
+                metadata={"elaboration_for": idea_id},
+            )
+        except StoreError:
+            record["elaboration_pending"] = True
+            return
+        record.pop("elaboration_pending", None)
 
     def create_workflow(
         self,

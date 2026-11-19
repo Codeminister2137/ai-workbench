@@ -139,6 +139,10 @@ def test_failed_run_with_open_source_is_not_orphaned(stores) -> None:
 def test_orphan_adopted_idea_without_elaboration_is_detected(stores) -> None:
     idea = stores.create_idea(title="i", body="b", source="owner")
     stores.set_idea_status(idea["id"], status="adopted", decision="go")
+    items, _ = stores.inbox.list(limit=100)  # simulate issuance ever missed
+    for item in items:
+        if (item.get("metadata") or {}).get("elaboration_for") == idea["id"]:
+            stores.inbox.delete(item["id"])
     orphans = find_followup_orphans(stores)
     assert [o for o in orphans if o["kind"] == "adopted-no-elaboration" and o["id"] == idea["id"]]
 

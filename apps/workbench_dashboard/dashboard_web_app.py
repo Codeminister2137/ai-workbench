@@ -3478,16 +3478,120 @@ def should_start_drain_scheduler(config: DashboardConfig) -> bool:
     return config.drain_interval_seconds >= DRAIN_SCHEDULER_MIN_INTERVAL_SECONDS
 
 
+def _file_failed_run_triage(stores: DashboardStores, run: dict, run_id: str, summary: dict) -> None:
+    """File one agent triage task for a failed run; never raises.
+
+    Dedupes on open inbox tasks with ``metadata.triage_for == run_id``.
+    A store cap-refusal flags ``triage_pending`` on the open source item
+    (mirroring ``closeout_pending``) instead of raising; a successful
+    filing clears that stale flag.
+    """
+    try:
+        try:
+            items, _total = stores.inbox.list(limit=1000)
+        except Exception:  # noqa: BLE001 - triage scan failure means no dedupe hit
+            items = []
+        for existing in items:
+            if not isinstance(existing, dict):
+                continue
+            if existing.get("status") != "open":
+                continue
+            metadata = existing.get("metadata") or {}
+            if isinstance(metadata, dict) and metadata.get("triage_for") == run_id:
+                return
+        failure_class = summary.get("failure_class") or _run_failure_class(run)
+        error = summary.get("error") or run.get("error") or "(unknown error)"
+        body = (
+            f"Run {run_id} failed.\n"
+            f"Error: {error}\n"
+            f"Failure class: {failure_class}\n"
+            f"Run report: see run {run_id} (run:{run_id}).\n\n"
+            "Triage the failure and decide the follow-up."
+        )
+        project_id: str | None = None
+        candidate = run.get("project_id")
+        if isinstance(candidate, str) and candidate.strip():
+            project_id = candidate.strip()
+        if project_id is None:
+            source_ref = run.get("bridged_from") or run.get("inbox_id")
+            if isinstance(source_ref, str) and source_ref:
+                try:
+                    source_item = stores.inbox.get(source_ref)
+                except Exception:  # noqa: BLE001 - triage never breaks report-back
+                    source_item = None
+                if isinstance(source_item, dict):
+                    raw_pid = source_item.get("project_id")
+                    if isinstance(raw_pid, str) and raw_pid.strip():
+                        project_id = raw_pid.strip()
+        if project_id is None:
+            try:
+                project_id = stores.default_project_id()
+            except Exception:  # noqa: BLE001 - create_inbox_task re-defaults on None
+                project_id = None
+        try:
+            stores.create_inbox_task(
+                title=f"Triage failed run {run_id[:8]}",
+                body=body,
+                task_type="task",
+                created_by="supervisor",
+                assignee="agent",
+                project_id=project_id,
+                metadata={"triage_for": run_id},
+                context_refs=[f"run:{run_id}"],
+            )
+        except StoreError:
+            try:
+                pending_ref = run.get("bridged_from") or run.get("inbox_id")
+                if isinstance(pending_ref, str) and pending_ref:
+                    try:
+                        pending_item = stores.inbox.get(pending_ref)
+                    except Exception:  # noqa: BLE001 - pending flag is best-effort
+                        pending_item = None
+                    if isinstance(pending_item, dict) and pending_item.get("status") == "open":
+                        pending_item["triage_pending"] = True
+                        try:
+                            stores.inbox.put(pending_ref, pending_item)
+                        except Exception:  # noqa: BLE001 - pending flag is best-effort
+                            return
+            except Exception:  # noqa: BLE001 - triage never breaks report-back
+                return
+            return
+        try:
+            clear_ref = run.get("bridged_from") or run.get("inbox_id")
+            if isinstance(clear_ref, str) and clear_ref:
+                try:
+                    clear_item = stores.inbox.get(clear_ref)
+                except Exception:  # noqa: BLE001 - pending clear is best-effort
+                    clear_item = None
+                if (
+                    isinstance(clear_item, dict)
+                    and clear_item.get("status") == "open"
+                    and "triage_pending" in clear_item
+                ):
+                    clear_item.pop("triage_pending", None)
+                    try:
+                        stores.inbox.put(clear_ref, clear_item)
+                    except Exception:  # noqa: BLE001 - pending clear is best-effort
+                        return
+        except Exception:  # noqa: BLE001 - triage never breaks report-back
+            return
+    except Exception:  # noqa: BLE001 - triage never breaks report-back
+        return
+
+
 def report_run_terminal(stores: DashboardStores, summary: dict) -> dict:
     """Append a terminal run's outcome to its source inbox item (report-back).
 
     The bridge files runs from inbox items; this closes the loop so no
     finished work orphans its request. Notes only — items stay open for
-    owner review; repeats dedupe on the run id. Never raises.
+    owner review; repeats dedupe on the run id. Failed runs additionally
+    file one agent triage task (deduped, cap-safe). Never raises.
     """
     try:
         run_id = str(summary.get("run_id") or "")
         run = stores.runs.get(run_id) if run_id else None
+        if run_id and summary.get("status") == "failed":
+            _file_failed_run_triage(stores, run or {}, run_id, summary)
         source_id = (run or {}).get("bridged_from") or (run or {}).get("inbox_id")
         if not run or not source_id:
             return {"action": "skipped", "reason": "no linked source item"}
