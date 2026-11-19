@@ -54,6 +54,21 @@ def _triage_tasks(stores: DashboardStores, run_id: str) -> list[dict]:
     ]
 
 
+def test_failed_triage_run_files_no_meta_triage(stores: DashboardStores) -> None:
+    run_id = "deadbeefcafe1234567890abcdef"
+    source_id = _source_and_run(stores, run_id)
+    source = stores.inbox.get(source_id)
+    assert source is not None
+    source["metadata"] = {**source.get("metadata", {}), "triage_for": "parent-run"}
+    stores.inbox.put(source_id, source)
+    result = report_run_terminal(stores, {"run_id": run_id, "status": "failed", "error": "boom"})
+    assert result["action"] == "noted"
+    assert _triage_tasks(stores, run_id) == []
+    reopened = stores.inbox.get(source_id)
+    assert reopened is not None
+    assert reopened["status"] == "open"
+
+
 def test_failed_files_triage_with_correct_fields(stores: DashboardStores) -> None:
     run_id = "deadbeefcafe1234567890abcdef"
     _source_and_run(stores, run_id)
