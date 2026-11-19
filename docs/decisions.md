@@ -1199,3 +1199,13 @@ rather than enabled. No purchase or broad privacy bypass is authorized.
 
 See [ADR-069](decisions/ADR-069-restricted-reviewed-non-sensitive-input.md) and
 [the A/B plan](repo-assistant/restricted-input-plan.md).
+
+## Eval allowance threshold (owner B, 2026-11-19)
+
+Inbox `5a326594ab884271b7a431b9998adb47` accepts 10% per bucket/cycle as an
+observed stop threshold with overshoot risk, superseding strict-cap wording for
+scope item `bd5fa3a2`. Sequential bounded calls need fresh pre/post observations;
+missing/stale readings or threshold crossing stop further calls. Metered spend
+and floor changes remain separate. The deterministic guard is implemented;
+the broader eval runner/scheduler and durable cycle accounting remain incomplete.
+See [decision and implementation boundary](decisions/eval-allowance-observed-threshold.md).
