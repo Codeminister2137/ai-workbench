@@ -25,8 +25,14 @@ effort behavior, 24-task dual-arm eval: local 13/24, grant 12/24).
 
 ## Blocked models (evidence-backed)
 
-- `deepseek-coder-v2:16b`: BLOCKED (Q4: 4/5 fail). Re-test only
-  on new weights with the same 5-task probe.
+- `deepseek-coder-v2:16b`: BLOCKED. Two independent grounds: (1) no
+  tool-call support — registry capabilities are completion+insert only
+  and a live `/api/chat` tools call returns clean 400 "does not support
+  tools" (confirmed 2026-11-18 and 2026-11-19); unusable for agent work
+  regardless of other quality. (2) Q4 instruction-following claim 4/5
+  fail, raw evidence missing (see re-probe note below). Re-test the
+  instruction dimension only on new weights with a recorded probe; the
+  tools verdict needs no re-test short of a new model release.
 
 ### Re-probe admission check — 2026-11-18
 
