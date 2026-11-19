@@ -183,12 +183,19 @@ class DashboardStores:
         return [
             item
             for item in items
-            if item.get("assignee") != "agent"
-            and not (item.get("type") == "report" and item.get("acknowledged"))
-            and (
-                item.get("status") == "open"
-                or (item.get("status") == "answered" and self.waiting_on(item) == "owner")
-                or (item.get("resolution_kind") or "final") != "final"
+            if (
+                item.get("assignee") != "agent"
+                and not (item.get("type") == "report" and item.get("acknowledged"))
+                and (
+                    item.get("status") == "open"
+                    or (item.get("status") == "answered" and self.waiting_on(item) == "owner")
+                    or (item.get("resolution_kind") or "final") != "final"
+                )
+            )
+            or (
+                item.get("status") == "closed"
+                and (item.get("resolution_kind") or "final") != "final"
+                and item.get("waiting_on") == "owner"
             )
         ]
 
@@ -456,12 +463,16 @@ class DashboardStores:
         *,
         resolution: str | None = None,
         resolution_kind: str = "final",
+        waiting_on: str | None = None,
     ) -> dict:
         """Close one inbox task; it stays in the audit trail.
 
         ``resolution_kind`` is "final" (answered/decided/implemented) or
         "followup" (closed with no final answer: elaboration, investigation
         or deferral still pending). Follow-up closes stay out of the archive.
+        A follow-up close may carry ``waiting_on="owner"`` when its
+        resolution asks the owner something; that badges the owner even on
+        agent-assigned threads, which otherwise never badge.
         """
         record = self.inbox.get(item_id)
         if record is None:
@@ -472,12 +483,16 @@ class DashboardStores:
             raise StoreError("Closing needs a resolution note")
         if resolution_kind not in ("final", "followup"):
             raise StoreError("Unknown resolution kind")
+        if waiting_on not in (None, "owner", "agent"):
+            raise StoreError("waiting_on must be owner, agent, or omitted")
+        if waiting_on is not None and resolution_kind != "followup":
+            raise StoreError("waiting_on is only meaningful on follow-up closes")
         resolution = resolution.strip()
         record["resolution"] = resolution
         record["resolution_kind"] = resolution_kind
         record["resolved_at"] = _utc_now()
         record["status"] = "closed"
-        record["waiting_on"] = None
+        record["waiting_on"] = waiting_on
         self.inbox.put(item_id, record)
         self._report_close_to_source(record)
         self._maybe_finalize_chain(record)
