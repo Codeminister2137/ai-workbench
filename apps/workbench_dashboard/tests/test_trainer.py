@@ -69,7 +69,10 @@ def test_ask_trainer_files_and_reuses_clarification(tmp_path) -> None:
     assert second["covered"] is False
     assert second["reused"] is True
     assert second["clarification_id"] == first["clarification_id"]
-    item = stores.inbox.get(first["clarification_id"])
+    clar_id = first["clarification_id"]
+    assert isinstance(clar_id, str)
+    item = stores.inbox.get(clar_id)
+    assert item is not None
     assert item["type"] == "clarification"
     assert item["assignee"] == "owner"
 
