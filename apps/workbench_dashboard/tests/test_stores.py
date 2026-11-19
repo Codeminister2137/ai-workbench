@@ -45,6 +45,35 @@ def test_answer_queues_ai_closeout_once(stores) -> None:
     assert sum(1 for i in items if (i.get("title") or "").startswith("Close out:")) == 1
 
 
+def test_followup_close_with_owner_wait_badges_agent_thread(stores) -> None:
+    record = stores.create_inbox_task(title="work", body="b", task_type="task", assignee="agent")
+    assert stores.attention_inbox_count() == 0
+    stores.close_inbox_task(
+        record["id"],
+        resolution="needs owner choice",
+        resolution_kind="followup",
+        waiting_on="owner",
+    )
+    assert stores.attention_inbox_count() == 1
+    plain = stores.create_inbox_task(title="work2", body="b", task_type="task", assignee="agent")
+    stores.close_inbox_task(
+        plain["id"], resolution="agent will continue", resolution_kind="followup"
+    )
+    assert stores.attention_inbox_count() == 1  # agent-owned follow-up stays quiet
+
+
+def test_followup_waiting_on_validated(stores) -> None:
+    record = stores.create_inbox_task(title="work", body="b", task_type="task", assignee="agent")
+    with pytest.raises(StoreError):
+        stores.close_inbox_task(
+            record["id"], resolution="x", resolution_kind="final", waiting_on="owner"
+        )
+    with pytest.raises(StoreError):
+        stores.close_inbox_task(
+            record["id"], resolution="x", resolution_kind="followup", waiting_on="crowd"
+        )
+
+
 def test_attention_e2e_counts_open_only_not_drafts(stores) -> None:
     items = [{"id": "a", "behavior": "b", "kind": "behavior", "area": "dashboard"}]
     open_task = stores.create_e2e_task(merge_commit="aaa", title="open", items=items)
