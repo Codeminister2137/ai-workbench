@@ -272,15 +272,16 @@ def research_command(task: ResearchTask, database: Path) -> list[str]:
 
 
 def eval_command(task: ResearchTask, database: Path) -> list[str]:
-    """Fixed capability-eval flags for one explicit route; local-only by construction.
+    """Fixed capability-eval flags for one explicit route.
 
     ``task.model`` is the route id; ``task.prompt`` is the catalog path
-    relative to the repo root (validated at planning). No --allow-hosted
-    flag is ever passed, so hosted routes refuse inside the eval itself.
+    relative to the repo root (validated at planning). --allow-hosted
+    is passed only when the task settings carry an explicit owner
+    allowance ack; otherwise hosted routes refuse inside the eval.
     """
     catalog = (task.repo_root / task.prompt).resolve()
     out = task.repo_root / task_artifact_directory(task, database) / "eval.json"
-    return [
+    command = [
         sys.executable,
         "-m",
         "ai_provider.capability_eval",
@@ -291,6 +292,9 @@ def eval_command(task: ResearchTask, database: Path) -> list[str]:
         "--output",
         str(out),
     ]
+    if task.settings.allowance_ack:
+        command.append("--allow-hosted")
+    return command
 
 
 def run_research_task(task: ResearchTask, database: Path, budget_seconds: float) -> int:
@@ -415,6 +419,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     plan.add_argument("--required-minutes", type=float, required=True)
     add_research_review_arguments(plan)
     plan.add_argument("--max-repair-cycles", type=int, default=3)
+    plan.add_argument(
+        "--allowance-ack",
+        default=None,
+        help="Owner allowance reference (route-eval only); enables --allow-hosted",
+    )
     sub.add_parser("list", help="List definitions without contacting providers")
     run = sub.add_parser("run", help="Start an explicitly selected sequence")
     run.add_argument("task_ids", nargs="+")
@@ -436,6 +445,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 raise ValueError("Acceptance uses its fixed prompt; omit --prompt")
             if args.route_eval and args.acceptance:
                 raise ValueError("Choose one of --route-eval or --acceptance")
+            if args.allowance_ack and not args.route_eval:
+                raise ValueError("--allowance-ack applies to route-eval tasks only")
             prompt = RESEARCH_ACCEPTANCE_PROMPT if args.acceptance else args.prompt
             if not prompt:
                 raise ValueError("Research tasks require --prompt")
@@ -452,6 +463,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 review_timeout_seconds=args.research_review_timeout_seconds,
                 review_tokenizer_file=str((root / tokenizer).resolve()) if tokenizer else None,
                 max_repair_cycles=args.max_repair_cycles,
+                allowance_ack=args.allowance_ack,
             )
             store.plan(
                 ResearchTask(

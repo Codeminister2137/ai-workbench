@@ -17,10 +17,15 @@ class ResearchTaskSettings:
     review_timeout_seconds: float = 300.0
     review_tokenizer_file: str | None = None
     max_repair_cycles: int = 3
+    allowance_ack: str | None = None
 
     def __post_init__(self) -> None:
         if self.review_policy not in ("legacy", "quality_first"):
             raise ValueError("Unsupported research review policy")
+        if self.allowance_ack is not None and (
+            not isinstance(self.allowance_ack, str) or not self.allowance_ack.strip()
+        ):
+            raise ValueError("Allowance ack must be a nonempty owner reference")
         if self.review_mode not in ("auto", "default", "direct", "deliberative"):
             raise ValueError("Unsupported research review mode")
         for value in (self.review_model, self.review_tokenizer_file):
