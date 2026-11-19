@@ -23,12 +23,13 @@ plus reliable Dashboard/system wiring.
 
 ## Still open (real work)
 
-- [ ] Eval parity vs Muse CLI: same task battery both sides, scored.
-      Needs an explicit owner call (paired runs cost real inference;
-      standing policy requires authorization for paired comparisons).
-- [ ] Stuck-run fallback (pause + requeue with cause): diagnostics warn,
-      automatic fallback not built.
-- [ ] Completion-to-inbox mail routing: briefed separately, not bundled.
+- [ ] Eval parity vs Muse CLI: battery prepared
+      (docs/plans/mai-parity-battery-20261119.md); authorization brief
+      filed to the owner inbox. No runs until approved.
+- [x] Stuck-run fallback: reconcile interruption cap shipped 2026-11-18
+      (cancel + terminal note after repeated output-less interruptions).
+- [x] Completion-to-inbox mail routing: unattended-only policy shipped
+      2026-11-18 (terminal mails wired, doc-pointer rule recorded).
 
 ## Sign-off
 
