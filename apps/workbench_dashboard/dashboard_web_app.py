@@ -557,16 +557,18 @@ def _run_failure_class(run: dict[str, Any]) -> str:
 
 
 def fleet_agents(stores, *, now: datetime | None = None) -> dict[str, Any]:
-    """Supervision verdicts over runs: stuck, broken, parked, or ok.
+    """Supervision verdicts over runs: stuck, broken, dead-end, parked, ok.
 
     Failed runs stay visible while fresh; running runs older than
     SUPERVISION_STUCK_MINUTES without an update are stuck; old queued
-    runs are parked. Fail-soft like every other Fleet probe.
+    runs are parked. A fresh failed run with no triage task is a
+    dead-end: terminal without follow-up. Fail-soft like every other
+    Fleet probe.
     """
     try:
         items, _total = stores.runs.list(limit=100)
     except Exception:  # noqa: BLE001 - health board never raises
-        return {"runs": [], "stuck": 0, "broken": 0, "attention": False}
+        return {"runs": [], "stuck": 0, "broken": 0, "dead_end": 0, "attention": False}
     moment = now or datetime.now(UTC)
     verdicts: list[dict[str, Any]] = []
     for run in items:
@@ -580,8 +582,13 @@ def fleet_agents(stores, *, now: datetime | None = None) -> dict[str, Any]:
         reason = ""
         if status == "failed":
             if age is None or age <= SUPERVISION_BROKEN_HOURS * 60:
-                verdict = "broken"
-                reason = _run_failure_class(run)
+                if _run_has_triage(stores, str(run.get("id") or "")):
+                    verdict = "broken"
+                    reason = _run_failure_class(run)
+                else:
+                    verdict = "dead-end"
+                    failure = _run_failure_class(run)
+                    reason = f"{failure}; no triage task" if failure else "no triage task"
             else:
                 continue
         elif status == "running" and age is not None and age > SUPERVISION_STUCK_MINUTES:
@@ -602,7 +609,30 @@ def fleet_agents(stores, *, now: datetime | None = None) -> dict[str, Any]:
         )
     stuck = sum(1 for item in verdicts if item["verdict"] == "stuck")
     broken = sum(1 for item in verdicts if item["verdict"] == "broken")
-    return {"runs": verdicts, "stuck": stuck, "broken": broken, "attention": bool(stuck or broken)}
+    dead_end = sum(1 for item in verdicts if item["verdict"] == "dead-end")
+    return {
+        "runs": verdicts,
+        "stuck": stuck,
+        "broken": broken,
+        "dead_end": dead_end,
+        "attention": bool(stuck or broken or dead_end),
+    }
+
+
+def _run_has_triage(stores, run_id: str) -> bool:
+    """True when an open triage task tracks this run (frozen T1 key)."""
+    if not run_id:
+        return False
+    try:
+        items, _total = stores.inbox.list(limit=1000)
+    except Exception:  # noqa: BLE001 - probe stays fail-soft
+        return True  # unknown: keep the established broken verdict
+    return any(
+        isinstance(item, dict)
+        and item.get("status") == "open"
+        and str((item.get("metadata") or {}).get("triage_for", "")) == run_id
+        for item in items
+    )
 
 
 def fleet_runs(stores) -> list[dict[str, Any]]:
@@ -1219,6 +1249,12 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             if path.startswith("/api/inbox/") and path.endswith("/close"):
                 item_id = path[len("/api/inbox/") : -len("/close")]
                 return self._close_inbox_task(item_id, payload)
+            if path.startswith("/api/inbox/") and path.endswith("/acknowledge"):
+                item_id = path[len("/api/inbox/") : -len("/acknowledge")]
+                return self._acknowledge_report(item_id)
+            if path.startswith("/api/inbox/") and path.endswith("/supersede"):
+                item_id = path[len("/api/inbox/") : -len("/supersede")]
+                return self._supersede_report(item_id, payload)
             if path.startswith("/api/inbox/") and path.endswith("/reopen"):
                 item_id = path[len("/api/inbox/") : -len("/reopen")]
                 return self._reopen_inbox_task(item_id)
@@ -2211,6 +2247,25 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             record = self._stores().close_inbox_task(
                 item_id, resolution=resolution, resolution_kind=kind
             )
+        except StoreError as exc:
+            status = 404 if "not found" in str(exc).lower() else 400
+            return self._send_json({"ok": False, "error": str(exc)}, status=status)
+        self._send_json({"ok": True, "id": record["id"], "status": record["status"]})
+
+    def _acknowledge_report(self, item_id: str) -> None:
+        try:
+            record = self._stores().acknowledge_report(item_id)
+        except StoreError as exc:
+            status = 404 if "not found" in str(exc).lower() else 400
+            return self._send_json({"ok": False, "error": str(exc)}, status=status)
+        self._send_json({"ok": True, "id": record["id"], "status": record["status"]})
+
+    def _supersede_report(self, item_id: str, payload: dict) -> None:
+        by_id = payload.get("by_id", "")
+        if not isinstance(by_id, str) or not by_id.strip():
+            return self._send_json({"ok": False, "error": "by_id is required"}, status=400)
+        try:
+            record = self._stores().supersede_report(item_id, by_id=by_id.strip())
         except StoreError as exc:
             status = 404 if "not found" in str(exc).lower() else 400
             return self._send_json({"ok": False, "error": str(exc)}, status=status)
@@ -3423,16 +3478,120 @@ def should_start_drain_scheduler(config: DashboardConfig) -> bool:
     return config.drain_interval_seconds >= DRAIN_SCHEDULER_MIN_INTERVAL_SECONDS
 
 
+def _file_failed_run_triage(stores: DashboardStores, run: dict, run_id: str, summary: dict) -> None:
+    """File one agent triage task for a failed run; never raises.
+
+    Dedupes on open inbox tasks with ``metadata.triage_for == run_id``.
+    A store cap-refusal flags ``triage_pending`` on the open source item
+    (mirroring ``closeout_pending``) instead of raising; a successful
+    filing clears that stale flag.
+    """
+    try:
+        try:
+            items, _total = stores.inbox.list(limit=1000)
+        except Exception:  # noqa: BLE001 - triage scan failure means no dedupe hit
+            items = []
+        for existing in items:
+            if not isinstance(existing, dict):
+                continue
+            if existing.get("status") != "open":
+                continue
+            metadata = existing.get("metadata") or {}
+            if isinstance(metadata, dict) and metadata.get("triage_for") == run_id:
+                return
+        failure_class = summary.get("failure_class") or _run_failure_class(run)
+        error = summary.get("error") or run.get("error") or "(unknown error)"
+        body = (
+            f"Run {run_id} failed.\n"
+            f"Error: {error}\n"
+            f"Failure class: {failure_class}\n"
+            f"Run report: see run {run_id} (run:{run_id}).\n\n"
+            "Triage the failure and decide the follow-up."
+        )
+        project_id: str | None = None
+        candidate = run.get("project_id")
+        if isinstance(candidate, str) and candidate.strip():
+            project_id = candidate.strip()
+        if project_id is None:
+            source_ref = run.get("bridged_from") or run.get("inbox_id")
+            if isinstance(source_ref, str) and source_ref:
+                try:
+                    source_item = stores.inbox.get(source_ref)
+                except Exception:  # noqa: BLE001 - triage never breaks report-back
+                    source_item = None
+                if isinstance(source_item, dict):
+                    raw_pid = source_item.get("project_id")
+                    if isinstance(raw_pid, str) and raw_pid.strip():
+                        project_id = raw_pid.strip()
+        if project_id is None:
+            try:
+                project_id = stores.default_project_id()
+            except Exception:  # noqa: BLE001 - create_inbox_task re-defaults on None
+                project_id = None
+        try:
+            stores.create_inbox_task(
+                title=f"Triage failed run {run_id[:8]}",
+                body=body,
+                task_type="task",
+                created_by="supervisor",
+                assignee="agent",
+                project_id=project_id,
+                metadata={"triage_for": run_id},
+                context_refs=[f"run:{run_id}"],
+            )
+        except StoreError:
+            try:
+                pending_ref = run.get("bridged_from") or run.get("inbox_id")
+                if isinstance(pending_ref, str) and pending_ref:
+                    try:
+                        pending_item = stores.inbox.get(pending_ref)
+                    except Exception:  # noqa: BLE001 - pending flag is best-effort
+                        pending_item = None
+                    if isinstance(pending_item, dict) and pending_item.get("status") == "open":
+                        pending_item["triage_pending"] = True
+                        try:
+                            stores.inbox.put(pending_ref, pending_item)
+                        except Exception:  # noqa: BLE001 - pending flag is best-effort
+                            return
+            except Exception:  # noqa: BLE001 - triage never breaks report-back
+                return
+            return
+        try:
+            clear_ref = run.get("bridged_from") or run.get("inbox_id")
+            if isinstance(clear_ref, str) and clear_ref:
+                try:
+                    clear_item = stores.inbox.get(clear_ref)
+                except Exception:  # noqa: BLE001 - pending clear is best-effort
+                    clear_item = None
+                if (
+                    isinstance(clear_item, dict)
+                    and clear_item.get("status") == "open"
+                    and "triage_pending" in clear_item
+                ):
+                    clear_item.pop("triage_pending", None)
+                    try:
+                        stores.inbox.put(clear_ref, clear_item)
+                    except Exception:  # noqa: BLE001 - pending clear is best-effort
+                        return
+        except Exception:  # noqa: BLE001 - triage never breaks report-back
+            return
+    except Exception:  # noqa: BLE001 - triage never breaks report-back
+        return
+
+
 def report_run_terminal(stores: DashboardStores, summary: dict) -> dict:
     """Append a terminal run's outcome to its source inbox item (report-back).
 
     The bridge files runs from inbox items; this closes the loop so no
     finished work orphans its request. Notes only — items stay open for
-    owner review; repeats dedupe on the run id. Never raises.
+    owner review; repeats dedupe on the run id. Failed runs additionally
+    file one agent triage task (deduped, cap-safe). Never raises.
     """
     try:
         run_id = str(summary.get("run_id") or "")
         run = stores.runs.get(run_id) if run_id else None
+        if run_id and summary.get("status") == "failed":
+            _file_failed_run_triage(stores, run or {}, run_id, summary)
         source_id = (run or {}).get("bridged_from") or (run or {}).get("inbox_id")
         if not run or not source_id:
             return {"action": "skipped", "reason": "no linked source item"}
@@ -3593,6 +3752,16 @@ def maybe_start_drain_scheduler(
             promoted = []
         if promoted:
             print(f"Workbench dashboard: auto-promoted {len(promoted)} backlog items")
+        try:
+            from supervisor_followups import supervisor_tick_audit
+
+            audit = supervisor_tick_audit(stores)
+        except Exception as exc:  # noqa: BLE001 - tick failures are never fatal
+            print(f"Workbench dashboard: supervisor self-audit failed: {exc}")
+            audit = {}
+        healed = (audit.get("healed") or {}) if isinstance(audit, dict) else {}
+        if any(healed.values()):
+            print(f"Workbench dashboard: self-audit healed {healed}")
         paused = drain_pause_state(stores)
         if paused is not None:
             print(f"Workbench dashboard: scheduled drain paused: {paused['reason']}")
