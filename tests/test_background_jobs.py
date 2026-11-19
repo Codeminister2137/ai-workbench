@@ -260,11 +260,12 @@ def test_fast_command_accumulates_across_polls(tmp_path) -> None:
     manager = JobManager(jobs_root(tmp_path))
     record = manager.start(_py("print('hello')"), tmp_path, _env())
     seen = ""
+    state = manager.poll(record.id)
     for _ in range(50):
-        state = manager.poll(record.id)
         seen += state["stdout"]
         if state["status"] != "running":
             break
         time.sleep(0.01)
+        state = manager.poll(record.id)
     assert state["status"] == "done"
     assert seen.strip() == "hello"
