@@ -5,6 +5,7 @@ from __future__ import annotations
 import sqlite3
 import time
 from collections.abc import Iterator
+from contextlib import closing, contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -28,13 +29,25 @@ class KnowMeEntry:
 _COLUMNS = "id, category, text, source, created_at, source_file, origin_text"
 
 
+@contextmanager
+def _connected(path: Path) -> Iterator[sqlite3.Connection]:
+    """Connect with commit-on-exit AND close-on-exit.
+
+    Bare ``with sqlite3.connect(...)`` commits but never closes, leaking
+    a connection per call (ResourceWarnings, Windows locking flakes).
+    """
+    with closing(sqlite3.connect(path)) as connection:
+        with connection:
+            yield connection
+
+
 class KnowMeStore:
     """Tiny SQLite store; v2 adds optional provenance columns (v1 auto-upgrades)."""
 
     def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        with sqlite3.connect(self.path) as connection:
+        with _connected(self.path) as connection:
             connection.execute(
                 """
                 CREATE TABLE IF NOT EXISTS entries (
@@ -83,7 +96,7 @@ class KnowMeStore:
                 raise ValueError("origin_text must be a string")
             origin_text = origin_text.strip() or None
         created = time.time()
-        with sqlite3.connect(self.path) as connection:
+        with _connected(self.path) as connection:
             cursor = connection.execute(
                 "INSERT INTO entries (category, text, source, created_at,"
                 " source_file, origin_text) VALUES (?, ?, ?, ?, ?, ?)",
@@ -111,19 +124,19 @@ class KnowMeStore:
             query += " WHERE category = ?"
             params = (category,)
         query += " ORDER BY id DESC LIMIT ?"
-        with sqlite3.connect(self.path) as connection:
+        with _connected(self.path) as connection:
             rows = connection.execute(query, (*params, limit)).fetchall()
         return [KnowMeEntry(*row) for row in rows]
 
     def count(self) -> int:
         """Total entries banked."""
-        with sqlite3.connect(self.path) as connection:
+        with _connected(self.path) as connection:
             row = connection.execute("SELECT COUNT(*) FROM entries").fetchone()
         return int(row[0])
 
     def iter_all(self) -> Iterator[KnowMeEntry]:
         """Stream every entry, oldest first (exports, reviews)."""
-        with sqlite3.connect(self.path) as connection:
+        with _connected(self.path) as connection:
             rows = connection.execute(f"SELECT {_COLUMNS} FROM entries ORDER BY id ASC").fetchall()
         for row in rows:
             yield KnowMeEntry(*row)

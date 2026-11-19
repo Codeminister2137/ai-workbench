@@ -255,6 +255,21 @@ class TestPolicyFiles:
         with pytest.raises(ValueError, match="Unknown spend policy keys"):
             policy_from_file(path)
 
+    def test_add_allowance_rejects_duplicates_and_bad_balances(self):
+        ledger = _ledger()
+        ledger.add_allowance(_allowance("a1"))
+        with pytest.raises(ValueError, match="Duplicate allowance id"):
+            ledger.add_allowance(_allowance("a1"))
+        bad = _allowance("neg")
+        object.__setattr__(bad, "balance_cents", -5)
+        object.__setattr__(bad, "granted_cents", 10)
+        with pytest.raises(ValueError, match="non-negative"):
+            ledger.add_allowance(bad)
+        over = _allowance("over", granted_cents=100)
+        object.__setattr__(over, "balance_cents", 150)
+        with pytest.raises(ValueError, match="cannot exceed granted"):
+            ledger.add_allowance(over)
+
     def test_set_rules_empty_restores_default_block(self):
         ledger = _ledger(rules=[PolicyRule(scope="global", prepaid_allowed=True)])
         policy = cast("dict[str, Any]", ledger.status()["policy"])
