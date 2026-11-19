@@ -1229,3 +1229,48 @@ output tokens were reasoning; the same prompt at `max_output_tokens: 512` return
 spent roughly 95% of its output budget on reasoning even for a trivial prompt, so a
 small cap silently produces empty answers. The four probes cost under USD0.01 in
 total. This is a small connectivity/accounting observation, not quality acceptance.
+
+## Local agent model research - 2026-11-19
+
+Scope: official public registry/docs, plus local inventory (no model-quality
+inference initiated by this research's tools). Implements owner option C on
+inbox a8739354c7694e4a9190778d0d7c2a47; replacement pull remains unapproved.
+The prior "fits 16GB with context headroom" claim was not established.
+
+| Candidate | Verified public facts | Benefit | Cost / limitation |
+| --- | --- | --- | --- |
+| Installed qwen2.5-coder:14b | Local inventory: 9.0GB; tools support previously verified in policy | No download; established gated-work baseline | No evidence here of broad autonomous coding competence |
+| devstral:24b | 14GB Q4_K_M, 128K, tools, Apache 2.0; digest prefix 9bd74193e939 matches explicit 2505 tag | Agent-focused, smaller artifact than alternatives below | Older May 2025 release; context residency and quantized quality unmeasured |
+| devstral-small-2:24b | 15GB Q4_K_M, tools/vision, Apache 2.0; requires Ollama >=0.13.3 | Newer agent-focused candidate; publisher reports 65.8% SWE-bench Verified | Tight 16GB budget; benchmark is not this workstation/quantization/harness |
+| codestral:22b | 13GB Q4_0, FIM/code generation, Mistral AI Non-Production License; registry lacks tools badge | Useful completion-oriented candidate | License constraint and no demonstrated native tool support make it a poor agent replacement |
+| qwen2.5-coder:32b | 20GB Q4_K_M, tools, Apache 2.0 | Larger coding model | Artifact exceeds 16GB GPU capacity; offload/latency unmeasured |
+| qwen3-coder:30b | 19GB Q4_K_M, tools, Apache 2.0, MoE 30.5B total | Agent-focused alternative | Low active parameter count does not remove weight storage; exceeds 16GB before context |
+
+Sources checked 2026-11-19:
+- https://ollama.com/library/devstral/tags
+- https://ollama.com/library/devstral:24b
+- https://ollama.com/library/devstral-small-2:24b
+- https://ollama.com/library/codestral:22b
+- https://ollama.com/library/qwen2.5-coder:32b
+- https://ollama.com/library/qwen3-coder:30b
+- https://mistral.ai/news/devstral-2507/ (1.1 is a separate July 2025 release;
+  its reported 53.6% must not be attributed to the 2505 registry alias)
+- https://docs.ollama.com/context-length (larger context requires more memory;
+  inspect allocated context and CPU/GPU split using `ollama ps`).
+
+Recommendation (pending owner choice): retain qwen2.5-coder:14b now; if
+admitting an upgrade download, prefer evaluating Devstral Small 2 over the
+older ambiguous alias. Alternative: retain the fleet without a download, saving
+disk/bandwidth but leaving upgrade quality unknown. No replacement was pulled.
+Before any promotion: pin manifest/version, set fresh finite call/time/path
+bounds, test native tool round-trip and one sandboxed edit with independent
+checks, measure configured context, GPU/CPU split and latency, then use the
+existing representative evaluation policy. Stop on failed phase; no silent
+retry or routing promotion. Neither registry badges nor a successful load prove
+model quality. RAM-offloaded larger models remain a later option if the owner
+accepts their download and latency trade-offs.
+
+Local cleanup: owner-requested `ollama rm deepseek-coder-v2:16b` returned
+success; post-removal inventory retained gpt-oss:20b, qwen3:14b and
+qwen2.5-coder:14b. Previous listed size 8.9GB; reclaimed bytes not measured.
+This dated inventory supersedes the four-installed observation of November 13.

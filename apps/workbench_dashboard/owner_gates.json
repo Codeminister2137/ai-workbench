@@ -1,6 +1,13 @@
 {
   "gates": [
     {
+      "id": "investor-asset-scope",
+      "title": "Investor: choose asset scope and paper autonomy policy",
+      "type": "decision",
+      "body": "Alpaca paper is selected (ADR-092, source inbox d50c644d9f8c44b992f1d6c83d13fe87). Decision needed: initial asset universe, additional broker research and human approval for paper orders. Multiple brokers can broaden coverage but add credentials, data entitlements, different fill assumptions and maintenance. A: Start with a small Alpaca-supported universe and human review while defining bounded autonomous paper trials. Pro: simpler, faster and uses free paper access. Con: narrower coverage and staged automation. B: Research broader asset classes and multiple paper brokers first. Pro: coverage informs design. Con: delays experiments and needs current free-API/eligibility verification. Recommendation: A, expanding for demonstrated gaps. Question: A or B, which assets, and what approval should paper orders require? Owner goal: experiment with autonomous and human-in-the-loop investing without cost. Free paper access does not guarantee free inference, data or infrastructure. No paid service, funded account or live orders approved.",
+      "options": ["A: Small Alpaca universe first", "B: Broader coverage research first"]
+    },
+    {
       "body": "Decision needed: create the read-only service account so the dashboard can read Go usage windows.\n\nWhy it matters: the .env key is the Go INFERENCE key, proven 403 on all usage endpoints (2026-11-17). Only a console service-account key (or a browser-cookie session) can read the 5h/weekly/monthly windows. Extra Usage is OFF, so headroom reads literally once wired.\n\nSteps (verified against dev.opencode.ai/docs/console/api):\n1. Console > Settings > Service accounts > Add Service Account, name e.g. workbench-usage.\n2. Open it > Add API Key, name e.g. usage-read.\n3. Permissions: Restricted with Usage set to Read (tightest), or Read only. Expiry: Never (or 365d custom + rotation note).\n4. Copy the key ONCE (shown once, oc_sk_... prefix afterwards).\n\nThen paste it here as your answer (or add OPENCODE_USAGE_KEY=<key> to .env yourself). Do NOT overwrite OPENCODE_API_KEY. Read-only keys cannot call models; usage counts to the service account's own budget; revocable anytime.\n\nTechnical recommendation: Restricted + Usage/Read + Never expiry.\nQuestion: paste the key, or say cookie-path.",
       "id": "opencode-key",
       "title": "OpenCode: create usage-read service account",
@@ -72,6 +79,16 @@
       "options": [
         "Done"
       ]
+    },
+    {
+      "id": "local-agent-upgrade-after-research",
+      "title": "Local agent upgrade: approve Devstral Small 2 probe or retain Qwen?",
+      "type": "decision",
+      "options": [
+        "A: retain installed Qwen (no pull)",
+        "B: approve Devstral Small 2 pull + bounded probe"
+      ],
+      "body": "Decision needed: replacement-model download after research requested in a8739354.\nWhy it matters: original devstral:24b alias is May 2025 weights, not latest. 14GB artifact size never established context headroom on the stated 16GB GPU. Research and cleanup are complete; this is a separate upgrade decision.\nA: retain qwen2.5-coder:14b. Pros: installed 9GB, tools-capable, no download, existing gated-work baseline. Cons: upgrade quality remains unknown; no claim of broad autonomous competence.\nB: approve devstral-small-2:24b (~15GB Q4_K_M, Apache 2.0, tools) download and bounded local probe. Pros: newer agent-focused candidate; published 65.8% SWE-bench Verified. Cons: tight VRAM, unknown CPU offload/latency and quantized quality; published score is not a local result. No automatic promotion.\nCompared alternatives: codestral:22b 13GB is completion-oriented, no tools badge, Non-Production License; qwen2.5-coder:32b 20GB and qwen3-coder:30b 19GB exceed stated VRAM before context.\nTechnical recommendation: A now; if you want upgrade experimentation, B is preferable to pulling the older devstral alias. Before B execution declare finite call/time/path bounds, pin digest, check tools/edit correctness, actual context and GPU split, then representative evaluation before routing.\nQuestion: A or B?\nEvidence: packages/ai_provider/docs/source-state.md#local-agent-model-research---2026-11-19; https://ollama.com/library/devstral/tags ; https://ollama.com/library/devstral-small-2:24b ; https://docs.ollama.com/context-length\nDeepSeek removal succeeded; post-removal inventory confirmed absence. Prior listed size 8.9GB; reclaimed bytes not measured."
     }
   ]
 }
