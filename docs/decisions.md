@@ -1,3 +1,13 @@
+## ADR-093 - Investor coverage research and autonomous paper policy (2026-11-19)
+
+Owner chose B in inbox `2592e3e4`: broader coverage research first, autonomous
+simulated-money experiments with at least decision records for learning.
+Alpaca remains the selected first broker (prior inbox `d50c644d`); no additional
+broker or executable universe is selected. Real spending and paid services remain
+outside this decision. See [ADR-093](decisions/ADR-093-investor-coverage-and-paper-autonomy.md)
+and [dated research](research/investor-coverage-20261119.md). Runtime integration
+and a durable Investor journal remain future implementation, not completed features.
+
 ## ADR-090 - Dashboard-native Mai supervision (2026-11-18)
 
 **Status:** Accepted by owner (inbox db16e0bd, accepted recommendation).

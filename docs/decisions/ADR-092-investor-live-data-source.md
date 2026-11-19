@@ -1,8 +1,9 @@
-# ADR-092: Investor live-data source (research recorded, selection open)
+# ADR-092: Investor live-data source (Alpaca paper selected)
 
-Status: Research recorded 2026-11-19; broker selection awaits owner
-decision (inbox brief filed alongside). Paper trading only; no broker
-selected, no accounts, no keys, no orders.
+Status: Alpaca paper selected by owner, 2026-11-19 (inbox
+`d50c644d9f8c44b992f1d6c83d13fe87`, answer A; closed dashboard resolution
+verified). First broker, not exclusive. No integration is implemented here.
+Coverage research and autonomous paper policy: [ADR-093](ADR-093-investor-coverage-and-paper-autonomy.md).
 
 ## Problem
 
@@ -12,6 +13,12 @@ which broker was undecided. Candidates differ in eligibility, cost to
 start, universe, and paper fidelity.
 
 ## Research
+
+Historical comparison below predates the selection. Corrections checked
+2026-11-19: XTB discontinued API access on 2025-03-14; OANDA's official v20
+exclusions name TMS BROKERS S.A. and Global Markets, rather than all EU access.
+See [current official sources and coverage findings](../research/investor-coverage-20261119.md).
+The old XTB candidate and blanket OANDA exclusion below are superseded.
 
 Full comparison: `docs/plans/investor-broker-selection-20261119.md`
 (dated sources, unknowns preserved).
@@ -29,16 +36,17 @@ Data/credentials/logging: paper keys via env, never logged; fills and
 curves persisted locally without secrets; fixtures remain the offline
 gate. Investor tuning/eval artifacts stay private.
 
-## Recommendation (not a decision)
+## Original recommendation (historical)
 
-Start with Alpaca paper-only (zero friction, documented limits); keep
-IBKR for EU assets once funded; keep XTB for CFD/forex focus. The owner
-selection brief carries options with pros/cons; this ADR records the
-outcome once the owner chooses.
+The original recommendation favored Alpaca paper-only and considered IBKR
+and XTB for broader coverage. Owner selected Alpaca as the first broker.
+XTB is no longer a viable API candidate; IBKR funding is not authorized.
+ADR-093 records the subsequent broader-research and autonomy decision.
 
 ## Consequences
 
-- No integration code is written until the owner selects a broker.
+- Alpaca is selected; additional brokers and the first execution universe remain
+  unselected pending the broader research direction in ADR-093.
 - The selected broker's paper limits become the documented caveats on
   every strategy result.
 - A funded-account prerequisite (IBKR) or live-eligibility question
