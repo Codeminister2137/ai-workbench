@@ -1533,7 +1533,10 @@ def _external_agent_progress_line(line: str) -> str | None:
 
     final_answer = _find_explicit_final_answer(event, event_type)
     if final_answer:
-        return f"external_agent_activity: final_answer - {_bounded_preview(final_answer)}"
+        return (
+            f"external_agent_activity: final_answer - "
+            f"{_bounded_preview(final_answer, limit=TEXT_PREVIEW_LIMIT)}"
+        )
 
     failure_reason = _find_failure_reason(event, event_type)
     if failure_reason:
@@ -1549,7 +1552,10 @@ def _external_agent_progress_line(line: str) -> str | None:
 
     text = _find_text_payload(event)
     if text and "reasoning" not in event_type:
-        return f"external_agent_activity: {event_type} - {_bounded_preview(text)}"
+        return (
+            f"external_agent_activity: {event_type} - "
+            f"{_bounded_preview(text, limit=TEXT_PREVIEW_LIMIT)}"
+        )
 
     return f"external_agent_activity: {event_type}"
 
@@ -1575,8 +1581,15 @@ def _is_noisy_codex_model_refresh_stderr(line: str) -> bool:
     )
 
 
+TEXT_PREVIEW_LIMIT = 2_000
+
+
 def _bounded_preview(value: str, *, limit: int = 360) -> str:
-    """Return a single-line preview without exposing unbounded event payloads."""
+    """Return a single-line preview without exposing unbounded event payloads.
+
+    Agent message text uses TEXT_PREVIEW_LIMIT: verdicts and consequences
+    past 360 chars are evidence, and truncating them loses findings.
+    """
 
     preview = " ".join(value.strip().split())
     if len(preview) <= limit:
