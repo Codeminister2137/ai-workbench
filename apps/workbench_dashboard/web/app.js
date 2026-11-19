@@ -1656,7 +1656,7 @@ async function renderE2E(id) {
         const note = entry.warning || entry.reason || "auto-passed";
         return `<li><strong>${esc(entry.behavior || entry.id)}</strong>
           <span class="pill">auto-pass · ${esc(entry.verdict_by || "")}</span>
-          <p class="muted">${esc(note)}</p>${whatHtml(entry, index === 0)}</li>`;
+          <p class="muted">${esc(note)}</p>${whatHtml(entry, true)}</li>`;
       }
       const hasSteps = entry.steps && entry.steps.length;
       const verdictRow = hasSteps ? "" : `
@@ -1671,7 +1671,7 @@ async function renderE2E(id) {
         ${entry.needs_pointers ? `<p class="muted">Draft steps — pointers requested; final checks land before testing opens.</p>` : ""}
         ${stepsHtml(entry, readOnly)}
         ${historyHtml(entry)}
-        ${whatHtml(entry, index === 0)}
+        ${whatHtml(entry, true)}
         ${controls}</li>`;
     }).join("");
     const isDraft = task.status === "draft";

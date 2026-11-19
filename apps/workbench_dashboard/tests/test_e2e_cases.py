@@ -134,9 +134,12 @@ def test_agent_cli_steps_do_not_claim_help_flags() -> None:
             "views": [],
         }
     }
-    (step,) = e2e_cases.draft_steps("agent-cli", evidence, ["s"])
+    (suite, step) = e2e_cases.draft_steps("agent-cli", evidence, ["s"])
+    assert suite["agent_runnable"] is True
+    assert "run-tests.py agent" in suite["action"]
     assert "--help" not in step["action"]
     assert "_external_execution_completed" in step["action"]
+    assert "pytest" not in step["action"]  # suites are AI work, never human steps
 
 
 def test_command_steps_give_exact_pytest_for_test_files() -> None:
@@ -453,3 +456,44 @@ def test_site_schema_only_needs_pointers() -> None:
     steps = e2e_cases.draft_steps("company-site", evidence, ["intake schema"])
     assert steps
     assert e2e_cases.needs_pointers(steps)
+
+
+def test_orchestrator_splits_suite_from_trigger() -> None:
+    evidence = {
+        "packages/ai_orchestrator/src/ai_orchestrator/deliberation.py": {
+            "symbols": ["request_verdict"],
+            "routes": [],
+            "views": [],
+        }
+    }
+    (suite, trigger) = e2e_cases.draft_steps("orchestrator", evidence, ["s"])
+    assert suite["agent_runnable"] is True
+    assert "run-tests.py orchestrator" in suite["action"]
+    assert "scoped pytest" not in trigger["action"]
+    assert "request_verdict" in trigger["action"]
+
+
+def test_provider_splits_suite_from_trigger() -> None:
+    evidence = {
+        "packages/ai_provider/src/ai_provider/source_claims.py": {
+            "symbols": ["extract_claims"],
+            "routes": [],
+            "views": [],
+        }
+    }
+    (suite, trigger) = e2e_cases.draft_steps("provider", evidence, ["s"])
+    assert suite["agent_runnable"] is True
+    assert "run-tests.py provider" in suite["action"]
+    assert "scoped pytest" not in trigger["action"]
+
+
+def test_test_only_evidence_gets_no_extra_suite_step() -> None:
+    evidence = {
+        "tests/test_source_claims.py": {
+            "symbols": ["test_x"],
+            "routes": [],
+            "views": [],
+        }
+    }
+    (step,) = e2e_cases.draft_steps("provider", evidence, ["s"])
+    assert "pytest tests/test_source_claims.py -q" in step["action"]
