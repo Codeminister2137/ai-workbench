@@ -1,3 +1,10 @@
+## ADR-092 - Alpaca paper selected (2026-11-19)
+
+Owner selected Alpaca paper as the first investor broker. Asset scope,
+additional brokers and autonomy policy remain open; multiple brokers are
+possible, not yet selected. See
+[ADR-092](decisions/ADR-092-investor-live-data-source.md).
+
 ## ADR-093 - Investor coverage research and autonomous paper policy (2026-11-19)
 
 Owner chose B in inbox `2592e3e4`: broader coverage research first, autonomous

@@ -24,8 +24,10 @@ plus reliable Dashboard/system wiring.
 ## Still open (real work)
 
 - [ ] Eval parity vs Muse CLI: battery prepared
-      (docs/plans/mai-parity-battery-20261119.md); authorization brief
-      filed to the owner inbox. No runs until approved.
+      (docs/plans/mai-parity-battery-20261119.md); owner authorized the full
+      five-task/two-arm battery (inbox `531f45df`, 2026-11-19), preferring
+      useful real coding tasks. Freeze current task requirements and fresh
+      bounds before execution. Runs and scored parity evidence remain pending.
 - [x] Stuck-run fallback: reconcile interruption cap shipped 2026-11-18
       (cancel + terminal note after repeated output-less interruptions).
 - [x] Completion-to-inbox mail routing: unattended-only policy shipped

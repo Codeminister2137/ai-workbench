@@ -103,10 +103,51 @@ bounded five-task run. Routing is unchanged by this documentation update.
 - `deepseek-coder-v2:16b`: completion + insert only, no tools
   (registry + live 400, twice). Out for agent work.
 
-Upgrade candidate (needs owner pull approval): `devstral:24b` — 14GB,
-128K, tools-tagged, Apache 2.0, agentic-tuned, 46.8% SWE-Bench Verified
-(ollama.com/library/devstral). Fits 16GB VRAM with context headroom;
-probe before routing.
+Upgrade candidate: owner approved **Devstral Small 2** (`devstral-small-2:24b`)
+pull and bounded local probe on 2026-11-19 (inbox `6750ebd4`, option B), to
+compare it with Qwen on the workstation GPU. This does not approve promotion.
+The older `devstral:24b` alias is a different release. Artifact size alone
+does not establish 16GB VRAM fit or context headroom.
+
+Run `09dcad608b854c25a0c92ce2ec5d4d43`: **INCOMPLETE before inference**.
+The one-shot allowance was one pull (20 minutes), then at most six local
+calls per model within 15 minutes, with 4,096 context and 512 output tokens.
+The pull reported approximately 4.7 MB/s and 53 minutes remaining, so the
+owned pull process was stopped early rather than extending the active bound.
+This was an operator feasibility stop, not a registry or model-quality failure.
+No inference phase was reached by the probe script. Installed inventory after
+the stop and local receipt are required evidence; partial download data may
+remain in Ollama's cache. Do not remove shared blobs to clean this trial.
+
+Next: use a fresh, explicitly declared download allowance sized for the observed
+transfer rate, then pin the installed manifest digest and run structured tool
+round-trip, sandboxed edit checks, latency and actual GPU/context residency
+checks against Qwen. The prepared synthetic micro-probe is not representative
+quality acceptance; broad routing requires the existing evaluation policy.
+Qwen remains the policy baseline while Devstral's local quality is unknown.
+
+## Upgrade research closeout - 2026-11-19
+
+Owner answer to inbox `a8739354c7694e4a9190778d0d7c2a47`: C, research
+more; also remove the unused DeepSeek model. Research is complete; no pull
+or routing change is approved. See the dated [source-state comparison](../packages/ai_provider/docs/source-state.md#local-agent-model-research---2026-11-19).
+
+Correction: `devstral:24b` is the May 2025 release, not the newest Devstral.
+Its 14GB artifact size does not establish usable context headroom on a 16GB
+GPU. The advertised 128K context is a model limit, not measured local capacity.
+Retain installed `qwen2.5-coder:14b` for the existing gated work. Recommend
+considering a bounded Devstral Small 2 probe only after a separate owner pull
+decision; published benchmarks do not establish local quantized agent quality.
+
+Cleanup: `ollama rm deepseek-coder-v2:16b` succeeded on 2026-11-19;
+subsequent `ollama list` showed only gpt-oss:20b, qwen3:14b and
+qwen2.5-coder:14b. Removed model's prior listed size was 8.9GB; actual freed
+filesystem bytes were not measured. Historical blocked-model evidence above
+is retained and does not describe current installation.
+
+Same-day update: the owner then approved option B (Devstral Small 2 pull +
+bounded probe) in inbox `6750ebd4`; current probe status is recorded under
+Upgrade candidate above, not in this research section.
 
 ## Review triggers
 
