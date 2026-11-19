@@ -746,6 +746,11 @@ def pointer_mission(merge: str, task_id: str, unclear: list[dict]) -> str:
         "without backticks is a defect.\n"
         "- One behavior per step; concrete inputs plus the exact text or "
         "state to observe. Never emit generic standing checks.\n"
+        "- Every referenced artifact carries its exact locator: report/run/chat/inbox "
+        "ids (8+ chars), filenames with paths, view hashes. Never write 'an applicable "
+        "X', 'a recent Y', 'the checklist', or any reference the reader cannot locate "
+        "verbatim. A step whose target cannot be found word-for-word is a defect "
+        "(owner verdicts 2026-11-18).\n"
         "\nReply BOTH ways so the result survives truncation:\n"
         "1. Write pointers.json at your worktree root: "
         '{"<item-id>": [{"action": "...", "expected": "..."}], ...} '

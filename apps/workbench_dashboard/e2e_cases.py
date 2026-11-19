@@ -222,7 +222,7 @@ def _dashboard_steps(evidence: dict[str, dict[str, list[str]]]) -> list[dict]:
         for view in evidence[path]["views"]:
             if view.strip("#/").count("/") > 0:
                 continue  # nested hashes need an id; not an openable view
-            key = f"view:{view}"
+            key = f"view:{view.rstrip('/')}"
             if key in seen:
                 continue
             seen.add(key)
@@ -262,15 +262,19 @@ def _dashboard_steps(evidence: dict[str, dict[str, list[str]]]) -> list[dict]:
         symbols = ", ".join(sorted(path_symbols))
         touched = f" (touched: {symbols})" if symbols else ""
         for route in evidence[path]["routes"]:
-            key = f"route:{route}"
-            if key in seen:
-                continue
-            seen.add(key)
             mapped = _route_ui(route)
             if mapped is None:
+                key = f"route:{route}"
+                if key in seen:
+                    continue
+                seen.add(key)
                 unmapped.append(route)
                 continue
             label, view_hash = mapped
+            key = f"tab:{view_hash}"
+            if key in seen:
+                continue
+            seen.add(key)
             steps.append(
                 {
                     "action": (
@@ -355,9 +359,32 @@ def _is_test_path(path: str) -> bool:
 
 
 def _command_steps(
-    evidence: dict[str, dict[str, list[str]]], action_template: str, expected: str
+    evidence: dict[str, dict[str, list[str]]],
+    action_template: str,
+    expected: str,
+    *,
+    suite_command: str | None = None,
 ) -> list[dict]:
+    """Trigger steps plus one agent-runnable suite step (owner decision).
+
+    Running test suites is AI work, never a human step (owner verdicts
+    2026-11-18: "Run the scoped pytest should not be in human test",
+    "running scripts SHOULD ABSOLUTELY BE AI JOB"): the suite runs
+    agent-side with its exact command, and human templates carry no
+    pytest clause.
+    """
     steps: list[dict] = []
+    if suite_command is not None and any(
+        evidence[path]["symbols"] for path in evidence if not _is_test_path(path)
+    ):
+        steps.append(
+            {
+                "action": f"Run `{suite_command}` from the repo root.",
+                "expected": "Exit 0: the touched area still passes its suite.",
+                "grounded": True,
+                "agent_runnable": True,
+            }
+        )
     for path in sorted(evidence):
         for symbol in evidence[path]["symbols"]:
             if _is_test_path(path):
@@ -398,20 +425,23 @@ def draft_steps(
     elif area == "agent-cli":
         steps = _command_steps(
             evidence,
-            "Exercise the changed path {symbol} ({path}) through its documented caller, then run the scoped pytest",
+            "Exercise the changed path {symbol} ({path}) through its documented caller",
             "Behaves as before; no traceback; no unintended writes.",
+            suite_command=REGRESSION_COMMANDS.get("agent-cli"),
         )
     elif area == "provider":
         steps = _command_steps(
             evidence,
-            "Run the scoped pytest for the touched adapter, then one real local request through {symbol} and read the route line",
+            "Send one real local request through {symbol} and read the route line",
             "Correct route chosen, response complete, usage recorded.",
+            suite_command=REGRESSION_COMMANDS.get("provider"),
         )
     elif area == "orchestrator":
         steps = _command_steps(
             evidence,
-            "Run the scoped pytest for the touched module, trigger one decision through {symbol}, read the reasoning",
+            "Trigger one decision through {symbol} and read the reasoning",
             "Sensible decision with visible reasoning; no gate bypass.",
+            suite_command=REGRESSION_COMMANDS.get("orchestrator"),
         )
     elif area == "company-site":
         steps = _site_steps(evidence, subjects)

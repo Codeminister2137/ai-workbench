@@ -17,6 +17,7 @@ from e2e_promotion import (
     is_ancestor,
     merge_diff_files,
     merges_between,
+    pointer_mission,
     promotion_verdict,
     uncovered_merges,
     verify_no_diff,
@@ -402,3 +403,10 @@ def test_git_helpers_against_tmp_repo(tmp_path: Path) -> None:
     proof = verify_no_diff(root, old, tip, ["a.txt"])
     assert proof is not None and proof["diff_bytes"] == 0
     assert verify_no_diff(root, old, tip, ["b.txt"]) is None
+
+
+def test_pointer_mission_forbids_unfindable_references() -> None:
+    mission = pointer_mission("abc123", "task1", [{"behavior": "b", "id": "i"}])
+    assert "exact locator" in mission
+    assert "an applicable" in mission
+    assert "cannot be found word-for-word is a defect" in mission

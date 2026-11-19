@@ -40,6 +40,23 @@ def _truncate(text: str, limit: int) -> str:
     return text if len(text) <= limit else text[:limit] + "…"
 
 
+def _run_title(title: str | None, text: str, *, limit: int = 60) -> str:
+    """Title chat-queued runs without mid-word cuts (owner verdict 2026-11-18).
+
+    Explicit titles win; otherwise the first ``limit`` chars cut at a word
+    boundary with an ellipsis. Falls back to a hard cut when the text has
+    no space inside the budget.
+    """
+    explicit = (title or "").strip()
+    if explicit:
+        return explicit
+    clean = " ".join(text.split())
+    if len(clean) <= limit:
+        return clean
+    cut = clean[:limit].rsplit(" ", 1)[0].rstrip()
+    return (cut or clean[:limit]) + "…"
+
+
 def _transcript_digest(
     store, session_id: str, *, max_turns: int = 30, per_turn: int = 500
 ) -> tuple[int, str]:
@@ -514,7 +531,7 @@ class DashboardChat:
         except ValueError as exc:
             raise ValueError(f"Invalid chat fan-out policy: {exc}") from exc
         run_id = uuid.uuid4().hex
-        run_title = (title or "").strip() or text[:60]
+        run_title = _run_title(title, text)
         now = datetime.now(UTC).isoformat()
         turn_count, digest = _transcript_digest(self.store, session_id)
         context_block = (
