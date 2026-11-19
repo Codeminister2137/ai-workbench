@@ -126,6 +126,29 @@ checks against Qwen. The prepared synthetic micro-probe is not representative
 quality acceptance; broad routing requires the existing evaluation policy.
 Qwen remains the policy baseline while Devstral's local quality is unknown.
 
+Attempt 2 `devstral-pull-1119` (2026-11-19): **probe complete**. Pull
+succeeded within the fresh 75-minute download bound (resumed from partial
+cache at 35%, ~35 minutes, ~4.7 MB/s). Installed digest pinned:
+`sha256:24277f07f62db8f9cb68e9dfc679ea1818a7fbac47a50eff0a701d3f645b63c8`
+(15,177,374,099 bytes; mistral3 24.0B Q4_K_M). Bounded inference
+(4096 ctx / 512 out, temp 0, ≤6 calls/model, 15-minute cap):
+Devstral passed every phase — one native `write_file` tool call with a
+correct `mean()`, 5/5 independent sandboxed checks, brief final reply —
+at 14GB and 100% GPU with context 4096, so it fits the 16GB card.
+Qwen2.5-coder:14b (9.5GB, 100% GPU) returned the same correct code as
+*text JSON* instead of a structured tool call (0 native calls), failing
+the frozen tool-channel check on content-correct output. First-call
+latency (Devstral 28.8s, Qwen 18.2s) is not a benchmark. No contention:
+each phase showed exactly one resident model. Evidence:
+`artifacts/devstral-pull-1119/` (allowance, pull log, probe receipt).
+
+Two single-call data points, not a verdict: Devstral's structured
+tool use works on this GPU, and Qwen's registry "tools" badge did not
+produce a native call through this API shape — the fleet's
+tools-capable claim for Qwen still rests on tags, not live calls.
+No routing change: representative evaluation precedes any promotion,
+and Devstral's quality beyond this synthetic edit remains unknown.
+
 ## Upgrade research closeout - 2026-11-19
 
 Owner answer to inbox `a8739354c7694e4a9190778d0d7c2a47`: C, research
