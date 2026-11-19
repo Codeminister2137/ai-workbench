@@ -1,3 +1,22 @@
+## Cheapest-route default + evidence-driven floors (owner direction 2026-11-19)
+
+Owner-directed after the battery round-1 block (brief b632b5aa, answer A):
+Mai must use the cheapest possible route within authorization, with
+free-tier constraints narrowing the eligible models — and the
+Orchestrator must derive that itself rather than rely on blanket bans.
+Battery re-run authorized on allowances (paid-vs-paid comparison).
+
+Standing doubt recorded: "no local/free model can do satisfactory code"
+is NOT proven. The round-1 blockage measured policy (dev HIGH floor vs
+unmeasured STANDARD grades), not capability: the repo's own 24-task eval
+scored local 13/24 vs grant 12/24, the quality policy trusts Qwen for
+gated deterministic work, and the Devstral probe showed a correct
+structured tool edit. The dev-HIGH floor rests on one 11-10 anecdote;
+all local grades carry "quality is not yet evaluated". Strengthening
+work (measured capability mapping per the open capability-mapping gate,
+task-sensitive floors, surfaced rejection reasons) is future scope, not
+approved implementation.
+
 ## ADR-094 - Supervisor follow-up guarantee + chain reports (2026-11-19)
 
 Extends ADR-090 with no new service or tabs: event-time follow-up
