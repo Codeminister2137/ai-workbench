@@ -77,10 +77,20 @@ def _poll_until_done(manager, job_id, *, tries=50):
 def test_start_fast_command_and_poll_output(tmp_path) -> None:
     manager = JobManager(jobs_root(tmp_path))
     record = manager.start(_py("print('hello')"), tmp_path, _env())
-    state = _poll_until_done(manager, record.id)
+    # Polls stream deltas: fast output can land on a running poll, so the
+    # final poll's delta alone is not the whole output. Accumulate, exactly
+    # like streaming consumers must (the old final-delta assert flaked).
+    seen = ""
+    state = manager.poll(record.id)
+    for _ in range(50):
+        seen += state["stdout"]
+        if state["status"] != "running":
+            break
+        time.sleep(0.2)
+        state = manager.poll(record.id)
     assert state["status"] == "done"
     assert state["exit_code"] == 0
-    assert state["stdout"].strip() == "hello"
+    assert seen.strip() == "hello"
     # Second poll has no repeats (cursor persisted).
     again = manager.poll(record.id)
     assert again["stdout"] == "" and again["stderr"] == ""
@@ -242,3 +252,19 @@ def test_tools_validate_and_register(tmp_path) -> None:
     assert "tooled" in seen
     stopped = StopCommandTool().execute({"job_id": job_id}, context)
     assert not stopped.is_error and stopped.metadata["status"] == "done"
+
+
+def test_fast_command_accumulates_across_polls(tmp_path) -> None:
+    # Regression: asserting only the final poll's delta flaked whenever the
+    # output landed while still running (1/40 repro 2026-11-19).
+    manager = JobManager(jobs_root(tmp_path))
+    record = manager.start(_py("print('hello')"), tmp_path, _env())
+    seen = ""
+    for _ in range(50):
+        state = manager.poll(record.id)
+        seen += state["stdout"]
+        if state["status"] != "running":
+            break
+        time.sleep(0.01)
+    assert state["status"] == "done"
+    assert seen.strip() == "hello"

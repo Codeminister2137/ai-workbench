@@ -239,10 +239,12 @@ def test_absolute_schedule_requires_owner_cancellation_path(tmp_path):
     assert "requires ReceiptPath and CancelPath" in result.stderr
 
 
-def wait_receipt(path, predicate):
+def wait_receipt(path, predicate, *, alive=None):
     # Cold powershell start takes ~5s solo and more under full-gate load;
     # 10s flaked in the gate (2026-11-12). Startup latency is not the
     # assertion, so allow headroom without masking real breakage.
+    # The optional alive probe discriminates a dead timer from a slow ack
+    # (gate-7 flake 2026-11-18 had no mechanism; never extend blindly).
     end = time.monotonic() + 30
     while time.monotonic() < end:
         try:
@@ -252,7 +254,13 @@ def wait_receipt(path, predicate):
         except (FileNotFoundError, json.JSONDecodeError, PermissionError):
             pass
         time.sleep(0.05)
-    pytest.fail(f"Receipt acknowledgement missing: {path}")
+    liveness = ""
+    if alive is not None:
+        try:
+            liveness = f" timer_alive={bool(alive())}."
+        except Exception:
+            liveness = " timer liveness unknown."
+    pytest.fail(f"Receipt acknowledgement missing: {path}.{liveness}")
 
 
 @contextmanager
@@ -333,7 +341,9 @@ def test_rolling_renewal_protects_long_work_without_replacing_process(tmp_path):
         )
         assert result.returncode == 0, result.stderr
         renewed = wait_receipt(
-            receipt, lambda value: value["planned_sleep_utc"] != initial["planned_sleep_utc"]
+            receipt,
+            lambda value: value["planned_sleep_utc"] != initial["planned_sleep_utc"],
+            alive=lambda: process.poll() is None,
         )
         assert datetime.fromisoformat(renewed["planned_sleep_utc"]) > first_due + timedelta(
             minutes=19
