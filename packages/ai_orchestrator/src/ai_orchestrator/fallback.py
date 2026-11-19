@@ -1,8 +1,10 @@
 """Default usage-limit fallback policy, independent of executor implementations."""
 
+import logging
 from dataclasses import replace
 from enum import StrEnum
 
+from ai_orchestrator.deliberation import DeliberationPort, request_verdict
 from ai_orchestrator.models import (
     ModelCatalogEntry,
     QualityThreshold,
@@ -22,6 +24,43 @@ class FallbackQualityPolicy(StrEnum):
     TASK_MINIMUM = "task_minimum"
     EMERGENCY_PRESERVE = "emergency_preserve"
     PREFER_QUALITY = "prefer_quality"
+
+
+logger = logging.getLogger(__name__)
+
+
+def _verdict_priority_routes(
+    port: DeliberationPort,
+    question: str,
+    known_route_ids: frozenset[str],
+) -> tuple[str, ...]:
+    """Route ids a council verdict steers toward (exact matches only).
+
+    Only ``next_actions`` entries that exactly name a known route steer;
+    prose agreement never invents routes. Consensus ``none``, port errors
+    and malformed verdicts yield nothing and the caller keeps current
+    behavior. Steering is logged with the fields that caused it.
+    """
+    try:
+        verdict = request_verdict(port, question)
+    except Exception as exc:  # noqa: BLE001 - verdict failure keeps current ranking
+        logger.debug("council verdict unavailable, keeping fallback ranking: %s", exc)
+        return ()
+    consensus = verdict.get("consensus")
+    if consensus not in ("full", "partial"):
+        logger.debug("council verdict consensus %r steers nothing", consensus)
+        return ()
+    steered = tuple(
+        action
+        for action in verdict.get("next_actions", [])
+        if isinstance(action, str) and action in known_route_ids
+    )
+    logger.info(
+        "council verdict steers fallback priority: consensus=%s routes=%s",
+        consensus,
+        ",".join(steered) if steered else "(no exact route matches)",
+    )
+    return steered
 
 
 def fallback_profile(
@@ -97,6 +136,8 @@ def fallback_candidates(
     excluded_route_ids: frozenset[str] = frozenset(),
     allow_cost_escalation: bool = False,
     cost_exemptions: frozenset[str] = frozenset(),
+    deliberation_port: DeliberationPort | None = None,
+    deliberation_question: str | None = None,
 ) -> tuple[ModelCatalogEntry, ...]:
     """Rank same-tier alternatives meeting the original task constraints.
 
@@ -124,6 +165,11 @@ def fallback_candidates(
     must opt in explicitly. Lower tiers than the initial route are always
     admissible: continuing on a cheaper source is a downgrade in spend, and the
     task cost policy still has to allow that tier.
+
+    ``deliberation_port`` plus ``deliberation_question`` opt into council
+    steering: verdict ``next_actions`` naming known routes join the priority
+    order behind caller-supplied entries. Without both, or on consensus
+    ``none`` / port error, ranking is exactly as before.
     """
 
     quality_policy = FallbackQualityPolicy(quality_policy)
@@ -165,6 +211,10 @@ def fallback_candidates(
             or quality_rank[entry.quality] < quality_rank[normal_profile.quality_threshold]
         )
     )
+    if deliberation_port is not None and deliberation_question:
+        known = frozenset(entry.backend.route_id for entry in catalog)
+        steered = _verdict_priority_routes(deliberation_port, deliberation_question, known)
+        priority = tuple(priority) + tuple(route for route in steered if route not in priority)
     if priority:
         listed = frozenset(priority)
         by_route = {entry.backend.route_id: entry for entry in eligible}
