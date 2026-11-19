@@ -470,7 +470,18 @@ def test_tampered_lease_outside_deadline_stops_without_power_request(tmp_path):
         # the deadline rejection (gate flake 2026-11-12).
         pending = lease.with_name(lease.name + ".tmp")
         pending.write_text((datetime.now(UTC) + timedelta(days=1)).isoformat())
-        pending.replace(lease)
+        # The timer may hold the lease open for reading at this instant;
+        # Windows refuses the replace then (gate flake 2026-11-19). Retry
+        # briefly: the holder only ever reads momentarily.
+        deadline = time.monotonic() + 5
+        while True:
+            try:
+                pending.replace(lease)
+                break
+            except PermissionError:
+                if time.monotonic() >= deadline:
+                    raise
+                time.sleep(0.05)
         _, stderr = process.communicate(timeout=5)
         assert process.returncode != 0
         assert "outside fixed deadline" in stderr
