@@ -497,3 +497,28 @@ def test_test_only_evidence_gets_no_extra_suite_step() -> None:
     }
     (step,) = e2e_cases.draft_steps("provider", evidence, ["s"])
     assert "pytest tests/test_source_claims.py -q" in step["action"]
+
+
+def test_dashboard_steps_dedupe_trailing_slash_views() -> None:
+    evidence = {
+        "apps/workbench_dashboard/web/app.js": {
+            "symbols": [],
+            "routes": [],
+            "views": ["#/e2e", "#/e2e/"],
+        }
+    }
+    (step,) = e2e_cases.draft_steps("dashboard", evidence, ["s"])
+    assert "e2e view" in step["action"]
+
+
+def test_dashboard_steps_dedupe_same_tab_routes() -> None:
+    evidence = {
+        "apps/workbench_dashboard/dashboard_web_app.py": {
+            "symbols": ["_send_e2e_task"],
+            "routes": ["/api/e2e/tasks", "/api/e2e/reports"],
+            "views": [],
+        }
+    }
+    steps = e2e_cases.draft_steps("dashboard", evidence, ["s"])
+    tabs = [s for s in steps if "E2E tab" in s["action"]]
+    assert len(tabs) == 1

@@ -222,7 +222,7 @@ def _dashboard_steps(evidence: dict[str, dict[str, list[str]]]) -> list[dict]:
         for view in evidence[path]["views"]:
             if view.strip("#/").count("/") > 0:
                 continue  # nested hashes need an id; not an openable view
-            key = f"view:{view}"
+            key = f"view:{view.rstrip('/')}"
             if key in seen:
                 continue
             seen.add(key)
@@ -262,15 +262,19 @@ def _dashboard_steps(evidence: dict[str, dict[str, list[str]]]) -> list[dict]:
         symbols = ", ".join(sorted(path_symbols))
         touched = f" (touched: {symbols})" if symbols else ""
         for route in evidence[path]["routes"]:
-            key = f"route:{route}"
-            if key in seen:
-                continue
-            seen.add(key)
             mapped = _route_ui(route)
             if mapped is None:
+                key = f"route:{route}"
+                if key in seen:
+                    continue
+                seen.add(key)
                 unmapped.append(route)
                 continue
             label, view_hash = mapped
+            key = f"tab:{view_hash}"
+            if key in seen:
+                continue
+            seen.add(key)
             steps.append(
                 {
                     "action": (
