@@ -3510,6 +3510,16 @@ def _file_failed_run_triage(stores: DashboardStores, run: dict, run_id: str, sum
             metadata = existing.get("metadata") or {}
             if isinstance(metadata, dict) and metadata.get("triage_for") == run_id:
                 return
+        source_ref = run.get("bridged_from") or run.get("inbox_id")
+        if isinstance(source_ref, str) and source_ref:
+            try:
+                source_item = stores.inbox.get(source_ref)
+            except Exception:  # noqa: BLE001 - triage never breaks report-back
+                source_item = None
+            if isinstance(source_item, dict) and (source_item.get("metadata") or {}).get(
+                "triage_for"
+            ):
+                return  # failed triage runs don't spawn meta-triage; source stays open
         failure_class = summary.get("failure_class") or _run_failure_class(run)
         error = summary.get("error") or run.get("error") or "(unknown error)"
         body = (
