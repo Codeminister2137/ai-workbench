@@ -210,12 +210,20 @@ def run_mai_session(
 
 
 def classify_failure(*texts: str) -> str:
-    """Map failure text to the supervision cause class (narrow first)."""
-    blob = "\n".join(texts)
-    if _CONFIG_RE.search(blob):
+    """Map failure text to the supervision cause class (narrow first).
+
+    Allowance/config match the error text (first argument) only: tails
+    carry agent prose that merely discusses budgets ("defer allowance
+    routes...") and must never pause the drain. Provider signals still
+    scan the full context. Callers embed the failure_reason in the
+    error, so genuine budget denials keep classifying.
+    """
+    error = texts[0] if texts else ""
+    if _CONFIG_RE.search(error or ""):
         return "config"
-    if _ALLOWANCE_RE.search(blob):
+    if _ALLOWANCE_RE.search(error or ""):
         return "allowance"
+    blob = "\n".join(texts)
     if _PROVIDER_RE.search(blob):
         return "provider"
     return "unknown"
