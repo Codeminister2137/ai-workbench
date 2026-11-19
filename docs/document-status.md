@@ -33,6 +33,7 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/local-model-quality-policy.md | KNOWLEDGE | Quality policy v1 (2026-11-09); supersedes plans draft. |
 | docs/logging-and-artifact-structure-plan.md | ACTED | Oct-19 working notes, consumed. |
 | docs/logging-artifact-inventory.md | KNOWLEDGE | Artifact inventory. |
+| docs/document-text-encoding.md | KNOWLEDGE | Diacritics/UTF-8 failure investigation + shell/serving fixes. |
 | docs/mail-digest.md | KNOWLEDGE | Mail digest reference. |
 | docs/muse-code-workbench-parity.md | KNOWLEDGE | Parity verdict (kept). |
 | docs/muse-window-recovery.md | KNOWLEDGE | Window-loss capture/recovery runbook; watchdog section predates v2 auto-restore (fa064c4). |

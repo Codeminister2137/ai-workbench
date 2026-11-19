@@ -26,6 +26,7 @@ from typing import Any
 
 from ai_agent.contracts import ToolCategory, ToolDefinition, ToolParameter, ToolResult
 from ai_agent.tools.base import BaseTool, ToolContext
+from ai_agent.tools.shell_encoding import powershell_command
 
 STREAM_HARD_CAP_BYTES = 8 * 1024 * 1024
 POLL_CHUNK_BYTES = 64 * 1024
@@ -77,7 +78,7 @@ class JobManager:
             stderr_handle = open(stderr_path, "wb")
             try:
                 if sys.platform == "win32":
-                    shell_cmd = ["powershell", "-NoProfile", "-Command", command]
+                    shell_cmd = powershell_command(command)
                 else:
                     shell_cmd = ["/bin/sh", "-c", command]
                 process = subprocess.Popen(

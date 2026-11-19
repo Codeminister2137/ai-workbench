@@ -53,6 +53,7 @@ def run_validation_process(
     text: bool = True,
     check: bool = False,
     env: dict[str, str] | None = None,
+    encoding: str | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Keep descendants owned until cleanup, including after their root exits.
 
@@ -106,7 +107,7 @@ def run_validation_process(
                     active_error.add_note(str(error))
                 else:
                     raise
-        encoding = "utf-8" if sys.flags.utf8_mode else locale.getencoding()
+        encoding = encoding or ("utf-8" if sys.flags.utf8_mode else locale.getencoding())
         captured = []
         for stream in (stdout, stderr):
             size = stream.seek(0, os.SEEK_END)

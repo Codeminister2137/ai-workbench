@@ -3113,6 +3113,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         if content_type in _ACTIVE_CONTENT_TYPES:
             content_type = "text/plain"
         name = doc_id.rsplit("/", 1)[-1]
+        if name.lower().endswith(".md"):
+            content_type = "text/markdown; charset=utf-8"
         ascii_name = "".join(char if ord(char) < 128 else "_" for char in name)
         self.send_response(200)
         self.send_header("Content-Type", content_type)

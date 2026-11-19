@@ -24,6 +24,9 @@ def doc_server(tmp_path):
     (library / "evil.html").write_text("<script>fetch('/api/inbox')</script>", encoding="utf-8")
     (library / "pic.svg").write_text("<svg>not-an-image</svg>", encoding="utf-8")
     (library / "note.pdf").write_bytes(b"%PDF-1.4 fake")
+    (library / "polish.md").write_text(
+        "# Zażółć gęślą jaźń\n\nBielsko-Biała — “źródło”.\n", encoding="utf-8", newline="\n"
+    )
 
     class TestHandler(DashboardRequestHandler):
         def log_message(self, format, *args):
@@ -96,3 +99,17 @@ def test_unknown_document_stays_404(doc_server) -> None:
         assert exc.code == 404
     else:  # pragma: no cover - fail loudly, never pass silently
         raise AssertionError("expected HTTP 404")
+
+
+def test_markdown_download_and_preview_preserve_polish(doc_server) -> None:
+    from dashboard_test_http import get_json
+
+    expected = "# Zażółć gęślą jaźń\n\nBielsko-Biała — “źródło”.\n"
+    with urllib.request.urlopen(
+        doc_server + "/api/documents/library/polish.md/file", timeout=10
+    ) as response:
+        assert response.headers.get_content_type() == "text/markdown"
+        assert response.headers.get_content_charset() == "utf-8"
+        assert response.read() == expected.encode("utf-8")
+    preview = get_json(doc_server, "/api/documents/library/polish.md?content=1")
+    assert preview["content"] == expected
