@@ -7,13 +7,16 @@ a binding term until reviewed. Conventions:
 - `[TO-VERIFY]` — needs accountant/lawyer confirmation before first use.
 - `[UNCERTAIN]` — business decision still open.
 
+Write the full term followed by its acronym in parentheses at first use in each
+document, including headings; use the acronym alone afterward.
+
 | Template | File | Covers |
 |---|---|---|
-| Statement of Work | `sow-template.md` | scope, fixed quote, acceptance, payment |
-| NDA (mutual, PL-law) | `nda-template.md` | confidentiality both directions |
-| B2B services contract | `contract-template.md` | services, IP transfer, liability cap |
+| Statement of Work (SOW) | `sow-template.md` | scope, fixed quote, acceptance, payment |
+| Non-disclosure agreement (NDA; mutual, Polish law) | `nda-template.md` | confidentiality both directions |
+| Business-to-business (B2B) services contract | `contract-template.md` | services, intellectual property (IP) transfer, liability cap |
 | Discovery report | `discovery-report-template.md` | paid-discovery deliverable |
-| Invoice + reminders | `invoice-template.md` | PL-compliant fields, KSeF notes |
+| Invoice + reminders | `invoice-template.md` | Polish invoice fields, National e-Invoicing System (Krajowy System e-Faktur, KSeF) notes |
 
 Related: P7 paperwork checklist (`docs/plans/p7-paperwork-checklist.md`),
 offering draft (`docs/plans/company-offering-draft.md`), accountant

@@ -1,4 +1,4 @@
-# Mutual NDA (template, PL law) — DRAFT
+# Mutual non-disclosure agreement (NDA) (template, Polish law) — DRAFT
 
 [TO-VERIFY] Entire template: lawyer review before first use. Mutual
 (both directions) so discovery conversations are covered for both sides.
@@ -32,7 +32,7 @@ secrets survive as long as they remain secret `[TO-VERIFY: wording]`.
 
 ## 4. No license, no commitment
 
-Nothing here grants IP rights or obliges either party to do business.
+Nothing here grants intellectual property (IP) rights or obliges either party to do business.
 
 ## 5. Practical rules (non-legal, binding as process)
 
@@ -42,7 +42,7 @@ Nothing here grants IP rights or obliges either party to do business.
 
 ## 6. Governing law & disputes
 
-Polish law `[TO-VERIFY: court/ADR venue wording]`:
+Polish law `[TO-VERIFY: court/alternative dispute resolution (ADR) venue wording]`:
 `[OWNER: e.g. Sąd powszechny właściwy dla siedziby Wykonawcy]`.
 
 ## 7. Signatures
