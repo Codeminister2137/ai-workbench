@@ -1,3 +1,16 @@
+## Eval scheduling scope B + observed-stop budgets (owner answers 2026-11-19)
+
+Owner selected **B: full scope with allowance budgets** (bd5fa3a2):
+local harness, refresh-aware proposal planning, allowance-sampled
+evaluations and grade recording, ~10% per allowance bucket/cycle.
+Enforcement settled by 5a326594 answer B: observed stop threshold,
+overshoot accepted (strict pre-call caps unworkable on
+percentage-only providers). Implemented P1 (route-eval scheduler
+kind), P2 (refresh planner with opencode pacing), P3 (allowance ack
++ snapshot-compare-stop budgeting). Explicit-start execution, no
+daemon, no metered evaluations without per-budget approval, and
+separate approval for routing-floor changes remain binding.
+
 ## Cheapest-route default + evidence-driven floors (owner direction 2026-11-19)
 
 Owner-directed after the battery round-1 block (brief b632b5aa, answer A):
