@@ -34,6 +34,13 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="List locally stored conversations.",
     )
+    parser.add_argument(
+        "--rounds",
+        type=int,
+        default=1,
+        choices=(1, 2, 3),
+        help="Deliberation rounds: 1 answers, 2 adds reactions, 3 adds chair synthesis.",
+    )
     return parser
 
 
@@ -59,11 +66,15 @@ def main() -> None:
         from council import LocalCouncil
 
         council = LocalCouncil(config, store)
-        answers = council.ask(prompt, conversation_name=args.conversation)
+        answers = council.ask(prompt, conversation_name=args.conversation, rounds=args.rounds)
 
-        for answer in answers:
-            print(f"\n## {answer['member']} ({answer['model']})\n")
-            print(answer["answer"])
+        ordered = sorted(answers, key=lambda item: (item.get("round", "1"), item["member"]))
+        for answer in ordered:
+            label = f" [R{answer['round']}]" if answer.get("round") else ""
+            print(f"\n## {answer['member']} ({answer['model']}){label}\n")
+            if answer.get("partial"):
+                print(f"_Partial: {answer['partial']}_\n")
+            print(answer["answer"] or f"_(error: {answer.get('error', 'unknown')})_")
     finally:
         store.close()
 

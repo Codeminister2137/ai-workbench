@@ -2,6 +2,7 @@ const grid = document.querySelector("#councilGrid");
 const promptForm = document.querySelector("#promptForm");
 const promptInput = document.querySelector("#promptInput");
 const conversationInput = document.querySelector("#conversationInput");
+const roundsInput = document.querySelector("#roundsInput");
 const askButton = document.querySelector("#askButton");
 const connectionStatus = document.querySelector("#connectionStatus");
 
@@ -76,7 +77,63 @@ function resetPanels() {
     panel.classList.remove("running", "done", "error");
     panel.querySelector(".member-state").textContent = "Waiting";
     setPanelText(memberName, "");
+    panel.querySelectorAll(".member-reaction").forEach((box) => box.remove());
   });
+  document.querySelectorAll("#synthesisPanel").forEach((pinned) => pinned.remove());
+}
+
+function ensureReactionBox(memberName) {
+  const panel = panels.get(memberName);
+  if (!panel) return null;
+  let box = panel.querySelector(".member-reaction");
+  if (!box) {
+    box = document.createElement("details");
+    box.className = "member-reaction";
+    const summary = document.createElement("summary");
+    summary.textContent = "Reaction (R2)";
+    const body = document.createElement("pre");
+    body.className = "reaction-answer empty";
+    body.textContent = "No reaction yet.";
+    box.appendChild(summary);
+    box.appendChild(body);
+    panel.appendChild(box);
+  }
+  return box.querySelector(".reaction-answer");
+}
+
+function appendReactionText(memberName, text) {
+  const body = ensureReactionBox(memberName);
+  if (!body) return;
+  if (body.classList.contains("empty")) {
+    body.textContent = "";
+    body.classList.remove("empty");
+  }
+  body.textContent += text;
+  body.scrollTop = body.scrollHeight;
+}
+
+function pinSynthesis(text, partial) {
+  let pinned = document.querySelector("#synthesisPanel");
+  if (!pinned) {
+    pinned = document.createElement("article");
+    pinned.id = "synthesisPanel";
+    pinned.className = "member-window synthesis";
+    pinned.innerHTML = `
+      <header class="member-header">
+        <div><div class="member-name">Synthesis</div></div>
+        <div class="member-state">Chair</div>
+      </header>
+      <pre class="member-answer empty">No synthesis yet.</pre>
+    `;
+    grid.prepend(pinned);
+  }
+  const body = pinned.querySelector(".member-answer");
+  body.classList.toggle("empty", !text);
+  body.textContent = text || "No synthesis yet.";
+  body.scrollTop = body.scrollHeight;
+  if (partial) {
+    pinned.querySelector(".member-state").textContent = "Partial";
+  }
 }
 
 function handleEvent(event) {
@@ -97,6 +154,32 @@ function handleEvent(event) {
   if (event.type === "member_error") {
     setPanelState(event.member, "error", "Error");
     setPanelText(event.member, event.error);
+  }
+
+  if (event.type === "reaction_delta") {
+    setPanelState(event.member, "running", "Reacting");
+    appendReactionText(event.member, event.delta);
+  }
+
+  if (event.type === "reaction_finished") {
+    setPanelState(event.member, "done", "Finished");
+  }
+
+  if (event.type === "synthesis_delta") {
+    pinSynthesis("", false);
+    const pinned = document.querySelector("#synthesisPanel .member-answer");
+    if (pinned) {
+      if (pinned.classList.contains("empty")) {
+        pinned.textContent = "";
+        pinned.classList.remove("empty");
+      }
+      pinned.textContent += event.delta;
+      pinned.scrollTop = pinned.scrollHeight;
+    }
+  }
+
+  if (event.type === "synthesis_finished") {
+    pinSynthesis(event.answer, event.partial);
   }
 
   if (event.type === "council_finished") {
@@ -142,6 +225,7 @@ promptForm.addEventListener("submit", async (event) => {
       body: JSON.stringify({
         prompt,
         conversation: conversationInput.value.trim(),
+        rounds: parseInt(roundsInput.value, 10) || 1,
       }),
     });
 
