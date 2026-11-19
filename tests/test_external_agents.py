@@ -830,6 +830,39 @@ def test_external_agent_progress_line_summarizes_json_events() -> None:
     assert _external_agent_progress_line("plain progress\n") == "external_agent_activity: stdout"
 
 
+def test_agent_message_text_survives_past_command_cap() -> None:
+    long_text = "Verdict YES. " + "detail " * 200
+    line = _external_agent_progress_line(
+        json.dumps({"type": "item.completed", "item": {"type": "agent_message", "text": long_text}})
+        + "\n"
+    )
+    assert line is not None
+    assert "Verdict YES." in line
+    assert long_text[-40:] in (line or "")  # tail present: not head-truncated
+    assert "...[truncated]" not in (line or "")
+    assert len(line or "") > 1000
+
+
+def test_command_preview_stays_tight() -> None:
+    long_command = "run " + "x" * 1000
+    line = _external_agent_progress_line(
+        json.dumps(
+            {
+                "type": "item.completed",
+                "item": {
+                    "type": "command_execution",
+                    "command": long_command,
+                    "status": "completed",
+                },
+            }
+        )
+        + "\n"
+    )
+    assert line is not None
+    assert line.endswith("...[truncated]")
+    assert len(line) < 500
+
+
 def test_external_agent_stderr_progress_suppresses_noisy_codex_model_refresh() -> None:
     line = (
         "2026-09-28T08:57:23.532192Z ERROR codex_models_manager::manager: "
