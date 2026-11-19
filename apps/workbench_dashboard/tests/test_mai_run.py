@@ -206,6 +206,22 @@ def test_reported_failure_on_exit_zero_is_failed_not_completed() -> None:
     assert receipt["source"] == "mai-session"
 
 
+def test_intermediate_failure_with_completed_execution_stays_completed() -> None:
+    from mai_run import MaiRunOutcome
+
+    tail = (
+        "coding_session_id: s1\n"
+        "external_agent_warning: intermediate failure (command_execution)"
+        " with complete final result\n"
+        "## **SUMMARY**\n"
+        "- Notes: status=ready; execution_status=completed; "
+        "failure_reason=command_execution\n"
+    )
+    outcome = MaiRunOutcome(exit_code=0, stdout_tail=tail, stderr_tail="")
+    receipt = mai_receipt(outcome, ["prompt"])
+    assert receipt["status"] == "completed"
+
+
 def test_facts_survive_tail_truncation() -> None:
     def runner(argv):
         print("coding_session_id: s1")
