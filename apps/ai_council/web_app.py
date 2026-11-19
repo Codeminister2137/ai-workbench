@@ -153,6 +153,9 @@ class CouncilRequestHandler(SimpleHTTPRequestHandler):
             conversation = payload.get("conversation", "")
             if not isinstance(prompt, str) or not isinstance(conversation, str):
                 raise InvalidRequest(400, "Prompt and conversation must be strings")
+            rounds = payload.get("rounds", 1)
+            if isinstance(rounds, bool) or not isinstance(rounds, int) or rounds not in (1, 2, 3):
+                raise InvalidRequest(400, "Rounds must be 1, 2, or 3")
             prompt = prompt.strip()
             conversation = conversation.strip() or None
             if not prompt:
@@ -174,7 +177,7 @@ class CouncilRequestHandler(SimpleHTTPRequestHandler):
 
         try:
             council = LocalCouncil(config, store)
-            for event in council.ask_events(prompt, conversation_name=conversation):
+            for event in council.ask_events(prompt, conversation_name=conversation, rounds=rounds):
                 self._write_event(event)
         finally:
             store.close()
