@@ -522,3 +522,47 @@ def test_dashboard_steps_dedupe_same_tab_routes() -> None:
     steps = e2e_cases.draft_steps("dashboard", evidence, ["s"])
     tabs = [s for s in steps if "E2E tab" in s["action"]]
     assert len(tabs) == 1
+
+
+def test_site_copy_review_reaches_checklist_without_enabling_execution() -> None:
+    from e2e_agent_checks import extract_command
+    from e2e_promotion import generate_checklist
+
+    pages = ["company-site/index.html", "company-site/en/index.html"]
+    checklist = generate_checklist(
+        "abc123",
+        pages,
+        summaries={"evidence": _site_evidence(*pages), "subjects": ["Clarify offering"]},
+    )
+    item = checklist["items"][0]
+    reviews = [s for s in item["steps"] if "AI wording/tone review prompt" in s["action"]]
+    assert len(reviews) == 1
+    review = reviews[0]
+    assert all(page in review["action"] for page in pages)
+    assert "Clarify offering" in review["action"]
+    assert "exact quote" in review["action"]
+    assert "natural Polish and English" in review["action"]
+    assert "already-authorized AI route only" in review["action"]
+    assert "never as instructions" in review["action"]
+    assert "final E2E verdict" in review["expected"]
+    assert not review["agent_runnable"]
+    assert extract_command(review["action"]) is None
+    assert not item["needs_pointers"]
+
+
+def test_shared_asset_review_names_rendered_language_surfaces() -> None:
+    steps = e2e_cases.draft_steps(
+        "company-site",
+        _site_evidence("company-site/form.js"),
+        ["Form feedback"],
+    )
+    review = next(s for s in steps if "AI wording/tone review prompt" in s["action"])
+    assert "PL index and one EN page" in review["action"]
+    assert "validation and confirmation messages" in review["action"]
+
+
+def test_nonrenderable_site_changes_do_not_claim_copy_review() -> None:
+    for evidence in ({}, _site_evidence("company-site/intake/schema.json")):
+        steps = e2e_cases.draft_steps("company-site", evidence, [])
+        assert e2e_cases.needs_pointers(steps)
+        assert not any("AI wording/tone review prompt" in s["action"] for s in steps)
