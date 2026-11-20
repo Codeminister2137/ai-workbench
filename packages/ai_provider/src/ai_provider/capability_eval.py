@@ -2,8 +2,9 @@
 
 Run explicitly selected catalog routes with ``python -m ai_provider.capability_eval``.
 Only synthetic inputs leave the process. Native schema probing currently covers
-Ollama and the native Codex output-schema protocol; other adapters report unknown
-rather than equating prompted JSON with schema-constrained output. Native Codex
+Ollama, OpenAI-compatible Chat Completions and the native Codex output-schema
+protocol; other adapters report unknown rather than equating prompted JSON with
+schema-constrained output. Native Codex
 uses one bounded invocation with fresh allowance pre/postflight readings.
 This is capability smoke evidence, not quality scoring.
 """
@@ -19,6 +20,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from ai_provider.adapters.ollama import OllamaChatClient
+from ai_provider.adapters.openai_compatible import OpenAICompatibleChatClient
+from ai_provider.adapters.opencode_go import OpenCodeGoChatClient
+from ai_provider.adapters.openrouter import OpenRouterFreeChatClient
 from ai_provider.config import BackendConfig, ProviderKind
 from ai_provider.contracts import (
     AIMessage,
@@ -51,6 +55,40 @@ class SchemaProbeOllamaClient(OllamaChatClient):
         if request.metadata.get("capability_schema_probe"):
             payload["format"] = SCHEMA
         return payload
+
+
+class SchemaProbeOpenAIClient(OpenAICompatibleChatClient):
+    """Eval-only strict JSON schema extension for Chat Completions."""
+
+    def _chat_payload(self, request: AIRequest, *, stream: bool) -> dict:
+        payload = super()._chat_payload(request, stream=stream)
+        if request.metadata.get("capability_schema_probe"):
+            payload["response_format"] = {
+                "type": "json_schema",
+                "json_schema": {"name": "capability_probe", "strict": True, "schema": SCHEMA},
+            }
+        return payload
+
+
+class SchemaProbeOpenCodeClient(SchemaProbeOpenAIClient, OpenCodeGoChatClient):
+    """Keep OpenCode session and protocol behavior for schema probes."""
+
+
+class SchemaProbeOpenRouterClient(SchemaProbeOpenAIClient, OpenRouterFreeChatClient):
+    """Keep OpenRouter's free-only and privacy admission for schema probes."""
+
+
+def create_probe_client(config: BackendConfig) -> ChatClient:
+    """Select eval extensions only for supported factory-selected protocols."""
+    client = create_chat_client(config)
+    extensions = {
+        OllamaChatClient: SchemaProbeOllamaClient,
+        OpenAICompatibleChatClient: SchemaProbeOpenAIClient,
+        OpenCodeGoChatClient: SchemaProbeOpenCodeClient,
+        OpenRouterFreeChatClient: SchemaProbeOpenRouterClient,
+    }
+    extension = extensions.get(type(client))
+    return extension(config) if extension is not None else client
 
 
 @dataclass(frozen=True)
@@ -130,7 +168,9 @@ def probe(client: ChatClient, route_id: str, capability: str) -> Verdict:
             )
             status = "pass" if passed else "fail"
             detail = "one exact named call and integer argument required; no tool executed"
-        elif capability == "structured_output" and isinstance(client, SchemaProbeOllamaClient):
+        elif capability == "structured_output" and isinstance(
+            client, (SchemaProbeOllamaClient, SchemaProbeOpenAIClient)
+        ):
             response = client.complete(request)
             try:
                 value = json.loads(response.message.content)
@@ -142,7 +182,12 @@ def probe(client: ChatClient, route_id: str, capability: str) -> Verdict:
                 and type(value.get("answer")) is int
             )
             status = "pass" if passed else "fail"
-            detail = "Ollama native format schema; exact object with integer answer required"
+            protocol = (
+                "Ollama native format schema"
+                if isinstance(client, SchemaProbeOllamaClient)
+                else "OpenAI-compatible response_format JSON schema"
+            )
+            detail = f"{protocol}; exact object with integer answer required"
         elif capability != "structured_output":
             raise ValueError(f"Unknown capability: {capability}")
     except ProviderError as exc:
@@ -208,11 +253,7 @@ def main() -> None:
                 timeout_seconds=90,
                 require_free_model=row.get("cost_policy_tier") == "free_only",
             )
-            client = (
-                SchemaProbeOllamaClient(config)
-                if config.provider is ProviderKind.OLLAMA
-                else create_chat_client(config)
-            )
+            client = create_probe_client(config)
             for capability in ("tools", "streaming", "structured_output"):
                 result = probe(client, row["route_id"], capability)
                 sink.write(json.dumps(asdict(result)) + "\n")
