@@ -148,6 +148,78 @@ No worker, VM, AppContainer profile or ACL grant was created by this investigati
 
 ## Proving checks required before enforcement completion
 
+### Restricted proxy transport selected and proved (2026-11-20)
+
+Owner approved a model proxy and the four-phase rollout on inbox
+`d5e377d5139e48e6bf4753b2030c006c`, then selected **B: restricted network
+proxy** on `d2780a18acf840c7960ab9c1800b924f`. This explicitly replaces
+`network none` for the future inference-enabled worker with restricted
+networking. The owner also requested consideration of Docker Compose because
+it is familiar and manages container networks. No further rationale for B
+was supplied. Existing provider/privacy/billing admission remains binding.
+
+Compose is suitable for this transport: one project per run, a worker and
+its inference endpoint on an `internal` bridge with IPv4/IPv6 gateway mode
+`isolated`, no published ports, no default network, and no Docker socket.
+An ordinary internal bridge is insufficient: its host bridge address can expose
+host listeners. Isolated mode removes that address. These options require a
+supporting Docker Engine; failure must refuse execution, never weaken the network.
+Both services keep non-root, read-only root, dropped capabilities,
+no-new-privileges and CPU/memory/PID limits.
+
+`apps/workbench_dashboard/inference_proxy.py` implements the narrow HTTP
+endpoint: one run/model fixed by trusted composition, bearer capability with
+expiry/revocation, bounded message-only JSON, bounded replies, and redacted
+failures. It has no URL forwarding, CONNECT, dashboard API or worker-selected
+provider/model. Tokens/prompts are not access-logged. The trusted completion
+callback must retain existing inference admission, cancellation and timeout
+policy. Revocation denies subsequent admission; it does not cancel work already
+admitted. Responses are currently buffered; streaming is not implemented.
+
+`scripts/docker-proxy-probe.py` generates an exact Compose JSON recipe and
+exercises this endpoint with synthetic completions only. It uses the existing
+approved image pinned by digest, refuses pulls, retains receipts, and removes
+its unique project in `finally`. Synthetic tokens are public test fixtures,
+never production capabilities. The probe does not mount a checkout, provider
+credentials or host state; only the endpoint source is mounted read-only.
+
+Native evidence on Docker Desktop Engine 29.2.1 / Compose 5.1.0: inference HTTP
+succeeded; wrong token, foreign run, dashboard paths, absolute forwarding URLs,
+CONNECT, upstream selection and oversized requests were refused. Direct public
+IP, external DNS, host dashboard/gateway/loopback and a live host sentinel were
+unreachable. A separate trusted bridge control first verified that the same
+loopback sentinel was reachable through Docker Desktop. No default route and
+the network's internal/isolated settings were independently checked. Cleanup
+verified no remaining project containers or networks. Evidence is retained under
+`artifacts/docker-proxy-ad7784-host-control/receipt.json` (and the final proof
+receipt named in the source-item resolution). This is bounded transport evidence,
+not resistance to kernel/runtime exploits or every possible network attack.
+
+Private plans inspected: `os-isolation-integration.md` is the relevant design,
+but its saved text is truncated and its localhost/network-none proposal is
+superseded by this answer. `mai-dashboard-wiring-plan.md` and
+`interactive-mai-plan.md` provide executor/chat context; they do not override
+the accepted transport. Unrelated business/provider/evaluation plans were skipped.
+
+The transport decision item may close as **decided and transport-proved**.
+Full production integration remains **INCOMPLETE**: the callback has not been
+wired to host inference admission across this network, nor have drain/chat,
+native-client routing, private workspace import/export, streaming/cancellation,
+artifact mediation and the full containment matrix been proved. No production
+default is enabled. Keep the design-rollout and original enforcement sources
+answered/open; the next action is to implement that admitted host/executor bridge
+and run the approved four-phase rollout. Do not interpret this transport closeout
+as completion of those separate sources.
+
+Sources checked for the selected network on 2026-11-20:
+
+- [Docker gateway modes](https://docs.docker.com/engine/network/port-publishing/#gateway-modes)
+  documents `isolated` on internal networks and the removed bridge address.
+- [Compose networking](https://docs.docker.com/compose/how-tos/networking/)
+  documents service discovery and isolated internal network composition.
+
+### Remaining full enforcement matrix
+
 All checks below are **planned, not executed**. Mocks establish composition only;
 native checks must run under the actual selected OS boundary.
 
