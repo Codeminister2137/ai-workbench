@@ -855,9 +855,12 @@ Never hard-code:
 Use approved environment/configuration mechanisms.
 
 Never claim a credential is missing without first checking configured names
-(repo `.env` via the names-only loader plus process env); stale docs are not
-evidence of absence. When a record says "blocked on account/key" and the names
-exist, correct the record instead of repeating the claim.
+(repo `.env` via `ai_provider.secrets.secret_status` / `dotenv_names` on the
+venv Python, plus process env); never regex the store, and never infer
+absence from a failed read — cite the verdict reason (missing, empty,
+duplicate, unreadable, missing-file). Stale docs are not evidence of absence.
+When a record says "blocked on account/key" and the names exist, correct the
+record instead of repeating the claim.
 
 Do not send user data to cloud providers unless the architecture and task permit it.
 

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Collection, Iterator
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
@@ -99,6 +100,54 @@ def load_dotenv(root: Path | None = None, *, override: bool = False) -> tuple[st
         os.environ[name] = value
         loaded.append(name)
     return tuple(loaded)
+
+
+@dataclass(frozen=True, slots=True)
+class SecretStatus:
+    """Presence verdict for one secret name; never carries the value.
+
+    ``present`` is True only for exactly one non-empty assignment.
+    ``reason`` names the outcome (``ok``, ``missing-file``,
+    ``unreadable``, ``missing``, ``empty``, ``duplicate``) so absence
+    claims always cite a verified cause instead of a failed read.
+    """
+
+    name: str
+    present: bool
+    reason: str
+    path: str
+
+
+def secret_status(path: Path, name: str) -> SecretStatus:
+    """Check one secret's presence without exposing its value.
+
+    The canonical credential check for agents and diagnostics: never
+    regex the store, never infer absence from an exception elsewhere.
+    """
+    location = str(path)
+    try:
+        text = Path(path).read_text(encoding="utf-8-sig")
+    except FileNotFoundError:
+        return SecretStatus(name, False, "missing-file", location)
+    except (OSError, UnicodeError):
+        return SecretStatus(name, False, "unreadable", location)
+    matches = [value for key, value in _iter_assignments(text) if key == name]
+    if not matches:
+        return SecretStatus(name, False, "missing", location)
+    if len(matches) > 1:
+        return SecretStatus(name, False, "duplicate", location)
+    if not matches[0]:
+        return SecretStatus(name, False, "empty", location)
+    return SecretStatus(name, True, "ok", location)
+
+
+def dotenv_names(path: Path) -> tuple[str, ...]:
+    """List secret NAMES in a store; pure read, no env side effects."""
+    try:
+        text = Path(path).read_text(encoding="utf-8-sig")
+    except (OSError, UnicodeError):
+        return ()
+    return tuple(dict.fromkeys(key for key, _value in _iter_assignments(text)))
 
 
 def read_secret_key(path: Path, name: str, *, label: str) -> str:

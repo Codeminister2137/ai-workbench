@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import urllib.error
 import urllib.request
 from collections.abc import Callable
@@ -64,6 +65,9 @@ def _read_env_or_dotenv(name: str) -> str | None:
     try:
         from ai_provider.secrets import read_secret_key
     except ImportError:
+        # Never conflate an unavailable reader with a missing key:
+        # warn loudly so diagnostics check the reader, not the store.
+        print(f"vendor_sources: ai_provider secrets reader unavailable for {name}", file=sys.stderr)
         return None
     try:
         return read_secret_key(
