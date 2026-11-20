@@ -257,6 +257,24 @@ def test_snapshot_detects_same_size_edits_and_deletion(tmp_path):
     assert changed_paths(after, workspace_fingerprints(tmp_path)) == ["RESEARCH_test.md"]
 
 
+def test_snapshot_excludes_scratch_but_keeps_ignored_reports(tmp_path):
+    scratch = tmp_path / ".tmp" / "run-worktrees" / "old"
+    scratch.mkdir(parents=True)
+    (scratch / "source.py").write_text("before")
+    reports = tmp_path / "artifacts"
+    reports.mkdir()
+    report = reports / "report.md"
+    report.write_text("before")
+    (tmp_path / ".gitignore").write_text("artifacts/\n")
+    before = workspace_fingerprints(tmp_path)
+    assert not any(path.startswith(".tmp/") for path in before)
+    assert "artifacts/report.md" in before
+    (scratch / "source.py").write_text("after")
+    assert workspace_fingerprints(tmp_path) == before
+    report.write_text("after")
+    assert changed_paths(before, workspace_fingerprints(tmp_path)) == ["artifacts/report.md"]
+
+
 def test_review_budget_stops_repair_before_deadline(run, monkeypatch):
     monkeypatch.setattr(cli.time, "perf_counter", lambda: 950.0)
 

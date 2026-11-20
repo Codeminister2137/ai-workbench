@@ -16,6 +16,47 @@ suites = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(suites)
 
 
+def _affected_prototype():
+    spec = importlib.util.spec_from_file_location(
+        "affected_prototype", SCRIPT.with_name("affected-tests-prototype.py")
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "pyproject.toml",
+        "conftest.py",
+        "deleted.py",
+        "scripts/run-tests.py",
+        "apps/ai_council/tests/test_deleted.py",
+    ],
+)
+def test_affected_prototype_unknown_changes_keep_full_gate(path):
+    groups = suites.suite_files()
+    selection = _affected_prototype().select_groups([path], groups)
+    assert set(selection["groups"]) == set(groups) - {"live"}
+    assert selection["shadow_only"] is True
+
+
+def test_affected_prototype_preserves_consumers_and_test_ownership():
+    groups = suites.suite_files()
+    prototype = _affected_prototype()
+    selection = prototype.select_groups(["packages/ai_agent/src/ai_agent/cli.py"], groups)
+    assert set(selection["groups"]) == set(groups) - {"live", "council", "job-search"}
+    selection = prototype.select_groups(["tests/test_repair_progress.py"], groups)
+    assert selection["groups"] == ["orchestrator"]
+    selection = prototype.select_groups(
+        ["tests/test_repair_progress.py", "removed_test.py"], groups
+    )
+    assert set(selection["groups"]) == set(groups) - {"live"}
+    assert prototype.select_groups([], groups)["groups"] == []
+
+
 class TestSuiteSelection:
     def test_child_environment_drops_repository_overrides_without_mutating_parent(
         self, monkeypatch

@@ -7,6 +7,7 @@ from pathlib import Path
 # Runtime bookkeeping must not turn an otherwise ineffective repair into progress.
 _RUNTIME_DIRS = {
     ".git",
+    ".tmp",
     ".venv",
     "venv",
     "env",
@@ -30,8 +31,9 @@ def workspace_fingerprints(root: Path) -> dict[str, str]:
     """Hash workspace files without following links or applying Git ignore rules.
 
     Reports remain visible even outside Git. Logs, databases, caches, and IDE
-    bookkeeping are excluded. Read errors are explicit evidence, never silently
-    interpreted as a successful edit. File contents remain local.
+    bookkeeping and scratch trees (.tmp) are excluded. Read errors are explicit
+    evidence, never silently interpreted as a successful edit. File contents
+    remain local.
     """
     result: dict[str, str] = {}
 

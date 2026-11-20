@@ -146,8 +146,69 @@ and [class node IDs and markers](https://docs.pytest.org/en/stable/example/marke
 
 ## CI recommendation and decision boundary
 
-The current approximately one-minute offline gate is manageable for a single
-developer. Keep focused local checks plus the full pre-push gate. No extra test
+### Family-5 follow-up (2026-11-20; adoption pending)
+
+Repair fingerprints now prune `.tmp` scratch trees before traversal. Ignored
+`artifacts/` reports remain repair evidence. The prior Family-5 main-checkout
+measurement was 639s workspace / about 652s total; it included 135 scratch
+worktrees, so comparisons with a fresh scratch checkout are not controlled.
+
+Saved follow-up trial logs (`.tmp/family5-trial/serial.log` and `xdist.log`)
+record 407.8s serial versus 86.3s with eight workers for workspace execution.
+Both have four failures: two documentation checks require ignored local assets,
+one dashboard check expects a different invalid-step error, and one HTTP rejection
+check encounters a connection reset whose exact mechanism remains unresolved.
+The serial run reports 5,294 workspace passes versus 5,289 in the parallel run;
+the count discrepancy also needs reconciliation before equivalence is claimed.
+Council (74) and job-search (249) pass in both logs. These are saved trial
+observations, not a fresh full-suite validation or a controlled speedup claim.
+The reviewed `a2e96522dbeb` worktree is absent at follow-up inspection; its
+pruning receipt and preserved isolation proof are under `.tmp/family5-trial/`.
+
+`scripts/affected-tests-prototype.py --base <commit>` prints shadow group
+recommendations for the committed diff to HEAD. It executes nothing and is not
+wired into hooks. Working-tree edits are outside that comparison. Renames are
+treated as delete/add; unknown paths, missing test owners, shared provider and
+orchestrator code, scripts and configuration select every offline group. Agent
+and dashboard changes select every workspace group; application changes also
+keep workspace consumers. Live suites retain their explicit opt-ins.
+
+Historical inclusion check (current manifest, fixing diffs; not failure replay):
+
+| Fix / recorded failure | Failure modules selected | Selected / offline modules |
+| --- | --- | --- |
+| `21f349a`: streamed-poll and sleep acknowledgement flakes | 2/2 | 168/341 |
+| `8f57706`: pre-push EOF/401 race (`docs/session-history.md`) | 1/1 | 69/341 |
+| `74a4ced`: hook Git-environment contamination (new regression module only) | 1/1 regression | 341/341 |
+
+The historical failure sample is 3/3, plus one included new regression module.
+This convenience sample has fixing-diff/test-edit bias. It demonstrates
+module inclusion, not that selected tests reproduce historical failures, nor
+that ownership describes all runtime dependencies. Selection is unsuitable as
+a replacement gate without prospective shadow comparisons against full results,
+including source-only changes, cross-component consumers and missed failures.
+The full suite remains required under the existing policy.
+
+G3 decision needed: retain local full gates with shadow evaluation, adopt
+affected pre-push selection, or authorize a CI spike. A local shadow evaluation
+adds no service or access boundary but retains gate cost. Affected pre-push
+selection can reduce repeated work but risks omissions and needs stronger recall
+evidence plus a defined full-suite merge rule. A GitHub Actions spike provides
+independent reporting but requires a clean-checkout test contract and an explicit
+runner/data boundary. Hosted runners lack ignored local assets; a runner on the
+owner PC retains its resource contention and exposes it to workflow code.
+[GitHub documents persistent compromise risk on self-hosted runners](https://docs.github.com/en/actions/reference/security/secure-use).
+Jenkins offers local control but adds controller/service maintenance; defer it
+without a requirement GitHub Actions cannot meet.
+
+Technical recommendation: retain the serial full gate and gather prospective
+shadow evidence first. Do not adopt eight-worker execution on one red trial.
+Question for the owner: retain local full + shadow evaluation, adopt affected
+pre-push selection with a full merge gate despite limited evidence, or authorize
+a GitHub Actions design spike? What constraint drives the choice?
+
+At the October checkpoint, the approximately one-minute offline gate was manageable
+for a single developer. That decision retained focused local checks plus the full pre-push gate. No extra test
 plugin, Jenkins installation, service, account, or remote runner was introduced.
 The owner accepted this recommendation on 2026-10-05. Jenkins and hosted CI are
 deferred until a concrete requirement justifies their infrastructure and access.
