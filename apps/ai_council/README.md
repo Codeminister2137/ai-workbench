@@ -23,25 +23,33 @@ Alpaca paper as the first broker. ADR-093 permits autonomous simulated decisions
 and requires inspectable records, including holds, rejections and failures.
 It does not select an execution universe or authorize paid services/live orders.
 
-Implemented: three investor profiles, synthetic price fixtures, allocation parsing,
-a deterministic stub judge and portfolio comparison metrics. Live-data source
-selection and coverage research have landed; a live-data adapter, council-backed
-judge, broker execution loop and durable Investor journal have not.
+Implemented: three profiles, synthetic fixtures, stub judging, portfolio metrics,
+and an offline decision journal in Council SQLite (owner answer A, inbox
+`713fe10d90de4e20abf32e175006c234`). See
+[ADR-097](../../docs/decisions/ADR-097-investor-offline-journal.md).
 
-Proposed next slice (pending owner choice): offline decision recording and replay
-over identical fixture snapshots for all profiles, using an injected deliberation
-implementation. Capture run/profile/prompt versions, observation and decision
-times, source references, proposed allocations, rationale, uncertainty,
-alternatives and risk outcomes. Preserve original decisions and link later
-assessments. Test success, hold, rejection and failure records, replay isolation
-from future observations, and allocation limits. This is a software-correctness
-slice; model quality and connected paper operation require later acceptance.
+`investor.replay.record_decision` accepts an injected callback returning a
+`Proposal`, explicit run/profile/prompt versions and timestamped `Observation`
+fixtures. Only observations available at decision time reach the callback.
+Records retain profile/model configuration, evidence, rationale, uncertainty,
+alternatives, risk checks and simulation assumptions. Empty allocations mean
+hold; unknown symbols, negative weights, excessive total allocation and profile
+position-limit breaches are rejected. Callback failures record the exception
+class, excluding its potentially sensitive message.
 
-Storage is a pending decision: extending Council SQLite keeps one local store
-but changes its schema; a separate append-only JSONL journal isolates Investor
-records but needs its own replay, integrity and lifecycle handling. Recommend
-Council SQLite with additive decision/outcome tables, pending owner approval.
-See dashboard owner gate `investor-decision-journal-storage`.
+`replay(store, run_id)` evaluates saved allocations without invoking deliberation;
+profiles at the same decision time must use identical observations. Accepted
+weights are complete targets (omitted fixture symbols become zero); holds,
+rejections and failures retain existing holdings. Fixtures must retain the held
+symbol universe. `assess` appends later outcomes/lessons linked to immutable
+original decisions. Both tables prohibit updates/deletes; this is application
+integrity, not protection from someone who can modify the SQLite file.
+
+This slice has no live adapter, council-backed judge or broker execution loop.
+Tests establish software correctness, not model quality or paper profitability.
+Injected callbacks own their privacy and inference authorization; the built-in
+fixture tests use deterministic callbacks. Do not put secrets/private transcripts
+in proposals or assessments.
 
 ## Requirements
 
