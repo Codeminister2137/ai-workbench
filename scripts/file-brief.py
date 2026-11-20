@@ -4,7 +4,9 @@
 Decision briefs filed with free-text "Options: A) ... B) ..." force the
 owner (or AI) to reconstruct the choices. This helper requires explicit
 --option values for decision items so the dashboard renders multi-choice
-directly from the record.
+directly from the record. Decisions additionally require one --tradeoff
+per option plus --recommend/--recommendation, so briefs always carry
+the pros/cons and recommendation the writing rules demand.
 """
 
 from __future__ import annotations
