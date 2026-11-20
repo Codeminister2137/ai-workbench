@@ -152,7 +152,7 @@ def test_auto_checks_persist_invalid_step_and_continue(monkeypatch):
     monkeypatch.setattr(handler, "_attach_step_evidence", attach)
     handler._auto_run_pending_checks("task")
     assert saved == [("task", record)]
-    assert steps[0]["evidence"] == "[auto-check skipped: invalid step]"
+    assert steps[0]["evidence"] == "[auto-check failed: private detail]"
     assert steps[0]["evidence_utc"]
     assert steps[0]["evidence_exit"] is None
     assert steps[1]["evidence"] == "passed"
