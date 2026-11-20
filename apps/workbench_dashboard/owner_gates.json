@@ -5,7 +5,10 @@
       "title": "Investor: choose decision-journal storage for offline replay slice",
       "type": "decision",
       "body": "Accepted A: Offline slice using Council SQLite. Owner source 713fe10d90de4e20abf32e175006c234. ADR-097 records the decision. Additive immutable decisions and linked outcomes, injected offline recording/replay, time isolation and allocation checks implemented. Connected execution and model quality remain future acceptance.",
-      "options": ["A: Offline slice using Council SQLite", "B: Offline slice using separate JSONL"]
+      "options": [
+        "A: Offline slice using Council SQLite",
+        "B: Offline slice using separate JSONL"
+      ]
     },
     {
       "id": "family5-gate-ci-adoption",
@@ -33,7 +36,10 @@
       "title": "Investor: choose asset scope and paper autonomy policy",
       "type": "decision",
       "body": "Alpaca paper is selected (ADR-092, source inbox d50c644d9f8c44b992f1d6c83d13fe87). Decision needed: initial asset universe, additional broker research and human approval for paper orders. Multiple brokers can broaden coverage but add credentials, data entitlements, different fill assumptions and maintenance. A: Start with a small Alpaca-supported universe and human review while defining bounded autonomous paper trials. Pro: simpler, faster and uses free paper access. Con: narrower coverage and staged automation. B: Research broader asset classes and multiple paper brokers first. Pro: coverage informs design. Con: delays experiments and needs current free-API/eligibility verification. Recommendation: A, expanding for demonstrated gaps. Question: A or B, which assets, and what approval should paper orders require? Owner goal: experiment with autonomous and human-in-the-loop investing without cost. Free paper access does not guarantee free inference, data or infrastructure. No paid service, funded account or live orders approved.",
-      "options": ["A: Small Alpaca universe first", "B: Broader coverage research first"]
+      "options": [
+        "A: Small Alpaca universe first",
+        "B: Broader coverage research first"
+      ]
     },
     {
       "body": "Decision needed: create the read-only service account so the dashboard can read Go usage windows.\n\nWhy it matters: the .env key is the Go INFERENCE key, proven 403 on all usage endpoints (2026-11-17). Only a console service-account key (or a browser-cookie session) can read the 5h/weekly/monthly windows. Extra Usage is OFF, so headroom reads literally once wired.\n\nSteps (verified against dev.opencode.ai/docs/console/api):\n1. Console > Settings > Service accounts > Add Service Account, name e.g. workbench-usage.\n2. Open it > Add API Key, name e.g. usage-read.\n3. Permissions: Restricted with Usage set to Read (tightest), or Read only. Expiry: Never (or 365d custom + rotation note).\n4. Copy the key ONCE (shown once, oc_sk_... prefix afterwards).\n\nThen paste it here as your answer (or add OPENCODE_USAGE_KEY=<key> to .env yourself). Do NOT overwrite OPENCODE_API_KEY. Read-only keys cannot call models; usage counts to the service account's own budget; revocable anytime.\n\nTechnical recommendation: Restricted + Usage/Read + Never expiry.\nQuestion: paste the key, or say cookie-path.",
@@ -68,7 +74,7 @@
       ]
     },
     {
-      "body": "Decision needed: where Mai supervision lives and what it may do unattended.\n\nWhy it matters: the drain executes queued runs while the owner is away, but supervision is scattered (supervisor tick, probe, mail notify, boot reconcile) with no single authority for pause/kill/page.\n\nOptions:\nA: Dashboard-native supervisor (recommend). Pro: single authority; tick + reconcile already there. Con: dashboard must run (supervised).\nB: Mai-side supervision. Pro: closer to the work. Con: split authority; new protocol.\nC: Keep scattered + document. Pro: nothing now. Con: gaps stay.\n\nAuthority sub-decision: pause-only, or pause + kill + page (needs mail-noise rules)?\n\nTechnical recommendation: A with full authority + mail-noise rules.\nQuestion: A, B, or C \u2014 and pause-only or full authority?",
+      "body": "Decision needed: where Mai supervision lives and what it may do unattended.\n\nWhy it matters: the drain executes queued runs while the owner is away, but supervision is scattered (supervisor tick, probe, mail notify, boot reconcile) with no single authority for pause/kill/page.\n\nOptions:\nA: Dashboard-native supervisor (recommend). Pro: single authority; tick + reconcile already there. Con: dashboard must run (supervised).\nB: Mai-side supervision. Pro: closer to the work. Con: split authority; new protocol.\nC: Keep scattered + document. Pro: nothing now. Con: gaps stay.\n\nAuthority sub-decision: pause-only, or pause + kill + page (needs mail-noise rules)?\n\nTechnical recommendation: A with full authority + mail-noise rules.\nQuestion: A, B, or C — and pause-only or full authority?",
       "id": "mai-supervision",
       "title": "Mai supervision: placement, authority, paging?",
       "type": "decision",
@@ -79,7 +85,7 @@
       ]
     },
     {
-      "body": "Decision needed: unblock the company-site launch tracks or explicitly defer them.\n\nWhy it matters: shell + intake live, but launch is gated on deliberation: (1) public naming (R6; research on 'Company names' awaits CLOSE/RE-RUN), (2) offering details, (3) pricing.\n\nOptions:\nA: Deliberate now, track by track (recommend starting with naming). Pro: unblocks the top product. Con: owner time.\nB: Defer with a date. Pro: focus stays. Con: site stays a shell.\nC: Park P7 entirely. Pro: clarity. Con: drops the client channel.\n\nTechnical recommendation: A for naming, B with a date for offering/pricing if full.\nQuestion: A, B, or C \u2014 and if A, naming first?",
+      "body": "Decision needed: unblock the company-site launch tracks or explicitly defer them.\n\nWhy it matters: shell + intake live, but launch is gated on deliberation: (1) public naming (R6; research on 'Company names' awaits CLOSE/RE-RUN), (2) offering details, (3) pricing.\n\nOptions:\nA: Deliberate now, track by track (recommend starting with naming). Pro: unblocks the top product. Con: owner time.\nB: Defer with a date. Pro: focus stays. Con: site stays a shell.\nC: Park P7 entirely. Pro: clarity. Con: drops the client channel.\n\nTechnical recommendation: A for naming, B with a date for offering/pricing if full.\nQuestion: A, B, or C — and if A, naming first?",
       "id": "p7-unblock",
       "title": "P7 unblock pack: deliberate or defer?",
       "type": "decision",
@@ -156,6 +162,16 @@
       "options": [
         "Keep Mai: record evidence",
         "Roll back to Muse: record reason"
+      ]
+    },
+    {
+      "id": "proxy-host-connection-boundary",
+      "title": "Host-side proxy: filtered direct connection or isolated-network relay?",
+      "type": "decision",
+      "body": "Decision needed: connection containment for the accepted B host-side inference proxy (source 98654698af0b458492b0bb74ddd3c5e3). B remains accepted; this does not reopen container versus host deployment.\nWhy it matters: the proven internal/isolated worker network blocks host listeners. Host-gateway address mapping does not itself restrict destination ports. Bearer authentication protects the inference endpoint, not other host services. Native host-side containment has not been proved.\nD: Filtered direct host connection. Pro: direct HTTP follows the original brief and avoids a relay. Con: platform-specific filtering, potentially privileged setup and rollback, plus IPv4/IPv6 bypass proof; hostname mapping alone is insufficient.\nR: Host-initiated relay on the isolated worker network. Pro: preserves worker isolation from host listeners while keeping provider credentials/admission on the host. Con: adds a relay protocol/component and bounded mediation, cancellation and cleanup work; exact transport needs design.\nTechnical recommendation: R, because it preserves the proved worker network and avoids relying on new host-wide filtering. This recommendation is not an owner decision.\nQuestion: approve R, or select D with network-policy setup scope? What constraint drives the choice?\nAI next: implement the selected connection, prove positive synthetic inference and negative host/public/DNS/foreign-run access and lifecycle cleanup, then perform separately admitted provider acceptance. Keep source 98654698 open until proved. See docs/decisions/ADR-095-provider-neutral-worktree-write-isolation.md, host-side section.\nInstruction audit: AGENTS.md and docs/workflow.md already require each option's pros AND cons and a recommendation. The original brief failed those rules; file-brief.py validates option count, not semantic completeness.",
+      "options": [
+        "D: Filtered direct host connection",
+        "R: Host-initiated isolated-network relay (recommended)"
       ]
     }
   ]

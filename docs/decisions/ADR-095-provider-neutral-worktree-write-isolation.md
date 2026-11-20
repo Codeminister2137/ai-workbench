@@ -218,6 +218,82 @@ Sources checked for the selected network on 2026-11-20:
 - [Compose networking](https://docs.docker.com/compose/how-tos/networking/)
   documents service discovery and isolated internal network composition.
 
+### Host-side provider proxy selected; connection boundary pending (2026-11-20)
+
+Owner selected **B: host-side proxy** on inbox
+`98654698af0b458492b0bb74ddd3c5e3`, adding: "I think B, but this decision
+needs better pros/cons. Also check our brief instructions cause lack of thos
+in decisions is bad". This accepts the deployment direction, not a waiver of
+the host-listener containment requirements. No further owner rationale was
+supplied; keeping credentials on the host is a technical benefit, not an
+attributed owner motive.
+
+The original brief's recommendation of A is superseded by the owner's B.
+The omitted trade-offs are:
+
+| Option | Benefits | Costs and risks |
+| --- | --- | --- |
+| A: egress-allowlisted proxy container | Compose owns lifecycle; provider client is isolated from host processes; worker can retain its internal network. | Credentials enter the proxy container; provider DNS/CDN changes complicate destination restrictions; Compose alone does not implement an API-host allowlist; additional filtering and proof are required. |
+| B: host-side proxy (accepted) | Provider credentials and existing admission remain on the host; avoids provider egress and credential distribution in containers. | Adds host process lifecycle and a worker-to-host connection; a host-gateway mapping alone does not restrict destination ports or preserve denial of other host listeners. Windows/Docker Desktop reachability and filtering need native proof. |
+| C: defer real inference | Preserves the already-proved synthetic boundary and avoids premature credential exposure. | Does not deliver real worker inference or advance production rollout. |
+
+Technical recommendation: retain accepted B, with explicit connection
+containment. The initial statement that worker threat posture is equivalent
+under A and B was unsupported: equivalence depends on proving the connection
+controls, not merely trusting the host.
+
+**BLOCKED for implementation and final source closure:** the existing isolated
+bridge deliberately removes the host bridge address. Replacing it with ordinary
+host reachability changes the proven boundary. Bearer authentication protects
+the inference endpoint but cannot block requests to unrelated host services.
+Do not add unrestricted host-gateway reachability as an implementation detail.
+
+Decision needed: choose how to connect the worker to accepted host-side
+inference while preserving denial of other host listeners and public egress.
+
+- **D: filtered direct host connection.** Benefit: follows the source brief's
+  direct HTTP topology and avoids a relay. Cost: platform-specific network
+  policy, potentially privileged setup, lifecycle/rollback and native IPv4/IPv6
+  bypass proof; mapping a hostname is insufficient.
+- **R: host-initiated relay on the isolated worker network.** Benefit: worker
+  need not receive a route to host listeners; host still owns credentials and
+  provider calls. Cost: an additional relay protocol/component, bounded request
+  and response mediation, cancellation and cleanup proof. Exact relay transport
+  requires design before implementation.
+
+Technical recommendation: R, subject to owner approval, because it preserves
+the already-proved worker network rather than relying on new host-wide filter
+rules. Neither option is implemented or natively proved by this closeout.
+Question: approve R, or choose D and its network-policy setup scope? What
+constraint drives the choice? This is a connection decision within B, not a
+request to select A/B again. The corresponding dashboard gate is
+`proxy-host-connection-boundary`.
+
+Brief instruction audit: `AGENTS.md` (How to ask) and `docs/workflow.md`
+already require pros and cons for every viable option and a recommendation.
+`scripts/file-brief.py` checks explicit option count, not semantic completeness;
+the original brief violated the existing writing rules. No new format or
+heuristic prose validator is introduced.
+
+Private plans inspected: `os-isolation-integration.md` remains relevant but
+truncated; its transport correction remains authoritative pending this
+connection decision. `mai-dashboard-wiring-plan.md` and
+`interactive-mai-plan.md` provide rollout context, not permission to expose
+unrelated host services. No private plans are present in this run worktree;
+these were read from the main repository's local plans.
+
+Official sources rechecked 2026-11-20:
+[Docker gateway modes](https://docs.docker.com/engine/network/port-publishing/#gateway-modes)
+describe isolated mode's removed host bridge address;
+[Docker Desktop host connectivity](https://docs.docker.com/desktop/features/networking/networking-how-tos/)
+describes host address resolution. Neither establishes per-port containment.
+
+Next action: implement the owner-selected connection, run synthetic positive
+inference and negative host/public/DNS/foreign-run tests plus lifecycle checks,
+then perform separately admitted real-provider acceptance. Only close source
+98654698 after those results and final diff review establish the selected path.
+Prior synthetic container-proxy receipts are not host-side inference proof.
+
 ### Remaining full enforcement matrix
 
 All checks below are **planned, not executed**. Mocks establish composition only;
