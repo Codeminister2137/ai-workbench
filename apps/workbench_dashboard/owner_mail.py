@@ -127,7 +127,7 @@ def mail_configured(
     return True
 
 
-def send_owner_mail(
+def _send_owner_mail_now(
     *,
     to: str,
     subject: str,
@@ -245,6 +245,9 @@ def notify_plan(
             dry_run=False,
             receipts_dir=receipts_dir,
             dedupe_key=key,
+            supervision=supervision,
+            data_dir=receipts_dir.parent,
+            blocker=summary.get("status") in {"failed", "waiting_on_owner"},
         )
 
     return _send, notify_on
@@ -268,3 +271,68 @@ def _already_mailed(receipts_dir: Path, dedupe_key: str) -> bool:
         ):
             return True
     return False
+
+
+def shared_mail_root(root: Path = REPO_ROOT) -> Path:
+    """Resolve linked worktrees to the main checkout's notification state."""
+    marker = root / ".git"
+    if marker.is_file():
+        git_dir = Path(marker.read_text(encoding="utf-8").strip().removeprefix("gitdir: "))
+        if not git_dir.is_absolute():
+            git_dir = root / git_dir
+        common_file = git_dir / "commondir"
+        if common_file.exists():
+            return (git_dir / common_file.read_text(encoding="utf-8").strip()).resolve().parent
+    return root
+
+
+def send_owner_mail(
+    *,
+    to: str,
+    subject: str,
+    body: str,
+    config: dict,
+    dry_run: bool = True,
+    receipts_dir: Path,
+    dedupe_key: str | None = None,
+    supervision: str | None = None,
+    blocker: bool = False,
+    all_work_blocked: bool = False,
+    data_dir: Path | None = None,
+) -> dict:
+    """Persist live notifications for the hourly unattended digest.
+
+    Only an explicitly confirmed blocker of all work bypasses cadence.
+    Dry runs retain the transport validation/receipt contract without queuing.
+    """
+    if dry_run:
+        return _send_owner_mail_now(
+            to=to,
+            subject=subject,
+            body=body,
+            config=config,
+            dry_run=True,
+            receipts_dir=receipts_dir,
+            dedupe_key=dedupe_key,
+        )
+    if to != config["owner"]:
+        raise ValueError("Refusing to send a notification off the owner address")
+    if not subject.strip() or len(subject) > MAX_SUBJECT_CHARS or len(body) > MAX_BODY_CHARS:
+        raise ValueError("Invalid notification subject or body length")
+    from owner_digest import queue_notification
+
+    root = shared_mail_root()
+    if supervision is None:
+        from dashboard_config import load_config
+
+        supervision = load_config(root / "apps/workbench_dashboard/dashboard.json").supervision
+    return queue_notification(
+        data_dir=data_dir or root / "apps/workbench_dashboard/data",
+        supervision=supervision,
+        subject=subject,
+        body=body,
+        config=config,
+        dedupe_key=dedupe_key,
+        blocker=blocker,
+        all_work_blocked=all_work_blocked,
+    )

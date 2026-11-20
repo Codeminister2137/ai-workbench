@@ -738,6 +738,10 @@ def _mail_failure(config: SuperviseConfig, reason: str) -> None:
             config=mail_config,
             dry_run=False,
             receipts_dir=config.data_dir / "mail-receipts",
+            data_dir=config.data_dir,
+            supervision="unattended",
+            blocker=True,
+            dedupe_key=f"redeploy:{reason}",
         )
     except Exception:  # noqa: BLE001 - mail is best-effort; banner is the record
         pass
@@ -802,6 +806,20 @@ def supervise_tick(config: SuperviseConfig, *, dry_run: bool = False, force: boo
         action, reason = decide(running_commit=running, origin_commit=origin)
         outcome.update(action=action, reason=reason, running=running, origin=origin)
         return outcome
+    try:
+        from dashboard_config import load_config
+        from owner_digest import flush_digest
+        from owner_mail import load_smtp_config
+
+        current = load_config(config.config_path)
+        if current.supervision == "unattended":
+            flush_digest(
+                data_dir=config.data_dir,
+                supervision=current.supervision,
+                config=load_smtp_config(root=config.main_root),
+            )
+    except Exception:  # noqa: BLE001 - SMTP cannot prevent dashboard recovery
+        pass
     for attempt in range(4):
         with _TickLock(config.data_dir) as acquired:
             if acquired:

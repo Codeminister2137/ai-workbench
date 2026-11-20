@@ -1279,3 +1279,7 @@ See [decision and implementation boundary](decisions/eval-allowance-observed-thr
 Owner chose A on inbox `713fe10d90de4e20abf32e175006c234`: additive
 Council SQLite decision/outcome tables and injected offline replay.
 See [ADR-097](decisions/ADR-097-investor-offline-journal.md).
+
+## ADR-098 - Hourly unattended owner mail (2026-11-20)
+
+[ADR-098](decisions/ADR-098-hourly-unattended-mail-digest.md) accepts the hourly unattended-only notification digest, blockers first, with immediate mail restricted to confirmed whole-window blockers (owner inbox fa9590e7).

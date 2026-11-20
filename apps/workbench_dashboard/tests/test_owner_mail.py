@@ -18,7 +18,9 @@ from owner_mail import (
     load_smtp_config,
     mail_configured,
     notify_plan,
-    send_owner_mail,
+)
+from owner_mail import (
+    _send_owner_mail_now as send_owner_mail,
 )
 
 SMTP_ENV = {
@@ -139,13 +141,13 @@ def test_notify_plan_dedupes_repeat_outcome(tmp_path, fake_smtp) -> None:
     assert sender is not None
     summary = {"run_id": "run1", "status": "failed", "title": "t"}
     first = sender(summary)
-    assert first["sent"] is True
+    assert first["queued"] is True
     second = sender(summary)
     assert second["sent"] is False
     assert second["deduped"] is True
-    assert len(FakeSMTP.instances) == 1
+    assert len(FakeSMTP.instances) == 0
     other = sender({"run_id": "run1", "status": "completed", "title": "t"})
-    assert other["sent"] is True  # different outcome still pages
+    assert other["queued"] is True  # different outcome joins the digest
 
 
 def test_send_refuses_off_owner_address(tmp_path) -> None:
@@ -230,8 +232,8 @@ def test_notify_plan_attended_mails_nothing(tmp_path, fake_smtp) -> None:
     assert notify_on == ATTENDED_NOTIFY_STATUSES
     assert ATTENDED_NOTIFY_STATUSES == frozenset()
     receipt = sender({"run_id": "run-12345678", "status": "failed", "title": "t"})
-    assert receipt["sent"] is True
-    assert "[workbench] run failed: run-1234" == receipt["subject"]
+    assert receipt["skipped"] == "attended"
+    assert not fake_smtp.instances
 
 
 def test_notify_plan_unattended_mails_terminal(tmp_path) -> None:
@@ -312,6 +314,25 @@ def test_notify_plan_uses_gmail_fallback(tmp_path, fake_smtp) -> None:
     assert sender is not None
     assert notify_on == UNATTENDED_NOTIFY_STATUSES
     receipt = sender({"run_id": "run-abcdef12", "status": "completed", "title": "t"})
-    assert receipt["sent"] is True
-    assert fake_smtp.instances[0].host == "smtp.gmail.com"
-    assert fake_smtp.instances[0].logins == [("owner@gmail.test", "app-pass")]
+    assert receipt["queued"] is True
+    assert not fake_smtp.instances
+
+
+def test_digest_reaches_smtp_only_when_due(tmp_path, fake_smtp):
+    import time
+
+    from owner_digest import flush_digest
+
+    sender, _ = notify_plan("unattended", tmp_path / "mail-receipts", dict(SMTP_ENV))
+    assert sender is not None
+    assert sender({"run_id": "r-digest", "status": "failed"})["queued"]
+    assert not fake_smtp.instances
+    result = flush_digest(
+        data_dir=tmp_path,
+        supervision="unattended",
+        config=load_smtp_config(dict(SMTP_ENV)),
+        now=time.time() + 3601,
+    )
+    assert result["sent"]
+    assert len(fake_smtp.instances) == 1
+    assert "BLOCKER" in fake_smtp.instances[0].sent[0].get_content()

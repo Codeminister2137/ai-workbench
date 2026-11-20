@@ -28,3 +28,7 @@ capability plus reliable wiring) needs one doctrine before the switch.
 - `notify_plan` gains a `dedupe_key` receipt field; repeats return
   `deduped` without sending.
 - Digest-batching of success mail stays a future option, not a promise.
+
+## Notification digest (owner decision, 2026-11-20)
+
+This supersedes the earlier deferral of digest batching. [ADR-098](ADR-098-hourly-unattended-mail-digest.md) records the accepted hourly unattended-only digest and whole-window blocker exception. Terminal outcome deduplication remains in force; routine outcomes now enter the shared durable digest rather than sending immediately.

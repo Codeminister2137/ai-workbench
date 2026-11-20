@@ -183,3 +183,23 @@ def test_scheduled_tick_defaults_to_module_repo_root(
     import dashboard_web_app as webapp
 
     assert _capture_tick(monkeypatch, tmp_path) == webapp.REPO_ROOT
+
+
+def test_unattended_scheduler_flushes_digest_before_drain(tmp_path, monkeypatch):
+    import dashboard_web_app as webapp
+    import owner_digest
+    import owner_mail
+    from dashboard_config import DashboardConfig
+
+    calls = []
+    monkeypatch.setattr(
+        webapp,
+        "load_config",
+        lambda path: DashboardConfig(supervision="unattended", drain_interval_seconds=300),
+    )
+    monkeypatch.setattr(owner_mail, "load_smtp_config", lambda **kwargs: {"owner": "owner@test"})
+    monkeypatch.setattr(owner_digest, "flush_digest", lambda **kwargs: calls.append(kwargs))
+    _capture_tick(monkeypatch, tmp_path)
+    assert len(calls) == 1
+    assert calls[0]["supervision"] == "unattended"
+    assert calls[0]["data_dir"] == tmp_path / "data"

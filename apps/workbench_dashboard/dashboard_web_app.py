@@ -1639,6 +1639,10 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 config=mail_config,
                 dry_run=False,
                 receipts_dir=self.data_dir / "mail-receipts",
+                data_dir=self.data_dir,
+                supervision="unattended",
+                blocker=True,
+                dedupe_key=f"chat-parked:{session_id}:{text[:2000]}",
             )
         except Exception:  # noqa: BLE001 - mail is best-effort; parked state is the record
             pass
@@ -3808,6 +3812,20 @@ def maybe_start_drain_scheduler(
 
     def tick() -> None:
         from inbox_bridge import bridge_agent_queue, resolve_bridge_fanout
+
+        try:
+            from owner_digest import flush_digest
+            from owner_mail import load_smtp_config
+
+            current = load_config(config_path)
+            if current.supervision == "unattended":
+                flush_digest(
+                    data_dir=data_dir,
+                    supervision=current.supervision,
+                    config=load_smtp_config(root=drain_root),
+                )
+        except Exception as exc:  # noqa: BLE001 - delivery must not stop supervision
+            print(f"Workbench dashboard: digest flush failed: {type(exc).__name__}")
 
         try:
             bridged = bridge_agent_queue(
