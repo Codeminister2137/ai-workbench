@@ -852,3 +852,32 @@ def test_model_list_response_shape(monkeypatch, payload, expected):
         urllib.request, "urlopen", lambda *a, **k: io.BytesIO(json.dumps(payload).encode())
     )
     assert route_eval._list_rows("requesty", {}) == expected
+
+
+@pytest.mark.parametrize("name", ["range", "minmax", "len_sum"])
+def test_t1b_builtin_control_preserves_t1_restrictions(name):
+    answers = {
+        "range": "result = base_ms\n    for _ in range(attempt):\n        result *= factor\n    return result",
+        "minmax": "return base_ms * pow(factor, attempt)",
+        "len_sum": "return sum([base_ms * factor ** attempt]) / len([0])",
+    }
+    text = (
+        "def clamp(value, lo, hi):\n    return min(max(value, lo), hi)\n"
+        "def retry_delay_ms(base_ms, factor, attempt):\n    " + answers[name]
+    )
+    assert route_eval.check_t1b(text)
+    assert not check_t1(text)
+
+
+def test_t1b_uses_same_edges_and_default_ladder():
+    assert route_eval.TASKS == ("T0", "T1", "T2", "T3")
+    assert route_eval.TASK_SPECS["T1b"].max_output_tokens == route_eval.MAX_OUTPUT_TOKENS_T1
+    assert route_eval.check_t1b(T1_GOOD)
+    assert not route_eval.check_t1b(T1_GOOD.replace("return hi", "return value"))
+    assert not route_eval.check_t1b(
+        "import os\n" + T1_GOOD.replace("```python", "").replace("```", "")
+    )
+    assert not route_eval.check_t1b(
+        "def clamp(v,l,h):\n    while True: pass\ndef retry_delay_ms(b,f,a): return 1"
+    )
+    assert not route_eval.check_t1b("")
