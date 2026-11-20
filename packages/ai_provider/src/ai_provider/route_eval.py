@@ -663,8 +663,8 @@ def _short_error(error: Exception) -> str:
     return f"{type(error).__name__}: {scrubbed[:150]}"
 
 
-_FREE_TIER_ROUTES = frozenset({"openrouter", "requesty"})
-"""Routes whose model selection enforces free-tier picks (see list_free_candidates)."""
+_ZERO_COST_ROUTES = frozenset({"openrouter", "requesty", "ollama"})
+"""Routes whose eval cost estimates $0: free-tier picks and local runtimes."""
 
 _SPARK_STANDARD_PER_MTOK = (1.25, 4.25)
 """Planning-only Meta rate: $1.25 input / $4.25 output per M tokens."""
@@ -680,7 +680,7 @@ def estimate_cost_usd(
     """
     if input_tokens is None or output_tokens is None:
         return None
-    if route in _FREE_TIER_ROUTES:
+    if route in _ZERO_COST_ROUTES:
         return 0.0
     if route == "meta":
         per_input, per_output = _SPARK_STANDARD_PER_MTOK
@@ -895,6 +895,9 @@ _PROVIDERS: dict[str, tuple[ProviderKind, str, float, bool]] = {
     "openrouter": (ProviderKind.OPENROUTER, "OPENROUTER_API_KEY", 90.0, False),
     "requesty": (ProviderKind.REQUESTY, "REQUESTY_API_KEY", 90.0, True),
     "opencode_go": (ProviderKind.OPENCODE_GO, "OPENCODE_API_KEY", 90.0, False),
+    # Local runtime: keyless ("" never matches a credential name), generous
+    # timeout for 14-24b models on a shared workstation GPU.
+    "ollama": (ProviderKind.OLLAMA, "", 300.0, False),
 }
 
 
@@ -927,16 +930,19 @@ def run_candidate_ladder(
     max_attempts: int = 3,
     stop_on_fail: bool = True,
     max_output_tokens: dict[str, int] | None = None,
+    walk_all: bool = False,
 ) -> list[EvalResult]:
     """Attempt ordered candidates until one is reached; record every attempt.
 
     The first candidate that returns a gradeable answer (no transport error)
     runs the rest of its ladder; transport/refusal errors record one row and
     move to the next candidate, up to ``max_attempts`` (``<= 0`` walks the
-    whole list). Two consecutive parked errors stop the walk: an
-    account-level wall will not clear for the next model. An empty list records
-    a ``no-model`` skip. Callers resolve and tier-gate the candidate order;
-    this walk never substitutes its own picks.
+    whole list). With ``walk_all``, every reached candidate runs its full
+    ladder instead of stopping at the first (benchmark mode). Two
+    consecutive parked errors stop the walk: an account-level wall will
+    not clear for the next model. An empty list records a ``no-model``
+    skip. Callers resolve and tier-gate the candidate order; this walk
+    never substitutes its own picks.
     """
     gate = tasks[0] if tasks else "T0"
     overrides = max_output_tokens or {}
@@ -964,7 +970,8 @@ def run_candidate_ladder(
                     max_output_tokens=max_output_tokens,
                 )
             )
-        return results
+        if not walk_all:
+            return results
     if not results:
         results.append(
             EvalResult(route, "?", _utc_now(), False, None, None, None, "no-model", task_id=gate)
@@ -981,6 +988,7 @@ def run_all(
     max_attempts: int = 3,
     stop_on_fail: bool = True,
     max_output_tokens: dict[str, int] | None = None,
+    walk_all: bool = False,
 ) -> list[EvalResult]:
     """Walk explicit per-route candidates; every skip recorded, never imputed."""
     factories = _clients(credentials)
@@ -997,6 +1005,7 @@ def run_all(
                 max_attempts=max_attempts,
                 stop_on_fail=stop_on_fail,
                 max_output_tokens=max_output_tokens,
+                walk_all=walk_all,
             )
         )
     return results
@@ -1108,6 +1117,11 @@ def main(argv: list[str] | None = None) -> int:
         default=3,
         help="walk attempts per route; 0 walks all resolved (default: 3)",
     )
+    parser.add_argument(
+        "--walk-all",
+        action="store_true",
+        help="run every reached candidate's full ladder (default: stop at first)",
+    )
     args = parser.parse_args(argv)
     tasks = tuple(args.tasks) if args.tasks is not None else TASKS
     unknown = [task for task in tasks if task not in TASK_SPECS]
@@ -1154,6 +1168,7 @@ def main(argv: list[str] | None = None) -> int:
                 max_attempts=args.max_candidates,
                 stop_on_fail=not args.continue_past_fail,
                 max_output_tokens=overrides,
+                walk_all=args.walk_all,
             )
         )
     snapshot = write_results_snapshot(results, tasks, args.snapshot_dir)

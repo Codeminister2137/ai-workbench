@@ -373,6 +373,20 @@ def test_cheapest_sufficient_route_wins_quality_ties() -> None:
     assert recommendation.selected.backend.route_id == "requesty-m"
 
 
+def test_max_alternatives_enumerates_all_accepted() -> None:
+    catalog = tuple(_candidate("ollama", f"m{i}", BackendLocation.LOCAL) for i in range(6))
+    profile = TaskProfile(
+        privacy_class=PrivacyClass.LOCAL_ONLY,
+        cost_policy_tier=CostPolicyTier.LOCAL_ONLY,
+    )
+    assert len(recommend_model(profile, catalog).alternatives) == 3
+    full = recommend_model(profile, catalog, max_alternatives=10)
+    assert len(full.alternatives) == 5
+    assert recommend_model(profile, catalog, max_alternatives=0).alternatives == ()
+    with pytest.raises(ValueError, match="max_alternatives"):
+        recommend_model(profile, catalog, max_alternatives=-1)
+
+
 def test_cost_tiebreak_never_buys_quality_downgrade() -> None:
     free_standard = _candidate(
         "ollama", "llama3.2", BackendLocation.LOCAL, quality=QualityThreshold.STANDARD

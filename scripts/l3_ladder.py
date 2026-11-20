@@ -40,10 +40,11 @@ from ai_provider import route_eval  # noqa: E402
 from ai_provider.route_eval import TASK_SPECS, TASKS, EvalResult  # noqa: E402
 from ai_provider.secrets import load_dotenv  # noqa: E402
 
-EVAL_ROUTES = ("meta", "baseten", "openrouter", "requesty", "opencode_go")
-"""Routes the ladder measures, in run order."""
+EVAL_ROUTES = ("ollama", "meta", "baseten", "openrouter", "requesty", "opencode_go")
+"""Routes the ladder measures, in run order (local first: zero spend)."""
 
 ROUTE_TIERS = {
+    "ollama": CostPolicyTier.LOCAL_ONLY,
     "openrouter": CostPolicyTier.FREE_ONLY,
     "requesty": CostPolicyTier.FREE_ONLY,
     "opencode_go": CostPolicyTier.ALLOWANCES_ALLOWED,
@@ -86,7 +87,9 @@ def catalog_order(
 ) -> list[str]:
     """Catalog-preferred model ids: recommended first, then alternatives."""
     try:
-        recommendation = recommend_model(eval_profile(route, tier), catalog)
+        recommendation = recommend_model(
+            eval_profile(route, tier), catalog, max_alternatives=len(catalog)
+        )
     except ValueError:
         return []
     ordered = [recommendation.selected.backend.model]
@@ -249,6 +252,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="resolve free routes from catalog pins only (default: live $0 refresh)",
     )
+    parser.add_argument(
+        "--walk-all",
+        action="store_true",
+        help="run every reached candidate's full ladder (default: stop at first)",
+    )
     return parser
 
 
@@ -306,6 +314,7 @@ def main(argv: list[str] | None = None) -> int:
         max_attempts=args.max_candidates,
         stop_on_fail=not args.continue_past_fail,
         max_output_tokens=overrides,
+        walk_all=args.walk_all,
     )
     results = apply_tier_blocks(results, blocked, gate)
     snapshot = route_eval.write_results_snapshot(results, tasks, args.snapshot_dir)

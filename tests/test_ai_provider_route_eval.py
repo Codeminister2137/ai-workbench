@@ -392,6 +392,7 @@ def test_estimate_cost_usd_uses_price_table():
     assert estimate_cost_usd("meta", 800, 1500) == (800 * 1.25 + 1500 * 4.25) / 1_000_000
     assert estimate_cost_usd("openrouter", 800, 1500) == 0.0
     assert estimate_cost_usd("requesty", 800, 1500) == 0.0
+    assert estimate_cost_usd("ollama", 800, 1500) == 0.0
     assert estimate_cost_usd("baseten", 800, 1500) is None
     assert estimate_cost_usd("opencode_go", 800, 1500) is None
     assert estimate_cost_usd("meta", None, 1500) is None
@@ -628,6 +629,29 @@ def test_run_candidate_ladder_graded_fail_ends_walk():
     assert seen == ["m1"]
     assert len(results) == 1
     assert (results[0].passed, results[0].error) == (False, None)
+
+
+def test_run_candidate_ladder_walk_all_grades_every_model():
+    seen = []
+
+    def build(model):
+        seen.append(model)
+        if model == "weak":
+            return ScriptedClient([("def add2", "I cannot do that.")])
+        return ScriptedClient(_LADDER_MARKS)
+
+    results = run_candidate_ladder(
+        build, "r", ["strong", "weak", "strong2"], tasks=("T0", "T1"), walk_all=True
+    )
+    assert seen == ["strong", "weak", "strong2"]
+    assert [(item.model, item.task_id) for item in results] == [
+        ("strong", "T0"),
+        ("strong", "T1"),
+        ("weak", "T0"),
+        ("strong2", "T0"),
+        ("strong2", "T1"),
+    ]
+    assert results[2].passed is False and results[2].error is None
 
 
 def test_run_all_walks_explicit_models(monkeypatch):

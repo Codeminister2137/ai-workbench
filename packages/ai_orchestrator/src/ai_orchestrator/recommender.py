@@ -67,6 +67,7 @@ def recommend_model(
     *,
     cost_exemptions: frozenset[str] = frozenset(),
     quality_adjustments: Mapping[str, int] | None = None,
+    max_alternatives: int = 3,
 ) -> ModelRecommendation:
     """Select the best catalog candidate for a task profile.
 
@@ -75,10 +76,14 @@ def recommend_model(
     privacy, capability and latency gates still apply to exempted routes.
     ``quality_adjustments`` maps route ids to quality-step changes from
     observed outcomes (demotions only); unknown routes are ignored.
+    ``max_alternatives`` caps the ranked runner-up list (evaluation
+    harnesses pass a large value to enumerate every accepted route).
     """
 
     if not catalog:
         raise ValueError("Model catalog must not be empty.")
+    if max_alternatives < 0:
+        raise ValueError("max_alternatives must be 0 or more.")
 
     if profile.max_expected_latency_seconds is not None and not _valid_latency(
         profile.max_expected_latency_seconds
@@ -114,7 +119,7 @@ def recommend_model(
         reverse=True,
     )
     selected = accepted[0]
-    alternatives = tuple(accepted[1:4])
+    alternatives = tuple(accepted[1 : 1 + max_alternatives])
 
     reasons = [
         (
