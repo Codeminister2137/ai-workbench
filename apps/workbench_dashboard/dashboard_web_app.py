@@ -1272,6 +1272,9 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             if path.startswith("/api/inbox/") and path.endswith("/delete"):
                 item_id = path[len("/api/inbox/") : -len("/delete")]
                 return self._delete_inbox_task(item_id)
+            if path.startswith("/api/inbox/") and path.endswith("/claim"):
+                item_id = path[len("/api/inbox/") : -len("/claim")]
+                return self._claim_inbox_task(item_id, payload)
             if path == "/api/inbox/bridge-runs":
                 return self._bridge_inbox_runs()
             if path.startswith("/api/plans/") and path.endswith("/approve"):
@@ -2295,6 +2298,23 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             status = 404 if "not found" in str(exc).lower() else 400
             return self._send_json({"ok": False, "error": str(exc)}, status=status)
         self._send_json({"ok": True, "id": record["id"], "status": record["status"]})
+
+    def _claim_inbox_task(self, item_id: str, payload: dict) -> None:
+        by = payload.get("by")
+        if by is not None and (not isinstance(by, str) or not by.strip()):
+            return self._send_json({"ok": False, "error": "Invalid claim payload"}, status=400)
+        try:
+            record = self._stores().claim_inbox_task(item_id, by.strip() if by else None)
+        except StoreError as exc:
+            status = 404 if "not found" in str(exc).lower() else 400
+            return self._send_json({"ok": False, "error": str(exc)}, status=status)
+        self._send_json(
+            {
+                "ok": True,
+                "id": record["id"],
+                "claimed_by": (record.get("metadata") or {}).get("claimed_by"),
+            }
+        )
 
     def _delete_inbox_task(self, item_id: str) -> None:
         try:

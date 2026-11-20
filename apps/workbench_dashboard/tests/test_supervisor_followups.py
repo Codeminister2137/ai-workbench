@@ -195,6 +195,30 @@ def test_report_body_explains_empty_chain(stores) -> None:
     assert "No runs were linked to this chain." in body
 
 
+def test_claim_defers_closeout_until_release(stores) -> None:
+    record = stores.create_inbox_task(
+        title="Pick?", body="b", task_type="decision", options=["A"], assignee="owner"
+    )
+    claimed = stores.claim_inbox_task(record["id"], by="loop-20261120")
+    assert (claimed.get("metadata") or {}).get("claimed_by") == "loop-20261120"
+    stores.answer_inbox_task(record["id"], answer="A")
+    stored = stores.inbox.get(record["id"])
+    assert stored is not None
+    assert stored.get("status") == "answered"
+    assert (stored.get("metadata") or {}).get("closeout_id") is None
+    assert stored.get("closeout_pending") is True
+    assert stores.retry_closeout(stored) is False
+    released = stores.claim_inbox_task(record["id"], by=None)
+    assert (released.get("metadata") or {}).get("claimed_by") is None
+    assert (released.get("metadata") or {}).get("closeout_id")
+    assert released.get("closeout_pending") is not True
+
+
+def test_claim_missing_item_raises(stores) -> None:
+    with pytest.raises(StoreError):
+        stores.claim_inbox_task("nope", by="loop-x")
+
+
 def test_finalize_dedupes_and_flags_cap(stores) -> None:
     record = stores.create_inbox_task(
         title="Pick?", body="b", task_type="decision", options=["A"], assignee="owner"
