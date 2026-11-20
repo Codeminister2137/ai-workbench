@@ -380,7 +380,11 @@ class DashboardStores:
         record["answered_at"] = _utc_now()
         record["waiting_on"] = "agent"
         if first_answer and not (record.get("metadata") or {}).get("closeout_id"):
-            self._queue_closeout(record)
+            if (record.get("metadata") or {}).get("claimed_by"):
+                record["closeout_pending"] = True
+                record["closeout_deferred"] = f"claimed:{record['metadata']['claimed_by']}"
+            else:
+                self._queue_closeout(record)
         self.inbox.put(item_id, record)
         return record
 
@@ -422,9 +426,40 @@ class DashboardStores:
         metadata = record.get("metadata") or {}
         if not record.get("closeout_pending") or metadata.get("closeout_id"):
             return False
+        if metadata.get("claimed_by"):
+            return False
         self._queue_closeout(record)
         self.inbox.put(record["id"], record)
         return bool((record.get("metadata") or {}).get("closeout_id"))
+
+    def claim_inbox_task(self, item_id: str, by: str | None) -> dict:
+        """Claim an item for a loop session, or release it (``by=None``).
+
+        While ``metadata.claimed_by`` is set, owner answers defer their
+        close-out filing instead of triggering drain execution, so a loop
+        session and the drain never implement the same answer twice.
+        Release files a deferred close-out immediately when one waits.
+        """
+        record = self.inbox.get(item_id)
+        if record is None:
+            raise StoreError(f"Inbox task not found: {item_id}")
+        metadata = dict(record.get("metadata") or {})
+        if by:
+            metadata["claimed_by"] = by
+            record["metadata"] = metadata
+            self.inbox.put(item_id, record)
+            return record
+        metadata.pop("claimed_by", None)
+        record["metadata"] = metadata
+        if (
+            record.get("status") == "answered"
+            and record.get("closeout_pending")
+            and not metadata.get("closeout_id")
+        ):
+            self._queue_closeout(record)
+            record.pop("closeout_deferred", None)
+        self.inbox.put(item_id, record)
+        return record
 
     def _report_close_to_source(self, record: dict) -> None:
         """Report an agent close back to its linked source (best-effort).
