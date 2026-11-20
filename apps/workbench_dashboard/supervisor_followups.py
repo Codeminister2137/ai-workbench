@@ -151,41 +151,69 @@ def _chain_members(stores: Any, source_id: str) -> tuple[dict | None, dict | Non
     return source, closeout, runs
 
 
+RUN_STATUS_WORDS = {
+    "completed": "finished successfully",
+    "failed": "failed",
+    "cancelled": "cancelled",
+    "running": "still running",
+    "planned": "planned but not started",
+    "deferred": "deferred",
+}
+
+
 def _report_body(source: dict, closeout: dict | None, runs: list) -> str:
+    """Compose the chain report in plain language for the owner.
+
+    Quoted titles, answers and resolutions stay verbatim (immutable
+    records are never rewritten); the surrounding framing explains what
+    each part means. Every id carries its link prefix (``inbox:``/``run:``)
+    so the dashboard renders it as a hyperlink.
+    """
+    source_id = source.get("id")
     lines = [
-        "## Initial",
-        f"Source: {source.get('title')} ({source.get('id')})",
-        f"Answer: {source.get('answer') or '(none)'}",
+        "## What was asked",
+        f"{source.get('title')} (decision brief inbox:{source_id}).",
+        f"Owner answer: {source.get('answer') or '(no answer recorded)'}.",
         "",
-        "## Evolution",
+        "## What happened",
     ]
     if closeout is not None:
-        lines.append(f"Close-out: {closeout.get('title')} ({closeout.get('id')})")
-        lines.append(f"Resolution: {(closeout.get('resolution') or '')[:1000]}")
+        lines.append(f"{closeout.get('title')} (close-out brief inbox:{closeout.get('id')}).")
+        resolution = (closeout.get("resolution") or "").strip()
+        lines.append(resolution if resolution else "No resolution text was recorded.")
     else:
-        lines.append("Close-out: (none filed)")
-    lines += ["", "## Achieved"]
-    if source.get("resolution"):
-        lines.append(f"Source resolution: {(source.get('resolution') or '')[:1000]}")
+        lines.append("No close-out brief was filed for this chain.")
+    lines += ["", "## What was achieved"]
+    achieved = (source.get("resolution") or "").strip()
+    if achieved:
+        lines.append(achieved[:2000])
     else:
-        lines.append("Source resolution: (source still open)")
-    lines += ["", "## Links"]
+        lines.append("The source brief is still open, so nothing is confirmed achieved yet.")
+    lines += ["", "## Runs in this chain"]
+    if runs:
+        for run in runs:
+            status = str(run.get("status") or "unknown")
+            words = RUN_STATUS_WORDS.get(status, status)
+            lines.append(f"- run:{run.get('id')}: {words} (status {status}).")
+    else:
+        lines.append("No runs were linked to this chain.")
+    lines += ["", "## Where to look"]
     refs = list(source.get("context_refs") or [])
     if closeout is not None:
         refs += list(closeout.get("context_refs") or [])
-    for ref in refs:
+    refs.append(f"inbox:{source_id}")
+    for ref in dict.fromkeys(refs):
         lines.append(f"- {ref}")
-    for run in runs:
-        lines.append(f"- run:{run.get('id')} ({run.get('status')})")
     return "\n".join(lines).strip()
 
 
 def finalize_chain_report(stores: Any, source_id: str) -> dict[str, Any]:
     """File the supervisor chain-end report for one source (deduped).
 
-    Composes initial + evolution + achieved + links from closed records;
-    files nothing twice and never raises. A cap refusal flags
-    ``report_pending`` on the source for the tick audit to retry.
+    Composes asked + happened + achieved + runs + links from closed
+    records in plain language; files nothing twice and never raises.
+    A cap refusal flags ``report_pending`` on the source for the tick
+    audit to retry.
     """
     try:
         items, _total = stores.inbox.list(limit=1000)

@@ -166,10 +166,33 @@ def test_finalize_files_chain_report_with_sections(stores) -> None:
     reports = [i for i in items if i.get("type") == "report"]
     assert len(reports) == 1
     body = reports[0].get("body") or ""
-    for section in ("## Initial", "## Evolution", "## Achieved", "## Links"):
+    for section in (
+        "## What was asked",
+        "## What happened",
+        "## What was achieved",
+        "## Runs in this chain",
+        "## Where to look",
+    ):
         assert section in body
-    assert "run:run-1" in body
+    assert "run:run-1: finished successfully (status completed)." in body
+    assert f"inbox:{record['id']}" in body
+    assert "did A" in body and "A implemented" in body  # quotes stay verbatim
     assert (reports[0].get("metadata") or {}).get("chain_report_for") == record["id"]
+
+
+def test_report_body_explains_empty_chain(stores) -> None:
+    record = stores.create_inbox_task(
+        title="Pick?", body="b", task_type="decision", options=["A"], assignee="owner"
+    )
+    filed = finalize_chain_report(stores, record["id"])
+    assert filed["action"] == "filed"
+    stored = stores.inbox.get(filed["id"])
+    assert stored is not None
+    body = stored.get("body") or ""
+    assert "Owner answer: (no answer recorded)." in body
+    assert "No close-out brief was filed for this chain." in body
+    assert "nothing is confirmed achieved yet" in body
+    assert "No runs were linked to this chain." in body
 
 
 def test_finalize_dedupes_and_flags_cap(stores) -> None:
