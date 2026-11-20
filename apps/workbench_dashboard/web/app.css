@@ -78,3 +78,5 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; }
 
 .fgroup { display: block; margin: var(--wb-space-2) 0; }
 .fgroup strong { margin-right: var(--wb-space-2); }
+
+#bug-dialog { max-width: var(--wb-size-page); border: var(--wb-border-plain); border-radius: var(--wb-radius); padding: var(--wb-pad-card); background: var(--wb-color-surface); }

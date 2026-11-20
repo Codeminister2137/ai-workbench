@@ -138,3 +138,8 @@ older status cache, without frontend registration. Optional display metadata can
 refine their presentation. Catalogue inclusion does not establish authentication,
 reachability or execution support: services without a status integration display
 `status unavailable`. Refresh continues to use only the existing status probes.
+
+Report bug opens a modal over the current view. Cancel, Escape, and successful
+submission preserve the route and unsaved form fields. Reports capture the view
+and go to the agent inbox for triage; recent API-path activity is attached only
+with explicit consent. Failed submissions keep the report open for retry.
