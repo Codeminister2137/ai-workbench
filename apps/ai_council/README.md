@@ -99,6 +99,38 @@ List stored conversations:
 
 Answers are saved to `data/council.sqlite3`.
 
+## Synthesis evaluation cadence
+
+The weekly forgotten-items sweep review owns the synthesis quality check:
+the repository maintenance agent runs it once per week, starting with the
+next weekly review after 2026-11-20, and after changes to synthesis prompts,
+verdict parsing, or deliberation. This is an explicit-start maintenance
+cadence, not an installed timer or an inference step inside the static sweep.
+If deferred, the reviewing agent queues an agent inbox follow-up with the
+reason and next eligible window so the check is not silently skipped.
+
+From `apps/ai_council`, using the workspace venv Python:
+
+```powershell
+..\..\.venv\Scripts\python.exe -m evals.run_synthesis_eval --compare
+```
+
+Use the usual live-evaluation gate before starting: announce the GPU work,
+check that the owner has not requested gaming/resource time, and declare a
+fresh bounded run (one suite, no automatic retries). The fixed synthetic
+questions use local Ollama and `qwen3:14b`; check model availability first,
+and defer rather than automatically download or substitute a provider.
+Do not run against private conversations. Preserve the timestamped
+`evals/runs/<stamp>/report.json` and SQLite run artifacts, and record the
+date, exit status, report path and any contention in the weekly review receipt.
+
+Compare against `evals/baselines/synthesis-v1.json`: exit 0 passes, exit 1
+means overall score fell by more than 0.10, and exit 2 means evaluation
+errors or an unavailable baseline. Investigate a failure before another
+bounded run; file a regression follow-up rather than using `--record` to
+erase it. Baseline replacement needs a separately reviewed explanation.
+Offline scorer tests are software checks, not evidence of model quality.
+
 Configuration, conversation history and logs are private local state. Local
 inference does not make saved prompts anonymous; inspect outputs before sharing.
 The private `council.json`, databases and logs are ignored. See the
