@@ -11,6 +11,7 @@ sys.path.insert(0, str(REPO_ROOT / "packages" / "ai_provider" / "src"))
 _SPEC = importlib.util.spec_from_file_location(
     "snapshot_allowances", REPO_ROOT / "scripts" / "snapshot-allowances.py"
 )
+assert _SPEC is not None and _SPEC.loader is not None
 _snapshot = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(_snapshot)
 
