@@ -117,7 +117,12 @@ def negative_descendant():
     return "child process inherits confinement"
 
 def negative_env():
-    leaked = [key for key in os.environ if "KEY" in key.upper() or "TOKEN" in key.upper()]
+    # GPG_KEY is baked into official python images: the PUBLIC key fingerprint
+    # used to verify the Python tarball at image build time (published on
+    # python.org), not a host credential. Only image-inherited allowlisted.
+    allowlisted = {"GPG_KEY"}
+    leaked = [key for key in os.environ
+              if ("KEY" in key.upper() or "TOKEN" in key.upper()) and key not in allowlisted]
     assert not leaked, f"credential-like env leaked: {leaked}"
     return "no credential-like environment"
 
