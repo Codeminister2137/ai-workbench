@@ -39,17 +39,136 @@ def test_decision_requires_two_options() -> None:
     assert payload["options"] == []
 
 
+def _decision_args(extra=None):
+    base = [
+        "--title",
+        "t",
+        "--body",
+        "b",
+        "--option",
+        "A: first",
+        "--option",
+        "B: second",
+        "--tradeoff",
+        "A | fast | narrow",
+        "--tradeoff",
+        "B | broad | slow",
+        "--recommend",
+        "A",
+        "--recommendation",
+        "Speed matters most.",
+    ]
+    return base + (extra or [])
+
+
 def test_dry_run_prints_payload(capsys) -> None:
     mod = _load()
-    code = mod.main(["--title", "t", "--body", "b", "--option", "A", "--option", "B", "--dry-run"])
+    code = mod.main(_decision_args(["--dry-run"]))
     assert code == 0
-    assert json.loads(capsys.readouterr().out)["options"] == ["A", "B"]
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["options"] == ["A: first", "B: second"]
+    assert payload["metadata"]["tradeoffs"] == [
+        {"option": "A: first", "pro": "fast", "con": "narrow"},
+        {"option": "B: second", "pro": "broad", "con": "slow"},
+    ]
+    assert payload["metadata"]["recommendation"] == {
+        "option": "A: first",
+        "why": "Speed matters most.",
+    }
+    assert "Trade-offs:" in payload["body"]
+    assert "Recommendation: A: first" in payload["body"]
 
 
 def test_main_rejects_optionless_decision(capsys) -> None:
     mod = _load()
     assert mod.main(["--title", "t", "--body", "b"]) == 2
+    assert "--tradeoff per option" in capsys.readouterr().err
+    assert (
+        mod.main(
+            [
+                "--title",
+                "t",
+                "--body",
+                "b",
+                "--option",
+                "Only",
+                "--tradeoff",
+                "Only | pro | con",
+                "--recommend",
+                "Only",
+                "--recommendation",
+                "Why.",
+            ]
+        )
+        == 2
+    )
     assert "at least two" in capsys.readouterr().err
+
+
+def test_decision_requires_tradeoffs_and_recommendation(capsys) -> None:
+    mod = _load()
+    assert mod.main(["--title", "t", "--body", "b", "--option", "A", "--option", "B"]) == 2
+    assert "--tradeoff per option" in capsys.readouterr().err
+    assert (
+        mod.main(
+            [
+                "--title",
+                "t",
+                "--body",
+                "b",
+                "--option",
+                "A",
+                "--option",
+                "B",
+                "--tradeoff",
+                "A | pro | con",
+            ]
+        )
+        == 2
+    )
+
+
+def test_tradeoff_coverage_validated() -> None:
+    mod = _load()
+    good = dict(title="t", body="b", options=["A: x", "B: y"])
+    with pytest.raises(ValueError, match="exactly once"):
+        mod.build_payload(**good, tradeoffs=["A | pro | con"])
+    with pytest.raises(ValueError, match="exactly one option"):
+        mod.build_payload(
+            **good,
+            tradeoffs=["A | pro | con", "Z | pro | con"],
+        )
+    with pytest.raises(ValueError, match="LABEL \\| PRO \\| CON"):
+        mod.build_payload(**good, tradeoffs=["A | onlypro", "B | pro | con"])
+    with pytest.raises(ValueError, match="both --recommend"):
+        mod.build_payload(
+            **good,
+            tradeoffs=["A | pro | con", "B | pro | con"],
+            recommend="A",
+        )
+    with pytest.raises(ValueError, match="exactly one option"):
+        mod.build_payload(
+            **good,
+            tradeoffs=["A | pro | con", "B | pro | con"],
+            recommend="Z",
+            recommendation="Why.",
+        )
+    payload = mod.build_payload(
+        **good,
+        tradeoffs=["B | broad | slow", "A | fast | narrow"],
+        recommend="b",
+        recommendation="Coverage wins.",
+    )
+    assert payload["metadata"]["recommendation"]["option"] == "B: y"
+
+
+def test_metadata_items_validated_and_merged(capsys) -> None:
+    mod = _load()
+    code = mod.main(_decision_args(["--metadata", "owner_gate=g1", "--dry-run"]))
+    assert code == 0
+    assert json.loads(capsys.readouterr().out)["metadata"]["owner_gate"] == "g1"
+    assert mod.main(_decision_args(["--metadata", "no-equals"])) == 2
+    assert "KEY=VALUE" in capsys.readouterr().err
 
 
 def test_followup_prepends_body_and_metadata() -> None:
