@@ -65,6 +65,17 @@ def test_ship_commits_and_files_merge_decision(stores, worktree, tmp_path) -> No
     assert (item.get("metadata") or {}).get("merge_for_branch") == "run/abc123"
 
 
+def test_ship_names_current_branch_not_stale_receipt(stores, worktree, tmp_path) -> None:
+    _git(worktree, "switch", "-c", "feature/worker-moved-on")
+    (worktree / "note.txt").write_text("base\nrun edit\n", encoding="utf-8")
+    shipment = ship_completed_run(_run(worktree), repo_root=tmp_path, stores=stores)
+    assert shipment["branch"] == "feature/worker-moved-on"
+    item = stores.inbox.get(shipment["merge_item"])
+    assert item is not None
+    assert (item.get("metadata") or {}).get("merge_for_branch") == "feature/worker-moved-on"
+    assert "feature/worker-moved-on" in item["title"]
+
+
 def test_ship_clean_tree_files_no_merge(stores, worktree, tmp_path) -> None:
     shipment = ship_completed_run(_run(worktree), repo_root=tmp_path, stores=stores)
     assert shipment == {
