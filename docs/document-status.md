@@ -29,6 +29,7 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/job-search-phase1.md | ACTED | Sender unify shipped (test_sender_unify in gate). |
 | docs/job-search-reuse-review.md | KNOWLEDGE | Comparison complete; deployment/runtime validation unselected. |
 | docs/job-search-openings-service.md | KNOWLEDGE | Openings kept-service runbook. |
+| docs/l3-t1b-control.md | KNOWLEDGE | T1b builtins-allowed control note. |
 | docs/limits-register.md | KNOWLEDGE | Limits register. |
 | docs/local-model-quality-policy.md | KNOWLEDGE | Quality policy v1 (2026-11-09); supersedes plans draft. |
 | docs/logging-and-artifact-structure-plan.md | ACTED | Oct-19 working notes, consumed. |
