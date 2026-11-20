@@ -17,6 +17,7 @@ rename-preview = ["ai-agent[rename-preview]"]
 [dependency-groups]
 dev = [
     "pytest>=9.0.0,<10.0.0",
+    "pytest-xdist>=3.0,<4.0",
     "ruff>=0.14.0,<0.15.0",
     "pyright>=1.1.400,<2.0.0",
     "pre-commit>=4.0,<5.0",
