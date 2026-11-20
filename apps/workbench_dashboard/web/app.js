@@ -154,7 +154,20 @@ function linkIds(html) {
     if (i % 2 === 1) return part;
     return part.split(/(<[^>]*>)/g).map((chunk) => {
       if (chunk.startsWith("<")) return chunk;
-      return chunk.replace(/\b(?:(inbox|run|idea|plan|chat):)?([0-9a-fA-F]{8,64})\b/g, (m, kind, id) => {
+      // URLs take precedence so numeric/hex path segments never become item IDs.
+      return chunk.replace(/\bhttps?:\/\/(?:(?!&(?:quot|lt|gt|#39);)[^\s<>"'])+|\b(?:(inbox|run|idea|plan|chat):)?([0-9a-fA-F]{8,64})\b/gi, (m, kind, id) => {
+        if (!id) {
+          let url = m.replace(/[.,;:!?]+$/, "");
+          while (/[)\]}]$/.test(url)) {
+            const close = url.at(-1);
+            const open = {')': '(', ']': '[', '}': '{'}[close];
+            if (url.split(close).length <= url.split(open).length) break;
+            url = url.slice(0, -1);
+          }
+          if (!/^https?:\/\/[^/?#]+/i.test(url)) return m;
+          return `<a href="${url}">${url}</a>${m.slice(url.length)}`;
+        }
+        kind = kind?.toLowerCase();
         if (!kind && id.length < 12) return m;
         const low = id.toLowerCase();
         const href = kind ? ID_ROUTES[kind] + low : "#/lookup/" + low;
@@ -169,7 +182,7 @@ function refLink(ref) {
   const known = text.match(/^(inbox|run|idea|plan|chat):([0-9a-fA-F]{8,64})$/);
   if (known) return `<a href="${ID_ROUTES[known[1]]}${known[2].toLowerCase()}" title="Open ${known[1]} ${known[2]}">${esc(text)}</a>`;
   if (/^[0-9a-fA-F]{8,64}$/.test(text)) return `<a href="#/lookup/${text.toLowerCase()}" title="Look up this ID">${esc(text)}</a>`;
-  return esc(text);
+  return linkIds(esc(text));
 }
 function truncate(s, limit) {
   const text = String(s || "");

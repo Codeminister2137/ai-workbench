@@ -4,6 +4,10 @@ Local-first supervisor dashboard: status-at-a-glance, chat with the
 supervisor, plans, runs, and the owner-task inbox. Stdlib HTTP on
 loopback only (council pattern); no new framework, DB, or auth.
 
+Report, inbox, idea, and document views using the shared link renderer automatically
+link complete HTTP(S) URLs as well as internal item IDs. Existing anchors are
+preserved; URL paths containing numeric or hex IDs remain external links.
+
 ## Run
 
 From `apps\workbench_dashboard`:

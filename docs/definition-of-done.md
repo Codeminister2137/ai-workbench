@@ -5,6 +5,9 @@
 - [ ] Requested behavior is reachable by the owner (enabled, routed, UI-surfaced; no dark flags).
 - [ ] Existing behavior that should remain unchanged still works.
 - [ ] Relevant edge cases considered.
+- [ ] User-facing external HTTP(S) URLs and supported item references are clickable
+      in full, without linking only IDs inside URLs or nesting anchors. Fix shared
+      rendering and add regression coverage so this remains automatic for future content.
 - [ ] Error handling is appropriate.
 
 ## Tests
