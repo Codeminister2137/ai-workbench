@@ -55,6 +55,7 @@ Executor = Callable[[dict], dict]
 InboxGet = Callable[[str], dict | None]
 InboxNote = Callable[[str, str], None]
 TerminalHook = Callable[[dict], None]
+ShipCompleted = Callable[[dict], dict]
 
 NEEDS_ATTENTION = "needs-attention"
 REPORT_NOTE_CHARS = 2000
@@ -120,6 +121,10 @@ class RunDrain:
     ``inbox_note`` posts the completion findings back to the linked
     inbox item (report-or-escalate: a linked run whose note cannot be
     delivered escalates instead of reading ``completed``).
+    ``ship_completed`` preserves a completed run's worktree edits
+    (commit on the run branch) and schedules the merge; a shipper
+    failure escalates the same way, so completed work is never
+    silently left uncommitted.
     """
 
     def __init__(
@@ -133,6 +138,7 @@ class RunDrain:
         worker_epoch: str | None = None,
         inbox_note: InboxNote | None = None,
         output_evidence: Callable[[str], bool] | None = None,
+        ship_completed: ShipCompleted | None = None,
     ) -> None:
         self._runs_dir = runs_dir
         self._get_inbox = get_inbox
@@ -142,6 +148,7 @@ class RunDrain:
         self._worker_epoch = worker_epoch
         self._inbox_note = inbox_note
         self._output_evidence = output_evidence
+        self._ship_completed = ship_completed
 
     def _notify_terminal(self, run: dict, status: str) -> None:
         if self._on_terminal is None:
@@ -506,6 +513,21 @@ class RunDrain:
                     run["status"] = status
                     error = f"completion write-back failed: {exc}"
                     run["error"] = error
+        if status == "completed" and self._ship_completed is not None:
+            try:
+                shipment = self._ship_completed(dict(run))
+            except Exception as exc:
+                status = NEEDS_ATTENTION
+                run["status"] = status
+                error = f"completion ship failed: {type(exc).__name__}: {exc}"
+                run["error"] = error[:1000]
+            else:
+                run["shipment"] = shipment if isinstance(shipment, dict) else {"ok": True}
+                if not run["shipment"].get("committed", True):
+                    status = NEEDS_ATTENTION
+                    run["status"] = status
+                    error = f"completion ship reported uncommitted: {run['shipment']}"
+                    run["error"] = error[:1000]
         append_run_event(run, "run_finished", {"status": status})
         self._publish(path, claim, run)
         self._notify_terminal(run, status)

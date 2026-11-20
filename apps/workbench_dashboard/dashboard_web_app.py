@@ -3709,6 +3709,11 @@ def build_run_drain(
         except OSError:
             return False
 
+    def _ship_completed(run: dict) -> dict:
+        from drain_ship import ship_completed_run
+
+        return ship_completed_run(run, repo_root=repo_root, stores=stores)
+
     return RunDrain(
         runs_dir=data_dir / "runs",
         get_inbox=lambda inbox_id: stores.inbox.get(inbox_id),
@@ -3717,6 +3722,7 @@ def build_run_drain(
         on_terminal=_notify,
         inbox_note=_note,
         output_evidence=_run_has_output,
+        ship_completed=_ship_completed,
     )
 
 

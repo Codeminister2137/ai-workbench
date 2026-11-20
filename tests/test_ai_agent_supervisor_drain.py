@@ -655,3 +655,44 @@ def test_reconcile_hard_cap_breaks_crash_loops(stores) -> None:
     assert drain.reconcile() == [
         {"run_id": "stuck1", "action": "cancelled", "reason": "interrupted repeatedly"}
     ]
+
+
+def _shipping_drain(stores, shipper):
+    def executor(run):
+        return {"status": "completed", "summary": "done"}
+
+    return RunDrain(
+        runs_dir=stores.data_dir / "runs",
+        get_inbox=stores.inbox.get,
+        executor=executor,
+        ship_completed=shipper,
+    )
+
+
+def test_shipper_records_shipment_on_completed(stores) -> None:
+    seen = []
+    drain = _shipping_drain(stores, lambda run: seen.append(run["id"]) or {"committed": True})
+    run_id, _inbox_id = _queue_chat_run(stores, answer="Approve")
+    outcomes = drain.drain()
+    assert outcomes == [{"run_id": run_id, "status": "completed"}]
+    assert seen == [run_id]
+    assert stores.runs.get(run_id)["shipment"] == {"committed": True}
+
+
+def test_shipper_failure_escalates_to_attention(stores) -> None:
+    def boom(run):
+        raise RuntimeError("git gone")
+
+    drain = _shipping_drain(stores, boom)
+    run_id, _inbox_id = _queue_chat_run(stores, answer="Approve")
+    outcomes = drain.drain()
+    assert outcomes == [{"run_id": run_id, "status": "needs-attention"}]
+    stored = stores.runs.get(run_id)
+    assert "completion ship failed" in stored["error"]
+
+
+def test_shipper_uncommitted_report_escalates(stores) -> None:
+    drain = _shipping_drain(stores, lambda run: {"committed": False, "error": "dirty"})
+    run_id, _inbox_id = _queue_chat_run(stores, answer="Approve")
+    outcomes = drain.drain()
+    assert outcomes == [{"run_id": run_id, "status": "needs-attention"}]
