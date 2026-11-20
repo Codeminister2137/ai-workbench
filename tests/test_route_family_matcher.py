@@ -140,8 +140,8 @@ def test_saved_reader_snapshot_reproduction():
             indent=2,
         )
     )
-    assert len(catalog["models"]) == 25
-    assert agreements == 25
+    assert len(catalog["models"]) == 26
+    assert agreements == 26
     assert disagreements == []
 
 
