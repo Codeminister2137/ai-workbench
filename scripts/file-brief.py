@@ -31,12 +31,31 @@ def build_payload(
     assignee: str = "owner",
     tier: str | None = None,
     metadata: dict | None = None,
+    needs_owner: str | None = None,
+    needs_ai: str | None = None,
 ) -> dict:
-    """Assemble the /api/inbox payload; decisions need >= 2 options."""
+    """Assemble the /api/inbox payload; decisions need >= 2 options.
+
+    Follow-ups (who + what) go both into ``metadata["followup"]`` for
+    structured consumers and on top of the body so every surface (UI,
+    mail, API) shows them without extra rendering.
+    """
     if not title.strip():
         raise ValueError("title is required")
     if item_type == "decision" and len(options) < 2:
         raise ValueError("decision briefs need at least two --option values")
+    followup: dict[str, str] = {}
+    if needs_owner and needs_owner.strip():
+        followup["owner"] = needs_owner.strip()
+    if needs_ai and needs_ai.strip():
+        followup["ai"] = needs_ai.strip()
+    if followup:
+        lead = []
+        if "owner" in followup:
+            lead.append(f"Needs from you (owner): {followup['owner']}")
+        if "ai" in followup:
+            lead.append(f"Needs from AI: {followup['ai']}")
+        body = "\n".join(lead) + "\n\n" + body
     payload = {
         "title": title,
         "body": body,
@@ -50,6 +69,8 @@ def build_payload(
         if tier not in MERGE_TIERS:
             raise ValueError(f"tier must be one of {MERGE_TIERS}")
         merged["tier"] = tier
+    if followup:
+        merged["followup"] = followup
     if merged:
         payload["metadata"] = merged
     return payload
@@ -77,6 +98,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--option", action="append", default=[], dest="options")
     parser.add_argument("--type", default="decision", dest="item_type")
     parser.add_argument("--tier", default=None, help="Merge tier (tier1/2/3, ADR-087).")
+    parser.add_argument(
+        "--needs-owner", default=None, help="Follow-up action needed from the owner."
+    )
+    parser.add_argument("--needs-ai", default=None, help="Follow-up action needed from AI.")
     parser.add_argument("--url", default=DEFAULT_URL)
     parser.add_argument("--token", default=None)
     parser.add_argument("--dry-run", action="store_true")
@@ -91,6 +116,8 @@ def main(argv: list[str] | None = None) -> int:
             options=args.options,
             item_type=args.item_type,
             tier=args.tier,
+            needs_owner=args.needs_owner,
+            needs_ai=args.needs_ai,
         )
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)
