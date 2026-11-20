@@ -111,6 +111,7 @@ def make_server(
                 return
             lengths = self.headers.get_all("Content-Length", [])
             if self.headers.get("Transfer-Encoding") or len(lengths) != 1:
+                self._drain_body()
                 self.reply(400, {"error": "one content length required"})
                 return
             try:
