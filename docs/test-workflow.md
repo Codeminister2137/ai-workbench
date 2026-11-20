@@ -148,6 +148,11 @@ and [class node IDs and markers](https://docs.pytest.org/en/stable/example/marke
 
 ### Family-5 follow-up (2026-11-20; adoption pending)
 
+The owner's request for further investigation is addressed in the
+[expanded G3 decision brief](family5-g3-assessment.md), with official external
+sources, cost/security distinctions, prospective evidence requirements and
+per-option trade-offs. Investigation completion does not select A, B or C.
+
 Repair fingerprints now prune `.tmp` scratch trees before traversal. Ignored
 `artifacts/` reports remain repair evidence. The prior Family-5 main-checkout
 measurement was 639s workspace / about 652s total; it included 135 scratch
