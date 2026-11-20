@@ -15,7 +15,7 @@ from ai_orchestrator.models import (
 )
 from ai_orchestrator.planner import ExecutionPlan, plan_execution
 from ai_orchestrator.prompt_judge import judge_prompt
-from ai_orchestrator.recommender import recommend_model
+from ai_orchestrator.recommender import NoCandidateError, recommend_model
 
 
 class OrchestrationStatus(StrEnum):
@@ -84,6 +84,16 @@ def prepare_execution(
             catalog,
             cost_exemptions=cost_exemptions,
             quality_adjustments=quality_adjustments,
+        )
+    except NoCandidateError as exc:
+        return OrchestrationResult(
+            original_prompt=prompt,
+            profile=profile,
+            status=OrchestrationStatus.MODEL_SELECTION_FAILED,
+            prompt_judge=prompt_judge,
+            recommendation=None,
+            execution_plan=None,
+            failure_reason=exc.hint,
         )
     except ValueError as exc:
         return OrchestrationResult(

@@ -10,6 +10,7 @@ from ai_orchestrator.models import (
     BackendLocation,
     BillingSource,
     CandidateRejection,
+    CheapestBlocked,
     CostPolicyTier,
     DelegationKind,
     LatencyTarget,
@@ -46,7 +47,7 @@ from ai_orchestrator.planner import (
 )
 from ai_orchestrator.prompt_judge import judge_prompt
 from ai_orchestrator.prompt_refinement import refine_prompt
-from ai_orchestrator.recommender import recommend_model
+from ai_orchestrator.recommender import NoCandidateError, recommend_model
 
 __all__ = [
     "AccessMethod",
@@ -54,6 +55,7 @@ __all__ = [
     "AuthMethod",
     "BillingSource",
     "CandidateRejection",
+    "CheapestBlocked",
     "CostPolicyTier",
     "DelegationDecision",
     "DelegationKind",
@@ -91,4 +93,5 @@ __all__ = [
     "plan_execution",
     "prepare_execution",
     "recommend_model",
+    "NoCandidateError",
 ]
