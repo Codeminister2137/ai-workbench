@@ -265,7 +265,8 @@ def test_commands(names: list[str], extra: list[str], *, root: Path = ROOT) -> l
             }
         )
         if paths:
-            commands.append([sys.executable, "-m", "pytest", *paths, *extra])
+            parallel = [] if any(part == "-n" for part in extra) else ["-n", "8"]
+            commands.append([sys.executable, "-m", "pytest", *parallel, *paths, *extra])
             labels.append(label)
     if len(commands) > 1:
         # Separate processes must not overwrite each other's CI test report.
