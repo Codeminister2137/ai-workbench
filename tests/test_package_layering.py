@@ -9,6 +9,7 @@ ratchet: shrinking the provider set is welcome, growing it fails loudly.
 
 from __future__ import annotations
 
+import ast
 import pathlib
 import re
 
@@ -81,3 +82,20 @@ def test_provider_up_imports_do_not_grow() -> None:
     assert current <= PROVIDER_UP_IMPORTERS, (
         f"new up-importers: {sorted(current - PROVIDER_UP_IMPORTERS)}"
     )
+
+
+def test_acceptance_storage_imports_only_approved_neutral_contracts() -> None:
+    path = ROOT / "packages/ai_provider/src/ai_provider/acceptance_storage.py"
+    approved = {
+        ("ai_orchestrator", "AccessMethod"),
+        ("ai_orchestrator", "load_model_catalog"),
+        ("ai_orchestrator.scheduling", "ScheduledTaskStatus"),
+    }
+    for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+        if isinstance(node, ast.ImportFrom) and node.module:
+            if node.module.split(".")[0] in {"ai_orchestrator", "ai_agent"}:
+                assert {(node.module, name.name) for name in node.names} <= approved
+        elif isinstance(node, ast.Import):
+            assert not any(
+                name.name.split(".")[0] in {"ai_orchestrator", "ai_agent"} for name in node.names
+            ), "Use the approved explicit neutral-contract imports"

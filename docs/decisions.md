@@ -1,3 +1,11 @@
+## Family-3 S2 acceptance storage importer exception (2026-11-20)
+
+Owner selected A in inbox `ed066ac7bf02418490ff1adf785ae175`: permit
+`acceptance_storage.py` to import the existing neutral Orchestrator contracts.
+The importer allowance grows by one; the exact imports are pinned and no
+orchestration behavior is authorized. See the
+[decision and trade-offs](decisions/family3-acceptance-storage-layering.md).
+
 ## Daily coding moves to Mai with rollback window (2026-11-20)
 
 Owner accepted "Switch now with rollback window" in inbox
