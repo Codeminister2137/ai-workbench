@@ -66,6 +66,46 @@ TASK_T1 = (
     "clamp(5, 0, 10) == 5; clamp(-3, 0, 10) == 0; "
     "retry_delay_ms(100, 2, 0) == 100; retry_delay_ms(100, 2, 3) == 800."
 )
+# Opt-in control: identical problem and examples, computational builtins permitted.
+T1B_BUILTINS = (
+    "abs",
+    "all",
+    "any",
+    "bool",
+    "dict",
+    "divmod",
+    "enumerate",
+    "filter",
+    "float",
+    "int",
+    "isinstance",
+    "issubclass",
+    "iter",
+    "len",
+    "list",
+    "map",
+    "max",
+    "min",
+    "next",
+    "pow",
+    "range",
+    "reversed",
+    "round",
+    "set",
+    "slice",
+    "sorted",
+    "str",
+    "sum",
+    "tuple",
+    "zip",
+)
+TASK_T1B = TASK_T1.replace(
+    "Use only plain arithmetic, comparisons, if/else, and for/while loops: "
+    "no builtin functions (no len/range/sum), no imports, no printing:",
+    "Use plain arithmetic, comparisons, if/else, for/while loops, and "
+    "computational builtin functions (" + ", ".join(T1B_BUILTINS) + "): "
+    "no imports, no printing:",
+)
 # Raised 2026-11-02 (was 2048): dots-studio T1 hit exactly 2048 output
 # tokens (truncated FAIL); per docs/limits-register.md the headroom is cheaper
 # than a rerun.
@@ -159,6 +199,7 @@ def check_completion(text: str) -> bool:
 
 _SANDBOX_SCRIPT = r'''
 """Grading child: exec one candidate answer, then serve calls over stdio JSON."""
+import builtins
 import json
 import math
 import re
@@ -174,7 +215,10 @@ def _restricted_import(name, *args, **kwargs):
     raise ImportError("import of %r is not allowed in eval answers" % (name,))
 
 
-_NAMESPACE = {"__builtins__": {"__import__": _restricted_import}}
+_BUILTINS = {"__import__": _restricted_import}
+for _name in filter(None, (sys.argv[2] if len(sys.argv) > 2 else "").split(",")):
+    _BUILTINS[_name] = getattr(builtins, _name)
+_NAMESPACE = {"__builtins__": _BUILTINS}
 for _name in _ALLOWED:
     if _name in _SAFE:
         _NAMESPACE[_name] = _SAFE[_name]
@@ -292,17 +336,25 @@ class _CandidateSandbox:
     """One short-lived child grading one candidate answer.
 
     Model text is exec'd ONLY in the child, in a bare namespace (no
-    builtins, only the task's named-safe modules, pre-bound AND importable
+    builtins by default (T1b opts into computational builtins), only the task's
+    named-safe modules, pre-bound AND importable
     through a restricted ``__import__``). The parent process sees JSON
     values plus proxy callables, so a dunder escape in model output cannot
     reach parent-process state: no parent modules, globals, or handles.
     """
 
-    def __init__(self, safe_modules: tuple[str, ...]) -> None:
+    def __init__(self, safe_modules: tuple[str, ...], builtin_names: tuple[str, ...] = ()) -> None:
         self._lock = threading.Lock()
         self._closed = False
         self._proc = subprocess.Popen(
-            [sys.executable, "-I", "-c", _SANDBOX_SCRIPT, ",".join(safe_modules)],
+            [
+                sys.executable,
+                "-I",
+                "-c",
+                _SANDBOX_SCRIPT,
+                ",".join(safe_modules),
+                ",".join(builtin_names),
+            ],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
@@ -385,6 +437,10 @@ class _CandidateSandbox:
 
     def abort(self) -> None:
         """Kill the child immediately (timeout path); never raises."""
+        # A blocked call holds the protocol lock while reading the child.
+        # Kill first so its read returns and releases that lock.
+        with contextlib.suppress(OSError):
+            self._proc.kill()
         with self._lock:
             if self._closed:
                 return
@@ -453,6 +509,8 @@ def _run_guarded(
     check: Callable[[dict[str, Any]], bool],
     safe_modules: tuple[str, ...],
     timeout_seconds: float = CANDIDATE_TIMEOUT_SECONDS,
+    *,
+    builtin_names: tuple[str, ...] = (),
 ) -> bool:
     """Grade one answer in the child with a wall-clock bound (2 s per design).
 
@@ -466,7 +524,7 @@ def _run_guarded(
 
     def attempt() -> None:
         try:
-            sandbox = _CandidateSandbox(safe_modules)
+            sandbox = _CandidateSandbox(safe_modules, builtin_names)
         except OSError:
             outcome.append(False)
             return
@@ -548,6 +606,31 @@ def check_t1(text: str) -> bool:
         return True
 
     return _grade(text, symbols=("def clamp", "def retry_delay_ms"), check=check)
+
+
+def check_t1b(text: str) -> bool:
+    """Grade the opt-in T1b control with T1 cases and computational builtins."""
+
+    def check(namespace: dict[str, Any]) -> bool:
+        clamp = namespace.get("clamp")
+        delay = namespace.get("retry_delay_ms")
+        if not callable(clamp) or not callable(delay):
+            return False
+        try:
+            for value, lo, hi, want in _T1_CLAMP_CASES:
+                if clamp(value, lo, hi) != want:
+                    return False
+            for base, factor, attempt, want in _T1_DELAY_CASES:
+                if delay(base, factor, attempt) != want:
+                    return False
+        except Exception:
+            return False
+        return True
+
+    block = _extract_block(text, ("def clamp", "def retry_delay_ms"))
+    if block is None:
+        return False
+    return _run_guarded(block, check, (), builtin_names=T1B_BUILTINS)
 
 
 _T2_CASES = (
@@ -652,6 +735,7 @@ class TaskSpec:
 TASK_SPECS: dict[str, TaskSpec] = {
     "T0": TaskSpec("T0", TASK, MAX_OUTPUT_TOKENS, check_completion),
     "T1": TaskSpec("T1", TASK_T1, MAX_OUTPUT_TOKENS_T1, check_t1),
+    "T1b": TaskSpec("T1b", TASK_T1B, MAX_OUTPUT_TOKENS_T1, check_t1b),
     "T2": TaskSpec("T2", TASK_T2, MAX_OUTPUT_TOKENS_T2, check_t2),
     "T3": TaskSpec("T3", TASK_T3, MAX_OUTPUT_TOKENS_T3, check_t3),
 }
