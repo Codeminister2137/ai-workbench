@@ -16,6 +16,9 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 MAX_REQUEST_BYTES = 64 * 1024
 MAX_RESPONSE_BYTES = 256 * 1024
+# Bounded drain before early rejection replies: consume at most this much
+# of an over-limit body so the client gets a clean 413 instead of RST.
+DRAIN_CAP_BYTES = 1024 * 1024
 
 
 class RunGrant:
@@ -75,11 +78,35 @@ def make_server(
             self.wfile.write(body)
             self.close_connection = True
 
+        def _drain_body(self) -> None:
+            """Consume a bounded prefix of the request body, if framed.
+
+            Lets early rejections answer cleanly instead of RSTing a
+            client whose upload is still in flight. Never reads past the
+            cap; unparsable framing drains nothing.
+            """
+            try:
+                lengths = self.headers.get_all("Content-Length", [])
+                size = int(lengths[0]) if len(lengths) == 1 else 0
+            except (TypeError, ValueError):
+                return
+            remaining = max(0, min(size, DRAIN_CAP_BYTES))
+            while remaining > 0:
+                try:
+                    chunk = self.rfile.read(min(65536, remaining))
+                except OSError:
+                    break  # Stalled client: answer anyway, connection handling copes.
+                if not chunk:
+                    break
+                remaining -= len(chunk)
+
         def do_POST(self) -> None:
             if not grant.accepts(self.headers.get("Authorization", "")):
+                self._drain_body()
                 self.reply(401, {"error": "invalid run grant"})
                 return
             if self.path != f"/runs/{grant.run_id}/inference":
+                self._drain_body()
                 self.reply(404, {"error": "unknown endpoint"})
                 return
             lengths = self.headers.get_all("Content-Length", [])
@@ -89,6 +116,7 @@ def make_server(
             try:
                 size = int(lengths[0])
                 if not 0 < size <= MAX_REQUEST_BYTES:
+                    self._drain_body()
                     self.reply(413, {"error": "request size refused"})
                     return
                 body = self.rfile.read(size)
