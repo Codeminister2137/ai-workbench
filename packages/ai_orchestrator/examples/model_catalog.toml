@@ -134,6 +134,33 @@ review_deliberative = true
 review_direct = true
 
 [[models]]
+route_id = "ollama/devstral-small-2:24b"
+provider = "ollama"
+product = "ollama"
+model = "devstral-small-2:24b"
+location = "local"
+access_method = "local_runtime"
+auth_method = "none"
+billing_source = "local_free"
+cost_policy_tier = "local_only"
+quality = "standard"
+latency = "interactive"
+notes = "Pulled 2026-11-20 for the local-agent-model decision; quality not yet evaluated. Capabilities unmeasured (chat assumed; the L3 ladder exercises only chat)."
+
+[models.capabilities]
+chat = true
+streaming = false
+tools = false
+structured_output = false
+multimodal_input = false
+embeddings = false
+
+[models.estimate]
+input_cost_per_million_tokens = 0
+output_cost_per_million_tokens = 0
+source = "local runtime: no per-token billing"
+
+[[models]]
 route_id = "openai/codex-gpt-6.1-sol"
 provider = "openai"
 product = "codex"

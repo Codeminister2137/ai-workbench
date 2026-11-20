@@ -24,6 +24,7 @@ resolve_route = _module.resolve_route
 FREE = CostPolicyTier.FREE_ONLY
 PREPAID = CostPolicyTier.PREPAID_CREDITS_ALLOWED
 BILLING = CostPolicyTier.BILLING_ALLOWED
+LOCAL = CostPolicyTier.LOCAL_ONLY
 
 
 def test_recent_failed_models_collects_error_ids(tmp_path) -> None:
@@ -117,6 +118,40 @@ def test_resolve_route_pins_without_live_refresh() -> None:
         live_refresh=False,
     )
     assert candidates == ["muse-spark-1.3"]
+
+
+def test_resolve_route_ollama_needs_no_credentials() -> None:
+    from ai_orchestrator.catalog import load_model_catalog
+
+    catalog = load_model_catalog(
+        Path(__file__).resolve().parents[1] / "packages/ai_orchestrator/examples/model_catalog.toml"
+    )
+    candidates, note = resolve_route(
+        "ollama",
+        catalog=catalog,
+        credentials={},
+        allow_tier=LOCAL,
+        max_candidates=0,
+        skip=frozenset(),
+        live_refresh=False,
+    )
+    assert "qwen3:14b" in candidates
+    assert "devstral-small-2:24b" in candidates
+    assert not note.startswith("tier-blocked")
+
+
+def test_resolve_route_local_only_blocks_hosted() -> None:
+    candidates, note = resolve_route(
+        "meta",
+        catalog=(),
+        credentials={},
+        allow_tier=LOCAL,
+        max_candidates=3,
+        skip=frozenset(),
+        live_refresh=False,
+    )
+    assert candidates == []
+    assert note.startswith("tier-blocked")
 
 
 def test_apply_tier_blocks_rewrites_skips_only() -> None:
