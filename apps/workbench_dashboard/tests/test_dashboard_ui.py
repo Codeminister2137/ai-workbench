@@ -867,10 +867,11 @@ def test_inbox_close_form_and_reopen_markers() -> None:
 
 
 def test_inbox_checkbox_filters_default_human_attention() -> None:
-    """Inbox mixes Who/State checkboxes; default is human attention."""
+    """Inbox mixes Who/State/Kind checkboxes; default is human attention, no reports."""
     js = _read("app.js")
     assert 'filterBoxes("inbox-filters"' in js
-    assert '"human,open,answered,followup"' in js
+    assert '"human,open,answered,followup,decision,clarification,order,task"' in js
+    assert '"human,open,answered,followup"' not in js
     assert 'data-f="${t}"' in js
     for token, label in (
         ("human", "Human"),
@@ -879,6 +880,11 @@ def test_inbox_checkbox_filters_default_human_attention() -> None:
         ("answered", "Answered"),
         ("followup", "Needs follow-up"),
         ("closed", "Closed"),
+        ("decision", "Decisions"),
+        ("clarification", "Clarifications"),
+        ("order", "Orders"),
+        ("task", "Tasks"),
+        ("report", "Reports"),
     ):
         assert f'["{token}", "{label}"' in js
     assert "status=queue" not in js
@@ -909,7 +915,7 @@ def test_all_list_tabs_share_filter_helper() -> None:
     assert "function bindFilterBoxes(id, base, param)" in js
     assert "function pickedTokens(param, fallback)" in js
     for view, default in (
-        ("inbox", "human,open,answered,followup"),
+        ("inbox", "human,open,answered,followup,decision,clarification,order,task"),
         ("e2e", "open,fail"),
         ("plans", "active"),
         ("runs", "failed,running,queued,paused,waiting,approved"),
@@ -1468,6 +1474,62 @@ const shown = (html) => (html.match(/<li>/g) || []).length;
   location.hash = '#/inbox?project=p1';
   await renderInbox(undefined);
   assert(view.innerHTML.includes('Project filter active'), 'project divergence noted');
+})().catch(error => {console.error(error); process.exitCode = 1;});
+"""
+    result = subprocess.run(
+        [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_inbox_kind_filter_hides_reports_by_default() -> None:
+    node = _node_driver()
+    driver = r"""
+const assert = require('assert');
+const source = require('fs').readFileSync(process.argv[1], 'utf8');
+const grab = (name) => eval('(' + source.slice(source.indexOf('function ' + name + '('),
+  source.indexOf('\n}', source.indexOf('function ' + name + '(')) + 2) + ')');
+const esc = grab('esc');
+const gtext = grab('gtext');
+const filterBoxes = grab('filterBoxes');
+const pickedTokens = grab('pickedTokens');
+const bindFilterBoxes = grab('bindFilterBoxes');
+const projectOptions = async () => '<option value="">All projects</option>';
+eval(source.slice(source.indexOf('const ID_ROUTES'), source.indexOf('function truncate(')));
+const renderer = source.slice(source.indexOf('async function renderInbox('),
+  source.indexOf('async function markIdeaSeen('));
+eval(renderer);
+const view = {innerHTML: '', querySelectorAll: () => []};
+const location = {hash: '#/inbox'};
+const document = {getElementById: () => ({addEventListener() {}})};
+const items = [
+  {id: 'd1', title: 'Decide this', type: 'decision', status: 'open', assignee: 'owner'},
+  {id: 'r1', title: 'Chain report', type: 'report', status: 'open', assignee: 'owner'},
+  {id: 't1', title: 'Do that', type: 'task', status: 'open', assignee: 'owner'},
+  {id: 'f1', title: 'Future kind', type: 'memo', status: 'open', assignee: 'owner'},
+];
+const api = async (path) => ({items, attention_ids: ['d1', 'r1', 't1', 'f1']});
+const shown = (html) => (html.match(/<li>/g) || []).length;
+(async () => {
+  await renderInbox(undefined);
+  assert.equal(shown(view.innerHTML), 3, 'default hides the report only');
+  assert(!view.innerHTML.includes('Chain report'), 'report hidden');
+  assert(view.innerHTML.includes('Future kind'), 'unknown kind fails open');
+  assert(view.innerHTML.includes('Reports hide by default'), 'banner explains the gap');
+  assert(!view.innerHTML.includes('Show all'), 'no looping reset link');
+  location.hash = '#/inbox?f=human,open,answered,followup,decision,clarification,order,task,report';
+  await renderInbox(undefined);
+  assert.equal(shown(view.innerHTML), 4, 'ticking Reports reveals it');
+  location.hash = '#/inbox?f=human,open,report';
+  await renderInbox(undefined);
+  assert.equal(shown(view.innerHTML), 2, 'kind narrows; unknown kind still fails open');
+  assert(view.innerHTML.includes('Chain report'));
+  location.hash = '#/inbox?f=human,open';
+  await renderInbox(undefined);
+  assert.equal(shown(view.innerHTML), 3, 'old bookmark without kinds uses defaults');
+  assert(!view.innerHTML.includes('Chain report'), 'report still hidden');
+  assert(view.innerHTML.includes('data-f="task" title="Work items to do or supervise" checked'),
+    'default kind boxes render checked');
 })().catch(error => {console.error(error); process.exitCode = 1;});
 """
     result = subprocess.run(

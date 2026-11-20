@@ -1969,7 +1969,7 @@ async function renderInbox(id) {
   }
   const params = new URLSearchParams(location.hash.split("?")[1] || "");
   const explicitFilters = params.has("f");
-  const picked = pickedTokens("f", "human,open,answered,followup");
+  const picked = pickedTokens("f", "human,open,answered,followup,decision,clarification,order,task");
   const inboxProj = params.get("project") || "";
   const inboxUrl = inboxProj ? "/api/inbox?project_id=" + encodeURIComponent(inboxProj) : "/api/inbox";
   const payload = await api(inboxUrl);
@@ -1980,17 +1980,28 @@ async function renderInbox(id) {
     if (isFollowup(t)) s.push("followup");
     return s;
   };
+  // Reports hide by default (read-only; nothing hangs on them). Unknown
+  // kinds fail open: never silently hide a type this view doesn't know.
+  // URLs without kind tokens (old bookmarks) get the default kinds.
+  const KNOWN_KINDS = new Set(["decision", "clarification", "order", "task", "report"]);
+  const kindPicked = new Set([...picked].filter((t) => KNOWN_KINDS.has(t)));
+  if (!kindPicked.size) for (const k of ["decision", "clarification", "order", "task"]) kindPicked.add(k);
+  const kindOK = (t) => !KNOWN_KINDS.has(t.type) || kindPicked.has(t.type);
   // Default view renders the backend attention set verbatim (badge == view
-  // by construction); explicit filter tokens narrow it with the banner.
+  // by construction), minus default-hidden reports; explicit filter tokens
+  // narrow it with the banner.
   const attentionOrder = new Map((payload.attention_ids || []).map((id, i) => [id, i]));
   const inAttention = (t) => attentionOrder.has(t.id);
   const shown = (!explicitFilters && !inboxProj)
-    ? payload.items.filter(inAttention).sort((a, b) => attentionOrder.get(a.id) - attentionOrder.get(b.id))
-    : payload.items.filter((t) => picked.has(who(t)) && states(t).some((s) => picked.has(s)));
+    ? payload.items.filter((t) => inAttention(t) && kindOK(t)).sort((a, b) => attentionOrder.get(a.id) - attentionOrder.get(b.id))
+    : payload.items.filter((t) => picked.has(who(t)) && states(t).some((s) => picked.has(s)) && kindOK(t));
   const shownIds = new Set(shown.map((t) => t.id));
   const hiddenCount = (payload.attention_ids || []).filter((id) => !shownIds.has(id)).length;
+  const hiddenReports = (!explicitFilters && !inboxProj)
+    ? payload.items.filter((t) => inAttention(t) && !shownIds.has(t.id) && t.type === "report").length
+    : 0;
   const divergence = hiddenCount || inboxProj
-    ? `<p class="muted"><strong>${hiddenCount ? hiddenCount + " attention item" + (hiddenCount === 1 ? "" : "s") + " hidden by filters. " : ""}${inboxProj ? "Project filter active — the badge counts all projects. " : ""}</strong><a href="#/inbox">Show all</a></p>`
+    ? `<p class="muted"><strong>${hiddenCount ? hiddenCount + " attention item" + (hiddenCount === 1 ? "" : "s") + " hidden by filters. " : ""}${hiddenReports ? "Reports hide by default — tick Reports to show them. " : ""}${inboxProj ? "Project filter active — the badge counts all projects. " : ""}</strong>${hiddenReports && !explicitFilters && !inboxProj ? "" : '<a href="#/inbox">Show all</a>'}</p>`
     : "";
   const items = shown.length
     ? shown.map((t) =>
@@ -2000,10 +2011,12 @@ async function renderInbox(id) {
   const groups = [
     ["Who", [["human", "Human", "Tasks assigned to you"], ["ai", "AI", "Tasks assigned to the agent"]]],
     ["State", [["open", "Open", "Not yet answered"], ["answered", "Answered", "Answered, awaiting close"], ["followup", "Needs follow-up", "Closed or open with follow-up requested"], ["closed", "Closed", "Archived tasks"]]],
+    ["Kind", [["decision", "Decisions", "Choices for you to make"], ["clarification", "Clarifications", "Questions needing your input"], ["order", "Orders", "Directives for you to approve"], ["task", "Tasks", "Work items to do or supervise"], ["report", "Reports", "Read-only records; nothing hangs on them"]]],
   ];
+  const boxPicked = new Set([...picked, ...kindPicked]);
   view.innerHTML = `<h1>Inbox</h1>
     ${divergence}
-    ${filterBoxes("inbox-filters", groups, picked)}
+    ${filterBoxes("inbox-filters", groups, boxPicked)}
     <p><input type="text" id="filter-inbox" placeholder="Filter tasks..." title="Filter inbox by text">
     <select id="filter-inbox-project" title="Show inbox tasks for one project">${await projectOptions(inboxProj)}</select>
     <input type="text" id="lookup-id" placeholder="Find item by ID..." title="Look up any inbox, run, idea, or plan ID (full or unique prefix)">
