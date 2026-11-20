@@ -142,6 +142,38 @@ def test_closed_after_approve_executes(drain, stores, calls) -> None:
     assert [call["id"] for call in calls] == [run_id]
 
 
+@pytest.mark.parametrize("mode", [None, "owner-filed", "e2e-followup", "agent-queue"])
+@pytest.mark.parametrize("status", ["open", "answered", "closed"])
+@pytest.mark.parametrize("answer", [None, "", "Approve", "Schedule it", "Reject", "Use option B"])
+def test_approval_mode_status_answer_matrix(drain, stores, calls, mode, status, answer):
+    """Completed tasks park; recorded decisions remain available for close-out."""
+    run_id, inbox_id = _queue_chat_run(stores)
+    item = stores.inbox.get(inbox_id)
+    item.update(status=status, answer=answer)
+    stores.inbox.put(inbox_id, item)
+    run = stores.runs.get(run_id)
+    run["approval_mode"] = mode
+    stores.runs.put(run_id, run)
+    path = stores.data_dir / "runs" / f"{run_id}.json"
+    before = path.read_bytes()
+
+    allowed = (
+        not (status == "closed" and not answer)
+        if mode is not None
+        else status in {"answered", "closed"} and answer in {"Approve", "Schedule it"}
+    )
+    outcomes = drain.drain()
+    if allowed:
+        assert outcomes == [{"run_id": run_id, "status": "completed"}]
+        assert [call["id"] for call in calls] == [run_id]
+    else:
+        assert outcomes[0]["action"] == "parked"
+        assert calls == []
+        assert path.read_bytes() == before
+        assert stores.runs.get(run_id)["status"] == "queued"
+    assert _claim_files(stores) == []
+
+
 def test_broken_approval_link_parks_fail_closed(drain, stores, calls) -> None:
     stores.runs.put("nolink", {"id": "nolink", "title": "t", "status": "queued"})
     stores.runs.put(

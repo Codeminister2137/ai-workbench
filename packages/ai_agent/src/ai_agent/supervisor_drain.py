@@ -12,9 +12,11 @@ inbox record carries a recorded approval answer (``Approve``, or
 or ``closed`` (close is archival and answers are immutable after close, so a
 close preceding the drain pass must not strand an approval), or when the run
 is marked with a preapproved ``approval_mode`` (``owner-filed``,
-``e2e-followup``, ``agent-queue``).
-Open, rejected,
-closed-without-answer, missing, or unreadable approvals leave the run parked:
+``e2e-followup``, ``agent-queue``). Preapproval permits open and answered
+linked items, but a linked item closed without an answer parks the run:
+the work is already complete. Closed-with-answer items still permit close-out.
+Without preapproval, open or rejected approvals also park the run.
+Closed-without-answer, missing, or unreadable linked items leave the run parked:
 never executed, never deleted. Paused runs resume without re-approval. The
 refusal path is an explicit ``Reject`` answer (or run cancellation), never a
 bare close.
@@ -193,9 +195,10 @@ class RunDrain:
             pass
 
     def _approval_allows(self, run: dict) -> tuple[bool, str]:
-        if run.get("approval_mode") in PREAPPROVED_MODES:
-            return True, f"preapproved ({run.get('approval_mode')})"
+        preapproved = run.get("approval_mode") in PREAPPROVED_MODES
         inbox_id = run.get("inbox_id")
+        if preapproved and not inbox_id:
+            return True, f"preapproved ({run.get('approval_mode')})"
         if not inbox_id or not isinstance(inbox_id, str):
             return False, "run has no linked inbox approval"
         try:
@@ -206,6 +209,10 @@ class RunDrain:
             return False, "linked approval not found"
         status = record.get("status")
         answer = record.get("answer")
+        if status == "closed" and not answer:
+            return False, "approval is closed"
+        if preapproved:
+            return True, f"preapproved ({run.get('approval_mode')})"
         if answer in APPROVAL_ANSWERS and status in ("answered", "closed"):
             return True, "approved"
         if status == "open":
