@@ -220,3 +220,86 @@ def test_search_prospeo_companies_validates_and_maps_errors() -> None:
         search_prospeo_companies(
             api_key="k", filters={"a": 1}, post=lambda *a: {"error": False, "companies": {}}
         )
+
+
+def test_registry_warns_without_exception_values(monkeypatch, capsys):
+    class BrokenSource:
+        def __init__(self):
+            raise RuntimeError("sensitive-value")
+
+    monkeypatch.setattr(vendor_sources, "ProspeoContactSource", BrokenSource)
+    monkeypatch.setattr(vendor_sources, "_read_env_or_dotenv", lambda name: None)
+    registry = vendor_sources.default_contact_registry()
+    assert registry.source_names
+    assert capsys.readouterr().err == "vendor_sources: BrokenSource: RuntimeError\n"
+
+
+@pytest.mark.parametrize("reason", ["duplicate", "empty", "unreadable", "missing", "missing-file"])
+def test_credential_status_warning(monkeypatch, capsys, reason):
+    from ai_provider import secrets
+
+    monkeypatch.delenv("TEST_VENDOR_KEY", raising=False)
+    monkeypatch.setattr(
+        secrets,
+        "secret_status",
+        lambda path, name: secrets.SecretStatus(name, False, reason, str(path)),
+    )
+    assert vendor_sources._read_env_or_dotenv("TEST_VENDOR_KEY") is None
+    warning = capsys.readouterr().err
+    if reason in {"missing", "missing-file"}:
+        assert warning == ""
+    else:
+        assert warning == f"vendor_sources: TEST_VENDOR_KEY: {reason}\n"
+
+
+def test_credential_environment_precedes_dotenv(monkeypatch):
+    from ai_provider import secrets
+
+    monkeypatch.setenv("TEST_VENDOR_KEY", " test-value ")
+
+    def unexpected(*args):
+        pytest.fail("dotenv must not be read when environment is configured")
+
+    monkeypatch.setattr(secrets, "secret_status", unexpected)
+    assert vendor_sources._read_env_or_dotenv("TEST_VENDOR_KEY") == "test-value"
+
+
+@pytest.mark.parametrize(
+    "content, expected, reason",
+    [
+        ("TEST_VENDOR_KEY=first\nTEST_VENDOR_KEY=second\n", None, "duplicate"),
+        ("TEST_VENDOR_KEY=\n", None, "empty"),
+        ("OTHER_KEY=value\n", None, None),
+        ("TEST_VENDOR_KEY=test-value\n", "test-value", None),
+    ],
+)
+def test_credential_dotenv_verdicts(tmp_path, monkeypatch, capsys, content, expected, reason):
+    monkeypatch.delenv("TEST_VENDOR_KEY", raising=False)
+    monkeypatch.setattr(
+        vendor_sources,
+        "__file__",
+        str(tmp_path / "apps" / "job_search" / "job-email" / "vendor_sources.py"),
+    )
+    (tmp_path / ".env").write_text(content, encoding="utf-8")
+    assert vendor_sources._read_env_or_dotenv("TEST_VENDOR_KEY") == expected
+    assert capsys.readouterr().err == (
+        f"vendor_sources: TEST_VENDOR_KEY: {reason}\n" if reason else ""
+    )
+
+
+def test_credential_read_failure_warns_without_values(monkeypatch, capsys):
+    from ai_provider import secrets
+
+    monkeypatch.delenv("TEST_VENDOR_KEY", raising=False)
+    monkeypatch.setattr(
+        secrets,
+        "secret_status",
+        lambda path, name: secrets.SecretStatus(name, True, "ok", str(path)),
+    )
+
+    def fail(*args, **kwargs):
+        raise ValueError("sensitive-value")
+
+    monkeypatch.setattr(secrets, "read_secret_key", fail)
+    assert vendor_sources._read_env_or_dotenv("TEST_VENDOR_KEY") is None
+    assert capsys.readouterr().err == "vendor_sources: TEST_VENDOR_KEY: read failed (ValueError)\n"

@@ -2085,7 +2085,9 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                             item["steps"], index, min(remaining, CHECK_TIMEOUT_SECONDS)
                         )
                     except ValueError:
-                        continue
+                        step["evidence"] = "[auto-check skipped: invalid step]"
+                        step["evidence_utc"] = datetime.now(UTC).isoformat()
+                        step["evidence_exit"] = None
                     touched = True
             if touched:
                 stores.e2e_tasks.put(task_id, record)

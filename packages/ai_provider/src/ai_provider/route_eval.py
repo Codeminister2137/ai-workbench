@@ -827,8 +827,8 @@ def capability_cards(results: list[EvalResult]) -> list[dict[str, Any]]:
     return list(cards.values())
 
 
-def _list_rows(route: str, credentials: dict[str, str | None]) -> list[dict]:
-    """Raw model rows from a route's live list endpoint (for model selection)."""
+def _list_rows(route: str, credentials: dict[str, str | None]) -> list[dict] | None:
+    """Raw model rows, or None when fetching or parsing the list fails."""
     import urllib.request
 
     entry = next(item for item in route_probe.ROUTES if item[0] == route)
@@ -842,18 +842,21 @@ def _list_rows(route: str, credentials: dict[str, str | None]) -> list[dict]:
         ) as response:
             raw = json.loads(response.read(route_probe._MAX_BYTES + 1).decode("utf-8"))
     except Exception:
-        return []
+        return None
     rows = raw.get("data") if isinstance(raw, dict) else None
     if not isinstance(rows, list):
         rows = raw.get("models") if isinstance(raw, dict) else None
     if not isinstance(rows, list):
-        return []
+        return None
     return [row for row in rows if isinstance(row, dict)]
 
 
 def _list_model_ids(route: str, credentials: dict[str, str | None]) -> list[str]:
     """All model ids from a route's live list endpoint (for model selection)."""
     rows = _list_rows(route, credentials)
+    if rows is None:
+        print(f"route_eval: {route}: model list unavailable; skipping selection", file=sys.stderr)
+        return []
     ids = [row.get("id") for row in rows]
     if not any(ids):
         ids = [row.get("name") for row in rows]
@@ -861,7 +864,7 @@ def _list_model_ids(route: str, credentials: dict[str, str | None]) -> list[str]
 
 
 def list_free_candidates(route: str, credentials: dict[str, str | None]) -> list[str]:
-    """Live $0-verified model ids for free-tier routes; [] elsewhere or empty.
+    """Live $0-verified model ids; failed lists skip with a stderr note.
 
     OpenRouter picks ``:free`` ids in list order; Requesty applies the same
     zero-price rule the completion guard enforces live. Paid and allowance
@@ -872,6 +875,11 @@ def list_free_candidates(route: str, credentials: dict[str, str | None]) -> list
     if route == "requesty":
         # Same zero-price rule the completion guard enforces live.
         rows = _list_rows(route, credentials)
+        if rows is None:
+            print(
+                f"route_eval: {route}: model list unavailable; skipping selection", file=sys.stderr
+            )
+            return []
         return [
             row["id"] for row in rows if isinstance(row.get("id"), str) and _zero_price_row(row)
         ]

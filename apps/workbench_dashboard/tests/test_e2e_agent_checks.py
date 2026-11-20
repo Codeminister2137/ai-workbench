@@ -127,3 +127,32 @@ def test_execute_check_refuses_unrunnable(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="no exact runnable command"):
         e2e_agent_checks.execute_check("Just look at it", tmp_path)
+
+
+def test_auto_checks_persist_invalid_step_and_continue(monkeypatch):
+    from types import SimpleNamespace
+
+    from dashboard_web_app import DashboardRequestHandler
+
+    steps = [
+        {"agent_runnable": True, "action": "invalid"},
+        {"agent_runnable": True, "action": "valid"},
+    ]
+    record = {"status": "open", "items": [{"steps": steps}]}
+    saved = []
+    store = SimpleNamespace(get=lambda task_id: record, put=lambda *args: saved.append(args))
+    handler = object.__new__(DashboardRequestHandler)
+    monkeypatch.setattr(handler, "_stores", lambda: SimpleNamespace(e2e_tasks=store))
+
+    def attach(steps, index, timeout):
+        if index == 0:
+            raise ValueError("private detail")
+        steps[index]["evidence"] = "passed"
+
+    monkeypatch.setattr(handler, "_attach_step_evidence", attach)
+    handler._auto_run_pending_checks("task")
+    assert saved == [("task", record)]
+    assert steps[0]["evidence"] == "[auto-check skipped: invalid step]"
+    assert steps[0]["evidence_utc"]
+    assert steps[0]["evidence_exit"] is None
+    assert steps[1]["evidence"] == "passed"

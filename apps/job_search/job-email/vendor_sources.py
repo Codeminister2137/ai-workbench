@@ -63,17 +63,22 @@ def _read_env_or_dotenv(name: str) -> str | None:
     if value:
         return value
     try:
-        from ai_provider.secrets import read_secret_key
+        from ai_provider.secrets import read_secret_key, secret_status
     except ImportError:
         # Never conflate an unavailable reader with a missing key:
         # warn loudly so diagnostics check the reader, not the store.
         print(f"vendor_sources: ai_provider secrets reader unavailable for {name}", file=sys.stderr)
         return None
+    path = Path(__file__).resolve().parents[3] / ".env"
+    status = secret_status(path, name)
+    if not status.present:
+        if status.reason not in {"missing", "missing-file"}:
+            print(f"vendor_sources: {name}: {status.reason}", file=sys.stderr)
+        return None
     try:
-        return read_secret_key(
-            Path(__file__).resolve().parents[3] / ".env", name, label="Vendor credential"
-        )
-    except (OSError, ValueError):
+        return read_secret_key(path, name, label="Vendor credential")
+    except (OSError, ValueError, UnicodeError) as exc:
+        print(f"vendor_sources: {name}: read failed ({type(exc).__name__})", file=sys.stderr)
         return None
 
 
@@ -378,7 +383,8 @@ def default_contact_registry() -> ContactRegistry:
     for cls in (ProspeoContactSource, ApolloContactSource):
         try:
             source = cls()
-        except Exception:
+        except Exception as exc:
+            print(f"vendor_sources: {cls.__name__}: {type(exc).__name__}", file=sys.stderr)
             continue
         if source.ready:
             sources.append(source)

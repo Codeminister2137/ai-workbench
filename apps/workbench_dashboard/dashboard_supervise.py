@@ -366,19 +366,21 @@ class ProcessInfo:
     parent: int | None
 
 
-def _probe_processes(pids: list[int]) -> dict[int, ProcessInfo]:
+def _probe_processes(pids: list[int]) -> dict[int, ProcessInfo] | None:
     """Map pids to command line + parent via one CIM query (Windows only).
 
-    Returns only the pids the query answered for; any failure yields an
-    empty map and the restart refuses rather than guessing ownership.
+    Returns only the pids the query answered for; infrastructure failure
+    yields None so callers can refuse destructive work.
     """
-    if os.name != "nt" or not pids:
+    if not pids:
         return {}
+    if os.name != "nt":
+        return None
     filt = " or ".join(f"ProcessId={pid}" for pid in sorted(set(pids)))
     script = (
         "$rows = @(Get-CimInstance Win32_Process -Filter '"
         + filt
-        + "' | Select-Object ProcessId, CommandLine, ParentProcessId); "
+        + "' -ErrorAction Stop | Select-Object ProcessId, CommandLine, ParentProcessId); "
         "$rows | ConvertTo-Json -Compress"
     )
     try:
@@ -389,13 +391,13 @@ def _probe_processes(pids: list[int]) -> dict[int, ProcessInfo]:
             timeout=60,
         )
     except (OSError, subprocess.SubprocessError):
-        return {}
+        return None
     if proc.returncode != 0:
-        return {}
+        return None
     try:
         payload = json.loads(proc.stdout.strip() or "null")
     except ValueError:
-        return {}
+        return None
     rows = payload if isinstance(payload, list) else [payload]
     found: dict[int, ProcessInfo] = {}
     for row in rows:
@@ -419,7 +421,7 @@ def _probe_processes(pids: list[int]) -> dict[int, ProcessInfo]:
 
 def _probe_cmdlines(pids: list[int]) -> dict[int, str]:
     """Map pids to command lines (parent-blind convenience wrapper)."""
-    return {pid: info.cmdline for pid, info in _probe_processes(pids).items()}
+    return {pid: info.cmdline for pid, info in (_probe_processes(pids) or {}).items()}
 
 
 def _cmdline_is_ours(cmdline: str, port: int) -> bool:
@@ -559,6 +561,8 @@ def reconcile_strays(config: SuperviseConfig) -> tuple[int, str]:
     # same-argv child) looks like a stray: socketless, old, ours. Never
     # reap a shim whose child is alive — it is the live server's parent.
     detail_map = _probe_processes(sorted(set(olds) | set(ours)))
+    if detail_map is None:
+        return 0, "kept all: process probe failed"
     children: dict[int, list[int]] = {}
     for pid, info in detail_map.items():
         if info.parent is not None:
