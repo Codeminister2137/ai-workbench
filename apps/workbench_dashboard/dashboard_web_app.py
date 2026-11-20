@@ -2084,8 +2084,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                         self._attach_step_evidence(
                             item["steps"], index, min(remaining, CHECK_TIMEOUT_SECONDS)
                         )
-                    except ValueError:
-                        step["evidence"] = "[auto-check skipped: invalid step]"
+                    except ValueError as exc:
+                        step["evidence"] = f"[auto-check failed: {exc}]"
                         step["evidence_utc"] = datetime.now(UTC).isoformat()
                         step["evidence_exit"] = None
                     touched = True
