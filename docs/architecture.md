@@ -61,8 +61,9 @@ decision, not an automatic extension of the pin.
 Applications include the AI Council, Job Search Automation, and future automation/client applications.
 Investor's accepted direction is broader asset research followed by autonomous
 paper experiments with inspectable decision records (ADR-093). Its current
-offline evaluator does not yet provide broker execution or a durable decision
-journal; the policy does not authorize real-money execution or paid services.
+offline evaluator now records immutable decisions and linked assessments in
+Council SQLite (ADR-097); broker execution remains future work. The policy
+does not authorize real-money execution or paid services.
 Applications should support official AI access routes, such as local Ollama,
 direct hosted provider APIs, Requesty-style gateways, subscription-backed
 clients such as Codex CLI, and orchestrator-guided route selection. The choice

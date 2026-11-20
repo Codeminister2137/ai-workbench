@@ -96,7 +96,7 @@ Alpaca remains the selected first broker (prior inbox `d50c644d`); no additional
 broker or executable universe is selected. Real spending and paid services remain
 outside this decision. See [ADR-093](decisions/ADR-093-investor-coverage-and-paper-autonomy.md)
 and [dated research](research/investor-coverage-20261119.md). Runtime integration
-and a durable Investor journal remain future implementation, not completed features.
+remains future implementation; ADR-097 adds the offline SQLite journal.
 
 ## ADR-090 - Dashboard-native Mai supervision (2026-11-18)
 
@@ -1265,3 +1265,9 @@ missing/stale readings or threshold crossing stop further calls. Metered spend
 and floor changes remain separate. The deterministic guard is implemented;
 the broader eval runner/scheduler and durable cycle accounting remain incomplete.
 See [decision and implementation boundary](decisions/eval-allowance-observed-threshold.md).
+
+## ADR-097 - Investor offline journal in Council SQLite (2026-11-20)
+
+Owner chose A on inbox `713fe10d90de4e20abf32e175006c234`: additive
+Council SQLite decision/outcome tables and injected offline replay.
+See [ADR-097](decisions/ADR-097-investor-offline-journal.md).

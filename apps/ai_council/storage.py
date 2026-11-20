@@ -21,6 +21,24 @@ class ConversationStore:
     def _migrate(self) -> None:
         self.connection.executescript(
             """
+            CREATE TABLE IF NOT EXISTS investor_decisions (
+                id TEXT PRIMARY KEY,
+                run_id TEXT NOT NULL,
+                record TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS investor_outcomes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                decision_id TEXT NOT NULL REFERENCES investor_decisions(id),
+                record TEXT NOT NULL
+            );
+            CREATE TRIGGER IF NOT EXISTS investor_decisions_no_update
+            BEFORE UPDATE ON investor_decisions BEGIN SELECT RAISE(ABORT, 'immutable'); END;
+            CREATE TRIGGER IF NOT EXISTS investor_decisions_no_delete
+            BEFORE DELETE ON investor_decisions BEGIN SELECT RAISE(ABORT, 'immutable'); END;
+            CREATE TRIGGER IF NOT EXISTS investor_outcomes_no_update
+            BEFORE UPDATE ON investor_outcomes BEGIN SELECT RAISE(ABORT, 'immutable'); END;
+            CREATE TRIGGER IF NOT EXISTS investor_outcomes_no_delete
+            BEFORE DELETE ON investor_outcomes BEGIN SELECT RAISE(ABORT, 'immutable'); END;
             CREATE TABLE IF NOT EXISTS conversations (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL UNIQUE,
