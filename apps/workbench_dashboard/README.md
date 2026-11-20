@@ -138,3 +138,20 @@ older status cache, without frontend registration. Optional display metadata can
 refine their presentation. Catalogue inclusion does not establish authentication,
 reachability or execution support: services without a status integration display
 `status unavailable`. Refresh continues to use only the existing status probes.
+
+
+## Orchestrator queries
+
+System > Orchestrator (`#/orchestrator`) is one read-only view over the configured
+model catalog and the existing `GET /api/orchestrator/routes` query path.
+Browse recorded grades and explanatory notes, search catalog fields by words,
+and change capability, maximum cost policy and privacy filters to inspect the
+recommender's selection and rejection reasons. Text search filters the catalog
+list independently of recommendation constraints. No-match searches and zero
+eligible routes are separate states; rejection explanations remain visible.
+
+This minimal surface uses existing catalog evidence, not live provider admission.
+A grade is a policy value, not proof of measured quality; missing explanations
+are labelled. Queries do not probe providers or execute inference. Arbitrary
+natural-language interpretation, live availability and new knowledge sources
+remain outside this slice and require a separately agreed design.

@@ -17,6 +17,7 @@ def query_routes(
     capabilities: list[str] | None = None,
     cost_tier: str = "prepaid_credits_allowed",
     privacy: str = "external_allowed",
+    search: str = "",
 ) -> dict[str, Any]:
     """Recommend catalog routes for a capability set; raises ValueError on bad input."""
     from ai_orchestrator import CostPolicyTier, load_model_catalog
@@ -25,8 +26,9 @@ def query_routes(
         TaskCapability,
         TaskProfile,
         TaskType,
+        supports_capability,
     )
-    from ai_orchestrator.recommender import recommend_model
+    from ai_orchestrator.recommender import NoCandidateError, recommend_model
 
     try:
         required = frozenset(TaskCapability(name) for name in (capabilities or ["chat"]))
@@ -50,12 +52,52 @@ def query_routes(
         required_capabilities=required,
         cost_policy_tier=tier,
     )
+    catalog_rows = [
+        {
+            "route_id": entry.backend.route_id,
+            "provider": entry.backend.provider,
+            "model": entry.backend.model,
+            "quality": entry.quality.value,
+            "notes": entry.notes or "No grade explanation recorded.",
+            "cost_tier": entry.backend.cost_policy_tier.value,
+            "capabilities": [
+                member.value
+                for member in TaskCapability
+                if supports_capability(entry.backend.capabilities, member)
+            ],
+        }
+        for entry in catalog
+    ]
+    terms = search.casefold().split()
+    catalog_rows = [
+        row for row in catalog_rows if all(term in str(row).casefold() for term in terms)
+    ]
+    options = {
+        "capabilities": [member.value for member in TaskCapability],
+        "cost_tiers": [member.value for member in CostPolicyTier],
+        "privacy": [member.value for member in PrivacyClass],
+    }
     try:
         result = recommend_model(profile, catalog)
-    except ValueError as exc:
-        return {"ok": False, "error": str(exc), "routes": [], "rejected": []}
+    except NoCandidateError as exc:
+        return {
+            "ok": True,
+            "admitted": False,
+            "message": str(exc),
+            "routes": [],
+            "catalog": catalog_rows,
+            "options": options,
+            "rejected": [
+                {"route_id": item.candidate.backend.route_id, "reason": item.reason}
+                for item in exc.rejected
+            ],
+            "reasons": [],
+        }
     return {
         "ok": True,
+        "admitted": True,
+        "catalog": catalog_rows,
+        "options": options,
         "routes": [
             {
                 "route_id": entry.backend.route_id,

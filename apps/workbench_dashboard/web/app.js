@@ -3251,6 +3251,7 @@ async function render() {
     else if (name === "schedule") await renderSchedule();
     else if (name === "fleet") await renderFleet();
     else if (name === "providers") await renderProviders();
+    else if (name === "orchestrator") await renderOrchestrator();
     else if (name === "restrictions") await renderRestrictions();
     else if (name === "knowme") await renderKnowme();
     else if (name === "help") renderHelp();
@@ -3332,3 +3333,50 @@ render();
 startInboxPoll();
 startMaintPoll();
 loadVersionPill();
+
+
+async function renderOrchestrator() {
+  view.innerHTML = `<h1>Orchestrator</h1>
+    <p>Read-only catalog knowledge. Grades are recorded policy values; notes describe available evidence.
+    Recommendations do not check live availability, quotas or credentials and do not authorize execution.</p>
+    <form id="orchestrator-query">
+      <label>Catalog text search <input name="search" title="Search recorded catalog fields" placeholder="Model, provider, grade or notes"></label>
+      <p>Text search matches all words in catalog fields; it does not interpret natural-language questions or change recommendations.</p>
+      <label>Required capability <select name="capability" title="Required route capability"></select></label>
+      <label>Maximum cost policy <select name="cost_tier" title="Maximum permitted catalog cost tier"></select></label>
+      <label>Privacy <select name="privacy" title="Task privacy constraint"></select></label>
+      <button type="submit" title="Query catalog without executing routes">Query</button>
+    </form><div id="orchestrator-results" aria-live="polite"></div>`;
+  const form = document.getElementById("orchestrator-query");
+  const results = document.getElementById("orchestrator-results");
+  const display = (data) => {
+    results.innerHTML = `<h2>Recommendation</h2>
+      <p>${esc(data.message || "Eligible routes under the selected catalog policy:")}</p>
+      <ul>${data.routes.map(r => `<li>${esc(r.route_id)}${r.selected ? " (selected)" : ""}</li>`).join("")}</ul>
+      <ul>${data.reasons.map(r => `<li>${esc(r)}</li>`).join("")}</ul>
+      <details><summary>Rejected routes (${data.rejected.length})</summary>
+      <ul>${data.rejected.map(r => `<li>${esc(r.route_id)}: ${esc(r.reason)}</li>`).join("")}</ul></details>
+      <h2>Catalog (${data.catalog.length})</h2>
+      ${data.catalog.length ? data.catalog.map(r => `<article class="card">
+        <h3>${esc(r.route_id)}</h3><p>${esc(r.provider)} / ${esc(r.model)}</p>
+        <p>Grade: ${esc(r.quality)}; cost: ${esc(r.cost_tier)}</p>
+        <p>Capabilities: ${esc(r.capabilities.join(", "))}</p>
+        <p>${esc(r.notes)}</p></article>`).join("") : "<p>No catalog entries match the text search.</p>"}`;
+  };
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      display(await api("/api/orchestrator/routes?" + new URLSearchParams(new FormData(form))));
+    } catch (err) { results.textContent = err.message; }
+  });
+  const data = await api("/api/orchestrator/routes");
+  for (const [name, values, selected] of [
+    ["capability", data.options.capabilities, "chat"],
+    ["cost_tier", data.options.cost_tiers, "prepaid_credits_allowed"],
+    ["privacy", data.options.privacy, "external_allowed"],
+  ]) {
+    form.elements.namedItem(name).innerHTML = values.map(value =>
+      `<option value="${esc(value)}"${value === selected ? " selected" : ""}>${esc(value)}</option>`).join("");
+  }
+  display(data);
+}
