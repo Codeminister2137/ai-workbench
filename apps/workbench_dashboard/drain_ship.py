@@ -113,6 +113,13 @@ def ship_completed_run(run: dict, *, repo_root: Path, stores: Any) -> dict[str, 
         raise RuntimeError(f"git commit failed: {(commit.stdout + commit.stderr).strip()[:300]}")
     rev = _run_git(worktree, "rev-parse", "--short", "HEAD")
     commit_hash = rev.stdout.strip() if rev.returncode == 0 else "?"
+    current = _run_git(worktree, "branch", "--show-current")
+    current_branch = current.stdout.strip() if current.returncode == 0 else ""
+    if current_branch and current_branch != "HEAD":
+        # Workers routinely move to feature branches mid-run; the merge
+        # item must name the branch holding the commit, not the stale
+        # run/* ref from the receipt.
+        branch = current_branch
     diffstat = _run_git(worktree, "show", "--stat", "--oneline", "HEAD")
     stat_line = ""
     if diffstat.returncode == 0:
