@@ -329,3 +329,63 @@ def test_cost_exemption_leaves_other_gates_intact() -> None:
             (paid,),
             cost_exemptions=frozenset({"openai_api_billing"}),
         )
+
+
+def test_no_candidate_error_carries_cheapest_blocked_diagnosis() -> None:
+    from ai_orchestrator import NoCandidateError
+
+    local_standard = _candidate(
+        "ollama", "llama3.2", BackendLocation.LOCAL, quality=QualityThreshold.STANDARD
+    )
+    billed_high = _candidate(
+        "openai", "big-model", BackendLocation.EXTERNAL, quality=QualityThreshold.HIGH
+    )
+    profile = TaskProfile(
+        privacy_class=PrivacyClass.EXTERNAL_ALLOWED,
+        quality_threshold=QualityThreshold.HIGH,
+        cost_policy_tier=CostPolicyTier.FREE_ONLY,
+    )
+    with pytest.raises(NoCandidateError) as caught:
+        recommend_model(profile, (local_standard, billed_high))
+    assert isinstance(caught.value, ValueError)
+    assert "Zero admission" in str(caught.value)
+    assert "quality x1" in caught.value.hint and "cost x1" in caught.value.hint
+    by_tier = {entry.tier: entry for entry in caught.value.cheapest_blocked}
+    assert by_tier[CostPolicyTier.LOCAL_ONLY].route_id == "ollama-llama3.2"
+    assert "quality threshold" in by_tier[CostPolicyTier.LOCAL_ONLY].reason
+    assert by_tier[CostPolicyTier.BILLING_ALLOWED].route_id == "openai-big-model"
+    assert "cost policy" in by_tier[CostPolicyTier.BILLING_ALLOWED].reason
+
+
+def test_cheapest_sufficient_route_wins_quality_ties() -> None:
+    cheap_high = _candidate(
+        "requesty", "m", BackendLocation.EXTERNAL, quality=QualityThreshold.HIGH
+    )
+    pricey_high = _candidate("openai", "m", BackendLocation.EXTERNAL, quality=QualityThreshold.HIGH)
+    recommendation = recommend_model(
+        TaskProfile(
+            privacy_class=PrivacyClass.EXTERNAL_ALLOWED,
+            quality_threshold=QualityThreshold.HIGH,
+            cost_policy_tier=CostPolicyTier.BILLING_ALLOWED,
+        ),
+        (pricey_high, cheap_high),
+    )
+    assert recommendation.selected.backend.route_id == "requesty-m"
+
+
+def test_cost_tiebreak_never_buys_quality_downgrade() -> None:
+    free_standard = _candidate(
+        "ollama", "llama3.2", BackendLocation.LOCAL, quality=QualityThreshold.STANDARD
+    )
+    billed_high = _candidate(
+        "openai", "big-model", BackendLocation.EXTERNAL, quality=QualityThreshold.HIGH
+    )
+    recommendation = recommend_model(
+        TaskProfile(
+            privacy_class=PrivacyClass.EXTERNAL_ALLOWED,
+            quality_threshold=QualityThreshold.HIGH,
+            cost_policy_tier=CostPolicyTier.BILLING_ALLOWED,
+        ),
+        (free_standard, billed_high),
+    )
+    assert recommendation.selected.backend.route_id == "openai-big-model"

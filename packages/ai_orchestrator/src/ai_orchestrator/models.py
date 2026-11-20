@@ -350,6 +350,20 @@ class CandidateRejection:
 
 
 @dataclass(frozen=True, slots=True)
+class CheapestBlocked:
+    """Closest rejected candidate in one cost tier, with its first blocker.
+
+    Built on zero admission so the owner sees exactly which constraint
+    to relax per tier instead of a bare failure.
+    """
+
+    tier: CostPolicyTier
+    route_id: str
+    quality: QualityThreshold
+    reason: str
+
+
+@dataclass(frozen=True, slots=True)
 class ModelRecommendation:
     """Selected model plus alternatives, rejections, and selection reasons."""
 

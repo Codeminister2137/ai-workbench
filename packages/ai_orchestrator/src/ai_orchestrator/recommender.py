@@ -7,6 +7,7 @@ from collections.abc import Mapping
 
 from ai_orchestrator.models import (
     CandidateRejection,
+    CheapestBlocked,
     ModelCatalogEntry,
     ModelPerformanceEstimate,
     ModelRecommendation,
@@ -24,6 +25,40 @@ _QUALITY_RANK = {
     QualityThreshold.STANDARD: 1,
     QualityThreshold.HIGH: 2,
 }
+
+_REASON_CLASSES = (
+    ("user", "Rejected by user"),
+    ("privacy", "Rejected because task is local-only"),
+    ("privacy", "Rejected because sensitive"),
+    ("cost", "Rejected because route requires cost policy"),
+    ("capability", "Rejected because candidate lacks required capability"),
+    ("quality", "Rejected because candidate does not meet the quality threshold"),
+    ("latency", "Rejected because estimated latency"),
+    ("latency", "Rejected because no latency estimate"),
+    ("latency", "Rejected because the latency estimate is invalid"),
+)
+
+
+class NoCandidateError(ValueError):
+    """Zero admission with structured diagnosis (a ValueError subclass).
+
+    Carries the full rejection list plus the cheapest blocked candidate
+    per cost tier, so callers can report which constraint to relax
+    instead of a bare failure string.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        rejected: tuple[CandidateRejection, ...],
+        cheapest_blocked: tuple[CheapestBlocked, ...],
+        hint: str,
+    ) -> None:
+        super().__init__(message)
+        self.rejected = rejected
+        self.cheapest_blocked = cheapest_blocked
+        self.hint = hint
 
 
 def recommend_model(
@@ -65,7 +100,14 @@ def recommend_model(
 
     if not accepted:
         reasons = tuple(rejection.reason for rejection in rejected)
-        raise ValueError(f"No model candidate satisfied the task profile: {reasons}")
+        cheapest = _cheapest_blocked_per_tier(rejected)
+        hint = _admission_hint(profile, rejected, cheapest)
+        raise NoCandidateError(
+            f"No model candidate satisfied the task profile: {reasons} {hint}",
+            rejected=tuple(rejected),
+            cheapest_blocked=cheapest,
+            hint=hint,
+        )
 
     accepted.sort(
         key=lambda candidate: _candidate_score(profile, candidate, adjustments),
@@ -106,6 +148,70 @@ def recommend_model(
         rejected=tuple(rejected),
         reasons=tuple(reasons),
     )
+
+
+def _reason_class(reason: str) -> str:
+    for name, prefix in _REASON_CLASSES:
+        if reason.startswith(prefix):
+            return name
+    return "other"
+
+
+def _cheapest_blocked_per_tier(
+    rejected: list[CandidateRejection],
+) -> tuple[CheapestBlocked, ...]:
+    """Closest rejected candidate per cost tier, cheapest tier first.
+
+    Within a tier the highest-quality candidate is closest: it fails
+    on the fewest gates by construction order (cost precedes quality,
+    so a tier-mate failing later is nearer admission).
+    """
+    best: dict[str, CandidateRejection] = {}
+    for rejection in rejected:
+        tier = rejection.candidate.backend.cost_policy_tier.value
+        current = best.get(tier)
+        if (
+            current is None
+            or _QUALITY_RANK[rejection.candidate.quality] > _QUALITY_RANK[current.candidate.quality]
+        ):
+            best[tier] = rejection
+    ordered = sorted(
+        best.values(),
+        key=lambda r: cost_policy_rank(r.candidate.backend.cost_policy_tier),
+    )
+    return tuple(
+        CheapestBlocked(
+            tier=rejection.candidate.backend.cost_policy_tier,
+            route_id=rejection.candidate.backend.route_id,
+            quality=rejection.candidate.quality,
+            reason=rejection.reason,
+        )
+        for rejection in ordered
+    )
+
+
+def _admission_hint(
+    profile: TaskProfile,
+    rejected: list[CandidateRejection],
+    cheapest: tuple[CheapestBlocked, ...],
+) -> str:
+    counts: dict[str, int] = {}
+    for rejection in rejected:
+        key = _reason_class(rejection.reason)
+        counts[key] = counts.get(key, 0) + 1
+    tally = ", ".join(f"{name} x{counts[name]}" for name in sorted(counts))
+    lines = [
+        "No model candidate satisfied the task profile. "
+        f"Zero admission for quality={profile.quality_threshold.value}, "
+        f"cost={profile.cost_policy_tier.value} "
+        f"({len(rejected)} candidates rejected: {tally})."
+    ]
+    for blocked in cheapest:
+        lines.append(
+            f"Closest {blocked.tier.value} route: {blocked.route_id} "
+            f"(quality {blocked.quality.value}) — first blocker: {blocked.reason}"
+        )
+    return " ".join(lines)
 
 
 def _rejection_reason(
@@ -203,7 +309,10 @@ def _candidate_score(
             latency,
             locality,
         )
-    return quality, latency, locality, 0
+    # Cheapest sufficient route: quality, latency and locality decide;
+    # cost breaks remaining ties so equal candidates resolve cheapest.
+    # The threshold still gates — cost never buys a downgrade.
+    return quality, latency, locality, -cost_policy_rank(candidate.backend.cost_policy_tier)
 
 
 def _estimate_reason(estimate: ModelPerformanceEstimate) -> str | None:
