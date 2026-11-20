@@ -1,8 +1,9 @@
 """Investor profiles: distinct council-backed paper-trading strategies.
 
 Paper trading only: profiles emit allocation decisions evaluated against
-price series. No broker, no orders, no network. Live data sources need
-an explicit owner decision (broker API vs scrape vs vendor feed).
+price series. This module has no broker, orders, or network integration.
+ADR-092 selects Alpaca paper as the first broker; ADR-093 defines the
+autonomous paper research policy. Connected execution remains future work.
 """
 
 from __future__ import annotations

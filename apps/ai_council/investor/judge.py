@@ -1,8 +1,9 @@
 """Profile judges: turn market snapshots into allocation decisions.
 
-The live judge asks the profile's model through a council agent; the
-stub judge serves tests and offline evals. Unparseable model output
-holds the previous allocation (fail-safe: never trade on confusion).
+Only the stub judge and prompt/weight parsing helpers are implemented.
+There is no live council-backed judge or execution loop here. The parser
+returns an empty mapping for unparseable output; callers must define how
+that result affects an existing allocation before connected execution.
 """
 
 from __future__ import annotations
