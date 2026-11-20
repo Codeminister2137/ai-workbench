@@ -6,6 +6,19 @@ execution surfaces; [publication](publication.md) covers source/history privacy.
 
 ## 1. Overall direction
 
+The repository assistant keeps request configuration, setup dispatch, argument
+validation, transcript setup, prompt preparation, response scrutiny and final
+validation/repair in explicit phase helpers. `_execute_request` retains the
+sequential execution flow; phase extraction preserves admission order, deadlines,
+cleanup and reporting rather than replacing the execution pipeline.
+
+MCP transports and the IDE bridge share wire constants and endpoint validation
+through `ai_agent.mcp_contracts`, without importing the MCP server entry point.
+Fixed acceptance job definitions and their existing additive storage belong to
+`ai_provider.acceptance_storage`; runtime, harness and process helpers depend on
+that module rather than the job CLI. The original import locations re-export
+the moved contracts for compatibility.
+
 Known malformed generated tool arguments may use the neutral ToolCallFormatError
 signal for shared-loop correction within the original allowance (ADR-061). This
 is separate from transport retry/fallback. The initial production path stops on

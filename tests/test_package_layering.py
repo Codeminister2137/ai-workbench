@@ -19,10 +19,17 @@ IMPORT_RE = re.compile(r"^from (ai_provider|ai_orchestrator|ai_agent)\b", re.M)
 # allowance_windows.py added 2026-11-17: brief-B models import neutral
 # orchestrator contracts (AccessMethod/BillingSource/ExecutionTarget),
 # the same precedent as codex_usage.py; landed in 0b8371e.
+# acceptance_storage.py added 2026-11-20: owner gate ed066ac7 answer A
+# approves this narrow importer exception (Family-3 S2). It imports only
+# the frozen neutral vocabulary (access method, catalog loading,
+# scheduling status) for the cycle-free storage boundary; no
+# orchestration behavior (routing, selection, judging). Growing the set
+# further still needs a new owner decision.
 PROVIDER_UP_IMPORTERS = frozenset(
     {
         "acceptance_harness.py",
         "acceptance_jobs.py",
+        "acceptance_storage.py",
         "account_usage.py",
         "agent_readiness.py",
         "allowance_windows.py",

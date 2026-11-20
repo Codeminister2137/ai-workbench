@@ -109,6 +109,16 @@
         "A: Windows AppContainer feasibility prototype",
         "B: VM-based worker design/prototype"
       ]
+    },
+    {
+      "id": "family3-acceptance-storage-layering",
+      "title": "Family-3 S2: acceptance storage layering exception",
+      "type": "decision",
+      "body": "Decision needed: permit acceptance_storage.py to import the same neutral Orchestrator contracts moved from acceptance_jobs.py. The Family-3 S2 candidate breaks the runtime cycle, but tests/test_package_layering.py rejects the new importer; AGENTS.md requires an owner decision before growing that frozen set. A: Approve this narrowly documented importer exception. Pro: keeps the cycle-free storage boundary and preserves AST-identical definitions, data format and public re-exports. Con: increases the frozen importer set by one module. B: Retain the frozen importer set and redesign the extraction. Pro: preserves the existing ratchet unchanged. Con: requires more invasive separation or injection of catalog validation and scheduling status dependencies. Technical recommendation: A, limited to the existing neutral contracts, with no new orchestration behavior. Question: approve A, or choose B?",
+      "options": [
+        "A: Approve narrow neutral-contract importer exception",
+        "B: Redesign within unchanged importer set"
+      ]
     }
   ]
 }

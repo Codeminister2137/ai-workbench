@@ -9,8 +9,8 @@ import time
 from pathlib import Path
 
 from ai_provider.acceptance_harness import run_fixture
-from ai_provider.acceptance_jobs import AcceptanceJob, validate_route
 from ai_provider.acceptance_processes import remaining, verify_runtime_owner
+from ai_provider.acceptance_storage import AcceptanceJob, validate_route
 
 
 def main() -> int:

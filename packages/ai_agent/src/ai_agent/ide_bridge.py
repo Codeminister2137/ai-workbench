@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from ai_agent.contracts import ToolCategory, ToolDefinition, ToolParameter, ToolResult
-from ai_agent.http_proxy import validate_loopback_url
+from ai_agent.mcp_contracts import validate_loopback_url
 from ai_agent.tools.base import BaseTool, ToolContext, ToolRegistry
 
 CONFIG_PATH = Path("data/pycharm-mcp.json")

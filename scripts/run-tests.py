@@ -174,6 +174,7 @@ GROUPS = {
         "tests/test_invoice_draft.py",
         "tests/test_document_status.py",
         "tests/test_package_layering.py",
+        "tests/test_family3_import_boundaries.py",
         "tests/test_go_acceptance_wiring.py",
         "tests/test_prune_run_worktrees.py",
         "tests/test_file_brief.py",
