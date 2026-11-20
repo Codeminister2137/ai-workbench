@@ -1767,6 +1767,23 @@ const nested = linkIds('<a href="#/inbox/x">see ' + full + '</a>');
 assert.equal((nested.match(/<a /g) || []).length, 1, 'never nests anchors');
 const attr = linkIds('<span title="' + full + '">t</span>');
 assert(!attr.includes('#/lookup'), 'attributes stay untouched');
+const apollo = 'https://knowledge.apollo.io/hc/en-us/articles/4416173158541-Use-Apollo-API';
+assert.equal(linkIds(esc(apollo)), `<a href="${apollo}">${apollo}</a>`);
+const query = 'https://example.com/' + full + '?a=1&b=2#section';
+const escaped = esc(query);
+assert.equal(linkIds(escaped), `<a href="${escaped}">${escaped}</a>`);
+assert.equal(linkIds('(' + apollo + ').'), `(<a href="${apollo}">${apollo}</a>).`);
+const balanced = 'https://example.com/wiki/API_(version)';
+assert.equal(linkIds(balanced), `<a href="${balanced}">${balanced}</a>`);
+const already = `<a href="${apollo}">${apollo}</a>`;
+assert.equal(linkIds(already), already, 'existing external anchors are preserved');
+assert.equal(linkIds(linkIds(apollo)), linkIds(apollo), 'repeated rendering is stable');
+const quoted = linkIds(esc('"' + apollo + '" <script>alert(1)</script>'));
+assert(quoted.includes(`&quot;<a href="${apollo}">${apollo}</a>&quot;`));
+assert(!quoted.includes('<script>'), 'escaped input stays escaped');
+assert.equal(linkIds('javascript:alert(1)'), 'javascript:alert(1)');
+const multiple = linkIds(apollo + ' http://example.org/docs. run:8fad37897a5b');
+assert.equal((multiple.match(/<a /g) || []).length, 3, 'URLs and item refs coexist');
 """
     result = subprocess.run(
         [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
@@ -1794,8 +1811,9 @@ eval(renderer);
 const view = {innerHTML: '', querySelectorAll: () => []};
 const location = {hash: '#/inbox/x1'};
 const document = {getElementById: () => ({addEventListener() {}})};
-const item = {id: 'x1', title: 'T', type: 'task', status: 'open', body: 'see f05e3226dd8440fc816e03cd89c6c431',
-  options: [], context_refs: ['inbox:abc12345', 'run:8fad37897a5b', 'branch:develop', 'bogus']};
+const apollo = 'https://knowledge.apollo.io/hc/en-us/articles/4416173158541-Use-Apollo-API';
+const item = {id: 'x1', title: 'T', type: 'task', status: 'open', body: 'see f05e3226dd8440fc816e03cd89c6c431 ' + apollo,
+  options: [], context_refs: ['inbox:abc12345', 'run:8fad37897a5b', 'branch:develop', 'bogus', apollo]};
 const api = async (path) => ({item});
 (async () => {
   await renderInbox('x1');
@@ -1805,6 +1823,8 @@ const api = async (path) => ({item});
   assert(html.includes('<li>branch:develop</li>'), 'unrouted ref stays text');
   assert(html.includes('<li>bogus</li>'), 'bare word stays text');
   assert(html.includes('<a href="#/lookup/f05e3226dd8440fc816e03cd89c6c431"'), 'body id links');
+  assert.equal(html.split(`<a href="${apollo}">${apollo}</a>`).length - 1, 2, 'body and context URL link in full');
+  assert(!html.includes('#/lookup/4416173158541'), 'article ID never routes internally');
   assert(html.includes('id="lookup-go"') === false, 'detail has no lookup field');
 })().catch(error => {console.error(error); process.exitCode = 1;});
 """
