@@ -111,7 +111,13 @@ def _post_json(
             body = response.read().decode("utf-8", errors="replace")
             status = response.status
     except urllib.error.HTTPError as exc:
-        raise VendorError(f"{url} returned HTTP {exc.code}") from None
+        # Vendors explain rejections in the body (e.g. Apollo's 403 names the
+        # plan/scope gate). Keep a bounded prefix; bodies never carry our key.
+        try:
+            detail = exc.read().decode("utf-8", errors="replace")[:300]
+        except Exception:
+            detail = ""
+        raise VendorError(f"{url} returned HTTP {exc.code}: {detail}") from None
     except Exception as exc:
         raise VendorError(f"{url} unreachable: {type(exc).__name__}") from None
     if status != 200:
