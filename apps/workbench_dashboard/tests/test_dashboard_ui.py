@@ -195,7 +195,7 @@ def test_static_controls_have_titles() -> None:
     for tag in re.findall(r"<button\b[^>]*>", html):
         assert "title=" in tag, f"button without title: {tag}"
     nav_links = re.findall(r"<a\b[^>]*data-view[^>]*>", html)
-    assert len(nav_links) == 22  # 19 + modules tab + E2E tab + jobs (spend merged into providers)
+    assert len(nav_links) == 23  # 19 + modules tab + E2E tab + jobs (spend merged into providers)
     for tag in nav_links:
         assert "title=" in tag, f"nav link without title: {tag}"
 
@@ -205,8 +205,8 @@ def test_dynamic_buttons_have_titles() -> None:
     js = _read("app.js")
     buttons = re.findall(r"<button\b[^>]*>", js)
     assert (
-        len(buttons) == 63
-    )  # +doc pin; +fanout apply; +delete-inbox-btn +e2e submit +chat mode/apply/approve +notes save +agent-check run +agent-config save +spend-policy add/save/remove +spend-adjust record +backlog to-task +jobs submit +report acknowledge +id lookup
+        len(buttons) == 64
+    )  # +doc pin; +fanout apply; +delete-inbox-btn +e2e submit +chat mode/apply/approve +notes save +agent-check run +agent-config save +spend-policy add/save/remove +spend-adjust record +backlog to-task +jobs submit +report acknowledge +id lookup +bug dialog (2) +orchestrator query
     for tag in buttons:
         assert "title=" in tag, f"button without title: {tag}"
 
@@ -216,13 +216,13 @@ def test_dynamic_inputs_and_selects_have_titles() -> None:
     js = _read("app.js")
     inputs = [tag for tag in re.findall(r"<input\b[^>]*>", js) if 'type="radio"' not in tag]
     assert (
-        len(inputs) == 68
+        len(inputs) == 69
     )  # +bad-test checkbox; +agent-enable checkbox; +spend-policy prepaid/cap (scope is a select); +spend-adjust remaining; step radios excluded; +jobs form (6); +id lookup; +bug report view/consent (2)
     for tag in inputs:
         assert "title=" in tag, f"input without title: {tag}"
     selects = re.findall(r"<select\b[^>]*>", js)
     assert (
-        len(selects) == 26
+        len(selects) == 29
     )  # +restrictions fan-out; +run fanout; +landing-page select; +agent policy; +spend-policy scope; +spend-adjust allowance; +jobs work-mode/type
     for tag in selects:
         assert "title=" in tag, f"select without title: {tag}"
@@ -2008,3 +2008,43 @@ const unchanged = () => {
     assert 'addEventListener("click", openBugReport)' in js
     assert "#/create/bug" not in js
     assert 'sessionStorage.getItem("bugView")' not in js
+
+
+def test_orchestrator_renders_escaped_catalog_and_rejections() -> None:
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node is required for Orchestrator rendering")
+    driver = r"""
+const assert = require('assert');
+const source = require('fs').readFileSync(process.argv[1], 'utf8');
+const esc = eval('(' + source.slice(source.indexOf('function esc('),
+  source.indexOf('\n}', source.indexOf('function esc(')) + 2) + ')');
+const view = {innerHTML: ''};
+const results = {innerHTML: ''};
+let submit;
+const fields = {};
+const form = {
+  elements: {namedItem: name => fields[name] ||= {}},
+  addEventListener: (event, callback) => {submit = callback;},
+};
+const document = {getElementById: id => id === 'orchestrator-query' ? form : results};
+const api = async () => ({
+  routes: [], reasons: [], message: 'No eligible routes',
+  rejected: [{route_id: '<route>', reason: 'Privacy <blocked>'}],
+  catalog: [{route_id: '<route>', provider: 'local', model: '<model>',
+    quality: 'standard', cost_tier: 'local_only', capabilities: ['chat'], notes: '<script>unsafe</script>'}],
+  options: {capabilities: ['chat'], cost_tiers: ['local_only'], privacy: ['local_only']},
+});
+eval(source.slice(source.indexOf('async function renderOrchestrator()')));
+(async () => {
+  await renderOrchestrator();
+  assert(view.innerHTML.includes('does not interpret natural-language'));
+  assert(results.innerHTML.includes('No eligible routes'));
+  assert(results.innerHTML.includes('Privacy &lt;blocked&gt;'));
+  assert(results.innerHTML.includes('&lt;script&gt;unsafe&lt;/script&gt;'));
+  assert(!results.innerHTML.includes('<script>'));
+  assert(fields.capability.innerHTML.includes('chat'));
+  assert(submit);
+})().catch(err => {console.error(err); process.exit(1);});
+"""
+    subprocess.run([node, "-e", driver, str(WEB_DIR / "app.js")], check=True)

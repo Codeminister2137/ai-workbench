@@ -1392,6 +1392,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             result = query_routes(
                 catalog_path,
                 capabilities=params.get("capability") or None,
+                search=params.get("search", [""])[0],
                 cost_tier=params.get("cost_tier", ["prepaid_credits_allowed"])[0],
                 privacy=params.get("privacy", ["external_allowed"])[0],
             )

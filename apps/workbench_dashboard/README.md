@@ -143,3 +143,19 @@ Report bug opens a modal over the current view. Cancel, Escape, and successful
 submission preserve the route and unsaved form fields. Reports capture the view
 and go to the agent inbox for triage; recent API-path activity is attached only
 with explicit consent. Failed submissions keep the report open for retry.
+
+## Orchestrator queries
+
+System > Orchestrator (`#/orchestrator`) is one read-only view over the configured
+model catalog and the existing `GET /api/orchestrator/routes` query path.
+Browse recorded grades and explanatory notes, search catalog fields by words,
+and change capability, maximum cost policy and privacy filters to inspect the
+recommender's selection and rejection reasons. Text search filters the catalog
+list independently of recommendation constraints. No-match searches and zero
+eligible routes are separate states; rejection explanations remain visible.
+
+This minimal surface uses existing catalog evidence, not live provider admission.
+A grade is a policy value, not proof of measured quality; missing explanations
+are labelled. Queries do not probe providers or execute inference. Arbitrary
+natural-language interpretation, live availability and new knowledge sources
+remain outside this slice and require a separately agreed design.

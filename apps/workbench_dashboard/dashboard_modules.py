@@ -24,6 +24,7 @@ CORE_VIEWS = (
     "invoices",
     "fleet",
     "providers",
+    "orchestrator",
     "restrictions",
     "modules",
     "help",
