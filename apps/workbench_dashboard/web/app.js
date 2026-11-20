@@ -173,7 +173,7 @@ function linkIds(html) {
             url = url.slice(0, -1);
           }
           if (!/^https?:\/\/[^/?#]+/i.test(url)) return m;
-          return `<a href="${url}">${url}</a>${m.slice(url.length)}`;
+          return `<a href="${url}" target="_blank" rel="noopener">${url}</a>${m.slice(url.length)}`;
         }
         kind = kind?.toLowerCase();
         if (!kind && id.length < 12) return m;
@@ -2043,7 +2043,9 @@ async function renderLookup(id) {
     return;
   }
   if (matches.length === 1) {
-    location.hash = matches[0].url;
+    // Replace, don't push: a pushed lookup URL re-resolves on Back and
+    // traps the user in a forward loop.
+    location.replace("#" + matches[0].url.replace(/^#/, ""));
     render();
     return;
   }
@@ -3247,7 +3249,7 @@ async function render() {
       return;
     }
     if (name === "modules") await renderModules();
-    else if (name === "spend") { location.hash = "#/providers"; return; }
+    else if (name === "spend") { location.replace("#/providers"); return; }
     else if (name === "home") await renderHome();
     else if (name === "chat" && id) {
       const q = new URLSearchParams(query || "").get("q");
