@@ -1,6 +1,17 @@
 {
   "gates": [
     {
+      "id": "family5-gate-ci-adoption",
+      "title": "Family-5 G3: local full gates, affected selection, or CI spike?",
+      "type": "decision",
+      "body": "Decision needed: gate/CI direction after Family-5. G1 excludes scratch fingerprints; G2's eight-worker trial is red and does not justify changing the serial gate. Historical affected-selection includes 3/3 sampled historical failure modules plus one new regression module, using fixing diffs and today's manifest, not historical failure replay; that biased sample is insufficient for adoption. Details: docs/test-workflow.md, Family-5 follow-up. A: Keep serial full gates and collect prospective affected-selection shadow evidence. Pro: preserves coverage, no new service/access boundary. Con: retains full gate cost and needs more comparisons. B: Adopt affected pre-push selection while retaining a mandatory full suite before merge. Pro: fewer repeated tests. Con: incomplete dependency knowledge can miss failures, evidence is limited, and merge enforcement must be specified. C: Authorize a GitHub Actions design spike, with hosted versus isolated self-hosted runner boundaries decided before setup. Pro: independent reporting and execution history. Con: clean checkouts lack local assets; hosted execution changes data/access boundaries, while owner-PC runners retain contention and execute workflow code on that PC. Jenkins offers control but adds controller/service maintenance; defer without a distinct requirement. Recommendation: A until prospective recall and clean-checkout evidence support adoption. No hook change, runner installation, credentials, paid usage or scheduling is authorized by this brief. Question: A, B, or C, and what constraint drives your choice?",
+      "options": [
+        "A: Retain full gates; evaluate shadow selection",
+        "B: Adopt affected push checks plus full merge gate",
+        "C: Authorize GitHub Actions design spike"
+      ]
+    },
+    {
       "id": "eval-allowance-cap-enforcement",
       "title": "Eval allowance budgets: strict cap or observed stop threshold?",
       "type": "decision",
