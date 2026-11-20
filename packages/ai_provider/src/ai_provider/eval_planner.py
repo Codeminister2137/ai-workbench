@@ -93,11 +93,20 @@ def plan_eval_windows(
     *,
     now: datetime | None = None,
     eval_share: float = DEFAULT_EVAL_SHARE,
+    min_remainder_percent: float = 0.0,
 ) -> list[EvalWindowProposal]:
-    """Propose one eval window per usable bucket, earliest first."""
+    """Propose one eval window per usable bucket, earliest first.
+
+    ``min_remainder_percent`` is the never-starve-product reserve: buckets
+    with no future reset are skipped unless their current remainder meets
+    it. Fresh-quota proposals are unaffected (they run after the reset).
+    Zero disables the reserve; the owner sets the operating value.
+    """
     moment = now or datetime.now(UTC)
     if not 0 < eval_share <= 1:
         raise ValueError("eval share must be within (0, 1]")
+    if not 0 <= min_remainder_percent <= 100:
+        raise ValueError("remainder reserve must be within [0, 100]")
     proposals: list[EvalWindowProposal] = []
     for window in windows:
         if window.remaining_percent is not None and window.remaining_percent <= 0:
@@ -108,6 +117,8 @@ def plan_eval_windows(
             reason = f"run on fresh quota after {window.window} reset"
             share = eval_share
         else:
+            if (window.remaining_percent or 0) < min_remainder_percent:
+                continue
             start = moment
             reason = "no future reset known; run on current remainder"
             share = eval_share
@@ -134,6 +145,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--windows", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--eval-share", type=float, default=DEFAULT_EVAL_SHARE)
+    parser.add_argument("--min-remainder-percent", type=float, default=0.0)
     args = parser.parse_args(argv)
     if args.output.exists():
         parser.error("output already exists; preserve consumed plans")
@@ -141,7 +153,11 @@ def main(argv: list[str] | None = None) -> int:
     if not isinstance(raw, list):
         parser.error("windows snapshot must be a JSON list")
     windows = [AllowanceWindow(**entry) for entry in raw]
-    plan = plan_eval_windows(windows, eval_share=args.eval_share)
+    plan = plan_eval_windows(
+        windows,
+        eval_share=args.eval_share,
+        min_remainder_percent=args.min_remainder_percent,
+    )
     args.output.write_text(
         json.dumps([entry.to_json() for entry in plan], indent=1), encoding="utf-8"
     )
