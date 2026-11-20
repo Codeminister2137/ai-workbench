@@ -53,6 +53,7 @@ class ExternalAgentConfig:
     shared_token_env: str | None = None
     shared_child_env: dict[str, str] | None = field(default=None, repr=False, compare=False)
     shared_available_tools: tuple[str, ...] = ()
+    codex_subscription_only: bool = False
 
 
 @dataclass(frozen=True)
@@ -166,6 +167,27 @@ class CodexPluginOperationResult:
             "stdout": self.stdout,
             "stderr": self.stderr,
         }
+
+
+def codex_eval_config(
+    model: str, cwd: Path, schema: Path, output: Path, *, timeout_seconds: float
+) -> ExternalAgentConfig:
+    """Construct a subscription-only schema probe without exposing routing enums."""
+    command = default_codex_command()
+    if not command:
+        raise ValueError("native client unavailable")
+    return ExternalAgentConfig(
+        access_method=AccessMethod.CODEX_CLI,
+        command=command,
+        model=model,
+        cwd=cwd,
+        timeout_seconds=timeout_seconds,
+        sandbox="read-only",
+        approval_policy="never",
+        codex_subscription_only=True,
+        output_schema_path=schema,
+        output_last_message_path=output,
+    )
 
 
 def is_external_agent_access_method(access_method: AccessMethod) -> bool:
@@ -787,6 +809,8 @@ def build_external_agent_command(
         return _build_alternate_agent_command(config, prompt=prompt)
 
     command = [config.command]
+    if config.codex_subscription_only:
+        command.extend(["-c", 'forced_login_method="chatgpt"', "-c", 'model_provider="openai"'])
     if config.web_search:
         command.append("--search")
     if config.codex_mcp_tools:
