@@ -9,12 +9,41 @@ the application workflow: loading member configuration, preserving raw member
 responses, streaming browser events, and storing history. Provider-specific API
 handling stays behind `ai_provider`.
 
-## Requirements
+## Investor
 
 Investor research policy and current implementation limits are documented in
 [ADR-093](../../docs/decisions/ADR-093-investor-coverage-and-paper-autonomy.md).
 The [coverage and geopolitical-event research](../../docs/research/investor-coverage-20261119.md)
 compares asset classes, broker access and approaches to learning from decisions.
+
+### Investor expansion: reconciled scope
+
+The original broker-API-versus-scraping blocker is resolved: ADR-092 selects
+Alpaca paper as the first broker. ADR-093 permits autonomous simulated decisions
+and requires inspectable records, including holds, rejections and failures.
+It does not select an execution universe or authorize paid services/live orders.
+
+Implemented: three investor profiles, synthetic price fixtures, allocation parsing,
+a deterministic stub judge and portfolio comparison metrics. Live-data source
+selection and coverage research have landed; a live-data adapter, council-backed
+judge, broker execution loop and durable Investor journal have not.
+
+Proposed next slice (pending owner choice): offline decision recording and replay
+over identical fixture snapshots for all profiles, using an injected deliberation
+implementation. Capture run/profile/prompt versions, observation and decision
+times, source references, proposed allocations, rationale, uncertainty,
+alternatives and risk outcomes. Preserve original decisions and link later
+assessments. Test success, hold, rejection and failure records, replay isolation
+from future observations, and allocation limits. This is a software-correctness
+slice; model quality and connected paper operation require later acceptance.
+
+Storage is a pending decision: extending Council SQLite keeps one local store
+but changes its schema; a separate append-only JSONL journal isolates Investor
+records but needs its own replay, integrity and lifecycle handling. Recommend
+Council SQLite with additive decision/outcome tables, pending owner approval.
+See dashboard owner gate `investor-decision-journal-storage`.
+
+## Requirements
 
 - Python dependencies from the workspace
 - `uv`
