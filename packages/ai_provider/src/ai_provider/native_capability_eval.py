@@ -12,11 +12,13 @@ import math
 import subprocess
 import tempfile
 import time
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+from ai_provider.allowance_windows import AllowanceWindow
 from ai_provider.capability_eval import SCHEMA, Verdict
 from ai_provider.codex_usage import read_codex_allowance
+from ai_provider.eval_threshold import EvalThresholdStop, ObservedEvalThreshold
 from ai_provider.external_agents import (
     codex_eval_config,
     run_external_agent,
@@ -30,7 +32,7 @@ class ProbeStopped(ValueError):
     """Safe, locally authored diagnostic that may be retained in a receipt."""
 
 
-def checked_windows(report: dict) -> dict[tuple[str, str], tuple[float, int]]:
+def checked_windows(report: dict) -> list[AllowanceWindow]:
     """Require fresh, complete primary/secondary readings with cycle identity."""
     if report.get("status") != "available" or report.get("cleanup_verified") is not True:
         raise ProbeStopped("allowance unavailable or cleanup unverified")
@@ -59,19 +61,18 @@ def checked_windows(report: dict) -> dict[tuple[str, str], tuple[float, int]]:
         (bucket, name) not in windows for bucket in buckets for name in ("primary", "secondary")
     ):
         raise ProbeStopped("both allowance windows required")
-    return windows
-
-
-def check_after(before: dict, after: dict) -> None:
-    """Accept call overshoot, then stop; never predict per-call consumption."""
-    if before.keys() != after.keys():
-        raise ProbeStopped("allowance buckets changed")
-    for key, (used, reset) in before.items():
-        current, current_reset = after[key]
-        if reset != current_reset or current < used:
-            raise ProbeStopped("allowance cycle changed")
-        if current - used >= STOP_THRESHOLD_PP:
-            raise ProbeStopped("observed allowance stop threshold reached")
+    return [
+        AllowanceWindow(
+            provider="codex",
+            bucket_id=bucket,
+            window=name,
+            used_percent=used,
+            remaining_percent=100 - used,
+            resets_at_utc=datetime.fromtimestamp(reset, UTC).isoformat(),
+            source="native_codex_eval",
+        )
+        for (bucket, name), (used, reset) in windows.items()
+    ]
 
 
 def probe_codex(route_id: str, model: str, output: Path) -> Verdict:
@@ -94,41 +95,51 @@ def probe_codex(route_id: str, model: str, output: Path) -> Verdict:
         receipt["phase"] = "client_lookup"
         schema = artifact / "schema.json"
         schema.write_text(json.dumps(SCHEMA), encoding="utf-8")
-        before_report = read_codex_allowance()
-        receipt["before"] = before_report
-        receipt["phase"] = "preflight"
-        before = checked_windows(before_report)
-        # Persist admission evidence before the only possible inference call.
-        (artifact / "admission.json").write_text(json.dumps(receipt), encoding="utf-8")
-        try:
-            receipt["phase"] = "inference"
-            with tempfile.TemporaryDirectory(prefix="codex-capability-") as working:
-                subprocess.run(
-                    ["git", "init", "--quiet", working],
-                    check=True,
-                    capture_output=True,
-                    timeout=10,
-                )
-                result = run_external_agent(
-                    'Return exactly {"answer":7}. Do not use tools, inspect files, or access network.',
-                    codex_eval_config(
-                        model,
-                        Path(working),
-                        schema.resolve(),
-                        (artifact / "answer.json").resolve(),
-                        timeout_seconds=CALL_SECONDS,
-                    ),
-                )
-            receipt["returncode"] = result.returncode
-            receipt["usage"] = result.events.usage if result.events else None
-        except (ValueError, OSError, RuntimeError, subprocess.SubprocessError) as exc:
-            receipt["inference_error_type"] = type(exc).__name__
-            raise
-        finally:
-            receipt["phase"] = "postflight"
-            after_report = read_codex_allowance()
-            receipt["after"] = after_report
-        check_after(before, checked_windows(after_report))
+        guard = ObservedEvalThreshold()
+        reads = 0
+
+        def read_windows() -> list[AllowanceWindow]:
+            nonlocal reads
+            phase = "before" if reads == 0 else "after"
+            receipt["phase"] = "preflight" if reads == 0 else "postflight"
+            reads += 1
+            report = read_codex_allowance()
+            receipt[phase] = report
+            return checked_windows(report)
+
+        def infer():
+            # Persist admission evidence before the only possible inference call.
+            (artifact / "admission.json").write_text(json.dumps(receipt), encoding="utf-8")
+            try:
+                receipt["phase"] = "inference"
+                with tempfile.TemporaryDirectory(prefix="codex-capability-") as working:
+                    subprocess.run(
+                        ["git", "init", "--quiet", working],
+                        check=True,
+                        capture_output=True,
+                        timeout=10,
+                    )
+                    result = run_external_agent(
+                        'Return exactly {"answer":7}. Do not use tools, inspect files, or access network.',
+                        codex_eval_config(
+                            model,
+                            Path(working),
+                            schema.resolve(),
+                            (artifact / "answer.json").resolve(),
+                            timeout_seconds=CALL_SECONDS,
+                        ),
+                    )
+                receipt["returncode"] = result.returncode
+                receipt["usage"] = result.events.usage if result.events else None
+            except (ValueError, OSError, RuntimeError, subprocess.SubprocessError) as exc:
+                receipt["inference_error_type"] = type(exc).__name__
+                raise
+
+            return result
+
+        result = guard.run(
+            infer, read_windows, clock=lambda: datetime.now(UTC), max_read_age=timedelta(seconds=60)
+        )
         receipt["phase"] = "grade"
         events = result.events
         if result.returncode or events is None or events.failure_reason or events.parse_errors:
@@ -152,7 +163,7 @@ def probe_codex(route_id: str, model: str, output: Path) -> Verdict:
         # Safe locally generated diagnostics only; never retain raw client errors.
         detail = f"native probe stopped ({type(exc).__name__}); inspect receipt"
         receipt["error_type"] = type(exc).__name__
-        if isinstance(exc, ProbeStopped):
+        if isinstance(exc, (ProbeStopped, EvalThresholdStop)):
             receipt["stop_reason"] = str(exc)
     finally:
         receipt.update(status=status, detail=detail)

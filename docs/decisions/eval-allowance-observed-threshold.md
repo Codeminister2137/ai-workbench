@@ -46,3 +46,9 @@ Proving checks cover below-threshold admission, shared usage reaching exactly
 10%, accepted post-call overshoot, failure latching, all-window enforcement,
 missing/invalid/expired/slow reads, cycle changes, decreasing usage, reentrant
 call rejection, and post-call observation after operation failure.
+
+The one-shot native Codex capability probe also uses this guard for its bounded
+operation. Its reader additionally requires verified cleanup, snapshots no older
+than 60 seconds, product headroom and paired primary/secondary windows for each
+bucket. The file-based planner continues to use `eval_budget`; this integration
+does not provide cross-job accounting or authorize new allowance calls.

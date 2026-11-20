@@ -76,18 +76,34 @@ def test_missing_and_duplicate_windows_refuse():
         native.checked_windows(report)
 
 
-def test_observed_stop_allows_headroom_without_forecasting():
-    before = native.checked_windows(reading(5))
-    native.check_after(before, native.checked_windows(reading(14)))
-    for used in (15, 19, 4):
-        with pytest.raises(ValueError):
-            native.check_after(before, native.checked_windows(reading(used)))
+@pytest.mark.parametrize(
+    "used,expected", [(14, "pass"), (15, "unknown"), (19, "unknown"), (4, "unknown")]
+)
+def test_observed_stop_allows_headroom_without_forecasting(monkeypatch, tmp_path, used, expected):
+    setup_probe(monkeypatch, lambda *_: result())
+    reports = iter([reading(5), reading(used)])
+    monkeypatch.setattr(native, "read_codex_allowance", lambda: next(reports))
+    assert native.probe_codex("r", "m", tmp_path / "eval.json").status == expected
+    receipt = json.loads((tmp_path / "eval.json.native/receipt.json").read_text())
+    assert receipt["usage"] == {"output_tokens": 8}
+    if used >= 15:
+        assert receipt["error_type"] == "EvalThresholdStop"
+
+
+@pytest.mark.parametrize("change", ["reset", "bucket", "secondary"])
+def test_shared_guard_rejects_changed_cycles_and_checks_every_window(monkeypatch, tmp_path, change):
+    setup_probe(monkeypatch, lambda *_: result())
     after = reading()
-    after["windows"][0]["resets_at_unix_seconds"] += 1
-    with pytest.raises(ValueError):
-        native.check_after(before, native.checked_windows(after))
-    with pytest.raises(ValueError):
-        native.check_after(before, {})
+    if change == "reset":
+        after["windows"][0]["resets_at_unix_seconds"] += 1
+    elif change == "bucket":
+        for row in after["windows"]:
+            row["bucket_id"] = "other"
+    else:
+        after["windows"][1]["used_percent"] = 15
+    reports = iter([reading(), after])
+    monkeypatch.setattr(native, "read_codex_allowance", lambda: next(reports))
+    assert native.probe_codex("r", "m", tmp_path / "eval.json").status == "unknown"
 
 
 def setup_probe(monkeypatch, run):
