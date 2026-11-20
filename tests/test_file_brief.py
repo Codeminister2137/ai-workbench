@@ -52,6 +52,31 @@ def test_main_rejects_optionless_decision(capsys) -> None:
     assert "at least two" in capsys.readouterr().err
 
 
+def test_followup_prepends_body_and_metadata() -> None:
+    mod = _load()
+    payload = mod.build_payload(
+        title="t",
+        body="details",
+        options=["A", "B"],
+        needs_owner="Pick A or B.",
+        needs_ai="Implement the pick.",
+    )
+    assert payload["body"].startswith(
+        "Needs from you (owner): Pick A or B.\nNeeds from AI: Implement the pick.\n\n"
+    )
+    assert payload["body"].endswith("details")
+    assert payload["metadata"] == {
+        "followup": {"owner": "Pick A or B.", "ai": "Implement the pick."}
+    }
+
+
+def test_followup_blank_means_absent() -> None:
+    mod = _load()
+    payload = mod.build_payload(title="t", body="b", options=["A", "B"], needs_owner="  ")
+    assert payload["body"] == "b"
+    assert "metadata" not in payload
+
+
 def test_tier_metadata_optional_and_validated() -> None:
     mod = _load()
     payload = mod.build_payload(title="t", body="b", options=["A", "B"], tier="tier2")
