@@ -691,3 +691,22 @@ def test_append_plan_evolution_logs_entries(stores) -> None:
     body = stores.plans.get("r1")["body"]
     assert body.count("## Evolutions") == 1
     assert body.index("shipped the thing") < body.index("second wave")
+
+
+def test_reassign_moves_item_between_queues(stores) -> None:
+    record = stores.create_inbox_task(title="T", body="b", task_type="task")
+    assert record["assignee"] == "owner"
+    moved = stores.reassign_inbox_task(record["id"], "agent")
+    assert moved["assignee"] == "agent"
+    assert stores.inbox.get(record["id"])["assignee"] == "agent"
+
+
+def test_reassign_rejects_bad_assignee_missing_and_closed(stores) -> None:
+    record = stores.create_inbox_task(title="T", body="b", task_type="task")
+    with pytest.raises(StoreError):
+        stores.reassign_inbox_task(record["id"], "someone")
+    with pytest.raises(StoreError):
+        stores.reassign_inbox_task("nope", "agent")
+    stores.close_inbox_task(record["id"], resolution="done")
+    with pytest.raises(StoreError):
+        stores.reassign_inbox_task(record["id"], "agent")

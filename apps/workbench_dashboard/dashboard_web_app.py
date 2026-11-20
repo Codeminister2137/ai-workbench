@@ -1275,6 +1275,9 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             if path.startswith("/api/inbox/") and path.endswith("/claim"):
                 item_id = path[len("/api/inbox/") : -len("/claim")]
                 return self._claim_inbox_task(item_id, payload)
+            if path.startswith("/api/inbox/") and path.endswith("/reassign"):
+                item_id = path[len("/api/inbox/") : -len("/reassign")]
+                return self._reassign_inbox_task(item_id, payload)
             if path == "/api/inbox/bridge-runs":
                 return self._bridge_inbox_runs()
             if path.startswith("/api/plans/") and path.endswith("/approve"):
@@ -2298,6 +2301,18 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             status = 404 if "not found" in str(exc).lower() else 400
             return self._send_json({"ok": False, "error": str(exc)}, status=status)
         self._send_json({"ok": True, "id": record["id"], "status": record["status"]})
+
+    def _reassign_inbox_task(self, item_id: str, payload: dict) -> None:
+        assignee = payload.get("assignee")
+        if assignee not in ("owner", "agent"):
+            return self._send_json({"ok": False, "error": "Invalid assignee"}, status=400)
+        try:
+            record = self._stores().reassign_inbox_task(item_id, assignee)
+        except StoreError as exc:
+            lowered = str(exc).lower()
+            status = 404 if "not found" in lowered else 400
+            return self._send_json({"ok": False, "error": str(exc)}, status=status)
+        self._send_json({"ok": True, "id": record["id"], "assignee": record["assignee"]})
 
     def _claim_inbox_task(self, item_id: str, payload: dict) -> None:
         by = payload.get("by")
