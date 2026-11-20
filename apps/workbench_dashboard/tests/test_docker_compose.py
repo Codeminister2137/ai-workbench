@@ -5,7 +5,13 @@ from __future__ import annotations
 import json
 
 import pytest
-from docker_compose import ComposeSpec, build_project, compose_file_content
+from docker_compose import (
+    ComposeSpec,
+    RelaySpec,
+    build_project,
+    build_relay_project,
+    compose_file_content,
+)
 
 yaml = pytest.importorskip("yaml")
 
@@ -82,3 +88,50 @@ def test_multiline_programs_survive_yaml_escaping(spec_with_command) -> None:
     program = command[-1]
     assert "import json" in program and "\ndef check(" in program
     compile(program, "<worker>", "exec")
+
+
+def test_relay_project_has_no_network_and_mailbox_mount(tmp_path) -> None:
+    module = tmp_path / "relay_mailbox.py"
+    module.write_text("# stub\n", encoding="utf-8")
+    mailbox = tmp_path / "mailbox"
+    mailbox.mkdir()
+    spec = RelaySpec(
+        run_id="r1",
+        project_name="relay-r1",
+        mailbox_host_path=mailbox,
+        relay_module_host_path=module,
+    )
+    doc = build_relay_project(spec)
+    assert list(doc["services"]) == ["worker"]
+    assert "networks" not in doc
+    worker = doc["services"]["worker"]
+    assert worker["network_mode"] == "none"
+    assert "networks" not in worker
+    assert f"{mailbox}:/mailbox:rw" in worker["volumes"]
+    assert "relay_mailbox.py:ro" in str(worker["volumes"])
+    assert worker["user"] == "65532:65532"
+    assert worker["read_only"] is True
+
+
+def test_relay_yaml_has_no_networks_block(tmp_path) -> None:
+    module = tmp_path / "relay_mailbox.py"
+    module.write_text("# stub\n", encoding="utf-8")
+    spec = RelaySpec(
+        run_id="r1",
+        project_name="relay-r1",
+        mailbox_host_path=tmp_path,
+        relay_module_host_path=module,
+    )
+    text = compose_file_content(spec)
+    doc = yaml.safe_load(text)
+    assert "networks" not in doc
+    assert doc["services"]["worker"]["network_mode"] == "none"
+
+
+def test_relay_requires_mailbox_and_module(tmp_path) -> None:
+    with pytest.raises(ValueError, match="mailbox"):
+        build_relay_project(
+            RelaySpec(run_id="r", project_name="p", relay_module_host_path=tmp_path)
+        )
+    with pytest.raises(ValueError, match="relay module"):
+        build_relay_project(RelaySpec(run_id="r", project_name="p", mailbox_host_path=tmp_path))
