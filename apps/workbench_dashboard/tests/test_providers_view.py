@@ -99,7 +99,7 @@ def test_uncached_status_returns_unchecked_skeleton(tmp_path: Path, monkeypatch)
     view = provider_status(tmp_path)
     assert view["ok"] is True
     assert view["cached"] is False
-    assert [p["route"] for p in view["providers"]] == [
+    assert [p["route"] for p in view["providers"]][:6] == [
         "openrouter",
         "requesty",
         "meta",
@@ -266,3 +266,47 @@ def test_status_uses_repo_dotenv(tmp_path: Path, monkeypatch) -> None:
     view = provider_status(tmp_path / "data", tmp_path)
     row = next(p for p in view["providers"] if p["route"] == "openrouter")
     assert row["key_configured"] is True
+
+
+def test_catalog_services_visible_without_probe(tmp_path: Path) -> None:
+    rows = {p["route"]: p for p in provider_status(tmp_path)["providers"]}
+    assert rows["kiro"]["status_supported"] is False
+    assert rows["kiro"]["checked_at"] is None
+    assert "github_copilot" in rows
+    assert "antigravity" in rows
+    assert len(rows) == len(provider_status(tmp_path)["providers"])
+
+
+def test_new_catalog_service_appears_with_old_cache(tmp_path: Path) -> None:
+    catalog = tmp_path / "catalog.toml"
+    catalog.write_text(
+        """[[models]]
+provider = "future_vendor"
+product = "future_service"
+model = "example"
+location = "local"
+""",
+        encoding="utf-8",
+    )
+    cached = {"providers": [_probe_row()]}
+    (tmp_path / "providers.json").write_text(json.dumps(cached), encoding="utf-8")
+    view = provider_status(tmp_path, catalog_path=catalog)
+    rows = {p["route"]: p for p in view["providers"]}
+    assert rows["openrouter"] == cached["providers"][0]
+    assert rows["future_service"]["display"] == "Future Service"
+    assert rows["future_service"]["status_supported"] is False
+    assert view["cached"] is True
+
+
+def _probe_row() -> dict:
+    from providers_view import ProviderView
+
+    return ProviderView.from_probe(_probe("openrouter"), key_configured=True).to_json()
+
+
+def test_refresh_includes_catalog_only_services(tmp_path: Path) -> None:
+    view = refresh_provider_status(
+        tmp_path, probe=_stub, codex_probe=_codex_unavailable, opencode_probe=_opencode_unavailable
+    )
+    assert any(p["route"] == "kiro" for p in view["providers"])
+    assert provider_status(tmp_path)["providers"] == view["providers"]

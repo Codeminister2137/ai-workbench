@@ -275,21 +275,66 @@ def load_cached(data_dir: Path) -> dict[str, Any] | None:
     return raw
 
 
-def provider_status(data_dir: Path, repo_root: Path | None = None) -> dict[str, Any]:
-    """Serve the cached snapshot; never probes (safe for every page load)."""
-    cached = load_cached(data_dir)
-    if cached is not None:
-        return {"ok": True, **cached, "cached": True}
-    presence = key_presence(repo_root)
-    rows = []
-    for route, _url, env_name in ROUTES:
-        rows.append(
-            ProviderView.unchecked(
-                route, key_configured=bool(env_name and presence.get(env_name))
-            ).to_json()
+def _catalog_rows(
+    repo_root: Path | None = None, catalog_path: Path | str | None = None
+) -> list[dict[str, Any]]:
+    """Discover services from the execution catalogue without running providers."""
+    from ai_orchestrator import load_model_catalog
+
+    root = repo_root or Path(__file__).resolve().parents[2]
+    path = (
+        Path(catalog_path)
+        if catalog_path
+        else root / "packages/ai_orchestrator/examples/model_catalog.toml"
+    )
+    if catalog_path is None and not path.exists():
+        path = (
+            Path(__file__).resolve().parents[2]
+            / "packages/ai_orchestrator/examples/model_catalog.toml"
         )
+    rows: dict[str, dict[str, Any]] = {}
+    for entry in load_model_catalog(path):
+        backend = entry.backend
+        # Existing HTTP probes describe the provider, including its product variants.
+        route = backend.provider if backend.provider in PROVIDER_META else backend.product
+        if route not in rows:
+            row = ProviderView.unchecked(route, key_configured=False).to_json()
+            if route not in PROVIDER_META:
+                row["display"] = route.replace("_", " ").title()
+                row["account_required"] = backend.auth_method.value != "none"
+                row["blurb"] = "Listed in the execution catalogue; live status is unavailable."
+                row["status_supported"] = False
+            rows[route] = row
+    return list(rows.values())
+
+
+def _merge_catalog(
+    snapshot: Mapping[str, Any], repo_root: Path | None, catalog_path: Path | str | None
+) -> dict[str, Any]:
+    """Keep observations while adding services introduced after the last refresh."""
+    rows = {row["route"]: dict(row) for row in snapshot["providers"]}
+    for row in _catalog_rows(repo_root, catalog_path):
+        rows.setdefault(row["route"], row)
+    return {**snapshot, "providers": list(rows.values())}
+
+
+def provider_status(
+    data_dir: Path, repo_root: Path | None = None, *, catalog_path: Path | str | None = None
+) -> dict[str, Any]:
+    """Serve cached observations plus current catalogue entries; never probes."""
+    cached = load_cached(data_dir)
+    presence = key_presence(repo_root)
+    rows = [
+        ProviderView.unchecked(
+            route, key_configured=bool(env_name and presence.get(env_name))
+        ).to_json()
+        for route, _url, env_name in ROUTES
+    ]
     rows.append(ProviderView.unchecked("codex", key_configured=False).to_json())
-    return {"ok": True, "providers": rows, "cached": False}
+    snapshot = _merge_catalog(
+        cached if cached is not None else {"providers": rows}, repo_root, catalog_path
+    )
+    return {"ok": True, **snapshot, "cached": cached is not None}
 
 
 def _attach_opencode_windows(rows: list[dict[str, Any]], report: Mapping[str, Any]) -> None:
@@ -307,6 +352,7 @@ def refresh_provider_status(
     data_dir: Path,
     repo_root: Path | None = None,
     *,
+    catalog_path: Path | str | None = None,
     probe: Callable[[Mapping[str, str | None]], list[RouteProbe]] | None = None,
     codex_probe: Callable[[], Mapping[str, Any]] | None = None,
     opencode_probe: Callable[[], Mapping[str, Any]] | None = None,
@@ -320,6 +366,7 @@ def refresh_provider_status(
     snapshot["providers"].append(codex_view(codex_sweep()).to_json())
     opencode_sweep = opencode_probe or (lambda: read_opencode_report(repo_root))
     _attach_opencode_windows(snapshot["providers"], opencode_sweep())
+    snapshot = _merge_catalog(snapshot, repo_root, catalog_path)
     path = _cache_path(data_dir)
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp_name = tempfile.mkstemp(dir=str(path.parent), prefix=path.name)

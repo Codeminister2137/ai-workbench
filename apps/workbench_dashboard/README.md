@@ -123,3 +123,14 @@ available Mai output; it does not stream model tokens or add heartbeats.
   plans, inbox, and route evidence.
 - Backend defaults to local Ollama; hosted providers need their usual
   environment credentials and explicit privacy choice.
+
+### Provider discovery
+
+The Providers tab includes services from the configured execution model catalogue
+(`catalog_path`, defaulting to `packages/ai_orchestrator/examples/model_catalog.toml`).
+Existing HTTP providers combine their product variants in one card; other services
+are grouped by catalogue product. New services appear on page load even with an
+older status cache, without frontend registration. Optional display metadata can
+refine their presentation. Catalogue inclusion does not establish authentication,
+reachability or execution support: services without a status integration display
+`status unavailable`. Refresh continues to use only the existing status probes.
