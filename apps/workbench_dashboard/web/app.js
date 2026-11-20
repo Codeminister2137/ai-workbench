@@ -16,9 +16,17 @@ function toast(message, ok) {
   setTimeout(() => el.remove(), 6000);
 }
 
+const recentApiPaths = [];
+
+function noteApiPath(method, path) {
+  recentApiPaths.push({method, path: String(path).split("?")[0], at: new Date().toISOString()});
+  while (recentApiPaths.length > 20) recentApiPaths.shift();
+}
+
 async function api(path, options) {
   let response;
   try {
+    noteApiPath((options && options.method) || "GET", path);
     response = await fetch(path, options);
   } catch (err) {
     throw new Error("Request failed: " + err.message);
@@ -2664,6 +2672,37 @@ function renderHelp() {
 }
 
 
+function buildBugReport({view, description, consent, recent, userAgent, version}) {
+  const desc = String(description || "").trim();
+  if (!desc) return null;
+  const lines = [
+    desc,
+    "",
+    "--- Captured context ---",
+    "view: " + (view || "(unknown)"),
+    "at: " + new Date().toISOString(),
+    "app: " + (version || "(unknown)"),
+    "browser: " + (userAgent || "(unknown)"),
+  ];
+  if (consent && Array.isArray(recent) && recent.length) {
+    lines.push("recent actions:");
+    for (const entry of recent.slice(-20)) {
+      lines.push(`- ${entry.at || ""} ${entry.method || "GET"} ${entry.path || ""}`.trim());
+    }
+  } else if (!consent) {
+    lines.push("(extended activity withheld by reporter)");
+  }
+  const title = "Bug: " + (desc.split("\n")[0].slice(0, 60) || view || "report");
+  return {
+    title,
+    body: lines.join("\n"),
+    type: "task",
+    created_by: "owner",
+    assignee: "agent",
+    metadata: {bug_report: true, view: view || null},
+  };
+}
+
 function renderCreate(kind) {
   const defs = {
     chat: {heading: "New chat", fields: `
@@ -2683,6 +2722,10 @@ function renderCreate(kind) {
       ${fieldRow("Description", '<textarea id="f-body" rows="3" title="Description (optional)"></textarea>', "optional")}
       ${fieldRow("Origin *", `<select id="f-source" title="Who filed it (required)"><option value="owner">me</option><option value="agent">AI agent</option></select>`, "required")}
       ${fieldRow("Ref", '<input type="text" id="f-ref" title="Origin reference: ledger doc, idea id (optional)">', "optional")}`},
+    bug: {heading: "Report a bug", fields: `
+      ${fieldRow("View", '<input type="text" id="f-view" readonly title="View where Report bug was clicked (automatic)">', "automatic")}
+      ${fieldRow("What happened *", '<textarea id="f-body" rows="4" title="Describe what went wrong (required)"></textarea>', "required")}
+      ${fieldRow("Details", '<label><input type="checkbox" id="f-consent" title="Attach recent in-app activity (API paths only, no form contents)"> attach recent in-app activity (API paths only, never form contents)</label>', "optional")}`},
   };
   const def = defs[kind];
   if (!def) { view.innerHTML = "<h1>Not found</h1>"; return; }
@@ -2690,9 +2733,37 @@ function renderCreate(kind) {
     <p><button type="submit" title="Create this item">Create</button>
     <button type="button" id="create-cancel" title="Cancel without creating anything">Cancel</button></p></form>`;
   document.getElementById("create-cancel").addEventListener("click", () => history.back());
+  if (kind === "bug") {
+    document.getElementById("f-view").value = sessionStorage.getItem("bugView") || location.hash || "";
+  }
   document.getElementById("create-form").addEventListener("submit", async (ev) => {
     ev.preventDefault();
     const createBtn = ev.target.querySelector("button[type=submit]");
+    if (kind === "bug") {
+      const payload = buildBugReport({
+        view: document.getElementById("f-view").value,
+        description: document.getElementById("f-body").value,
+        consent: document.getElementById("f-consent").checked,
+        recent: recentApiPaths,
+        userAgent: navigator.userAgent,
+        version: (document.getElementById("version-pill") || {}).textContent,
+      });
+      if (!payload) { toast("Please describe what happened", false); return; }
+      createBtn.disabled = true;
+      try {
+        const out = await api("/api/inbox", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify(payload),
+        });
+        toast("Bug report filed", true);
+        location.hash = "#/inbox/" + out.id;
+      } catch (err) {
+        createBtn.disabled = false;
+        toast(err.message, false);
+      }
+      return;
+    }
     const title = document.getElementById("f-title").value.trim();
     if (!title) { toast("Title is required", false); return; }
     createBtn.disabled = true;
@@ -3244,6 +3315,10 @@ async function renderE2EReminders(name) {
 document.getElementById("create-btn").addEventListener("click", () => {
   document.getElementById("create-menu").hidden =
     !document.getElementById("create-menu").hidden;
+});
+document.getElementById("bug-btn").addEventListener("click", () => {
+  try { sessionStorage.setItem("bugView", location.hash || ""); } catch (err) { /* private mode */ }
+  location.hash = "#/create/bug";
 });
 document.querySelectorAll("[data-create]").forEach((btn) => {
   btn.addEventListener("click", () => {

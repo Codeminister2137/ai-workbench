@@ -216,8 +216,8 @@ def test_dynamic_inputs_and_selects_have_titles() -> None:
     js = _read("app.js")
     inputs = [tag for tag in re.findall(r"<input\b[^>]*>", js) if 'type="radio"' not in tag]
     assert (
-        len(inputs) == 66
-    )  # +bad-test checkbox; +agent-enable checkbox; +spend-policy prepaid/cap (scope is a select); +spend-adjust remaining; step radios excluded; +jobs form (6); +id lookup
+        len(inputs) == 68
+    )  # +bad-test checkbox; +agent-enable checkbox; +spend-policy prepaid/cap (scope is a select); +spend-adjust remaining; step radios excluded; +jobs form (6); +id lookup; +bug report view/consent (2)
     for tag in inputs:
         assert "title=" in tag, f"input without title: {tag}"
     selects = re.findall(r"<select\b[^>]*>", js)
@@ -1867,6 +1867,37 @@ const api = async (path) => ({matches});
   assert(view.innerHTML.includes('2 matches'), 'ambiguous lists');
   assert(view.innerHTML.includes('#/inbox/a') && view.innerHTML.includes('#/runs/b'), 'both link');
 })().catch(error => {console.error(error); process.exitCode = 1;});
+"""
+    result = subprocess.run(
+        [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_bug_report_builder_requires_description_and_gates_activity() -> None:
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node is required for bug report builder")
+    driver = r"""
+const assert = require('assert');
+const source = require('fs').readFileSync(process.argv[1], 'utf8');
+const start = source.indexOf('function buildBugReport(');
+const end = source.indexOf('\n}', start) + 2;
+eval(source.slice(start, end));
+assert.equal(buildBugReport({description: '  '}), null, 'blank rejected');
+const recent = [{at: 't', method: 'GET', path: '/api/inbox'}];
+const withConsent = buildBugReport({view: '#/runs', description: 'It broke\nmore',
+  consent: true, recent, userAgent: 'UA', version: 'v1'});
+assert.equal(withConsent.title, 'Bug: It broke', 'title from first line');
+assert.equal(withConsent.assignee, 'agent', 'agent triages');
+assert.equal(withConsent.metadata.bug_report, true, 'marked');
+assert(withConsent.body.includes('view: #/runs'), 'view captured');
+assert(withConsent.body.includes('GET /api/inbox'), 'activity attached');
+const without = buildBugReport({view: '#/x', description: 'oops', consent: false, recent: []});
+assert(without.body.includes('withheld by reporter'), 'withhold noted');
+assert(!without.body.includes('recent actions'), 'no activity leaked');
+const evil = buildBugReport({description: '<script>alert(1)</script>', consent: false, recent: []});
+assert(evil.body.includes('<script>alert(1)</script>'), 'raw text kept for server escape');
 """
     result = subprocess.run(
         [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
