@@ -45,6 +45,7 @@ GROUPS = {
         "tests/test_eval_budget.py",
         "tests/test_snapshot_allowances.py",
         "tests/test_native_capability_eval.py",
+        "tests/test_capability_eval.py",
         "tests/test_eval_threshold.py",
         "tests/test_baseten_adapter.py",
         "tests/test_ollama_*.py",
@@ -186,7 +187,6 @@ GROUPS = {
         "tests/test_allowance_healthcheck.py",
         "tests/test_window_watch_restore.py",
         "tests/test_seed_projects.py",
-        "tests/test_capability_eval.py",
     ),
     "research": (
         "tests/test_research_*.py",

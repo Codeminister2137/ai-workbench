@@ -39,6 +39,16 @@ report quality.
 
 See the [interface specification](docs/interface.md) for the capability matrix.
 
+`python -m ai_provider.capability_eval` probes explicitly selected catalog routes
+for tools, streaming and structured output. Schema probes use Ollama's native
+`format` or strict Chat Completions `response_format` JSON schema, including
+Requesty, OpenCode Go chat routes and guarded OpenRouter free routes. OpenCode
+Responses/Messages routes remain unknown. Existing price, quota, credential and
+privacy admission checks still apply; hosted calls require a current owner
+allowance and `--allow-hosted`. Evidence contains verdicts and sanitized error
+categories, never raw response/error bodies. A pass is a one-attempt schema
+smoke check, not proof that a provider enforces schemas for arbitrary inputs.
+
 OpenRouter root and choice-level errors use the same sanitized provider error
 categories. An `error` finish without usable details is non-retryable; partial
 answers and tool calls from that failed response are rejected. Existing eligible
