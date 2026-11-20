@@ -103,12 +103,6 @@ class LocalCouncil:
         cap = self.config.max_tokens_per_question
         return cap > 0 and spent >= cap
 
-    def _member_model(self, name: str) -> str:
-        for member in self.config.members:
-            if member.name == name:
-                return member.model
-        return ""
-
     def _react_round(self, conversation_id: int, history, answers: list[dict[str, Any]]) -> None:
         by_member = {
             item["member"]: item.get("answer", "") for item in answers if not item.get("error")
