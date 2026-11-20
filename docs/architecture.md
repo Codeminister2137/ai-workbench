@@ -18,6 +18,11 @@ Fixed acceptance job definitions and their existing additive storage belong to
 `ai_provider.acceptance_storage`; runtime, harness and process helpers depend on
 that module rather than the job CLI. The original import locations re-export
 the moved contracts for compatibility.
+Owner decision `ed066ac7` (A, 2026-11-20) permits this storage module to import
+only `AccessMethod`, `load_model_catalog` and `ScheduledTaskStatus` from the
+Orchestrator. The layering ratchet pins this narrow exception; routing,
+selection and judging behavior remain outside the provider boundary. See the
+[decision record](decisions/family3-acceptance-storage-layering.md).
 
 Known malformed generated tool arguments may use the neutral ToolCallFormatError
 signal for shared-loop correction within the original allowance (ADR-061). This
