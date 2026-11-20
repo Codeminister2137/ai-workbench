@@ -63,3 +63,19 @@ def test_opencode_weekly_paced_against_monthly() -> None:
 def test_rejects_bad_share() -> None:
     with pytest.raises(ValueError):
         plan_eval_windows([], now=NOW, eval_share=0)
+
+
+def test_reserve_skips_thin_remainders_but_keeps_fresh_quota() -> None:
+    reset = (NOW + timedelta(days=1)).isoformat()
+    windows = [
+        _window("codex", "thin", "weekly", remaining_percent=10.0, resets_at_utc=None),
+        _window("codex", "rich", "weekly", remaining_percent=50.0, resets_at_utc=None),
+        _window("codex", "fresh", "weekly", remaining_percent=1.0, resets_at_utc=reset),
+    ]
+    plan = plan_eval_windows(windows, now=NOW, min_remainder_percent=25.0)
+    assert [entry.bucket_id for entry in plan] == ["rich", "fresh"]
+
+
+def test_rejects_bad_reserve() -> None:
+    with pytest.raises(ValueError):
+        plan_eval_windows([], now=NOW, min_remainder_percent=101)

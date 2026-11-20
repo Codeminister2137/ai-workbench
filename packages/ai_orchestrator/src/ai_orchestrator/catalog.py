@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import math
 import tomllib
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -25,8 +26,27 @@ from ai_orchestrator.models import (
 )
 
 
-def load_model_catalog(path: Path | str) -> tuple[ModelCatalogEntry, ...]:
-    """Load, validate, and convert a TOML model catalog into typed entries."""
+@dataclass(frozen=True, slots=True)
+class MeasuredCapabilities:
+    """Neutral measured-grade overlay for one route (no provider imports)."""
+
+    capabilities: dict[str, bool]
+    checked_utc: str
+    evidence: str
+
+
+def load_model_catalog(
+    path: Path | str,
+    *,
+    measured: Mapping[str, MeasuredCapabilities] | None = None,
+) -> tuple[ModelCatalogEntry, ...]:
+    """Load, validate, and convert a TOML model catalog into typed entries.
+
+    ``measured`` overlays dated probe evidence on declarations: every
+    measured flag wins over the catalog boolean, and provenance lands in
+    entry metadata. Records for unknown routes are ignored (orphan
+    hygiene belongs to a separate check, not the load path).
+    """
 
     catalog_path = Path(path)
     if not catalog_path.is_file():
@@ -37,7 +57,67 @@ def load_model_catalog(path: Path | str) -> tuple[ModelCatalogEntry, ...]:
     if not isinstance(entries, Sequence) or isinstance(entries, (str, bytes)):
         raise ValueError("Model catalog must define a top-level 'models' array.")
 
-    return tuple(_parse_entry(item) for item in entries)
+    parsed = tuple(_parse_entry(item) for item in entries)
+    if not measured:
+        return parsed
+    return tuple(_apply_measured(entry, measured) for entry in parsed)
+
+
+_MEASURED_FLAGS = (
+    "chat",
+    "streaming",
+    "tools",
+    "structured_output",
+    "multimodal_input",
+    "embeddings",
+)
+
+
+def measured_overlay(
+    records: Mapping[str, Mapping[str, Any]],
+) -> dict[str, MeasuredCapabilities]:
+    """Build the neutral overlay from plain grade-record mappings.
+
+    Lives here (not in the provider package) so grade records never
+    up-import the orchestrator: callers pass ``record.to_json()`` dicts.
+    """
+    overlay = {}
+    for route_id, raw in records.items():
+        try:
+            capabilities = dict(raw["capabilities"])
+            checked_utc = str(raw["checked_utc"])
+            evidence = str(raw["evidence"])
+        except (KeyError, TypeError, ValueError):
+            raise ValueError(f"Invalid grade record for {route_id!r}") from None
+        overlay[route_id] = MeasuredCapabilities(
+            capabilities=capabilities,
+            checked_utc=checked_utc,
+            evidence=evidence,
+        )
+    return overlay
+
+
+def _apply_measured(
+    entry: ModelCatalogEntry,
+    measured: Mapping[str, MeasuredCapabilities],
+) -> ModelCatalogEntry:
+    record = measured.get(entry.backend.route_id)
+    if record is None:
+        return entry
+    flags = {
+        name: value
+        for name, value in record.capabilities.items()
+        if name in _MEASURED_FLAGS and isinstance(value, bool)
+    }
+    if not flags:
+        return entry
+    capabilities = replace(entry.backend.capabilities, **flags)
+    metadata = dict(entry.metadata)
+    metadata["measured_at"] = record.checked_utc
+    metadata["measured_evidence"] = record.evidence
+    metadata["measured_capabilities"] = ",".join(sorted(flags))
+    backend = replace(entry.backend, capabilities=capabilities)
+    return replace(entry, backend=backend, metadata=metadata)
 
 
 def _parse_entry(item: object) -> ModelCatalogEntry:

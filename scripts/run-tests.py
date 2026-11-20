@@ -41,6 +41,7 @@ GROUPS = {
         "tests/test_ai_provider_*.py",
         "tests/test_provider_*.py",
         "tests/test_eval_planner.py",
+        "tests/test_grade_records.py",
         "tests/test_eval_budget.py",
         "tests/test_snapshot_allowances.py",
         "tests/test_native_capability_eval.py",
