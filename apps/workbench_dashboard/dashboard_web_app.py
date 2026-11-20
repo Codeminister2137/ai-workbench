@@ -963,7 +963,11 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             if path == "/api/knowme":
                 return self._send_knowme(parsed.query)
             if path == "/api/providers":
-                return self._send_json(providers_status(self.data_dir, self.repo_root))
+                return self._send_json(
+                    providers_status(
+                        self.data_dir, self.repo_root, catalog_path=config.catalog_path
+                    )
+                )
             if path == "/api/fleet":
                 return self._send_json(
                     {
@@ -1193,7 +1197,11 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 session_id = path[len("/api/chat/sessions/") : -len("/draft-plan")]
                 return self._draft_plan_from_chat(config, session_id, payload)
             if path == "/api/providers/refresh":
-                return self._send_json(refresh_provider_status(self.data_dir, self.repo_root))
+                return self._send_json(
+                    refresh_provider_status(
+                        self.data_dir, self.repo_root, catalog_path=config.catalog_path
+                    )
+                )
             if path == "/api/spend/policy":
                 return self._save_spend_policy(payload)
             if path == "/api/spend/adjust":

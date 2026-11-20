@@ -3000,6 +3000,7 @@ async function renderRestrictions() {
     </ul></div>`;
 }
 function providerStatusPill(p) {
+  if (p.status_supported === false) return '<span class="pill">status unavailable</span>';
   if (p.reachable === null || p.reachable === undefined || p.checked_at === null) {
     return '<span class="pill">not checked yet</span>';
   }
@@ -3033,7 +3034,9 @@ function providerCardHtml(p, allowances) {
   const site = p.site_url
     ? `<p><a href="${esc(p.site_url)}" target="_blank" rel="noopener">` +
       `Log in / register at ${esc(p.display)}</a></p>` : "";
-  const keyLine = p.route === "codex"
+  const keyLine = p.status_supported === false
+    ? '<p class="muted">Authentication and availability have not been checked.</p>'
+    : p.route === "codex"
     ? (p.key_configured
       ? '<p class="muted">Codex CLI login detected.</p>'
       : '<p class="muted">Codex CLI login not detected — log in so quota reads work.</p>')
