@@ -6,10 +6,12 @@ from pathlib import Path
 import pytest
 from ai_provider.secrets import (
     _iter_assignments,
+    dotenv_names,
     load_dotenv,
     parse_dotenv_lines,
     read_dotenv_values,
     read_secret_key,
+    secret_status,
 )
 
 
@@ -218,3 +220,35 @@ def test_parse_dotenv_lines_iter_assignments_grammar_parity() -> None:
     # Spot-check pinned and export rows through both APIs.
     assert parse_dotenv_lines('  KEY  =  "  secret-value  "  ')["KEY"] == "  secret-value  "
     assert dict(_iter_assignments('export KEY="  secret-value  "'))["KEY"] == "  secret-value  "
+
+
+def test_secret_status_names_every_outcome(tmp_path: Path) -> None:
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "PRESENT_K=fake-1\nexport EXPORTED_K=fake-2\nEMPTY_K=\nDUP_K=fake-3\nDUP_K=fake-4\n",
+        encoding="utf-8",
+    )
+    assert secret_status(env_file, "PRESENT_K").reason == "ok"
+    assert secret_status(env_file, "PRESENT_K").present is True
+    assert secret_status(env_file, "EXPORTED_K").present is True
+    assert secret_status(env_file, "MISSING_K").reason == "missing"
+    assert secret_status(env_file, "EMPTY_K").reason == "empty"
+    assert secret_status(env_file, "DUP_K").reason == "duplicate"
+    assert secret_status(tmp_path / "absent", "PRESENT_K").reason == "missing-file"
+
+
+def test_secret_status_never_carries_values(tmp_path: Path) -> None:
+    env_file = tmp_path / ".env"
+    env_file.write_text("PRESENT_K=fake-secret-value\n", encoding="utf-8")
+    verdict = secret_status(env_file, "PRESENT_K")
+    assert "fake-secret-value" not in repr(verdict)
+    assert (verdict.name, verdict.present, verdict.reason) == ("PRESENT_K", True, "ok")
+
+
+def test_dotenv_names_lists_without_side_effects(tmp_path: Path, monkeypatch) -> None:
+    env_file = tmp_path / ".env"
+    env_file.write_text("AAA_K=fake-1\nexport BBB_K=fake-2\n", encoding="utf-8")
+    monkeypatch.delenv("AAA_K", raising=False)
+    assert dotenv_names(env_file) == ("AAA_K", "BBB_K")
+    assert "AAA_K" not in os.environ
+    assert dotenv_names(tmp_path / "absent") == ()
