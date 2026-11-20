@@ -127,7 +127,8 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/plans/repo-assistant-cli-parity-plan.md | ACTED | Consumed into CLI/ADRs (one narrow Oct-19 PENDING likely moot). |
 | docs/plans/research-review-orchestration-plan.md | KNOWLEDGE | Retained findings index for reanalysis. |
 | docs/plans/l1-l2-reader-design-20261118.md | PENDING | L1/L2/L3 ladder + onboarding flow; slices proposed. |
-| docs/mai-switch-readiness.md | PENDING | Checklist draft 2026-11-18; owner sign-off open. |
+| docs/mai-switch-readiness.md | ACTED | Owner accepted switch 2026-11-20; daily coding protocol records pending soak reviews. |
+| docs/mai-daily-coding.md | KNOWLEDGE | Accepted Mai workflow, weekly evidence tracking and rollback review due 2026-12-04. |
 | docs/plans/remote-offers-20261118.md | PENDING | Remote-first lines E–I draft; owner picks first two. |
 | docs/plans/repo-gap-assessment-20261117.md | KNOWLEDGE | Research sweep 2026-11-17 (state+gaps+phases); partly executed since. |
 | docs/plans/push-transfer-investigation-20261118.md | KNOWLEDGE | Idle-SSH + red-hook-bypass root causes; keepalive applied, verified. |

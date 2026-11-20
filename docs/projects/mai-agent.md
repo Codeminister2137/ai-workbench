@@ -7,5 +7,7 @@ and the drain that executes queued runs unattended.
 Key areas: `packages/ai_agent` (loop, tools, Mai sessions),
 `apps/workbench_dashboard/dashboard_chat.py`, `mai_run.py`.
 
-Current state: interactive surface live; supervision placement undecided;
-switch-readiness tracked in the Mai Roadmap (Plans tab).
+Current state: daily coding uses dashboard Mai (owner decision 2026-11-20).
+Dashboard-native supervision is accepted in ADR-090. Muse CLI stays available
+for overflow and rollback. Weekly checks and the 2026-12-04 review follow the
+[daily coding protocol](../mai-daily-coding.md).

@@ -1,4 +1,4 @@
-# Mai-switch readiness checklist (draft for owner sign-off, 2026-11-18)
+# Mai-switch readiness checklist (switch accepted, 2026-11-20)
 
 Bar (owner-set): Mai reaches same-or-higher capability than Muse CLI
 plus reliable Dashboard/system wiring.
@@ -28,7 +28,7 @@ plus reliable Dashboard/system wiring.
       zero-correctness task, wiring reliable all 5 turns; ~4x fewer tokens
       (1.87M/12.9K vs 8.12M/47.4K). Caveats: 5 pilot tasks; local-model
       grades unevaluated. Evidence: docs/plans/mai-parity-battery/scores.json.
-      Migration decision brief: inbox `ee58d176` (2026-11-20, open).
+      Migration decision: inbox `ee58d176` (2026-11-20), switch now with rollback window.
 - [x] Stuck-run fallback: reconcile interruption cap shipped 2026-11-18
       (cancel + terminal note after repeated output-less interruptions).
 - [x] Completion-to-inbox mail routing: unattended-only policy shipped
@@ -36,5 +36,10 @@ plus reliable Dashboard/system wiring.
 
 ## Sign-off
 
-Owner signs by answering the linked inbox item: switch approved,
-switch approved with conditions (state them), or not yet (state the blocker).
+Owner selected **Switch now with rollback window** on 2026-11-20 in inbox
+`ee58d176076d4aa083e669955c0904d2`. Mai is the daily coding surface;
+Muse CLI remains provisioned for overflow and rollback. See the
+[daily coding and rollback protocol](mai-daily-coding.md).
+
+Migration setup is COMPLETE; the two-week operational review is pending.
+The soak items above remain observations to collect, not proven successes.
