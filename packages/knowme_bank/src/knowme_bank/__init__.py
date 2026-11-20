@@ -133,10 +133,3 @@ class KnowMeStore:
         with _connected(self.path) as connection:
             row = connection.execute("SELECT COUNT(*) FROM entries").fetchone()
         return int(row[0])
-
-    def iter_all(self) -> Iterator[KnowMeEntry]:
-        """Stream every entry, oldest first (exports, reviews)."""
-        with _connected(self.path) as connection:
-            rows = connection.execute(f"SELECT {_COLUMNS} FROM entries ORDER BY id ASC").fetchall()
-        for row in rows:
-            yield KnowMeEntry(*row)

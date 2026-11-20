@@ -11,12 +11,6 @@ import math
 from dataclasses import dataclass, field
 
 
-@dataclass(frozen=True)
-class PriceTick:
-    symbol: str
-    close: float
-
-
 @dataclass
 class PaperPortfolio:
     """Cash + share ledger rebalanced to target weights each tick."""

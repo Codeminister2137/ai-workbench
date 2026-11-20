@@ -17,7 +17,7 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
-from ai_orchestrator import AccessMethod, ExecutionTarget, OrchestrationResult
+from ai_orchestrator import AccessMethod, ExecutionTarget
 
 from ai_provider.diagnostic_process import run_owned_diagnostic
 
@@ -522,42 +522,6 @@ def _parse_codex_plugin_row(line: str) -> CodexPluginInfo | None:
     version = parts[2] if len(parts) >= 3 and parts[2] != "-" else None
     path = " ".join(parts[3:]) if len(parts) > 3 else None
     return CodexPluginInfo(name=name, status=status, version=version, path=path)
-
-
-def external_agent_config_from_orchestration(
-    orchestration: OrchestrationResult,
-    *,
-    repo_root: Path,
-    timeout_seconds: float,
-    sandbox: str = "workspace-write",
-    approval_policy: str = "never",
-    codex_persist_session: bool = False,
-    codex_resume: str | None = None,
-    output_last_message_path: Path | None = None,
-    output_schema_path: Path | None = None,
-    web_search: bool = False,
-    image_paths: tuple[Path, ...] = (),
-    codex_mcp_tools: bool = False,
-    shared_tool_profile: str | None = None,
-) -> ExternalAgentConfig:
-    """Adapt a ready orchestration result to an external-agent runtime config."""
-    if orchestration.execution_plan is None:
-        raise ValueError("External execution requires a prepared plan")
-    return external_agent_config_from_target(
-        orchestration.execution_plan.target,
-        repo_root=repo_root,
-        timeout_seconds=timeout_seconds,
-        sandbox=sandbox,
-        approval_policy=approval_policy,
-        codex_persist_session=codex_persist_session,
-        codex_resume=codex_resume,
-        output_last_message_path=output_last_message_path,
-        output_schema_path=output_schema_path,
-        web_search=web_search,
-        image_paths=image_paths,
-        codex_mcp_tools=codex_mcp_tools,
-        shared_tool_profile=shared_tool_profile,
-    )
 
 
 def external_agent_config_from_target(

@@ -174,25 +174,6 @@ def build_worker_command(spec: WorkerSpec, *, guest_script: str = GUEST_PROBE) -
     ]
 
 
-@dataclass(slots=True)
-class ProbeOutcome:
-    """Host-side result with the pinned digest and bounded guest report."""
-
-    exit_code: int
-    image_digest: str | None
-    findings: dict
-    raw_bytes: int
-
-    def passed(self) -> bool:
-        return (
-            self.exit_code == 0
-            and bool(self.findings)
-            and all(
-                isinstance(item, dict) and item.get("ok") is True for item in self.findings.values()
-            )
-        )
-
-
 def parse_probe_output(stdout: str) -> dict:
     """Parse the guest JSON report; reject oversized or malformed output."""
     raw = stdout.encode("utf-8", "replace")
