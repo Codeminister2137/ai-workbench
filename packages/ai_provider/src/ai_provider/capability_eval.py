@@ -2,8 +2,10 @@
 
 Run explicitly selected catalog routes with ``python -m ai_provider.capability_eval``.
 Only synthetic inputs leave the process. Native schema probing currently covers
-Ollama; other adapters report unknown rather than equating prompted JSON with
-schema-constrained output. This is capability smoke evidence, not quality scoring.
+Ollama and the native Codex output-schema protocol; other adapters report unknown
+rather than equating prompted JSON with schema-constrained output. Native Codex
+uses one bounded invocation with fresh allowance pre/postflight readings.
+This is capability smoke evidence, not quality scoring.
 """
 
 from __future__ import annotations
@@ -170,13 +172,31 @@ def main() -> None:
         row = rows[0]
         if row["provider"] != "ollama" and not args.allow_hosted:
             parser.error("hosted routes require an explicit current allowance and --allow-hosted")
-        if row["access_method"] not in {"local_runtime", "provider_api"}:
+        if row["access_method"] == "codex_cli":
+            if (
+                row["provider"] != "openai"
+                or row.get("billing_source") != "chatgpt_subscription_allowance"
+                or not args.allow_hosted
+            ):
+                parser.error("Codex eval requires the explicit subscription allowance route")
+        elif row["access_method"] not in {"local_runtime", "provider_api"}:
             parser.error("native subscription clients require their own capability protocol")
         selected.append(row)
+    if any(row["access_method"] == "codex_cli" for row in selected) and len(selected) != 1:
+        parser.error("native allowance evaluation requires exactly one explicit route per run")
     load_dotenv(args.env_root)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with args.output.open("x", encoding="utf-8") as sink:
         for row in selected:
+            if row["access_method"] == "codex_cli":
+                from ai_provider.native_capability_eval import probe_codex
+
+                result = probe_codex(row["route_id"], row["model"], args.output)
+                sink.write(json.dumps(asdict(result)) + "\n")
+                sink.flush()
+                if result.status != "pass":
+                    raise SystemExit(1)
+                continue
             config = BackendConfig(
                 provider=ProviderKind(row["provider"]),
                 model=row["model"],

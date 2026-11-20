@@ -1,5 +1,15 @@
 # Provider source state
 
+## Native Codex eval contract checked 2026-11-20
+
+Official [non-interactive documentation](https://learn.chatgpt.com/docs/non-interactive-mode)
+documents `exec --output-schema` and final-message output. The official
+[configuration sample](https://learn.chatgpt.com/docs/config-file/config-sample)
+lists `forced_login_method = "chatgpt"` and provider selection. The capability
+worker uses these through the existing native runner; deterministic checks do
+not establish live model compatibility. Account headroom/reset observations
+remain private runtime evidence. See [worker contract](../../../docs/repo-assistant/codex-native-eval.md).
+
 **Checked:** 2026-10-13; Gemini individual-access retirement verified 2026-10-14.
 Published limits and account observations can expire.
 
