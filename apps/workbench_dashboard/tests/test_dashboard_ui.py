@@ -1023,7 +1023,7 @@ def test_spend_merged_into_providers() -> None:
     html = _read("index.html")
     assert "renderSpend" not in js
     assert "spendCardHtml" in js
-    assert 'location.hash = "#/providers"' in js
+    assert 'location.replace("#/providers")' in js
     assert 'location.hash = "#/fleet"' not in js
     assert 'data-view="spend"' not in html
 
@@ -1111,7 +1111,8 @@ const router = source.slice(source.indexOf('async function render() {'), source.
 const view = {innerHTML: ''};
 const document = {querySelectorAll: () => [], querySelector: () => null};
 let moduleSettings = {landing_page: 'runs', modules: [{id: 'overview', views: ['home'], activated: false}]};
-const location = {hash: ''};
+let replaced = null;
+const location = {hash: '', replace(url) { replaced = url; }};
 const stopRunsPoll = () => {}, stopRunDetailPoll = () => {}, loadModules = async () => {};
 const refreshBadge = () => {}, toast = () => {}, esc = String;
 let rendered = '';
@@ -1131,6 +1132,7 @@ eval(router);
  }
  location.hash = ''; rendered = ''; await render(); assert.equal(rendered, 'runs:');
  location.hash = '#/unknown'; view.innerHTML = ''; await render(); assert(view.innerHTML.includes('Not found'));
+ location.hash = '#/spend'; await render(); assert.equal(replaced, '#/providers', 'alias replaces (no back-trap)');
 })().catch(error => {console.error(error); process.exitCode = 1;});
 """
     assert "moduleSettings.landing_page" in router
@@ -1830,18 +1832,19 @@ assert.equal((nested.match(/<a /g) || []).length, 1, 'never nests anchors');
 const attr = linkIds('<span title="' + full + '">t</span>');
 assert(!attr.includes('#/lookup'), 'attributes stay untouched');
 const apollo = 'https://knowledge.apollo.io/hc/en-us/articles/4416173158541-Use-Apollo-API';
-assert.equal(linkIds(esc(apollo)), `<a href="${apollo}">${apollo}</a>`);
+const ext = (u) => `<a href="${u}" target="_blank" rel="noopener">${u}</a>`;
+assert.equal(linkIds(esc(apollo)), ext(apollo));
 const query = 'https://example.com/' + full + '?a=1&b=2#section';
 const escaped = esc(query);
-assert.equal(linkIds(escaped), `<a href="${escaped}">${escaped}</a>`);
-assert.equal(linkIds('(' + apollo + ').'), `(<a href="${apollo}">${apollo}</a>).`);
+assert.equal(linkIds(escaped), ext(escaped));
+assert.equal(linkIds('(' + apollo + ').'), `(${ext(apollo)}).`);
 const balanced = 'https://example.com/wiki/API_(version)';
-assert.equal(linkIds(balanced), `<a href="${balanced}">${balanced}</a>`);
+assert.equal(linkIds(balanced), ext(balanced));
 const already = `<a href="${apollo}">${apollo}</a>`;
 assert.equal(linkIds(already), already, 'existing external anchors are preserved');
 assert.equal(linkIds(linkIds(apollo)), linkIds(apollo), 'repeated rendering is stable');
 const quoted = linkIds(esc('"' + apollo + '" <script>alert(1)</script>'));
-assert(quoted.includes(`&quot;<a href="${apollo}">${apollo}</a>&quot;`));
+assert(quoted.includes(`&quot;${ext(apollo)}&quot;`));
 assert(!quoted.includes('<script>'), 'escaped input stays escaped');
 assert.equal(linkIds('javascript:alert(1)'), 'javascript:alert(1)');
 const multiple = linkIds(apollo + ' http://example.org/docs. run:8fad37897a5b');
@@ -1885,7 +1888,7 @@ const api = async (path) => ({item});
   assert(html.includes('<li>branch:develop</li>'), 'unrouted ref stays text');
   assert(html.includes('<li>bogus</li>'), 'bare word stays text');
   assert(html.includes('<a href="#/lookup/f05e3226dd8440fc816e03cd89c6c431"'), 'body id links');
-  assert.equal(html.split(`<a href="${apollo}">${apollo}</a>`).length - 1, 2, 'body and context URL link in full');
+  assert.equal(html.split(`<a href="${apollo}" target="_blank" rel="noopener">${apollo}</a>`).length - 1, 2, 'body and context URL link in full');
   assert(!html.includes('#/lookup/4416173158541'), 'article ID never routes internally');
   assert(html.includes('id="lookup-go"') === false, 'detail has no lookup field');
 })().catch(error => {console.error(error); process.exitCode = 1;});
@@ -1909,7 +1912,8 @@ const renderer = source.slice(source.indexOf('async function renderLookup('),
   source.indexOf('async function markIdeaSeen('));
 eval(renderer);
 const view = {innerHTML: '', querySelectorAll: () => []};
-const location = {hash: '#/lookup/abc'};
+let replaced = null;
+const location = {hash: '#/lookup/abc', replace(url) { replaced = url; this.hash = url; }};
 let rendered = 0;
 const render = async () => { rendered++; };
 let matches = [];
@@ -1921,7 +1925,7 @@ const api = async (path) => ({matches});
   assert(view.innerHTML.includes('No inbox, run, idea, or plan matches'), 'missing explains');
   matches = [{kind: 'run', id: 'r1', title: 'R', status: 'queued', url: '#/runs/r1'}];
   await renderLookup('r1');
-  assert.equal(location.hash, '#/runs/r1', 'single match navigates');
+  assert.equal(replaced, '#/runs/r1', 'single match replaces (Back skips the lookup URL)');
   assert.equal(rendered, 1, 'navigation re-renders');
   matches = [{kind: 'inbox', id: 'a', title: 'A', status: 'open', url: '#/inbox/a'},
     {kind: 'run', id: 'b', title: 'B', status: 'failed', url: '#/runs/b'}];
