@@ -230,6 +230,24 @@ def build_parser() -> argparse.ArgumentParser:
         help=f"task ids in ladder order (default: {' '.join(TASKS)})",
     )
     parser.add_argument(
+        "--tier",
+        default=None,
+        choices=["local", "control", "allowance", "metered"],
+        help="resolve tasks from a tier set instead of --tasks (see eval_task_sets)",
+    )
+    parser.add_argument(
+        "--max-tier-tasks",
+        type=int,
+        default=0,
+        help="cap tier tasks deterministically; 0 keeps all (default: 0)",
+    )
+    parser.add_argument(
+        "--sample-seed",
+        type=int,
+        default=0,
+        help="seed for tier sampling (default: 0)",
+    )
+    parser.add_argument(
         "--continue-past-fail",
         action="store_true",
         help="run every requested task even after a FAIL (default: PASS-gated)",
@@ -264,7 +282,14 @@ def main(argv: list[str] | None = None) -> int:
     """Resolve candidates per route, walk the ladder, write snapshots."""
     parser = build_parser()
     args = parser.parse_args(argv)
-    tasks = tuple(args.tasks) if args.tasks is not None else TASKS
+    if args.tasks is not None and args.tier is not None:
+        parser.error("choose one of --tasks or --tier")
+    if args.tier is not None:
+        from ai_provider.eval_task_sets import sample_tasks, tasks_for_tier
+
+        tasks = sample_tasks(tasks_for_tier(args.tier), args.max_tier_tasks, seed=args.sample_seed)
+    else:
+        tasks = tuple(args.tasks) if args.tasks is not None else TASKS
     unknown = [task for task in tasks if task not in TASK_SPECS]
     if unknown:
         parser.error(f"unknown task id(s): {', '.join(unknown)} (choose from {' '.join(TASKS)})")

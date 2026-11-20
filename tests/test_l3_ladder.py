@@ -223,6 +223,49 @@ def test_main_runs_offline_with_tmp_catalog(monkeypatch, tmp_path, capsys) -> No
     assert list((tmp_path / "snap").glob("ladder-resolved-*.json")) != []
 
 
+def test_main_rejects_tasks_with_tier(capsys) -> None:
+    with pytest.raises(SystemExit) as exc:
+        _module.main(["--tasks", "T0", "--tier", "local"])
+    assert exc.value.code == 2
+
+
+def test_main_tier_resolves_sampled_tasks(monkeypatch, tmp_path, capsys) -> None:
+    catalog = tmp_path / "cat.toml"
+    catalog.write_text(
+        '[[models]]\nroute_id = "ollama/m"\nprovider = "ollama"\nmodel = "m"\nlocation = "local"\n',
+        encoding="utf-8",
+    )
+
+    class Client:
+        def complete(self, request):
+            return SimpleNamespace(
+                message=SimpleNamespace(content="def add2(x):\n    return x + 2"),
+                usage=SimpleNamespace(input_tokens=1, output_tokens=2),
+            )
+
+    monkeypatch.setattr(
+        _module.route_eval, "_clients", lambda creds: {"ollama": lambda m: Client()}
+    )
+    code = _module.main(
+        [
+            "--catalog",
+            str(catalog),
+            "--snapshot-dir",
+            str(tmp_path / "snap"),
+            "--routes",
+            "ollama",
+            "--allow-tier",
+            "local_only",
+            "--tier",
+            "metered",
+        ]
+    )
+    assert code == 0
+    out = capsys.readouterr().out
+    assert "ollama/T0 (m): PASS" in out
+    assert "snapshot: " in out
+
+
 def test_resolve_route_zero_returns_full_live_list(monkeypatch) -> None:
     from ai_orchestrator.catalog import load_model_catalog
 
