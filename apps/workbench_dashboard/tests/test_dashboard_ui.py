@@ -205,7 +205,7 @@ def test_dynamic_buttons_have_titles() -> None:
     js = _read("app.js")
     buttons = re.findall(r"<button\b[^>]*>", js)
     assert (
-        len(buttons) == 61
+        len(buttons) == 63
     )  # +doc pin; +fanout apply; +delete-inbox-btn +e2e submit +chat mode/apply/approve +notes save +agent-check run +agent-config save +spend-policy add/save/remove +spend-adjust record +backlog to-task +jobs submit +report acknowledge +id lookup
     for tag in buttons:
         assert "title=" in tag, f"button without title: {tag}"
@@ -1903,3 +1903,108 @@ assert(evil.body.includes('<script>alert(1)</script>'), 'raw text kept for serve
         [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
     )
     assert result.returncode == 0, result.stderr
+
+
+def test_bug_dialog_preserves_view_on_cancel_submit_and_failure() -> None:
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node is required for bug dialog lifecycle")
+    driver = r"""
+const assert = require('assert');
+const source = require('fs').readFileSync(process.argv[1], 'utf8');
+const code = source.slice(source.indexOf('function buildBugReport('),
+  source.indexOf('function renderCreate('));
+let current = null, posts = [], fail = false, pending;
+const location = {hash: '#/create/idea'};
+const draft = {value: 'unsaved idea'};
+const view = {draft};
+Object.defineProperty(view, "innerHTML", {set() {throw new Error("underlying view replaced");}});
+const trigger = {isConnected: true, focused: false, focus() {this.focused = true;}};
+const recentApiPaths = [{method: 'GET', path: '/api/runs'}];
+const navigator = {userAgent: 'test'};
+const fieldRow = (label, field) => field;
+const toast = () => {};
+const api = async (path, options) => {
+  posts.push({path, payload: JSON.parse(options.body)});
+  if (fail) throw new Error('offline');
+  if (pending) await pending;
+  return {id: 'report'};
+};
+function element() {
+  return {value: '', checked: false, disabled: false, handlers: {},
+    addEventListener(name, fn) {this.handlers[name] = fn;}};
+}
+const document = {
+  activeElement: trigger,
+  getElementById(id) {return id === 'bug-dialog' ? current : null;},
+  body: {append(dialog) {current = dialog;}},
+  createElement(tag) {
+    assert.equal(tag, 'dialog');
+    const nodes = {};
+    const dialog = element();
+    dialog.setAttribute = () => {};
+    dialog.querySelector = (id) => nodes[id] ||= element();
+    dialog.querySelector('#bug-form').querySelector = dialog.querySelector;
+    dialog.showModal = () => {dialog.open = true;};
+    dialog.remove = () => {current = null;};
+    dialog.close = () => {dialog.open = false; dialog.handlers.close();};
+    return dialog;
+  },
+};
+eval(code);
+const submit = () => current.querySelector('#bug-form').handlers.submit({preventDefault() {}});
+const unchanged = () => {
+  assert.equal(location.hash, '#/create/idea');
+  assert.strictEqual(view.draft, draft);
+  assert.equal(draft.value, 'unsaved idea');
+};
+(async () => {
+  openBugReport();
+  assert(current.open);
+  assert.equal(current.querySelector('#bug-view').value, location.hash);
+  const first = current;
+  openBugReport();
+  assert.strictEqual(current, first, 'one dialog');
+  current.querySelector('#bug-cancel').handlers.click();
+  assert.equal(current, null);
+  assert(trigger.focused);
+  unchanged();
+  openBugReport();
+  current.close(); // Native Escape closes the modal through the same close event.
+  unchanged();
+  openBugReport();
+  await submit();
+  assert.equal(posts.length, 0, 'blank report rejected');
+  current.querySelector('#bug-description').value = 'Broken';
+  fail = true;
+  await submit();
+  assert(current.open, 'failure retains dialog');
+  assert.equal(current.querySelector('#bug-error').textContent, 'offline');
+  assert.equal(current.querySelector('#bug-description').value, 'Broken');
+  assert.equal(current.querySelector('button[type=submit]').disabled, false);
+  assert.equal(posts[0].payload.assignee, 'agent');
+  assert.equal(posts[0].payload.metadata.view, location.hash);
+  assert(!posts[0].payload.body.includes('GET /api/runs'), 'consent defaults off');
+  unchanged();
+  fail = false;
+  let resolve;
+  pending = new Promise(r => {resolve = r;});
+  current.querySelector('#bug-consent').checked = true;
+  const saving = submit();
+  await submit();
+  assert.equal(posts.length, 2, 'duplicate submit blocked');
+  resolve();
+  await saving;
+  assert.equal(current, null, 'success closes dialog');
+  assert(posts[1].payload.body.includes('GET /api/runs'));
+  unchanged();
+})().catch(err => {console.error(err); process.exitCode = 1;});
+"""
+    result = subprocess.run(
+        [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
+    )
+    assert result.returncode == 0, result.stderr
+    js = _read("app.js")
+    assert 'addEventListener("click", openBugReport)' in js
+    assert "#/create/bug" not in js
+    assert 'sessionStorage.getItem("bugView")' not in js

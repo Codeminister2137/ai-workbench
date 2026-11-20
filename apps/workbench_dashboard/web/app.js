@@ -2703,6 +2703,59 @@ function buildBugReport({view, description, consent, recent, userAgent, version}
   };
 }
 
+function openBugReport() {
+  if (document.getElementById("bug-dialog")) return;
+  const origin = location.hash || "";
+  const previousFocus = document.activeElement;
+  const dialog = document.createElement("dialog");
+  dialog.id = "bug-dialog";
+  dialog.setAttribute("aria-labelledby", "bug-heading");
+  dialog.innerHTML = `<h2 id="bug-heading">Report a bug</h2><form id="bug-form">
+      ${fieldRow("View", '<input type="text" id="bug-view" readonly title="View where Report bug was clicked (automatic)">', "automatic")}
+      ${fieldRow("What happened *", '<textarea id="bug-description" rows="4" required autofocus title="Describe what went wrong (required)"></textarea>', "required")}
+      ${fieldRow("Details", '<label><input type="checkbox" id="bug-consent" title="Attach recent in-app activity (API paths only, no form contents)"> attach recent in-app activity (API paths only, never form contents)</label>', "optional")}
+    <p><button type="submit" title="File this bug for agent triage">Report bug</button>
+    <button type="button" id="bug-cancel" title="Cancel without filing a report">Cancel</button></p>
+    <p id="bug-error" role="alert"></p></form>`;
+  document.body.append(dialog);
+  dialog.querySelector("#bug-view").value = origin;
+  dialog.addEventListener("close", () => {
+    dialog.remove();
+    if (previousFocus && previousFocus.isConnected) previousFocus.focus();
+  });
+  dialog.querySelector("#bug-cancel").addEventListener("click", () => dialog.close());
+  const form = dialog.querySelector("#bug-form");
+  form.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const createBtn = form.querySelector("button[type=submit]");
+    if (createBtn.disabled) return;
+    const payload = buildBugReport({
+      view: origin,
+      description: dialog.querySelector("#bug-description").value,
+      consent: dialog.querySelector("#bug-consent").checked,
+      recent: recentApiPaths,
+      userAgent: navigator.userAgent,
+      version: (document.getElementById("version-pill") || {}).textContent,
+    });
+    if (!payload) { toast("Please describe what happened", false); return; }
+    dialog.querySelector("#bug-error").textContent = "";
+    createBtn.disabled = true;
+    try {
+      await api("/api/inbox", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(payload),
+      });
+      toast("Bug report filed", true);
+      dialog.close();
+    } catch (err) {
+      createBtn.disabled = false;
+      dialog.querySelector("#bug-error").textContent = err.message;
+    }
+  });
+  dialog.showModal();
+}
+
 function renderCreate(kind) {
   const defs = {
     chat: {heading: "New chat", fields: `
@@ -2722,10 +2775,6 @@ function renderCreate(kind) {
       ${fieldRow("Description", '<textarea id="f-body" rows="3" title="Description (optional)"></textarea>', "optional")}
       ${fieldRow("Origin *", `<select id="f-source" title="Who filed it (required)"><option value="owner">me</option><option value="agent">AI agent</option></select>`, "required")}
       ${fieldRow("Ref", '<input type="text" id="f-ref" title="Origin reference: ledger doc, idea id (optional)">', "optional")}`},
-    bug: {heading: "Report a bug", fields: `
-      ${fieldRow("View", '<input type="text" id="f-view" readonly title="View where Report bug was clicked (automatic)">', "automatic")}
-      ${fieldRow("What happened *", '<textarea id="f-body" rows="4" title="Describe what went wrong (required)"></textarea>', "required")}
-      ${fieldRow("Details", '<label><input type="checkbox" id="f-consent" title="Attach recent in-app activity (API paths only, no form contents)"> attach recent in-app activity (API paths only, never form contents)</label>', "optional")}`},
   };
   const def = defs[kind];
   if (!def) { view.innerHTML = "<h1>Not found</h1>"; return; }
@@ -2733,37 +2782,9 @@ function renderCreate(kind) {
     <p><button type="submit" title="Create this item">Create</button>
     <button type="button" id="create-cancel" title="Cancel without creating anything">Cancel</button></p></form>`;
   document.getElementById("create-cancel").addEventListener("click", () => history.back());
-  if (kind === "bug") {
-    document.getElementById("f-view").value = sessionStorage.getItem("bugView") || location.hash || "";
-  }
   document.getElementById("create-form").addEventListener("submit", async (ev) => {
     ev.preventDefault();
     const createBtn = ev.target.querySelector("button[type=submit]");
-    if (kind === "bug") {
-      const payload = buildBugReport({
-        view: document.getElementById("f-view").value,
-        description: document.getElementById("f-body").value,
-        consent: document.getElementById("f-consent").checked,
-        recent: recentApiPaths,
-        userAgent: navigator.userAgent,
-        version: (document.getElementById("version-pill") || {}).textContent,
-      });
-      if (!payload) { toast("Please describe what happened", false); return; }
-      createBtn.disabled = true;
-      try {
-        const out = await api("/api/inbox", {
-          method: "POST",
-          headers: {"Content-Type": "application/json"},
-          body: JSON.stringify(payload),
-        });
-        toast("Bug report filed", true);
-        location.hash = "#/inbox/" + out.id;
-      } catch (err) {
-        createBtn.disabled = false;
-        toast(err.message, false);
-      }
-      return;
-    }
     const title = document.getElementById("f-title").value.trim();
     if (!title) { toast("Title is required", false); return; }
     createBtn.disabled = true;
@@ -3316,10 +3337,8 @@ document.getElementById("create-btn").addEventListener("click", () => {
   document.getElementById("create-menu").hidden =
     !document.getElementById("create-menu").hidden;
 });
-document.getElementById("bug-btn").addEventListener("click", () => {
-  try { sessionStorage.setItem("bugView", location.hash || ""); } catch (err) { /* private mode */ }
-  location.hash = "#/create/bug";
-});
+document.getElementById("bug-btn").addEventListener("click", openBugReport);
+
 document.querySelectorAll("[data-create]").forEach((btn) => {
   btn.addEventListener("click", () => {
     document.getElementById("create-menu").hidden = true;
