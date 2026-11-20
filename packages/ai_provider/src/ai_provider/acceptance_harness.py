@@ -17,8 +17,8 @@ from ai_agent.contracts import ToolCall, ToolDefinition, ToolResult
 from ai_agent.tools import EditFileTool, ReadFileTool, ToolContext, ToolRegistry
 from ai_agent.tools.base import BaseTool
 
-from ai_provider.acceptance_jobs import AcceptanceJob
 from ai_provider.acceptance_processes import OwnedChild, remaining
+from ai_provider.acceptance_storage import AcceptanceJob
 from ai_provider.config import BackendConfig, ProviderKind
 from ai_provider.contracts import AIRequest, AIResponse, AIStreamEvent, BackendInfo, ChatClient
 from ai_provider.factory import create_chat_client

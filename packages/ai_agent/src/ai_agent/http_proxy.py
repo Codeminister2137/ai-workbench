@@ -6,24 +6,10 @@ import sys
 from collections.abc import Iterable
 from typing import Any
 from urllib.error import HTTPError
-from urllib.parse import urlsplit
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
-from ai_agent.mcp_server import PROTOCOL_VERSION
-
-
-def validate_loopback_url(url: str) -> None:
-    parsed = urlsplit(url)
-    if (
-        parsed.scheme != "http"
-        or parsed.hostname not in {"127.0.0.1", "::1", "localhost"}
-        or parsed.username is not None
-        or parsed.password is not None
-        or parsed.query
-        or parsed.fragment
-        or not parsed.port
-    ):
-        raise ValueError("MCP endpoint must be an explicit credential-free loopback HTTP URL")
+from ai_agent.mcp_contracts import PROTOCOL_VERSION
+from ai_agent.mcp_contracts import validate_loopback_url as validate_loopback_url
 
 
 class HttpMcpConnection:

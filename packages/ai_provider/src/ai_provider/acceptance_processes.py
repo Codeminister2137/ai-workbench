@@ -12,7 +12,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any, cast
 
-from ai_provider.acceptance_jobs import endpoint
+from ai_provider.acceptance_storage import endpoint
 from ai_provider.process_ownership import WindowsJob as WindowsJob
 
 

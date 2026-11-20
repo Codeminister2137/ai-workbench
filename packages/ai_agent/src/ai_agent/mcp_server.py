@@ -42,6 +42,7 @@ from ai_provider import (
 from ai_agent.contracts import ToolCall, ToolCategory, ToolDefinition, ToolResult
 from ai_agent.execution_status import assess_execution
 from ai_agent.loop import AgentLoop
+from ai_agent.mcp_contracts import PROTOCOL_VERSION as PROTOCOL_VERSION
 from ai_agent.permissions import PermissionManager, PermissionPolicy
 from ai_agent.shared_approvals import TerminalApproval, scoped_registry
 from ai_agent.tool_profiles import shared_tool_registry
@@ -57,7 +58,6 @@ from ai_agent.tools.delegation import DelegateTaskTool
 
 READ_SEARCH_TOOLS = ("read_file", "list_dir", "find_files", "grep_search")
 CODEX_MCP_TOOLS = (*READ_SEARCH_TOOLS, "delegate_task")
-PROTOCOL_VERSION = "2025-06-18"
 DEFAULT_CATALOG_PATH = Path("packages/ai_orchestrator/examples/model_catalog.toml")
 DEFAULT_DELEGATION_TIMEOUT_SECONDS = 180.0
 DEFAULT_DELEGATION_MAX_ITERATIONS = 8
