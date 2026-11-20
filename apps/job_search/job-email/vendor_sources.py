@@ -366,7 +366,9 @@ def default_contact_registry() -> ContactRegistry:
     """Manual first (free, already-known), then ready vendors in order.
 
     Dormant vendors (no key) are skipped; ``registry.source_names``
-    shows what is active. Apollo stays dormant until its 403 clears.
+    shows what is active. Apollo's 403 is its free-plan gate
+    (API_INACCESSIBLE, verified 2026-11-20): it clears only on a paid
+    plan, never by key rotation or retries.
     """
     sources: list[ContactSource] = [ManualContactSource()]
     for cls in (ProspeoContactSource, ApolloContactSource):
