@@ -1,3 +1,23 @@
+## ADR-096 - Provider/orchestrator import exception (accepted) - owner 2026-11-18
+
+Owner chose B on inbox `d9854413c7044281b5e5dc5ffff06ec2`: document existing
+provider imports of orchestrator contracts/policy and retain the layering ratchet,
+rather than extract shared contracts. The conceptual responsibility diagram is
+not a strict import graph; this accepts existing placement without authorizing
+new crossings. See [ADR-096](decisions/ADR-096-provider-orchestrator-import-exception.md).
+
+## ADR-091 - Job-search dashboard review surface (2026-11-18)
+
+**Status:** Accepted by owner (option A, inbox `0e5a06e2`).
+
+M3 per-application review belongs in the existing Workbench dashboard:
+vacancy, match, material diffs and warnings together, with edit/approve/reject
+through the existing application approval gate. The dashboard keeps review
+centralized and visible without a terminal, at the cost of web UI work;
+a richer CLI is faster and scriptable but splits the review workflow.
+The surface decision is resolved; the M3 page and end-to-end acceptance
+remain incomplete. See [ADR-091](decisions/ADR-091-job-search-dashboard-review.md).
+
 ## ADR-095 - Provider-neutral worktree write isolation (2026-11-19)
 
 Owner selected OS isolation over restricting provider/client coverage. The
