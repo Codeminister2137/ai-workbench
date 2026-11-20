@@ -249,6 +249,11 @@ select a dependency, deployment, privacy boundary or third-party permission.
 - File decision briefs with `scripts/file-brief.py` (explicit `--option`
   values, never prose-only "Options: A/B"), so multi-choice renders
   without further parsing.
+- Assignee routing (owner rule 2026-11-20): `owner` is for decisions,
+  deliberations, approvals, and reports only. Anything an agent must
+  execute is filed `assignee=agent` (`--assignee agent`); the filer
+  warns when AI-only follow-ups go to the owner. Misfiled open items
+  move via `POST /api/inbox/<id>/reassign`, never by refile churn.
 - Plans live under `docs/plans/*.md` with a header naming their registry
   project (`docs/goals/registry.json`); flip the header `Status` in the
   same commit that finishes the work. Project health lives in the registry;

@@ -19,6 +19,7 @@ DEFAULT_URL = "http://127.0.0.1:8766"
 
 
 MERGE_TIERS = ("tier1", "tier2", "tier3")
+ASSIGNEES = ("owner", "agent")
 
 
 def build_payload(
@@ -44,6 +45,8 @@ def build_payload(
         raise ValueError("title is required")
     if item_type == "decision" and len(options) < 2:
         raise ValueError("decision briefs need at least two --option values")
+    if assignee not in ASSIGNEES:
+        raise ValueError(f"assignee must be one of {ASSIGNEES}")
     followup: dict[str, str] = {}
     if needs_owner and needs_owner.strip():
         followup["owner"] = needs_owner.strip()
@@ -102,6 +105,11 @@ def main(argv: list[str] | None = None) -> int:
         "--needs-owner", default=None, help="Follow-up action needed from the owner."
     )
     parser.add_argument("--needs-ai", default=None, help="Follow-up action needed from AI.")
+    parser.add_argument(
+        "--assignee",
+        default="owner",
+        help="Who must act: owner (decisions, approvals) or agent (AI work).",
+    )
     parser.add_argument("--url", default=DEFAULT_URL)
     parser.add_argument("--token", default=None)
     parser.add_argument("--dry-run", action="store_true")
@@ -116,12 +124,23 @@ def main(argv: list[str] | None = None) -> int:
             options=args.options,
             item_type=args.item_type,
             tier=args.tier,
+            assignee=args.assignee,
             needs_owner=args.needs_owner,
             needs_ai=args.needs_ai,
         )
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
+    if (
+        args.assignee == "owner"
+        and args.needs_ai
+        and args.needs_ai.strip()
+        and not (args.needs_owner and args.needs_owner.strip())
+    ):
+        print(
+            "warning: AI-only follow-up filed to the owner; pass --assignee agent for AI work",
+            file=sys.stderr,
+        )
     if args.dry_run:
         print(json.dumps(payload, indent=2))
         return 0

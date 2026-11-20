@@ -1,0 +1,362 @@
+[
+  [
+    {
+      "path": "apps\\workbench_dashboard\\tests\\test_dashboard_ui.py",
+      "lineno": 75,
+      "lines": 32,
+      "nodes": 52,
+      "name": "test_spend_card_renders_dollars_policy_editor_and_adjust",
+      "key": "069ec6cc6efd8280"
+    },
+    {
+      "path": "apps\\workbench_dashboard\\tests\\test_dashboard_ui.py",
+      "lineno": 109,
+      "lines": 44,
+      "nodes": 52,
+      "name": "test_provider_card_renders_quota_windows",
+      "key": "069ec6cc6efd8280"
+    },
+    {
+      "path": "apps\\workbench_dashboard\\tests\\test_dashboard_ui.py",
+      "lineno": 1427,
+      "lines": 50,
+      "nodes": 52,
+      "name": "test_inbox_divergence_banner_explains_badge_gap",
+      "key": "069ec6cc6efd8280"
+    },
+    {
+      "path": "apps\\workbench_dashboard\\tests\\test_dashboard_ui.py",
+      "lineno": 1479,
+      "lines": 36,
+      "nodes": 52,
+      "name": "test_inbox_detail_renders_notes_with_line_breaks",
+      "key": "069ec6cc6efd8280"
+    },
+    {
+      "path": "apps\\workbench_dashboard\\tests\\test_dashboard_ui.py",
+      "lineno": 1517,
+      "lines": 27,
+      "nodes": 52,
+      "name": "test_jobs_view_renders_review_form",
+      "key": "069ec6cc6efd8280"
+    },
+    {
+      "path": "apps\\workbench_dashboard\\tests\\test_dashboard_ui.py",
+      "lineno": 1546,
+      "lines": 25,
+      "nodes": 52,
+      "name": "test_humanize_activity_translates_mai_lines",
+      "key": "069ec6cc6efd8280"
+    },
+    {
+      "path": "apps\\workbench_dashboard\\tests\\test_dashboard_ui.py",
+      "lineno": 1573,
+      "lines": 50,
+      "nodes": 52,
+      "name": "test_chat_thread_renders_agent_turn_commands_above_report",
+      "key": "069ec6cc6efd8280"
+    },
+    {
+      "path": "apps\\workbench_dashboard\\tests\\test_dashboard_ui.py",
+      "lineno": 1625,
+      "lines": 51,
+      "nodes": 52,
+      "name": "test_chat_thread_collapses_long_turns_and_links_plan",
+      "key": "069ec6cc6efd8280"
+    },
+    {
+      "path": "apps\\workbench_dashboard\\tests\\test_dashboard_ui.py",
+      "lineno": 1678,
+      "lines": 35,
+      "nodes": 52,
+      "name": "test_inbox_detail_renders_acknowledge_for_reports",
+      "key": "069ec6cc6efd8280"
+    },
+    {
+      "path": "apps\\workbench_dashboard\\tests\\test_dashboard_ui.py",
+      "lineno": 1715,
+      "lines": 35,
+      "nodes": 52,
+      "name": "test_fleet_flags_dead_end_runs",
+      "key": "069ec6cc6efd8280"
+    },
+    {
+      "path": "apps\\workbench_dashboard\\tests\\test_dashboard_ui.py",
+      "lineno": 1752,
+      "lines": 23,
+      "nodes": 52,
+      "name": "test_link_ids_links_refs_and_bare_ids_without_nesting",
+      "key": "069ec6cc6efd8280"
+    },
+    {
+      "path": "apps\\workbench_dashboard\\tests\\test_dashboard_ui.py",
+      "lineno": 1777,
+      "lines": 38,
+      "nodes": 52,
+      "name": "test_inbox_detail_renders_ref_hyperlinks",
+      "key": "069ec6cc6efd8280"
+    },
+    {
+      "path": "apps\\workbench_dashboard\\tests\\test_dashboard_ui.py",
+      "lineno": 1817,
+      "lines": 38,
+      "nodes": 52,
+      "name": "test_lookup_view_resolves_and_disambiguates",
+      "key": "069ec6cc6efd8280"
+    }
+  ],
+  [
+    {
+      "path": "apps\\workbench_dashboard\\chat_channel_tools.py",
+      "lineno": 47,
+      "lines": 17,
+      "nodes": 34,
+      "name": "GetRunStatusTool.definition",
+      "key": "62130e4361d73510"
+    },
+    {
+      "path": "apps\\workbench_dashboard\\chat_channel_tools.py",
+      "lineno": 176,
+      "lines": 18,
+      "nodes": 34,
+      "name": "ReadDashboardDocTool.definition",
+      "key": "62130e4361d73510"
+    },
+    {
+      "path": "packages\\ai_agent\\src\\ai_agent\\tools\\background.py",
+      "lineno": 521,
+      "lines": 18,
+      "nodes": 34,
+      "name": "PollCommandTool.definition",
+      "key": "62130e4361d73510"
+    },
+    {
+      "path": "packages\\ai_agent\\src\\ai_agent\\tools\\background.py",
+      "lineno": 588,
+      "lines": 17,
+      "nodes": 34,
+      "name": "StopCommandTool.definition",
+      "key": "62130e4361d73510"
+    },
+    {
+      "path": "packages\\ai_agent\\src\\ai_agent\\tools\\owner_tasks.py",
+      "lineno": 93,
+      "lines": 21,
+      "nodes": 34,
+      "name": "AskOwnerTool.definition",
+      "key": "62130e4361d73510"
+    }
+  ],
+  [
+    {
+      "path": "apps\\workbench_dashboard\\tests\\test_chat_run_request.py",
+      "lineno": 16,
+      "lines": 23,
+      "nodes": 133,
+      "name": "chat_run_server",
+      "key": "854ed6fad413455f"
+    },
+    {
+      "path": "apps\\workbench_dashboard\\tests\\test_inbox_tasks.py",
+      "lineno": 17,
+      "lines": 23,
+      "nodes": 133,
+      "name": "tasks_server",
+      "key": "854ed6fad413455f"
+    },
+    {
+      "path": "apps\\workbench_dashboard\\tests\\test_project_staged.py",
+      "lineno": 17,
+      "lines": 23,
+      "nodes": 133,
+      "name": "project_server",
+      "key": "854ed6fad413455f"
+    },
+    {
+      "path": "apps\\workbench_dashboard\\tests\\test_wake_to_drain.py",
+      "lineno": 21,
+      "lines": 23,
+      "nodes": 133,
+      "name": "wake_server",
+      "key": "854ed6fad413455f"
+    }
+  ],
+  [
+    {
+      "path": "apps\\workbench_dashboard\\tests\\test_dashboard_ui.py",
+      "lineno": 1154,
+      "lines": 45,
+      "nodes": 69,
+      "name": "test_filter_changes_and_badge_execute",
+      "key": "bae369e53d9cc181"
+    },
+    {
+      "path": "apps\\workbench_dashboard\\tests\\test_dashboard_ui.py",
+      "lineno": 1201,
+      "lines": 35,
+      "nodes": 69,
+      "name": "test_reminder_entries_separated_execute",
+      "key": "bae369e53d9cc181"
+    },
+    {
+      "path": "apps\\workbench_dashboard\\tests\\test_dashboard_ui.py",
+      "lineno": 1238,
+      "lines": 42,
+      "nodes": 69,
+      "name": "test_receipts_keep_open_state_across_refreshes",
+      "key": "bae369e53d9cc181"
+    },
+    {
+      "path": "apps\\workbench_dashboard\\tests\\test_dashboard_ui.py",
+      "lineno": 1282,
+      "lines": 47,
+      "nodes": 69,
+      "name": "test_e2e_detail_return_preserves_list_selection",
+      "key": "bae369e53d9cc181"
+    }
+  ],
+  [
+    {
+      "path": "apps\\job_search\\job-email\\test_email_cli.py",
+      "lineno": 11,
+      "lines": 22,
+      "nodes": 173,
+      "name": "outreach",
+      "key": "fd4e28c85d385933"
+    },
+    {
+      "path": "apps\\job_search\\job-email\\test_message_variant_cli.py",
+      "lineno": 25,
+      "lines": 22,
+      "nodes": 173,
+      "name": "outreach",
+      "key": "fd4e28c85d385933"
+    }
+  ],
+  [
+    {
+      "path": "apps\\workbench_dashboard\\tests\\test_agent_executor.py",
+      "lineno": 126,
+      "lines": 19,
+      "nodes": 110,
+      "name": "test_failed_on_provider_error",
+      "key": "af30fefd9c84d207"
+    },
+    {
+      "path": "apps\\workbench_dashboard\\tests\\test_agent_executor.py",
+      "lineno": 147,
+      "lines": 19,
+      "nodes": 110,
+      "name": "test_failed_on_iteration_limit",
+      "key": "af30fefd9c84d207"
+    }
+  ],
+  [
+    {
+      "path": "packages\\ai_agent\\src\\ai_agent\\tools\\owner_tasks.py",
+      "lineno": 27,
+      "lines": 27,
+      "nodes": 45,
+      "name": "OwnerTaskTool.definition",
+      "key": "324a614c68e3eac4"
+    },
+    {
+      "path": "packages\\ai_agent\\src\\ai_agent\\tools\\staged.py",
+      "lineno": 23,
+      "lines": 26,
+      "nodes": 45,
+      "name": "StageFileTool.definition",
+      "key": "324a614c68e3eac4"
+    }
+  ],
+  [
+    {
+      "path": "packages\\ai_agent\\src\\ai_agent\\tools\\search.py",
+      "lineno": 53,
+      "lines": 28,
+      "nodes": 60,
+      "name": "FindFilesTool.definition",
+      "key": "9d71fddde5f62ed0"
+    },
+    {
+      "path": "packages\\ai_agent\\src\\ai_agent\\tools\\shell.py",
+      "lineno": 19,
+      "lines": 30,
+      "nodes": 60,
+      "name": "RunCommandTool.definition",
+      "key": "9d71fddde5f62ed0"
+    }
+  ],
+  [
+    {
+      "path": "packages\\ai_provider\\src\\ai_provider\\chat_transcripts.py",
+      "lineno": 180,
+      "lines": 15,
+      "nodes": 57,
+      "name": "SQLiteChatTranscriptStore.get_session",
+      "key": "34cc554ecb647f3d"
+    },
+    {
+      "path": "packages\\ai_provider\\src\\ai_provider\\chat_transcripts.py",
+      "lineno": 385,
+      "lines": 15,
+      "nodes": 57,
+      "name": "SQLiteChatTranscriptStore.get_rolling_summary",
+      "key": "34cc554ecb647f3d"
+    }
+  ],
+  [
+    {
+      "path": "packages\\ai_provider\\src\\ai_provider\\chat_transcripts.py",
+      "lineno": 368,
+      "lines": 16,
+      "nodes": 63,
+      "name": "SQLiteChatTranscriptStore.list_messages",
+      "key": "beac1b3947c63da9"
+    },
+    {
+      "path": "packages\\ai_provider\\src\\ai_provider\\orchestrated_runs.py",
+      "lineno": 321,
+      "lines": 24,
+      "nodes": 63,
+      "name": "SQLiteOrchestratedRunStore.list_stages",
+      "key": "beac1b3947c63da9"
+    }
+  ],
+  [
+    {
+      "path": "packages\\ai_provider\\src\\ai_provider\\ollama_models.py",
+      "lineno": 134,
+      "lines": 15,
+      "nodes": 44,
+      "name": "list_local_ollama_models",
+      "key": "9c45da4b22da01d8"
+    },
+    {
+      "path": "packages\\ai_provider\\src\\ai_provider\\ollama_models.py",
+      "lineno": 151,
+      "lines": 15,
+      "nodes": 44,
+      "name": "list_running_ollama_models",
+      "key": "9c45da4b22da01d8"
+    }
+  ],
+  [
+    {
+      "path": "scripts\\baseten-slice-develop.py",
+      "lineno": 46,
+      "lines": 28,
+      "nodes": 139,
+      "name": "main",
+      "key": "c224c8776b4f84d8"
+    },
+    {
+      "path": "scripts\\meta-slice-develop.py",
+      "lineno": 37,
+      "lines": 28,
+      "nodes": 139,
+      "name": "main",
+      "key": "c224c8776b4f84d8"
+    }
+  ]
+]

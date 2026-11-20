@@ -77,6 +77,40 @@ def test_followup_blank_means_absent() -> None:
     assert "metadata" not in payload
 
 
+def test_assignee_flag_validated() -> None:
+    mod = _load()
+    payload = mod.build_payload(title="t", body="b", options=[], item_type="task", assignee="agent")
+    assert payload["assignee"] == "agent"
+    with pytest.raises(ValueError, match="assignee"):
+        mod.build_payload(title="t", body="b", options=["A", "B"], assignee="someone")
+
+
+def test_ai_only_followup_to_owner_warns(capsys) -> None:
+    mod = _load()
+    code = mod.main(
+        ["--title", "t", "--body", "b", "--type", "task", "--needs-ai", "Do it.", "--dry-run"]
+    )
+    assert code == 0
+    assert "--assignee agent" in capsys.readouterr().err
+    code = mod.main(
+        [
+            "--title",
+            "t",
+            "--body",
+            "b",
+            "--type",
+            "task",
+            "--needs-ai",
+            "Do it.",
+            "--assignee",
+            "agent",
+            "--dry-run",
+        ]
+    )
+    assert code == 0
+    assert capsys.readouterr().err == ""
+
+
 def test_tier_metadata_optional_and_validated() -> None:
     mod = _load()
     payload = mod.build_payload(title="t", body="b", options=["A", "B"], tier="tier2")

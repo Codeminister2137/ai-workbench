@@ -432,6 +432,22 @@ class DashboardStores:
         self.inbox.put(record["id"], record)
         return bool((record.get("metadata") or {}).get("closeout_id"))
 
+    def reassign_inbox_task(self, item_id: str, assignee: str) -> dict:
+        """Move an open/answered item between owner and agent queues.
+
+        Corrections only: closed items stay archival (reopen first).
+        """
+        if assignee not in INBOX_ASSIGNEES:
+            raise StoreError(f"Inbox assignee must be one of {INBOX_ASSIGNEES}")
+        record = self.inbox.get(item_id)
+        if record is None:
+            raise StoreError(f"Inbox task not found: {item_id}")
+        if record.get("status") == "closed":
+            raise StoreError("Closed items cannot be reassigned")
+        record["assignee"] = assignee
+        self.inbox.put(item_id, record)
+        return record
+
     def claim_inbox_task(self, item_id: str, by: str | None) -> dict:
         """Claim an item for a loop session, or release it (``by=None``).
 
