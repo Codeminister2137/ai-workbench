@@ -54,6 +54,7 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/spend-grants.md | KNOWLEDGE | Spend grants reference. |
 | docs/supervisor-handbook.md | KNOWLEDGE | Supervisor handbook. |
 | docs/test-workflow.md | KNOWLEDGE | Test workflow reference. |
+| docs/family5-g3-assessment.md | PENDING | G3 gate/CI evidence brief; adoption awaits owner choice. |
 | docs/unattended-sleep.md | KNOWLEDGE | Sleep runbook. |
 | docs/unattended-work-plan-template.md | KNOWLEDGE | Plan template. |
 | docs/visual-style-brief.md | KNOWLEDGE | Design input for idea cc3857e9 (open). |
