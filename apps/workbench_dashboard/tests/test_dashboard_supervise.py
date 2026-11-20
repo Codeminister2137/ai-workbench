@@ -6,6 +6,8 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 DASHBOARD_DIR = Path(__file__).resolve().parent.parent
 if str(DASHBOARD_DIR) not in sys.path:
     sys.path.insert(0, str(DASHBOARD_DIR))
@@ -792,3 +794,48 @@ def test_ensure_single_server_refuses_busy_port() -> None:
     with pytest.raises(SystemExit):
         ensure_single_server("127.0.0.1", 8766, probe=lambda host, port: True)
     ensure_single_server("127.0.0.1", 8766, probe=lambda host, port: False)
+
+
+def test_reconcile_keeps_all_on_probe_failure(tmp_path, monkeypatch):
+    import dashboard_supervise as sup
+
+    monkeypatch.setattr(sup, "_identify_ours", lambda config: ({123: 1.0}, [], []))
+    monkeypatch.setattr(sup, "_port_listeners", lambda port: [])
+    monkeypatch.setattr(sup, "_probe_processes", lambda pids: None)
+    stopped = []
+    monkeypatch.setattr(sup, "_stop_verified_servers", lambda *args: stopped.append(args))
+    assert sup.reconcile_strays(_mail_throttle_config(tmp_path)) == (
+        0,
+        "kept all: process probe failed",
+    )
+    assert stopped == []
+    assert sup._probe_cmdlines([123]) == {}
+
+
+@pytest.mark.parametrize("result", [OSError("private"), (1, ""), (0, "invalid")])
+def test_process_probe_distinguishes_failure(monkeypatch, result):
+    from types import SimpleNamespace
+
+    import dashboard_supervise as sup
+
+    def run(*args, **kwargs):
+        if isinstance(result, Exception):
+            raise result
+        return SimpleNamespace(returncode=result[0], stdout=result[1])
+
+    monkeypatch.setattr(sup, "os", SimpleNamespace(name="nt"))
+    monkeypatch.setattr(sup.subprocess, "run", run)
+    assert sup._probe_processes([123]) is None
+    assert sup._probe_processes([]) == {}
+
+
+def test_process_probe_empty_success(monkeypatch):
+    from types import SimpleNamespace
+
+    import dashboard_supervise as sup
+
+    monkeypatch.setattr(sup, "os", SimpleNamespace(name="nt"))
+    monkeypatch.setattr(
+        sup.subprocess, "run", lambda *a, **k: SimpleNamespace(returncode=0, stdout="null")
+    )
+    assert sup._probe_processes([123]) == {}

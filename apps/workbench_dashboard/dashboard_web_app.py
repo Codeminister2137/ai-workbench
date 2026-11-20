@@ -2087,8 +2087,10 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                         self._attach_step_evidence(
                             item["steps"], index, min(remaining, CHECK_TIMEOUT_SECONDS)
                         )
-                    except ValueError:
-                        continue
+                    except ValueError as exc:
+                        step["evidence"] = f"[auto-check failed: {exc}]"
+                        step["evidence_utc"] = datetime.now(UTC).isoformat()
+                        step["evidence_exit"] = None
                     touched = True
             if touched:
                 stores.e2e_tasks.put(task_id, record)

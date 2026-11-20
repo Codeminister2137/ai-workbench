@@ -784,3 +784,47 @@ def test_main_zero_max_candidates_walks_all(monkeypatch, tmp_path, capsys):
     )
     assert code == 0
     assert seen == ["m1", "m2", "m3", "m4"]
+
+
+@pytest.mark.parametrize("route", ["requesty", "openrouter"])
+def test_failed_model_list_skips_with_note(monkeypatch, capsys, route):
+    monkeypatch.setattr(route_eval, "_list_rows", lambda *args: None)
+    assert list_free_candidates(route, {}) == []
+    assert f"{route}: model list unavailable; skipping selection" in capsys.readouterr().err
+
+
+def test_model_list_transport_failure_is_not_empty(monkeypatch):
+    import urllib.request
+
+    def fail(*args, **kwargs):
+        raise OSError("private detail")
+
+    monkeypatch.setattr(urllib.request, "urlopen", fail)
+    assert route_eval._list_rows("requesty", {}) is None
+
+
+def test_model_list_invalid_json_is_not_empty(monkeypatch):
+    import io
+    import urllib.request
+
+    monkeypatch.setattr(urllib.request, "urlopen", lambda *a, **k: io.BytesIO(b"invalid"))
+    assert route_eval._list_rows("requesty", {}) is None
+
+
+@pytest.mark.parametrize(
+    "payload, expected",
+    [
+        ({"data": []}, []),
+        ({"models": []}, []),
+        ({"error": "unavailable"}, None),
+        ({"data": [{"id": "ok"}, None]}, [{"id": "ok"}]),
+    ],
+)
+def test_model_list_response_shape(monkeypatch, payload, expected):
+    import io
+    import urllib.request
+
+    monkeypatch.setattr(
+        urllib.request, "urlopen", lambda *a, **k: io.BytesIO(json.dumps(payload).encode())
+    )
+    assert route_eval._list_rows("requesty", {}) == expected

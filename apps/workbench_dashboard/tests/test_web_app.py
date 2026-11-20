@@ -679,6 +679,32 @@ def test_submit_marks_skipped_when_budget_spent(dashboard_server, tmp_path, monk
     assert step["evidence_exit"] is None
 
 
+def test_submit_records_evidence_when_check_raises(dashboard_server, tmp_path, monkeypatch) -> None:
+    import e2e_agent_checks
+
+    def boom(action, repo_root, timeout_seconds=None):
+        raise ValueError("bad step shape")
+
+    monkeypatch.setattr(e2e_agent_checks, "execute_check", boom)
+    _agent_check_task(
+        tmp_path,
+        [
+            {
+                "action": "Run `python --help` now",
+                "expected": "help",
+                "grounded": True,
+                "agent_runnable": True,
+            }
+        ],
+    )
+    out = post_json(dashboard_server, "/api/e2e/tasks/t1/submit", _submit_results("pass"))
+    assert out["ok"] is True
+    stored = json.loads((tmp_path / "data" / "e2e_tasks" / "t1.json").read_text(encoding="utf-8"))
+    step = stored["items"][0]["steps"][0]
+    assert "auto-check failed: bad step shape" in step["evidence"]
+    assert step["evidence_exit"] is None
+
+
 def test_submit_accepts_agent_verdict_and_rejects_junk(dashboard_server, tmp_path) -> None:
     _agent_check_task(
         tmp_path,
