@@ -540,3 +540,10 @@ If the task requires a product, architecture, dependency, privacy, data-model, o
 
 After approval, implement only the agreed scope, run the relevant tests/checks, inspect the diff, and report the result.
 ```
+
+## Daily coding surface (owner decision 2026-11-20)
+
+Use dashboard Mai for daily coding, with Muse CLI retained for overflow and
+rollback. The [two-week protocol](mai-daily-coding.md) owns weekly usage/quality
+tracking, the 2026-11-27 checkpoint and the 2026-12-04 rollback review.
+Source decision: inbox `ee58d176076d4aa083e669955c0904d2`.

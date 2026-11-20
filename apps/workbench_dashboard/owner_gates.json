@@ -130,6 +130,26 @@
         "A: Approve narrow neutral-contract importer exception",
         "B: Redesign within unchanged importer set"
       ]
+    },
+    {
+      "id": "mai-daily-review-2026-11-27",
+      "title": "Mai daily coding: week 1 due 2026-11-27",
+      "type": "task",
+      "body": "Due 2026-11-27; source ee58d176076d4aa083e669955c0904d2 approved switch now with rollback window. Read docs/mai-daily-coding.md. Inspect weekly run receipts and chat reports, record usage/latency (unknown where missing), correctness/rework, wiring/recovery failures and Muse overflow. Add owner usability observations. Append evidence to the protocol and resolve this item with keep/rollback and reasons. Roll back daily coding to Muse if quality or usage regresses; preserve Mai records. Missing evidence is not a pass. This item tracks a future review, not a claim that the soak passed.",
+      "options": [
+        "Keep Mai: record evidence",
+        "Roll back to Muse: record reason"
+      ]
+    },
+    {
+      "id": "mai-daily-review-2026-12-04",
+      "title": "Mai daily coding: rollback review due 2026-12-04",
+      "type": "task",
+      "body": "Due 2026-12-04; source ee58d176076d4aa083e669955c0904d2 approved switch now with rollback window. Read docs/mai-daily-coding.md. Inspect weekly run receipts and chat reports, record usage/latency (unknown where missing), correctness/rework, wiring/recovery failures and Muse overflow. Add owner usability observations. Append evidence to the protocol and resolve this item with keep/rollback and reasons. Roll back daily coding to Muse if quality or usage regresses; preserve Mai records. Missing evidence is not a pass. This item tracks a future review, not a claim that the soak passed.",
+      "options": [
+        "Keep Mai: record evidence",
+        "Roll back to Muse: record reason"
+      ]
     }
   ]
 }

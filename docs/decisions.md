@@ -1,3 +1,16 @@
+## Daily coding moves to Mai with rollback window (2026-11-20)
+
+Owner accepted "Switch now with rollback window" in inbox
+`ee58d176076d4aa083e669955c0904d2`. Dashboard Mai becomes the daily coding
+surface; Muse CLI stays available for overflow and rollback. Weekly usage and
+quality reviews are due 2026-11-27 and 2026-12-04, with rollback if either
+regresses at the two-week review. No additional owner rationale was supplied.
+The source's five-task pilot supports this reversible workflow choice, not a
+claim of general model parity. Trial would defer adoption with the same setup;
+hold would retain Muse as primary but delay daily Mai evidence. The accepted
+switch provides daily evidence while retaining a working escape path.
+Implementation and review criteria: [daily coding protocol](mai-daily-coding.md).
+
 ## ADR-096 - Provider/orchestrator import exception (accepted) - owner 2026-11-18
 
 Owner chose B on inbox `d9854413c7044281b5e5dc5ffff06ec2`: document existing
