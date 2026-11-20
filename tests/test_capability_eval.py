@@ -97,3 +97,15 @@ def test_schema_is_actually_sent_and_prompt_alone_is_not_enough(monkeypatch):
     ]:
         monkeypatch.setattr(client, "complete", lambda request, text=text: response(text))
         assert probe(client, "fixture", "structured_output").status == expected
+
+
+def test_probe_attests_synthetic_prompts_for_retention_gates() -> None:
+    seen: list[dict] = []
+
+    def capture(request):
+        seen.append(dict(request.metadata))
+        return response()
+
+    client = FakeClient(complete=capture, stream=lambda request: iter([]))
+    assert probe(client, "fixture", "tools").status == "fail"
+    assert seen and all(meta.get("public_or_synthetic") is True for meta in seen)

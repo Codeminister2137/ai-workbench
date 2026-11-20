@@ -76,6 +76,10 @@ def probe(client: ChatClient, route_id: str, capability: str) -> Verdict:
         metadata={
             "ollama_context_length": 4096,
             "capability_schema_probe": capability == "structured_output",
+            # All probe prompts are fixed synthetic constants carrying no
+            # user data, so provider retention risk is nil. Adapters with
+            # retention-gated free tiers (OpenRouter) honor this flag.
+            "public_or_synthetic": True,
         },
     )
     try:
