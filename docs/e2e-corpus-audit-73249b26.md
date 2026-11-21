@@ -25,6 +25,8 @@ Historical reports: **33 pass, 50 fail**. Across their items: 70 pass, 36 fail, 
 
 ## Follow-up limitations and next action
 
+Current HTTP/API and UI-contract follow-up: [run 60066ae7 behavior triage](e2e-behavior-triage-60066ae7.md). It preserves browser-only and historical execution evidence gaps explicitly; it does not replace this audit's historical verdicts.
+
 48 action-bearing reports have a directly linked E2E follow-up inbox record, all already closed. These closures are observed records, **not independently verified fixes**. Eight further action-bearing reports lack a direct metadata report-id link (listed below); same-merge follow-ups and later reports exist in several cases, but are not assumed to cover every observation. Latest same-commit reports are shown as lineage only: they do not prove current behavior or automatically supersede another report's individual steps.
 
 No failure was re-issued solely because it appeared in a historical report. No consumed acceptance run, paid inference, or mutating owner test was replayed by the audit tools. No product fixes were made.
