@@ -1,9 +1,10 @@
 ## Mai container full fallback requirement (2026-11-21)
 
 Owner answer `3dcbb514` requires the whole qualifying fallback tree, rejecting
-Ollama-only and single-model production restrictions. Execution placement across
-the network-none boundary remains pending; see the
-[accepted requirement and remaining choice](decisions/mai-container-full-fallback.md).
+Ollama-only and single-model production restrictions. Owner answer `bd270333`
+selects host Mai orchestration with isolated worker tools across the network-none
+boundary. Implementation and containment proof remain incomplete; see the
+[accepted requirement and placement](decisions/mai-container-full-fallback.md).
 
 ## Family-3 S2 acceptance storage importer exception (2026-11-20)
 
