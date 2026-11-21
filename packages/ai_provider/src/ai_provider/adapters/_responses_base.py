@@ -15,7 +15,7 @@ from typing import Any, ClassVar
 from urllib.error import HTTPError, URLError
 from urllib.request import Request
 
-from ai_provider.config import BackendConfig
+from ai_provider.config import BackendConfig, _provider_api_key
 from ai_provider.contracts import (
     AIMessage,
     AIRequest,
@@ -178,7 +178,10 @@ class _ResponsesProtocolBase:
 
     def _http_error(self, exc: HTTPError) -> ProviderError:
         return http_error_to_provider_error(
-            exc, provider=self.config.provider.value, api_label=self._api_label
+            exc,
+            provider=self.config.provider.value,
+            api_label=self._api_label,
+            credentials=(self.config.api_key, _provider_api_key(self.config.provider)),
         )
 
     def _message_payload(self, message: AIMessage) -> dict[str, Any]:

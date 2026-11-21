@@ -46,7 +46,11 @@ Requesty, OpenCode Go chat routes and guarded OpenRouter free routes. OpenCode
 Responses/Messages routes remain unknown. Existing price, quota, credential and
 privacy admission checks still apply; hosted calls require a current owner
 allowance and `--allow-hosted`. Evidence contains verdicts and sanitized error
-categories, never raw response/error bodies. A pass is a one-attempt schema
+categories, never raw response/error bodies. HTTP failures may surface a
+single-line response diagnostic capped at 500 characters. JSON envelopes expose
+only error message/type/code; credential-bearing or request-bearing payloads are
+withheld. Diagnostic reads are bounded and fail closed. This exception does not
+permit raw body dumps in receipts or other evidence. A pass is a one-attempt schema
 smoke check, not proof that a provider enforces schemas for arbitrary inputs.
 
 OpenRouter root and choice-level errors use the same sanitized provider error

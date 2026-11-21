@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+import re
+from collections.abc import Iterable
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
@@ -46,7 +49,56 @@ class ProviderError(RuntimeError):
         self.tool_results: tuple[Any, ...] = ()
 
 
-def http_error_to_provider_error(exc, *, provider: str, api_label: str) -> ProviderError:
+def _http_error_detail(exc, *, credentials: Iterable[str | None]) -> str:
+    """Expose bounded error diagnostics, failing closed on sensitive payloads.
+
+    Never inspect request objects, headers or exception reprs. JSON response
+    envelopes contribute only error message/type/code, not echoed request fields.
+    """
+    from ai_provider.credential_guard import contains_credentials
+
+    sensitive = re.compile(
+        r"(?i)(?:bearer\s+|\bsk-[\w-]+|api[_ -]?key|authorization|"
+        r"password|secret|\btoken\b|access_token|private_key|"
+        r"\bprompt\b|\bmessages\b|\brequest\b|\binput\b|\bcontent\b)"
+    )
+    credentials = tuple(credentials)
+    try:
+        body = exc.read(16_385)
+        if not body:
+            return ""
+        text = body.decode("utf-8", errors="replace")
+        if contains_credentials(text, extra=credentials) or sensitive.search(text):
+            return "[response detail withheld]"
+        # A partial JSON document cannot be safely filtered for echoed inputs.
+        if text.lstrip().startswith(("{", "[")):
+            if len(body) > 16_384:
+                return "[response detail withheld]"
+            payload = json.loads(text)
+            # JSON escapes can conceal credential values and sensitive field names.
+            decoded = json.dumps(payload, ensure_ascii=False)
+            if contains_credentials(payload, extra=credentials) or sensitive.search(decoded):
+                return "[response detail withheld]"
+            if not isinstance(payload, dict) or "error" not in payload:
+                return ""
+            error = payload["error"]
+            if isinstance(error, dict):
+                error = {key: error[key] for key in ("message", "type", "code") if key in error}
+                if any(not isinstance(value, (str, int, type(None))) for value in error.values()):
+                    return ""
+            elif not isinstance(error, str):
+                return ""
+            text = json.dumps(error, ensure_ascii=False)
+        text = " ".join(text.split())
+        return text if len(text) <= 500 else text[:497] + "..."
+    except Exception:
+        # A diagnostic read/parse failure must not replace the original status.
+        return ""
+
+
+def http_error_to_provider_error(
+    exc, *, provider: str, api_label: str, credentials: Iterable[str | None] = ()
+) -> ProviderError:
     """Map an HTTPError to a categorized ProviderError (shared adapter helper).
 
     Status mapping is provider-agnostic; only the provider id and the API
@@ -60,8 +112,12 @@ def http_error_to_provider_error(exc, *, provider: str, api_label: str) -> Provi
         category = ProviderErrorCategory.RETRYABLE
     else:
         category = ProviderErrorCategory.NON_RETRYABLE
+    detail = _http_error_detail(exc, credentials=credentials)
+    message = f"{api_label} provider returned HTTP {exc.code}."
+    if detail:
+        message += f" Response detail: {detail}"
     return ProviderError(
-        f"{api_label} provider returned HTTP {exc.code}.",
+        message,
         category=category,
         retryable=category in {ProviderErrorCategory.RATE_LIMIT, ProviderErrorCategory.RETRYABLE},
         provider=provider,
