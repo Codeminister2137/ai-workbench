@@ -180,6 +180,37 @@ def test_finalize_files_chain_report_with_sections(stores) -> None:
     assert (reports[0].get("metadata") or {}).get("chain_report_for") == record["id"]
 
 
+@pytest.mark.parametrize("merge_key", ["merge_for_branch", "merge_for_run"])
+@pytest.mark.parametrize("source_first", [True, False])
+@pytest.mark.parametrize("answer", ["Merge now", "Hold"])
+def test_merge_closes_without_report(stores, merge_key, source_first, answer) -> None:
+    source = stores.create_inbox_task(
+        title="Merge run branch?",
+        body="b",
+        task_type="decision",
+        options=["Merge now", "Hold"],
+        assignee="owner",
+        metadata={merge_key: "run/example"},
+    )
+    answered = stores.answer_inbox_task(source["id"], answer=answer)
+    closeout_id = answered["metadata"]["closeout_id"]
+    ids = [source["id"], closeout_id]
+    for item_id in ids if source_first else reversed(ids):
+        stores.close_inbox_task(item_id, resolution=f"Recorded {answer}")
+    items, _ = stores.inbox.list(limit=100)
+    assert not [item for item in items if item.get("type") == "report"]
+    closed = stores.inbox.get(source["id"])
+    assert closed["status"] == "closed"
+    assert closed["answer"] == answer
+    assert f"closeout:{closeout_id}" in closed["note"]
+    # A pending filing left by the old rule must not revive the flood.
+    closed["report_pending"] = True
+    stores.inbox.put(source["id"], closed)
+    assert supervisor_tick_audit(stores)["healed"]["chain_report"] == 0
+    assert "report_pending" not in stores.inbox.get(source["id"])
+    assert finalize_chain_report(stores, source["id"])["reason"] == "merge substep"
+
+
 def test_report_body_explains_empty_chain(stores) -> None:
     record = stores.create_inbox_task(
         title="Pick?", body="b", task_type="decision", options=["A"], assignee="owner"

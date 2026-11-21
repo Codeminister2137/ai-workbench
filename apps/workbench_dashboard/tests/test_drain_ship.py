@@ -65,6 +65,29 @@ def test_ship_commits_and_files_merge_decision(stores, worktree, tmp_path) -> No
     assert (item.get("metadata") or {}).get("merge_for_branch") == "run/abc123"
 
 
+@pytest.mark.parametrize("answer", ["Merge now", "Hold"])
+def test_shipped_merge_decision_resolves_without_report(stores, worktree, tmp_path, answer):
+    (worktree / "note.txt").write_text("run edit\n", encoding="utf-8")
+    shipment = ship_completed_run(_run(worktree), repo_root=tmp_path, stores=stores)
+    decision = stores.inbox.get(shipment["merge_item"])
+    assert decision["status"] == "open"
+    assert decision["assignee"] == "owner"
+    assert "no separate merge report" in decision["metadata"]["followup"]["ai"]
+    items, _ = stores.inbox.list(limit=100)
+    assert len(items) == 1  # Shipping still waits for the owner's decision.
+
+    answered = stores.answer_inbox_task(decision["id"], answer=answer)
+    closeout_id = answered["metadata"]["closeout_id"]
+    stores.close_inbox_task(closeout_id, resolution=f"Completed {answer}")
+    stores.close_inbox_task(decision["id"], resolution=f"Resolved {answer}")
+    resolved = stores.inbox.get(decision["id"])
+    assert resolved["answer"] == answer and resolved["status"] == "closed"
+    assert f"Completed {answer}" in resolved["note"]
+    items, _ = stores.inbox.list(limit=100)
+    assert len(items) == 2
+    assert not any(item["type"] == "report" for item in items)
+
+
 def test_ship_names_current_branch_not_stale_receipt(stores, worktree, tmp_path) -> None:
     _git(worktree, "switch", "-c", "feature/worker-moved-on")
     (worktree / "note.txt").write_text("base\nrun edit\n", encoding="utf-8")

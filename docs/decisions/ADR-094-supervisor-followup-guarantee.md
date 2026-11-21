@@ -35,6 +35,13 @@ chains with no durable summary. Each gap was found live on 2026-11-19.
 
 ## Consequences
 
+Owner correction (2026-11-21, complaint 00bf5f42, retry adb2871b88b4):
+chain reports belong to wider tasks, not each merge substep. Sources marked
+`merge_for_branch` or `merge_for_run` do not file separate inbox reports,
+including pending filing retries. Their decisions, close-outs, resolution
+notes and approval requirements remain intact. Existing reports are retained;
+this correction does not delete or acknowledge historical inbox items.
+
 - New follow-up duties go in dashboard supervisor flows, never in
   agents, Mai-side code, or new processes.
 - The weekly forgotten sweep keeps its backstop role; healed loops
