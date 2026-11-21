@@ -883,6 +883,8 @@ When introducing a new external integration, identify:
 
 Meaningful behavior changes require appropriate tests.
 
+Every new `test_*.py` file must join a `GROUPS` entry in `scripts/run-tests.py` (match the covered component's group; the gate fails loudly on unassigned modules).
+
 Prefer:
 
 * unit tests for deterministic logic;
