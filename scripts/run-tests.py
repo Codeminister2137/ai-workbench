@@ -149,6 +149,7 @@ GROUPS = {
         "tests/test_test_suites.py",
         "tests/test_workstation_resources.py",
         "tests/test_workstation_sleep.py",
+        "tests/test_docker_relay_probe.py",
         "tests/test_sampling_controls.py",
         "tests/test_meta_develop_launcher.py",
         "tests/test_meta_supervised_develop.py",
