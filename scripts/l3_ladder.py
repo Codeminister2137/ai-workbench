@@ -19,6 +19,7 @@ import datetime
 import json
 import os
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -38,6 +39,7 @@ from ai_orchestrator import (  # noqa: E402
 )
 from ai_provider import route_eval  # noqa: E402
 from ai_provider.eval_budget import AllowanceTaskBudget  # noqa: E402
+from ai_provider.grade_records import record_ladder_grades  # noqa: E402
 from ai_provider.route_eval import TASK_SPECS, TASKS, EvalResult  # noqa: E402
 from ai_provider.secrets import load_dotenv  # noqa: E402
 
@@ -66,16 +68,18 @@ CREDENTIAL_NAMES = (
 )
 
 
-def eval_profile(route: str, tier: CostPolicyTier) -> TaskProfile:
+def eval_profile(
+    route: str, tier: CostPolicyTier, quality: QualityThreshold | None = None
+) -> TaskProfile:
     """Selection profile for one eval route: synthetic coding, tier-capped."""
-    return TaskProfile(
+    profile = TaskProfile(
         task_type=TaskType.CODING,
         privacy_class=PrivacyClass.PUBLIC_OR_LOW_RISK,
         required_capabilities=frozenset({TaskCapability.CHAT}),
-        quality_threshold=QualityThreshold.STANDARD,
         cost_policy_tier=tier,
         user_backend_override=route,
     )
+    return replace(profile, quality_threshold=quality) if quality is not None else profile
 
 
 def _cap(items: list[str], max_candidates: int) -> list[str]:
@@ -84,12 +88,16 @@ def _cap(items: list[str], max_candidates: int) -> list[str]:
 
 
 def catalog_order(
-    route: str, catalog: tuple, tier: CostPolicyTier, max_candidates: int
+    route: str,
+    catalog: tuple,
+    tier: CostPolicyTier,
+    max_candidates: int,
+    quality: QualityThreshold | None = None,
 ) -> list[str]:
     """Catalog-preferred model ids: recommended first, then alternatives."""
     try:
         recommendation = recommend_model(
-            eval_profile(route, tier), catalog, max_alternatives=len(catalog)
+            eval_profile(route, tier, quality), catalog, max_alternatives=len(catalog)
         )
     except ValueError:
         return []
@@ -134,13 +142,14 @@ def resolve_route(
     max_candidates: int,
     skip: frozenset[tuple[str, str]],
     live_refresh: bool,
+    quality: QualityThreshold | None = None,
 ) -> tuple[list[str], str]:
     """Resolve ordered candidates for one route; tier-blocked returns []."""
     ceiling = ROUTE_TIERS[route]
     if not cost_policy_allows(ceiling, allow_tier):
         return [], f"tier-blocked: route needs {ceiling.value}, run allows {allow_tier.value}"
     tier = ceiling if ceiling == CostPolicyTier.FREE_ONLY else allow_tier
-    preferred = catalog_order(route, catalog, tier, max_candidates)
+    preferred = catalog_order(route, catalog, tier, max_candidates, quality)
     if route in FREE_ROUTES and live_refresh:
         live = [
             model
@@ -211,6 +220,18 @@ def build_parser() -> argparse.ArgumentParser:
     """CLI mirroring route_eval plus catalog and tier policy flags."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--snapshot-dir", type=Path, default=Path("artifacts/route-evals"))
+    parser.add_argument(
+        "--quality",
+        choices=[quality.value for quality in QualityThreshold],
+        default=None,
+        help="override candidate-selection quality (default: task profile default)",
+    )
+    parser.add_argument(
+        "--grades-dir",
+        type=Path,
+        default=None,
+        help="record ladder quality outcomes separately from capability grades (opt-in)",
+    )
     parser.add_argument(
         "--catalog",
         type=Path,
@@ -312,6 +333,7 @@ def main(
     except (OSError, ValueError) as exc:
         parser.error(f"bad --catalog file {args.catalog}: {exc}")
     allow_tier = CostPolicyTier(args.allow_tier)
+    quality = QualityThreshold(args.quality) if args.quality is not None else None
     wanted: list[str] = args.routes or list(EVAL_ROUTES)
     unknown_routes = [route for route in wanted if route not in EVAL_ROUTES]
     if unknown_routes:
@@ -333,8 +355,14 @@ def main(
             max_candidates=args.max_candidates,
             skip=skip,
             live_refresh=not args.no_live_refresh,
+            quality=quality,
         )
-        resolutions[route] = {"candidates": candidates, "note": note}
+        resolutions[route] = {
+            "candidates": candidates,
+            "note": note,
+            "quality_override": args.quality,
+            "quality_threshold": eval_profile(route, allow_tier, quality).quality_threshold.value,
+        }
         if not candidates and note.startswith("tier-blocked"):
             blocked[route] = note
         models[route] = candidates
@@ -360,6 +388,9 @@ def main(
             }
     snapshot = route_eval.write_results_snapshot(results, tasks, args.snapshot_dir)
     record = write_resolution_record(resolutions, args.snapshot_dir, allow_tier)
+    if args.grades_dir is not None:
+        grades = record_ladder_grades(snapshot, args.grades_dir, evidence=str(record))
+        print(f"ladder grades: {grades}")
     for item in results:
         print(item.summary())
     print(f"snapshot: {snapshot}")

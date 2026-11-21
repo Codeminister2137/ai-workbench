@@ -292,3 +292,67 @@ def test_main_rejects_negative_max_candidates(capsys) -> None:
         _module.main(["--max-candidates", "-1"])
     assert exc.value.code == 2
     assert "--max-candidates" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("quality", [None, "low", "standard", "high"])
+def test_main_quality_reaches_selection_and_records_grades(
+    quality, monkeypatch, tmp_path, capsys
+) -> None:
+    catalog = tmp_path / "cat.toml"
+    catalog.write_text(
+        '[[models]]\nroute_id = "ollama/m"\nprovider = "ollama"\nmodel = "m"\nlocation = "local"\n',
+        encoding="utf-8",
+    )
+    observed = []
+    original = _module.recommend_model
+
+    def recommend(profile, entries, **kwargs):
+        observed.append(profile.quality_threshold.value)
+        return original(profile, entries, **kwargs)
+
+    calls = []
+
+    class Client:
+        def complete(self, request):
+            calls.append(request)
+            return SimpleNamespace(
+                message=SimpleNamespace(content="def add2(x):\n    return x + 2"),
+                usage=SimpleNamespace(input_tokens=1, output_tokens=2),
+            )
+
+    monkeypatch.setattr(_module, "recommend_model", recommend)
+    monkeypatch.setattr(_module, "load_dotenv", lambda: None)
+    monkeypatch.setattr(
+        _module.route_eval, "_clients", lambda creds: {"ollama": lambda m: Client()}
+    )
+    argv = [
+        "--catalog",
+        str(catalog),
+        "--snapshot-dir",
+        str(tmp_path / "snap"),
+        "--routes",
+        "ollama",
+        "--tasks",
+        "T0",
+        "--no-live-refresh",
+        "--grades-dir",
+        str(tmp_path / "grades"),
+    ]
+    if quality is not None:
+        argv += ["--quality", quality]
+    assert _module.main(argv) == 0
+    assert observed == [quality or "standard"]
+    assert len(calls) == (0 if quality == "high" else 1)
+    audit = json.loads(next((tmp_path / "snap").glob("ladder-resolved-*.json")).read_text())
+    assert audit["routes"]["ollama"]["quality_override"] == quality
+    assert audit["routes"]["ollama"]["quality_threshold"] == (quality or "standard")
+    grades = json.loads(next((tmp_path / "grades/ladder-quality").glob("*.json")).read_text())
+    assert grades["outcomes"][0]["status"] == ("inconclusive" if quality == "high" else "pass")
+    assert "capabilities" not in grades
+    assert "ladder grades:" in capsys.readouterr().out
+
+
+def test_quality_rejects_unknown_value() -> None:
+    with pytest.raises(SystemExit) as exc:
+        _module.build_parser().parse_args(["--quality", "excellent"])
+    assert exc.value.code == 2

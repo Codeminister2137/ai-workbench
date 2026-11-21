@@ -11,6 +11,7 @@ from ai_provider.grade_records import (
     fold_verdicts,
     load_grade_records,
     record_grades,
+    record_ladder_grades,
 )
 
 CATALOG = """\
@@ -148,3 +149,67 @@ def test_catalog_overlay_measured_wins_with_provenance(tmp_path: Path):
 def test_measured_overlay_rejects_invalid_record():
     with pytest.raises(ValueError, match="Invalid grade record"):
         measured_overlay({"r1": {"capabilities": {}}})
+
+
+def test_ladder_quality_is_separate_and_retains_task_outcomes(tmp_path):
+    snapshot = tmp_path / "snapshot.json"
+    rows = [
+        dict(
+            route="ollama",
+            model="m",
+            task_id=task,
+            checked_utc="2026-11-21T10:00:00Z",
+            passed=passed,
+            error=error,
+        )
+        for task, passed, error in [
+            ("T0", True, None),
+            ("T1", False, None),
+            ("T2", False, "parked: refused"),
+            ("T3", False, "budget-stop: limit"),
+        ]
+    ]
+    snapshot.write_text(json.dumps(rows), encoding="utf-8")
+    grades_dir = tmp_path / "grades"
+    target = record_ladder_grades(snapshot, grades_dir, evidence="resolution.json")
+    saved = json.loads(target.read_text(encoding="utf-8"))
+    assert saved["kind"] == "ladder-quality"
+    assert saved["evidence"] == "resolution.json"
+    assert saved["snapshot"] == str(snapshot)
+    assert [row["status"] for row in saved["outcomes"]] == [
+        "pass",
+        "fail",
+        "inconclusive",
+        "inconclusive",
+    ]
+    assert [row["task_id"] for row in saved["outcomes"]] == ["T0", "T1", "T2", "T3"]
+    assert load_grade_records(grades_dir) == {}
+    before = target.read_bytes()
+    with pytest.raises(FileExistsError):
+        record_ladder_grades(snapshot, grades_dir, evidence="another-run")
+    assert target.read_bytes() == before
+
+
+@pytest.mark.parametrize(
+    "rows",
+    [
+        {},
+        [None],
+        [{}],
+        [
+            dict(
+                route="r",
+                model="m",
+                task_id="T0",
+                checked_utc="invalid",
+                passed=True,
+            )
+        ],
+    ],
+)
+def test_ladder_quality_rejects_invalid_snapshot(tmp_path, rows):
+    snapshot = tmp_path / "snapshot.json"
+    snapshot.write_text(json.dumps(rows), encoding="utf-8")
+    with pytest.raises(ValueError):
+        record_ladder_grades(snapshot, tmp_path / "grades", evidence="e")
+    assert not (tmp_path / "grades").exists()
