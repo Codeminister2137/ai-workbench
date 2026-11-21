@@ -97,3 +97,22 @@ def test_unparseable_file_warns_exit_zero(tmp_path, capsys) -> None:
     assert scanner.scan_file(bad) == []
     assert "skipping" in capsys.readouterr().err
     assert scanner.main([str(tmp_path)]) == 0
+
+
+def test_hidden_ancestor_and_relative_roots(tmp_path, monkeypatch):
+    root = tmp_path / ".tmp" / "repo"
+    root.mkdir(parents=True)
+    (root / "a.py").write_text("def a():\n    return 1\n")
+    (root / ".hidden").mkdir()
+    (root / ".hidden" / "b.py").write_text("")
+    assert scanner.iter_python_files([root]) == [root / "a.py"]
+    monkeypatch.chdir(root.parent)
+    assert scanner.iter_python_files([Path("repo")]) == [Path("repo/a.py")]
+
+
+def test_stdout_json_does_not_create_dash(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "a.py").write_text("def a():\n    return 1\n")
+    assert scanner.main([".", "--json", "-"]) == 0
+    assert json.loads(capsys.readouterr().out) == []
+    assert not (tmp_path / "-").exists()
