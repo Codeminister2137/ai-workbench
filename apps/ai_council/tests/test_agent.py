@@ -110,3 +110,25 @@ def test_local_agent_streams_provider_deltas(monkeypatch) -> None:
 
     assert chunks == ["provider ", "stream"]
     assert client.requests[0].messages[0] == AIMessage(MessageRole.SYSTEM, "Be careful.")
+
+
+@pytest.mark.parametrize("stream", [False, True])
+def test_deliberation_prompts_preserve_positions_and_disagreement(monkeypatch, stream):
+    client = FakeClient()
+    monkeypatch.setattr("agent.create_chat_client", lambda config: client)
+    agent = LocalAgent(CouncilMember("Chair", "fake", "Be careful."))
+    history = [AIMessage(MessageRole.USER, "Question?")]
+    peers = [("Minority", "Do not ship: unresolved risk.")]
+    if stream:
+        list(agent.stream_react(history, peers))
+        list(agent.stream_synthesize(history, peers))
+    else:
+        agent.react(history, peers)
+        agent.synthesize(history, peers)
+    reaction, synthesis = [request.messages[-1].content for request in client.requests]
+    assert "at most 150 words" in reaction
+    assert "what would change your answer" in reaction
+    assert "Minority" in reaction and "unresolved risk" in reaction
+    assert "Minority" in synthesis and "unresolved risk" in synthesis
+    assert "Never invent consensus" in synthesis
+    assert "DISAGREEMENTS:" in synthesis

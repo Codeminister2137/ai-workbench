@@ -136,6 +136,23 @@ List stored conversations:
 
 Answers are saved to `data/council.sqlite3`.
 
+Use `--rounds 2` for member reactions or `--rounds 3` for chair synthesis.
+Single-round requests remain the default for compatibility. In `council.json`,
+`max_rounds` defaults to 2; set it to 3 to permit synthesis. Optional `chair`
+selects a member by name and otherwise uses the first member. Each reaction
+receives the other members' R1 answers, truncated to `reaction_cap_chars`
+(default 2000) per answer, and is prompted to reply in at most 150 words.
+The chair receives answers and reactions and must preserve named disagreements
+rather than invent consensus.
+
+`max_tokens_per_question` defaults to 0 (unlimited). The cap uses a rough
+characters/4 estimate of conversation and peer inputs plus returned text,
+not provider billing usage or a hard generation limit. It is checked between
+rounds: the current round finishes, subsequent rounds stop, and results are
+marked partial. Streamed cap stops emit `synthesis_finished` with `partial: true`
+when synthesis was requested. Stored messages carry a nullable round number;
+legacy NULL values read as round 1 without rewriting historical messages.
+
 ## Synthesis evaluation cadence
 
 The weekly forgotten-items sweep review owns the synthesis quality check:

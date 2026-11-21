@@ -41,6 +41,9 @@ def live_server(tmp_path, monkeypatch):
     config_path = tmp_path / "council.json"
     db_path = tmp_path / "council.sqlite3"
     write_config(config_path)
+    raw = json.loads(config_path.read_text())
+    raw["max_rounds"] = 3
+    config_path.write_text(json.dumps(raw))
     monkeypatch.setattr("council.LocalAgent", FakeAgent)
 
     captured: dict = {}

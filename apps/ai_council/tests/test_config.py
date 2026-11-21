@@ -33,3 +33,12 @@ def test_missing_config_has_actionable_error(tmp_path) -> None:
 
     with pytest.raises(FileNotFoundError, match="Missing"):
         load_config(missing_path)
+
+
+def test_default_cost_controls_match_settled_protocol(tmp_path):
+    path = tmp_path / "council.json"
+    write_config(path)
+    config = load_config(path)
+    assert config.max_rounds == 2
+    assert config.reaction_cap_chars == 2000
+    assert config.max_tokens_per_question == 0

@@ -55,7 +55,7 @@ class LocalCouncil:
 
         history = to_provider_messages(self.store.list_messages(conversation_id))
         answers: list[dict[str, Any]] = []
-        spent = _estimate_tokens([prompt])
+        spent = 0
 
         for member in self.config.members:
             try:
@@ -76,17 +76,17 @@ class LocalCouncil:
                         "answer": answer,
                     }
                 )
-                spent += _estimate_tokens([answer])
+                spent += _estimate_tokens([message.content for message in history] + [answer])
             except Exception as exc:
                 answers.append(
                     {"member": member.name, "model": member.model, "answer": "", "error": str(exc)}
                 )
 
         wanted = self._rounds(rounds)
-        if wanted >= 2:
-            self._react_round(conversation_id, history, answers)
+        if wanted >= 2 and not self._over_cap(spent):
+            spent += self._react_round(conversation_id, history, answers)
         if wanted >= 3 and not self._over_cap(spent):
-            self._synthesize_round(conversation_id, history, answers)
+            spent += self._synthesize_round(conversation_id, history, answers)
         elif wanted >= 3:
             answers.append(
                 {
@@ -97,13 +97,17 @@ class LocalCouncil:
                 }
             )
 
+        if self._over_cap(spent):
+            for answer in answers:
+                answer.setdefault("partial", "token cap reached")
         return answers
 
     def _over_cap(self, spent: int) -> bool:
         cap = self.config.max_tokens_per_question
         return cap > 0 and spent >= cap
 
-    def _react_round(self, conversation_id: int, history, answers: list[dict[str, Any]]) -> None:
+    def _react_round(self, conversation_id: int, history, answers: list[dict[str, Any]]) -> int:
+        spent = 0
         by_member = {
             item["member"]: item.get("answer", "") for item in answers if not item.get("error")
         }
@@ -116,6 +120,11 @@ class LocalCouncil:
             try:
                 agent = LocalAgent(member, ollama_base_url=self.config.ollama_base_url)
                 reaction = agent.react(history, peers)
+                spent += _estimate_tokens(
+                    [message.content for message in history]
+                    + [text for _, text in peers]
+                    + [reaction]
+                )
                 self.store.add_message(
                     conversation_id,
                     role="assistant",
@@ -143,9 +152,11 @@ class LocalCouncil:
                     }
                 )
 
+        return spent
+
     def _synthesize_round(
         self, conversation_id: int, history, answers: list[dict[str, Any]]
-    ) -> None:
+    ) -> int:
         chair = self._chair()
         member = next(item for item in self.config.members if item.name == chair)
         positions = self._capped(
@@ -182,6 +193,12 @@ class LocalCouncil:
                 }
             )
 
+        return _estimate_tokens(
+            [message.content for message in history]
+            + [text for _, text in positions]
+            + [answers[-1]["answer"]]
+        )
+
     def ask_events(self, prompt: str, conversation_name: str | None = None, *, rounds: int = 1):
         name = conversation_name or self.config.default_conversation
         conversation_id = self.store.get_or_create_conversation(name)
@@ -198,7 +215,7 @@ class LocalCouncil:
         }
 
         answers: list[dict[str, Any]] = []
-        spent = _estimate_tokens([prompt])
+        spent = 0
         for member in self.config.members:
             yield {
                 "type": "member_started",
@@ -218,7 +235,7 @@ class LocalCouncil:
                     }
 
                 answer = "".join(answer_parts)
-                spent += _estimate_tokens([answer])
+                spent += _estimate_tokens([message.content for message in history] + [answer])
                 self.store.add_message(
                     conversation_id,
                     role="assistant",
@@ -241,7 +258,7 @@ class LocalCouncil:
                 }
 
         wanted = self._rounds(rounds)
-        if wanted >= 2:
+        if wanted >= 2 and not self._over_cap(spent):
             yield {"type": "round_started", "round": 2}
             by_member = {item["member"]: item["answer"] for item in answers}
             for member in self.config.members:
@@ -257,6 +274,12 @@ class LocalCouncil:
                         parts.append(chunk)
                         yield {"type": "reaction_delta", "member": member.name, "delta": chunk}
                     reaction = "".join(parts)
+                    spent += _estimate_tokens(
+                        [message.content for message in history]
+                        + [text for _, text in peers]
+                        + [reaction]
+                    )
+                    answers.append({"member": member.name, "answer": reaction, "round": "2"})
                     self.store.add_message(
                         conversation_id,
                         role="assistant",
@@ -284,6 +307,11 @@ class LocalCouncil:
                         parts.append(chunk)
                         yield {"type": "synthesis_delta", "delta": chunk}
                     synthesis = "".join(parts)
+                    spent += _estimate_tokens(
+                        [message.content for message in history]
+                        + [text for _, text in positions]
+                        + [synthesis]
+                    )
                     self.store.add_message(
                         conversation_id,
                         role="assistant",
@@ -295,10 +323,10 @@ class LocalCouncil:
                     yield {
                         "type": "synthesis_finished",
                         "answer": synthesis,
-                        "partial": False,
+                        "partial": self._over_cap(spent),
                         "verdict": _verdict_json(synthesis),
                     }
                 except Exception as exc:
                     yield {"type": "member_error", "member": chair, "error": str(exc)}
 
-        yield {"type": "council_finished", "conversation": name}
+        yield {"type": "council_finished", "conversation": name, "partial": self._over_cap(spent)}
