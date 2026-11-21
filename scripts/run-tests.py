@@ -165,6 +165,7 @@ GROUPS = {
         "tests/test_wake_on_lan.py",
         "tests/test_day_cycle.py",
         "tests/test_l3_ladder.py",
+        "tests/test_eval_ladder_budget.py",
         "tests/test_install_workbench.py",
         "tests/test_scrutiny_response_guard.py",
         "tests/test_watchdog_tasks.py",
