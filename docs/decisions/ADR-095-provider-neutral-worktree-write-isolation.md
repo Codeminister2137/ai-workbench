@@ -298,15 +298,16 @@ Prior synthetic container-proxy receipts are not host-side inference proof.
 
 Owner answer `3dcbb514` requires full qualifying fallback for in-container Mai
 over the proven file mailbox (relay R), with no new worker-reachable endpoint.
-Credentials and live admission remain host-side. P2 delegates the choice between
-host resolution and a grant-carried fallback tree to the designer for supervisor
-review. The implementation selects host per-turn `FallbackSession` resolution,
-retaining failure state across turns and existing orchestrator policy. This avoids
-stale policy in worker grants at the cost of host mediation each turn; a snapshot
-tree remains an alternative with freshness/reconciliation costs. See the
+Credentials and live admission remain host-side. Owner answer `bd270333`
+(Option 1, 2026-11-21) places orchestration on the host: the implementation
+uses host per-turn `FallbackSession` resolution, retaining failure state
+across turns and existing orchestrator policy. This avoids stale policy in
+worker grants at the cost of host mediation each turn; a snapshot tree was
+considered and not chosen. See the
 [design, composition and synthetic proof](../repo-assistant/mai-relay-fallback.md).
-Hosted P1 acceptance, supervisor review and production enablement are separate;
-this does not close the full enforcement matrix below.
+Hosted P1 acceptance and production enablement are separate; supervisor
+review (2026-11-21) verified composition, tests and the bounded container
+proof. This does not close the full enforcement matrix below.
 
 ### Remaining full enforcement matrix
 
