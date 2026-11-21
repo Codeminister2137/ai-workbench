@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier, BrokenBarrierError
+
 from dashboard_stores import DashboardStores
 from dashboard_web_app import drain_pause_state
 
@@ -45,6 +48,46 @@ def test_later_success_recovers_and_closes_alert(tmp_path) -> None:
     assert drain_pause_state(stores) is None
     inbox, _ = stores.inbox.list(limit=10)
     assert inbox[0]["status"] == "closed"
+
+
+def test_concurrent_double_fire_files_one_alert(tmp_path, monkeypatch) -> None:
+    stores = DashboardStores(tmp_path)
+    other_stores = DashboardStores(tmp_path)
+    stores.runs.put("r1", _run("r1", "failed", "2026-11-16T10:00:00+00:00", "allowance"))
+    snapshots = Barrier(2)
+
+    def synchronize_snapshots(collection):
+        original_list = collection.list
+
+        def list_snapshot(**kwargs):
+            result = original_list(**kwargs)
+            try:
+                # Without serialization both callers capture an empty inbox.
+                # With it, the first times out and files before the second reads.
+                snapshots.wait(timeout=1)
+            except BrokenBarrierError:
+                pass
+            return result
+
+        monkeypatch.setattr(collection, "list", list_snapshot)
+
+    synchronize_snapshots(stores.inbox)
+    synchronize_snapshots(other_stores.inbox)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        first = pool.submit(drain_pause_state, stores)
+        second = pool.submit(drain_pause_state, other_stores)
+        paused = first.result(timeout=5)
+        again = second.result(timeout=5)
+
+    assert paused is not None and again is not None
+    assert paused["alert_id"] == again["alert_id"]
+    inbox, _ = stores.inbox.list(limit=10)
+    assert len(inbox) == 1
+    assert inbox[0]["metadata"] == {
+        "kind": "drain-pause",
+        "run_id": "r1",
+        "failure_class": "allowance",
+    }
 
 
 def test_agent_close_acknowledges_until_next_failure(tmp_path) -> None:
