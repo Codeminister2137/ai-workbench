@@ -78,9 +78,7 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/plans/business-funding-20261119.md | KNOWLEDGE | Funding options + acquisition prep 2026-11-19 (run da1eb76c). |
 | docs/plans/business-names-20261119.md | KNOWLEDGE | 15-name screening 2026-11-19 (run da1eb76c); none cleared. |
 | docs/plans/business-research-20261119.md | KNOWLEDGE | Business evidence + qualifications 2026-11-19 (run da1eb76c). |
-| docs/plans/morning-loop-20261120.md | ACTED | Morning dev loop plan 2026-11-20 (executed same day). |
 | docs/plans/repo-health-scan.md | PENDING | Repo health scan plan; many-scans + tiered sweep decided 2026-11-20, run queued. |
-| docs/plans/evening-loop-20261120.md | ACTED | Evening unattended loop plan 2026-11-20 14:30-22:00 (executing). |
 | docs/plans/os-isolation-integration.md | PENDING | OS-isolation Docker integration design; owner review brief open. |
 | docs/plans/backlog.md | ACTED | All items DONE (fan-out, merge). |
 | docs/plans/branch-consolidation-checklist.md | PENDING | DO NOT EXECUTE — owner review gate (Nov-9 prune was develop-local only). |
