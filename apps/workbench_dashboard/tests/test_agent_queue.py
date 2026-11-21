@@ -134,5 +134,5 @@ def test_human_and_attention_tabs_present_in_js() -> None:
     js = (WEB_DIR / "app.js").read_text(encoding="utf-8")
     assert '["human", "Human"' in js
     assert '["followup", "Needs follow-up"' in js
-    assert '"human,open,answered,followup,decision,clarification,order,task"' in js
+    assert '"human,open,followup,decision,clarification,order,task"' in js
     assert "picked.has(who(t))" in js
