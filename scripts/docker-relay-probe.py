@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import json
 import secrets
+import subprocess
 import sys
 import threading
 import time
@@ -242,14 +243,15 @@ def main() -> int:
             served["error"] = f"{type(exc).__name__}: {exc}"
 
     host = threading.Thread(target=mediate, daemon=True)
-    try:
+
+    def run_transport() -> int:
         up = compose(compose_file, spec.project_name, "up", "--wait", "--wait-timeout", "180")
         receipt["up"] = {
             "exit_code": up.returncode,
             "tail": ((up.stdout or "") + (up.stderr or ""))[-500:],
         }
         if up.returncode != 0:
-            return _write(evidence, receipt, 1)
+            return 1
         host.start()
         host.join(timeout=240)
         receipt["served"] = served
@@ -267,21 +269,52 @@ def main() -> int:
             receipt["findings"] = json.loads(lines[-1])
         except (IndexError, ValueError) as exc:
             receipt["findings_error"] = f"{type(exc).__name__}: {exc}"
-            return _write(evidence, receipt, 1)
+            return 1
         findings = receipt["findings"]
         receipt["passed"] = (
             isinstance(findings, dict)
             and all(v is True for v in findings.values())
             and served.get("turns") == 1
         )
-        return _write(evidence, receipt, 0 if receipt["passed"] else 1)
+        return 0 if receipt["passed"] else 1
+
+    try:
+        code = run_transport()
     finally:
         down = compose(compose_file, spec.project_name, "down", "--volumes", "--remove-orphans")
         receipt["teardown_exit"] = down.returncode
+        receipt["teardown_listing"] = _teardown_listing(spec.project_name)
+        receipt["cleanup_verified"] = (
+            down.returncode == 0 and receipt["teardown_listing"]["empty_verified"]
+        )
+        receipt["passed"] = receipt["passed"] and receipt["cleanup_verified"]
         try:
             (evidence / "receipt.json").write_text(json.dumps(receipt, indent=2), encoding="utf-8")
         except OSError:
             pass
+    return _write(evidence, receipt, code if receipt["cleanup_verified"] else 1)
+
+
+def _teardown_listing(project_name: str) -> dict:
+    """Independently list remaining project containers, including stopped ones."""
+    command = [
+        "docker",
+        "ps",
+        "--all",
+        "--filter",
+        f"label=com.docker.compose.project={project_name}",
+        "--format",
+        "{{.ID}} {{.Names}} {{.Status}}",
+    ]
+    result = subprocess.run(command, capture_output=True, text=True, timeout=30, check=False)
+    return {
+        "command": command,
+        "observed_at": datetime.now(UTC).isoformat(),
+        "exit_code": result.returncode,
+        "stdout": result.stdout,
+        "stderr": result.stderr,
+        "empty_verified": result.returncode == 0 and not result.stdout.strip(),
+    }
 
 
 def _write(evidence: Path, receipt: dict, code: int) -> int:
