@@ -27,6 +27,18 @@ BILLING = CostPolicyTier.BILLING_ALLOWED
 LOCAL = CostPolicyTier.LOCAL_ONLY
 
 
+@pytest.fixture(autouse=True)
+def fake_ollama_inventory(monkeypatch):
+    """Keep all ladder tests independent of the live Ollama server."""
+    monkeypatch.setattr(
+        _module,
+        "list_local_ollama_models",
+        lambda: tuple(
+            SimpleNamespace(model=model) for model in ("m", "qwen3:14b", "devstral-small-2:24b")
+        ),
+    )
+
+
 def test_recent_failed_models_collects_error_ids(tmp_path) -> None:
     good = [{"route": "r", "model": "fine", "error": None, "task_id": "T0"}]
     bad = [
@@ -340,7 +352,7 @@ def test_main_quality_reaches_selection_and_records_grades(
     ]
     if quality is not None:
         argv += ["--quality", quality]
-    assert _module.main(argv) == 0
+    assert _module.main(argv) == (1 if quality == "high" else 0)
     assert observed == [quality or "standard"]
     assert len(calls) == (0 if quality == "high" else 1)
     audit = json.loads(next((tmp_path / "snap").glob("ladder-resolved-*.json")).read_text())
@@ -356,3 +368,71 @@ def test_quality_rejects_unknown_value() -> None:
     with pytest.raises(SystemExit) as exc:
         _module.build_parser().parse_args(["--quality", "excellent"])
     assert exc.value.code == 2
+
+
+@pytest.mark.parametrize("live_refresh", [True, False])
+@pytest.mark.parametrize("installed", [("available",), ("missing", "available"), (), ("other",)])
+def test_ollama_filters_inventory_before_cap(monkeypatch, installed, live_refresh):
+    recommendation = SimpleNamespace(
+        selected=SimpleNamespace(backend=SimpleNamespace(model="missing")),
+        alternatives=[SimpleNamespace(backend=SimpleNamespace(model="available"))],
+    )
+    monkeypatch.setattr(_module, "recommend_model", lambda *a, **kw: recommendation)
+    monkeypatch.setattr(
+        _module,
+        "list_local_ollama_models",
+        lambda: tuple(SimpleNamespace(model=model) for model in installed),
+    )
+    candidates, note = resolve_route(
+        "ollama",
+        catalog=(),
+        credentials={},
+        allow_tier=LOCAL,
+        max_candidates=1,
+        skip=frozenset(),
+        live_refresh=live_refresh,
+    )
+    expected = [model for model in ("missing", "available") if model in installed][:1]
+    assert candidates == expected
+    if "missing" not in installed:
+        assert "'missing': 'not installed in Ollama'" in note
+    assert note.startswith("inventory-blocked") == (not expected)
+
+
+@pytest.mark.parametrize("inventory_error", [False, True])
+def test_main_ollama_inventory_blocks_without_inference(
+    monkeypatch, tmp_path, capsys, inventory_error
+):
+    def inventory():
+        if inventory_error:
+            raise _module.ProviderError("inventory unavailable")
+        return ()
+
+    def unexpected_client(model):
+        pytest.fail(f"must not attempt inference for {model}")
+
+    monkeypatch.setattr(_module, "list_local_ollama_models", inventory)
+    monkeypatch.setattr(_module, "load_dotenv", lambda: None)
+    monkeypatch.setattr(_module.route_eval, "_clients", lambda creds: {"ollama": unexpected_client})
+    assert (
+        _module.main(
+            [
+                "--routes",
+                "ollama",
+                "--allow-tier",
+                "local_only",
+                "--tasks",
+                "T0",
+                "--snapshot-dir",
+                str(tmp_path),
+                "--no-live-refresh",
+            ]
+        )
+        == 1
+    )
+    assert "inventory-blocked" in capsys.readouterr().out
+    audit = json.loads(next(tmp_path.glob("ladder-resolved-*.json")).read_text())
+    assert audit["routes"]["ollama"]["candidates"] == []
+    assert "inventory-blocked" in audit["routes"]["ollama"]["note"]
+    rows = json.loads(next(tmp_path.glob("route-eval-T0-*.json")).read_text())
+    assert "inventory-blocked" in rows[0]["error"]
