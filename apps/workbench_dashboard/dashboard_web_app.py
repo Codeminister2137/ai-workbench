@@ -75,7 +75,13 @@ from document_library import DocumentLibrary
 from drain_scheduler import DrainScheduler
 from nl_tasks import ORDER_OPTIONS, SCHEDULE_ANSWER, propose_task, scheduled_run_record
 from owner_mail import mail_configured
-from owner_sleep import cancel_owner_sleep, schedule_owner_sleep, timer_state
+from owner_sleep import (
+    cancel_owner_sleep,
+    last_outcome,
+    read_lastwake_text,
+    schedule_owner_sleep,
+    timer_state,
+)
 from providers_view import provider_status as providers_status
 from providers_view import refresh_provider_status
 from restrictions_view import restrictions_status
@@ -1098,7 +1104,11 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             if path.startswith("/api/e2e/reports/"):
                 return self._send_item(self._stores().e2e_reports, path[len("/api/e2e/reports/") :])
             if path == "/api/sleep":
-                return self._send_json({"ok": True, **timer_state(self.repo_root)})
+                state = timer_state(self.repo_root)
+                state["last_outcome"] = last_outcome(
+                    self.repo_root, lastwake_text=read_lastwake_text()
+                )
+                return self._send_json({"ok": True, **state})
             if path == "/api/version":
                 version = dict(type(self).served_version or {})
                 version.setdefault("branch", "unknown")
