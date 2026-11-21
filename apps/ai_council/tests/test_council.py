@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
+
 from config import load_config
 from council import LocalCouncil
 from storage import ConversationStore
@@ -29,7 +31,7 @@ class FakeAgent:
     def synthesize(self, conversation, answers):
         return f"synthesis of {len(answers)} positions"
 
-    def stream_synthesize(self, conversation, answers):
+    def stream_synthesize(self, conversation, answers) -> Iterator[str]:
         yield "synthesis"
 
 
@@ -144,7 +146,9 @@ def _council(tmp_path, monkeypatch, agent=FakeAgent):
     config_path = tmp_path / "council.json"
     db_path = tmp_path / "council.sqlite3"
     write_config(config_path)
-    config = load_config(config_path)
+    from dataclasses import replace
+
+    config = replace(load_config(config_path), max_rounds=3)
     store = ConversationStore(db_path)
     monkeypatch.setattr("council.LocalAgent", agent)
     return LocalCouncil(config, store), store
@@ -201,6 +205,7 @@ def test_ask_events_marks_synthesis_partial_on_cap(tmp_path, monkeypatch) -> Non
     write_config(config_path)
     raw = json.loads(config_path.read_text(encoding="utf-8"))
     raw["max_tokens_per_question"] = 1
+    raw["max_rounds"] = 3
     config_path.write_text(json.dumps(raw), encoding="utf-8")
     council = LocalCouncil(load_config(config_path), ConversationStore(tmp_path / "c.sqlite3"))
     monkeypatch.setattr("council.LocalAgent", FakeAgent)
@@ -219,6 +224,7 @@ def test_token_cap_marks_synthesis_partial(tmp_path, monkeypatch) -> None:
     write_config(config_path)
     raw = json.loads(config_path.read_text(encoding="utf-8"))
     raw["max_tokens_per_question"] = 1
+    raw["max_rounds"] = 3
     config_path.write_text(json.dumps(raw), encoding="utf-8")
     config = load_config(config_path)
     store = ConversationStore(db_path)
@@ -269,3 +275,120 @@ def test_config_rejects_bad_chair_and_rounds(tmp_path) -> None:
     config_path.write_text(json.dumps(raw), encoding="utf-8")
     with pytest.raises(ValueError, match="max_rounds"):
         load_config(config_path)
+
+
+def test_peer_inputs_are_capped_and_streamed_synthesis_includes_reactions(tmp_path, monkeypatch):
+    class RecordingAgent(FakeAgent):
+        peers = []
+        positions = []
+
+        def answer(self, conversation):
+            return self.member.name + "x" * 2500
+
+        def stream_answer(self, conversation):
+            yield self.answer(conversation)
+
+        def react(self, conversation, peer_answers):
+            self.peers.append((self.member.name, peer_answers))
+            return self.member.name + " reaction"
+
+        def stream_react(self, conversation, peer_answers):
+            yield self.react(conversation, peer_answers)
+
+        def synthesize(self, conversation, answers):
+            self.positions.append(answers)
+            return "synthesis"
+
+        def stream_synthesize(self, conversation, answers):
+            yield self.synthesize(conversation, answers)
+
+    council, store = _council(tmp_path, monkeypatch, RecordingAgent)
+    council.ask("Q?", rounds=3)
+    events = list(council.ask_events("Q?", conversation_name="stream", rounds=3))
+    assert len(RecordingAgent.peers) == 4
+    for member, peers in RecordingAgent.peers:
+        assert len(peers) == 1
+        assert peers[0][0] != member
+        assert len(peers[0][1]) == 2000
+    assert RecordingAgent.positions[0] == RecordingAgent.positions[1]
+    assert [text for _, text in RecordingAgent.positions[1]][-2:] == [
+        "Analyst reaction",
+        "Skeptic reaction",
+    ]
+    assert [event["type"] for event in events].count("synthesis_finished") == 1
+    stored = store.list_messages(store.get_or_create_conversation("stream"))
+    assert [row["round"] for row in stored] == [1, 1, 1, 2, 2, 3]
+    store.close()
+
+
+def test_cap_stops_after_current_round_in_both_execution_paths(tmp_path, monkeypatch):
+    from dataclasses import replace
+
+    class ExpensiveAgent(FakeAgent):
+        def answer(self, conversation):
+            return "a" * 40
+
+        def stream_answer(self, conversation):
+            yield self.answer(conversation)
+
+        def react(self, conversation, peer_answers):
+            return "r" * 400
+
+        def stream_react(self, conversation, peer_answers):
+            yield self.react(conversation, peer_answers)
+
+    council, store = _council(tmp_path, monkeypatch, ExpensiveAgent)
+    # R1 costs 20 estimated tokens; R2 crosses 30 and must finish both members.
+    council.config = replace(council.config, max_tokens_per_question=30)
+    answers = council.ask("Q?", rounds=3)
+    assert [item.get("round", "1") for item in answers[:-1]] == ["1", "1", "2", "2"]
+    assert answers[-1]["partial"] == "token cap reached"
+    events = list(council.ask_events("Q?", conversation_name="stream", rounds=3))
+    assert sum(e["type"] == "reaction_finished" for e in events) == 2
+    assert not any(e["type"] == "synthesis_delta" for e in events)
+    assert next(e for e in events if e["type"] == "synthesis_finished")["partial"] is True
+    assert events[-1]["partial"] is True
+    # Even when the first member exceeds the cap, the current round finishes.
+    council.config = replace(council.config, max_tokens_per_question=1)
+    events = list(council.ask_events("Q?", conversation_name="capped", rounds=3))
+    assert sum(e["type"] == "member_finished" for e in events) == 2
+    assert not any(e["type"] == "reaction_finished" for e in events)
+    store.close()
+
+
+def test_configured_chair_and_round_ceiling(tmp_path, monkeypatch):
+    from dataclasses import replace
+
+    council, store = _council(tmp_path, monkeypatch)
+    council.config = replace(council.config, chair="Skeptic", max_rounds=2)
+    answers = council.ask("Q?", rounds=3)
+    assert len(answers) == 4
+    assert not any(item["member"].endswith(":synthesis") for item in answers)
+    council.config = replace(council.config, max_rounds=3)
+    assert council.ask("Q?", rounds=3)[-1]["member"] == "Skeptic:synthesis"
+    rows = store.list_messages(store.get_or_create_conversation("test-conversation"))
+    assert rows[-1]["member_name"] == "Skeptic:synthesis"
+    assert rows[-1]["round"] == 3
+    store.close()
+
+
+def test_cap_crossed_during_synthesis_marks_generated_result_partial(tmp_path, monkeypatch):
+    from dataclasses import replace
+
+    class LongSynthesisAgent(FakeAgent):
+        def synthesize(self, conversation, answers):
+            return "s" * 8000
+
+        def stream_synthesize(self, conversation, answers):
+            yield self.synthesize(conversation, answers)
+
+    council, store = _council(tmp_path, monkeypatch, LongSynthesisAgent)
+    council.config = replace(council.config, max_tokens_per_question=1000)
+    answers = council.ask("Q?", rounds=3)
+    assert len(answers[-1]["answer"]) == 8000
+    assert answers[-1]["partial"] == "token cap reached"
+    events = list(council.ask_events("Q?", conversation_name="stream", rounds=3))
+    synthesis = next(e for e in events if e["type"] == "synthesis_finished")
+    assert len(synthesis["answer"]) == 8000
+    assert synthesis["partial"] is True
+    store.close()

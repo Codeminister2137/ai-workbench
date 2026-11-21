@@ -17,7 +17,7 @@ class CouncilConfig:
     default_conversation: str
     members: list[CouncilMember]
     chair: str | None = None
-    max_rounds: int = 3
+    max_rounds: int = 2
     reaction_cap_chars: int = 2000
     max_tokens_per_question: int = 0
 
@@ -37,7 +37,7 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> CouncilConfig:
     chair = raw.get("chair")
     if chair is not None and chair not in names:
         raise ValueError(f"Council chair {chair!r} is not a member.")
-    max_rounds = int(raw.get("max_rounds", 3))
+    max_rounds = int(raw.get("max_rounds", 2))
     if not 1 <= max_rounds <= 3:
         raise ValueError("Council max_rounds must be 1-3.")
     reaction_cap = int(raw.get("reaction_cap_chars", 2000))

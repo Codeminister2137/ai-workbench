@@ -109,3 +109,29 @@ def test_enabling_declared_constraint_preserves_legacy_rows(tmp_path) -> None:
     with pytest.raises(sqlite3.IntegrityError, match="FOREIGN KEY"):
         reopened.add_message(999, "assistant", "New orphan refused")
     reopened.close()
+
+
+def test_legacy_schema_keeps_rows_and_adds_nullable_round_without_backfill(tmp_path):
+    path = tmp_path / "legacy.sqlite3"
+    with sqlite3.connect(path) as connection:
+        connection.executescript("""
+            CREATE TABLE conversations (
+                id INTEGER PRIMARY KEY, name TEXT UNIQUE,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE TABLE messages (
+                id INTEGER PRIMARY KEY, conversation_id INTEGER,
+                role TEXT, member_name TEXT, model TEXT, content TEXT,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            );
+            INSERT INTO conversations(id, name) VALUES (1, 'legacy');
+            INSERT INTO messages(id, conversation_id, role, content)
+                VALUES (1, 1, 'user', 'Original');
+        """)
+    store = ConversationStore(path)
+    assert store.list_messages(1)[0]["round"] == 1
+    assert store.list_messages(1)[0]["content"] == "Original"
+    assert store.connection.execute("SELECT round FROM messages").fetchone()[0] is None
+    store.add_message(1, "assistant", "Reaction", round=2)
+    assert [row["round"] for row in store.list_messages(1)] == [1, 2]
+    store.close()

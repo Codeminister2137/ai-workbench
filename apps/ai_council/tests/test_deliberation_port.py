@@ -26,11 +26,13 @@ class FakeAgent:
 
 
 def _port(tmp_path, monkeypatch) -> CouncilDeliberationPort:
+    from dataclasses import replace
+
     config_path = tmp_path / "council.json"
     write_config(config_path)
     monkeypatch.setattr("council.LocalAgent", FakeAgent)
     return CouncilDeliberationPort(
-        load_config(config_path), ConversationStore(tmp_path / "c.sqlite3")
+        replace(load_config(config_path), max_rounds=3), ConversationStore(tmp_path / "c.sqlite3")
     )
 
 
