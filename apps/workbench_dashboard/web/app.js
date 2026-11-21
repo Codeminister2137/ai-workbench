@@ -1222,6 +1222,15 @@ async function renderPlans(id) {
   bindFilterBoxes("plans-filters", "plans", "f");
 }
 
+function serviceRowsHtml(services) {
+  return (services || []).map((s) =>
+    `<li><span class="pill st-${s.kind === "bundled" ? "none" : s.up ? "ready" : "missing"}">${s.kind === "bundled" ? "bundled" : s.up ? "up" : "down"}</span> <strong>${esc(s.name)}</strong>` +
+    ` <span class="muted">${esc(s.version || "?")}` +
+    (s.commit_utc ? ` · committed ${esc(fmtTime(s.commit_utc))}` : "") +
+    (s.started_utc ? ` · started ${esc(fmtTime(s.started_utc))}` : "") +
+    `</span>` + (s.explain ? `<p class="muted">${esc(s.explain)}</p>` : "") + `</li>`).join("");
+}
+
 async function renderProjects(id) {
   if (id) {
     const payload = await api("/api/projects/" + encodeURIComponent(id));
@@ -1311,6 +1320,9 @@ async function renderProjects(id) {
      <span class="pill">${esc(a.status)}</span>
      <span class="muted">${esc(a.project)} · ${(a.reasons || []).map(esc).join("; ")}</span></li>`).join("");
   view.innerHTML = `<h1>Projects</h1>
+    <h2>Bundled services</h2>
+    <p class="muted">Landed components share the dashboard served revision; bundled is not a live health check.</p>
+    <ul class="plain">${serviceRowsHtml(payload.services) || '<li class="muted">No bundled services listed.</li>'}</ul>
     <h2>Goals</h2>
     <p class="muted">Curated repository goals from docs/goals/registry.json and their goal documents. These describe roadmap work; registered project directories appear under Work roots.</p>
     <ul class="plain" id="goals-list">${goals || '<li class="muted">No goal registry found.</li>'}</ul>
@@ -2937,12 +2949,7 @@ async function renderFleet() {
     const ownerLast = ownerSleep.last_outcome && ownerSleep.last_outcome.summary
       ? `<p class="muted">Last: ${esc(ownerSleep.last_outcome.summary)}</p>`
       : "";
-    const serviceRows = (f.services || []).map((s) =>
-      `<li><span class="pill st-${s.up ? "ready" : "missing"}">${s.up ? "up" : "down"}</span> <strong>${esc(s.name)}</strong>` +
-      ` <span class="muted">${esc(s.version || "?")}` +
-      (s.commit_utc ? ` · committed ${esc(fmtTime(s.commit_utc))}` : "") +
-      (s.started_utc ? ` · started ${esc(fmtTime(s.started_utc))}` : "") +
-      `</span></li>`).join("");
+    const serviceRows = serviceRowsHtml(f.services);
     body = `<div class="card"><h2>Servers</h2><ul class="plain">
       <li><span class="pill st-ready">up</span> <strong>dashboard</strong> <span class="muted">${esc(f.dashboard.explain || "this server")}</span></li>
       <li><span class="pill st-${f.ollama.up ? "ready" : "missing"}">${f.ollama.up ? "up" : "down"}</span> <strong>ollama</strong> <span class="muted">${f.ollama.up ? esc(f.ollama.models) + " model(s)" : esc(f.ollama.detail || "")}${f.ollama.explain ? ` — ${esc(f.ollama.explain)}` : ""}</span></li></ul></div>

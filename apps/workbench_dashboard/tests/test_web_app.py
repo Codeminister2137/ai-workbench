@@ -1386,6 +1386,31 @@ def test_fleet_services_versions_dashboard_and_openings(tmp_path: Path) -> None:
     assert rows[1]["up"] in (True, False)
 
 
+def test_bundled_services_coverage_and_versions(tmp_path: Path) -> None:
+    from dashboard_web_app import BUNDLED_SERVICES, bundled_services
+
+    root = Path(__file__).resolve().parents[3]
+    names = {
+        "relay mailbox/mediator",
+        "owner digest",
+        "verify-report/last_outcome",
+        "eval ladder/grades",
+    }
+    version = {"branch": "develop", "commit": "abc1234"}
+    rows = bundled_services(root, version)
+    assert {row["name"] for row in rows} == names
+    assert all(row["explain"] and row["kind"] == "bundled" for row in rows)
+    assert all(row["version"] == "develop@abc1234" for row in rows)
+    assert all("up" not in row for row in rows)
+    assert bundled_services(tmp_path, version) == []
+    for source in BUNDLED_SERVICES.values():
+        path = tmp_path / source
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.touch()
+    assert {row["name"] for row in fleet_services(tmp_path, None)} == names
+    assert all(row["version"] == "?@?" for row in bundled_services(tmp_path, None))
+
+
 def test_fleet_services_openings_reports_checkout_sha(tmp_path: Path) -> None:
     import subprocess
 

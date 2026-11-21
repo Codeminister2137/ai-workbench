@@ -1782,6 +1782,69 @@ const api = async (path) => ({item});
     assert result.returncode == 0, result.stderr
 
 
+def test_bundled_services_render_in_fleet_and_projects() -> None:
+    import json
+    import sys
+
+    sys.path.insert(0, str(WEB_DIR.parent))
+    from dashboard_web_app import bundled_services
+
+    rows = bundled_services(WEB_DIR.parents[2], {"branch": "develop", "commit": "abc1234"})
+    assert len(rows) == 4
+    node = _node_driver()
+    driver = r"""
+const assert = require('assert');
+const source = require('fs').readFileSync(process.argv[1], 'utf8');
+const rows = JSON.parse(process.argv[2]);
+const grab = (name) => eval('(' + source.slice(source.indexOf('function ' + name + '('),
+  source.indexOf('\n}', source.indexOf('function ' + name + '(')) + 2) + ')');
+const esc = grab('esc');
+const fmtTime = grab('fmtTime');
+const serviceRowsHtml = grab('serviceRowsHtml');
+const view = {innerHTML: '', querySelectorAll: () => []};
+const document = {getElementById: () => ({addEventListener() {}})};
+const moduleActive = () => false;
+const location = {hash: '#/projects'};
+const gtext = esc;
+const fleet = {tasks: [], runs: [], agents: {runs: []}, sleep: {active: false},
+  services: rows, dashboard: {}, ollama: {up: false}};
+const api = async (path) => {
+  if (path === '/api/projects') return {projects: [], services: rows};
+  if (path === '/api/fleet') return {fleet};
+  if (path === '/api/sleep') return {active: false};
+  throw Error('Unexpected request: ' + path);
+};
+eval(source.slice(source.indexOf('async function renderProjects('),
+  source.indexOf('async function renderMeetings(')));
+eval(source.slice(source.indexOf('async function renderFleet('),
+  source.indexOf('async function flipToggle(')));
+(async () => {
+  for (const render of [renderFleet, renderProjects]) {
+    await render();
+    for (const row of rows) {
+      assert(view.innerHTML.includes('<strong>' + esc(row.name) + '</strong>'));
+      assert(view.innerHTML.includes(esc(row.explain)));
+    }
+    assert.equal((view.innerHTML.match(/>bundled</g) || []).length, 4);
+    assert.equal((view.innerHTML.match(/develop@abc1234/g) || []).length, 4);
+  }
+  const escaped = serviceRowsHtml([{kind: 'bundled', name: '<script>',
+    version: '<v>', explain: '<img onerror=alert(1)>'}]);
+  assert(!escaped.includes('<script>'));
+  assert(escaped.includes('&lt;img onerror=alert(1)&gt;'));
+  assert(serviceRowsHtml([{name: 'server', up: true}]).includes('>up<'));
+  assert(serviceRowsHtml([{name: 'server', up: false}]).includes('>down<'));
+  assert.equal(serviceRowsHtml(), '');
+})().catch(error => {console.error(error); process.exitCode = 1;});
+"""
+    result = subprocess.run(
+        [node, "-e", driver, str(WEB_DIR / "app.js"), json.dumps(rows)],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+
+
 def test_fleet_flags_dead_end_runs() -> None:
     node = _node_driver()
     driver = r"""
@@ -1791,6 +1854,7 @@ const grab = (name) => eval('(' + source.slice(source.indexOf('function ' + name
   source.indexOf('\n}', source.indexOf('function ' + name + '(')) + 2) + ')');
 const esc = grab('esc');
 const fmtTime = grab('fmtTime');
+const serviceRowsHtml = grab('serviceRowsHtml');
 const renderer = source.slice(source.indexOf('async function renderFleet('),
   source.indexOf('async function flipToggle('));
 eval(renderer);

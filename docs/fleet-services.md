@@ -5,6 +5,33 @@ Schedule tabs. The dashboard parses this file (strict `## <name>` headers)
 and shows each paragraph under its service, so keep headers exact and each
 explanation to one short paragraph.
 
+Bundled components also appear in Projects. Their version is the dashboard's
+served repository revision; the bundled label does not report live health.
+
+## relay mailbox/mediator
+
+The Docker worker's file mailbox and host mediator carry scoped inference
+requests to the host-owned executor. The relay enforces run grants and keeps
+provider credentials off the worker; it runs only as part of a granted run.
+
+## owner digest
+
+Coordinates durable owner notifications into an hourly digest, with immediate
+delivery for blockers. Existing scheduler and supervisor ticks flush pending
+notifications; this is not a separate daemon or the weekly Gmail digest.
+
+## verify-report/last_outcome
+
+Summarizes sleep-helper receipts and wake evidence for the Fleet sleep button's
+last outcome. Reports the recorded sleep interval and wake source without
+scheduling sleep or treating a scheduling receipt as a verified transition.
+
+## eval ladder/grades
+
+The L3 evaluation ladder resolves tier-gated route candidates and uses the
+provider evaluation mechanism to walk tasks, grade results and save snapshots.
+Recorded grades inform route quality; listing this component runs no evaluation.
+
 ## WorkbenchDashboard
 
 Starts the dashboard at sign-in (installer-registered autostart). If the
