@@ -1746,6 +1746,54 @@ const api = async (path) => {
     assert result.returncode == 0, result.stderr
 
 
+def test_chat_thread_scrolls_to_input_on_open() -> None:
+    node = _node_driver()
+    driver = r"""
+const assert = require('assert');
+const source = require('fs').readFileSync(process.argv[1], 'utf8');
+const grab = (name) => eval('(' + source.slice(source.indexOf('function ' + name + '('),
+  source.indexOf('\n}', source.indexOf('function ' + name + '(')) + 2) + ')');
+const esc = grab('esc');
+const gtext = grab('gtext');
+const truncate = grab('truncate');
+const renderer = source.slice(source.indexOf('async function renderChatThread('),
+  source.indexOf('async function renderInbox('));
+eval(renderer);
+const view = {innerHTML: '', querySelectorAll: () => []};
+const location = {hash: '#/chat/x1'};
+const scrolled = [];
+const el = (id) => ({addEventListener() {}, dataset: {}, value: '', checked: false,
+  scrollIntoView: id === 'chat-form' ? ((opts) => scrolled.push(opts)) : undefined});
+const document = {getElementById: el, createElement: () => ({})};
+const window = {};
+const setInterval = () => 0;
+const clearInterval = () => {};
+const toast = () => {};
+const render = () => {};
+const loadProjectPicker = async () => {};
+const loadPlanPicker = async () => {};
+const api = async (path) => {
+  if (path.includes('/messages')) return {messages: [
+    {role: 'user', content: 'hi'},
+  ], pending_turn: null};
+  if (path === '/api/plans') return {items: []};
+  if (path === '/api/chat/agent-config') return {enabled: false, approval: 'scoped'};
+  return {sessions: [{id: 'x1', title: 'T', mode: 'ask'}], agent_enabled: false};
+};
+(async () => {
+  await renderChatThread('x1');
+  assert(scrolled.length === 1, 'input scrolled into view once on open');
+  assert(scrolled[0] && scrolled[0].block === 'end', 'scrolled to end');
+})().catch(error => {console.error(error); process.exitCode = 1;});
+"""
+    result = subprocess.run(
+        [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
+    )
+    assert result.returncode == 0, result.stderr
+    css = (WEB_DIR / "app.css").read_text(encoding="utf-8")
+    assert "#chat-form" in css and "position: sticky" in css
+
+
 def test_inbox_detail_renders_acknowledge_for_reports() -> None:
     node = _node_driver()
     driver = r"""

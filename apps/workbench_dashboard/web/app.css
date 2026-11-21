@@ -22,6 +22,7 @@ nav a.active { font-weight: bold; text-decoration: underline; }
 .activity-feed { white-space: pre-wrap; }
 .inbox-body { white-space: pre-wrap; }
 form.inline { display: flex; gap: var(--wb-gap-flex); margin-top: var(--wb-space-3); }
+#chat-form { position: sticky; bottom: 0; background: var(--wb-color-surface); padding: var(--wb-space-3) 0; border-top: var(--wb-border-thin); z-index: 4; }
 input[type="text"], textarea { flex: 1; font: inherit; }
 button { font: inherit; cursor: pointer; }
 ul.plain { list-style: none; padding-left: 0; }
