@@ -37,6 +37,7 @@ from ai_orchestrator import (  # noqa: E402
     recommend_model,
 )
 from ai_provider import route_eval  # noqa: E402
+from ai_provider.eval_budget import AllowanceTaskBudget  # noqa: E402
 from ai_provider.route_eval import TASK_SPECS, TASKS, EvalResult  # noqa: E402
 from ai_provider.secrets import load_dotenv  # noqa: E402
 
@@ -278,12 +279,18 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(
+    argv: list[str] | None = None,
+    *,
+    budgets: dict[str, AllowanceTaskBudget] | None = None,
+) -> int:
     """Resolve candidates per route, walk the ladder, write snapshots."""
     parser = build_parser()
     args = parser.parse_args(argv)
     if args.tasks is not None and args.tier is not None:
         parser.error("choose one of --tasks or --tier")
+    if args.max_tier_tasks < 0:
+        parser.error("--max-tier-tasks must be nonnegative")
     if args.tier is not None:
         from ai_provider.eval_task_sets import sample_tasks, tasks_for_tier
 
@@ -305,7 +312,7 @@ def main(argv: list[str] | None = None) -> int:
     except (OSError, ValueError) as exc:
         parser.error(f"bad --catalog file {args.catalog}: {exc}")
     allow_tier = CostPolicyTier(args.allow_tier)
-    wanted = args.routes or list(EVAL_ROUTES)
+    wanted: list[str] = args.routes or list(EVAL_ROUTES)
     unknown_routes = [route for route in wanted if route not in EVAL_ROUTES]
     if unknown_routes:
         parser.error(f"unknown route(s): {', '.join(unknown_routes)}")
@@ -340,8 +347,17 @@ def main(argv: list[str] | None = None) -> int:
         stop_on_fail=not args.continue_past_fail,
         max_output_tokens=overrides,
         walk_all=args.walk_all,
+        budgets=budgets,
     )
     results = apply_tier_blocks(results, blocked, gate)
+    for route, budget in (budgets or {}).items():
+        if route in resolutions:
+            resolutions[route]["eval_budget"] = {
+                "max_tasks": budget.max_tasks,
+                "calls": budget.calls,
+                "stop_reason": budget.stop_reason,
+                "threshold_pp": 10,
+            }
     snapshot = route_eval.write_results_snapshot(results, tasks, args.snapshot_dir)
     record = write_resolution_record(resolutions, args.snapshot_dir, allow_tier)
     for item in results:

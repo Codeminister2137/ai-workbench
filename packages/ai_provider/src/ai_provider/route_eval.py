@@ -38,6 +38,7 @@ from ai_provider.adapters.openai_compatible import _zero_price_row
 from ai_provider.config import BackendConfig, ProviderKind
 from ai_provider.contracts import AIMessage, AIRequest, MessageRole, PrivacyClass
 from ai_provider.errors import ProviderError, ProviderErrorCategory
+from ai_provider.eval_budget import AllowanceTaskBudget
 from ai_provider.factory import create_chat_client
 from ai_provider.secrets import load_dotenv
 from ai_provider.source_info import _utc_now
@@ -803,11 +804,70 @@ def run_eval(
     *,
     task_id: str = "T0",
     max_output_tokens: int | None = None,
+    budget: AllowanceTaskBudget | None = None,
 ) -> EvalResult:
     """Send one ladder task through one client and grade deterministically.
 
     ``max_output_tokens`` overrides the task spec cap for this attempt only.
     """
+    if route == "opencode_go" and budget is None:
+        return EvalResult(
+            route,
+            model,
+            _utc_now(),
+            False,
+            None,
+            None,
+            None,
+            "budget-stop: allowance cycle budget required",
+            task_id=task_id,
+        )
+    if budget is not None:
+        if task_id not in budget.tasks:
+            return EvalResult(
+                route,
+                model,
+                _utc_now(),
+                False,
+                None,
+                None,
+                None,
+                "budget-stop: task outside allowance tier",
+                task_id=task_id,
+            )
+        # The inner call has already passed allowance admission.
+        result = budget.run(
+            lambda: _run_eval_unbudgeted(
+                client, route, model, task_id=task_id, max_output_tokens=max_output_tokens
+            )
+        )
+        if result is not None:
+            return result
+        return EvalResult(
+            route,
+            model,
+            _utc_now(),
+            False,
+            None,
+            None,
+            None,
+            f"budget-stop: {budget.stop_reason}",
+            task_id=task_id,
+        )
+    return _run_eval_unbudgeted(
+        client, route, model, task_id=task_id, max_output_tokens=max_output_tokens
+    )
+
+
+def _run_eval_unbudgeted(
+    client: Any,
+    route: str,
+    model: str,
+    *,
+    task_id: str,
+    max_output_tokens: int | None,
+) -> EvalResult:
+    """Execute one call after caller-side admission."""
     spec = TASK_SPECS.get(task_id)
     if spec is None:
         raise ValueError(f"unknown route-eval task: {task_id!r}")
@@ -857,6 +917,7 @@ def run_ladder(
     tasks: tuple[str, ...] = TASKS,
     stop_on_fail: bool = True,
     max_output_tokens: dict[str, int] | None = None,
+    budget: AllowanceTaskBudget | None = None,
 ) -> list[EvalResult]:
     """Attempt ladder tasks in order; PASS-gated by default.
 
@@ -870,8 +931,14 @@ def run_ladder(
     results = []
     for task_id in tasks:
         override = (max_output_tokens or {}).get(task_id)
-        result = run_eval(client, route, model, task_id=task_id, max_output_tokens=override)
+        result = run_eval(
+            client, route, model, task_id=task_id, max_output_tokens=override, budget=budget
+        )
         results.append(result)
+        if result.error and result.error.startswith("budget-stop:"):
+            break
+        if budget is not None and (budget.stop_reason or budget.calls >= budget.max_tasks):
+            break
         if stop_on_fail and not result.passed:
             break
     return results
@@ -1015,6 +1082,7 @@ def run_candidate_ladder(
     stop_on_fail: bool = True,
     max_output_tokens: dict[str, int] | None = None,
     walk_all: bool = False,
+    budget: AllowanceTaskBudget | None = None,
 ) -> list[EvalResult]:
     """Attempt ordered candidates until one is reached; record every attempt.
 
@@ -1028,15 +1096,25 @@ def run_candidate_ladder(
     skip. Callers resolve and tier-gate the candidate order; this walk
     never substitutes its own picks.
     """
-    gate = tasks[0] if tasks else "T0"
+    if budget is not None:
+        tasks = tuple(task for task in budget.tasks if task in tasks)
+    if not tasks:
+        return []
+    gate = tasks[0]
     overrides = max_output_tokens or {}
     results: list[EvalResult] = []
     attempts = list(models) if max_attempts <= 0 else list(models)[:max_attempts]
     parked_streak = 0
     for model in attempts:
         client = build(model)
-        first = run_eval(client, route, model, task_id=gate, max_output_tokens=overrides.get(gate))
+        first = run_eval(
+            client, route, model, task_id=gate, max_output_tokens=overrides.get(gate), budget=budget
+        )
         results.append(first)
+        if first.error and first.error.startswith("budget-stop:"):
+            return results
+        if budget is not None and (budget.stop_reason or budget.calls >= budget.max_tasks):
+            return results
         if first.error is not None:
             parked = first.error.startswith("parked:")
             parked_streak = parked_streak + 1 if parked else 0
@@ -1052,8 +1130,11 @@ def run_candidate_ladder(
                     tasks=tasks[1:],
                     stop_on_fail=stop_on_fail,
                     max_output_tokens=max_output_tokens,
+                    budget=budget,
                 )
             )
+        if budget is not None and (budget.stop_reason or budget.calls >= budget.max_tasks):
+            return results
         if not walk_all:
             return results
     if not results:
@@ -1073,6 +1154,7 @@ def run_all(
     stop_on_fail: bool = True,
     max_output_tokens: dict[str, int] | None = None,
     walk_all: bool = False,
+    budgets: dict[str, AllowanceTaskBudget] | None = None,
 ) -> list[EvalResult]:
     """Walk explicit per-route candidates; every skip recorded, never imputed."""
     factories = _clients(credentials)
@@ -1090,6 +1172,7 @@ def run_all(
                 stop_on_fail=stop_on_fail,
                 max_output_tokens=max_output_tokens,
                 walk_all=walk_all,
+                budget=(budgets or {}).get(route),
             )
         )
     return results
