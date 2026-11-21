@@ -19,6 +19,7 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/codex-toolkit.md | KNOWLEDGE | Portable tooling notes. |
 | docs/company-run.md | KNOWLEDGE | Company-run reference (G12). |
 | docs/day-cycle.md | KNOWLEDGE | Day-cycle reference. |
+| docs/day-report-20261121.md | KNOWLEDGE | Day report 2026-11-21 (snapshot 21:47; closeout addendum pending). |
 | docs/decisions.md | KNOWLEDGE | Decision index (append-only log). |
 | docs/definition-of-done.md | KNOWLEDGE | Done criteria. |
 | docs/documentation-conformance-plan.md | PENDING | In progress; bounded findings recorded, follow-ups open. |
