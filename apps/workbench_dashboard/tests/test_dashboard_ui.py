@@ -870,7 +870,7 @@ def test_inbox_checkbox_filters_default_human_attention() -> None:
     """Inbox mixes Who/State/Kind checkboxes; default is human attention, no reports."""
     js = _read("app.js")
     assert 'filterBoxes("inbox-filters"' in js
-    assert '"human,open,answered,followup,decision,clarification,order,task"' in js
+    assert '"human,open,followup,decision,clarification,order,task"' in js
     assert '"human,open,answered,followup"' not in js
     assert 'data-f="${t}"' in js
     for token, label in (
@@ -882,7 +882,7 @@ def test_inbox_checkbox_filters_default_human_attention() -> None:
         ("closed", "Closed"),
         ("decision", "Decisions"),
         ("clarification", "Clarifications"),
-        ("order", "Orders"),
+        ("order", "Approval requests"),
         ("task", "Tasks"),
         ("report", "Reports"),
     ):
@@ -915,7 +915,7 @@ def test_all_list_tabs_share_filter_helper() -> None:
     assert "function bindFilterBoxes(id, base, param)" in js
     assert "function pickedTokens(param, fallback)" in js
     for view, default in (
-        ("inbox", "human,open,answered,followup,decision,clarification,order,task"),
+        ("inbox", "human,open,followup,decision,clarification,order,task"),
         ("e2e", "open,fail"),
         ("plans", "active"),
         ("runs", "failed,running,queued,paused,waiting,approved"),
@@ -1464,18 +1464,24 @@ const api = async (path) => ({items, attention_ids: ['f1', 'o1', 'a1', 'a2']});
 const shown = (html) => (html.match(/<li>/g) || []).length;
 (async () => {
   await renderInbox(undefined);
-  assert(!view.innerHTML.includes('hidden by filters'), 'default shows all: ' + view.innerHTML.length);
-  assert.equal(shown(view.innerHTML), 4);
+  assert.equal(shown(view.innerHTML), 2);
+  assert(!view.innerHTML.includes('Answered one'));
+  assert(!view.innerHTML.includes('AI job'));
+  assert(!view.innerHTML.includes('inbox/x2'));
   const html = view.innerHTML;
   assert(html.indexOf('Follow-up') < html.indexOf('Open one'), 'attention order verbatim');
   location.hash = '#/inbox?f=human,open,followup';
   await renderInbox(undefined);
   assert.equal(shown(view.innerHTML), 2);
   assert(view.innerHTML.includes('2 attention items hidden by filters'), 'banner counts hidden');
-  assert(view.innerHTML.includes('href="#/inbox">Show all'), 'banner resets');
+  assert(view.innerHTML.includes('closed,decision,clarification,order,task,report">Show all'), 'banner offers archive and all kinds');
   location.hash = '#/inbox?project=p1';
   await renderInbox(undefined);
   assert(view.innerHTML.includes('Project filter active'), 'project divergence noted');
+  assert.equal(shown(view.innerHTML), 2, 'project defaults match global defaults');
+  location.hash = '#/inbox?f=human,answered,task';
+  await renderInbox(undefined);
+  assert.equal(shown(view.innerHTML), 2, 'answered remains available explicitly');
 })().catch(error => {console.error(error); process.exitCode = 1;});
 """
     result = subprocess.run(
@@ -1519,7 +1525,7 @@ const shown = (html) => (html.match(/<li>/g) || []).length;
   assert(view.innerHTML.includes('Future kind'), 'unknown kind fails open');
   assert(view.innerHTML.includes('Reports hide by default'), 'banner explains the gap');
   assert(!view.innerHTML.includes('Show all'), 'no looping reset link');
-  location.hash = '#/inbox?f=human,open,answered,followup,decision,clarification,order,task,report';
+  location.hash = '#/inbox?f=human,open,followup,decision,clarification,order,task,report';
   await renderInbox(undefined);
   assert.equal(shown(view.innerHTML), 4, 'ticking Reports reveals it');
   location.hash = '#/inbox?f=human,open,report';
