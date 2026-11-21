@@ -135,7 +135,18 @@ separately in `a0c04c3f257d42028791e0ddb494c336`.
    Y", with the dated Europe/Warsaw interval, receipt status and evidence source.
    Example: 2026-11-21 SleepStudy session 12, 01:14:13-01:26:49 Warsaw:
    "slept 12 min 36 s, woken by Power Button"; Troubleshooter starts at 01:14:10.
-   A wake source does not identify who pressed the button.
+   A wake source does not identify the actor or physical mechanism. Owner answer
+   `86dfdd67` (2026-11-21): the owner wakes the PC remotely via Termux and gave
+   Mai an AI task. Record that as the owner's account alongside the Windows
+   "Power Button" label; do not infer a physical button press or the dashboard
+   Sleep button as the task's entry point. The exact task/channel and any prior
+   Mai report are not identified by that answer.
+   The owner requires the report to be connected to that AI task: retain its
+   task/run reference with the sleep receipt and pending check, then attach the
+   post-wake report to the same task/thread, including its run reference when
+   available. A standalone sleep clarification does not replace that report.
+   If the originating task cannot be located, state that limitation and preserve
+   the missing link for investigation; do not invent an identifier or delivery.
 5. If evidence is absent, conflicting or unavailable, report the observed receipt
    status and "sleep outcome/duration/wake source unverified" as appropriate.
    Preserve the pending check and name missing evidence. Do not remain silent,
