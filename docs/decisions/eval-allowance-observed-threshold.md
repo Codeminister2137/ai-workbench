@@ -52,3 +52,28 @@ operation. Its reader additionally requires verified cleanup, snapshots no older
 than 60 seconds, product headroom and paired primary/secondary windows for each
 bucket. The file-based planner continues to use `eval_budget`; this integration
 does not provide cross-job accounting or authorize new allowance calls.
+
+## Ladder runner integration (D5)
+
+The ladder accepts an explicit `AllowanceTaskBudget` from `eval_budget` via
+`run_eval`, `run_ladder`, `run_candidate_ladder`, or the per-route `budgets`
+mapping on `run_all` and `scripts.l3_ladder.main`. Construction performs no reads
+or inference. The caller explicitly starts execution and supplies a fresh native
+reader, clock, acquisition freshness bound, and optionally a retained cycle guard.
+The reader remains responsible for product headroom and complete account windows.
+
+The allowance tier set supplies the finite `max_tasks` (currently T0 and T1);
+a positive caller cap may reduce it. Attempts, including transport failures,
+consume that count across candidates and repeated jobs using the same budget.
+The count is a maximum sample size, not a prediction of ten percent's purchasing
+power: percentage-only observations cannot establish a per-request cost bound.
+The existing observed guard stops earlier at ten percentage points in any bucket,
+or on uncertain readings. A completed grade survives a failed postflight; the
+latched budget prevents subsequent calls. The L3 resolution record captures task
+count, calls, and stop reason.
+
+OpenCode Go ladder calls without a supplied cycle budget are recorded as
+`budget-stop` without inference. The CLI does not invent a native reader or
+restore a cycle from an arbitrary file. Cross-process recovery remains
+unimplemented; callers must retain the cycle objects or fail closed. No automatic
+start, metered approval, new provider access, or live acceptance is introduced.
