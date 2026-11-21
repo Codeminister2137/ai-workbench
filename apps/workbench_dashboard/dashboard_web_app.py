@@ -775,6 +775,31 @@ def _dir_version(path: Path) -> str:
     return proc.stdout.strip() if proc.returncode == 0 else "unknown"
 
 
+BUNDLED_SERVICES = {
+    "relay mailbox/mediator": "apps/workbench_dashboard/relay_mailbox.py",
+    "owner digest": "apps/workbench_dashboard/owner_digest.py",
+    "verify-report/last_outcome": "apps/workbench_dashboard/owner_sleep.py",
+    "eval ladder/grades": "scripts/l3_ladder.py",
+}
+
+
+def bundled_services(repo_root: Path, version: dict[str, Any] | None) -> list[dict[str, Any]]:
+    """Describe landed components without starting or probing their workflows."""
+    explanations = fleet_explain(repo_root)
+    served = version or {}
+    return [
+        {
+            "name": name,
+            "kind": "bundled",
+            "version": f"{served.get('branch', '?')}@{served.get('commit', '?')}",
+            "commit_utc": served.get("commit_utc"),
+            "explain": explanations.get(name, ""),
+        }
+        for name, source in BUNDLED_SERVICES.items()
+        if (repo_root / source).is_file()
+    ]
+
+
 def fleet_services(repo_root: Path, version: dict[str, Any] | None) -> list[dict[str, Any]]:
     """Kept-service versions; every probe is fail-soft."""
     services: list[dict[str, Any]] = []
@@ -798,7 +823,7 @@ def fleet_services(repo_root: Path, version: dict[str, Any] | None) -> list[dict
                 "port": 8501,
             }
         )
-    return services
+    return services + bundled_services(repo_root, version)
 
 
 def fleet_status(repo_root: Path, stores, version: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -1073,6 +1098,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                         "projects": projects,
                         "goals": list_goals(self.repo_root),
                         "attention": list_plan_attention(self.repo_root),
+                        "services": bundled_services(self.repo_root, type(self).served_version),
                     }
                 )
             if path.startswith("/api/projects/"):

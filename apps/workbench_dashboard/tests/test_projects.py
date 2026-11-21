@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from urllib.error import HTTPError
 
 import pytest
@@ -57,12 +58,35 @@ def test_registry_refusals(tmp_path) -> None:
         create_project(data_dir, name="  ", root=str(root))
 
 
+def test_projects_lists_bundled_services(dashboard_server, tmp_path, monkeypatch) -> None:
+    from dashboard_web_app import BUNDLED_SERVICES, DashboardRequestHandler
+
+    monkeypatch.setattr(
+        DashboardRequestHandler, "served_version", {"branch": "develop", "commit": "abc1234"}
+    )
+    repo = Path(__file__).resolve().parents[3]
+    for source in BUNDLED_SERVICES.values():
+        path = tmp_path / source
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.touch()
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs/fleet-services.md").write_text(
+        (repo / "docs/fleet-services.md").read_text(encoding="utf-8"), encoding="utf-8"
+    )
+    payload = get_json(dashboard_server, "/api/projects")
+    assert {row["name"] for row in payload["services"]} == set(BUNDLED_SERVICES)
+    assert all(row["explain"] for row in payload["services"])
+    assert all(row["version"] == "develop@abc1234" for row in payload["services"])
+    assert payload["projects"] == []  # The inventory does not register work roots.
+
+
 def test_projects_endpoints(dashboard_server, tmp_path) -> None:
     assert get_json(dashboard_server, "/api/projects") == {
         "ok": True,
         "projects": [],
         "goals": [],
         "attention": [],
+        "services": [],
     }
     root = tmp_path / "proj"
     root.mkdir()
