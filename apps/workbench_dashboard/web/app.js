@@ -2935,6 +2935,9 @@ async function renderFleet() {
     const ownerLine = ownerSleep.active
       ? `<span class="pill st-ready">scheduled</span> <strong>due ${esc(ownerSleep.due_warsaw || "?")} Warsaw</strong>`
       : `<span class="pill">none</span> <span class="muted">${esc(ownerSleep.status || "no owner timer")}</span>`;
+    const ownerLast = ownerSleep.last_outcome && ownerSleep.last_outcome.summary
+      ? `<p class="muted">Last: ${esc(ownerSleep.last_outcome.summary)}</p>`
+      : "";
     const serviceRows = (f.services || []).map((s) =>
       `<li><span class="pill st-${s.up ? "ready" : "missing"}">${s.up ? "up" : "down"}</span> <strong>${esc(s.name)}</strong>` +
       ` <span class="muted">${esc(s.version || "?")}` +
@@ -2947,7 +2950,7 @@ async function renderFleet() {
       <div class="card"><h2>Service versions</h2><ul class="plain">${serviceRows || '<li class="muted">No versioned services.</li>'}</ul></div>
       <div class="card"><h2>Watchdog tasks</h2><ul class="plain">${taskRows}</ul></div>
       <div class="card"><h2>Sleep guard</h2><p>${sleep}</p></div>
-      <div class="card"><h2>Sleep button</h2><p>${ownerLine}</p>
+      <div class="card"><h2>Sleep button</h2><p>${ownerLine}</p>${ownerLast}
       <form id="sleep-form" class="inline">
         <input type="number" name="delay" placeholder="Minutes (1-1440)..." title="Sleep delay in minutes (1-1440)" value="">
         <button type="submit" title="Schedule PC sleep after this delay">Schedule sleep</button>

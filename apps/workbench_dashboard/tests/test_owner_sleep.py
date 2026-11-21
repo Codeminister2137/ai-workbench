@@ -12,6 +12,7 @@ from dashboard_web_app import DashboardRequestHandler
 from owner_sleep import (
     cancel_owner_sleep,
     describe_sleep_outcome,
+    last_outcome,
     launch_argv,
     parse_wake_source,
     read_lastwake_text,
@@ -246,3 +247,26 @@ def test_read_lastwake_text_runner_contract() -> None:
     assert failed is None
     blank = read_lastwake_text(runner=lambda argv: SimpleNamespace(returncode=0, stdout="  \n"))
     assert blank is None
+
+
+def _success_receipt_file(root) -> None:
+    receipt, _ = receipt_paths(root)
+    receipt.parent.mkdir(parents=True, exist_ok=True)
+    receipt.write_text(json.dumps(_success_receipt()), encoding="utf-8")
+
+
+def test_last_outcome_reads_timer_slot(tmp_path) -> None:
+    assert last_outcome(tmp_path)["status"] == "none"
+    _success_receipt_file(tmp_path)
+    outcome = last_outcome(tmp_path, lastwake_text=POWER_BUTTON_LASTWAKE)
+    assert outcome["slept"] == "12m39s"
+    assert outcome["wake_source"] == "Power Button"
+
+
+def test_sleep_get_reports_last_outcome(dashboard_server, tmp_path, monkeypatch) -> None:
+    _success_receipt_file(tmp_path)
+    monkeypatch.setattr("dashboard_web_app.read_lastwake_text", lambda: POWER_BUTTON_LASTWAKE)
+    payload = get_json(dashboard_server, "/api/sleep")
+    assert payload["active"] is False
+    assert payload["last_outcome"]["slept"] == "12m39s"
+    assert "Power Button" in payload["last_outcome"]["summary"]

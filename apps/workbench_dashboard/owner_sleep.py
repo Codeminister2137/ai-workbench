@@ -282,3 +282,9 @@ def describe_sleep_outcome(receipt: dict | None, *, lastwake_text: str | None = 
             "summary": "sleep requested; helper has not reported back (PC may be asleep now)",
         }
     return {"status": status, "summary": f"unrecognized sleep status: {status!r}"}
+
+
+def last_outcome(repo_root: Path, *, lastwake_text: str | None = None) -> dict:
+    """Verify-report outcome for the owner timer slot ('none' when never used)."""
+    receipt, _ = receipt_paths(repo_root)
+    return describe_sleep_outcome(read_receipt(receipt), lastwake_text=lastwake_text)
