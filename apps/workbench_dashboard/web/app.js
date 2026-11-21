@@ -1848,7 +1848,7 @@ async function renderInbox(id) {
       : "";
     view.innerHTML = `<h1>Inbox task</h1><p><a href="#/inbox">All tasks</a></p>
       <div class="card"><h2>${gtext(item.title)}</h2>
-      <p class="muted">${esc(item.type)} · ${esc(item.status)}${(item.resolution_kind || "final") !== "final" ? " · needs follow-up" : ""} · from ${esc(item.created_by || "")} · opened ${stamp(item.created_at)}</p>
+      <p class="muted">${esc(item.type === "order" ? "Approval request" : item.type)} · ${esc(item.status)}${(item.resolution_kind || "final") !== "final" ? " · needs follow-up" : ""} · from ${esc(item.created_by || "")} · opened ${stamp(item.created_at)}</p>
       <h3>Request</h3>
       <p class="inbox-body">${linkIds(gtext(item.body || ""))}</p>
       ${item.type === "task" ? '<p class="muted">Do the steps above, then answer Done with a note. Never paste secrets here — put keys in .env / User env.</p>' : ""}
@@ -1969,7 +1969,7 @@ async function renderInbox(id) {
   }
   const params = new URLSearchParams(location.hash.split("?")[1] || "");
   const explicitFilters = params.has("f");
-  const picked = pickedTokens("f", "human,open,answered,followup,decision,clarification,order,task");
+  const picked = pickedTokens("f", "human,open,followup,decision,clarification,order,task");
   const inboxProj = params.get("project") || "";
   const inboxUrl = inboxProj ? "/api/inbox?project_id=" + encodeURIComponent(inboxProj) : "/api/inbox";
   const payload = await api(inboxUrl);
@@ -1987,34 +1987,33 @@ async function renderInbox(id) {
   const kindPicked = new Set([...picked].filter((t) => KNOWN_KINDS.has(t)));
   if (!kindPicked.size) for (const k of ["decision", "clarification", "order", "task"]) kindPicked.add(k);
   const kindOK = (t) => !KNOWN_KINDS.has(t.type) || kindPicked.has(t.type);
-  // Default view renders the backend attention set verbatim (badge == view
-  // by construction), minus default-hidden reports; explicit filter tokens
-  // narrow it with the banner.
+  // Apply the checked filters consistently, including project-scoped defaults.
+  // Preserve backend priority order among matching attention items.
   const attentionOrder = new Map((payload.attention_ids || []).map((id, i) => [id, i]));
   const inAttention = (t) => attentionOrder.has(t.id);
-  const shown = (!explicitFilters && !inboxProj)
-    ? payload.items.filter((t) => inAttention(t) && kindOK(t)).sort((a, b) => attentionOrder.get(a.id) - attentionOrder.get(b.id))
-    : payload.items.filter((t) => picked.has(who(t)) && states(t).some((s) => picked.has(s)) && kindOK(t));
+  const shown = payload.items.filter((t) => picked.has(who(t)) && states(t).some((s) => picked.has(s)) && kindOK(t))
+    .sort((a, b) => (attentionOrder.get(a.id) ?? Infinity) - (attentionOrder.get(b.id) ?? Infinity));
   const shownIds = new Set(shown.map((t) => t.id));
   const hiddenCount = (payload.attention_ids || []).filter((id) => !shownIds.has(id)).length;
   const hiddenReports = (!explicitFilters && !inboxProj)
     ? payload.items.filter((t) => inAttention(t) && !shownIds.has(t.id) && t.type === "report").length
     : 0;
   const divergence = hiddenCount || inboxProj
-    ? `<p class="muted"><strong>${hiddenCount ? hiddenCount + " attention item" + (hiddenCount === 1 ? "" : "s") + " hidden by filters. " : ""}${hiddenReports ? "Reports hide by default — tick Reports to show them. " : ""}${inboxProj ? "Project filter active — the badge counts all projects. " : ""}</strong>${hiddenReports && !explicitFilters && !inboxProj ? "" : '<a href="#/inbox">Show all</a>'}</p>`
+    ? `<p class="muted"><strong>${hiddenCount ? hiddenCount + " attention item" + (hiddenCount === 1 ? "" : "s") + " hidden by filters. " : ""}${hiddenReports ? "Reports hide by default — tick Reports to show them. " : ""}${inboxProj ? "Project filter active — the badge counts all projects. " : ""}</strong>${hiddenReports && !explicitFilters && !inboxProj ? "" : '<a href="#/inbox?f=human,ai,open,answered,followup,closed,decision,clarification,order,task,report">Show all</a>'}</p>`
     : "";
   const items = shown.length
     ? shown.map((t) =>
         `<li><a href="#/inbox/${esc(t.id)}">${gtext(t.title)}</a>
-         <span class="pill st-${esc((t.status || "none").replace(/\s+/g, "-"))}">${esc(t.type)} · ${esc(t.status)}${t.assignee === "agent" ? " · for AI" : ""}${isFollowup(t) ? " · needs follow-up" : ""}${t.run_status ? " · run " + esc(t.run_status) : ""}</span></li>`).join("")
+         <span class="pill st-${esc((t.status || "none").replace(/\s+/g, "-"))}">${esc(t.type === "order" ? "Approval request" : t.type)} · ${esc(t.status)}${t.assignee === "agent" ? " · for AI" : ""}${isFollowup(t) ? " · needs follow-up" : ""}${t.run_status ? " · run " + esc(t.run_status) : ""}</span></li>`).join("")
     : '<li class="muted">Nothing matches these filters. Tick more boxes, or tick Closed to see the archive.</li>';
   const groups = [
     ["Who", [["human", "Human", "Tasks assigned to you"], ["ai", "AI", "Tasks assigned to the agent"]]],
     ["State", [["open", "Open", "Not yet answered"], ["answered", "Answered", "Answered, awaiting close"], ["followup", "Needs follow-up", "Closed or open with follow-up requested"], ["closed", "Closed", "Archived tasks"]]],
-    ["Kind", [["decision", "Decisions", "Choices for you to make"], ["clarification", "Clarifications", "Questions needing your input"], ["order", "Orders", "Directives for you to approve"], ["task", "Tasks", "Work items to do or supervise"], ["report", "Reports", "Read-only records; nothing hangs on them"]]],
+    ["Kind", [["decision", "Decisions", "Choices for you to make"], ["clarification", "Clarifications", "Questions needing your input"], ["order", "Approval requests", "Proposed actions needing your approval before work proceeds"], ["task", "Tasks", "Work items to do or supervise"], ["report", "Reports", "Read-only records; nothing hangs on them"]]],
   ];
   const boxPicked = new Set([...picked, ...kindPicked]);
   view.innerHTML = `<h1>Inbox</h1>
+    <p class="muted">Start with open decisions, questions and tasks for you, plus items needing follow-up. Approval requests ask you to authorize a proposed action; tasks track the work itself.</p>
     ${divergence}
     ${filterBoxes("inbox-filters", groups, boxPicked)}
     <p><input type="text" id="filter-inbox" placeholder="Filter tasks..." title="Filter inbox by text">

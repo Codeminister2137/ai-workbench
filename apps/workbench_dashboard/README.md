@@ -159,3 +159,13 @@ A grade is a policy value, not proof of measured quality; missing explanations
 are labelled. Queries do not probe providers or execute inference. Arbitrary
 natural-language interpretation, live availability and new knowledge sources
 remain outside this slice and require a separately agreed design.
+
+### Inbox priorities
+
+The inbox defaults to human-assigned open decisions, clarification questions,
+approval requests and tasks, plus items needing follow-up. Answered items and
+reports are available through the filters. Project selection uses the same defaults.
+Approval requests (the legacy `order` record type) ask the owner to authorize a
+proposed action; tasks track work to perform. Approval requests remain excluded
+from automatic task-to-run bridging. Existing records and filter URLs retain
+the `order` token for compatibility. Show all includes every state, kind and assignee.
