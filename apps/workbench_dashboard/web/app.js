@@ -1164,6 +1164,8 @@ async function renderChatThread(id, initial) {
     }
   });
   if (initial) send(initial);
+  const chatForm = document.getElementById("chat-form");
+  if (chatForm && chatForm.scrollIntoView) chatForm.scrollIntoView({block: "end"});
 }
 
 async function renderPlans(id) {
