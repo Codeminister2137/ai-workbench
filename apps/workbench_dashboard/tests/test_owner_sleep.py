@@ -11,7 +11,10 @@ from dashboard_test_http import get_json, post_json
 from dashboard_web_app import DashboardRequestHandler
 from owner_sleep import (
     cancel_owner_sleep,
+    describe_sleep_outcome,
     launch_argv,
+    parse_wake_source,
+    read_lastwake_text,
     receipt_paths,
     schedule_owner_sleep,
     timer_state,
@@ -142,3 +145,104 @@ def test_sleep_endpoints(dashboard_server, tmp_path, monkeypatch) -> None:
     cancelled = post_json(dashboard_server, "/api/sleep/cancel", {})
     assert cancelled["cancelled"] is False  # no live helper to acknowledge
     assert "acknowledgement" in cancelled["status"]
+
+
+POWER_BUTTON_LASTWAKE = """Wake History Count - 1
+Wake History [0]
+  Wake Source Count - 1
+  Wake Source [0]
+    Type: Fixed Feature
+    Power Button
+"""
+
+DEVICE_LASTWAKE = """Wake History Count - 1
+Wake History [0]
+  Wake Source Count - 1
+  Wake Source [0]
+    Type: Device
+    Instance Path: USB\\VID_046D&PID_C52B\\6&2b9a3c4&0&2
+    Description: USB Input Device
+    Manufacturer: (Standard system devices)
+"""
+
+
+def _success_receipt():
+    # Shape of .tmp/owner-sleep/sleep-owner.json, 2026-11-21 01:14 sleep.
+    return {
+        "status": "sleep_api_returned_success",
+        "transition_times_utc": {
+            "sleep_requested": "2026-11-21T00:14:10.1016380+00:00",
+            "sleep_api_returned_success": "2026-11-21T00:26:49.4163944+00:00",
+        },
+        "transition_times_warsaw": {
+            "sleep_requested": "2026-11-21 01:14:10",
+            "sleep_api_returned_success": "2026-11-21 01:26:49",
+        },
+    }
+
+
+def test_describe_success_reports_span_and_wake_source() -> None:
+    outcome = describe_sleep_outcome(_success_receipt(), lastwake_text=POWER_BUTTON_LASTWAKE)
+    assert outcome["status"] == "sleep_api_returned_success"
+    assert outcome["slept"] == "12m39s"
+    assert outcome["wake_source"] == "Power Button"
+    assert "12m39s" in outcome["summary"]
+    assert "2026-11-21 01:14:10" in outcome["summary"]
+    assert "Power Button" in outcome["summary"]
+
+
+def test_describe_success_without_lastwake_capture() -> None:
+    outcome = describe_sleep_outcome(_success_receipt())
+    assert outcome["slept"] == "12m39s"
+    assert outcome["wake_source"] == "unknown (no lastwake capture)"
+
+
+def test_describe_success_without_transitions() -> None:
+    outcome = describe_sleep_outcome({"status": "sleep_api_returned_success"})
+    assert outcome["slept"] == "unknown span"
+    assert "unknown span" in outcome["summary"]
+
+
+def test_describe_non_success_states() -> None:
+    assert describe_sleep_outcome(None)["summary"] == "no sleep receipt recorded"
+    assert describe_sleep_outcome({})["status"] is None
+    cancelled = describe_sleep_outcome({"status": "sleep_cancelled"})
+    assert "cancelled" in cancelled["summary"]
+    blocked = describe_sleep_outcome(
+        {"status": "sleep_blocked_pending_update", "detail": "pending update reboot: X"}
+    )
+    assert "not attempted" in blocked["summary"] and "X" in blocked["summary"]
+    assert (
+        "pending update reboot"
+        in describe_sleep_outcome({"status": "sleep_blocked_pending_update"})["summary"]
+    )
+    assert "rejected" in describe_sleep_outcome({"status": "sleep_request_rejected"})["summary"]
+    scheduled = describe_sleep_outcome(
+        {"status": "sleep_scheduled", "planned_sleep_warsaw": "2026-11-21 02:00:00"}
+    )
+    assert "02:00:00" in scheduled["summary"]
+    requested = describe_sleep_outcome({"status": "sleep_requested"})
+    assert "not reported back" in requested["summary"]
+    weird = describe_sleep_outcome({"status": "sleep_bogus"})
+    assert "unrecognized" in weird["summary"]
+
+
+def test_parse_wake_source_shapes() -> None:
+    assert parse_wake_source(POWER_BUTTON_LASTWAKE) == "Power Button"
+    assert parse_wake_source(DEVICE_LASTWAKE) == "USB Input Device"
+    assert parse_wake_source("Wake History Count - 0\n") == "none recorded"
+    assert parse_wake_source(None) == "unknown (no lastwake capture)"
+    assert parse_wake_source("  \n") == "unknown (no lastwake capture)"
+    assert parse_wake_source("Wake History Count - 1\nWake History [0]\n") == "unknown"
+
+
+def test_read_lastwake_text_runner_contract() -> None:
+    from types import SimpleNamespace
+
+    ok = read_lastwake_text(runner=lambda argv: SimpleNamespace(returncode=0, stdout="text"))
+    assert ok == "text"
+    assert read_lastwake_text(runner=lambda argv: (_ for _ in ()).throw(OSError())) is None
+    failed = read_lastwake_text(runner=lambda argv: SimpleNamespace(returncode=1, stdout="text"))
+    assert failed is None
+    blank = read_lastwake_text(runner=lambda argv: SimpleNamespace(returncode=0, stdout="  \n"))
+    assert blank is None

@@ -172,3 +172,113 @@ def cancel_owner_sleep(repo_root: Path) -> dict:
     if stale:
         return {"cancelled": False, "status": "stale (no acknowledgement; timer presumed gone)"}
     return {"cancelled": False, "status": "cancel sent, no acknowledgement yet"}
+
+
+LASTWAKE_ARGV = ["powercfg", "/lastwake"]
+
+
+def read_lastwake_text(*, runner=None) -> str | None:
+    """Capture `powercfg /lastwake` output; None when unavailable.
+
+    The runner is injectable so tests stay deterministic; only the
+    default shells out.
+    """
+    run = runner or (lambda argv: subprocess.run(argv, capture_output=True, text=True))
+    try:
+        completed = run(LASTWAKE_ARGV)
+    except (OSError, ValueError):
+        return None
+    if getattr(completed, "returncode", 1) != 0:
+        return None
+    text = getattr(completed, "stdout", "") or ""
+    return text if text.strip() else None
+
+
+def parse_wake_source(lastwake_text: str | None) -> str:
+    """Best-effort wake source from `powercfg /lastwake` output."""
+    if not lastwake_text or not lastwake_text.strip():
+        return "unknown (no lastwake capture)"
+    if "Wake History Count - 0" in lastwake_text:
+        return "none recorded"
+    candidates = []
+    for line in lastwake_text.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if stripped.startswith("Description:"):
+            return stripped.removeprefix("Description:").strip() or "unknown"
+        if stripped.startswith(("Wake History", "Wake Source", "Type:")):
+            continue
+        candidates.append(stripped)
+    return candidates[-1] if candidates else "unknown"
+
+
+def _parse_utc(raw) -> datetime | None:
+    if not isinstance(raw, str):
+        return None
+    try:
+        moment = datetime.fromisoformat(raw)
+    except ValueError:
+        return None
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=UTC)
+    return moment
+
+
+def _format_span(seconds: float) -> str:
+    total = max(0, int(round(seconds)))
+    minutes, secs = divmod(total, 60)
+    hours, minutes = divmod(minutes, 60)
+    if hours:
+        return f"{hours}h{minutes:02d}m{secs:02d}s"
+    if minutes:
+        return f"{minutes}m{secs:02d}s"
+    return f"{secs}s"
+
+
+def describe_sleep_outcome(receipt: dict | None, *, lastwake_text: str | None = None) -> dict:
+    """One verify-report outcome from a helper receipt.
+
+    Pure: callers capture `powercfg /lastwake` via read_lastwake_text and
+    pass the text in. Success spans use requested → api_returned (the API
+    returns after wake, so that gap is the sleep itself).
+    """
+    if not isinstance(receipt, dict):
+        return {"status": "none", "summary": "no sleep receipt recorded"}
+    status = receipt.get("status")
+    if status == "sleep_api_returned_success":
+        transitions = receipt.get("transition_times_utc") or {}
+        warsaw = receipt.get("transition_times_warsaw") or {}
+        requested = _parse_utc(transitions.get("sleep_requested"))
+        returned = _parse_utc(transitions.get("sleep_api_returned_success"))
+        if requested is not None and returned is not None:
+            span = _format_span((returned - requested).total_seconds())
+        else:
+            span = "unknown span"
+        source = parse_wake_source(lastwake_text)
+        when_requested = warsaw.get("sleep_requested", "?")
+        when_returned = warsaw.get("sleep_api_returned_success", "?")
+        return {
+            "status": status,
+            "slept": span,
+            "wake_source": source,
+            "summary": (
+                f"slept {span} ({when_requested} -> {when_returned} Warsaw), woken by: {source}"
+            ),
+        }
+    if status == "sleep_blocked_pending_update":
+        detail = receipt.get("detail") or "pending update reboot"
+        return {"status": status, "summary": f"sleep not attempted: {detail}"}
+    if status == "sleep_request_rejected":
+        return {"status": status, "summary": "Windows rejected the sleep request"}
+    if status == "sleep_cancelled":
+        return {"status": status, "summary": "sleep timer cancelled before firing"}
+    if status == "sleep_scheduled":
+        due = receipt.get("planned_sleep_warsaw", "?")
+        return {"status": status, "summary": f"sleep scheduled, due {due} Warsaw (no outcome yet)"}
+    if status == "sleep_requested":
+        return {
+            "status": status,
+            "summary": "sleep requested; helper has not reported back (PC may be asleep now)",
+        }
+    return {"status": status, "summary": f"unrecognized sleep status: {status!r}"}
