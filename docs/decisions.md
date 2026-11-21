@@ -1,3 +1,60 @@
+## P4 finite STANDARD pilot exception (2026-11-21)
+
+Owner selected **C: Finite STANDARD pilot exception** in inbox
+`4352cfa7268d42beb9986a944df055da`, noting: "C may confirm if we want
+to expand to B or D". This resolves the P4 policy choice, not pilot acceptance.
+The implement/coding-chat default remains HIGH; catalog grades are unchanged.
+Use the existing explicit per-invocation `--quality standard` override only
+for this pilot. Do not put STANDARD in persistent user defaults.
+
+C provides direct evidence without a permanent floor change, at the cost of
+narrow results and preparation. A retains protection but excludes potentially
+sufficient cheap routes; B admits mechanically verifiable work more broadly
+but needs task boundaries and escalation; D broadens eligibility most but lacks
+representative autonomous-coding evidence. C was the technical recommendation
+and is the owner's accepted choice. B or D needs a subsequent owner decision.
+
+### Fresh local pilot protocol: p4-standard-local-20261121
+
+Status: **PREPARED; model execution and quality acceptance INCOMPLETE**.
+This is a fresh single-arm pilot, not a replay of the consumed parity battery
+or authorization for a paid comparison. Relevant private planning inputs:
+`docs/plans/eval-scheduling-20261119.md` (P4 decision boundary) and
+`docs/plans/mai-parity-battery-20261119.md` (outcome-based scoring precedent).
+
+- Three fresh scratch worktrees from the same recorded commit, one task each:
+  small Python feature with edge-case tests, seeded Python bug repair with a
+  hidden regression check, and a multi-file Python behavior change with caller
+  checks. Freeze exact prompts, seed patches, allowed paths and independent
+  graders before the first call; keep graders outside agent-writable paths.
+- Local-only inference, one installed tool-capable route recorded at admission;
+  retain existing model blocks. No hosted, metered or allowance inference is
+  authorized by this protocol. No fallback across that privacy boundary.
+- Each invocation explicitly supplies `--execute --mode implement --quality standard
+  --privacy local_only --timeout-seconds 1200 --max-action-rounds 12`.
+  At most three invocations, 60 minutes total model execution; no automatic
+  retries, replacements, allowance extension or route switching. Record start,
+  deadline, route identity and consumption before/after each task.
+- Preserve ordinary repository instructions, approval policy and tool access.
+  The sole quality-policy deviation is STANDARD admission for these tasks;
+  scratch paths, hidden graders and finite bounds are pilot containment.
+- After each task, independently inspect diff/status, run frozen behavior
+  checks, relevant regression tests, Ruff/format and configured type checks.
+  Retain the original report, checks, route, usage, timing and any recovery.
+  Apply `docs/repo-assistant/acceptance-criteria.md`; report host verification
+  separately from model authorship. Stop further tasks on failed acceptance,
+  missing evidence, approval/privacy breach or exhausted bounds. Do not regrade
+  consumed trials after changing criteria.
+- Completion requires all three independently accepted outcomes and an honest
+  report. Even a pass is narrow evidence, not general parity or an automatic
+  floor promotion. Publish evidence and a B/D decision brief to the owner inbox
+  before broader relaxation; otherwise HIGH continues unchanged.
+
+Next execution action: freeze the three exact fixtures and independent graders
+in a fresh receipt, verify local route/tool capability and all invocation bounds,
+then execute within this finite protocol. Deterministic admission tests prove
+the override/default behavior only; they do not establish model quality.
+
 ## Mai container full fallback requirement (2026-11-21)
 
 Owner answer `3dcbb514` requires the whole qualifying fallback tree, rejecting

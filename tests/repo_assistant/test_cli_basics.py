@@ -501,6 +501,44 @@ def test_dev_floor_respects_explicit_config_and_other_modes() -> None:
     assert configured.quality == "high"
 
 
+def test_p4_standard_pilot_admission_does_not_change_next_invocation() -> None:
+    """The pilot override is per invocation and preserves local-only admission."""
+    from ai_agent.repo_coding_assistant import _configure_dev_quality_floor
+    from ai_orchestrator import (
+        PrivacyClass,
+        QualityThreshold,
+        TaskProfile,
+        load_model_catalog,
+        recommend_model,
+    )
+    from ai_orchestrator.recommender import NoCandidateError
+
+    catalog = load_model_catalog(
+        Path(__file__).resolve().parents[2] / "packages/ai_orchestrator/examples/model_catalog.toml"
+    )
+    for mode in ("implement", "coding-chat"):
+        argv = ["task", "--mode", mode, "--quality=standard", "--privacy", "local_only"]
+        args = _parse_dev_args(*argv[1:])
+        _configure_dev_quality_floor(args, argv)
+        profile = TaskProfile(
+            privacy_class=PrivacyClass.LOCAL_ONLY,
+            quality_threshold=QualityThreshold(args.quality),
+        )
+        admitted = recommend_model(profile, catalog)
+        assert admitted.selected.backend.provider == "ollama"
+        ordinary = _parse_dev_args("--mode", mode)
+        _configure_dev_quality_floor(ordinary, ["task", "--mode", mode])
+        assert ordinary.quality == "high"
+        with pytest.raises(NoCandidateError):
+            recommend_model(
+                TaskProfile(
+                    privacy_class=PrivacyClass.LOCAL_ONLY,
+                    quality_threshold=QualityThreshold(ordinary.quality),
+                ),
+                catalog,
+            )
+
+
 def test_implement_fails_closed_before_inference_without_explicit_quality(tmp_path, capsys) -> None:
     """Local STANDARD routes cannot take dev work by silent default."""
     (tmp_path / "AGENTS.md").write_text("required rules" * 10)

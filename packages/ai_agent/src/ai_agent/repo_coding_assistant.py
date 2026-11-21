@@ -467,6 +467,9 @@ def _configure_dev_quality_floor(
     so a configured quality default does not override this dev-mode need.
     Explicit --quality or an explicit route/model choice (deliberate local
     testing) keeps working unchanged.
+
+    Owner P4 decision 4352cfa7 (2026-11-21) uses the explicit STANDARD
+    override for a finite pilot only; it does not relax this default.
     """
 
     if args.mode not in _DEV_QUALITY_MODES:
