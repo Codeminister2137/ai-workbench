@@ -49,6 +49,24 @@ Ignored local XML/profiling evidence is under `artifacts/local-tool-host-accepta
 
 ## Run relevant groups while iterating
 
+### Documentation checks in public checkouts
+
+The full offline gate needs neither generated API HTML nor private documents.
+`tests/test_document_status.py` always checks public ledger paths and exercises
+plan-header validation against synthetic temporary plans (valid headers, invalid
+projects/statuses/timeboxes, and existing/missing replacement paths).
+
+The explicit local-only ledger assets are `docs/api-reference/` (generated using
+the command in `api-docs.md`), `docs/plans/`, `docs/library-private/`, and the
+ignored `docs/pycharm-ai-prompt-library.md` IDE copy, plus ignored
+`docs/artifacts/` runtime evidence. Their absence is permitted;
+public paths are still required. Installed private trees must satisfy their
+ledger rows. Every local Markdown plan is still checked for ledger coverage and
+valid headers automatically by the same gate; an installed empty plan tree fails.
+Only the real-plan test skips when `docs/plans/` is absent. No private plans need
+to be copied into a clean worktree or committed. Run the documentation checks
+directly with `python -m pytest tests/test_document_status.py -q`.
+
 The 2026-10-08 audit adds `job-search` to the full offline gate. Root, Council,
 and job-search run in separate processes to avoid legacy top-level import
 collisions. Discovery checks root tests plus all applications/packages and fails
