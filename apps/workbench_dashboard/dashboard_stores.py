@@ -87,25 +87,25 @@ class JsonCollection:
                 page.append({"id": path.stem, "unreadable": True})
         return page, total
 
-    def get(self, item_id: str) -> dict | None:
-        """Return one item by single-segment id, or None when absent."""
+    def get(self, item_id: str, *, claim: bool = False) -> dict | None:
+        """Read an item, or its drain claim when requested; None when absent."""
         if not item_id or "/" in item_id or "\\" in item_id or item_id.startswith("."):
             raise StoreError("Invalid item id")
-        path = self.directory / f"{item_id}.json"
+        path = self.directory / f"{item_id}.json{'.claim' if claim else ''}"
         if not path.exists():
             return None
         return _read_json(path)
 
-    def put(self, item_id: str, payload: dict) -> Path:
-        """Write one item atomically; returns the file path."""
+    def put(self, item_id: str, payload: dict, *, claim: bool = False) -> Path:
+        """Write an item or drain claim atomically; returns the file path."""
         if not item_id or "/" in item_id or "\\" in item_id or item_id.startswith("."):
             raise StoreError("Invalid item id")
         self._ensure()
-        path = self.directory / f"{item_id}.json"
+        path = self.directory / f"{item_id}.json{'.claim' if claim else ''}"
         body = json.dumps(payload, indent=2, ensure_ascii=False).encode("utf-8")
         if len(body) > MAX_RESPONSE_BYTES:
             raise StoreError("Stored item exceeds the size bound")
-        tmp = path.with_suffix(".json.tmp")
+        tmp = path.with_name(path.name + ".tmp")
         tmp.write_bytes(body)
         tmp.replace(path)
         return path

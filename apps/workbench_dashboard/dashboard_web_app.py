@@ -3012,15 +3012,20 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         self._send_json({"ok": True, "outcomes": outcomes, "routed": routed})
 
     def _cancel_run(self, run_id: str) -> None:
+        runs = self._stores().runs
+        claim = False
         try:
-            run = self._stores().runs.get(run_id)
+            run = runs.get(run_id)
+            if run is None:
+                claim = True
+                run = runs.get(run_id, claim=True)
         except StoreError as exc:
             return self._send_json({"ok": False, "error": str(exc)}, status=400)
         if run is None:
             return self._send_json({"ok": False, "error": "Not found"}, status=404)
         try:
             request_run_cancel(run)
-            self._stores().runs.put(run_id, run)
+            runs.put(run_id, run, claim=claim)
         except (StoreError, ValueError) as exc:
             return self._send_json({"ok": False, "error": str(exc)}, status=400)
         self._send_json({"ok": True, "run": with_fanout_policy(run)})

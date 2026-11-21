@@ -15,6 +15,7 @@ is marked with a preapproved ``approval_mode`` (``owner-filed``,
 ``e2e-followup``, ``agent-queue``). Preapproval permits open and answered
 linked items, but a linked item closed without an answer parks the run:
 the work is already complete. Closed-with-answer items still permit close-out.
+Linked items resolve through ``inbox_id`` or the bridge's ``bridged_from``.
 Without preapproval, open or rejected approvals also park the run.
 Closed-without-answer, missing, or unreadable linked items leave the run parked:
 never executed, never deleted. Paused runs resume without re-approval. The
@@ -196,7 +197,7 @@ class RunDrain:
 
     def _approval_allows(self, run: dict) -> tuple[bool, str]:
         preapproved = run.get("approval_mode") in PREAPPROVED_MODES
-        inbox_id = run.get("inbox_id")
+        inbox_id = run.get("inbox_id") or run.get("bridged_from")
         if preapproved and not inbox_id:
             return True, f"preapproved ({run.get('approval_mode')})"
         if not inbox_id or not isinstance(inbox_id, str):

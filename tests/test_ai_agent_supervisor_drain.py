@@ -143,9 +143,10 @@ def test_closed_after_approve_executes(drain, stores, calls) -> None:
 
 
 @pytest.mark.parametrize("mode", [None, "owner-filed", "e2e-followup", "agent-queue"])
+@pytest.mark.parametrize("link", ["inbox_id", "bridged_from"])
 @pytest.mark.parametrize("status", ["open", "answered", "closed"])
 @pytest.mark.parametrize("answer", [None, "", "Approve", "Schedule it", "Reject", "Use option B"])
-def test_approval_mode_status_answer_matrix(drain, stores, calls, mode, status, answer):
+def test_approval_mode_status_answer_matrix(drain, stores, calls, mode, link, status, answer):
     """Completed tasks park; recorded decisions remain available for close-out."""
     run_id, inbox_id = _queue_chat_run(stores)
     item = stores.inbox.get(inbox_id)
@@ -153,6 +154,8 @@ def test_approval_mode_status_answer_matrix(drain, stores, calls, mode, status, 
     stores.inbox.put(inbox_id, item)
     run = stores.runs.get(run_id)
     run["approval_mode"] = mode
+    run["inbox_id"] = None
+    run[link] = inbox_id
     stores.runs.put(run_id, run)
     path = stores.data_dir / "runs" / f"{run_id}.json"
     before = path.read_bytes()
@@ -171,6 +174,31 @@ def test_approval_mode_status_answer_matrix(drain, stores, calls, mode, status, 
         assert calls == []
         assert path.read_bytes() == before
         assert stores.runs.get(run_id)["status"] == "queued"
+    assert _claim_files(stores) == []
+
+
+@pytest.mark.parametrize("mode", ["owner-filed", "e2e-followup", "agent-queue"])
+def test_bridged_close_between_scan_and_pickup_parks(drain, stores, calls, monkeypatch, mode):
+    run_id, inbox_id = _queue_chat_run(stores)
+    run = stores.runs.get(run_id)
+    run.update(inbox_id=None, bridged_from=inbox_id, approval_mode=mode)
+    path = stores.runs.put(run_id, run)
+    before = path.read_bytes()
+    pickup = drain._run_claimed
+
+    def close_then_pickup(path):
+        item = stores.inbox.get(inbox_id)
+        item.update(status="closed", answer=None)
+        stores.inbox.put(inbox_id, item)
+        return pickup(path)
+
+    monkeypatch.setattr(drain, "_run_claimed", close_then_pickup)
+    outcomes = drain.drain()
+    assert outcomes == [
+        {"run_id": run_id, "status": "queued", "action": "parked", "reason": "approval is closed"}
+    ]
+    assert calls == []
+    assert path.read_bytes() == before
     assert _claim_files(stores) == []
 
 

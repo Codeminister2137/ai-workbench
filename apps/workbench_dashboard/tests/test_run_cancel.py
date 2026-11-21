@@ -32,6 +32,62 @@ def test_cancel_missing_run_404(dashboard_server) -> None:
     assert exc.value.code == 404
 
 
+def test_cancel_claim_only_run_prevents_pickup(dashboard_server, tmp_path, monkeypatch) -> None:
+    from ai_agent.supervisor_drain import RunDrain
+
+    stores = DashboardStores(tmp_path / "data")
+    _put_run(tmp_path, "r1", "queued")
+    run = stores.runs.get("r1")
+    assert run is not None
+    run["approval_mode"] = "agent-queue"
+    path = stores.runs.put("r1", run)
+    rename = type(path).rename
+    calls = []
+
+    def cancel_after_claim(source, target):
+        result = rename(source, target)
+        if source == path:
+            assert not path.exists()
+            payload = post_json(dashboard_server, "/api/runs/r1/cancel", {})
+            assert payload["run"]["cancel_requested"] is True
+            assert not path.exists()
+            claimed = stores.runs.get("r1", claim=True)
+            assert claimed is not None
+            assert claimed["events"][-1]["kind"] == "cancellation_requested"
+        return result
+
+    monkeypatch.setattr(type(path), "rename", cancel_after_claim)
+
+    def executor(run):
+        calls.append(run)
+        return {"status": "completed", "summary": "done"}
+
+    drain = RunDrain(
+        runs_dir=stores.runs.directory,
+        get_inbox=stores.inbox.get,
+        executor=executor,
+    )
+    assert drain.drain() == [{"run_id": "r1", "status": "cancelled"}]
+    assert calls == []
+    stored = stores.runs.get("r1")
+    assert stored is not None
+    assert stored["status"] == "cancelled"
+    assert not list(stores.runs.directory.glob("*.claim"))
+
+
+@pytest.mark.parametrize("status", ["running", "completed"])
+def test_cancel_claim_only_refuses_executing_or_terminal(dashboard_server, tmp_path, status):
+    stores = DashboardStores(tmp_path / "data")
+    stores.runs.put("r1", {"id": "r1", "status": status}, claim=True)
+    with pytest.raises(HTTPError) as exc:
+        post_json(dashboard_server, "/api/runs/r1/cancel", {})
+    assert exc.value.code == 400
+    assert stores.runs.get("r1") is None
+    claimed = stores.runs.get("r1", claim=True)
+    assert claimed is not None
+    assert "cancel_requested" not in claimed
+
+
 def test_cancel_terminal_run_refused(dashboard_server, tmp_path) -> None:
     _put_run(tmp_path, "r1", "completed")
     with pytest.raises(HTTPError) as exc:
