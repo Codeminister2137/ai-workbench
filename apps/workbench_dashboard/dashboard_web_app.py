@@ -3490,6 +3490,7 @@ DRAIN_SCHEDULER_MIN_INTERVAL_SECONDS = 60
 SCHEDULER_DRAIN_MAX_RUNS = 1
 DRAIN_PAUSE_ALERT_KIND = "drain-pause"
 DRAIN_PAUSE_CLASSES = frozenset({"allowance", "config"})
+_drain_pause_lock = threading.Lock()
 
 
 def _run_sort_key(run: dict) -> str:
@@ -3529,6 +3530,16 @@ def drain_pause_state(stores: DashboardStores) -> dict | None:
         key=_run_sort_key,
         reverse=True,
     )
+    # Scheduler and HTTP ticks may observe the same failure concurrently.
+    # Read alerts inside the filing lock so the second caller sees the first alert.
+    with _drain_pause_lock:
+        return _drain_pause_alert_state(stores, failed, succeeded)
+
+
+def _drain_pause_alert_state(
+    stores: DashboardStores, failed: list[dict], succeeded: list[dict]
+) -> dict | None:
+    """Check and file pause alerts while holding the drain pause lock."""
     inbox, _ = stores.inbox.list(limit=10000)
     alerts = [
         item
@@ -3569,7 +3580,11 @@ def drain_pause_state(stores: DashboardStores) -> dict | None:
             "this task to resume. A later failure re-files automatically."
         ),
         task_type="task",
-        metadata={"kind": DRAIN_PAUSE_ALERT_KIND},
+        metadata={
+            "kind": DRAIN_PAUSE_ALERT_KIND,
+            "run_id": newest["id"],
+            "failure_class": _run_failure_class(newest),
+        },
         assignee="agent",
     )
     return {"paused": True, "reason": reason, "alert_id": alert["id"]}
