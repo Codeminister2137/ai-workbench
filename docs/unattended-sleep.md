@@ -115,8 +115,30 @@ not an accepted owner decision. Owner clarification
 `86dfdd67b6074866a86504d2e70507c3` records remote wake via Termux, an AI task
 given to Mai, and the requirement to connect the report to that task. Do not
 repeat those answered questions or infer a physical button actor from the
-Windows wake-source label. Exact historical task/report mapping remains tracked
-separately in `a0c04c3f257d42028791e0ddb494c336`.
+Windows wake-source label.
+
+Historical mapping resolved by owner answer `a0c04c3f257d42028791e0ddb494c336`
+(2026-11-21): both wakes at 01:26:49 and 13:51:37 Europe/Warsaw were the
+owner's. The originating task and report destination are **Wake up sleep**,
+inbox `e341cfae1a6043b5bf89ba5aec733503`, run
+`f0e36476218c4021a5fc9455c8236e26`. It was the only owner-created task in
+the inspected overnight window (20 November 21:00 through 21 November 04:00
+Warsaw), created at 22:53:47 on 20 November. The run receipt records
+`source=mai-session` and Mai session `33479568a6db4a3585382aed0ade0740`;
+Codex was its backend, not evidence of a different task channel. The earlier
+audio report and the later sleep outcome belong to this same task. This
+identifies the task/report destination; it does not establish who invoked the
+Sleep-button API or claim that the earlier run requested the later sleep.
+
+The attached historical outcome is: slept **12 min 36 s**, 21 November
+01:14:13–01:26:49 Warsaw, woken by **Power Button** (SleepStudy session 12).
+The saved receipt `.tmp/owner-sleep/sleep-owner.json` records a request at
+01:14:10 and `sleep_api_returned_success` at 01:26:49. Troubleshooter Event 1
+independently matches those endpoints; the request-to-wake span includes
+transition overhead. The Windows source label and the owner's account of
+remote waking via Termux are separate evidence, not a contradiction requiring
+another actor question. This mapping closeout does not decide the audio policy
+or complete the originating task's automatic remote-wake behavior requirement.
 
 1. Re-read the actual receipt, including `status` and `transition_times_utc`.
    Distinguish scheduled, requested, cancelled, blocked and API-returned states.
@@ -139,8 +161,8 @@ separately in `a0c04c3f257d42028791e0ddb494c336`.
    `86dfdd67` (2026-11-21): the owner wakes the PC remotely via Termux and gave
    Mai an AI task. Record that as the owner's account alongside the Windows
    "Power Button" label; do not infer a physical button press or the dashboard
-   Sleep button as the task's entry point. The exact task/channel and any prior
-   Mai report are not identified by that answer.
+   Sleep button as the task's entry point. The later `a0c04c3f` answer and
+   historical mapping above identify the originating task and prior Mai report.
    The owner requires the report to be connected to that AI task: retain its
    task/run reference with the sleep receipt and pending check, then attach the
    post-wake report to the same task/thread, including its run reference when
