@@ -216,6 +216,16 @@ def finalize_chain_report(stores: Any, source_id: str) -> dict[str, Any]:
     audit to retry.
     """
     try:
+        source = stores.inbox.get(source_id)
+        if source is None:
+            return {"action": "skipped", "reason": "source gone"}
+        metadata = source.get("metadata") or {}
+        # Shipping is a substep of the wider task, not another owner report.
+        # Apply this here so both event-time closes and audit retries agree.
+        if "merge_for_branch" in metadata or "merge_for_run" in metadata:
+            if source.pop("report_pending", None) is not None:
+                stores.inbox.put(source_id, source)
+            return {"action": "skipped", "reason": "merge substep"}
         items, _total = stores.inbox.list(limit=1000)
         for item in items:
             if (

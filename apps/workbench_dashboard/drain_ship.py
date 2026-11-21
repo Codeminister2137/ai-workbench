@@ -147,7 +147,8 @@ def ship_completed_run(run: dict, *, repo_root: Path, stores: Any) -> dict[str, 
                     "owner": "Pick Merge now or Hold.",
                     "ai": (
                         "On Merge now: merge, gated push, redeploy, "
-                        "health-check, smoke, report. On Hold: leave "
+                        "health-check, smoke, record the resolution on this decision "
+                        "(no separate merge report). On Hold: leave "
                         "the branch; release on request."
                     ),
                 },
