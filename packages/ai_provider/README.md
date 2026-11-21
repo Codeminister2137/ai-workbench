@@ -227,6 +227,22 @@ Authenticated OpenAI-compatible requests refuse HTTP redirects for inference,
 streaming and model-catalog reads. Configure the final API endpoint directly;
 credentials and prompts are never forwarded to a redirect destination.
 
+The orchestrator-driven ladder (`scripts/l3_ladder.py`) accepts an optional
+`--quality low|standard|high` candidate-selection override. Omitting it retains
+the task profile's STANDARD default. The override flows to catalog recommendation;
+existing free-route live discovery and cost-tier guards are unchanged. Each
+route's resolution audit records the explicit override (or null) and effective
+threshold. This selection threshold is not a measured quality grade.
+
+Use `--grades-dir PATH` to additionally record per-task ladder quality outcomes
+under `PATH/ladder-quality/`, with snapshot and resolution-audit references.
+Grade recording is opt-in and refuses to overwrite an existing record. PASS and
+FAIL remain task/model-specific; errors, budget stops and skips are inconclusive.
+These records do not promote catalog quality tiers or set capability flags.
+`ai_provider.grade_records.record_ladder_grades` can also record an existing
+snapshot without inference; `record_grades` remains the capability-probe JSONL
+recording path.
+
 Normal tests use mocks and do not require Ollama or hosted credentials:
 
 ```powershell

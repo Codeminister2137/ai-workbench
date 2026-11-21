@@ -155,3 +155,56 @@ def load_grade_records(grades_dir: Path) -> dict[str, GradeRecord]:
         if current is None or record.checked_utc > current.checked_utc:
             best[record.route_id] = record
     return best
+
+
+def record_ladder_grades(snapshot: Path, grades_dir: Path, *, evidence: str) -> Path:
+    """Record per-task quality verdicts without changing capability/catalog grades.
+
+    Transport errors and skipped tasks are inconclusive, never quality failures.
+    Keep model and task identity: a partial ladder is not a general quality tier.
+    The dedicated subdirectory cannot be consumed by the capability loader.
+    """
+    if not evidence.strip():
+        raise ValueError("Ladder grades require an evidence reference")
+    rows = json.loads(snapshot.read_text(encoding="utf-8"))
+    if not isinstance(rows, list):
+        raise ValueError("Ladder snapshot must be a JSON array")
+    outcomes = []
+    for row in rows:
+        if not isinstance(row, dict):
+            raise ValueError("Ladder result must be a JSON object")
+        for key in ("route", "model", "task_id", "checked_utc"):
+            if not isinstance(row.get(key), str) or not row[key].strip():
+                raise ValueError(f"Ladder result needs {key}")
+        _record_date(row["checked_utc"])
+        if not isinstance(row.get("passed"), bool):
+            raise ValueError("Ladder result needs boolean passed")
+        error = row.get("error")
+        if error is not None and not isinstance(error, str):
+            raise ValueError("Ladder error must be a string or null")
+        outcomes.append(
+            {key: row[key] for key in ("route", "model", "task_id", "checked_utc")}
+            | {
+                "status": "inconclusive"
+                if error is not None
+                else "pass"
+                if row["passed"]
+                else "fail",
+                "error": error,
+            }
+        )
+    target = grades_dir / "ladder-quality" / snapshot.name
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with target.open("x", encoding="utf-8") as stream:
+        json.dump(
+            {
+                "kind": "ladder-quality",
+                "snapshot": str(snapshot),
+                "evidence": evidence,
+                "outcomes": outcomes,
+            },
+            stream,
+            indent=2,
+        )
+        stream.write("\n")
+    return target
