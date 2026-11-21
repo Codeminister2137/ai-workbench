@@ -1,4 +1,4 @@
-"""Drain pause gate: allowance/config failures pause the queue with one owner alert."""
+"""Drain pause gate: allowance/config failures pause the queue with one agent alert."""
 
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ def test_allowance_failure_pauses_and_files_one_alert(tmp_path) -> None:
     assert "r1" in paused["reason"]
     inbox, _ = stores.inbox.list(limit=10)
     assert len(inbox) == 1
-    assert inbox[0]["assignee"] == "owner"
+    assert inbox[0]["assignee"] == "agent"
     assert inbox[0]["metadata"]["kind"] == "drain-pause"
     again = drain_pause_state(stores)
     assert again is not None and again["alert_id"] == paused["alert_id"]
@@ -47,7 +47,7 @@ def test_later_success_recovers_and_closes_alert(tmp_path) -> None:
     assert inbox[0]["status"] == "closed"
 
 
-def test_owner_close_acknowledges_until_next_failure(tmp_path) -> None:
+def test_agent_close_acknowledges_until_next_failure(tmp_path) -> None:
     from datetime import UTC, datetime, timedelta
 
     stores = DashboardStores(tmp_path)

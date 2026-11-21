@@ -3473,14 +3473,14 @@ def _run_sort_key(run: dict) -> str:
 
 
 def drain_pause_state(stores: DashboardStores) -> dict | None:
-    """Owner-visible drain pause; None means proceed this tick.
+    """AI-visible drain pause; None means proceed this tick.
 
     Pauses when the newest terminal failure is allowance/config-related
     with no success since, so the queue stops burning money or hammering
-    a broken setup. Files one owner alert (deduped); the owner resumes
-    by closing it, and a later failure re-files. Recovered runs
-    auto-close a stale alert. Manual drains bypass the pause (explicit
-    owner action).
+    a broken setup. Files one AI alert (deduped); the AI agent resumes
+    by closing it after fixing the underlying issue, and a later failure
+    re-files. Recovered runs auto-close a stale alert. Manual drains
+    bypass the pause (explicit owner action).
     """
     runs, _ = stores.runs.list(limit=10000)
     failed = sorted(
@@ -3538,13 +3538,13 @@ def drain_pause_state(stores: DashboardStores) -> dict | None:
     alert = stores.create_inbox_task(
         title="Drain paused: allowance or config failure",
         body=(
-            f"{reason}\n\nQueued runs are held, not executed. Fix the underlying "
-            "issue (grants/budget or configuration), then close this task to resume. "
-            "A later failure re-files automatically."
+            f"{reason}\n\nQueued runs are held, not executed. Investigate and fix "
+            "the underlying issue (grants/budget or configuration), then close "
+            "this task to resume. A later failure re-files automatically."
         ),
         task_type="task",
         metadata={"kind": DRAIN_PAUSE_ALERT_KIND},
-        assignee="owner",
+        assignee="agent",
     )
     return {"paused": True, "reason": reason, "alert_id": alert["id"]}
 
