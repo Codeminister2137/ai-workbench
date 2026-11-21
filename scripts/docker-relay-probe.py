@@ -18,6 +18,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "apps" / "workbench_dashboard"))
+sys.path.insert(0, str(REPO_ROOT / "packages" / "ai_provider" / "src"))
 
 from docker_compose import RelaySpec, compose, compose_file_content  # noqa: E402
 from relay_mailbox import HostMediator, RelayGrant  # noqa: E402
@@ -38,8 +39,8 @@ WORKER_PROGRAM = "\n".join(
         "        findings[name] = type(exc).__name__ + ': ' + str(exc)[:200]",
         "def relay_turn():",
         "    client = WorkerClient('/mailbox', RelayGrant(RUN, MODEL))",
-        "    result = client.complete([{'role': 'user', 'content': 'hi'}], timeout_s=120)",
-        "    assert result.get('text') == 'synthetic', result",
+        "    result = client.complete([{'role': 'user', 'content': 'PROMPT_PLACEHOLDER'}], timeout_s=300)",
+        "    assert 'EXPECT_PLACEHOLDER' in (result.get('text') or ''), result",
         "check('relay_turn', relay_turn)",
         "def no_default_route():",
         "    rows = open('/proc/net/route').read().splitlines()[1:]",
@@ -71,17 +72,50 @@ WORKER_PROGRAM = "\n".join(
 )
 
 
+def _ollama_callback(model: str):
+    """Real local callback: host reaches Ollama; the worker never can."""
+
+    from ai_provider.config import BackendConfig, ProviderKind
+    from ai_provider.contracts import AIMessage, AIRequest, MessageRole
+    from ai_provider.factory import create_chat_client
+
+    client = create_chat_client(BackendConfig(ProviderKind.OLLAMA, model, None, None, 300.0))
+
+    def complete(granted: str, messages: list[dict[str, str]]) -> dict:
+        request = AIRequest(
+            messages=tuple(AIMessage(MessageRole(m["role"]), m["content"]) for m in messages),
+            temperature=0.0,
+            # Thinking models spend tokens before answering; 64 truncated
+            # qwen3 to an empty reply in the first live attempt.
+            max_output_tokens=512,
+        )
+        response = client.complete(request)
+        return {"model": granted, "text": response.message.content}
+
+    return complete
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--evidence-dir", required=True, type=Path)
+    parser.add_argument("--live-ollama", action="store_true")
+    parser.add_argument("--live-model", default="qwen3:14b")
     args = parser.parse_args()
     evidence = args.evidence_dir.resolve()
     evidence.mkdir(parents=True, exist_ok=False)
     mailbox = evidence / "mailbox"
     mailbox.mkdir()
     run_id = "relay-proof"
-    model = "synthetic"
-    program = WORKER_PROGRAM.replace("MODEL_PLACEHOLDER", model).replace("RUN_PLACEHOLDER", run_id)
+    live = bool(args.live_ollama)
+    model = args.live_model if live else "synthetic"
+    prompt = "Say the word relay-ok and nothing else." if live else "hi"
+    expect = "relay-ok" if live else "synthetic"
+    program = (
+        WORKER_PROGRAM.replace("MODEL_PLACEHOLDER", model)
+        .replace("RUN_PLACEHOLDER", run_id)
+        .replace("PROMPT_PLACEHOLDER", prompt)
+        .replace("EXPECT_PLACEHOLDER", expect)
+    )
     spec = RelaySpec(
         run_id=run_id,
         project_name="relay-proof-" + secrets.token_hex(6),
@@ -101,14 +135,13 @@ def main() -> int:
         ),
         encoding="utf-8",
     )
-    receipt: dict = {"passed": False}
+    receipt: dict = {"passed": False, "live": live}
     compose_file = evidence / "docker-compose.yml"
     compose_file.write_text(compose_file_content(spec), encoding="utf-8")
-    mediator = HostMediator(
-        mailbox,
-        RelayGrant(run_id, model),
-        lambda m, messages: {"model": m, "text": "synthetic"},
+    callback = (
+        _ollama_callback(model) if live else (lambda m, messages: {"model": m, "text": "synthetic"})
     )
+    mediator = HostMediator(mailbox, RelayGrant(run_id, model), callback)
     served: dict = {}
 
     def mediate() -> None:
