@@ -81,6 +81,18 @@ def test_callback_exception_reports_class_only(tmp_path: Path):
     assert "RuntimeError" in str(outcome["error"])
 
 
+def test_oversized_callback_answer_is_bounded_error(tmp_path: Path):
+    outcome = _run_turn(
+        tmp_path,
+        lambda *_: {"text": "x" * (256 * 1024)},
+        [{"role": "user", "content": "hi"}],
+    )
+    assert isinstance(outcome["error"], RelayError)
+    assert "RelayError" in str(outcome["error"])
+    assert outcome["served"] is True
+    assert list(tmp_path.iterdir()) == []
+
+
 def test_worker_timeout_when_host_silent(tmp_path: Path):
     client = WorkerClient(tmp_path, GRANT)
     with pytest.raises(RelayError, match="timed out"):
@@ -122,6 +134,7 @@ def test_validate_request_shapes() -> None:
         {**good, "model": "other"},
         {**good, "messages": []},
         {**good, "messages": [{"role": "tool", "content": "x"}]},
+        {**good, "messages": [{"role": [], "content": "x"}]},
         {**good, "messages": [{"role": "user", "content": 42}]},
         {**good, "messages": [{"role": "user", "content": "x", "extra": 1}]},
     ):

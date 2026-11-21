@@ -44,7 +44,10 @@ remain incomplete. See [ADR-091](decisions/ADR-091-job-search-dashboard-review.m
 Owner selected OS isolation over restricting provider/client coverage. The
 direction and Docker Linux worker prototype are accepted. Owner selected restricted
 HTTP proxy transport (Compose internal/isolated network); its synthetic transport
-proof passes, while production wiring and full enforcement remain incomplete. Current
+proof passes. The current P2 answer (`3dcbb514`, 2026-11-21) requires relay R's
+network-none mailbox and full qualifying host fallback. The neutral Mai client
+and host per-turn composition are implemented with synthetic tests; supervisor
+review, hosted acceptance, production wiring and full enforcement remain separate. Current
 worktrees and working-directory checks do not enforce a write boundary. See
 [ADR-095](decisions/ADR-095-provider-neutral-worktree-write-isolation.md) for the
 proposed host boundary, backend trade-offs and unexecuted proving-check matrix.
