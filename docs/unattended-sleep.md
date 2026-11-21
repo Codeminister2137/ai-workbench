@@ -103,6 +103,21 @@ workflow, not a new timer or background monitor. The remote-wake idle-sleep
 request remains subject to existing work/presence guards; whether audio should
 block sleep remains an open owner question.
 
+Audio-report provenance (owner follow-up `dac8bf5b`): see the **Agent report**
+in dashboard run `f0e36476218c4021a5fc9455c8236e26` (Wake up sleep),
+dated 2026-11-20 22:56 Europe/Warsaw, linked from inbox
+`e341cfae1a6043b5bf89ba5aec733503`. It reported "Windows reports an active
+audio stream" and said it did not request or schedule sleep because idle
+status was uncertain. This is a historical agent-reported observation, not
+proof of an audio fault, a particular application's involvement, or a failed
+Windows sleep request. The audio-blocking policy was a recommendation/question,
+not an accepted owner decision. Owner clarification
+`86dfdd67b6074866a86504d2e70507c3` records remote wake via Termux, an AI task
+given to Mai, and the requirement to connect the report to that task. Do not
+repeat those answered questions or infer a physical button actor from the
+Windows wake-source label. Exact historical task/report mapping remains tracked
+separately in `a0c04c3f257d42028791e0ddb494c336`.
+
 1. Re-read the actual receipt, including `status` and `transition_times_utc`.
    Distinguish scheduled, requested, cancelled, blocked and API-returned states.
    `sleep_api_returned_success` alone does not prove sustained Windows sleep.
