@@ -366,21 +366,34 @@ class DashboardChat:
         except (ValueError, OSError):
             activity_path = None
         execute = agent_executor or self._default_agent_executor(worktree, binding, activity_path)
-        receipt = execute(
-            {
-                "id": f"chat-{request.message_id}",
-                "title": f"Chat turn {session_id}",
-                # build_mai_argv renders Task from "body"; "instruction" is
-                # silently dropped, which used to deliver empty tasks to Mai.
-                "body": build_chat_prompt(request.history, request.text),
-            }
-        )
+        try:
+            receipt = execute(
+                {
+                    "id": f"chat-{request.message_id}",
+                    "title": f"Chat turn {session_id}",
+                    # build_mai_argv renders Task from "body"; "instruction" is
+                    # silently dropped, which used to deliver empty tasks to Mai.
+                    "body": build_chat_prompt(request.history, request.text),
+                }
+            )
+        except Exception as exc:  # executor failures must leave a visible chat answer
+            return CodingTurnResult(
+                1,
+                None,
+                "failed",
+                f"Mai turn failed ({type(exc).__name__}): {exc}. "
+                "Inspect staged files and progress before retrying; earlier effects may remain.",
+                provider=self.config.provider,
+            )
         if receipt.get("status") != "completed":
             return CodingTurnResult(
                 1,
                 None,
                 "failed",
-                str(receipt.get("error") or "Mai session failed"),
+                str(receipt.get("error") or "Mai session failed")
+                + ". Inspect staged files and progress before retrying; "
+                "earlier effects may remain. For context-budget errors, shorten the request "
+                "or start a new chat with the remaining task.",
                 provider=self.config.provider,
             )
         if receipt.get("mai_session_id"):

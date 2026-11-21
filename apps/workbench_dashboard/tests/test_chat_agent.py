@@ -98,6 +98,59 @@ def test_agent_turn_refuses_when_disabled(git_repo, tmp_path, stores) -> None:
     assert "disabled" in (outcome.failure_reason or "")
 
 
+def test_oversized_digest_is_bounded_and_current_request_preserved():
+    history = "old report " * 100000 + "recent correction"
+    prompt = build_chat_prompt(history, "Keep the entire current request")
+    assert len(prompt) < 7500
+    assert "excerpt, not a summary" in prompt
+    assert "recent correction" in prompt
+    assert "Current request:\nKeep the entire current request" in prompt
+    assert prompt == build_chat_prompt(history, "Keep the entire current request")
+
+
+def test_executor_exception_returns_and_persists_actionable_answer(chat, stores):
+    session = chat.create_session(title="executor failure")
+
+    def fail(_run):
+        raise OSError("subprocess unavailable")
+
+    outcome = chat.send(
+        session.session_id, "inspect", stores=stores, mode="agent", agent_executor=fail
+    )
+    assert outcome.execution_status == "failed"
+    assert "subprocess unavailable" in outcome.failure_reason
+    assert "before retrying" in outcome.failure_reason
+    messages = chat.list_messages(session.session_id)
+    assert [m.role for m in messages] == ["user", "assistant"]
+    assert messages[-1].content == outcome.failure_reason
+    assert messages[-1].metadata["reply_to"] == messages[0].message_id
+
+
+def test_oversized_persisted_reports_allow_next_agent_turn(chat, stores):
+    session = chat.create_session(title="large history")
+    bodies = []
+
+    def execute(run):
+        bodies.append(run["body"])
+        return {"status": "completed", "stdout_tail": "old report " * 10000}
+
+    for index in range(4):
+        outcome = chat.send(
+            session.session_id,
+            f"request {index}",
+            stores=stores,
+            mode="agent",
+            agent_executor=execute,
+        )
+        assert outcome.execution_status == "completed"
+    assert all(len(body) < 7500 for body in bodies)
+    assert "Current request:\nrequest 3" in bodies[-1]
+    assert "excerpt, not a summary" in bodies[-1]
+    reports = [m for m in chat.list_messages(session.session_id) if m.role == "assistant"]
+    assert len(reports) == 4
+    assert all(m.content == ("old report " * 10000).strip() for m in reports)
+
+
 def test_explicit_ask_overrides_stored_agent(chat, stores) -> None:
     session = chat.create_session(title="t")
     stores.set_chat_mode(session.session_id, mode="agent")

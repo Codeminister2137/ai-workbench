@@ -19,6 +19,20 @@ pin a provider or model. The dashboard's Ollama Ask settings do not select
 Mai's coding route. Existing privacy, quality floors, spend grants, deadlines
 and approval boundaries continue to apply.
 
+Dashboard Mai uses a 160,000-character loop allowance to include the full
+96,000-character instruction allowance, resumed session handoff, and tool schemas.
+Its conversation digest is bounded to a recent 6,000-character excerpt with an
+explicit omission notice; originals remain in the local transcript. The current
+request is preserved verbatim. Loop summaries and their source excerpts are
+bounded too. Mandatory instructions or a current request that cannot fit still
+fail explicitly rather than silently losing instructions. Character budgeting
+does not guarantee admission to every provider's token window.
+
+Failed turns show Mai's diagnostic and recovery guidance in the chat. Inspect
+staged files and progress before retrying: a failed turn can have earlier effects.
+Context-budget failures may require a shorter request or a new chat containing
+the remaining task; neither action grants approval to replay earlier work.
+
 ## Weekly usage and quality tracking
 
 Dashboard owner tasks dated 2026-11-27 and 2026-12-04 link to this protocol.
