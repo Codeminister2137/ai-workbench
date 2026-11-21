@@ -93,6 +93,40 @@ usage cutoff, the existing helper continues without model calls; do not silently
 restart the window. On return inspect the actual receipt/process state. Report
 scheduled, requested, rejected and verified Windows transition separately.
 
+## Wake-up-sleep: verify and report after wake (2026-11-21)
+
+Standing follow-up to owner item `e341cfae` and run `f0e36476`: the sleep
+requester must close the loop on its next execution after wake. Preserve the
+receipt path and pending verification in the handoff before requesting sleep;
+if interrupted, the next session resumes that verification. This is a requester
+workflow, not a new timer or background monitor. The remote-wake idle-sleep
+request remains subject to existing work/presence guards; whether audio should
+block sleep remains an open owner question.
+
+1. Re-read the actual receipt, including `status` and `transition_times_utc`.
+   Distinguish scheduled, requested, cancelled, blocked and API-returned states.
+   `sleep_api_returned_success` alone does not prove sustained Windows sleep.
+2. Query System log `Microsoft-Windows-Power-Troubleshooter` Event 1 for the
+   matching request/wake interval. Inspect SleepTime, WakeTime and wake source;
+   do not attribute the latest unrelated wake to this request. Correlate
+   Kernel-Power events and, when needed, existing SleepStudy evidence and
+   `powercfg /lastwake`. A seconds-apart 42/107 pair alone proves neither an
+   aborted suspend nor its duration.
+3. Calculate elapsed time from matched sleep/wake evidence. Label the source:
+   Troubleshooter's request-to-wake span can include transition overhead;
+   SleepStudy's Sleep session measures the sleep interval. Never use the API's
+   return timestamp as work-end time or its call duration alone as proven sleep.
+4. Report visibly through the originating task/channel: "slept X min, woken by
+   Y", with the dated Europe/Warsaw interval, receipt status and evidence source.
+   Example: 2026-11-21 SleepStudy session 12, 01:14:13-01:26:49 Warsaw:
+   "slept 12 min 36 s, woken by Power Button"; Troubleshooter starts at 01:14:10.
+   A wake source does not identify who pressed the button.
+5. If evidence is absent, conflicting or unavailable, report the observed receipt
+   status and "sleep outcome/duration/wake source unverified" as appropriate.
+   Preserve the pending check and name missing evidence. Do not remain silent,
+   infer success, retry sleep, or introduce a timer to obtain a result. Use inbox
+   for unresolved owner questions; mail remains subject to existing policy.
+
 ## Pending-update gate (2026-11-14)
 
 Before requesting sleep, the helper refuses when Windows Update servicing

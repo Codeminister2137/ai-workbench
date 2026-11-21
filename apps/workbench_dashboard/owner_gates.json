@@ -1,6 +1,13 @@
 {
   "gates": [
     {
+      "id": "sleep-20261121-owner-facts",
+      "title": "Sleep follow-up: power-button actor, Mai channel and report",
+      "type": "clarification",
+      "body": "Open factual questions for the owner; do not answer in owner voice. On 2026-11-21 the verified SleepStudy session was 01:14:13-01:26:49 Europe/Warsaw (12 min 36 s), ending with Power Button. Who pressed that button, through which channel was Mai tasked, and what did Mai report back? Audio blocking sleep remains unresolved in Wake up sleep item e341cfae. Task 2 of run c727ba32a4e247948c7ccbcf15d478a4 remains blocked on locating the specific 11-13 monitors-off abort receipt: the inspected powertest sleep-test1/2/3 receipts instead span about 274/102/135 seconds; the evening sleep-complete receipt spans over an hour. These receipts do not establish the requested immediate-return finding. Identify the specific abort receipt before editing docs/power-loss-20261108.md; the existing finding has not been weakened or replaced.",
+      "options": []
+    },
+    {
       "id": "mail-notification-cadence",
       "title": "Mail: choose hourly digest or simpler throttle",
       "type": "decision",

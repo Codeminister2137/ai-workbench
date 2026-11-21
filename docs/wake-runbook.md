@@ -1,5 +1,11 @@
 # Remote-wake runbook (Wake-on-LAN ladder)
 
+After a requested sleep and subsequent wake, follow the standing
+[Wake-up-sleep verification and report loop](unattended-sleep.md#wake-up-sleep-verify-and-report-after-wake-2026-11-21).
+The requester must report the matched receipt outcome, sleep duration and wake
+source; missing evidence stays explicitly unverified. The audio-blocks-sleep
+question remains open with the owner.
+
 Owner-infra doc. No access material here — this file is public, so it
 carries placeholders only. Real values live in the local-only `.env`
 (`WAKE_DDNS_HOSTNAME`, `WAKE_MAC`, `WAKE_WOL_PORT`, `WAKE_LAN_IP`); a reader
