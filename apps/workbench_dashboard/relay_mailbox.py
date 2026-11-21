@@ -15,6 +15,7 @@ this relay from any other file drop.
 from __future__ import annotations
 
 import json
+import math
 import time
 import uuid
 from collections.abc import Callable, Mapping, Sequence
@@ -32,7 +33,11 @@ ROLES = frozenset({"system", "user", "assistant"})
 
 @dataclass(frozen=True, slots=True)
 class RelayGrant:
-    """One run's fixed relay terms; the model is not negotiable."""
+    """Fixed run binding: legacy model or opaque Mai host-policy identifier.
+
+    Mai cannot select a model; its identifier only binds a host session.
+    This binding never authorizes inference independently of scoped admission.
+    """
 
     run_id: str
     model: str
@@ -98,6 +103,7 @@ def validate_request(data: Any, grant: RelayGrant) -> tuple[str, list[dict[str, 
         if (
             not isinstance(message, dict)
             or set(message) != {"role", "content"}
+            or not isinstance(message["role"], str)
             or message["role"] not in ROLES
             or not isinstance(message["content"], str)
         ):
@@ -120,14 +126,23 @@ class WorkerClient:
         self, messages: Sequence[Mapping[str, str]], *, timeout_s: float = 300.0
     ) -> dict[str, Any]:
         """Run one relayed inference turn; raise RelayError on any failure."""
-        if timeout_s <= 0:
+        return self._exchange({"messages": list(messages)}, timeout_s=timeout_s)
+
+    def complete_request(self, request: Mapping[str, Any], *, timeout_s: float = 300.0):
+        """Carry a neutral Mai request; routing remains entirely host-owned."""
+        return self._exchange(
+            {"run_id": self._grant.run_id, "request": dict(request)}, timeout_s=timeout_s
+        )
+
+    def _exchange(self, payload: dict[str, Any], *, timeout_s: float) -> dict[str, Any]:
+        if not math.isfinite(timeout_s) or timeout_s <= 0:
             raise RelayError("timeout must be positive")
         turn_id = uuid.uuid4().hex
         request_path = _mailbox_file(self._mailbox, REQUEST_NAME)
         response_path = _mailbox_file(self._mailbox, RESPONSE_NAME)
         _write_json_atomic(
             request_path,
-            {"id": turn_id, "model": self._grant.model, "messages": list(messages)},
+            {"id": turn_id, "model": self._grant.model, **payload},
             MAX_REQUEST_BYTES,
         )
         deadline = time.monotonic() + timeout_s
@@ -164,14 +179,17 @@ class HostMediator:
         mailbox: str | Path,
         grant: RelayGrant,
         complete: Callable[[str, list[dict[str, str]]], dict[str, Any]],
+        *,
+        complete_request: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
     ) -> None:
         self._mailbox = Path(mailbox)
         self._grant = grant
         self._complete = complete
+        self._complete_request = complete_request
 
     def serve_once(self, *, timeout_s: float = 300.0) -> bool:
         """Mediate one turn if a request arrives; False on host timeout."""
-        if timeout_s <= 0:
+        if not math.isfinite(timeout_s) or timeout_s <= 0:
             raise RelayError("timeout must be positive")
         request_path = _mailbox_file(self._mailbox, REQUEST_NAME)
         response_path = _mailbox_file(self._mailbox, RESPONSE_NAME)
@@ -181,8 +199,23 @@ class HostMediator:
                 data: Any = None
                 try:
                     data = _read_json_capped(request_path, MAX_REQUEST_BYTES)
-                    turn_id, messages = validate_request(data, self._grant)
+                    request_path.unlink()
+                    if isinstance(data, dict) and "request" in data:
+                        if (
+                            set(data) != {"id", "model", "run_id", "request"}
+                            or data["run_id"] != self._grant.run_id
+                            or not isinstance(data["id"], str)
+                            or not data["id"].strip()
+                            or data["model"] != self._grant.model
+                            or not isinstance(data["request"], dict)
+                            or self._complete_request is None
+                        ):
+                            raise RelayError("invalid Mai request or run grant")
+                        turn_id, messages = data["id"], []
+                    else:
+                        turn_id, messages = validate_request(data, self._grant)
                 except RelayError as exc:
+                    request_path.unlink(missing_ok=True)
                     claimed = (
                         data.get("id")
                         if isinstance(data, dict) and isinstance(data.get("id"), str)
@@ -195,23 +228,22 @@ class HostMediator:
                     )
                 else:
                     try:
-                        result = self._complete(self._grant.model, messages)
+                        result = (
+                            self._complete_request(data["request"])
+                            if "request" in data and self._complete_request is not None
+                            else self._complete(self._grant.model, messages)
+                        )
+                        _write_json_atomic(
+                            response_path,
+                            {"id": turn_id, "result": dict(result)},
+                            MAX_RESPONSE_BYTES,
+                        )
                     except Exception as exc:  # noqa: BLE001 - class only, never secrets
                         _write_json_atomic(
                             response_path,
                             {"id": turn_id, "error": type(exc).__name__},
                             MAX_RESPONSE_BYTES,
                         )
-                    else:
-                        _write_json_atomic(
-                            response_path,
-                            {"id": turn_id, "result": dict(result)},
-                            MAX_RESPONSE_BYTES,
-                        )
-                try:
-                    request_path.unlink()
-                except OSError:
-                    pass
                 return True
             time.sleep(POLL_SECONDS)
         return False
