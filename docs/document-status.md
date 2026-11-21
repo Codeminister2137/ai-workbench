@@ -11,6 +11,7 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/api-docs.md | KNOWLEDGE | API reference. |
 | docs/architecture.md | KNOWLEDGE | System architecture (update when architecture changes). |
 | docs/audit-20261103-triage.md | ACTED | Triage complete 2026-11-06 (0 UNREVIEWED, 0 REAL). |
+| docs/e2e-corpus-audit-73249b26.md | KNOWLEDGE | E2E corpus lifecycle audit (run 73249b26); behavior triage outstanding. |
 | docs/capabilities.md | KNOWLEDGE | Capability reference. |
 | docs/chatbot-options-20261101.md | ACTED | Owner decided 2026-11-01; form-first shipped. |
 | docs/codex-plugin-review.md | KNOWLEDGE | Point-in-time catalog note (not upstream truth). |
