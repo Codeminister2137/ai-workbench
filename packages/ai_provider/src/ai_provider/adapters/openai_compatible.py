@@ -460,7 +460,10 @@ class OpenAICompatibleChatClient:
 
     def _http_error(self, exc: HTTPError) -> ProviderError:
         return http_error_to_provider_error(
-            exc, provider=self.config.provider.value, api_label="Chat Completions"
+            exc,
+            provider=self.config.provider.value,
+            api_label="Chat Completions",
+            credentials=(self.config.api_key, _provider_api_key(self.config.provider)),
         )
 
     @staticmethod
