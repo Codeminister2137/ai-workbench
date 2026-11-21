@@ -82,3 +82,26 @@ or loop activity explains these. Next steps are physical: different
 socket/strip first (cheapest), PSU test/swap if it recurs, BIOS temp
 check, reseat RAM/GPU power. Until then, commit and push often — power
 can cut at any time.
+
+## Revision 2026-11-21: Event 107 ~2s after 42 proves nothing alone (night loop)
+
+2026-11-21 01:14 Mai-tasked sleep: Event 42 (Sleep Reason: Application API)
+at 01:14:13 followed by Event 107 "resumed" at 01:14:15 — yet five
+independent sources prove a real 12m36s S3 sleep 01:14:13–01:26:49 ended
+by power-button press: Power-Troubleshooter Sleep 01:14:10 → Wake
+01:26:49 (source Power Button, powercfg /lastwake agrees); SleepStudy
+session 12 (Sleep 01:14:13, 0:12:36); firmware S3 resume events 130/131
+at 01:26:47; OS clock frozen 01:14:15–01:26:47; SetSuspendState returned
+success at 01:26:49 in the surviving process (PID 19996). The 107 did
+not lead to a running OS (the clock never advanced after its timestamp),
+so it reads as a transition artifact. Evidence:
+.tmp/owner-sleep/sleep-owner.json, .tmp/sleepstudy-20261121.html; analysis
+in CURRENT_CONTEXT.md 2026-11-21 night-loop closeout.
+
+Rule: never judge a sleep cycle by the 42/107 gap alone. Discriminators:
+receipt requested → api_returned_success gap (success timestamp = wake
+time, and only a surviving process can write it), Troubleshooter
+Sleep/Wake span + wake source, SleepStudy session table. This does not
+weaken the accepted 11-13 monitors-off abort record (feadc041, merged
+855b4f1): that case resumed headless into power-off, i.e. no success
+receipt could exist — the opposite of tonight's surviving-process span.
