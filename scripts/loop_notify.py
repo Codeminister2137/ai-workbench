@@ -228,8 +228,12 @@ def send_ping(
     recipient: str | None = None,
     dry_run: bool = False,
     state: str | None = None,
+    all_work_blocked: bool = False,
 ) -> dict:
-    """Send one owner-self ping and record a JSON receipt.
+    """Queue one unattended owner-self ping and record a JSON receipt.
+
+    Live delivery follows the shared hourly digest. Only an explicit
+    ``all_work_blocked`` with a blocker state requests immediate delivery.
 
     Raises ``ValueError`` when the recipient is not the owner's own address
     (fail closed: misdirected mail is refused, never rerouted). Transport
@@ -301,6 +305,9 @@ def send_ping(
                     config=mail_config,
                     dry_run=not use_live,
                     receipts_dir=notifications,
+                    dedupe_key=f"loop:{run_dir.resolve()}:{event}",
+                    blocker=state in {"BLOCKED", "WAITING_FOR_OWNER"},
+                    all_work_blocked=all_work_blocked,
                 )
             except ValueError:
                 raise
@@ -310,6 +317,25 @@ def send_ping(
                     raise
                 time.sleep(30)
                 continue
+            if (
+                mail_receipt.get("queued")
+                or mail_receipt.get("deduped")
+                or mail_receipt.get("skipped")
+            ):
+                payload = dict(
+                    mail_receipt,
+                    success=True,
+                    live=False,
+                    transport_name="digest",
+                    attempts=attempts,
+                    event=event,
+                    subject=subject,
+                    state=state,
+                    public_ip=address,
+                    recipient=target,
+                )
+                receipt_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+                return payload
             sent = mail_receipt["sent"] if use_live else True
             finished = mail_receipt["finished"]
             error_message = mail_receipt["error"]
@@ -345,6 +371,11 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--run-dir", type=Path, required=True)
     parser.add_argument("--event", required=True)
+    parser.add_argument(
+        "--all-work-blocked",
+        action="store_true",
+        help="Confirm this blocker prevents all remaining work; page immediately.",
+    )
     parser.add_argument("--subject", required=True)
     parser.add_argument(
         "--state",
@@ -389,6 +420,7 @@ def main(argv=None) -> int:
     if args.inbox_digest:
         body = f"{body}\n\n{unanswered_inbox_digest(args.inbox_url)}"
     receipt = send_ping(
+        all_work_blocked=args.all_work_blocked,
         subject=subject,
         body=body,
         run_dir=args.run_dir.resolve(),

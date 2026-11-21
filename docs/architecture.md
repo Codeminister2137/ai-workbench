@@ -564,3 +564,11 @@ Codex must ask before making material decisions involving new services, persiste
 5. Explain consequences.
 6. Ask the user when the decision is material.
 7. Record the accepted decision in `docs/decisions.md`.
+
+## Owner notification delivery
+
+Owner notification delivery uses the dashboard's shared local hourly digest
+([ADR-098](decisions/ADR-098-hourly-unattended-mail-digest.md)): unattended only,
+blockers before routine updates, immediate mail only for a confirmed blocker of
+all work. Existing dashboard scheduler/supervisor ticks flush durable pending
+notifications; individual failed tasks do not imply whole-window blockage.

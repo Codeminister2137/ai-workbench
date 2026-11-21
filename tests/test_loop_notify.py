@@ -18,6 +18,7 @@ spec.loader.exec_module(notify)
 @pytest.fixture(autouse=True)
 def _isolate_stable_ip(tmp_path, monkeypatch):
     """Keep the cross-window IP file inside the test tmp dir."""
+    monkeypatch.setattr(notify, "public_ip", lambda **kwargs: None)
     monkeypatch.setattr(
         notify, "stable_ip_path", lambda root=notify.ROOT: tmp_path / "stable-ip.txt"
     )
@@ -481,3 +482,27 @@ def test_cli_inbox_digest_appends_to_body(tmp_path, monkeypatch) -> None:
     )
     assert "plain body\n\nInbox: 1 unanswered, 0 answered-awaiting-close." in calls[0]["body"]
     assert "- aaaabbbb Needs me" in calls[0]["body"]
+
+
+def test_queued_ping_does_not_retry_or_claim_delivery(tmp_path, monkeypatch):
+    calls = []
+
+    class Mail:
+        @staticmethod
+        def send_owner_mail(**kwargs):
+            calls.append(kwargs)
+            return {"sent": False, "queued": True, "error": None}
+
+    monkeypatch.setattr(notify, "_load_owner_mail", lambda: Mail())
+    monkeypatch.setattr(notify, "read_gmail_config", lambda: ("owner@example.com", "pw"))
+    receipt = notify.send_ping(
+        subject="blocked",
+        body="detail",
+        run_dir=tmp_path,
+        event="block",
+        state="BLOCKED",
+        all_work_blocked=True,
+    )
+    assert receipt["queued"] and not receipt["live"]
+    assert len(calls) == 1
+    assert calls[0]["blocker"] and calls[0]["all_work_blocked"]
