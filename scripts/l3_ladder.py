@@ -10,6 +10,11 @@ an allowance (``--allow-tier``). A route whose ceiling exceeds the allowance
 is recorded as ``tier-blocked`` and never attempted — cost tiers are never
 escalated without an explicit flag. Free routes additionally never resolve
 paid candidates, matching the provider guards.
+
+Ollama candidates must appear in the current installed-model inventory.
+This check also runs with ``--no-live-refresh``; missing models are recorded
+and skipped before the walk cap. An unavailable inventory or no eligible
+installed model blocks the route and makes the command exit nonzero.
 """
 
 from __future__ import annotations
@@ -38,8 +43,10 @@ from ai_orchestrator import (  # noqa: E402
     recommend_model,
 )
 from ai_provider import route_eval  # noqa: E402
+from ai_provider.errors import ProviderError  # noqa: E402
 from ai_provider.eval_budget import AllowanceTaskBudget  # noqa: E402
 from ai_provider.grade_records import record_ladder_grades  # noqa: E402
+from ai_provider.ollama_models import list_local_ollama_models  # noqa: E402
 from ai_provider.route_eval import TASK_SPECS, TASKS, EvalResult  # noqa: E402
 from ai_provider.secrets import load_dotenv  # noqa: E402
 
@@ -149,7 +156,22 @@ def resolve_route(
     if not cost_policy_allows(ceiling, allow_tier):
         return [], f"tier-blocked: route needs {ceiling.value}, run allows {allow_tier.value}"
     tier = ceiling if ceiling == CostPolicyTier.FREE_ONLY else allow_tier
-    preferred = catalog_order(route, catalog, tier, max_candidates, quality)
+    preferred = catalog_order(
+        route, catalog, tier, 0 if route == "ollama" else max_candidates, quality
+    )
+    if route == "ollama":
+        try:
+            installed = {model.model for model in list_local_ollama_models()}
+        except ProviderError as exc:
+            return [], f"inventory-blocked: cannot verify installed Ollama models: {exc}"
+        missing = {
+            model: "not installed in Ollama" for model in preferred if model not in installed
+        }
+        candidates = [model for model in preferred if model in installed]
+        note = f"catalog={preferred} installed={sorted(installed)} skipped={missing}"
+        if not candidates:
+            return [], f"inventory-blocked: no installed Ollama candidate matches selection; {note}"
+        return _cap(candidates, max_candidates), note
     if route in FREE_ROUTES and live_refresh:
         live = [
             model
@@ -171,7 +193,7 @@ def resolve_route(
 def apply_tier_blocks(
     results: list[EvalResult], blocked: dict[str, str], gate: str
 ) -> list[EvalResult]:
-    """Rewrite no-model skips as tier-blocked rows for blocked routes."""
+    """Rewrite no-model skips with the recorded resolution-block reason."""
     rewritten = []
     for item in results:
         if item.route in blocked and item.error == "no-model":
@@ -290,7 +312,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--no-live-refresh",
         action="store_true",
-        help="resolve free routes from catalog pins only (default: live $0 refresh)",
+        help="resolve free routes from catalog pins only; Ollama inventory is always checked",
     )
     parser.add_argument(
         "--walk-all",
@@ -363,7 +385,7 @@ def main(
             "quality_override": args.quality,
             "quality_threshold": eval_profile(route, allow_tier, quality).quality_threshold.value,
         }
-        if not candidates and note.startswith("tier-blocked"):
+        if not candidates and note.startswith(("tier-blocked", "inventory-blocked")):
             blocked[route] = note
         models[route] = candidates
     results = route_eval.run_all(
@@ -395,7 +417,7 @@ def main(
         print(item.summary())
     print(f"snapshot: {snapshot}")
     print(f"resolved: {record}")
-    return 0
+    return 1 if any(note.startswith("inventory-blocked") for note in blocked.values()) else 0
 
 
 if __name__ == "__main__":
