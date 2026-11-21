@@ -102,7 +102,8 @@ def iter_python_files(roots: list[Path]) -> list[Path]:
             found.append(root)
             continue
         for path in sorted(root.rglob("*.py")):
-            if "__pycache__" in path.parts or any(part.startswith(".") for part in path.parts):
+            parts = path.relative_to(root).parts
+            if "__pycache__" in parts or any(part.startswith(".") for part in parts):
                 continue
             found.append(path)
     return found
@@ -141,17 +142,24 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("paths", nargs="+", type=Path)
     parser.add_argument("--min-nodes", type=int, default=30)
     parser.add_argument("--min-lines", type=int, default=8)
-    parser.add_argument("--json", type=Path, default=None)
+    parser.add_argument("--json", type=Path, default=None, help="JSON output path, or - for stdout")
     args = parser.parse_args(argv)
+    for root in args.paths:
+        if not root.exists():
+            parser.error(f"scan root does not exist: {root}")
     records = []
     for path in iter_python_files(args.paths):
         records.extend(scan_file(path))
     groups = find_groups(records, min_nodes=args.min_nodes, min_lines=args.min_lines)
-    print(f"scanned {len(records)} functions, {len(groups)} clone groups")
-    if groups:
-        print(format_text(groups))
+    if args.json != Path("-"):
+        print(f"scanned {len(records)} functions, {len(groups)} clone groups")
+        if groups:
+            print(format_text(groups))
     if args.json is not None:
-        args.json.write_text(json.dumps(groups, indent=2), encoding="utf-8")
+        if args.json == Path("-"):
+            print(json.dumps(groups, indent=2))
+        else:
+            args.json.write_text(json.dumps(groups, indent=2), encoding="utf-8")
     return 0
 
 
