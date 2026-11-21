@@ -812,6 +812,7 @@ def test_chat_send_refreshes_thread_on_failure() -> None:
     js = _read("app.js").replace("\r\n", "\n")
     assert "} finally {\n      if (timer) clearInterval(timer);" in js
     assert "if (progressTimer) clearInterval(progressTimer);\n      render();" in js
+    assert "payload.error || payload.failure_reason ||" in js
 
 
 def test_create_form_disables_submit_while_creating() -> None:

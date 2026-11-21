@@ -229,6 +229,12 @@ def build_chat_prompt(transcript_digest: str, turn_text: str) -> str:
     workspace, and the host diffs and reviews them afterwards. Nothing
     is applied to the shared checkout without the owner saying so.
     """
+    if len(transcript_digest) > 6000:
+        transcript_digest = (
+            "[Earlier context omitted deterministically; this is an excerpt, not a summary. "
+            "Re-read the local chat transcript for earlier owner decisions before acting.]\n"
+            + transcript_digest[-6000:]
+        )
     return (
         "You are Mai, acting inside one dashboard chat turn.\n"
         "Edit files directly in your workspace when the request needs code; "

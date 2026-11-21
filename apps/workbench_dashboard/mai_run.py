@@ -32,7 +32,7 @@ _PROVIDER_RE = re.compile(
     r"ProviderError|provider|authenticat|timeout|timed out|connect|model|route",
     re.IGNORECASE,
 )
-_FAILURE_REASON_RE = re.compile(r"failure_reason=([^;\n]+)")
+_FAILURE_REASON_RE = re.compile(r"failure_reason\s*[=:]\s*([^;\n]+)")
 _EXECUTION_STATUS_RE = re.compile(r"execution_status\s*[=:]\s*([A-Za-z_]+)")
 _RETRYABLE_TIMEOUT_RE = re.compile(r"timed?\s*out", re.IGNORECASE)
 
@@ -137,6 +137,9 @@ def build_mai_argv(
         "trusted_local",
         "--instruction-budget-chars",
         str(MAI_INSTRUCTION_BUDGET_CHARS),
+        # Include full instructions, the task, resumed handoff and tool schemas.
+        "--loop-context-budget-chars",
+        "160000",
     ]
     if provider:
         argv += ["--provider", provider]

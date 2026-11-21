@@ -38,7 +38,7 @@ async function api(path, options) {
     throw new Error("Bad server reply on " + path + " (HTTP " + response.status + ")");
   }
   if (!response.ok || payload.ok === false) {
-    throw new Error(payload.error || ("HTTP " + response.status + " on " + path));
+    throw new Error(payload.error || payload.failure_reason || ("HTTP " + response.status + " on " + path));
   }
   return payload;
 }

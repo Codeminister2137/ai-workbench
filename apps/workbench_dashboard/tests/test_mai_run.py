@@ -421,6 +421,20 @@ def test_receipt_surfaces_mai_failure_reason() -> None:
     assert bare["error"] == "Mai session exited with code 1"
 
 
+def test_receipt_surfaces_colon_failure_diagnostic():
+    from mai_run import MaiRunOutcome
+
+    reason = "loop instructions plus the latest message exceed the loop context budget"
+    receipt = mai_receipt(MaiRunOutcome(1, f"failure_reason: {reason}\n", ""), ["p"])
+    assert receipt["error"].endswith(reason)
+
+
+def test_mai_loop_budget_reserves_instruction_and_history_space():
+    argv = build_mai_argv(_run(), repo_root=".", user_config="u")
+    budget = int(argv[argv.index("--loop-context-budget-chars") + 1])
+    assert budget >= MAI_INSTRUCTION_BUDGET_CHARS + 2 * 7000 + 30000
+
+
 def test_retrying_executor_retries_provider_timeouts_once() -> None:
     from mai_run import build_retrying_executor
 

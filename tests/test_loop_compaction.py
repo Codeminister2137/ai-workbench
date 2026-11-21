@@ -117,6 +117,39 @@ def test_compaction_disabled_by_default(tmp_path) -> None:
     assert result.response.message.content == "Finished"
 
 
+def test_oversized_summary_fits_budget_without_repeated_compaction(tmp_path):
+    client = CompactingClient(summary_text="summary " * 10000)
+    loop = _loop(
+        client,
+        tmp_path,
+        max_iterations=5,
+        loop_context_budget_chars=1000,
+        compaction_tail_messages=2,
+    )
+    result = loop.run(
+        "Create the output file, then report completion. " + "x" * 350,
+        system_prompt="Preserve these rules",
+        privacy_class=PrivacyClass.LOCAL_ONLY,
+    )
+    assert result.compactions == 1
+    assert result.response.message.content == "Finished"
+    for request in client.requests:
+        if request.metadata.get("task_type") != "loop_compaction":
+            assert loop._measured_context_chars(list(request.messages)) <= 1000
+    assert "Summary truncated" in client.requests[-1].messages[1].content
+    assert client.requests[-1].messages[0].content == "Preserve these rules"
+
+
+@pytest.mark.parametrize("cap", [1, 50, 500, 1000])
+def test_single_oversized_history_message_cannot_overflow_summary_input(cap):
+    from ai_agent.loop import _render_compaction_source
+
+    messages = [AIMessage(MessageRole.USER, "owner task " * 100000)]
+    source = _render_compaction_source(messages, cap)
+    assert len(source) <= cap
+    assert source == _render_compaction_source(messages, cap)
+
+
 def test_compaction_thrash_limit_refuses_instead_of_looping(tmp_path) -> None:
     client = CompactingClient()
     with pytest.raises(ProviderError, match="after 0 compactions"):

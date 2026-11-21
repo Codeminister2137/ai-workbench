@@ -410,9 +410,11 @@ class AgentLoop:
                 provider=self.client.backend.provider,
             )
         tail = conversation[-self.compaction_tail_messages :]
-        while tail and self._measured_context_chars([*immune, *tail]) > budget:
+        # Reserve space for the summary rather than repeatedly replacing history
+        # with a summary that itself overflows the next request.
+        while len(tail) > 1 and self._measured_context_chars([*immune, *tail]) + 256 > budget:
             tail = tail[1:]
-        if conversation and not tail:
+        if conversation and self._measured_context_chars([*immune, *tail]) > budget:
             raise ProviderError(
                 "loop instructions plus the latest message exceed the loop "
                 "context budget; nothing older remains to summarize.",
@@ -443,7 +445,9 @@ class AgentLoop:
                     "questions, and remaining work. Do not invent facts. "
                     "Return only the summary.",
                 ),
-                AIMessage(MessageRole.USER, _render_compaction_source(foldable, budget)),
+                AIMessage(
+                    MessageRole.USER, _render_compaction_source(foldable, max(1, budget - 1024))
+                ),
             ),
             model=model,
             privacy_class=privacy_class,
@@ -478,25 +482,41 @@ class AgentLoop:
                 f"dropped {len(foldable)} oldest turns to fit budget. Do not claim "
                 "effects from dropped turns; re-inspect files as needed.)"
             )
-            messages[:] = [*immune, AIMessage(MessageRole.SYSTEM, marker), *tail]
+            messages[:] = self._bounded_compaction(immune, tail, marker, budget)
             if self.diagnostic:
                 self.diagnostic(f"loop_compaction: n={compactions + 1} fallback={failure_reason}")
             return compactions + 1, None
-        messages[:] = [
-            *immune,
-            AIMessage(
-                MessageRole.SYSTEM,
-                "Compacted summary of earlier turns. Use this as compressed "
-                "context; the following messages are the recent raw tail.\n\n"
-                f"{summary_text}",
-            ),
-            *tail,
-        ]
+        messages[:] = self._bounded_compaction(
+            immune,
+            tail,
+            "Compacted summary of earlier turns. Use this as compressed "
+            "context; the following messages are the recent raw tail.\n\n"
+            f"{summary_text}",
+            budget,
+        )
         if self.diagnostic:
             self.diagnostic(
                 f"loop_compaction: n={compactions + 1} summarized={len(foldable)} tail={len(tail)}"
             )
         return compactions + 1, summary_usage
+
+    def _bounded_compaction(
+        self, immune: list[AIMessage], tail: list[AIMessage], summary: str, budget: int
+    ) -> list[AIMessage]:
+        """Fit generated context deterministically without changing instructions or tail."""
+        available = budget - self._measured_context_chars([*immune, *tail]) - len("system")
+        marker = "\n[Summary truncated; inspect original evidence before acting.]"
+        if available <= len(marker):
+            raise ProviderError(
+                "loop instructions plus latest message leave no room for a compaction "
+                "notice; shorten the request or raise the loop context budget. "
+                "Inspect earlier effects before continuing.",
+                category=ProviderErrorCategory.NON_RETRYABLE,
+                provider=self.client.backend.provider,
+            )
+        if len(summary) > available:
+            summary = summary[: available - len(marker)] + marker
+        return [*immune, AIMessage(MessageRole.SYSTEM, summary), *tail]
 
     def resume(
         self,
@@ -1036,7 +1056,13 @@ def _render_compaction_source(messages: list[AIMessage], cap_chars: int) -> str:
         + (f", {omitted} oldest omitted over the cap" if omitted else "")
         + ")\n"
     )
-    return header + "\n\n".join(parts)
+    rendered = header + "\n\n".join(parts)
+    if len(rendered) <= cap_chars:
+        return rendered
+    marker = "\n[Earlier transcript excerpt truncated to budget.]"
+    if cap_chars <= len(marker):
+        return marker[:cap_chars]
+    return rendered[: cap_chars - len(marker)] + marker
 
 
 _PATH_ARGUMENT_KEYS = ("path", "file", "files", "target")
