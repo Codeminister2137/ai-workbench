@@ -1,3 +1,10 @@
+## Mai container full fallback requirement (2026-11-21)
+
+Owner answer `3dcbb514` requires the whole qualifying fallback tree, rejecting
+Ollama-only and single-model production restrictions. Execution placement across
+the network-none boundary remains pending; see the
+[accepted requirement and remaining choice](decisions/mai-container-full-fallback.md).
+
 ## Family-3 S2 acceptance storage importer exception (2026-11-20)
 
 Owner selected A in inbox `ed066ac7bf02418490ff1adf785ae175`: permit
