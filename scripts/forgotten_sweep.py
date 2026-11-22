@@ -728,6 +728,26 @@ def collect_e2e(
             continue
         rid = str(report.get("id", "?"))
         title = str(report.get("title", ""))
+        final_followup = next(
+            (
+                item
+                for item in inbox
+                if (item.get("metadata") or {}).get("report_id") == rid
+                and item.get("status") == "closed"
+                and item.get("resolution_kind") == "final"
+                and str(item.get("resolution") or "").strip()
+            ),
+            None,
+        )
+        if final_followup is not None:
+            resolved.append(
+                {
+                    "key": f"E2:{rid}",
+                    "reason": "linked follow-up has a final resolution",
+                    "inbox_id": final_followup["id"],
+                }
+            )
+            continue
         age = _age_h(_record_ts(report), now)
         if age is None:
             continue

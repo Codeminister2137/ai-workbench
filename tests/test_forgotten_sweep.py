@@ -285,6 +285,37 @@ def test_e2e_linkage() -> None:
     assert not [k for k in by_key if ":t2" in k or ":r4" in k]
 
 
+def test_final_e2e_followup_resolves_only_its_linked_report() -> None:
+    report = {
+        "id": "r1",
+        "title": "E2E promotion for abc1234",
+        "overall": "fail",
+        "built_utc": _ts(30),
+        "commit": "abc1234",
+    }
+    run = {"title": "E2E follow-up: abc1234", "status": "failed"}
+    item = {
+        "id": "i1",
+        "title": "E2E follow-up: abc1234",
+        "status": "closed",
+        "metadata": {"report_id": "r1"},
+        "resolution_kind": "final",
+        "resolution": "Verified fixed live.",
+    }
+    findings, resolved = SWEEP.collect_e2e([], [report], [run], [item], NOW)
+    assert findings == []
+    assert resolved[0]["inbox_id"] == "i1"
+    assert report["overall"] == "fail"
+    for change in (
+        {"status": "open"},
+        {"resolution_kind": "interim"},
+        {"resolution": ""},
+        {"metadata": {"report_id": "other"}},
+    ):
+        findings, _ = SWEEP.collect_e2e([], [report], [run], [item | change], NOW)
+        assert [f["key"] for f in findings] == ["E2:r1"]
+
+
 def test_closed_approval_resolves_r1_and_stales_r2() -> None:
     inbox = [
         {
