@@ -100,6 +100,13 @@ def test_filing_dedupes_by_problem_hash(tmp_path: Path) -> None:
     problems = [{"kind": "reader_failed", "provider": "codex", "detail": "x"}]
     first = CHECK.file_problems(stores, problems, [])
     assert first is not None
+    assert first["assignee"] == first["waiting_on"] == "agent"
+    assert first["options"] == []
+    assert "Agent action:" in first["body"]
+    assert "receipt-*.json" in first["body"]
+    assert "resolution" in first["body"]
+    assert CHECK.file_problems(stores, problems, []) is None
+    stores.answer_inbox_task(first["id"], answer="Investigate")
     assert CHECK.file_problems(stores, problems, []) is None
     other = CHECK.file_problems(
         stores, problems + [{"kind": "window_exhausted", "provider": "codex", "detail": "y"}], []
