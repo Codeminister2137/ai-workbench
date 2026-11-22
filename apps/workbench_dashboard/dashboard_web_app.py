@@ -3781,6 +3781,20 @@ def build_run_drain(
     def _notify(summary: dict) -> None:
         report_run_terminal(stores, summary)
         try:
+            # Read recorded follow-ups after report-back has filed failed-run triage.
+            run_id = str(summary.get("run_id") or "")
+            run = stores.runs.get(run_id) or {}
+            summary = dict(summary)
+            summary["shipment"] = run.get("shipment")
+            summary["inbox_id"] = run.get("bridged_from") or run.get("inbox_id")
+            items, _ = stores.inbox.list(limit=1000)
+            for item in items:
+                if (
+                    item.get("status") == "open"
+                    and (item.get("metadata") or {}).get("triage_for") == run_id
+                ):
+                    summary["triage_item"] = item.get("id")
+                    break
             from owner_mail import notify_plan
 
             sender, notify_on = notify_plan(
