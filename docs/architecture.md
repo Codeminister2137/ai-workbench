@@ -549,6 +549,11 @@ docs), ancestor matching with no-diff proofs and visible warnings, the owner
 E2E task UI with per-item verdicts, auto-built reports, and the promotion gate
 (`e2e_promotion`, `e2e_tasks`/`e2e_reports` stores, `/api/e2e/*`,
 `scripts/e2e-promotion.py`). A failed E2E blocks only its own merge.
+Symbol-only CLI/provider/orchestrator evidence stays unresolved even when
+an exact regression suite is available: code locators do not constitute
+human test procedures. The existing pointer agent authors concrete human
+actions and inputs or exact allowlisted automated checks before the draft
+opens; missing automation or unresolved test design escalates to the owner.
 
 Drained runs stamp a worker epoch at start; dashboard boot reconciles runs
 orphaned by a restart (different-epoch `running` runs requeue with evidence,

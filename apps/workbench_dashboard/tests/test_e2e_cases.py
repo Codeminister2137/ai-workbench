@@ -140,6 +140,35 @@ def test_agent_cli_steps_do_not_claim_help_flags() -> None:
     assert "--help" not in step["action"]
     assert "_external_execution_completed" in step["action"]
     assert "pytest" not in step["action"]  # suites are AI work, never human steps
+    assert step["grounded"] is False
+    assert e2e_cases.needs_pointers([suite, step])
+
+
+@pytest.mark.parametrize("area", ["agent-cli", "provider", "orchestrator"])
+def test_symbol_evidence_requires_agent_test_design(area) -> None:
+    from e2e_agent_checks import extract_command
+
+    path = {
+        "agent-cli": "packages/ai_agent/src/ai_agent/instructions.py",
+        "provider": "packages/ai_provider/src/ai_provider/client.py",
+        "orchestrator": "packages/ai_orchestrator/src/ai_orchestrator/planner.py",
+    }[area]
+    checklist = generate_checklist(
+        "abc123",
+        [path],
+        summaries={
+            "subjects": ["Instruction budget: 96000 default, complete rules and strict overflow"],
+            "evidence": {path: {"symbols": ["build_instructions"], "routes": [], "views": []}},
+        },
+    )
+    behavior = next(i for i in checklist["items"] if i["kind"] == "behavior")
+    assert behavior["needs_pointers"] is True
+    suite, unresolved = behavior["steps"]
+    assert suite["grounded"] and suite["agent_runnable"]
+    assert extract_command(suite["action"]) is not None
+    assert not unresolved["grounded"]
+    assert not unresolved["agent_runnable"]
+    assert "build_instructions" in unresolved["action"]
 
 
 def test_command_steps_give_exact_pytest_for_test_files() -> None:
