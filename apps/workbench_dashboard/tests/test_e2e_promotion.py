@@ -410,3 +410,13 @@ def test_pointer_mission_forbids_unfindable_references() -> None:
     assert "exact locator" in mission
     assert "an applicable" in mission
     assert "cannot be found word-for-word is a defect" in mission
+
+
+def test_pointer_mission_separates_human_execution_from_test_design() -> None:
+    mission = pointer_mission("abc123", "task1", [{"behavior": "b", "id": "i"}])
+    assert "Humans must not inspect source" in mission
+    assert "calculate instruction budgets" in mission
+    assert "Do that investigation while authoring" in mission
+    assert "exact allowlisted agent commands" in mission
+    assert "Suite success alone is regression evidence" in mission
+    assert "DECLINE with the missing automation and test-design question" in mission

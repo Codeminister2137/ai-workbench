@@ -11,8 +11,8 @@ record, but the checklist itself is checkable steps.
 Grounding: evidence (changed symbols, API routes, dashboard views) is
 extracted deterministically from the diff, and steps cite it. Steps
 that cannot cite evidence are flagged ``needs_pointers``: the task
-stays a draft and the owner is asked what to verify, because a vague
-scheduled test the owner must send back costs more than a question.
+stays a draft and an agent authors concrete checks first, escalating to
+the owner only when test design needs their input.
 """
 
 from __future__ import annotations
@@ -398,7 +398,7 @@ def _command_steps(
     *,
     suite_command: str | None = None,
 ) -> list[dict]:
-    """Trigger steps plus one agent-runnable suite step (owner decision).
+    """Unresolved symbol checks plus one agent-runnable suite step.
 
     Running test suites is AI work, never a human step (owner verdicts
     2026-11-18: "Run the scoped pytest should not be in human test",
@@ -433,7 +433,9 @@ def _command_steps(
                 {
                     "action": action,
                     "expected": expected,
-                    "grounded": True,
+                    # A code locator is evidence for authoring, not an
+                    # executable human procedure. Keep the task in draft.
+                    "grounded": runnable,
                     "agent_runnable": runnable,
                 }
             )
@@ -449,7 +451,7 @@ def draft_steps(
 
     Grounded steps cite diff evidence; when the diff yields nothing the
     generator can point at, the fallback step says so honestly and the
-    item needs owner pointers instead of a vague scheduled test.
+    item needs agent-authored pointers instead of a vague scheduled test.
     """
     # Silence unused-argument lint: subjects feed the item record, steps cite files.
     _ = subjects
