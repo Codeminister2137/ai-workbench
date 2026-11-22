@@ -22,7 +22,8 @@ and computational builtin policy. No dependency or public contract changes.
   **208 passed**, 10.74 seconds.
 - Ruff check and format check: passed on both changed Python files.
 - Targeted Pyright: 0 errors, 0 warnings; configuration reported the worktree
-  `.venv` absent (checks used the main checkout's existing Python environment).
+  `.venv` absent initially. Added an ignored junction to the main checkout's
+  existing environment; targeted Pyright and both commit hooks then passed.
 - `git diff --check`: passed.
 - Scanner on the affected files: all three original signatures
   `069ec6cc6efd8280`, `1115ad0276653c34`, `bae369e53d9cc181` absent.
