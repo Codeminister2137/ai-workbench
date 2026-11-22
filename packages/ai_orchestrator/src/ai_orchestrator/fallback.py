@@ -1,7 +1,6 @@
 """Default usage-limit fallback policy, independent of executor implementations."""
 
 import logging
-from collections.abc import Mapping
 from dataclasses import replace
 from enum import StrEnum
 
@@ -15,7 +14,7 @@ from ai_orchestrator.models import (
     cost_policy_allows,
 )
 from ai_orchestrator.planner import ExecutionTarget
-from ai_orchestrator.recommender import _allowance_rank, recommend_model
+from ai_orchestrator.recommender import recommend_model
 
 
 class FallbackQualityPolicy(StrEnum):
@@ -137,7 +136,6 @@ def fallback_candidates(
     excluded_route_ids: frozenset[str] = frozenset(),
     allow_cost_escalation: bool = False,
     cost_exemptions: frozenset[str] = frozenset(),
-    allowance_remaining: Mapping[str, float] | None = None,
     deliberation_port: DeliberationPort | None = None,
     deliberation_question: str | None = None,
 ) -> tuple[ModelCatalogEntry, ...]:
@@ -154,8 +152,8 @@ def fallback_candidates(
 
     ``priority`` is a caller-supplied ordered route list, typically derived from
     observed account allowance, reliability and task quality. Listed routes are
-    returned first in that order within each allowance band; unlisted eligible
-    routes keep the existing recommender ranking behind them. Priority never relaxes privacy, capability
+    returned first in that order; unlisted eligible routes keep the existing
+    recommender ranking behind them. Priority never relaxes privacy, capability
     or quality filters, so it orders candidates rather than admitting new ones.
 
     ``excluded_route_ids`` drops routes unconditionally, for example a source
@@ -233,18 +231,10 @@ def fallback_candidates(
     while remaining:
         try:
             chosen = recommend_model(
-                candidate_profile,
-                remaining,
-                cost_exemptions=cost_exemptions,
-                allowance_remaining=allowance_remaining,
+                candidate_profile, remaining, cost_exemptions=cost_exemptions
             ).selected
         except ValueError:
             break
         ranked.append(chosen)
         remaining = tuple(entry for entry in remaining if entry is not chosen)
-    # Stable demotion also applies to caller/council priority within each band.
-    ranked.sort(
-        key=lambda entry: _allowance_rank(entry.backend.route_id, allowance_remaining),
-        reverse=True,
-    )
     return tuple(ranked)

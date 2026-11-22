@@ -1,17 +1,5 @@
 # Provider source state
 
-## Allowance ranking integration checked 2026-11-22 (code-derived)
-
-The repo coding CLI and dashboard auto-selection now compose existing native
-allowance readers with normalized windows for route ranking. The minimum active
-remaining percentage soft-demotes thin subscriptions (<=20%, critically <=5%)
-after hard admission. Unknown/expired observations do not establish fresh quota;
-per-attempt allowance/spend guards remain required. No account measurements or
-public pricing facts were refreshed by deterministic regression tests.
-See [scope and limits](../../../docs/repo-assistant/allowance-aware-routing.md),
-including the distinction between the repo host fallback session and Mai's own
-adapter/loop implementation.
-
 ## Kiro Windows quota discovery checked 2026-11-22
 
 Local investigation of allowance-health inbox `7f4b7e3d`: neither PATH alias
