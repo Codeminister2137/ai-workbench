@@ -196,17 +196,73 @@ def _deliver(config: dict, to: str, subject: str, body: str) -> None:
         smtp.send_message(message)
 
 
+def _mail_text(value: object, limit: int = 300) -> str:
+    """Accept bounded single-line text, never serialize arbitrary payloads."""
+    return " ".join(value.split())[:limit] if isinstance(value, str) else ""
+
+
+def _run_label(summary: Mapping[str, object]) -> str:
+    return {
+        "completed": "Done",
+        "failed": "Failed",
+        "waiting_on_owner": "Blocked",
+        "cancelled": "Cancelled",
+    }.get(str(summary.get("status")), "Run update")
+
+
+def format_run_subject(summary: Mapping[str, object]) -> str:
+    title = _mail_text(summary.get("title"), 160) or "Untitled run"
+    return f"{_run_label(summary)}: {title}"
+
+
 def format_run_mail(summary: Mapping[str, object]) -> str:
-    """Render a short plain-text body for a terminal run summary."""
-    lines = [
-        f"Run {summary.get('run_id', '?')} finished: {summary.get('status', '?')}.",
-        f"Title: {summary.get('title') or '(untitled)'}",
-    ]
-    error = summary.get("error")
+    """Render allowlisted run facts without prompts, receipts or JSON dumps."""
+    status = summary.get("status")
+    title = _mail_text(summary.get("title")) or "Untitled run"
+    outcomes = {
+        "completed": f"Completed: {title}.",
+        "failed": f"Could not complete: {title}.",
+        "waiting_on_owner": f"Stopped for owner input: {title}.",
+        "cancelled": f"Cancelled: {title}.",
+    }
+    outcome = outcomes.get(str(status), "See the dashboard run report for the outcome.")
+    error = _mail_text(summary.get("error"), 500)
     if error:
-        lines += ["", f"Error: {error}"]
-    lines += ["", "Details:", json.dumps(dict(summary), indent=2, default=str)]
-    return "\n".join(lines)
+        outcome += f" Reason: {error}"
+    source = _mail_text(summary.get("inbox_id"), 64)
+    triage = _mail_text(summary.get("triage_item"), 64)
+    shipment = summary.get("shipment")
+    shipment = shipment if isinstance(shipment, Mapping) else {}
+    review = _mail_text(shipment.get("merge_item"), 64)
+    merged = _mail_text(shipment.get("merged_sha"), 64)
+    if status == "waiting_on_owner":
+        next_step = (
+            f"Needs owner input; inbox:{source}."
+            if source
+            else "Needs owner input; see the dashboard run report."
+        )
+    elif triage:
+        next_step = f"Triage queued; inbox:{triage}."
+    elif merged:
+        next_step = f"Merged as {merged}."
+    elif review:
+        next_step = f"Integration review queued; inbox:{review}."
+    else:
+        next_step = "See the dashboard run report; no queued follow-up recorded."
+    refs = list(dict.fromkeys(ref for ref in (source, triage, review) if ref))
+    machine = f"Refs: run:{_mail_text(summary.get('run_id'), 8) or '?'}"
+    if refs:
+        machine += " | " + " ".join(f"inbox:{ref}" for ref in refs)
+    return "\n".join(
+        [
+            _run_label(summary),
+            f"Title: {title}",
+            f"Outcome: {outcome}",
+            f"Next: {next_step}",
+            "",
+            machine,
+        ]
+    )
 
 
 def notify_plan(
@@ -239,7 +295,7 @@ def notify_plan(
             return {"to": config["owner"], "sent": False, "deduped": True, "dedupe_key": key}
         return send_owner_mail(
             to=config["owner"],
-            subject=f"[workbench] run {summary.get('status', '?')}: {run_id[:8]}",
+            subject=format_run_subject(summary),
             body=format_run_mail(summary),
             config=config,
             dry_run=False,

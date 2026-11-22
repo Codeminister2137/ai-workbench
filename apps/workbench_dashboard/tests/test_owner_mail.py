@@ -15,6 +15,7 @@ from owner_mail import (
     ATTENDED_NOTIFY_STATUSES,
     UNATTENDED_NOTIFY_STATUSES,
     format_run_mail,
+    format_run_subject,
     load_smtp_config,
     mail_configured,
     notify_plan,
@@ -243,7 +244,7 @@ def test_notify_plan_unattended_mails_terminal(tmp_path) -> None:
 
 def test_format_run_mail_includes_error() -> None:
     body = format_run_mail({"run_id": "r1", "status": "failed", "error": "boom"})
-    assert "r1" in body and "failed" in body and "boom" in body
+    assert "r1" in body and "Failed" in body and "boom" in body
 
 
 def test_settings_defaults_attended_unconfigured(dashboard_server, monkeypatch) -> None:
@@ -336,3 +337,90 @@ def test_digest_reaches_smtp_only_when_due(tmp_path, fake_smtp):
     assert result["sent"]
     assert len(fake_smtp.instances) == 1
     assert "BLOCKER" in fake_smtp.instances[0].sent[0].get_content()
+
+
+@pytest.mark.parametrize(
+    "status,label",
+    [
+        ("completed", "Done"),
+        ("failed", "Failed"),
+        ("waiting_on_owner", "Blocked"),
+        ("cancelled", "Cancelled"),
+    ],
+)
+def test_human_run_notification(status, label):
+    summary = {
+        "run_id": "123456789abcdef",
+        "status": status,
+        "title": "Fix digest",
+        "error": "Validation failed",
+        "inbox_id": "source",
+        "prompt": "PRIVATE PROMPT",
+        "credentials": "SECRET",
+    }
+    body = format_run_mail(summary)
+    assert format_run_subject(summary) == f"{label}: Fix digest"
+    assert body.startswith(f"{label}\nTitle: Fix digest\nOutcome: ")
+    assert "Reason: Validation failed" in body
+    assert body.splitlines()[-1] == "Refs: run:12345678 | inbox:source"
+    assert "PRIVATE" not in body and "SECRET" not in body and "Details:" not in body
+    if status == "waiting_on_owner":
+        assert "Needs owner input; inbox:source" in body
+
+
+@pytest.mark.parametrize(
+    "extra,expected",
+    [
+        ({"triage_item": "triage1"}, "Triage queued; inbox:triage1"),
+        (
+            {"shipment": {"merge_item": "review1", "commit": "abc"}},
+            "Integration review queued; inbox:review1",
+        ),
+        ({"shipment": {"merged_sha": "abcdef"}}, "Merged as abcdef"),
+        ({}, "no queued follow-up recorded"),
+    ],
+)
+def test_run_notification_next_step_is_evidenced(extra, expected):
+    body = format_run_mail({"run_id": "r", "status": "completed", **extra})
+    assert expected in body
+    assert body.count("Refs:") == 1
+
+
+def test_run_notification_bounds_and_structured_error():
+    summary = {"title": "x\n" * 50000, "error": {"prompt": "SECRET"}, "status": "failed"}
+    assert len(format_run_subject(summary)) <= 300
+    assert len(format_run_mail(summary)) <= 50000
+    assert "SECRET" not in format_run_mail(summary)
+
+
+def test_human_notification_dry_run_receipt(tmp_path, monkeypatch):
+    import owner_mail
+
+    def no_delivery(*args, **kwargs):
+        pytest.fail("Dry run attempted SMTP delivery")
+
+    monkeypatch.setattr(owner_mail, "_deliver", no_delivery)
+    summary = {
+        "run_id": "123456789abcdef",
+        "status": "failed",
+        "title": "Fix digest",
+        "error": "Tests failed",
+        "triage_item": "triage1",
+    }
+    body = format_run_mail(summary)
+    receipt = owner_mail.send_owner_mail(
+        to="owner@example.test",
+        subject=format_run_subject(summary),
+        body=body,
+        config=load_smtp_config(SMTP_ENV),
+        receipts_dir=tmp_path,
+        dry_run=True,
+    )
+    saved = json.loads((tmp_path / receipt["receipt"]).read_text())
+    assert saved["subject"] == "Failed: Fix digest"
+    assert saved["dry_run"] and not saved["sent"]
+    assert saved["error"] is None
+    assert "Outcome: Could not complete: Fix digest. Reason: Tests failed" in body
+    assert "Next: Triage queued" in body
+    assert body.endswith("Refs: run:12345678 | inbox:triage1")
+    assert not (tmp_path / "owner-digest.sqlite3").exists()
