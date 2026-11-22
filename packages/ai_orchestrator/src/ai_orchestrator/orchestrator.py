@@ -55,6 +55,7 @@ def prepare_execution(
     timeout_seconds: float = 60.0,
     cost_exemptions: frozenset[str] = frozenset(),
     quality_adjustments: Mapping[str, int] | None = None,
+    allowance_remaining: Mapping[str, float] | None = None,
 ) -> OrchestrationResult:
     """Review a prompt, recommend a model, and prepare a neutral execution plan.
 
@@ -84,6 +85,7 @@ def prepare_execution(
             catalog,
             cost_exemptions=cost_exemptions,
             quality_adjustments=quality_adjustments,
+            allowance_remaining=allowance_remaining,
         )
     except NoCandidateError as exc:
         return OrchestrationResult(

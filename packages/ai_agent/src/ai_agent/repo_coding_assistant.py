@@ -75,7 +75,11 @@ from ai_provider.coding_assist import (
     run_coding_prompt,
 )
 from ai_provider.contracts import FinishReason
-from ai_provider.execution_fallback import FallbackSession, external_usage_limit
+from ai_provider.execution_fallback import (
+    FallbackSession,
+    external_usage_limit,
+    read_route_allowances,
+)
 from ai_provider.external_agents import (
     ExternalAgentConfig as ExternalAgentConfig,  # noqa: F401 - compatibility export
 )
@@ -1957,6 +1961,12 @@ def _execute_request(
         if args.ollama_profile is not None
         else None
     )
+    args._allowance_remaining = read_route_allowances(
+        profile,
+        catalog,
+        cost_exemptions=args.cost_exemptions,
+        deadline=execution_deadline,
+    )
     external_orchestration = prepare_execution(
         prompt,
         profile,
@@ -1966,6 +1976,7 @@ def _execute_request(
         timeout_seconds=args.timeout_seconds,
         cost_exemptions=args.cost_exemptions,
         quality_adjustments=_quality_adjustments_for_run(args),
+        allowance_remaining=args._allowance_remaining,
     )
     if (
         sampling_kwargs(args)
@@ -2795,7 +2806,11 @@ def _run_coding_prompt_with_fallback(
     repo_root: Path,
     **kwargs: Any,
 ) -> Any:
-    kwargs = {**kwargs, **sampling_kwargs(args)}
+    kwargs = {
+        **kwargs,
+        **sampling_kwargs(args),
+        "allowance_remaining": getattr(args, "_allowance_remaining", None),
+    }
     session = getattr(args, "fallback_session", None)
     if not kwargs.get("execute") or session is None or not session.enabled:
         return run_coding_prompt(
