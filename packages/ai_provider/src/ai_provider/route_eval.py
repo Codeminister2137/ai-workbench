@@ -587,51 +587,37 @@ _T1_DELAY_CASES = (
 )
 
 
+def _check_t1_namespace(namespace: dict[str, Any]) -> bool:
+    """Apply the shared T1/T1b held-edge cases to candidate functions."""
+    clamp = namespace.get("clamp")
+    delay = namespace.get("retry_delay_ms")
+    if not callable(clamp) or not callable(delay):
+        return False
+    try:
+        for value, lo, hi, want in _T1_CLAMP_CASES:
+            if clamp(value, lo, hi) != want:
+                return False
+        for base, factor, attempt, want in _T1_DELAY_CASES:
+            if delay(base, factor, attempt) != want:
+                return False
+    except Exception:
+        return False
+    return True
+
+
 def check_t1(text: str) -> bool:
     """Grade the T1 small module: clamp plus retry_delay_ms over held edges."""
 
-    def check(namespace: dict[str, Any]) -> bool:
-        clamp = namespace.get("clamp")
-        delay = namespace.get("retry_delay_ms")
-        if not callable(clamp) or not callable(delay):
-            return False
-        try:
-            for value, lo, hi, want in _T1_CLAMP_CASES:
-                if clamp(value, lo, hi) != want:
-                    return False
-            for base, factor, attempt, want in _T1_DELAY_CASES:
-                if delay(base, factor, attempt) != want:
-                    return False
-        except Exception:
-            return False
-        return True
-
-    return _grade(text, symbols=("def clamp", "def retry_delay_ms"), check=check)
+    return _grade(text, symbols=("def clamp", "def retry_delay_ms"), check=_check_t1_namespace)
 
 
 def check_t1b(text: str) -> bool:
     """Grade the opt-in T1b control with T1 cases and computational builtins."""
 
-    def check(namespace: dict[str, Any]) -> bool:
-        clamp = namespace.get("clamp")
-        delay = namespace.get("retry_delay_ms")
-        if not callable(clamp) or not callable(delay):
-            return False
-        try:
-            for value, lo, hi, want in _T1_CLAMP_CASES:
-                if clamp(value, lo, hi) != want:
-                    return False
-            for base, factor, attempt, want in _T1_DELAY_CASES:
-                if delay(base, factor, attempt) != want:
-                    return False
-        except Exception:
-            return False
-        return True
-
     block = _extract_block(text, ("def clamp", "def retry_delay_ms"))
     if block is None:
         return False
-    return _run_guarded(block, check, (), builtin_names=T1B_BUILTINS)
+    return _run_guarded(block, _check_t1_namespace, (), builtin_names=T1B_BUILTINS)
 
 
 _T2_CASES = (
