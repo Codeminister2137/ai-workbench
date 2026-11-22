@@ -165,6 +165,7 @@ def _resolve_backend(
             load_quality_adjustments,
         )
         from ai_provider.coding_assist import coding_task_profile
+        from ai_provider.execution_fallback import read_route_allowances
         from ai_provider.user_config import active_cost_exemptions, load_user_config
 
         catalog_path = (
@@ -187,6 +188,11 @@ def _resolve_backend(
             profile,
             catalog,
             review_prompt=False,
+            allowance_remaining=read_route_allowances(
+                profile,
+                catalog,
+                cost_exemptions=active_cost_exemptions(user_config),
+            ),
             cost_exemptions=active_cost_exemptions(user_config),
             quality_adjustments=load_quality_adjustments(
                 repo_root / "artifacts" / OUTCOMES_FILENAME

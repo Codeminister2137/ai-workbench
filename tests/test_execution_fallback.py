@@ -958,6 +958,7 @@ def test_exhaustion_is_bounded_and_informs_user(monkeypatch, routes):
         ProviderErrorCategory.AUTHENTICATION,
         ProviderErrorCategory.TIMEOUT,
         ProviderErrorCategory.NON_RETRYABLE,
+        ProviderErrorCategory.CONFIGURATION,
     ],
 )
 def test_other_errors_do_not_switch(monkeypatch, routes, category):
@@ -1574,3 +1575,186 @@ def test_session_walks_the_whole_ordered_set_until_a_route_completes(monkeypatch
         "finished",
     ]
     assert run.current.route_id == "antigravity"
+
+
+def test_live_ranking_normalizes_limiting_window_and_deduplicates(monkeypatch, routes):
+    from ai_provider.execution_fallback import read_route_allowances
+
+    calls = []
+
+    def read(target):
+        calls.append(target.route_id)
+        if target.route_id.startswith("codex"):
+            return {
+                "status": "available",
+                "windows": [
+                    {"bucket_id": "codex", "window": "primary", "used_percent": 10},
+                    {"bucket_id": "codex", "window": "weekly", "used_percent": 92},
+                    {
+                        "bucket_id": "codex",
+                        "window": "expired",
+                        "used_percent": 100,
+                        "resets_at_unix_seconds": 1,
+                    },
+                ],
+            }
+        if target.route_id == "kiro":
+            return {
+                "status": "available",
+                "windows": [
+                    {"bucket_id": "plan", "window": "monthly", "reported_percent": 80},
+                ],
+            }
+        raise OSError("private diagnostic")
+
+    duplicate = replace(
+        routes[0],
+        backend=replace(
+            routes[0].backend, route=replace(routes[0].backend.route, route_id="codex-other")
+        ),
+    )
+    measured = read_route_allowances(
+        replace(profile(), user_route_id_override=None),
+        (*routes, duplicate),
+        observe=read,
+    )
+    assert measured == {"codex": 8, "codex-other": 8, "kiro": 80}
+    assert calls == ["codex", "copilot", "kiro"]
+    assert read_route_allowances(profile(), routes, observe=read) == {}
+    assert calls == ["codex", "copilot", "kiro"]
+
+
+def test_fallback_allowance_overrides_priority_without_admitting_blocked_routes(routes):
+    assert [
+        entry.backend.route_id
+        for entry in fallback_candidates(
+            profile(),
+            routes,
+            initial(routes),
+            priority=("copilot", "kiro"),
+            allowance_remaining={"copilot": 8, "kiro": 80},
+        )
+    ] == ["kiro", "copilot"]
+
+
+@pytest.mark.parametrize("kind", ["http400", "context", "fatal_capability"])
+def test_safe_fatal_route_refusal_walks_same_bucket_once(monkeypatch, routes, kind):
+    from email.message import Message
+    from urllib.error import HTTPError
+
+    routes = tuple(
+        replace(
+            item,
+            backend=replace(
+                item.backend,
+                route=replace(item.backend.route, billing_source=routes[0].backend.billing_source),
+            ),
+        )
+        for item in routes
+    )
+    run = session(monkeypatch, routes)
+    calls = []
+
+    def execute(target, prompt):
+        calls.append(target.route_id)
+        if len(calls) < 3:
+            if kind == "http400":
+                raise ProviderError(
+                    "HTTP 400",
+                    category=ProviderErrorCategory.NON_RETRYABLE,
+                    raw_error=HTTPError("https://invalid", 400, "bad", Message(), None),
+                )
+            if kind == "context":
+                raise ProviderError(
+                    "Native model input does not fit the estimated context budget; no model request sent",
+                    category=ProviderErrorCategory.CONFIGURATION,
+                )
+            raise ProviderError(
+                "route to a longer-context model", category=ProviderErrorCategory.NON_RETRYABLE
+            )
+        return "done"
+
+    assert run.run("Fix", execute, lambda value: False, observe=str) == "done"
+    assert calls == ["codex", "copilot", "kiro"]
+    assert not run.exhausted
+    assert run.incapable == {"codex", "copilot"}
+
+
+def test_live_fallback_demotes_thin_alternative(monkeypatch, routes):
+    def read(target):
+        if target.route_id == "copilot":
+            return {
+                "status": "available",
+                "windows": [{"bucket_id": "premium", "window": "monthly", "remaining_percent": 8}],
+            }
+        if target.route_id == "kiro":
+            return {
+                "status": "available",
+                "windows": [{"bucket_id": "plan", "window": "monthly", "reported_percent": 80}],
+            }
+        return None
+
+    run = session(monkeypatch, routes, observe_allowance=read)
+    calls = []
+
+    def execute(target, prompt):
+        calls.append(target.route_id)
+        if len(calls) == 1:
+            raise ProviderError("spent", category=ProviderErrorCategory.USAGE_LIMIT)
+        return "done"
+
+    assert run.run("Fix", execute, lambda value: False, observe=str) == "done"
+    assert calls == ["codex", "kiro"]
+
+
+@pytest.mark.parametrize(
+    "privacy", [PrivacyClass.LOCAL_ONLY, PrivacyClass.SENSITIVE_REVIEW_REQUIRED]
+)
+def test_allowance_ranking_does_not_probe_privacy_blocked_routes(routes, privacy):
+    from ai_provider.execution_fallback import read_route_allowances
+
+    def forbidden(target):
+        pytest.fail("blocked account was observed")
+
+    assert (
+        read_route_allowances(
+            replace(profile(), user_route_id_override=None, privacy_class=privacy),
+            routes,
+            observe=forbidden,
+        )
+        == {}
+    )
+
+
+def test_allowance_ranking_deadline_and_cancellation(monkeypatch, routes):
+    from ai_provider.execution_fallback import read_route_allowances
+
+    unpinned = replace(profile(), user_route_id_override=None)
+    monkeypatch.setattr("ai_provider.execution_fallback.time.perf_counter", lambda: 10)
+
+    def forbidden(target):
+        pytest.fail("expired deadline admitted a read")
+
+    assert read_route_allowances(unpinned, routes, observe=forbidden, deadline=9) == {}
+
+    def cancel(target):
+        raise KeyboardInterrupt()
+
+    with pytest.raises(KeyboardInterrupt):
+        read_route_allowances(unpinned, routes, observe=cancel)
+
+
+@pytest.mark.parametrize("value", [True, -1, 101, float("nan"), "92"])
+def test_invalid_live_allowance_is_neutral(routes, value):
+    from ai_provider.execution_fallback import read_route_allowances
+
+    def read(target):
+        return {
+            "status": "available",
+            "windows": [{"bucket_id": "plan", "window": "weekly", "used_percent": value}],
+        }
+
+    assert (
+        read_route_allowances(replace(profile(), user_route_id_override=None), routes, observe=read)
+        == {}
+    )

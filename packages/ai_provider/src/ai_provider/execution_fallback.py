@@ -6,6 +6,7 @@ import sys
 import time
 from collections.abc import Callable
 from dataclasses import replace
+from datetime import UTC, datetime
 from typing import Any
 
 from ai_orchestrator import ExecutionTarget, ModelCatalogEntry, TaskProfile, prepare_execution
@@ -81,6 +82,90 @@ def explicit_capability_reroute(text: str) -> bool:
     return any(marker in normalized for marker in _CAPABILITY_REROUTE_MARKERS)
 
 
+def read_route_allowances(
+    profile: TaskProfile,
+    catalog: tuple[ModelCatalogEntry, ...],
+    *,
+    cost_exemptions: frozenset[str] = frozenset(),
+    observe: Callable[[ExecutionTarget], dict[str, Any] | None] | None = None,
+    deadline: float | None = None,
+) -> dict[str, float]:
+    """Read each admitted subscription once; reduce active windows to headroom.
+
+    No prompt is sent to the readers. Failures/unknown windows are neutral,
+    expired windows are ignored, and observations live only for this ranking.
+    Explicit single-route selections require no ranking observation.
+    """
+    from ai_provider.account_usage import read_execution_allowance
+    from ai_provider.allowance_windows import normalize_windows, provider_for_target
+
+    admitted = []
+    for entry in catalog:
+        prepared = prepare_execution(
+            "Allowance ranking",
+            profile,
+            (entry,),
+            review_prompt=False,
+            cost_exemptions=cost_exemptions,
+        )
+        if prepared.execution_plan is not None:
+            admitted.append(prepared.execution_plan.target)
+    if len(admitted) < 2:
+        return {}
+    reader = observe or read_execution_allowance
+    by_provider: dict[str, float | None] = {}
+    remaining: dict[str, float] = {}
+    for target in admitted:
+        provider = provider_for_target(target)
+        if provider is None:
+            continue
+        if provider not in by_provider:
+            by_provider[provider] = None
+            if deadline is not None:
+                seconds = deadline - time.perf_counter()
+                if seconds <= 0:
+                    break
+                target = replace(target, timeout_seconds=min(target.timeout_seconds, seconds))
+            try:
+                report = reader(target)
+                if report is None or report.get("status") != "available":
+                    continue
+                windows = normalize_windows(provider, report.get("windows", []), "route_ranking")
+                now = datetime.now(UTC)
+                values = [
+                    window.remaining_percent
+                    for window in windows
+                    if window.remaining_percent is not None
+                    and (
+                        window.resets_at_utc is None
+                        or datetime.fromisoformat(window.resets_at_utc) > now
+                    )
+                ]
+                if values:
+                    by_provider[provider] = min(values)
+            except Exception:  # noqa: BLE001 - optional telemetry; never log raw errors
+                continue
+        value = by_provider[provider]
+        if value is not None:
+            remaining[target.route_id] = value
+    return remaining
+
+
+def route_refusal(error: ProviderError) -> bool:
+    """Known pre-response refusals may walk elsewhere, never retry this route.
+
+    Arbitrary fatal errors, authentication, privacy and unknown effects stop.
+    """
+    return (
+        error.category is ProviderErrorCategory.NON_RETRYABLE
+        and getattr(error.raw_error, "code", None) == 400
+    ) or (
+        error.category is ProviderErrorCategory.CONFIGURATION
+        and str(error).startswith("Native model input does not fit the estimated context budget;")
+        and "no model request sent" in str(error)
+    )
+
+
 class FallbackSession:
     """Bound attempts to preflighted routes and preserve exhaustion across repairs."""
 
@@ -121,6 +206,7 @@ class FallbackSession:
         self.allow_cost_escalation = allow_cost_escalation
         self.cost_exemptions = cost_exemptions
         self.allowance_observations: dict[str, dict[str, Any]] = {}
+        self._ranking_reports: dict[str, dict[str, Any] | None] = {}
         self.exhausted: set[str] = set()
         self.overloaded: set[str] = set()
         self.incapable: set[str] = set()
@@ -355,10 +441,13 @@ class FallbackSession:
                     ProviderErrorCategory.RETRYABLE,
                     ProviderErrorCategory.UNKNOWN,
                 }
-                capability = (
-                    not overload
-                    and exc.category == ProviderErrorCategory.RETRYABLE
-                    and explicit_capability_reroute(str(exc))
+                capability = not overload and (
+                    (
+                        exc.category
+                        in {ProviderErrorCategory.RETRYABLE, ProviderErrorCategory.NON_RETRYABLE}
+                        and explicit_capability_reroute(str(exc))
+                    )
+                    or route_refusal(exc)
                 )
                 if (
                     not overload
@@ -408,12 +497,34 @@ class FallbackSession:
                 self.incapable.add(failed.route_id)
             else:
                 self.exhausted.add(failed.billing_source.value)
+            ranking_profile = fallback_profile(
+                self.profile, self.initial, self.catalog, quality_policy=self.quality_policy
+            )
+            allowance_remaining = (
+                read_route_allowances(
+                    ranking_profile,
+                    tuple(
+                        entry
+                        for entry in self.catalog
+                        if entry.backend.route_id in self.ready
+                        and entry.backend.route_id not in self.overloaded | self.incapable
+                        and entry.backend.billing_source.value not in self.exhausted
+                    ),
+                    cost_exemptions=self.cost_exemptions,
+                    observe=self._read_ranking_allowance,
+                    deadline=self.deadline,
+                )
+                if self.observe_allowance is not None and ranking_profile is not None
+                else {}
+            )
             candidates = fallback_candidates(
                 self.profile,
                 self.catalog,
                 self.initial,
                 exhausted_billing_sources=frozenset(self.exhausted),
                 unavailable_route_ids=frozenset(self.overloaded | self.incapable),
+                allowance_remaining=allowance_remaining,
+                cost_exemptions=self.cost_exemptions,
                 allow_initial_billing_source=bool(self.overloaded or self.incapable),
                 quality_policy=self.quality_policy,
                 priority=self.priority,
@@ -571,13 +682,23 @@ class FallbackSession:
                     self.handoff["save_error"] = type(exc).__name__
             break
 
+    def _read_ranking_allowance(self, target: ExecutionTarget) -> dict[str, Any] | None:
+        assert self.observe_allowance is not None
+        report = self.observe_allowance(target)
+        self._ranking_reports[target.billing_source.value] = report
+        return report
+
     def _observe_allowance(self) -> None:
-        """Retain account observations separately from routing and saved handoffs."""
+        """Retain attempt diagnostics separately from ranking and saved handoffs."""
         source = self.current.billing_source.value
         if self.observe_allowance is None or source in self.allowance_observations:
             return
         try:
-            observation = self.observe_allowance(self.current)
+            observation = (
+                self._ranking_reports.pop(source)
+                if source in self._ranking_reports
+                else self.observe_allowance(self.current)
+            )
         except Exception:  # noqa: BLE001
             # Optional account diagnostics must not alter execution or disclose
             # adapter errors. Cancellation (BaseException) still propagates.
