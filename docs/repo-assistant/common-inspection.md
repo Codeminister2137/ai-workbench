@@ -37,7 +37,7 @@ Discovery does not install skills, grant tools, or advertise sources without a
 known prerequisite contract.
 
 Required root and selected-path nested `AGENTS.md` instructions are loaded intact,
-before optional snippets. Their independent limit defaults to 64,000 characters;
+before optional snippets. Their independent limit defaults to 96,000 characters;
 `--instruction-budget-chars` changes it. Optional context retains its own total and
 per-file limits. An instruction overflow or unreadable instructions refuses before
 route preparation. Character limits alone do not establish model token capacity.
