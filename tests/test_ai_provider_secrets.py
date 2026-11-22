@@ -171,6 +171,40 @@ def test_read_dotenv_values_missing_raise(tmp_path: Path) -> None:
     assert str(missing) in str(excinfo.value)
 
 
+@pytest.mark.parametrize("error_type", [PermissionError, OSError])
+def test_read_dotenv_values_unreadable(tmp_path: Path, monkeypatch, error_type) -> None:
+    env_file = tmp_path / ".env"
+    error = error_type("synthetic read failure")
+
+    def fail_read(*args, **kwargs):
+        raise error
+
+    monkeypatch.setattr(Path, "read_text", fail_read)
+    assert secret_status(env_file, "KEY").reason == "unreadable"
+    assert read_dotenv_values(env_file) == {}
+    assert read_dotenv_values(env_file, missing="empty") == {}
+    with pytest.raises(error_type) as excinfo:
+        read_dotenv_values(env_file, missing="raise")
+    assert excinfo.value is error
+
+
+def test_read_dotenv_values_invalid_encoding(tmp_path: Path) -> None:
+    env_file = tmp_path / ".env"
+    env_file.write_bytes(b"KEY=\xff\n")
+    assert secret_status(env_file, "KEY").reason == "unreadable"
+    assert read_dotenv_values(env_file) == {}
+    with pytest.raises(UnicodeDecodeError):
+        read_dotenv_values(env_file, missing="raise")
+
+
+@pytest.mark.parametrize("text", ["", "OTHER=value\n"])
+def test_read_dotenv_values_readable_without_matching_names(tmp_path: Path, text: str) -> None:
+    env_file = tmp_path / ".env"
+    env_file.write_text(text, encoding="utf-8")
+    assert secret_status(env_file, "KEY").reason == "missing"
+    assert read_dotenv_values(env_file, ["KEY"], missing="raise") == {}
+
+
 def test_pinned_quote_whitespace_parity(tmp_path: Path) -> None:
     pinned = '  KEY  =  "  secret-value  "  '
     assert parse_dotenv_lines(pinned) == {"KEY": "  secret-value  "}

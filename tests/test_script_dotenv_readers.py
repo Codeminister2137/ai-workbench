@@ -222,6 +222,37 @@ def test_alternate_honors_export_prefix(tmp_path) -> None:
     assert _alternate_module.load_dotenv_secrets(tmp_path)["REQUESTY_API_KEY"] == "sk-export-123"
 
 
+def test_alternate_missing_dotenv_reports_missing_file(tmp_path) -> None:
+    with pytest.raises(FileNotFoundError, match="missing"):
+        _alternate_module.load_dotenv_secrets(tmp_path)
+
+
+def test_alternate_unreadable_dotenv_propagates(tmp_path, monkeypatch) -> None:
+    def fail_read(*args, **kwargs):
+        raise PermissionError("synthetic unreadable store")
+
+    monkeypatch.setattr(Path, "read_text", fail_read)
+    with pytest.raises(PermissionError, match="synthetic unreadable store"):
+        _alternate_module.load_dotenv_secrets(tmp_path)
+
+
+def test_loop_notify_unreadable_dotenv_uses_fallback(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("GMAIL_EMAIL", raising=False)
+    monkeypatch.delenv("GMAIL_PASSWORD", raising=False)
+    fallback = tmp_path / "apps/job_search/job-email/.env"
+    fallback.parent.mkdir(parents=True)
+    fallback.write_text("GMAIL_EMAIL=test@example.com\nGMAIL_PASSWORD=fake\n", encoding="utf-8")
+    original_read = Path.read_text
+
+    def read_with_unreadable_root(path, *args, **kwargs):
+        if path == tmp_path / ".env":
+            raise PermissionError("synthetic unreadable store")
+        return original_read(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", read_with_unreadable_root)
+    assert _loop_notify_module.read_gmail_config(tmp_path) == ("test@example.com", "fake")
+
+
 def test_loop_notify_skips_comment_lines(tmp_path) -> None:
     env_file = tmp_path / ".env"
     env_file.write_text(
