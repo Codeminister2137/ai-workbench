@@ -13,7 +13,9 @@ from ai_provider.repo_actions import (
 
 DEFAULT_CONTEXT_BUDGET_CHARS = 5_000
 DEFAULT_CONTEXT_FILE_BUDGET_CHARS = 2_500
-DEFAULT_INSTRUCTION_BUDGET_CHARS = 64_000
+# Match the shipped example config: repository rules already exceed 64k.
+# Keep a finite cumulative limit with headroom for applicable nested rules.
+DEFAULT_INSTRUCTION_BUDGET_CHARS = 96_000
 BASE_SYSTEM_PROMPT = """
 You are a repo-aware coding assistant. Use the provided repository context,
 preserve the permission boundary, and do not claim to have edited or executed

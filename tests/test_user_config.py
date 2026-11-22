@@ -99,7 +99,7 @@ def test_invalid_defaults_rejected(tmp_path, setting):
         ("--approval-policy", "approval_policy", "interactive"),
         ("--context-budget-chars", "context_budget_chars", 0),
         ("--context-file-budget-chars", "context_file_budget_chars", 2500),
-        ("--instruction-budget-chars", "instruction_budget_chars", 64000),
+        ("--instruction-budget-chars", "instruction_budget_chars", 96000),
         ("--timeout-seconds", "timeout_seconds", 600.0),
         ("--validation-timeout-seconds", "validation_timeout_seconds", 300.0),
         ("--max-repair-cycles", "max_repair_cycles", 0),

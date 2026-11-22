@@ -144,6 +144,35 @@ def test_required_instructions_have_a_cumulative_limit(tmp_path: Path) -> None:
     assert all(item.required_instruction for item in loaded)
 
 
+def test_default_instruction_budget_loads_large_root_and_nested_rules(tmp_path: Path) -> None:
+    root_rules = "R" * 66_188
+    nested_rules = "N" * 2_000
+    (tmp_path / "AGENTS.md").write_text(root_rules, encoding="utf-8")
+    nested = tmp_path / "package"
+    nested.mkdir()
+    (nested / "AGENTS.md").write_text(nested_rules, encoding="utf-8")
+
+    loaded = load_prompt_context(tmp_path, [nested], context_budget_chars=1)
+
+    assert [item.content for item in loaded] == [root_rules, nested_rules]
+    assert all(item.required_instruction for item in loaded)
+    with pytest.raises(ValueError, match="instructions were not truncated"):
+        load_prompt_context(tmp_path, [nested], instruction_budget_chars=64_000)
+
+
+def test_default_instruction_budget_still_refuses_cumulative_overflow(tmp_path: Path) -> None:
+    from ai_provider.repo_context import DEFAULT_INSTRUCTION_BUDGET_CHARS
+
+    (tmp_path / "AGENTS.md").write_text("R" * DEFAULT_INSTRUCTION_BUDGET_CHARS)
+    nested = tmp_path / "package"
+    nested.mkdir()
+    (nested / "AGENTS.md").write_text("N")
+
+    assert load_prompt_context(tmp_path, [])[0].content == "R" * DEFAULT_INSTRUCTION_BUDGET_CHARS
+    with pytest.raises(ValueError, match="instructions were not truncated"):
+        load_prompt_context(tmp_path, [nested])
+
+
 def test_root_instructions_are_complete_under_tiny_optional_budget(tmp_path: Path) -> None:
     rules = "REQUIRED\n" * 4000
     (tmp_path / "AGENTS.md").write_text(rules, encoding="utf-8")

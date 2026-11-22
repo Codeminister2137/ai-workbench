@@ -22,7 +22,10 @@ The same `[defaults]` section accepts `quality`, `context_budget_chars`,
 `validation_timeout_seconds`, and `max_repair_cycles`. See the checked-in example
 for shipped values and bounds. Explicit CLI flags win, including abbreviated
 options and values equal to shipped defaults. Required instructions refuse
-overflow; they are never truncated. An explicitly configured request timeout
+overflow; they are never truncated. The shared default instruction budget is
+96,000 characters, matching the example config and allowing the repository's
+66k root rules plus nested instructions. Explicit lower limits still refuse
+overflow; optional context budgets remain separate. An explicitly configured request timeout
 also wins over the automatic `--away-minutes` request timeout. If the key is
 absent, away runs retain their existing automatic timeout. Scheduler deadlines
 and admission checks remain independent limits. Privacy and approval defaults
