@@ -1,0 +1,19 @@
+{
+  "shadow_only": true,
+  "groups": [
+    "agent",
+    "cli",
+    "council",
+    "dashboard",
+    "job-search",
+    "orchestrator",
+    "provider",
+    "research"
+  ],
+  "reasons": [
+    {
+      "path": "packages/ai_orchestrator/src/ai_orchestrator/repair.py",
+      "reason": "unknown/shared/deleted path: full fallback"
+    }
+  ]
+}

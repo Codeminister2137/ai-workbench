@@ -1,0 +1,13 @@
+{
+  "command": [
+    "C:\\Users\\Jakub\\PycharmProjects\\ai-workbench\\.venv\\Scripts\\python.exe",
+    "-m",
+    "pytest",
+    "tests/test_aider_polyglot_scores.py",
+    "-q",
+    "-n",
+    "0"
+  ],
+  "exit": 1,
+  "seconds": 0.659
+}

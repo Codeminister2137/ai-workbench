@@ -1,0 +1,6 @@
+{
+  "read_dotenv_values_missing_raise": {},
+  "secret_status_reason": "unreadable",
+  "scope": "Mocked synthetic path only; no actual credential-store observation",
+  "caller_review": "loop_notify.read_gmail_config consumes empty mapping and may return None; alternate-agent-acceptance.load_dotenv_secrets only catches missing-file. Fixes excluded from this slice."
+}

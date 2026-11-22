@@ -1,0 +1,88 @@
+{
+  "totals": {
+    "covered_lines": 129,
+    "num_statements": 143,
+    "percent_covered": 88.60103626943005,
+    "percent_covered_display": "89",
+    "missing_lines": 14,
+    "excluded_lines": 0,
+    "percent_statements_covered": 90.20979020979021,
+    "percent_statements_covered_display": "90",
+    "num_branches": 50,
+    "num_partial_branches": 8,
+    "covered_branches": 42,
+    "missing_branches": 8,
+    "percent_branches_covered": 84.0,
+    "percent_branches_covered_display": "84"
+  },
+  "methods": {
+    "packages\\ai_provider\\src\\ai_provider\\aider_polyglot_scores.py": {
+      "summary": {
+        "covered_lines": 129,
+        "num_statements": 143,
+        "percent_covered": 88.60103626943005,
+        "percent_covered_display": "89",
+        "missing_lines": 14,
+        "excluded_lines": 0,
+        "percent_statements_covered": 90.20979020979021,
+        "percent_statements_covered_display": "90",
+        "num_branches": 50,
+        "num_partial_branches": 8,
+        "covered_branches": 42,
+        "missing_branches": 8,
+        "percent_branches_covered": 84.0,
+        "percent_branches_covered_display": "84"
+      },
+      "handle_data": {
+        "executed_lines": [
+          101,
+          102,
+          103,
+          104,
+          106
+        ],
+        "summary": {
+          "covered_lines": 5,
+          "num_statements": 5,
+          "percent_covered": 100.0,
+          "percent_covered_display": "100",
+          "missing_lines": 0,
+          "excluded_lines": 0,
+          "percent_statements_covered": 100.0,
+          "percent_statements_covered_display": "100",
+          "num_branches": 4,
+          "num_partial_branches": 0,
+          "covered_branches": 4,
+          "missing_branches": 0,
+          "percent_branches_covered": 100.0,
+          "percent_branches_covered_display": "100"
+        },
+        "missing_lines": [],
+        "excluded_lines": [],
+        "start_line": 100,
+        "executed_branches": [
+          [
+            101,
+            102
+          ],
+          [
+            101,
+            103
+          ],
+          [
+            103,
+            104
+          ],
+          [
+            103,
+            106
+          ]
+        ],
+        "missing_branches": []
+      }
+    }
+  },
+  "coverage_log": "19 passed",
+  "deletion_log": "10 failed, 9 passed; inherited HTMLParser callback removal loses text",
+  "scope": "one module, one framework callback; not repository robustness or dead-code census"
+}

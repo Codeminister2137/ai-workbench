@@ -1,0 +1,13 @@
+{
+  "restored_paths_match_HEAD_normalized": {
+    "packages/ai_orchestrator/src/ai_orchestrator/repair.py": true,
+    "packages/ai_provider/src/ai_provider/aider_polyglot_scores.py": true,
+    "packages/ai_agent/src/ai_agent/workflow_graph.py": true
+  },
+  "test_processes": 9,
+  "aggregate_test_seconds": 267.156,
+  "retries": 0,
+  "post_restoration_source_diff": "",
+  "executed_runner_sha256": "22052c810a8b56ddbde62dc08597e4886c4ac09d926bb78ad3c1f8bfeff01575",
+  "note": "readable runner formatted after preservation; original executed bytes retained in scratch"
+}

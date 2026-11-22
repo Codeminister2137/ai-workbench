@@ -1,0 +1,15 @@
+{
+  "purpose": "one focused serial diagnostic after baseline socket abort; not a baseline retry or regrade",
+  "timeout_seconds": 30,
+  "command": [
+    "C:/Users/Jakub/PycharmProjects/ai-workbench/.venv/Scripts/python.exe",
+    "-m",
+    "pytest",
+    "apps/workbench_dashboard/tests/test_inference_proxy.py::test_run_scope_auth_revocation_and_size",
+    "-q",
+    "-n",
+    "0"
+  ],
+  "exit": 0,
+  "seconds": 0.9927534000000833
+}

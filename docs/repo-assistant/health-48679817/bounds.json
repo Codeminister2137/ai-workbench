@@ -1,0 +1,25 @@
+{
+  "revision": "2459d6470169c91b870a76a4da4efdef3ca857a8",
+  "trials": [
+    [
+      "source-only",
+      "packages/ai_agent/src/ai_agent/workflow_graph.py",
+      "_MAX_NODES = 50",
+      "_MAX_NODES = 0"
+    ],
+    [
+      "cross-component",
+      "packages/ai_orchestrator/src/ai_orchestrator/repair.py",
+      "return \"no_progress\"",
+      "return \"state_changed\""
+    ]
+  ],
+  "deletion": "_PolyglotParser.handle_data",
+  "max_test_processes": 18,
+  "per_process_timeout_seconds": 300,
+  "outer_seconds": 2400,
+  "retries": 0,
+  "expected_mutation_failures_are_observations": true,
+  "stop": "Unexpected baseline/infrastructure failure stops admission; always restore source.",
+  "selection_frozen_before_execution": true
+}

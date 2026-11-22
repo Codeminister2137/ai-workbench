@@ -1,0 +1,6 @@
+{
+  "observed_sha256": "bf40d590c4534e297de9399e4b983163bdbfae44db148dcd85ff9b05428c16f1",
+  "abandoned_mutation": "if False and failure_changed",
+  "prior_final_trial": "incomplete, unscored; no active experiment Python observed",
+  "restored_to_head_normalized": true
+}

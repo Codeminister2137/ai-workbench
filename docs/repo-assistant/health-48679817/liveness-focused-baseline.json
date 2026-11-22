@@ -1,0 +1,13 @@
+{
+  "command": [
+    "C:\\Users\\Jakub\\PycharmProjects\\ai-workbench\\.venv\\Scripts\\python.exe",
+    "-m",
+    "pytest",
+    "tests/test_repair_progress.py",
+    "-q",
+    "-n",
+    "0"
+  ],
+  "exit": 0,
+  "seconds": 6.184
+}

@@ -1,0 +1,9 @@
+{
+  "mutation": "repair_progress no_progress -> state_changed",
+  "process_timeout_seconds": 300,
+  "selected_run": "timed out; truncated log, no completed JUnit or recall comparison",
+  "full_run": "not admitted",
+  "cause": "mutation bypasses repeated_no_progress termination; test fixture allows unbounded cycles with 600-second run deadline",
+  "restoration": "verified by receipt and git diff",
+  "cleanup": "no identity-matching observed descendant remained at cleanup inspection"
+}

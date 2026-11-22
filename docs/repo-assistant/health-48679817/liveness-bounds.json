@@ -1,0 +1,9 @@
+{
+  "outer_seconds": 900,
+  "max_test_processes": 9,
+  "per_process_timeout_seconds": 300,
+  "retries": 0,
+  "scope": "focused repair baseline after preserved full baseline socket failure; one cross-component comparison, coverage, deletion; full tests unchanged; any unrelated failure reported separately",
+  "prior_interruption": "preserved, not replayed or scored",
+  "stop": "baseline or infrastructure failure stops admission; source restored in finally"
+}

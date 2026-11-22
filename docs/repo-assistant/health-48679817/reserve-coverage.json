@@ -1,0 +1,16 @@
+{
+  "command": [
+    "C:\\Users\\Jakub\\PycharmProjects\\ai-workbench\\.venv\\Scripts\\python.exe",
+    "-m",
+    "pytest",
+    "tests/test_aider_polyglot_scores.py",
+    "-q",
+    "-n",
+    "0",
+    "--cov=ai_provider.aider_polyglot_scores",
+    "--cov-branch",
+    "--cov-report=json:C:\\Users\\Jakub\\PycharmProjects\\ai-workbench\\.tmp\\run-worktrees\\4867981737e2\\.tmp\\health-48679817-reserve\\coverage-data.json"
+  ],
+  "exit": 0,
+  "seconds": 0.954
+}

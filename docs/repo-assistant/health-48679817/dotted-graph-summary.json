@@ -1,0 +1,52 @@
+{
+  "modules": 435,
+  "resolved_edges": 900,
+  "sccs": [
+    [
+      "ai_provider.contracts",
+      "ai_provider.credential_guard",
+      "ai_provider.errors"
+    ],
+    [
+      "ai_provider",
+      "ai_provider.factory",
+      "ai_provider.go_source_info"
+    ],
+    [
+      "ai_agent.delegation_scope",
+      "ai_agent.permissions",
+      "ai_agent.tools.base"
+    ],
+    [
+      "ai_agent.tools",
+      "ai_agent.tools.delegation"
+    ],
+    [
+      "ai_agent.repo_assistant_args",
+      "ai_agent.run_tracking",
+      "ai_agent.validation",
+      "ai_provider.research_execution"
+    ],
+    [
+      "ai_provider.external_agents",
+      "ai_provider.foreground_tools",
+      "ai_provider.gemini_cli"
+    ],
+    [
+      "ai_provider.account_usage",
+      "ai_provider.codex_usage"
+    ],
+    [
+      "ai_provider.eval_budget",
+      "ai_provider.eval_task_sets",
+      "ai_provider.route_eval"
+    ],
+    [
+      "ai_provider.capability_eval",
+      "ai_provider.native_capability_eval"
+    ]
+  ],
+  "unresolved_external_or_alias_count": 7916,
+  "limitations": "No runtime sys.path aliases/dynamic imports; lexical imports include deferred/type-only edges.",
+  "raw_sha256": "5202d13e935d1841c6384e86a4570ad6d41004df89e8fa883cd0025994971bc3"
+}

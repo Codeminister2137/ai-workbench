@@ -1,0 +1,20 @@
+{
+  "full_failures": [
+    "tests.test_repair_progress::test_neutral_policy_and_review_reserve",
+    "tests.test_repair_progress::test_repair_validation_timeout_preserves_review_budget",
+    "tests.test_review_policy::test_research_reserve_is_opt_in_and_has_approved_cap"
+  ],
+  "selected_failures": [
+    "tests.test_foreground_http::test_permissions_session_binding_deadline_and_shutdown",
+    "tests.test_repair_progress::test_neutral_policy_and_review_reserve",
+    "tests.test_repair_progress::test_repair_validation_timeout_preserves_review_budget",
+    "tests.test_review_policy::test_research_reserve_is_opt_in_and_has_approved_cap"
+  ],
+  "missed": [],
+  "selected_cases": 6220,
+  "full_cases": 6220,
+  "selected_seconds": 129.527,
+  "full_seconds": 131.994,
+  "hash_before": "23226aa2808a67110a7c30014d15243cb71ea6b74342d9bfe231da5b02df656a",
+  "hash_mutated": "c76405140ae8607600c604341b76f4fb2356881f9422df52795fd3c24b726dbf"
+}
