@@ -190,9 +190,12 @@ def read_dotenv_values(
     Unlike load_dotenv which skips empty values, empty values are KEPT
     here — callers decide how to handle them.
 
-    When ``names`` is given only those names are returned. On a missing
-    file, return {} when missing="empty", else re-raise FileNotFoundError
-    naming the path. Other OSError also yields {}.
+    When ``names`` is given only those names are returned. ``missing``
+    controls all file-read failures: "empty" (the default) returns {} for
+    missing, unreadable, or invalidly encoded files; "raise" propagates
+    OSError and UnicodeError, with FileNotFoundError naming the path.
+    A readable file with no matching assignments returns {} in either mode.
+    Use secret_status for a value-free presence verdict, including unreadable.
     """
     try:
         text = Path(path).read_text(encoding="utf-8-sig")
@@ -201,6 +204,8 @@ def read_dotenv_values(
             raise FileNotFoundError(f"dotenv file not found: {path}") from exc
         return {}
     except (OSError, UnicodeError):
+        if missing == "raise":
+            raise
         return {}
     wanted: set[str] | None = set(names) if names is not None else None
     values: dict[str, str] = {}
