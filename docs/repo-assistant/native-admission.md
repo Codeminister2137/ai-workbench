@@ -64,7 +64,13 @@ in the metadata handoff. Neither mode trims required instructions or bypasses
 hard input admission, privacy, quality, billing or approval gates.
 
 Diagnostics label this `estimated_utf8` and `verified_token_count=false`. This
-heuristic can reject inputs an exact tokenizer would fit and cannot prove actual
+overflow error also carries input, output, framing and capacity numbers so a
+captured failure reason remains actionable when the preceding diagnostic is lost.
+Dashboard supervision classifies this rejection as configuration, not allowance.
+The loop's character compaction threshold is separate from native token admission;
+increasing it does not increase the selected model's context capacity.
+
+The heuristic can reject inputs an exact tokenizer would fit and cannot prove actual
 native capacity. It must not be reported as a verified token count. The verified
 research-review counter supports specific tool-free framing only; it is deliberately
 not reused for coding tools/history. Exact tool-bearing counting remains deferred.
