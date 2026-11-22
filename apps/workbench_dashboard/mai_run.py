@@ -27,7 +27,10 @@ TAIL_CHARS = 4000
 MAI_INSTRUCTION_BUDGET_CHARS = 96_000
 
 _ALLOWANCE_RE = re.compile(r"allowance|denied|cost polic|budget|quota|exhaust", re.IGNORECASE)
-_CONFIG_RE = re.compile(r"instruction.?budget", re.IGNORECASE)
+_CONFIG_RE = re.compile(
+    r"instruction.?budget|estimated context budget|invalid native (?:context|output) budget",
+    re.IGNORECASE,
+)
 _PROVIDER_RE = re.compile(
     r"ProviderError|provider|authenticat|timeout|timed out|connect|model|route",
     re.IGNORECASE,

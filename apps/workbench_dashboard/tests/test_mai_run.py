@@ -7,6 +7,7 @@ from pathlib import Path
 from mai_run import (
     MAI_INSTRUCTION_BUDGET_CHARS,
     TAIL_CHARS,
+    MaiRunOutcome,
     build_mai_argv,
     build_mai_executor,
     capture_tail,
@@ -301,6 +302,22 @@ def test_classify_failure_ignores_budget_prose_in_tails() -> None:
         classify_failure("Required instructions exceed instruction_budget_chars=64000: AGENTS.md")
         == "config"
     )
+
+
+def test_native_context_rejection_is_config_not_allowance() -> None:
+    outcome = mai_receipt(
+        MaiRunOutcome(
+            exit_code=1,
+            stdout_tail="",
+            stderr_tail=(
+                "failure_reason: Native model input does not fit the estimated context budget; "
+                "input_tokens=66744 output_tokens=8192 framing_tokens=256 context_tokens=65536"
+            ),
+        ),
+        [],
+    )
+    assert outcome["failure_class"] == "config"
+    assert "context_tokens=65536" in outcome["stderr_tail"]
 
 
 def test_argv_carries_raised_instruction_budget(tmp_path) -> None:

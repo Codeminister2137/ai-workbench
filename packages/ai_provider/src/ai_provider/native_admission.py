@@ -279,6 +279,9 @@ class NativeCodingClient:
             self._pending = None
             raise ProviderError(
                 "Native model input does not fit the estimated context budget; "
+                f"input_tokens={estimated} output_tokens={output} framing_tokens=256 "
+                f"context_tokens={context} estimate_kind={estimate_kind} "
+                "verified_token_count=false; "
                 "complete instructions, schemas and history were preserved; no model request sent",
                 category=ProviderErrorCategory.CONFIGURATION,
                 provider=self.config.provider.value,

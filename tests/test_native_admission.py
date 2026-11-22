@@ -27,6 +27,7 @@ from ai_provider.native_admission import (
     NATIVE_CONTRACT_VERSION,
     NATIVE_TOOL_EVIDENCE,
     NativeCodingClient,
+    estimate_coding_input_tokens,
     native_coding_catalog,
     native_tool_incompatibility,
     prepare_native_coding_client,
@@ -215,8 +216,13 @@ def test_overflow_refuses_without_truncation_or_inference(admitted, component):
     original = request
     with pytest.raises(
         ProviderError, match="complete instructions, schemas and history were preserved"
-    ):
+    ) as caught:
         wrapper.complete(request)
+    detail = str(caught.value)
+    assert f"input_tokens={estimate_coding_input_tokens(request)}" in detail
+    assert f"context_tokens={wrapper.context_tokens}" in detail
+    assert "output_tokens=" in detail and "framing_tokens=256" in detail
+    assert "estimate_kind=estimated_utf8 verified_token_count=false" in detail
     assert request == original and not client.requests
 
 
