@@ -1,0 +1,7 @@
+{
+  "exit_code": 0,
+  "python": "3.14.4 (tags/v3.14.4:23116f9, Apr  7 2026, 14:10:54) [MSC v.1944 64 bit (AMD64)]",
+  "events": 350,
+  "bounds": "one test, serial, one invocation; external timeout 45s",
+  "limitation": "application observations, no packet/ETW trace; timing perturbed"
+}
