@@ -28,6 +28,8 @@ The status capture observes `send_response`, not a snapshot of the host deque.
 Retained evidence: [events](socket-framing-b1eac80c/events.json),
 [receipt](socket-framing-b1eac80c/receipt.json),
 [pytest result](socket-framing-b1eac80c/result.xml).
+The retained JUnit artifact has its machine hostname removed during integration
+review; test counts, timings and outcome are unchanged.
 Raw console output remains in `.tmp/socket-framing-b1eac80c/console.txt`.
 The script refuses to reuse an existing output directory to preserve consumed runs.
 
