@@ -285,6 +285,29 @@ def test_e2e_linkage() -> None:
     assert not [k for k in by_key if ":t2" in k or ":r4" in k]
 
 
+def test_e2_does_not_label_mixed_followup_outcomes_as_failed() -> None:
+    report = _report("original", "44b6eec", "fail", 140)
+    for other_status in ("completed", "running", "queued", "paused", "merged"):
+        runs = [
+            {"title": "E2E follow-up: 44b6eec", "status": status}
+            for status in ("failed", other_status)
+        ]
+        findings, _ = SWEEP.collect_e2e([], [report], runs, [], NOW)
+        assert not findings, other_status
+        assert report["overall"] == "fail"
+
+
+def test_e2_flags_multiple_failed_followups() -> None:
+    runs = [
+        {"title": "E2E follow-up: 44b6eec", "status": "failed"},
+        {"title": "E2E follow-up: 44b6eec (retry)", "status": "failed"},
+    ]
+    findings, _ = SWEEP.collect_e2e(
+        [], [_report("original", "44b6eec", "fail", 140)], runs, [], NOW
+    )
+    assert [finding["key"] for finding in findings] == ["E2:original"]
+
+
 def test_closed_approval_resolves_r1_and_stales_r2() -> None:
     inbox = [
         {
