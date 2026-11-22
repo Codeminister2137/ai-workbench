@@ -74,6 +74,8 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/plans/05_AI_Orchestrator_Project_Plan.txt | KNOWLEDGE | Founder source plan (capability evidence). |
 | docs/plans/ai-trainer-framing.md | PENDING | Blocked: needs owner go on first slice. |
 | docs/plans/accountant-investigation.md | PENDING | Owner action: paid hour before first invoice (D6). |
+| docs/plans/accountant-dossier-20261122.md | PENDING | Accountant-meeting dossier (Polish) 2026-11-22; decisions pending meeting. |
+| docs/plans/accountant-search-20261122.md | PENDING | Accountant candidates report (Polish) 2026-11-22; owner picks. |
 | docs/plans/business-decision-20261119.md | PENDING | Business form/name/funding brief 2026-11-19 (run da1eb76c); personalization pending c1809752 closeout. |
 | docs/plans/eval-scheduling-20261119.md | ACTED | Owner chose B full scope + observed-stop budgets (bd5fa3a2, 5a326594); P1-P3 implemented. |
 | docs/plans/business-funding-20261119.md | KNOWLEDGE | Funding options + acquisition prep 2026-11-19 (run da1eb76c). |
