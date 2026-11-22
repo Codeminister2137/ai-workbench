@@ -1,0 +1,91 @@
+{
+  "handler_records": 21,
+  "all_handler_hashes_match": true,
+  "handler_checks": [
+    {
+      "file": "apps/ai_council/evals/run_synthesis_eval.py",
+      "matches": true
+    },
+    {
+      "file": "apps/ai_council/investor/judge.py",
+      "matches": true
+    },
+    {
+      "file": "apps/ai_council/web_app.py",
+      "matches": true
+    },
+    {
+      "file": "apps/job_search/job-email/models.py",
+      "matches": true
+    },
+    {
+      "file": "apps/job_search/job-email/openings_api.py",
+      "matches": true
+    },
+    {
+      "file": "apps/job_search/job-email/outreach_cli.py",
+      "matches": true
+    },
+    {
+      "file": "apps/job_search/job-email/outreach_cli.py",
+      "matches": true
+    },
+    {
+      "file": "apps/job_search/job-email/outreach_cli.py",
+      "matches": true
+    },
+    {
+      "file": "apps/job_search/job-email/outreach_cli.py",
+      "matches": true
+    },
+    {
+      "file": "apps/job_search/job-email/outreach_cli.py",
+      "matches": true
+    },
+    {
+      "file": "apps/job_search/job-email/outreach_cli.py",
+      "matches": true
+    },
+    {
+      "file": "apps/job_search/job-email/outreach_cli.py",
+      "matches": true
+    },
+    {
+      "file": "packages/ai_provider/src/ai_provider/secrets.py",
+      "matches": true
+    },
+    {
+      "file": "packages/ai_provider/src/ai_provider/secrets.py",
+      "matches": true
+    },
+    {
+      "file": "packages/ai_provider/src/ai_provider/secrets.py",
+      "matches": true
+    },
+    {
+      "file": "packages/ai_provider/src/ai_provider/secrets.py",
+      "matches": true
+    },
+    {
+      "file": "packages/ai_provider/src/ai_provider/secrets.py",
+      "matches": true
+    },
+    {
+      "file": "packages/ai_provider/src/ai_provider/secrets.py",
+      "matches": true
+    },
+    {
+      "file": "packages/ai_provider/src/ai_provider/secrets.py",
+      "matches": true
+    },
+    {
+      "file": "packages/ai_provider/src/ai_provider/secrets.py",
+      "matches": true
+    },
+    {
+      "file": "packages/ai_provider/src/ai_provider/secrets.py",
+      "matches": true
+    }
+  ],
+  "raw_graph_hash_matches": true
+}

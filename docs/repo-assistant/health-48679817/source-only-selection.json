@@ -1,0 +1,17 @@
+{
+  "shadow_only": true,
+  "groups": [
+    "agent",
+    "cli",
+    "dashboard",
+    "orchestrator",
+    "provider",
+    "research"
+  ],
+  "reasons": [
+    {
+      "path": "packages/ai_agent/src/ai_agent/workflow_graph.py",
+      "reason": "agent/dashboard plus all workspace consumers"
+    }
+  ]
+}

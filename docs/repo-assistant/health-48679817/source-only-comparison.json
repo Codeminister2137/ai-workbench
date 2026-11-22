@@ -1,0 +1,23 @@
+{
+  "full_failures": [
+    "apps.workbench_dashboard.tests.test_workflows::test_create_get_and_archive",
+    "apps.workbench_dashboard.tests.test_workflows::test_workflow_endpoints",
+    "tests.test_workflow_graph::test_rejects_bad_shapes",
+    "tests.test_workflow_graph::test_round_trip_and_plan_mapping",
+    "tests.test_workflow_graph::test_template_is_valid_and_ordered"
+  ],
+  "selected_failures": [
+    "apps.workbench_dashboard.tests.test_workflows::test_create_get_and_archive",
+    "apps.workbench_dashboard.tests.test_workflows::test_workflow_endpoints",
+    "tests.test_workflow_graph::test_rejects_bad_shapes",
+    "tests.test_workflow_graph::test_round_trip_and_plan_mapping",
+    "tests.test_workflow_graph::test_template_is_valid_and_ordered"
+  ],
+  "missed": [],
+  "selected_cases": 5881,
+  "full_cases": 6220,
+  "selected_seconds": 113.923,
+  "full_seconds": 130.512,
+  "hash_before": "8b09d4dde5daf459bab0387bebbf7a6ac90d8331b1d55d0da26242a325f3d1fd",
+  "hash_mutated": "154f37aa87ed06862fa74b400379b0e56ab89a868ad99b6a8e4274c84f8fafac"
+}

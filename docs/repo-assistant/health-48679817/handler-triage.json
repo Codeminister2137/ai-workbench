@@ -1,0 +1,174 @@
+{
+  "bounds": "11 named functions; all their lexical handlers; no live credentials or inference",
+  "handlers": [
+    {
+      "file": "apps/ai_council/evals/run_synthesis_eval.py",
+      "function": "main",
+      "line": 122,
+      "source_sha256": "1bb690a45c47b5074dc7c3f89cec3e3a920590963b2e7bd9815c2bb5799673de",
+      "handler": "except (OSError, ValueError):\n    print('no baseline; run --record first', file=sys.stderr)\n    return 2",
+      "assessment": "Diagnostic ambiguity: unreadable and malformed baseline both say no baseline; nonzero exit prevents false passing evaluation."
+    },
+    {
+      "file": "apps/ai_council/investor/judge.py",
+      "function": "parse_weights",
+      "line": 33,
+      "source_sha256": "9d9bf27743357148ef5a1e79222f411f105df0bef7483e69bb54a43f442fbc42",
+      "handler": "except ValueError:\n    continue",
+      "assessment": "Documented junk-line filter; not evidence of missing configuration. Empty mapping semantics delegated to caller."
+    },
+    {
+      "file": "apps/ai_council/web_app.py",
+      "function": "abort_read",
+      "line": 125,
+      "source_sha256": "be61b94b1d0fb90fb9919fb5f6ff78b587e2e26de891d5384c538ea6d8a9b534",
+      "handler": "except OSError:\n    pass",
+      "assessment": "Best-effort socket cleanup; expired event is set before shutdown, reader reports 408."
+    },
+    {
+      "file": "apps/job_search/job-email/models.py",
+      "function": "is_approved_for_sending",
+      "line": 215,
+      "source_sha256": "d413ec97a7bf305b8812d235fe562c3af1f5aaef37b1073ce0933db893ac8fcf",
+      "handler": "except OSError:\n    return False",
+      "assessment": "Intentional fail-closed boolean authorization check; attachment read failure cannot authorize sending."
+    },
+    {
+      "file": "apps/job_search/job-email/openings_api.py",
+      "function": "expire",
+      "line": 155,
+      "source_sha256": "edce4a8b3e90f2f619717c84113348cd10746ad7c3698ed94934e62240cd7b94",
+      "handler": "except OSError:\n    pass",
+      "assessment": "Best-effort watchdog shutdown; enclosing request owns timeout failure. No absence assertion."
+    },
+    {
+      "file": "apps/job_search/job-email/outreach_cli.py",
+      "function": "run_outreach",
+      "line": 109,
+      "source_sha256": "401d3cdf1525abd15c0ff21015f7af201e388c98487be026c71bb10207635937",
+      "handler": "except OSError as exc:\n    print(f'Cannot read vacancies file {vacancies_path}: {exc}')\n    return 1",
+      "assessment": "Explicit user diagnostics and failure exits/flags; delivery ledger failures stop to prevent duplicate sends. Cancellation breaks review intentionally."
+    },
+    {
+      "file": "apps/job_search/job-email/outreach_cli.py",
+      "function": "run_outreach",
+      "line": 133,
+      "source_sha256": "401d3cdf1525abd15c0ff21015f7af201e388c98487be026c71bb10207635937",
+      "handler": "except ValueError as exc:\n    print(f'Cannot prepare application for {email}: {exc}; no delivery attempted.')\n    failed = True\n    continue",
+      "assessment": "Explicit user diagnostics and failure exits/flags; delivery ledger failures stop to prevent duplicate sends. Cancellation breaks review intentionally."
+    },
+    {
+      "file": "apps/job_search/job-email/outreach_cli.py",
+      "function": "run_outreach",
+      "line": 141,
+      "source_sha256": "401d3cdf1525abd15c0ff21015f7af201e388c98487be026c71bb10207635937",
+      "handler": "except OSError:\n    print(f'Cannot read attachment for {email}; no delivery attempted.')\n    failed = True\n    continue",
+      "assessment": "Explicit user diagnostics and failure exits/flags; delivery ledger failures stop to prevent duplicate sends. Cancellation breaks review intentionally."
+    },
+    {
+      "file": "apps/job_search/job-email/outreach_cli.py",
+      "function": "run_outreach",
+      "line": 150,
+      "source_sha256": "401d3cdf1525abd15c0ff21015f7af201e388c98487be026c71bb10207635937",
+      "handler": "except (EOFError, KeyboardInterrupt):\n    print('Review cancelled; no further delivery attempted.')\n    break",
+      "assessment": "Explicit user diagnostics and failure exits/flags; delivery ledger failures stop to prevent duplicate sends. Cancellation breaks review intentionally."
+    },
+    {
+      "file": "apps/job_search/job-email/outreach_cli.py",
+      "function": "run_outreach",
+      "line": 169,
+      "source_sha256": "401d3cdf1525abd15c0ff21015f7af201e388c98487be026c71bb10207635937",
+      "handler": "except (OSError, UnapprovedApplicationError):\n    print(f'Reviewed materials unavailable or changed for {email}; no delivery attempted.')\n    failed = True\n    continue",
+      "assessment": "Explicit user diagnostics and failure exits/flags; delivery ledger failures stop to prevent duplicate sends. Cancellation breaks review intentionally."
+    },
+    {
+      "file": "apps/job_search/job-email/outreach_cli.py",
+      "function": "run_outreach",
+      "line": 181,
+      "source_sha256": "401d3cdf1525abd15c0ff21015f7af201e388c98487be026c71bb10207635937",
+      "handler": "except OSError:\n    print(f'Sent to {email}, but recording failed. Stop and reconcile sent history.')\n    return 1",
+      "assessment": "Explicit user diagnostics and failure exits/flags; delivery ledger failures stop to prevent duplicate sends. Cancellation breaks review intentionally."
+    },
+    {
+      "file": "apps/job_search/job-email/outreach_cli.py",
+      "function": "run_outreach",
+      "line": 186,
+      "source_sha256": "401d3cdf1525abd15c0ff21015f7af201e388c98487be026c71bb10207635937",
+      "handler": "except OSError:\n    print(f'Sent to {email} and recorded in sent history, but the application record was not saved. Stop and reconcile {config.RECORDS_FILE}.')\n    return 1",
+      "assessment": "Explicit user diagnostics and failure exits/flags; delivery ledger failures stop to prevent duplicate sends. Cancellation breaks review intentionally."
+    },
+    {
+      "file": "packages/ai_provider/src/ai_provider/secrets.py",
+      "function": "load_dotenv",
+      "line": 90,
+      "source_sha256": "134d069c4a1042ccdab242adb5ff3867274b19d068747a638e85764536c4308e",
+      "handler": "except FileNotFoundError:\n    return ()",
+      "assessment": "Convenience loader deliberately returns empty on missing/unreadable; unsafe as presence evidence. Inspect callers separately."
+    },
+    {
+      "file": "packages/ai_provider/src/ai_provider/secrets.py",
+      "function": "load_dotenv",
+      "line": 92,
+      "source_sha256": "134d069c4a1042ccdab242adb5ff3867274b19d068747a638e85764536c4308e",
+      "handler": "except (OSError, UnicodeError):\n    return ()",
+      "assessment": "Convenience loader deliberately returns empty on missing/unreadable; unsafe as presence evidence. Inspect callers separately."
+    },
+    {
+      "file": "packages/ai_provider/src/ai_provider/secrets.py",
+      "function": "dotenv_names",
+      "line": 148,
+      "source_sha256": "134d069c4a1042ccdab242adb5ff3867274b19d068747a638e85764536c4308e",
+      "handler": "except (OSError, UnicodeError):\n    return ()",
+      "assessment": "Names-only helper folds read errors; secret_status is necessary to distinguish empty from unreadable."
+    },
+    {
+      "file": "packages/ai_provider/src/ai_provider/secrets.py",
+      "function": "read_dotenv_values",
+      "line": 199,
+      "source_sha256": "134d069c4a1042ccdab242adb5ff3867274b19d068747a638e85764536c4308e",
+      "handler": "except FileNotFoundError as exc:\n    if missing == 'raise':\n        raise FileNotFoundError(f'dotenv file not found: {path}') from exc\n    return {}",
+      "assessment": "Confirmed API ambiguity: missing=raise only raises on missing-file; unreadable still returns empty. Not a presence-verdict API."
+    },
+    {
+      "file": "packages/ai_provider/src/ai_provider/secrets.py",
+      "function": "read_dotenv_values",
+      "line": 203,
+      "source_sha256": "134d069c4a1042ccdab242adb5ff3867274b19d068747a638e85764536c4308e",
+      "handler": "except (OSError, UnicodeError):\n    return {}",
+      "assessment": "Confirmed API ambiguity: missing=raise only raises on missing-file; unreadable still returns empty. Not a presence-verdict API."
+    },
+    {
+      "file": "packages/ai_provider/src/ai_provider/secrets.py",
+      "function": "secret_status",
+      "line": 130,
+      "source_sha256": "134d069c4a1042ccdab242adb5ff3867274b19d068747a638e85764536c4308e",
+      "handler": "except FileNotFoundError:\n    return SecretStatus(name, False, 'missing-file', location)",
+      "assessment": "Explicit missing-file versus unreadable outcomes; retain distinct verdicts."
+    },
+    {
+      "file": "packages/ai_provider/src/ai_provider/secrets.py",
+      "function": "secret_status",
+      "line": 132,
+      "source_sha256": "134d069c4a1042ccdab242adb5ff3867274b19d068747a638e85764536c4308e",
+      "handler": "except (OSError, UnicodeError):\n    return SecretStatus(name, False, 'unreadable', location)",
+      "assessment": "Explicit missing-file versus unreadable outcomes; retain distinct verdicts."
+    },
+    {
+      "file": "packages/ai_provider/src/ai_provider/secrets.py",
+      "function": "read_secret_key",
+      "line": 167,
+      "source_sha256": "134d069c4a1042ccdab242adb5ff3867274b19d068747a638e85764536c4308e",
+      "handler": "except FileNotFoundError as exc:\n    raise ValueError(f'{label}: secret {name!r} missing: file not found: {path}') from exc",
+      "assessment": "Raises labelled cause-specific errors; no folded absence result."
+    },
+    {
+      "file": "packages/ai_provider/src/ai_provider/secrets.py",
+      "function": "read_secret_key",
+      "line": 169,
+      "source_sha256": "134d069c4a1042ccdab242adb5ff3867274b19d068747a638e85764536c4308e",
+      "handler": "except (OSError, UnicodeError) as exc:\n    raise ValueError(f'{label}: cannot read secret {name!r} from {path}: {exc}') from exc",
+      "assessment": "Raises labelled cause-specific errors; no folded absence result."
+    }
+  ],
+  "not_exhaustive": true
+}

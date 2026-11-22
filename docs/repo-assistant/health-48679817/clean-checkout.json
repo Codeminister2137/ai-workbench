@@ -1,0 +1,28 @@
+{
+  "command": [
+    "C:\\Users\\Jakub\\PycharmProjects\\ai-workbench\\.venv\\Scripts\\python.exe",
+    "-m",
+    "pytest",
+    "tests/test_document_status.py",
+    "tests/test_test_suites.py",
+    "-q",
+    "-n",
+    "0"
+  ],
+  "exit": 0,
+  "seconds": 5.027,
+  "private_plans_present": false,
+  "dotenv_present": false,
+  "modules_per_group": {
+    "provider": 56,
+    "orchestrator": 18,
+    "agent": 70,
+    "cli": 103,
+    "research": 13,
+    "council": 12,
+    "dashboard": 65,
+    "job-search": 20,
+    "live": 3
+  },
+  "limitations": "Tracked HEAD archive, no Git metadata; shared existing venv; no fresh dependency install, hosted run, or full clean-checkout suite."
+}
