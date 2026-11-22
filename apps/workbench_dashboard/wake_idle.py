@@ -27,10 +27,6 @@ def interlock(data_dir: Path):
     data_dir.mkdir(parents=True, exist_ok=True)
     with _LOCK, (data_dir / "wake-idle.lock").open("a+b") as stream:
         stream.seek(0)
-        if stream.read(1) == b"":
-            stream.write(b"0")
-            stream.flush()
-        stream.seek(0)
         if os.name == "nt":
             import msvcrt
 
@@ -45,6 +41,11 @@ def interlock(data_dir: Path):
 
             fcntl.flock(stream.fileno(), fcntl.LOCK_EX)
         try:
+            # Windows locks may extend beyond EOF. Initialize only while locked:
+            # reading the locked byte before acquisition fails under contention.
+            if os.fstat(stream.fileno()).st_size == 0:
+                stream.write(b"0")
+                stream.flush()
             yield
         finally:
             stream.seek(0)

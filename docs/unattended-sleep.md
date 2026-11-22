@@ -237,8 +237,16 @@ running runs, claimed runs (including claim files), and runs finished within
 30 minutes block sleep. Owner inbox items and audio playback do not block it.
 
 Task admission and mode changes share `wake_idle.interlock`; new work cancels
-the pending idle handoff. The helper performs display restoration without that
-lock, then holds the same file lock across a fresh Python state check and the
+the pending idle handoff. RunDrain uses the dependency-free agent-side
+`ai_agent.wake_idle_lock.interlock` with the same protocol: byte zero of
+`<data_dir>/wake-idle.lock` via Windows byte-range locking, or POSIX `flock`.
+Claim, release, requeue and publish mutations take this lock and touch the idle
+cancel marker while holding it; touching the marker alone cannot serialize
+with suspend. JSON staging, execution and callbacks stay outside the lock.
+Work admitted before sleep commitment cancels the handoff; mutations arriving
+after the helper owns the commitment lock wait until it releases the lock.
+
+The helper performs display restoration without that lock, then holds the same file lock across a fresh Python state check and the
 Windows suspend call. Unreadable state fails closed. The helper's own receipt
 (`wake-idle-helper.json`) distinguishes cancellation, rejection and API return;
 an API return alone does not prove a sleep transition.

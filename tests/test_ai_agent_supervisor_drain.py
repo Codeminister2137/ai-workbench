@@ -756,3 +756,111 @@ def test_shipper_uncommitted_report_escalates(stores) -> None:
     run_id, _inbox_id = _queue_chat_run(stores, answer="Approve")
     outcomes = drain.drain()
     assert outcomes == [{"run_id": run_id, "status": "needs-attention"}]
+
+
+@pytest.mark.parametrize("holder", ["agent", "dashboard"])
+def test_wake_idle_lock_compatibility(stores, holder):
+    """Independent implementations exclude each other on the same lock byte."""
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Event
+
+    from ai_agent.wake_idle_lock import interlock as agent_lock
+    from wake_idle import interlock as dashboard_lock
+
+    first, second = (agent_lock, dashboard_lock)
+    if holder == "dashboard":
+        first, second = second, first
+    attempted, acquired = Event(), Event()
+
+    def contend():
+        attempted.set()
+        with second(stores.data_dir):
+            acquired.set()
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        with first(stores.data_dir):
+            future = pool.submit(contend)
+            assert attempted.wait(2)
+            assert not acquired.wait(0.15)
+        future.result(timeout=3)
+    assert acquired.is_set()
+    assert (stores.data_dir / "wake-idle.lock").read_bytes()[:1] == b"0"
+
+
+@pytest.mark.parametrize("operation", ["claim", "release", "restore", "requeue", "publish"])
+def test_drain_mutations_serialize_with_sleep_commit(stores, operation):
+    """Once the final-check lock is held, no drain mutation can cross it."""
+    from concurrent.futures import ThreadPoolExecutor, TimeoutError
+    from threading import Event
+
+    from wake_idle import interlock
+
+    path = stores.data_dir / "runs" / "race.json"
+    claim = path.with_suffix(".json.claim")
+    record = {"id": "race", "status": "queued", "approval_mode": "owner-filed"}
+    stores.runs.put("race", record)
+    attempted, executed = Event(), Event()
+
+    def execute(_run):
+        # Lock must be available throughout execution, including to other modules.
+        with interlock(stores.data_dir):
+            executed.set()
+        return {"status": "completed", "summary": "done"}
+
+    worker = RunDrain(runs_dir=path.parent, get_inbox=lambda _: None, executor=execute)
+    if operation in {"release", "restore", "publish"}:
+        path.rename(claim)
+    if operation == "requeue":
+        stores.runs.put("race", {**record, "status": "running"})
+    cancel = stores.data_dir / "wake-idle.cancel"
+    cancel.unlink(missing_ok=True)
+    before = (path.read_bytes() if path.exists() else None, claim.exists())
+
+    def mutate():
+        attempted.set()
+        if operation == "claim":
+            return worker._run_claimed(path)
+        if operation == "release":
+            return worker._release(path, claim)
+        if operation == "publish":
+            return worker._publish(path, claim, record)
+        return worker.reconcile()
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        with interlock(stores.data_dir):
+            future = pool.submit(mutate)
+            assert attempted.wait(2)
+            with pytest.raises(TimeoutError):
+                future.result(timeout=0.15)
+            assert not cancel.exists()
+            assert (path.read_bytes() if path.exists() else None, claim.exists()) == before
+        future.result(timeout=5)
+    assert cancel.exists()
+    if operation == "claim":
+        assert executed.is_set()
+
+
+def test_claim_before_final_check_cancels_sleep_even_after_fast_completion(stores):
+    """A claim in the handoff window invalidates sleep even if its blocker disappears."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    from wake_idle import final_check, interlock
+
+    stores.data_dir.mkdir(parents=True, exist_ok=True)
+    config = stores.data_dir / "config.json"
+    config.write_text('{"supervision":"unattended"}', encoding="utf-8")
+    path = stores.data_dir / "runs" / "race.json"
+    # A paused run is not itself an idle blocker; claiming it must invalidate sleep.
+    stores.runs.put("race", {"id": "race", "status": "paused"})
+    (stores.data_dir / "wake-idle.cancel").unlink(missing_ok=True)
+    worker = RunDrain(
+        runs_dir=path.parent,
+        get_inbox=lambda _: None,
+        executor=lambda _: {"status": "paused"},
+    )
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        pool.submit(worker._run_claimed, path).result(timeout=5)
+    assert not path.with_suffix(".json.claim").exists()
+    assert stores.runs.get("race")["status"] == "paused"
+    with interlock(stores.data_dir):
+        assert final_check(stores.data_dir, config) != 0
