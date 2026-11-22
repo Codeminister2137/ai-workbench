@@ -15,6 +15,40 @@ pytestmark = pytest.mark.skipif(sys.platform != "win32", reason="Windows sleep h
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts/workstation-sleep.ps1"
 
 
+def test_idle_final_interlock_catches_work_during_display_restore(tmp_path):
+    data = tmp_path / "data"
+    (data / "runs").mkdir(parents=True)
+    (data / "wake-idle.lock").write_bytes(b"0")
+    config = tmp_path / "config.json"
+    config.write_text('{"supervision":"unattended"}', encoding="utf-8")
+    receipt = tmp_path / "receipt.json"
+    guard = SCRIPT.parent.parent / "apps/workbench_dashboard/wake_idle.py"
+    command = f"""
+$ErrorActionPreference = 'Stop'
+$source = [IO.File]::ReadAllText('{SCRIPT.as_posix()}')
+$powerCall = '$accepted = [System.Windows.Forms.Application]::SetSuspendState('
+if (-not $source.Contains($powerCall)) {{ throw 'Suspend safety shim no longer matches' }}
+$source = $source.Replace($powerCall, "throw 'Suspend forbidden in tests'`n" + $powerCall)
+$source = $source.Replace('$pendingUpdateReboot = @(Get-PendingUpdateReboot)', '$pendingUpdateReboot = @()')
+$source = $source.Replace("& (Join-Path `$PSScriptRoot 'monitors-on.ps1') | Out-Null", '$null = 1')
+$source = $source.Replace("(Join-Path `$PSScriptRoot '../apps/workbench_dashboard/wake_idle.py')", "'{guard.as_posix()}'")
+function Start-Sleep {{
+    param($Seconds)
+    [IO.File]::WriteAllText('{(data / "runs/late.json").as_posix()}', '{{"status":"queued"}}')
+}}
+& ([scriptblock]::Create($source)) -Sleep -DelaySeconds 0 `
+    -IdlePython '{Path(sys.executable).as_posix()}' -IdleDataDirectory '{data.as_posix()}' `
+    -IdleConfigPath '{config.as_posix()}' -ControlDirectory '{tmp_path / "control"}' `
+    -ReceiptPath '{receipt.as_posix()}' -CancelPath '{(data / "wake-idle.cancel").as_posix()}'
+"""
+    result = run_helper(command)
+    assert result.returncode == 0, result.stderr
+    saved = json.loads(receipt.read_text(encoding="utf-8-sig"))
+    assert saved["status"] == "sleep_cancelled"
+    assert "sleep_requested" not in saved["transition_times_utc"]
+    assert (data / "wake-idle.cancel").exists()
+
+
 def run_helper(command):
     return subprocess.run(
         ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", command],
@@ -164,9 +198,9 @@ def test_absolute_deadline_reaches_mock_power_call_only_after_due(tmp_path):
     command = f"""
 $source = [IO.File]::ReadAllText('{SCRIPT.as_posix()}')
 $powerCall = @'
-$accepted = [System.Windows.Forms.Application]::SetSuspendState(
-    [System.Windows.Forms.PowerState]::Suspend, $false, $false
-)
+    $accepted = [System.Windows.Forms.Application]::SetSuspendState(
+        [System.Windows.Forms.PowerState]::Suspend, $false, $false
+    )
 '@
 $source = $source.Replace("`r`n", "`n")
 $powerCall = $powerCall.Replace("`r`n", "`n")
