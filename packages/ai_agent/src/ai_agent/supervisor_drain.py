@@ -47,6 +47,7 @@ from ai_agent.run_tracking import (
     ensure_run_not_cancelled,
     run_cancelled,
 )
+from ai_agent.wake_idle_lock import interlock
 
 APPROVAL_ANSWER = "Approve"
 APPROVAL_ANSWERS = frozenset({APPROVAL_ANSWER, "Schedule it"})
@@ -170,28 +171,40 @@ class RunDrain:
     def _iso_now(self) -> str:
         return datetime.fromtimestamp(self._now(), UTC).isoformat()
 
-    def _write_json(self, path: Path, payload: dict) -> None:
+    @staticmethod
+    def _stage_json(path: Path, payload: dict) -> Path:
         tmp = path.with_suffix(TMP_SUFFIX)
         tmp.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
-        tmp.replace(path)
+        return tmp
+
+    def _write_json(self, path: Path, payload: dict) -> None:
+        tmp = self._stage_json(path, payload)
+        with interlock(self._runs_dir.parent):
+            (self._runs_dir.parent / "wake-idle.cancel").touch()
+            tmp.replace(path)
 
     def _publish(self, path: Path, claim: Path, run: dict) -> None:
-        self._write_json(path, run)
-        try:
-            claim.unlink()
-        except FileNotFoundError:
-            pass
+        tmp = self._stage_json(path, run)
+        with interlock(self._runs_dir.parent):
+            (self._runs_dir.parent / "wake-idle.cancel").touch()
+            tmp.replace(path)
+            try:
+                claim.unlink()
+            except FileNotFoundError:
+                pass
 
     @staticmethod
     def _release(path: Path, claim: Path) -> None:
         """Return an unprocessed claim; never masks the real outcome."""
-        if not claim.exists():
-            return
         try:
-            if path.exists():
-                claim.unlink()
-            else:
-                claim.rename(path)
+            with interlock(path.parent.parent):
+                if not claim.exists():
+                    return
+                (path.parent.parent / "wake-idle.cancel").touch()
+                if path.exists():
+                    claim.unlink()
+                else:
+                    claim.rename(path)
         except OSError:
             pass
 
@@ -288,7 +301,9 @@ class RunDrain:
                 outcomes.append({"run_id": run_id, "action": "cleaned"})
             else:
                 try:
-                    claim.rename(path)
+                    with interlock(self._runs_dir.parent):
+                        (self._runs_dir.parent / "wake-idle.cancel").touch()
+                        claim.rename(path)
                 except OSError as exc:
                     outcomes.append(
                         {"run_id": run_id, "action": "skipped", "reason": f"stale claim: {exc}"}
@@ -362,7 +377,9 @@ class RunDrain:
         run_id = path.stem
         claim = path.with_suffix(CLAIM_SUFFIX)
         try:
-            path.rename(claim)
+            with interlock(self._runs_dir.parent):
+                (self._runs_dir.parent / "wake-idle.cancel").touch()
+                path.rename(claim)
         except FileNotFoundError:
             return {
                 "run_id": run_id,

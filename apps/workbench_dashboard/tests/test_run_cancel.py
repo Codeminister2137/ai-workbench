@@ -33,6 +33,7 @@ def test_cancel_missing_run_404(dashboard_server) -> None:
 
 
 def test_cancel_claim_only_run_prevents_pickup(dashboard_server, tmp_path, monkeypatch) -> None:
+    from ai_agent import supervisor_drain
     from ai_agent.supervisor_drain import RunDrain
 
     stores = DashboardStores(tmp_path / "data")
@@ -41,12 +42,13 @@ def test_cancel_claim_only_run_prevents_pickup(dashboard_server, tmp_path, monke
     assert run is not None
     run["approval_mode"] = "agent-queue"
     path = stores.runs.put("r1", run)
-    rename = type(path).rename
+    read_json = supervisor_drain._read_json
     calls = []
 
-    def cancel_after_claim(source, target):
-        result = rename(source, target)
-        if source == path:
+    def cancel_after_claim(source):
+        # Inject after the atomic claim's lock is released. A synchronous HTTP
+        # call from inside rename would wait on the lock held by this thread.
+        if source == path.with_suffix(".json.claim"):
             assert not path.exists()
             payload = post_json(dashboard_server, "/api/runs/r1/cancel", {})
             assert payload["run"]["cancel_requested"] is True
@@ -54,9 +56,9 @@ def test_cancel_claim_only_run_prevents_pickup(dashboard_server, tmp_path, monke
             claimed = stores.runs.get("r1", claim=True)
             assert claimed is not None
             assert claimed["events"][-1]["kind"] == "cancellation_requested"
-        return result
+        return read_json(source)
 
-    monkeypatch.setattr(type(path), "rename", cancel_after_claim)
+    monkeypatch.setattr(supervisor_drain, "_read_json", cancel_after_claim)
 
     def executor(run):
         calls.append(run)
