@@ -4,7 +4,7 @@
   The task runs scripts/allowance_healthcheck.py with the checkout venv:
   read native allowance windows, flag exhausted windows and failed codex
   reads, list stale models, write a receipt under .tmp/allowance-health/
-  on every run, and file one owner inbox task per new problem set
+  on every run, and file one agent inbox task per new problem set
   (deduped by hash, so repeats never spam). Missed runs start when
   available.
 
@@ -46,7 +46,7 @@ $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries `
   -DontStopIfGoingOnBatteries -StartWhenAvailable
 Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger `
   -Settings $settings `
-  -Description 'Daily allowance health check (windows, refresh eve, stale models; file owner task on problems).' `
+  -Description 'Daily allowance health check (windows, refresh eve, stale models; file agent task on problems).' `
   -Force | Out-Null
 $task = Get-ScheduledTask -TaskName $TaskName
 $info = Get-ScheduledTaskInfo -TaskName $TaskName

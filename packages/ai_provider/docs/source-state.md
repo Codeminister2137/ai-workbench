@@ -1,5 +1,24 @@
 # Provider source state
 
+## Kiro Windows quota discovery checked 2026-11-22
+
+Local investigation of allowance-health inbox `7f4b7e3d`: neither PATH alias
+nor `%LOCALAPPDATA%/Kiro-Cli/kiro-cli.exe` was present; the inspected
+`run/chat-cli-2.24.0.exe` remained installed. The quota reader now falls back
+to that exact engine and still verifies its version before starting its
+isolated, tool-free `/usage` session. A bounded live observation returned
+`available` with verified cleanup. Account measurements remain private in
+the inbox resolution. Why the launcher disappeared is not established.
+
+Official [installation documentation](https://kiro.dev/docs/cli/installation/)
+and [Windows release notes](https://kiro.dev/changelog/cli/2-0/) were searched
+for Windows discovery/install changes; they establish Windows support, not
+the cause of this machine's missing launcher. No upgrade or reinstall was
+performed. New client versions remain unverified for this reader.
+
+Health-check alerts now contain investigation and completion steps and enter
+the agent queue. Only an evidenced owner decision/manual action is escalated.
+
 ## Native Codex eval contract checked 2026-11-20
 
 Official [non-interactive documentation](https://learn.chatgpt.com/docs/non-interactive-mode)

@@ -19,6 +19,25 @@ OUTPUT = (
 )
 
 
+def test_missing_launcher_discovers_only_inspected_windows_engine(tmp_path, monkeypatch):
+    monkeypatch.setattr(usage, "external_agent_command", lambda method: None)
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    engine = tmp_path / "Kiro-Cli" / "run" / "chat-cli-2.24.0.exe"
+    engine.parent.mkdir(parents=True)
+    (engine.parent / "chat-cli-3.0.0.exe").touch()
+    assert usage.read_kiro_allowance()["reason"] == "client_unavailable"
+    engine.touch()
+    commands = []
+
+    def read(command, **kwargs):
+        commands.append(command)
+        return {"status": "unknown", "reason": "test", "cleanup_verified": True}
+
+    monkeypatch.setattr(usage, "read_native_account_usage", read)
+    assert usage.read_kiro_allowance()["reason"] == "client_version_unverified"
+    assert commands == [None, (str(engine), "--version")]
+
+
 def test_native_credit_measurements_do_not_infer_remaining_or_percent_semantics():
     windows = usage.normalize_usage(OUTPUT)
     assert windows == [

@@ -2,7 +2,7 @@
 
 Reads native allowance windows (codex required, copilot/kiro best-effort),
 flags exhausted windows and failed codex reads, lists models with no spend
-in STALE_DAYS, and writes a receipt. Files ONE owner inbox item on problems
+in STALE_DAYS, and writes a receipt. Files ONE agent inbox item on problems
 (deduped by problem hash); healthy runs stay silent. 5h rolling windows
 refresh too fast to target, so they get health-checked, not eve-checked.
 """
@@ -121,7 +121,7 @@ def _problems_hash(problems: list[dict[str, Any]]) -> str:
 
 
 def file_problems(stores, problems: list[dict[str, Any]], stale: list[str]):
-    """File one owner item; skip when an open item holds the same hash."""
+    """File actionable agent investigation; deduplicate unresolved problem sets."""
     if not problems:
         return None
     digest = _problems_hash(problems)
@@ -131,12 +131,31 @@ def file_problems(stores, problems: list[dict[str, Any]], stale: list[str]):
         if (
             meta.get("key") == DEDUPE_KEY
             and meta.get("problems_hash") == digest
-            and item.get("status") == "open"
+            and item.get("status") in {"open", "answered"}
         ):
             return None
     lines = ["Allowance health check found problems:"]
     for problem in problems:
         lines.append(f"- [{problem['provider']}] {problem['kind']}: {problem['detail']}")
+    lines.extend(
+        [
+            "",
+            "Agent action:",
+            "1. Inspect the latest .tmp/allowance-health/receipt-*.json and compare "
+            "the prior reading; retain the failure evidence.",
+            "2. Trace the affected provider reader in packages/ai_provider/src/ai_provider/ "
+            "and its command discovery. Check installed client paths and scheduled-task "
+            "environment before attributing the failure to the provider or account.",
+            "3. Fix a confirmed local defect and add focused regression tests. For exhausted "
+            "or resetting windows, report the reset/headroom evidence without treating "
+            "normal quota state as a software defect.",
+            "4. Run focused tests and lint; record findings, changes, checks and any "
+            "remaining limitation as this item's resolution, then close it.",
+            "Escalate only an evidenced owner decision or manual action with a complete "
+            "decision brief. Do not change billing, credentials, client versions or run "
+            "inference to diagnose this alert.",
+        ]
+    )
     if stale:
         lines.append("")
         lines.append(f"Models with no spend in {STALE_DAYS}d (info): {', '.join(stale)}")
@@ -145,7 +164,9 @@ def file_problems(stores, problems: list[dict[str, Any]], stale: list[str]):
         body="\n".join(lines),
         task_type="task",
         created_by="supervisor",
-        assignee="owner",
+        assignee="agent",
+        options=[],
+        context_refs=["scripts/allowance_healthcheck.py", ".tmp/allowance-health/"],
         metadata={"key": DEDUPE_KEY, "problems_hash": digest},
     )
 
