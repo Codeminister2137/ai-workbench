@@ -1,0 +1,1138 @@
+[
+  {
+    "utc": "2026-11-22T12:07:22.483147+00:00",
+    "ns": 9201138549600,
+    "thread": 18140,
+    "event": "send.start",
+    "connection": 2410507505008,
+    "bytes": 140
+  },
+  {
+    "utc": "2026-11-22T12:07:22.483505+00:00",
+    "ns": 9201138905500,
+    "thread": 21744,
+    "event": "readinto.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.483521+00:00",
+    "ns": 9201138920400,
+    "thread": 18140,
+    "event": "send.end",
+    "connection": 2410507505008,
+    "bytes": 140
+  },
+  {
+    "utc": "2026-11-22T12:07:22.483531+00:00",
+    "ns": 9201138928000,
+    "thread": 18140,
+    "event": "send.start",
+    "connection": 2410507505008,
+    "bytes": 56
+  },
+  {
+    "utc": "2026-11-22T12:07:22.483544+00:00",
+    "ns": 9201138941500,
+    "thread": 21744,
+    "event": "readinto.end",
+    "bytes": 140
+  },
+  {
+    "utc": "2026-11-22T12:07:22.483648+00:00",
+    "ns": 9201139045600,
+    "thread": 21744,
+    "event": "readinto.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.483658+00:00",
+    "ns": 9201139055300,
+    "thread": 18140,
+    "event": "send.end",
+    "connection": 2410507505008,
+    "bytes": 56
+  },
+  {
+    "utc": "2026-11-22T12:07:22.483682+00:00",
+    "ns": 9201139078800,
+    "thread": 18140,
+    "event": "begin.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.483687+00:00",
+    "ns": 9201139083200,
+    "thread": 18140,
+    "event": "readinto.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.483696+00:00",
+    "ns": 9201139093500,
+    "thread": 21744,
+    "event": "readinto.end",
+    "bytes": 56
+  },
+  {
+    "utc": "2026-11-22T12:07:22.483713+00:00",
+    "ns": 9201139109700,
+    "thread": 21744,
+    "event": "send_response.start",
+    "connection": 2410507669072,
+    "status": 401,
+    "content_length_count": 1,
+    "content_length": 56,
+    "transfer_encoding_present": false
+  },
+  {
+    "utc": "2026-11-22T12:07:22.483738+00:00",
+    "ns": 9201139135100,
+    "thread": 21744,
+    "event": "send_response.end",
+    "connection": 2410507669072,
+    "status": 401,
+    "content_length_count": 1,
+    "content_length": 56,
+    "transfer_encoding_present": false
+  },
+  {
+    "utc": "2026-11-22T12:07:22.483744+00:00",
+    "ns": 9201139140800,
+    "thread": 21744,
+    "event": "end_headers.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.483769+00:00",
+    "ns": 9201139165600,
+    "thread": 18140,
+    "event": "readinto.end",
+    "bytes": 173
+  },
+  {
+    "utc": "2026-11-22T12:07:22.483831+00:00",
+    "ns": 9201139227600,
+    "thread": 18140,
+    "event": "begin.end"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.483839+00:00",
+    "ns": 9201139235200,
+    "thread": 18140,
+    "event": "readinto.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.483851+00:00",
+    "ns": 9201139248100,
+    "thread": 21744,
+    "event": "end_headers.end"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.483868+00:00",
+    "ns": 9201139264200,
+    "thread": 18140,
+    "event": "readinto.end",
+    "bytes": 30
+  },
+  {
+    "utc": "2026-11-22T12:07:22.483882+00:00",
+    "ns": 9201139279300,
+    "thread": 21744,
+    "event": "finish.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.483890+00:00",
+    "ns": 9201139286200,
+    "thread": 21744,
+    "event": "finish.end"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.483895+00:00",
+    "ns": 9201139291400,
+    "thread": 21744,
+    "event": "shutdown_request.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.483963+00:00",
+    "ns": 9201139361200,
+    "thread": 18140,
+    "event": "send.start",
+    "connection": 2410507766352,
+    "bytes": 167
+  },
+  {
+    "utc": "2026-11-22T12:07:22.483977+00:00",
+    "ns": 9201139374400,
+    "thread": 21744,
+    "event": "close_request.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.483986+00:00",
+    "ns": 9201139382600,
+    "thread": 21744,
+    "event": "close_request.end"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.483988+00:00",
+    "ns": 9201139384400,
+    "thread": 21744,
+    "event": "shutdown_request.end"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.484172+00:00",
+    "ns": 9201139569100,
+    "thread": 21744,
+    "event": "readinto.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.484182+00:00",
+    "ns": 9201139581400,
+    "thread": 18140,
+    "event": "send.end",
+    "connection": 2410507766352,
+    "bytes": 167
+  },
+  {
+    "utc": "2026-11-22T12:07:22.484191+00:00",
+    "ns": 9201139587800,
+    "thread": 18140,
+    "event": "send.start",
+    "connection": 2410507766352,
+    "bytes": 56
+  },
+  {
+    "utc": "2026-11-22T12:07:22.484199+00:00",
+    "ns": 9201139595900,
+    "thread": 21744,
+    "event": "readinto.end",
+    "bytes": 167
+  },
+  {
+    "utc": "2026-11-22T12:07:22.484254+00:00",
+    "ns": 9201139651600,
+    "thread": 21744,
+    "event": "readinto.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.484263+00:00",
+    "ns": 9201139659800,
+    "thread": 18140,
+    "event": "send.end",
+    "connection": 2410507766352,
+    "bytes": 56
+  },
+  {
+    "utc": "2026-11-22T12:07:22.484277+00:00",
+    "ns": 9201139673600,
+    "thread": 18140,
+    "event": "begin.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.484285+00:00",
+    "ns": 9201139681000,
+    "thread": 18140,
+    "event": "readinto.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.484296+00:00",
+    "ns": 9201139693100,
+    "thread": 21744,
+    "event": "readinto.end",
+    "bytes": 56
+  },
+  {
+    "utc": "2026-11-22T12:07:22.484311+00:00",
+    "ns": 9201139707600,
+    "thread": 21744,
+    "event": "send_response.start",
+    "connection": 2410507666896,
+    "status": 401,
+    "content_length_count": 1,
+    "content_length": 56,
+    "transfer_encoding_present": false
+  },
+  {
+    "utc": "2026-11-22T12:07:22.484331+00:00",
+    "ns": 9201139728200,
+    "thread": 21744,
+    "event": "send_response.end",
+    "connection": 2410507666896,
+    "status": 401,
+    "content_length_count": 1,
+    "content_length": 56,
+    "transfer_encoding_present": false
+  },
+  {
+    "utc": "2026-11-22T12:07:22.484339+00:00",
+    "ns": 9201139738200,
+    "thread": 21744,
+    "event": "end_headers.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.484374+00:00",
+    "ns": 9201139773900,
+    "thread": 18140,
+    "event": "readinto.end",
+    "bytes": 173
+  },
+  {
+    "utc": "2026-11-22T12:07:22.484451+00:00",
+    "ns": 9201139849900,
+    "thread": 18140,
+    "event": "begin.end"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.484462+00:00",
+    "ns": 9201139859600,
+    "thread": 18140,
+    "event": "readinto.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.484480+00:00",
+    "ns": 9201139881900,
+    "thread": 21744,
+    "event": "end_headers.end"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.484531+00:00",
+    "ns": 9201139931500,
+    "thread": 18140,
+    "event": "readinto.end",
+    "bytes": 30
+  },
+  {
+    "utc": "2026-11-22T12:07:22.484559+00:00",
+    "ns": 9201139959700,
+    "thread": 21744,
+    "event": "finish.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.484572+00:00",
+    "ns": 9201139969100,
+    "thread": 21744,
+    "event": "finish.end"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.484579+00:00",
+    "ns": 9201139976000,
+    "thread": 21744,
+    "event": "shutdown_request.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.484642+00:00",
+    "ns": 9201140041200,
+    "thread": 18140,
+    "event": "send.start",
+    "connection": 2410507766352,
+    "bytes": 173
+  },
+  {
+    "utc": "2026-11-22T12:07:22.484660+00:00",
+    "ns": 9201140057200,
+    "thread": 21744,
+    "event": "close_request.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.484692+00:00",
+    "ns": 9201140092700,
+    "thread": 21744,
+    "event": "close_request.end"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.484701+00:00",
+    "ns": 9201140098000,
+    "thread": 21744,
+    "event": "shutdown_request.end"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.484945+00:00",
+    "ns": 9201140345200,
+    "thread": 21744,
+    "event": "readinto.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.484958+00:00",
+    "ns": 9201140354700,
+    "thread": 21744,
+    "event": "readinto.end",
+    "bytes": 173
+  },
+  {
+    "utc": "2026-11-22T12:07:22.485018+00:00",
+    "ns": 9201140415600,
+    "thread": 21744,
+    "event": "readinto.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.485031+00:00",
+    "ns": 9201140431800,
+    "thread": 18140,
+    "event": "send.end",
+    "connection": 2410507766352,
+    "bytes": 173
+  },
+  {
+    "utc": "2026-11-22T12:07:22.485043+00:00",
+    "ns": 9201140440300,
+    "thread": 18140,
+    "event": "send.start",
+    "connection": 2410507766352,
+    "bytes": 56
+  },
+  {
+    "utc": "2026-11-22T12:07:22.485073+00:00",
+    "ns": 9201140470600,
+    "thread": 21744,
+    "event": "readinto.end",
+    "bytes": 56
+  },
+  {
+    "utc": "2026-11-22T12:07:22.485088+00:00",
+    "ns": 9201140485000,
+    "thread": 21744,
+    "event": "send_response.start",
+    "connection": 2410507666896,
+    "status": 404,
+    "content_length_count": 1,
+    "content_length": 56,
+    "transfer_encoding_present": false
+  },
+  {
+    "utc": "2026-11-22T12:07:22.485106+00:00",
+    "ns": 9201140503000,
+    "thread": 21744,
+    "event": "send_response.end",
+    "connection": 2410507666896,
+    "status": 404,
+    "content_length_count": 1,
+    "content_length": 56,
+    "transfer_encoding_present": false
+  },
+  {
+    "utc": "2026-11-22T12:07:22.485112+00:00",
+    "ns": 9201140509000,
+    "thread": 21744,
+    "event": "end_headers.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.485122+00:00",
+    "ns": 9201140519600,
+    "thread": 18140,
+    "event": "send.end",
+    "connection": 2410507766352,
+    "bytes": 56
+  },
+  {
+    "utc": "2026-11-22T12:07:22.485139+00:00",
+    "ns": 9201140535800,
+    "thread": 18140,
+    "event": "begin.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.485143+00:00",
+    "ns": 9201140540100,
+    "thread": 18140,
+    "event": "readinto.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.485155+00:00",
+    "ns": 9201140552400,
+    "thread": 21744,
+    "event": "end_headers.end"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.485164+00:00",
+    "ns": 9201140561400,
+    "thread": 18140,
+    "event": "readinto.end",
+    "bytes": 170
+  },
+  {
+    "utc": "2026-11-22T12:07:22.485221+00:00",
+    "ns": 9201140617800,
+    "thread": 18140,
+    "event": "begin.end"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.485227+00:00",
+    "ns": 9201140623700,
+    "thread": 18140,
+    "event": "readinto.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.485238+00:00",
+    "ns": 9201140634700,
+    "thread": 21744,
+    "event": "finish.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.485244+00:00",
+    "ns": 9201140640700,
+    "thread": 21744,
+    "event": "finish.end"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.485249+00:00",
+    "ns": 9201140646000,
+    "thread": 21744,
+    "event": "shutdown_request.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.485258+00:00",
+    "ns": 9201140655500,
+    "thread": 18140,
+    "event": "readinto.end",
+    "bytes": 29
+  },
+  {
+    "utc": "2026-11-22T12:07:22.485267+00:00",
+    "ns": 9201140663700,
+    "thread": 21744,
+    "event": "close_request.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.485274+00:00",
+    "ns": 9201140708100,
+    "thread": 21744,
+    "event": "close_request.end"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.485315+00:00",
+    "ns": 9201140711600,
+    "thread": 21744,
+    "event": "shutdown_request.end"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.485374+00:00",
+    "ns": 9201140772900,
+    "thread": 18140,
+    "event": "send.start",
+    "connection": 2410507798384,
+    "bytes": 162
+  },
+  {
+    "utc": "2026-11-22T12:07:22.485555+00:00",
+    "ns": 9201140954200,
+    "thread": 18140,
+    "event": "send.end",
+    "connection": 2410507798384,
+    "bytes": 162
+  },
+  {
+    "utc": "2026-11-22T12:07:22.485564+00:00",
+    "ns": 9201140960700,
+    "thread": 18140,
+    "event": "send.start",
+    "connection": 2410507798384,
+    "bytes": 56
+  },
+  {
+    "utc": "2026-11-22T12:07:22.485601+00:00",
+    "ns": 9201141001200,
+    "thread": 21744,
+    "event": "readinto.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.485615+00:00",
+    "ns": 9201141012300,
+    "thread": 18140,
+    "event": "send.end",
+    "connection": 2410507798384,
+    "bytes": 56
+  },
+  {
+    "utc": "2026-11-22T12:07:22.485630+00:00",
+    "ns": 9201141027300,
+    "thread": 18140,
+    "event": "begin.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.485634+00:00",
+    "ns": 9201141031300,
+    "thread": 18140,
+    "event": "readinto.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.485645+00:00",
+    "ns": 9201141043100,
+    "thread": 21744,
+    "event": "readinto.end",
+    "bytes": 218
+  },
+  {
+    "utc": "2026-11-22T12:07:22.485715+00:00",
+    "ns": 9201141113000,
+    "thread": 21744,
+    "event": "send_response.start",
+    "connection": 2410506941264,
+    "status": 404,
+    "content_length_count": 1,
+    "content_length": 56,
+    "transfer_encoding_present": false
+  },
+  {
+    "utc": "2026-11-22T12:07:22.485733+00:00",
+    "ns": 9201141130600,
+    "thread": 21744,
+    "event": "send_response.end",
+    "connection": 2410506941264,
+    "status": 404,
+    "content_length_count": 1,
+    "content_length": 56,
+    "transfer_encoding_present": false
+  },
+  {
+    "utc": "2026-11-22T12:07:22.485740+00:00",
+    "ns": 9201141136400,
+    "thread": 21744,
+    "event": "end_headers.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.485771+00:00",
+    "ns": 9201141170800,
+    "thread": 18140,
+    "event": "readinto.end",
+    "bytes": 170
+  },
+  {
+    "utc": "2026-11-22T12:07:22.485832+00:00",
+    "ns": 9201141229200,
+    "thread": 18140,
+    "event": "begin.end"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.485839+00:00",
+    "ns": 9201141235500,
+    "thread": 18140,
+    "event": "readinto.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.485850+00:00",
+    "ns": 9201141247300,
+    "thread": 21744,
+    "event": "end_headers.end"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.485870+00:00",
+    "ns": 9201141267200,
+    "thread": 18140,
+    "event": "readinto.end",
+    "bytes": 29
+  },
+  {
+    "utc": "2026-11-22T12:07:22.485883+00:00",
+    "ns": 9201141279900,
+    "thread": 21744,
+    "event": "finish.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.485889+00:00",
+    "ns": 9201141285600,
+    "thread": 21744,
+    "event": "finish.end"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.485894+00:00",
+    "ns": 9201141290400,
+    "thread": 21744,
+    "event": "shutdown_request.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.486082+00:00",
+    "ns": 9201141480000,
+    "thread": 18140,
+    "event": "send.start",
+    "connection": 2410507798384,
+    "bytes": 178
+  },
+  {
+    "utc": "2026-11-22T12:07:22.486109+00:00",
+    "ns": 9201141508600,
+    "thread": 21744,
+    "event": "close_request.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.486123+00:00",
+    "ns": 9201141520100,
+    "thread": 21744,
+    "event": "close_request.end"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.486126+00:00",
+    "ns": 9201141522700,
+    "thread": 21744,
+    "event": "shutdown_request.end"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.486290+00:00",
+    "ns": 9201141688600,
+    "thread": 21744,
+    "event": "readinto.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.486302+00:00",
+    "ns": 9201141698700,
+    "thread": 21744,
+    "event": "readinto.end",
+    "bytes": 178
+  },
+  {
+    "utc": "2026-11-22T12:07:22.486357+00:00",
+    "ns": 9201141753900,
+    "thread": 21744,
+    "event": "readinto.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.486367+00:00",
+    "ns": 9201141766600,
+    "thread": 18140,
+    "event": "send.end",
+    "connection": 2410507798384,
+    "bytes": 178
+  },
+  {
+    "utc": "2026-11-22T12:07:22.486376+00:00",
+    "ns": 9201141773000,
+    "thread": 18140,
+    "event": "send.start",
+    "connection": 2410507798384,
+    "bytes": 70047
+  },
+  {
+    "utc": "2026-11-22T12:07:22.486413+00:00",
+    "ns": 9201141810400,
+    "thread": 18140,
+    "event": "send.end",
+    "connection": 2410507798384,
+    "bytes": 70047
+  },
+  {
+    "utc": "2026-11-22T12:07:22.486428+00:00",
+    "ns": 9201141824500,
+    "thread": 18140,
+    "event": "begin.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.486431+00:00",
+    "ns": 9201141827800,
+    "thread": 18140,
+    "event": "readinto.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.486439+00:00",
+    "ns": 9201141836700,
+    "thread": 21744,
+    "event": "readinto.end",
+    "bytes": 70047
+  },
+  {
+    "utc": "2026-11-22T12:07:22.486455+00:00",
+    "ns": 9201141851800,
+    "thread": 21744,
+    "event": "send_response.start",
+    "connection": 2410506941264,
+    "status": 413,
+    "content_length_count": 1,
+    "content_length": 70047,
+    "transfer_encoding_present": false
+  },
+  {
+    "utc": "2026-11-22T12:07:22.486471+00:00",
+    "ns": 9201141867300,
+    "thread": 21744,
+    "event": "send_response.end",
+    "connection": 2410506941264,
+    "status": 413,
+    "content_length_count": 1,
+    "content_length": 70047,
+    "transfer_encoding_present": false
+  },
+  {
+    "utc": "2026-11-22T12:07:22.486475+00:00",
+    "ns": 9201141871800,
+    "thread": 21744,
+    "event": "end_headers.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.486498+00:00",
+    "ns": 9201141894600,
+    "thread": 18140,
+    "event": "readinto.end",
+    "bytes": 178
+  },
+  {
+    "utc": "2026-11-22T12:07:22.486544+00:00",
+    "ns": 9201141940500,
+    "thread": 18140,
+    "event": "begin.end"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.486549+00:00",
+    "ns": 9201141945500,
+    "thread": 18140,
+    "event": "readinto.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.486558+00:00",
+    "ns": 9201141955200,
+    "thread": 21744,
+    "event": "end_headers.end"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.486574+00:00",
+    "ns": 9201141970800,
+    "thread": 21744,
+    "event": "finish.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.486579+00:00",
+    "ns": 9201141975200,
+    "thread": 21744,
+    "event": "finish.end"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.486583+00:00",
+    "ns": 9201141979200,
+    "thread": 21744,
+    "event": "shutdown_request.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.486590+00:00",
+    "ns": 9201141987500,
+    "thread": 18140,
+    "event": "readinto.end",
+    "bytes": 33
+  },
+  {
+    "utc": "2026-11-22T12:07:22.486597+00:00",
+    "ns": 9201141993000,
+    "thread": 21744,
+    "event": "close_request.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.486602+00:00",
+    "ns": 9201141998100,
+    "thread": 21744,
+    "event": "close_request.end"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.486604+00:00",
+    "ns": 9201141999900,
+    "thread": 21744,
+    "event": "shutdown_request.end"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.486653+00:00",
+    "ns": 9201142050000,
+    "thread": 18140,
+    "event": "send.start",
+    "connection": 2410506349616,
+    "bytes": 183
+  },
+  {
+    "utc": "2026-11-22T12:07:22.486815+00:00",
+    "ns": 9201142212800,
+    "thread": 21744,
+    "event": "readinto.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.486835+00:00",
+    "ns": 9201142232000,
+    "thread": 21744,
+    "event": "readinto.end",
+    "bytes": 183
+  },
+  {
+    "utc": "2026-11-22T12:07:22.486886+00:00",
+    "ns": 9201142282500,
+    "thread": 21744,
+    "event": "send_response.start",
+    "connection": 2410507319376,
+    "status": 400,
+    "content_length_count": 0,
+    "content_length": null,
+    "transfer_encoding_present": true
+  },
+  {
+    "utc": "2026-11-22T12:07:22.486899+00:00",
+    "ns": 9201142295000,
+    "thread": 21744,
+    "event": "send_response.end",
+    "connection": 2410507319376,
+    "status": 400,
+    "content_length_count": 0,
+    "content_length": null,
+    "transfer_encoding_present": true
+  },
+  {
+    "utc": "2026-11-22T12:07:22.486903+00:00",
+    "ns": 9201142299100,
+    "thread": 21744,
+    "event": "end_headers.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.486912+00:00",
+    "ns": 9201142311300,
+    "thread": 18140,
+    "event": "send.end",
+    "connection": 2410506349616,
+    "bytes": 183
+  },
+  {
+    "utc": "2026-11-22T12:07:22.486921+00:00",
+    "ns": 9201142317600,
+    "thread": 18140,
+    "event": "send.start",
+    "connection": 2410506349616,
+    "bytes": 56
+  },
+  {
+    "utc": "2026-11-22T12:07:22.486934+00:00",
+    "ns": 9201142330800,
+    "thread": 18140,
+    "event": "send.end",
+    "connection": 2410506349616,
+    "bytes": 56
+  },
+  {
+    "utc": "2026-11-22T12:07:22.486946+00:00",
+    "ns": 9201142342700,
+    "thread": 18140,
+    "event": "begin.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.486949+00:00",
+    "ns": 9201142345900,
+    "thread": 18140,
+    "event": "readinto.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.486957+00:00",
+    "ns": 9201142353400,
+    "thread": 18140,
+    "event": "readinto.end",
+    "bytes": 172
+  },
+  {
+    "utc": "2026-11-22T12:07:22.486998+00:00",
+    "ns": 9201142394300,
+    "thread": 18140,
+    "event": "begin.end"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.487002+00:00",
+    "ns": 9201142398200,
+    "thread": 18140,
+    "event": "readinto.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.487010+00:00",
+    "ns": 9201142406700,
+    "thread": 21744,
+    "event": "end_headers.end"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.487024+00:00",
+    "ns": 9201142420700,
+    "thread": 18140,
+    "event": "readinto.end",
+    "bytes": 40
+  },
+  {
+    "utc": "2026-11-22T12:07:22.487034+00:00",
+    "ns": 9201142430400,
+    "thread": 21744,
+    "event": "finish.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.487039+00:00",
+    "ns": 9201142435300,
+    "thread": 21744,
+    "event": "finish.end"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.487043+00:00",
+    "ns": 9201142439400,
+    "thread": 21744,
+    "event": "shutdown_request.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.487080+00:00",
+    "ns": 9201142477600,
+    "thread": 18140,
+    "event": "send.start",
+    "connection": 2410506418608,
+    "bytes": 175
+  },
+  {
+    "utc": "2026-11-22T12:07:22.487092+00:00",
+    "ns": 9201142488500,
+    "thread": 21744,
+    "event": "close_request.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.487100+00:00",
+    "ns": 9201142496600,
+    "thread": 21744,
+    "event": "close_request.end"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.487102+00:00",
+    "ns": 9201142498300,
+    "thread": 21744,
+    "event": "shutdown_request.end"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.487265+00:00",
+    "ns": 9201142661900,
+    "thread": 21744,
+    "event": "readinto.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.487272+00:00",
+    "ns": 9201142669000,
+    "thread": 21744,
+    "event": "readinto.end",
+    "bytes": 175
+  },
+  {
+    "utc": "2026-11-22T12:07:22.487313+00:00",
+    "ns": 9201142709400,
+    "thread": 21744,
+    "event": "readinto.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.487322+00:00",
+    "ns": 9201142721800,
+    "thread": 18140,
+    "event": "send.end",
+    "connection": 2410506418608,
+    "bytes": 175
+  },
+  {
+    "utc": "2026-11-22T12:07:22.487331+00:00",
+    "ns": 9201142728200,
+    "thread": 18140,
+    "event": "send.start",
+    "connection": 2410506418608,
+    "bytes": 56
+  },
+  {
+    "utc": "2026-11-22T12:07:22.487353+00:00",
+    "ns": 9201142749500,
+    "thread": 21744,
+    "event": "readinto.end",
+    "bytes": 56
+  },
+  {
+    "utc": "2026-11-22T12:07:22.487363+00:00",
+    "ns": 9201142759100,
+    "thread": 21744,
+    "event": "send_response.start",
+    "connection": 2410507314128,
+    "status": 401,
+    "content_length_count": 1,
+    "content_length": 56,
+    "transfer_encoding_present": false
+  },
+  {
+    "utc": "2026-11-22T12:07:22.487375+00:00",
+    "ns": 9201142771100,
+    "thread": 21744,
+    "event": "send_response.end",
+    "connection": 2410507314128,
+    "status": 401,
+    "content_length_count": 1,
+    "content_length": 56,
+    "transfer_encoding_present": false
+  },
+  {
+    "utc": "2026-11-22T12:07:22.487379+00:00",
+    "ns": 9201142775900,
+    "thread": 21744,
+    "event": "end_headers.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.487387+00:00",
+    "ns": 9201142783900,
+    "thread": 18140,
+    "event": "send.end",
+    "connection": 2410506418608,
+    "bytes": 56
+  },
+  {
+    "utc": "2026-11-22T12:07:22.487399+00:00",
+    "ns": 9201142796000,
+    "thread": 18140,
+    "event": "begin.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.487403+00:00",
+    "ns": 9201142799300,
+    "thread": 18140,
+    "event": "readinto.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.487411+00:00",
+    "ns": 9201142807300,
+    "thread": 18140,
+    "event": "readinto.end",
+    "bytes": 173
+  },
+  {
+    "utc": "2026-11-22T12:07:22.487455+00:00",
+    "ns": 9201142852000,
+    "thread": 18140,
+    "event": "begin.end"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.487460+00:00",
+    "ns": 9201142856400,
+    "thread": 18140,
+    "event": "readinto.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.487468+00:00",
+    "ns": 9201142864900,
+    "thread": 21744,
+    "event": "end_headers.end"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.487482+00:00",
+    "ns": 9201142879000,
+    "thread": 18140,
+    "event": "readinto.end",
+    "bytes": 30
+  },
+  {
+    "utc": "2026-11-22T12:07:22.487492+00:00",
+    "ns": 9201142888800,
+    "thread": 21744,
+    "event": "finish.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.487497+00:00",
+    "ns": 9201142893600,
+    "thread": 21744,
+    "event": "finish.end"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.487501+00:00",
+    "ns": 9201142897400,
+    "thread": 21744,
+    "event": "shutdown_request.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.487541+00:00",
+    "ns": 9201142937500,
+    "thread": 21744,
+    "event": "close_request.start"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.487548+00:00",
+    "ns": 9201142944700,
+    "thread": 21744,
+    "event": "close_request.end"
+  },
+  {
+    "utc": "2026-11-22T12:07:22.487550+00:00",
+    "ns": 9201142946500,
+    "thread": 21744,
+    "event": "shutdown_request.end"
+  }
+]
