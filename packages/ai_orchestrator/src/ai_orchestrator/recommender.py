@@ -68,7 +68,6 @@ def recommend_model(
     cost_exemptions: frozenset[str] = frozenset(),
     quality_adjustments: Mapping[str, int] | None = None,
     max_alternatives: int = 3,
-    allowance_remaining: Mapping[str, float] | None = None,
 ) -> ModelRecommendation:
     """Select the best catalog candidate for a task profile.
 
@@ -77,9 +76,6 @@ def recommend_model(
     privacy, capability and latency gates still apply to exempted routes.
     ``quality_adjustments`` maps route ids to quality-step changes from
     observed outcomes (demotions only); unknown routes are ignored.
-    ``allowance_remaining`` maps route ids to fresh limiting-window remaining
-    percentages. Thin buckets (<=20%, critically <=5%) are soft-demoted after
-    hard admission; missing/invalid observations preserve normal ranking.
     ``max_alternatives`` caps the ranked runner-up list (evaluation
     harnesses pass a large value to enumerate every accepted route).
     """
@@ -119,10 +115,7 @@ def recommend_model(
         )
 
     accepted.sort(
-        key=lambda candidate: (
-            _allowance_rank(candidate.backend.route_id, allowance_remaining),
-            *_candidate_score(profile, candidate, adjustments),
-        ),
+        key=lambda candidate: _candidate_score(profile, candidate, adjustments),
         reverse=True,
     )
     selected = accepted[0]
@@ -136,13 +129,6 @@ def recommend_model(
         ),
         "Candidates were filtered by route, privacy, cost policy, capability, and quality.",
     ]
-    thin = sorted(
-        entry.backend.route_id
-        for entry in accepted
-        if _allowance_rank(entry.backend.route_id, allowance_remaining) < 0
-    )
-    if thin:
-        reasons.append("Thin allowance buckets demoted for: " + ", ".join(thin) + ".")
     adjusted = sorted(
         {route for route in adjustments if adjustments[route] != 0}
         & {entry.backend.route_id for entry in accepted}
@@ -347,17 +333,3 @@ def _estimate_reason(estimate: ModelPerformanceEstimate) -> str | None:
 
     source = f" Source: {estimate.source}." if estimate.source else ""
     return f"Selected model estimates: {', '.join(parts)}.{source}"
-
-
-def _allowance_rank(route_id: str, remaining: Mapping[str, float] | None) -> int:
-    """Demote <=20% headroom, more strongly at <=5%; unknown stays neutral.
-
-    This soft preference runs only after hard admission. It cannot authorize
-    spend or relax privacy, capability, latency or the declared quality floor.
-    """
-    value = (remaining or {}).get(route_id)
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
-        return 0
-    if not math.isfinite(value) or not 0 <= value <= 100:
-        return 0
-    return -2 if value <= 5 else (-1 if value <= 20 else 0)

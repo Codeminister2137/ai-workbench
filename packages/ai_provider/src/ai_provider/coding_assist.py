@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import argparse
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -138,7 +138,6 @@ def run_coding_prompt(
     progress_prefix: str = "local_agent_activity",
     cost_exemptions: frozenset[str] = frozenset(),
     stream_text: Callable[[str], None] | None = None,
-    allowance_remaining: Mapping[str, float] | None = None,
 ) -> CodingAssistResult:
     """Prepare and optionally execute one coding-oriented AI request."""
 
@@ -150,7 +149,6 @@ def run_coding_prompt(
         prompt_for_review=prompt_for_review,
         timeout_seconds=timeout_seconds,
         cost_exemptions=cost_exemptions,
-        allowance_remaining=allowance_remaining,
     )
     if not orchestration.is_ready or orchestration.execution_plan is None:
         if progress_callback is not None:

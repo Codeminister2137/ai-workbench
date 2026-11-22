@@ -313,16 +313,6 @@ Paid Requesty catalog routes require prepaid authorization; the separate free
 route checks live zero prices before each inference request. See ADR-031 for the
 user-preference format and alternate official CLI adapters.
 
-Allowance-aware ranking (owner request, 2026-11-22): the orchestrator accepts
-an optional route-to-remaining-percent snapshot; provider composition reads live
-native observations through `ai_provider.allowance_windows` normalization.
-Among hard-admitted routes, <=20% headroom is demoted, <=5% more strongly;
-unknown/invalid observations are neutral. The minimum active window governs a
-subscription; expired windows are ignored. This soft preference can choose a
-lower declared grade only above the active quality floor. Existing billing tiers,
-spend authorizations and per-attempt live admission remain authoritative.
-See [routing scope and validation](repo-assistant/allowance-aware-routing.md).
-
 Default usage-limit fallback policy belongs to `ai_orchestrator.fallback`.
 The CLI preflights eligible executors, preserves the working tree, and supplies
 an observed-state handoff. Replacement routes stay on the same billing tier,

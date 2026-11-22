@@ -214,19 +214,3 @@ def test_run_coding_prompt_keeps_local_only_profile_off_external_backend() -> No
     assert result.config is None
     assert result.orchestration.failure_reason is not None
     assert "local-only" in result.orchestration.failure_reason
-
-
-def test_coding_preparation_keeps_allowance_ranked_route():
-    thin = _candidate(model="thin")
-    healthy = _candidate(model="healthy")
-    result = run_coding_prompt(
-        "Explain the failing test and suggest a minimal fix.",
-        coding_task_profile(),
-        (thin, healthy),
-        review_prompt=False,
-        allowance_remaining={thin.backend.route_id: 8, healthy.backend.route_id: 80},
-    )
-    assert result.orchestration.execution_plan is not None
-    assert result.orchestration.execution_plan.target.route_id == healthy.backend.route_id
-    assert result.request is not None
-    assert result.request.model == "healthy"
