@@ -1196,6 +1196,10 @@ Never remove a time guard without owner authorization.
 Report whether sleep was scheduled, requested, rejected or subsequently verified;
 never silently treat a failed request as success.
 
+Owner policy (2026-11-22, inbox 1a5eb4fa answer A): only active tasks block
+auto-sleep. Audio playback alone is not a sleep blocker; never decline or delay
+a scheduled sleep because audio is playing.
+
 New owner instructions or an explicit switch back to an attended session cancel
 pending unattended sleep that has not been requested: run `.\cancel-sleep.cmd`
 and verify the helpers' `sleep_cancelled` receipts before
