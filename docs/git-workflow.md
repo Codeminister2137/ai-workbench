@@ -29,6 +29,32 @@ This repository uses a two-branch integration model.
   branch before editing. Do not implement or commit task changes directly here
   without an explicit owner exception for that task.
 
+### Drain integration under ADR-087
+
+Completed dirty drain worktrees are committed on their working branch and get
+an agent-assigned **Review and integrate run branch** task, not a routine owner
+merge decision. The existing inbox bridge queues that review without another
+launch approval. This is scheduling of agent review, not automatic Git merging
+or a deterministic risk classifier.
+
+The integration agent must review the complete branch diff against current
+`develop`, record the reviewed commit, tier and rationale, and resolve scoped
+review findings. Tier 1/2 integration requires green tests, lint, formatting and
+configured type checks; a completion receipt or shipper Ruff pass is insufficient.
+Tier 3 (auth/secrets/credentials, billing, deletion/migration, architecture or
+external routing) still requires a concrete owner inbox decision before merge.
+Unclear tier or feature-plan authority requires inbox clarification. Changing the
+reviewed scope requires renewed review and, where applicable, approval.
+
+The owner should review concrete Tier 3 risk briefs and use the served dashboard
+through per-behavior E2E tasks. Promotion to `master` still needs explicit owner
+instruction and the existing E2E promotion gates. Existing pending merge decisions
+are not automatically answered, closed or migrated by this change.
+
+This workflow relies on the integration agent obeying these instructions and the
+existing Git/push gates; queue tests do not prove semantic risk classification or
+live integration quality. The legacy `auto/*` helper is not broadened by this path.
+
 ### Feature branches
 
 Before the first repository edit, verify the branch and create a focused branch

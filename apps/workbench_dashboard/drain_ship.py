@@ -5,12 +5,10 @@ uncommitted. The drain calls :func:`ship_completed_run` for every
 completed run; failures escalate the run to needs-attention instead of
 reading completed.
 
-What this does, in order: commit the run worktree on its own branch
-(run branches are never shared, so no approval is needed), then file a
-merge DECISION for the owner (merges touch shared develop plus serve,
-so they keep human approval). The merge close-out run does the
-merge, gated push, redeploy, and end-to-end smoke. Nothing here pushes,
-merges, or redeploys by itself.
+Commit on the run branch, then queue an agent integration review under
+ADR-087. Scheduling review is not merge authorization: the reviewer must
+classify the complete branch diff, preserve Tier 3 owner approval, and
+integrate Tier 1/2 only after green gates. Nothing here merges or pushes.
 """
 
 from __future__ import annotations
@@ -20,8 +18,28 @@ import sys
 from pathlib import Path
 from typing import Any
 
-MERGE_DECISION_TYPE = "decision"
-MERGE_OPTIONS = ("Merge now", "Hold")
+INTEGRATION_REVIEW = """Read docs/decisions/ADR-087-tiered-merge-gates-e2e-promotion.md.
+Review the complete branch diff against current develop (not just the last
+commit or run summary), including existing committed work. Record the reviewed
+commit, tier, rationale and scoped agent review findings; never merge unreviewed
+work. Re-review if the branch changes. Do not infer tier from file count or a
+completed run status.
+Tier 3: auth, secrets, credentials, money/billing, data deletion/migration,
+architecture changes, external data routing. Before merging any Tier 3 change,
+file an owner-assigned decision with the concrete diff, risks, options and
+recommendation, linked to this run and branch. Wait for explicit approval of
+that reviewed scope. If classification or approved feature-plan scope is
+unclear, stop and surface a clarification in the inbox; do not assume Tier 1/2.
+Tier 1/2: no routine owner merge approval. Integrate into develop only after
+scoped agent review, tests, lint, formatting and configured typecheck are green.
+Red/missing gates or unresolved review findings block integration; record the
+blocker rather than asking the owner to rubber-stamp it. Preserve existing
+push gates, redeploy on green, then health-check and smoke the behavior.
+Never target master. Owner per-behavior E2E and explicit develop-to-master
+promotion remain required; surface those actions on their existing dashboard
+surfaces. Record tier, review, gate evidence and integration result on this
+item (no separate merge report).
+"""
 
 
 def _run_git(worktree: Path, *args: str) -> subprocess.CompletedProcess[str]:
@@ -74,7 +92,7 @@ def _ruff_ok(worktree: Path, changed_py: list[str]) -> tuple[bool, str]:
 
 
 def ship_completed_run(run: dict, *, repo_root: Path, stores: Any) -> dict[str, Any]:
-    """Commit a completed run's worktree and file its merge decision.
+    """Commit a completed run's worktree and queue its integration review.
 
     Returns a shipment record with ``committed`` (bool), ``commit``,
     ``branch``, ``merge_item`` (or None), and ``action`` notes. Raises
@@ -129,35 +147,28 @@ def ship_completed_run(run: dict, *, repo_root: Path, stores: Any) -> dict[str, 
     merge_error = None
     try:
         item = stores.create_inbox_task(
-            title=f"Merge run branch {branch}?",
+            title=f"Review and integrate run branch {branch}",
             body=(
                 f"Drain run {run_id} ({title}) committed {commit_hash} on {branch} "
-                f"({stat_line}). Merge into develop, push through the gate, redeploy "
-                "on green, then health-check and smoke the feature end to end."
+                f"({stat_line}).\n\n{INTEGRATION_REVIEW}"
             ),
-            task_type=MERGE_DECISION_TYPE,
-            options=list(MERGE_OPTIONS),
+            task_type="task",
             created_by="supervisor",
-            assignee="owner",
+            assignee="agent",
             project_id=str(stores.default_project_id()),
             metadata={
                 "merge_for_branch": branch,
                 "merge_for_run": run_id,
-                "followup": {
-                    "owner": "Pick Merge now or Hold.",
-                    "ai": (
-                        "On Merge now: merge, gated push, redeploy, "
-                        "health-check, smoke, record the resolution on this decision "
-                        "(no separate merge report). On Hold: leave "
-                        "the branch; release on request."
-                    ),
-                },
             },
             context_refs=[f"run:{run_id}"],
         )
         merge_item = item.get("id")
     except Exception as exc:  # noqa: BLE001 - commit preserved; merge retries later
         merge_error = f"{type(exc).__name__}: {exc}"
+    if merge_error:
+        raise RuntimeError(
+            f"commit {commit_hash} preserved; integration review not queued: {merge_error}"
+        )
     return {
         "committed": True,
         "action": "shipped",
