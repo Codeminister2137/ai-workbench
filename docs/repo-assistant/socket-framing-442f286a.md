@@ -25,7 +25,7 @@ present in this checkout.
 [events](socket-framing-442f286a/events.json),
 [receipt](socket-framing-442f286a/receipt.json),
 [supervisor bound/result](socket-framing-442f286a/supervisor.json),
-[pytest result](socket-framing-442f286a/result.xml).
+[pytest result](socket-framing-442f286a/result.xml) (machine hostname removed).
 Console output remains at `.tmp/socket-framing-442f286a/console.txt`.
 Output-directory creation refuses reuse. Ruff subsequently reformatted the
 script; this was whitespace only, and the consumed test was not rerun.
