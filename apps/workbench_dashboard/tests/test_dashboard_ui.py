@@ -15,9 +15,6 @@ def _read(name: str) -> str:
 
 
 def test_knowme_groups_entries_without_rewriting_facts() -> None:
-    node = shutil.which("node")
-    if node is None:
-        pytest.skip("node is required for KnowMe rendering")
     driver = r"""
 const assert = require('assert');
 const source = require('fs').readFileSync(process.argv[1], 'utf8');
@@ -58,10 +55,7 @@ eval(renderer);
   assert(!view.innerHTML.includes('<section'));
 })().catch(error => {console.error(error); process.exitCode = 1;});
 """
-    result = subprocess.run(
-        [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
-    )
-    assert result.returncode == 0, result.stderr
+    _run_node_driver(driver)
     assert "white-space: pre-wrap" in _read("app.css")
 
 
@@ -72,8 +66,17 @@ def _node_driver() -> str:
     return node
 
 
+def _run_node_driver(driver: str) -> None:
+    """Run an app.js assertion driver with shared Node discovery and diagnostics."""
+    result = subprocess.run(
+        [_node_driver(), "-e", driver, str(WEB_DIR / "app.js")],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+
+
 def test_spend_card_renders_dollars_policy_editor_and_adjust() -> None:
-    node = _node_driver()
     driver = r"""
 const assert = require('assert');
 const source = require('fs').readFileSync(process.argv[1], 'utf8');
@@ -100,14 +103,10 @@ assert(html.includes('name="remaining"'), 'remaining input');
 const off = spendCardHtml({configured: false});
 assert(off.includes('denied by default'), 'unconfigured denial');
 """
-    result = subprocess.run(
-        [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
-    )
-    assert result.returncode == 0, result.stderr
+    _run_node_driver(driver)
 
 
 def test_provider_card_renders_quota_windows() -> None:
-    node = _node_driver()
     driver = r"""
 const assert = require('assert');
 const source = require('fs').readFileSync(process.argv[1], 'utf8');
@@ -146,10 +145,7 @@ const ohtml = providerCardHtml(occ, []);
 assert(ohtml.includes('weekly'), 'opencode label');
 assert(ohtml.includes('17% used'), 'opencode used');
 """
-    result = subprocess.run(
-        [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
-    )
-    assert result.returncode == 0, result.stderr
+    _run_node_driver(driver)
 
 
 def test_create_menu_hidden_rule_collapses_menu() -> None:
@@ -1095,9 +1091,6 @@ def test_mobile_media_query_keeps_single_scrollable_tab_row() -> None:
 
 
 def test_module_routing_executes_landing_and_disabled_deep_links():
-    node = shutil.which("node")
-    if node is None:
-        pytest.skip("node is required for router execution")
     js = _read("app.js")
     router = js[
         js.index("async function render() {") : js.index(
@@ -1137,10 +1130,7 @@ eval(router);
 })().catch(error => {console.error(error); process.exitCode = 1;});
 """
     assert "moduleSettings.landing_page" in router
-    result = subprocess.run(
-        [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
-    )
-    assert result.returncode == 0, result.stderr
+    _run_node_driver(driver)
 
 
 def test_chat_live_progress_pins():
@@ -1162,9 +1152,6 @@ def test_chat_live_progress_pins():
 
 def test_filter_changes_and_badge_execute():
     """Checkbox changes keep valid routes and explicit empty selections across reloads."""
-    node = shutil.which("node")
-    if node is None:
-        pytest.skip("node is required for filter execution")
     driver = r"""
 const assert = require('assert');
 const source = require('fs').readFileSync(process.argv[1], 'utf8');
@@ -1201,17 +1188,11 @@ eval(source.slice(source.indexOf('async function pollInboxBadge()'), source.inde
   attention = 0; await pollInboxBadge(); assert.equal(badge.hidden, true);
 })().catch(error => {console.error(error); process.exitCode = 1;});
 """
-    result = subprocess.run(
-        [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
-    )
-    assert result.returncode == 0, result.stderr
+    _run_node_driver(driver)
 
 
 def test_reminder_entries_separated_execute():
     """Reminder cards separate entries with a rule, never one run-on block."""
-    node = shutil.which("node")
-    if node is None:
-        pytest.skip("node is required for reminder execution")
     driver = r"""
 const assert = require('assert');
 const source = require('fs').readFileSync(process.argv[1], 'utf8');
@@ -1238,17 +1219,11 @@ eval(source.slice(source.indexOf('async function renderE2EReminders('),
   assert(html.indexOf('<hr>') > html.indexOf('b1'));
 })().catch(error => {console.error(error); process.exitCode = 1;});
 """
-    result = subprocess.run(
-        [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
-    )
-    assert result.returncode == 0, result.stderr
+    _run_node_driver(driver)
 
 
 def test_receipts_keep_open_state_across_refreshes():
     """Unchanged receipts skip re-render; changed ones restore open entries."""
-    node = shutil.which("node")
-    if node is None:
-        pytest.skip("node is required for receipts execution")
     driver = r"""
 const assert = require('assert');
 const source = require('fs').readFileSync(process.argv[1], 'utf8');
@@ -1282,17 +1257,11 @@ eval(source.slice(source.indexOf('function receiptHtml('), source.indexOf('/* Pr
   assert.deepEqual(opened, ['r1']);  // previously open entry restored
 })().catch(error => {console.error(error); process.exitCode = 1;});
 """
-    result = subprocess.run(
-        [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
-    )
-    assert result.returncode == 0, result.stderr
+    _run_node_driver(driver)
 
 
 def test_e2e_detail_return_preserves_list_selection():
     """Checklist/report navigation retains filters, including an empty selection."""
-    node = shutil.which("node")
-    if node is None:
-        pytest.skip("node is required for E2E navigation execution")
     driver = r"""
 const assert = require('assert');
 const source = require('fs').readFileSync(process.argv[1], 'utf8');
@@ -1331,16 +1300,10 @@ eval(source.slice(source.indexOf('async function renderE2E('), source.indexOf('a
   }
 })().catch(error => {console.error(error); process.exitCode = 1;});
 """
-    result = subprocess.run(
-        [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
-    )
-    assert result.returncode == 0, result.stderr
+    _run_node_driver(driver)
 
 
 def test_runs_explains_scheduler_cadence_and_failure_states() -> None:
-    node = shutil.which("node")
-    if node is None:
-        pytest.skip("node is required to execute the scheduler renderer")
     driver = r"""
 const assert = require('assert');
 const fs = require('fs');
@@ -1356,10 +1319,7 @@ assert.match(active, /Finished ticks: 7; tick errors: 0/);
 assert.match(active, /Drain paused/);
 assert.match(drainSchedulerText({started: true, errors: 2, last_error: 'RuntimeError: boom'}), /tick errors: 2. Last error: RuntimeError: boom/);
 """
-    result = subprocess.run(
-        [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
-    )
-    assert result.returncode == 0, result.stderr
+    _run_node_driver(driver)
     js = _read("app.js")
     assert 'drainStatus = (await api("/api/status")).drain_scheduler' in js
     assert "${esc(drainSchedulerText(drainStatus))}" in js
@@ -1411,9 +1371,6 @@ def test_chat_agent_controls_present() -> None:
 
 def test_run_report_renders_readable_markdown() -> None:
     """Run reports render headers/lists/bold, never raw markdown or markup."""
-    node = shutil.which("node")
-    if node is None:
-        pytest.skip("node is required to execute the report renderer")
     driver = r"""
 const assert = require('assert');
 const source = require('fs').readFileSync(process.argv[1], 'utf8');
@@ -1426,15 +1383,11 @@ assert(html.includes('<li>read_file</li>'));
 assert(!html.includes('<script>'));
 assert(html.includes('&lt;script&gt;'));
 """
-    result = subprocess.run(
-        [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
-    )
-    assert result.returncode == 0, result.stderr
+    _run_node_driver(driver)
     assert "mdHtml(run.report)" in _read("app.js")
 
 
 def test_inbox_divergence_banner_explains_badge_gap() -> None:
-    node = _node_driver()
     driver = r"""
 const assert = require('assert');
 const source = require('fs').readFileSync(process.argv[1], 'utf8');
@@ -1485,14 +1438,10 @@ const shown = (html) => (html.match(/<li>/g) || []).length;
   assert.equal(shown(view.innerHTML), 2, 'answered remains available explicitly');
 })().catch(error => {console.error(error); process.exitCode = 1;});
 """
-    result = subprocess.run(
-        [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
-    )
-    assert result.returncode == 0, result.stderr
+    _run_node_driver(driver)
 
 
 def test_inbox_kind_filter_hides_reports_by_default() -> None:
-    node = _node_driver()
     driver = r"""
 const assert = require('assert');
 const source = require('fs').readFileSync(process.argv[1], 'utf8');
@@ -1541,14 +1490,10 @@ const shown = (html) => (html.match(/<li>/g) || []).length;
     'default kind boxes render checked');
 })().catch(error => {console.error(error); process.exitCode = 1;});
 """
-    result = subprocess.run(
-        [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
-    )
-    assert result.returncode == 0, result.stderr
+    _run_node_driver(driver)
 
 
 def test_inbox_detail_renders_notes_with_line_breaks() -> None:
-    node = _node_driver()
     driver = r"""
 const assert = require('assert');
 const source = require('fs').readFileSync(process.argv[1], 'utf8');
@@ -1579,14 +1524,10 @@ const api = async (path) => ({item});
     'answer note preserves breaks');
 })().catch(error => {console.error(error); process.exitCode = 1;});
 """
-    result = subprocess.run(
-        [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
-    )
-    assert result.returncode == 0, result.stderr
+    _run_node_driver(driver)
 
 
 def test_jobs_view_renders_review_form() -> None:
-    node = _node_driver()
     driver = r"""
 const assert = require('assert');
 const source = require('fs').readFileSync(process.argv[1], 'utf8');
@@ -1608,14 +1549,10 @@ const document = {getElementById: () => ({addEventListener() {}})};
   assert(html.includes('id="jobs-result"'), 'result target renders');
 })().catch(error => {console.error(error); process.exitCode = 1;});
 """
-    result = subprocess.run(
-        [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
-    )
-    assert result.returncode == 0, result.stderr
+    _run_node_driver(driver)
 
 
 def test_humanize_activity_translates_mai_lines() -> None:
-    node = _node_driver()
     driver = r"""
 const assert = require('assert');
 const source = require('fs').readFileSync(process.argv[1], 'utf8');
@@ -1635,14 +1572,10 @@ assert.equal(humanizeActivity('route_id: openai/x'), null);
 assert.equal(humanizeActivity('Some plain narration.'), 'Some plain narration.');
 assert.equal(truncate('abcdef', 4), 'abcd…');
 """
-    result = subprocess.run(
-        [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
-    )
-    assert result.returncode == 0, result.stderr
+    _run_node_driver(driver)
 
 
 def test_chat_thread_renders_agent_turn_commands_above_report() -> None:
-    node = _node_driver()
     driver = r"""
 const assert = require('assert');
 const source = require('fs').readFileSync(process.argv[1], 'utf8');
@@ -1687,14 +1620,10 @@ const api = async (path) => {
   assert(html.includes('git status'), 'command text renders');
 })().catch(error => {console.error(error); process.exitCode = 1;});
 """
-    result = subprocess.run(
-        [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
-    )
-    assert result.returncode == 0, result.stderr
+    _run_node_driver(driver)
 
 
 def test_chat_thread_collapses_long_turns_and_links_plan() -> None:
-    node = _node_driver()
     driver = r"""
 const assert = require('assert');
 const source = require('fs').readFileSync(process.argv[1], 'utf8');
@@ -1740,14 +1669,10 @@ const api = async (path) => {
   assert(!html.includes('#/plans/p2'), 'unrelated plans excluded');
 })().catch(error => {console.error(error); process.exitCode = 1;});
 """
-    result = subprocess.run(
-        [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
-    )
-    assert result.returncode == 0, result.stderr
+    _run_node_driver(driver)
 
 
 def test_chat_thread_scrolls_to_input_on_open() -> None:
-    node = _node_driver()
     driver = r"""
 const assert = require('assert');
 const source = require('fs').readFileSync(process.argv[1], 'utf8');
@@ -1786,16 +1711,12 @@ const api = async (path) => {
   assert(scrolled[0] && scrolled[0].block === 'end', 'scrolled to end');
 })().catch(error => {console.error(error); process.exitCode = 1;});
 """
-    result = subprocess.run(
-        [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
-    )
-    assert result.returncode == 0, result.stderr
+    _run_node_driver(driver)
     css = (WEB_DIR / "app.css").read_text(encoding="utf-8")
     assert "#chat-form" in css and "position: sticky" in css
 
 
 def test_inbox_detail_renders_acknowledge_for_reports() -> None:
-    node = _node_driver()
     driver = r"""
 const assert = require('assert');
 const source = require('fs').readFileSync(process.argv[1], 'utf8');
@@ -1825,10 +1746,7 @@ const api = async (path) => ({item});
   assert(!html.includes('id="close-form"'), 'reports take no closes');
 })().catch(error => {console.error(error); process.exitCode = 1;});
 """
-    result = subprocess.run(
-        [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
-    )
-    assert result.returncode == 0, result.stderr
+    _run_node_driver(driver)
 
 
 def test_bundled_services_render_in_fleet_and_projects() -> None:
@@ -1895,7 +1813,6 @@ eval(source.slice(source.indexOf('async function renderFleet('),
 
 
 def test_fleet_flags_dead_end_runs() -> None:
-    node = _node_driver()
     driver = r"""
 const assert = require('assert');
 const source = require('fs').readFileSync(process.argv[1], 'utf8');
@@ -1926,14 +1843,10 @@ const api = async (path) => path === '/api/sleep' ? {active: false} : {fleet};
   assert(!html.includes('>ok<'), 'ok runs stay unflagged');
 })().catch(error => {console.error(error); process.exitCode = 1;});
 """
-    result = subprocess.run(
-        [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
-    )
-    assert result.returncode == 0, result.stderr
+    _run_node_driver(driver)
 
 
 def test_link_ids_links_refs_and_bare_ids_without_nesting() -> None:
-    node = _node_driver()
     driver = r"""
 const assert = require('assert');
 const source = require('fs').readFileSync(process.argv[1], 'utf8');
@@ -1969,14 +1882,10 @@ assert.equal(linkIds('javascript:alert(1)'), 'javascript:alert(1)');
 const multiple = linkIds(apollo + ' http://example.org/docs. run:8fad37897a5b');
 assert.equal((multiple.match(/<a /g) || []).length, 3, 'URLs and item refs coexist');
 """
-    result = subprocess.run(
-        [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
-    )
-    assert result.returncode == 0, result.stderr
+    _run_node_driver(driver)
 
 
 def test_inbox_detail_renders_ref_hyperlinks() -> None:
-    node = _node_driver()
     driver = r"""
 const assert = require('assert');
 const source = require('fs').readFileSync(process.argv[1], 'utf8');
@@ -2012,14 +1921,10 @@ const api = async (path) => ({item});
   assert(html.includes('id="lookup-go"') === false, 'detail has no lookup field');
 })().catch(error => {console.error(error); process.exitCode = 1;});
 """
-    result = subprocess.run(
-        [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
-    )
-    assert result.returncode == 0, result.stderr
+    _run_node_driver(driver)
 
 
 def test_lookup_view_resolves_and_disambiguates() -> None:
-    node = _node_driver()
     driver = r"""
 const assert = require('assert');
 const source = require('fs').readFileSync(process.argv[1], 'utf8');
@@ -2053,16 +1958,10 @@ const api = async (path) => ({matches});
   assert(view.innerHTML.includes('#/inbox/a') && view.innerHTML.includes('#/runs/b'), 'both link');
 })().catch(error => {console.error(error); process.exitCode = 1;});
 """
-    result = subprocess.run(
-        [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
-    )
-    assert result.returncode == 0, result.stderr
+    _run_node_driver(driver)
 
 
 def test_bug_report_builder_requires_description_and_gates_activity() -> None:
-    node = shutil.which("node")
-    if node is None:
-        pytest.skip("node is required for bug report builder")
     driver = r"""
 const assert = require('assert');
 const source = require('fs').readFileSync(process.argv[1], 'utf8');
@@ -2084,16 +1983,10 @@ assert(!without.body.includes('recent actions'), 'no activity leaked');
 const evil = buildBugReport({description: '<script>alert(1)</script>', consent: false, recent: []});
 assert(evil.body.includes('<script>alert(1)</script>'), 'raw text kept for server escape');
 """
-    result = subprocess.run(
-        [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
-    )
-    assert result.returncode == 0, result.stderr
+    _run_node_driver(driver)
 
 
 def test_bug_dialog_preserves_view_on_cancel_submit_and_failure() -> None:
-    node = shutil.which("node")
-    if node is None:
-        pytest.skip("node is required for bug dialog lifecycle")
     driver = r"""
 const assert = require('assert');
 const source = require('fs').readFileSync(process.argv[1], 'utf8');
@@ -2185,10 +2078,7 @@ const unchanged = () => {
   unchanged();
 })().catch(err => {console.error(err); process.exitCode = 1;});
 """
-    result = subprocess.run(
-        [node, "-e", driver, str(WEB_DIR / "app.js")], capture_output=True, text=True
-    )
-    assert result.returncode == 0, result.stderr
+    _run_node_driver(driver)
     js = _read("app.js")
     assert 'addEventListener("click", openBugReport)' in js
     assert "#/create/bug" not in js
