@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 from dashboard_stores import DashboardStores
 from drain_ship import ship_completed_run
+from inbox_bridge import bridge_agent_queue
 
 
 @pytest.fixture
@@ -50,7 +51,7 @@ def _run(worktree: Path, branch: str = "run/abc123") -> dict:
     }
 
 
-def test_ship_commits_and_files_merge_decision(stores, worktree, tmp_path) -> None:
+def test_ship_commits_and_queues_integration_review(stores, worktree, tmp_path) -> None:
     (worktree / "note.txt").write_text("base\nrun edit\n", encoding="utf-8")
     shipment = ship_completed_run(_run(worktree), repo_root=tmp_path, stores=stores)
     assert shipment["committed"] is True
@@ -60,32 +61,50 @@ def test_ship_commits_and_files_merge_decision(stores, worktree, tmp_path) -> No
     assert shipment["merge_item"]
     item = stores.inbox.get(shipment["merge_item"])
     assert item is not None
-    assert item["type"] == "decision"
-    assert item["options"] == ["Merge now", "Hold"]
+    assert item["type"] == "task"
+    assert item["assignee"] == "agent"
+    assert item["options"] == ["Done"]
     assert (item.get("metadata") or {}).get("merge_for_branch") == "run/abc123"
 
 
-@pytest.mark.parametrize("answer", ["Merge now", "Hold"])
-def test_shipped_merge_decision_resolves_without_report(stores, worktree, tmp_path, answer):
-    (worktree / "note.txt").write_text("run edit\n", encoding="utf-8")
+@pytest.mark.parametrize("path", ["note.txt", "auth.txt", "billing.txt", "migration.sql"])
+def test_routine_and_sensitive_changes_require_review_before_integration(
+    stores, worktree, tmp_path, path
+):
+    (worktree / path).write_text("change\n", encoding="utf-8")
+    develop_before = _git(worktree, "rev-parse", "develop")
     shipment = ship_completed_run(_run(worktree), repo_root=tmp_path, stores=stores)
-    decision = stores.inbox.get(shipment["merge_item"])
-    assert decision["status"] == "open"
-    assert decision["assignee"] == "owner"
-    assert "no separate merge report" in decision["metadata"]["followup"]["ai"]
+    item = stores.inbox.get(shipment["merge_item"])
+    assert item["type"] == "task" and item["assignee"] == "agent"
+    body = item["body"]
+    assert "complete branch diff" in body
+    assert "Wait for explicit approval" in body
+    assert "Tier 1/2: no routine owner merge approval" in body
+    assert "tests, lint, formatting and configured typecheck" in body
+    assert "Never target master" in body
+    assert "Owner per-behavior E2E" in body
+    (receipt,) = bridge_agent_queue(stores)
+    queued = stores.runs.get(receipt["run_id"])
+    assert queued["approval_mode"] == "agent-queue"
+    assert body.strip() in queued["body"]
+    assert bridge_agent_queue(stores) == []
+    assert _git(worktree, "rev-parse", "develop") == develop_before
     items, _ = stores.inbox.list(limit=100)
-    assert len(items) == 1  # Shipping still waits for the owner's decision.
+    assert not any(item["type"] == "decision" for item in items)
 
-    answered = stores.answer_inbox_task(decision["id"], answer=answer)
-    closeout_id = answered["metadata"]["closeout_id"]
-    stores.close_inbox_task(closeout_id, resolution=f"Completed {answer}")
-    stores.close_inbox_task(decision["id"], resolution=f"Resolved {answer}")
-    resolved = stores.inbox.get(decision["id"])
-    assert resolved["answer"] == answer and resolved["status"] == "closed"
-    assert f"Completed {answer}" in resolved["note"]
-    items, _ = stores.inbox.list(limit=100)
-    assert len(items) == 2
-    assert not any(item["type"] == "report" for item in items)
+
+def test_ship_queue_failure_escalates_with_preserved_commit(
+    stores, worktree, tmp_path, monkeypatch
+):
+    (worktree / "note.txt").write_text("change\n", encoding="utf-8")
+
+    def fail(**kwargs):
+        raise RuntimeError("inbox unavailable")
+
+    monkeypatch.setattr(stores, "create_inbox_task", fail)
+    with pytest.raises(RuntimeError, match="preserved; integration review not queued"):
+        ship_completed_run(_run(worktree), repo_root=tmp_path, stores=stores)
+    assert _git(worktree, "status", "--porcelain") == ""
 
 
 def test_ship_names_current_branch_not_stale_receipt(stores, worktree, tmp_path) -> None:
