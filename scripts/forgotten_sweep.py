@@ -781,7 +781,10 @@ def collect_e2e(
                     age,
                 )
             )
-        elif all("failed" in slot["runs"] or not slot["runs"] for slot in linked):
+        elif all(
+            not slot["runs"] or all(status == "failed" for status in slot["runs"])
+            for slot in linked
+        ):
             runs_desc = ",".join(sorted({s for slot in linked for s in slot["runs"]}) or ["?"])
             findings.append(
                 _finding(
