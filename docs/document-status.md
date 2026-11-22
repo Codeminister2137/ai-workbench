@@ -114,6 +114,7 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/plans/model-capability-data-plan.md | KNOWLEDGE | Program reference; L1/L2 live per roadmap, L3 ladder pending. |
 | docs/plans/morning-loop-20261122.md | PENDING | Morning loop plan 2026-11-22 (active; delete or archive at closeout). |
 | docs/plans/morning-loop-20261123.md | PENDING | Morning loop plan 2026-11-23 (routing recovery first; bounds TBD). |
+| docs/plans/free-tier-20261123.md | PENDING | Free-tier map v0 (web-only, unverified) 2026-11-23; verify before spending. |
 | docs/plans/opencode-go-ide-handoff-20261022.md | KNOWLEDGE | Ordering superseded by integration-first; task detail still referenced. |
 | docs/plans/opencode-go-integration-first-20261022.md | ACTED | Task order consumed (Go work + acceptance scripts exist). |
 | docs/plans/p3-workbench-routed-loop-scouting.md | KNOWLEDGE | Durable finding (bridge claim half wrong). |
