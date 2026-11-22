@@ -14,6 +14,9 @@ param(
     [datetimeoffset]$SleepAtUtc = [datetimeoffset]::MinValue,
     [string]$ReceiptPath = "",
     [string]$CancelPath = "",
+    [string]$IdlePython = "",
+    [string]$IdleDataDirectory = "",
+    [string]$IdleConfigPath = "",
     [datetimeoffset]$NotBeforeUtc = [datetimeoffset]::MinValue
 )
 
@@ -312,15 +315,33 @@ try {
 } catch {
     Write-Output "sleep_status: display restore failed (proceeding): $_"
 }
-Write-SleepReceipt "sleep_requested"
-Write-Output "sleep_requested_warsaw: $($sleepTransitionTimesWarsaw['sleep_requested']) (Europe/Warsaw)"
-Write-Output "sleep_status: requesting"
-$accepted = [System.Windows.Forms.Application]::SetSuspendState(
-    [System.Windows.Forms.PowerState]::Suspend, $false, $false
-)
-if (-not $accepted) {
-    Write-SleepReceipt "sleep_request_rejected"
-    throw "Windows rejected the sleep request."
+$idleLock = $null
+try {
+    if ($IdleDataDirectory) {
+        if (-not $IdlePython -or -not $IdleConfigPath) { throw 'Idle interlock requires Python and config.' }
+        $idleLock = [IO.File]::Open((Join-Path $IdleDataDirectory 'wake-idle.lock'),
+            [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, [IO.FileShare]::ReadWrite)
+        $idleLock.Lock(0, 1)
+        & $IdlePython (Join-Path $PSScriptRoot '../apps/workbench_dashboard/wake_idle.py') `
+            --check-final --data-dir $IdleDataDirectory --config $IdleConfigPath
+        if ($LASTEXITCODE -ne 0 -or (Read-CancelGeneration) -ne $cancelGeneration -or
+            ($CancelPath -and (Test-Path -LiteralPath $CancelPath))) {
+            Write-SleepReceipt 'sleep_cancelled' 'idle interlock blocked final handoff'
+            return
+        }
+    }
+    Write-SleepReceipt "sleep_requested"
+    Write-Output "sleep_requested_warsaw: $($sleepTransitionTimesWarsaw['sleep_requested']) (Europe/Warsaw)"
+    Write-Output "sleep_status: requesting"
+    $accepted = [System.Windows.Forms.Application]::SetSuspendState(
+        [System.Windows.Forms.PowerState]::Suspend, $false, $false
+    )
+    if (-not $accepted) {
+        Write-SleepReceipt "sleep_request_rejected"
+        throw "Windows rejected the sleep request."
+    }
+    Write-SleepReceipt "sleep_api_returned_success"
+    Write-Output "sleep_status: API returned success (may return after wake)"
+} finally {
+    if ($null -ne $idleLock) { $idleLock.Dispose() }
 }
-Write-SleepReceipt "sleep_api_returned_success"
-Write-Output "sleep_status: API returned success (may return after wake)"

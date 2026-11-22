@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import secrets
 import uuid
+from contextlib import nullcontext
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -106,8 +107,17 @@ class JsonCollection:
         if len(body) > MAX_RESPONSE_BYTES:
             raise StoreError("Stored item exceeds the size bound")
         tmp = path.with_name(path.name + ".tmp")
-        tmp.write_bytes(body)
-        tmp.replace(path)
+        from wake_idle import cancel_pending, interlock
+
+        task_state = self.directory.name in {"inbox", "runs"}
+        with interlock(self.directory.parent) if task_state else nullcontext():
+            if task_state and (
+                self.directory.name == "runs"
+                or (payload.get("status") == "open" and payload.get("assignee") == "agent")
+            ):
+                cancel_pending(self.directory.parent)
+            tmp.write_bytes(body)
+            tmp.replace(path)
         return path
 
     def delete(self, item_id: str) -> bool:

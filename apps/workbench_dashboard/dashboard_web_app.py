@@ -1463,7 +1463,11 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 {"ok": False, "error": "supervision must be a string"}, status=400
             )
         try:
-            saved = save_supervision(self.config_path, supervision)
+            from wake_idle import cancel_pending, interlock
+
+            with interlock(self.data_dir):
+                cancel_pending(self.data_dir)
+                saved = save_supervision(self.config_path, supervision)
         except ValueError as exc:
             return self._send_json({"ok": False, "error": str(exc)}, status=400)
         self._send_json(
@@ -3866,7 +3870,15 @@ def maybe_start_drain_scheduler(
     stores = DashboardStores(data_dir)
     drain_root = repo_root or REPO_ROOT
 
+    from wake_idle import WakeIdle
+
+    wake_idle = WakeIdle(data_dir, config_path, drain_root)
+
     def tick() -> None:
+        try:
+            wake_idle.tick()
+        except Exception as exc:  # noqa: BLE001 - idle failure must not stop drains
+            print(f"Workbench dashboard: wake-idle check failed: {exc}")
         from inbox_bridge import bridge_agent_queue, resolve_bridge_fanout
 
         try:

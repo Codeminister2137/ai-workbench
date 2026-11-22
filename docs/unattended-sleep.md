@@ -227,3 +227,24 @@ after interruption.
 The local waiting/renewal work should be small, but has not been benchmarked.
 Ten-minute refreshes mean roughly six lightweight checkpoints per hour; combining
 them with normal progress checks avoids separate model/reviewer invocations.
+
+## Dashboard wake-idle interlock
+
+The existing dashboard supervision/drain tick checks wake-idle sleep when its
+periodic scheduler is enabled. Startup and detected resume receive 30 minutes
+of grace. Only unattended mode is eligible. Open agent inbox tasks, queued or
+running runs, claimed runs (including claim files), and runs finished within
+30 minutes block sleep. Owner inbox items and audio playback do not block it.
+
+Task admission and mode changes share `wake_idle.interlock`; new work cancels
+the pending idle handoff. The helper performs display restoration without that
+lock, then holds the same file lock across a fresh Python state check and the
+Windows suspend call. Unreadable state fails closed. The helper's own receipt
+(`wake-idle-helper.json`) distinguishes cancellation, rejection and API return;
+an API return alone does not prove a sleep transition.
+
+`wake_idle.commit_sleep` is the single handoff seam. This implements option A
+per e8eb8857/A and the safety condition; 4b7c31d0 remains pending owner
+retro-confirmation. Option B was excluded because deferring admission without
+a configured waker can strand queued work. No scheduled task is installed.
+`WakeIdle.tick(dry_run=True)` writes `wake-idle.json` without invoking the helper.
