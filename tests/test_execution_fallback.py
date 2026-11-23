@@ -1818,3 +1818,16 @@ def test_verdict_classifier_covers_the_full_matrix():
         )
         == "usage_limit"
     )
+    # Local request/environment failures stay terminal even with zero work:
+    # falling through would burn another allowance to mask a local problem.
+    assert classify_external_result(failed("", failure="unsupported model")) == "genuine_failure"
+    assert (
+        classify_external_result(failed("permission denied", failure="permission denied"))
+        == "genuine_failure"
+    )
+    assert (
+        classify_external_result(
+            failed("jetski: auto-denied in headless mode", failure="auto-denied")
+        )
+        == "genuine_failure"
+    )

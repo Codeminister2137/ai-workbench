@@ -344,10 +344,12 @@ EXTERNAL_MATRIX = [
     ("usage-failure-reason", (1, "", "clean", "usage limit reached"), "usage_limit"),
     ("overload-failure-reason", (1, "", "clean", "server_overloaded"), "model_overload"),
     # Scope B (owner 2026-11-23): zero-work failures fall through as
-    # route_failure instead of recording finished. Stdout markers are
-    # still never matched (these yield route_failure via zero work
-    # evidence, never usage_limit/model_overload).
-    ("no-marker", (1, "", "permission denied", None), "route_failure"),
+    # route_failure instead of recording finished — except local
+    # request/environment failures (bad pin, permission refusal), which
+    # stay terminal so they are reported, not masked by a route switch.
+    # Stdout markers are still never matched: stdout-only cases yield
+    # route_failure via zero work evidence, never usage_limit/overload.
+    ("no-marker", (1, "", "permission denied", None), "finished"),
     ("usage-stdout-only", (1, "usage limit reached", "clean", None), "route_failure"),
     ("overload-stdout-only", (1, "server_overloaded", "clean", None), "route_failure"),
     ("success-usage-stderr", (0, "done", "usage limit reached", None), "finished"),

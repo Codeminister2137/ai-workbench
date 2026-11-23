@@ -81,6 +81,26 @@ def explicit_capability_reroute(text: str) -> bool:
     return any(marker in normalized for marker in _CAPABILITY_REROUTE_MARKERS)
 
 
+_LOCAL_FAILURE_MARKERS = (
+    "unsupported model",
+    "permission denied",
+    "permission was denied",
+    "auto-denied",
+)
+"""Failure text proving the request/environment is bad, never the route.
+
+A bad model pin or a local permission refusal is actionable where it
+happened: falling through would burn another allowance to mask a local
+misconfiguration. Evidence-based list; extend only with observed text.
+"""
+
+
+def explicit_local_failure(text: str) -> bool:
+    """Recognize local request/environment failures; never generic errors."""
+    normalized = text.lower()
+    return any(marker in normalized for marker in _LOCAL_FAILURE_MARKERS)
+
+
 def external_route_failure(result: ExternalAgentResult) -> bool:
     """True when a failed client never engaged: no work evidence at all.
 
@@ -90,10 +110,14 @@ def external_route_failure(result: ExternalAgentResult) -> bool:
     Kiro monthly cap exits 1 with empty channels). This must fall
     through to the next route, never record "finished". Only presence
     flags and counts are inspected, never prompt/tool/answer content.
+    Local request/environment failures (bad pin, permission refusal)
+    are terminal and never route failures.
     """
 
     failure = result.events.failure_reason if result.events else None
     if result.returncode == 0 and not failure:
+        return False
+    if explicit_local_failure((failure or "") + "\n" + result.stderr):
         return False
     if result.last_message:
         return False

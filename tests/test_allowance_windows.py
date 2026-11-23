@@ -83,8 +83,8 @@ def test_kiro_date_reset_and_reported_share():
         ],
         "kiro_cli",
     )
-    assert window.remaining_percent == 87.5
-    assert window.used_percent == 12.5
+    assert window.used_percent == 87.5
+    assert window.remaining_percent == 12.5
     assert window.resets_at_utc == "2026-11-20T00:00:00+00:00"
     assert window.details["covered_credits"] == 87.5
 

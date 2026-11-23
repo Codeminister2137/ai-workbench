@@ -1,3 +1,14 @@
+## Fallback repair: verdict pipeline now (B), single executor later (C) (2026-11-23)
+
+Owner selected **B then C** (attended): fallback is a core feature and
+top priority; major restructuring acceptable if needed. B fixes the
+silent-cap class with one verdict pipeline in ai_provider (zero-work
+failures fall through as `route_failure`; verified-exhausted allowance
+skips execution); C restructures to one fallback executor later.
+Relay composition kept for the accepted Mai-container placement; C
+absorbs it. Full record: [fallback-verdict-pipeline-B-then-C](decisions/fallback-verdict-pipeline-B-then-C.md).
+Backlog: inbox `0da81197` (B, implemented 6d95caa), `b58f8502` (C).
+
 ## P4 finite STANDARD pilot exception (2026-11-21)
 
 Owner selected **C: Finite STANDARD pilot exception** in inbox

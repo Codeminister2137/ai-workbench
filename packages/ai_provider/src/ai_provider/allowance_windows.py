@@ -118,11 +118,13 @@ def normalize_windows(
                 if k not in {"bucket_id", "window", "remaining_percent", "reset_date"}
             }
         elif provider == "kiro":
-            # "Credits (X of Y covered in plan), Z%": the plan-covered share
-            # still available, i.e. remaining. Owner case-by-case review (brief
-            # note) confirms per-provider semantics.
-            used = None
-            remaining = _percent(entry.get("reported_percent"), "credit measurement")
+            # "Credits (X of Y covered in plan), Z%": consumed share.
+            # Corrected 2026-11-23: day-long run telemetry shows the figure
+            # rising with use (0 -> 50/50) while the CLI worked, and the CLI
+            # refuses all work at 50/50 100%. A remaining metric would fall
+            # with use. The earlier "remaining" reading was never evidenced.
+            used = _percent(entry.get("reported_percent"), "credit measurement")
+            remaining = None
             resets_at = _reset_from_text(entry.get("reset_date"), date_only=True)
             details = {
                 k: v
