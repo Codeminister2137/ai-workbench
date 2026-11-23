@@ -81,6 +81,110 @@ def explicit_capability_reroute(text: str) -> bool:
     return any(marker in normalized for marker in _CAPABILITY_REROUTE_MARKERS)
 
 
+def external_route_failure(result: ExternalAgentResult) -> bool:
+    """True when a failed client never engaged: no work evidence at all.
+
+    A nonzero exit (or failure reason) with zero command/tool/file/web
+    events, no final answer and no last message means the route died
+    before doing anything — the classic silent-cap shape (observed:
+    Kiro monthly cap exits 1 with empty channels). This must fall
+    through to the next route, never record "finished". Only presence
+    flags and counts are inspected, never prompt/tool/answer content.
+    """
+
+    failure = result.events.failure_reason if result.events else None
+    if result.returncode == 0 and not failure:
+        return False
+    if result.last_message:
+        return False
+    events = result.events
+    if events is None:
+        return True
+    if events.final_answer:
+        return False
+    return not (
+        events.command_events
+        or events.tool_events
+        or events.file_change_events
+        or events.web_search_events
+    )
+
+
+def classify_external_result(result: ExternalAgentResult) -> str:
+    """One verdict for an external-agent result; the single decision point.
+
+    Returns "success", "usage_limit", "model_overload", "capability",
+    "route_failure" (failed before doing anything: fall through) or
+    "genuine_failure" (failed after engaging: terminal, no spend
+    multiplication). Signal markers win over work evidence: a client
+    that reports a usage limit after partial work is still limited.
+    """
+
+    failure = result.events.failure_reason if result.events else None
+    if result.returncode == 0 and not failure:
+        return "success"
+    if external_usage_limit(result):
+        return "usage_limit"
+    if external_model_overload(result):
+        return "model_overload"
+    if explicit_capability_reroute((failure or "") + "\n" + result.stderr):
+        return "capability"
+    if external_route_failure(result):
+        return "route_failure"
+    return "genuine_failure"
+
+
+def _kiro_windows_exhausted(windows: list[dict[str, Any]]) -> bool:
+    """Kiro covered-credits semantics: covered==plan means consumed.
+
+    Verified empirically 2026-11-23: the Kiro CLI refuses work when
+    covered_credits reaches plan_credits (monthly cap), so "X of Y
+    covered in plan" reads as consumed, not remaining, for admission.
+    """
+    for window in windows:
+        if not isinstance(window, dict):
+            continue
+        if window.get("bucket_id") != "plan_credits":
+            continue
+        try:
+            covered = float(window.get("covered_credits", 0.0))
+            plan = float(window.get("plan_credits", 0.0))
+        except (TypeError, ValueError):
+            continue
+        if plan > 0 and covered >= plan:
+            return True
+    return False
+
+
+ALLOWANCE_EXHAUSTION = {
+    "kiro_isolated_v2_usage": _kiro_windows_exhausted,
+}
+"""Verified per-source exhaustion interpreters; unknown sources never block."""
+
+
+def allowance_exhausted(observation: dict[str, Any] | None) -> bool:
+    """True when an allowance observation proves no budget remains.
+
+    Only sources with a verified interpreter count; anything unknown,
+    malformed or unobserved returns False so admission never blocks
+    on uninterpretable data (the "never infer" caution, scoped).
+    """
+    if not isinstance(observation, dict):
+        return False
+    if observation.get("status") != "available":
+        return False
+    interpret = ALLOWANCE_EXHAUSTION.get(str(observation.get("source") or ""))
+    if interpret is None:
+        return False
+    windows = observation.get("windows")
+    if not isinstance(windows, list):
+        return False
+    try:
+        return bool(interpret(windows))
+    except Exception:  # noqa: BLE001 - interpretation must never break routing
+        return False
+
+
 class FallbackSession:
     """Bound attempts to preflighted routes and preserve exhaustion across repairs."""
 
@@ -124,6 +228,7 @@ class FallbackSession:
         self.exhausted: set[str] = set()
         self.overloaded: set[str] = set()
         self.incapable: set[str] = set()
+        self.failed_routes: set[str] = set()
         self.handoff: dict[str, Any] | None = None
         self.attempts: list[dict[str, str]] = []
         self.ready: dict[str, ExecutionTarget] = {}
@@ -303,6 +408,7 @@ class FallbackSession:
             self.current.billing_source.value in self.exhausted
             or self.current.route_id in self.overloaded
             or self.current.route_id in self.incapable
+            or self.current.route_id in self.failed_routes
         ):
             self._report_progress(
                 "fallback_exhausted: no ready route remains; partial work preserved"
@@ -311,8 +417,7 @@ class FallbackSession:
                 "No ready continuation route remains; no further execution attempted. "
                 "Partial work and handoff preserved.",
                 category=ProviderErrorCategory.RETRYABLE
-                if self.current.route_id in self.overloaded
-                or self.current.route_id in self.incapable
+                if self.current.route_id in (self.overloaded | self.incapable | self.failed_routes)
                 else ProviderErrorCategory.USAGE_LIMIT,
             )
         while True:
@@ -340,16 +445,44 @@ class FallbackSession:
                 self.current = replace(
                     self.current, timeout_seconds=min(self.current.timeout_seconds, remaining)
                 )
-            try:
-                result = execute(self.current, current_prompt)
-                limited = is_limited(result)
-                overload = (
-                    not limited
-                    and isinstance(result, ExternalAgentResult)
-                    and external_model_overload(result)
+            allowance_skip = self.enabled and self._current_allowance_exhausted()
+            route_failed = False
+            if allowance_skip:
+                self._report_progress(
+                    f"fallback_allowance_exhausted: {self.current.route_id}; no execution attempted"
                 )
+                result = None
+                limited = True
+                overload = False
                 capability = False
-                observed = observe(result) if limited or overload else ""
+                observed = (
+                    "Allowance observation proves the billing bucket is exhausted; "
+                    "no execution attempted."
+                )
+                error = ProviderError(
+                    "Allowance observation proves the billing bucket is exhausted; "
+                    "no execution attempted.",
+                    category=ProviderErrorCategory.USAGE_LIMIT,
+                )
+            try:
+                if not allowance_skip:
+                    result = execute(self.current, current_prompt)
+                    limited = is_limited(result)
+                    verdict = (
+                        classify_external_result(result)
+                        if isinstance(result, ExternalAgentResult)
+                        else "genuine_failure"
+                    )
+                    limited = limited or verdict == "usage_limit"
+                    overload = not limited and verdict == "model_overload"
+                    capability = not limited and not overload and verdict == "capability"
+                    route_failed = (
+                        not limited
+                        and not overload
+                        and not capability
+                        and verdict == "route_failure"
+                    )
+                    observed = observe(result) if limited or overload or route_failed else ""
             except ProviderError as exc:
                 overload = explicit_model_overload(str(exc)) and exc.category in {
                     ProviderErrorCategory.RETRYABLE,
@@ -384,8 +517,11 @@ class FallbackSession:
                     "inspect the current working tree before continuing."
                 )
                 result = None
-            if not (limited or overload or capability) or not self.enabled:
-                if not (limited or overload or capability) and self.deadline is not None:
+            if not (limited or overload or capability or route_failed) or not self.enabled:
+                if (
+                    not (limited or overload or capability or route_failed)
+                    and self.deadline is not None
+                ):
                     if time.perf_counter() >= self.deadline:
                         raise ProviderError(
                             "Continuation deadline expired after execution; "
@@ -397,15 +533,26 @@ class FallbackSession:
                     raise error
                 return result
             failed = self.current
-            reason = (
-                "model_overload" if overload else ("capability" if capability else "usage_limit")
-            )
+            if allowance_skip:
+                reason = "allowance_exhausted"
+            elif route_failed:
+                reason = "route_failure"
+            else:
+                reason = (
+                    "model_overload"
+                    if overload
+                    else ("capability" if capability else "usage_limit")
+                )
             self.attempts.append({"route_id": failed.route_id, "status": reason})
             observed_history.append(f"Route {failed.route_id}:\n{observed}")
             if overload:
                 self.overloaded.add(failed.route_id)
             elif capability:
                 self.incapable.add(failed.route_id)
+            elif route_failed:
+                # Zero-work failure proves nothing about the billing bucket;
+                # only the route is retired, never its cost bucket.
+                self.failed_routes.add(failed.route_id)
             else:
                 self.exhausted.add(failed.billing_source.value)
             candidates = fallback_candidates(
@@ -413,7 +560,9 @@ class FallbackSession:
                 self.catalog,
                 self.initial,
                 exhausted_billing_sources=frozenset(self.exhausted),
-                unavailable_route_ids=frozenset(self.overloaded | self.incapable),
+                unavailable_route_ids=frozenset(
+                    self.overloaded | self.incapable | self.failed_routes
+                ),
                 allow_initial_billing_source=bool(self.overloaded or self.incapable),
                 quality_policy=self.quality_policy,
                 priority=self.priority,
@@ -570,6 +719,18 @@ class FallbackSession:
                 except (OSError, ValueError) as exc:
                     self.handoff["save_error"] = type(exc).__name__
             break
+
+    def _current_allowance_exhausted(self) -> bool:
+        """True when the current route's observed bucket provably has no budget.
+
+        Only verified source interpreters count; without an observer or
+        with uninterpretable data this is False and execution proceeds.
+        """
+        if self.observe_allowance is None:
+            return False
+        return allowance_exhausted(
+            self.allowance_observations.get(self.current.billing_source.value)
+        )
 
     def _observe_allowance(self) -> None:
         """Retain account observations separately from routing and saved handoffs."""

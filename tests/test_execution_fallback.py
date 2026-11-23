@@ -1574,3 +1574,247 @@ def test_session_walks_the_whole_ordered_set_until_a_route_completes(monkeypatch
         "finished",
     ]
     assert run.current.route_id == "antigravity"
+
+
+def silent_exit(route_id="kiro"):
+    """Bare nonzero exit with empty channels: the silent-cap shape."""
+    from ai_provider.external_agents import ExternalAgentEventSummary
+
+    return ExternalAgentResult(
+        (),
+        1,
+        "",
+        "",
+        events=ExternalAgentEventSummary(
+            final_answer=None,
+            command_events=(),
+            tool_events=(),
+            web_search_events=(),
+            file_change_events=(),
+            usage=None,
+            failure_reason="process exited with code 1",
+            parse_errors=(),
+        ),
+    )
+
+
+def test_silent_cap_falls_through_instead_of_recording_finished(monkeypatch):
+    """2026-11-23 run 3cf57c68: kiro's silent exit stopped a 13-route tree."""
+    from ai_provider.execution_fallback import external_usage_limit
+
+    catalog = (
+        entry(
+            "codex",
+            AccessMethod.CODEX_CLI,
+            BillingSource.CHATGPT_SUBSCRIPTION_ALLOWANCE,
+            QualityThreshold.HIGH,
+        ),
+        entry(
+            "kiro",
+            AccessMethod.KIRO_CLI,
+            BillingSource.KIRO_SUBSCRIPTION_ALLOWANCE,
+            QualityThreshold.HIGH,
+        ),
+        entry(
+            "copilot",
+            AccessMethod.COPILOT_CLI,
+            BillingSource.GITHUB_COPILOT_SUBSCRIPTION_ALLOWANCE,
+            QualityThreshold.HIGH,
+        ),
+    )
+    run = session(monkeypatch, catalog, priority=("kiro", "copilot"))
+    calls = []
+
+    def execute(target, prompt):
+        calls.append(target.route_id)
+        if target.route_id == "copilot":
+            return ExternalAgentResult((), 0, "done", "")
+        if target.route_id == "kiro":
+            return silent_exit()
+        return ExternalAgentResult((), 1, "", "You've hit your usage limit")
+
+    result = run.run("Fix source", execute, external_usage_limit, observe=str)
+
+    assert calls == ["codex", "kiro", "copilot"]
+    assert [attempt["status"] for attempt in run.attempts] == [
+        "usage_limit",
+        "route_failure",
+        "finished",
+    ]
+    assert run.current.route_id == "copilot"
+    assert result.returncode == 0
+    # Zero-work failure retires the route, never its billing bucket.
+    assert "kiro" in run.failed_routes
+    assert BillingSource.KIRO_SUBSCRIPTION_ALLOWANCE.value not in run.exhausted
+
+
+def test_genuine_mid_work_failure_stays_terminal(monkeypatch, routes):
+    """A route that engaged then failed must not burn the next allowance."""
+    from ai_provider.external_agents import ExternalAgentEventSummary
+
+    run = session(monkeypatch, routes)
+    calls = []
+
+    def execute(target, prompt):
+        calls.append(target.route_id)
+        return ExternalAgentResult(
+            (),
+            1,
+            "",
+            "sandbox denied the write",
+            events=ExternalAgentEventSummary(
+                final_answer=None,
+                command_events=(),
+                tool_events=({"tool": "write"},),
+                web_search_events=(),
+                file_change_events=(),
+                usage=None,
+                failure_reason="sandbox denied the write",
+                parse_errors=(),
+            ),
+        )
+
+    result = run.run("Fix source", execute, external_usage_limit, observe=str)
+
+    assert calls == ["codex"]
+    assert [attempt["status"] for attempt in run.attempts] == ["finished"]
+    assert result.returncode == 1
+    assert not run.failed_routes and not run.exhausted
+
+
+def test_consumed_kiro_plan_skips_execution_without_burning_an_attempt(monkeypatch):
+    """100%-consumed plan windows mean exhausted; the route is never tried."""
+    catalog = (
+        entry(
+            "codex",
+            AccessMethod.CODEX_CLI,
+            BillingSource.CHATGPT_SUBSCRIPTION_ALLOWANCE,
+            QualityThreshold.HIGH,
+        ),
+        entry(
+            "kiro",
+            AccessMethod.KIRO_CLI,
+            BillingSource.KIRO_SUBSCRIPTION_ALLOWANCE,
+            QualityThreshold.HIGH,
+        ),
+        entry(
+            "copilot",
+            AccessMethod.COPILOT_CLI,
+            BillingSource.GITHUB_COPILOT_SUBSCRIPTION_ALLOWANCE,
+            QualityThreshold.HIGH,
+        ),
+    )
+    kiro_windows = [
+        {
+            "bucket_id": "plan_credits",
+            "window": "subscription",
+            "measurement_kind": "native_estimate",
+            "covered_credits": 50.0,
+            "plan_credits": 50.0,
+            "reported_percent": 100.0,
+            "reset_date": "2026-12-01",
+        }
+    ]
+
+    def collect(target):
+        if target.route_id == "kiro":
+            return {
+                "status": "available",
+                "source": "kiro_isolated_v2_usage",
+                "reason": "available",
+                "observed_at_utc": "2026-11-23T18:31:05+00:00",
+                "windows": kiro_windows,
+            }
+        return {"status": "unknown", "source": "test", "windows": []}
+
+    run = session(monkeypatch, catalog, priority=("kiro", "copilot"), observe_allowance=collect)
+    calls = []
+
+    def execute(target, prompt):
+        calls.append(target.route_id)
+        if target.route_id == "copilot":
+            return ExternalAgentResult((), 0, "done", "")
+        return ExternalAgentResult((), 1, "", "You've hit your usage limit")
+
+    run.run("Fix source", execute, external_usage_limit, observe=str)
+
+    assert calls == ["codex", "copilot"]
+    assert [attempt["status"] for attempt in run.attempts] == [
+        "usage_limit",
+        "allowance_exhausted",
+        "finished",
+    ]
+    assert [attempt["route_id"] for attempt in run.attempts] == ["codex", "kiro", "copilot"]
+    assert BillingSource.KIRO_SUBSCRIPTION_ALLOWANCE.value in run.exhausted
+
+
+def test_allowance_interpreter_only_trusts_verified_sources():
+    from ai_provider.execution_fallback import allowance_exhausted
+
+    consumed = {
+        "status": "available",
+        "source": "kiro_isolated_v2_usage",
+        "windows": [{"bucket_id": "plan_credits", "covered_credits": 50.0, "plan_credits": 50.0}],
+    }
+    assert allowance_exhausted(consumed)
+    assert not allowance_exhausted(
+        {
+            "status": "available",
+            "source": "kiro_isolated_v2_usage",
+            "windows": [
+                {
+                    "bucket_id": "plan_credits",
+                    "covered_credits": 12.0,
+                    "plan_credits": 50.0,
+                }
+            ],
+        }
+    )
+    # Unknown sources, bad shapes and non-available probes never block.
+    assert not allowance_exhausted({**consumed, "source": "codex_app_server"})
+    assert not allowance_exhausted({**consumed, "status": "unknown"})
+    assert not allowance_exhausted({**consumed, "windows": [{"used_percent": 100}]})
+    assert not allowance_exhausted({**consumed, "windows": "nope"})
+    assert not allowance_exhausted(None)
+    assert not allowance_exhausted("nope")
+
+
+def test_verdict_classifier_covers_the_full_matrix():
+    from ai_provider.execution_fallback import classify_external_result
+    from ai_provider.external_agents import ExternalAgentEventSummary
+
+    def failed(stderr="", failure=None, **evidence):
+        params = {
+            "final_answer": None,
+            "command_events": (),
+            "tool_events": (),
+            "web_search_events": (),
+            "file_change_events": (),
+            "usage": None,
+            "failure_reason": failure,
+            "parse_errors": (),
+        }
+        params.update(evidence)
+        return ExternalAgentResult((), 1, "", stderr, events=ExternalAgentEventSummary(**params))
+
+    assert classify_external_result(ExternalAgentResult((), 0, "done", "")) == "success"
+    assert classify_external_result(failed("You've hit your usage limit")) == "usage_limit"
+    assert classify_external_result(failed("Selected model is at capacity")) == "model_overload"
+    assert classify_external_result(failed("route to a tool-capable model")) == "capability"
+    assert classify_external_result(failed("boom", failure="boom")) == "route_failure"
+    assert classify_external_result(failed("", failure=None)) == "route_failure"
+    assert (
+        classify_external_result(failed("denied", failure="denied", tool_events=({"t": 1},)))
+        == "genuine_failure"
+    )
+    assert (
+        classify_external_result(failed("denied", failure="denied", final_answer="sorry"))
+        == "genuine_failure"
+    )
+    # Signal markers win over work evidence: a limit after partial work is limited.
+    assert (
+        classify_external_result(
+            failed("quota exceeded", failure="quota exceeded", tool_events=({"t": 1},))
+        )
+        == "usage_limit"
+    )

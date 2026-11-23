@@ -237,7 +237,7 @@ def _assert_provider_case(run, calls, expected):
         assert run.exhausted == set()
         assert run.overloaded == set()
         return
-    reason = expected  # "usage_limit" or "model_overload"
+    reason = expected  # "usage_limit", "model_overload" or "route_failure"
     assert calls == ["codex", "copilot"]
     assert run.attempts == [
         {"route_id": "codex", "status": reason},
@@ -247,9 +247,16 @@ def _assert_provider_case(run, calls, expected):
     if expected == "usage_limit":
         assert run.exhausted == {codex_billing}
         assert run.overloaded == set()
+        assert run.failed_routes == set()
+    elif expected == "route_failure":
+        # Zero-work failure retires the route, never its billing bucket.
+        assert run.failed_routes == {"codex"}
+        assert run.exhausted == set()
+        assert run.overloaded == set()
     else:
         assert run.overloaded == {"codex"}
         assert run.exhausted == set()
+        assert run.failed_routes == set()
 
 
 PROVIDER_MATRIX = [
@@ -336,9 +343,13 @@ EXTERNAL_MATRIX = [
     ("both-markers", (1, "", "usage limit reached; server_overloaded", None), "usage_limit"),
     ("usage-failure-reason", (1, "", "clean", "usage limit reached"), "usage_limit"),
     ("overload-failure-reason", (1, "", "clean", "server_overloaded"), "model_overload"),
-    ("no-marker", (1, "", "permission denied", None), "finished"),
-    ("usage-stdout-only", (1, "usage limit reached", "clean", None), "finished"),
-    ("overload-stdout-only", (1, "server_overloaded", "clean", None), "finished"),
+    # Scope B (owner 2026-11-23): zero-work failures fall through as
+    # route_failure instead of recording finished. Stdout markers are
+    # still never matched (these yield route_failure via zero work
+    # evidence, never usage_limit/model_overload).
+    ("no-marker", (1, "", "permission denied", None), "route_failure"),
+    ("usage-stdout-only", (1, "usage limit reached", "clean", None), "route_failure"),
+    ("overload-stdout-only", (1, "server_overloaded", "clean", None), "route_failure"),
     ("success-usage-stderr", (0, "done", "usage limit reached", None), "finished"),
     ("success-overload-stderr", (0, "done", "server_overloaded", None), "finished"),
 ]
