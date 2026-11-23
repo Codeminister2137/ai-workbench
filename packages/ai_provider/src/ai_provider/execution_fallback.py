@@ -471,6 +471,11 @@ class FallbackSession:
                 )
             allowance_skip = self.enabled and self._current_allowance_exhausted()
             route_failed = False
+            result = None
+            limited = False
+            overload = False
+            capability = False
+            observed = ""
             if allowance_skip:
                 self._report_progress(
                     f"fallback_allowance_exhausted: {self.current.route_id}; no execution attempted"

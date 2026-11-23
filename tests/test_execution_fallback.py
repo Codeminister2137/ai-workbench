@@ -1776,7 +1776,7 @@ def test_allowance_interpreter_only_trusts_verified_sources():
     assert not allowance_exhausted({**consumed, "windows": [{"used_percent": 100}]})
     assert not allowance_exhausted({**consumed, "windows": "nope"})
     assert not allowance_exhausted(None)
-    assert not allowance_exhausted("nope")
+    assert not allowance_exhausted("nope")  # type: ignore[arg-type]
 
 
 def test_verdict_classifier_covers_the_full_matrix():
