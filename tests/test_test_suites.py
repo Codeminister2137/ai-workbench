@@ -257,3 +257,94 @@ class TestSuiteSelection:
         assert "Running council:" in out
         assert "council" in out and "FAIL(3)" in out
         assert out.count("FAIL(") == 1
+
+    def test_default_execution_is_serial(self):
+        """Full suite runs serially by default with no xdist -n flag."""
+        commands = suites.test_commands(["full"], ["-q"])
+        assert len(commands) == 3
+        for command in commands:
+            assert "-n" not in command
+
+    def test_opt_in_parallel_flag_adds_workers(self):
+        """Explicit workers parameter adds xdist -n flag."""
+        commands = suites.test_commands(["full"], ["-q"], workers=4)
+        assert len(commands) == 3
+        for command in commands:
+            assert command[3:5] == ["-n", "4"]
+
+    def test_opt_in_parallel_env_adds_workers(self, monkeypatch):
+        """Setting WORKBENCH_TEST_WORKERS enables parallel execution."""
+        monkeypatch.setenv("WORKBENCH_TEST_WORKERS", "8")
+        commands = suites.test_commands(["full"], ["-q"])
+        assert len(commands) == 3
+        for command in commands:
+            assert command[3:5] == ["-n", "8"]
+
+    def test_explicit_extra_n_overrides_parallel_setting(self):
+        """When caller explicitly forwards -n in extra, runner does not duplicate -n."""
+        commands = suites.test_commands(["full"], ["-q", "-n", "2"], workers=8)
+        assert len(commands) == 3
+        for command in commands:
+            assert command.count("-n") == 1
+            assert command[-2:] == ["-n", "2"]
+
+    def test_main_runs_serially_by_default(self, monkeypatch):
+        """CLI main() invokes pytest serially by default."""
+        from types import SimpleNamespace
+
+        captured_commands = []
+        monkeypatch.setattr(
+            suites.subprocess,
+            "run",
+            lambda cmd, *a, **kw: captured_commands.append(cmd) or SimpleNamespace(returncode=0),
+        )
+        assert suites.main(["full", "--", "-q"]) == 0
+        assert len(captured_commands) == 3
+        for cmd in captured_commands:
+            assert "-n" not in cmd
+
+    def test_main_runs_parallel_with_flag(self, monkeypatch):
+        """CLI main() accepts --parallel with optional worker count."""
+        from types import SimpleNamespace
+
+        captured_commands = []
+        monkeypatch.setattr(
+            suites.subprocess,
+            "run",
+            lambda cmd, *a, **kw: captured_commands.append(cmd) or SimpleNamespace(returncode=0),
+        )
+        assert suites.main(["full", "--parallel", "4", "--", "-q"]) == 0
+        assert len(captured_commands) == 3
+        for cmd in captured_commands:
+            assert cmd[3:5] == ["-n", "4"]
+
+    def test_main_runs_parallel_with_short_flag(self, monkeypatch):
+        """CLI main() accepts -n as worker flag alias."""
+        from types import SimpleNamespace
+
+        captured_commands = []
+        monkeypatch.setattr(
+            suites.subprocess,
+            "run",
+            lambda cmd, *a, **kw: captured_commands.append(cmd) or SimpleNamespace(returncode=0),
+        )
+        assert suites.main(["full", "-n", "6", "--", "-q"]) == 0
+        assert len(captured_commands) == 3
+        for cmd in captured_commands:
+            assert cmd[3:5] == ["-n", "6"]
+
+    def test_main_parallel_cli_overrides_env(self, monkeypatch):
+        """CLI parallel argument takes precedence over environment variable."""
+        from types import SimpleNamespace
+
+        captured_commands = []
+        monkeypatch.setenv("WORKBENCH_TEST_WORKERS", "2")
+        monkeypatch.setattr(
+            suites.subprocess,
+            "run",
+            lambda cmd, *a, **kw: captured_commands.append(cmd) or SimpleNamespace(returncode=0),
+        )
+        assert suites.main(["full", "--parallel", "7", "--", "-q"]) == 0
+        assert len(captured_commands) == 3
+        for cmd in captured_commands:
+            assert cmd[3:5] == ["-n", "7"]
