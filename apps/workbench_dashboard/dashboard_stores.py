@@ -1273,14 +1273,16 @@ class DashboardStores:
 
         A failed item means the behavior is broken; a note on a pass
         means the tester saw something worth considering; a bad-test
-        flag means the steps themselves were untestable. All land in
-        a single AI-queue task so none dies in the report. Filing
-        never fails the submit: a refusal is stamped on the task.
+        flag means the steps themselves were untestable; an item whose
+        every step is machine-runnable needs a human-test redesign.
+        All land in a single AI-queue task so none dies in the report.
+        Filing never fails the submit: a refusal is stamped on the task.
         """
         fails = []
         noted = []
         bad_tests = []
         mismatched = []
+        redesign = []
         for entry in report.get("items", []):
             if entry.get("status") != "tested":
                 continue
@@ -1293,7 +1295,14 @@ class DashboardStores:
                 noted.append(entry)
             if entry.get("agent_check_mismatches"):
                 mismatched.append(entry)
-        if not fails and not noted and not bad_tests and not mismatched:
+            steps = entry.get("steps") or []
+            if (
+                steps
+                and all(isinstance(step, dict) and step.get("agent_runnable") for step in steps)
+                and entry.get("verdict") != "bad-test"
+            ):
+                redesign.append(entry)
+        if not fails and not noted and not bad_tests and not mismatched and not redesign:
             return None
         merge = str(record.get("merge_commit") or "")
         parts = [f"{len(fails)} failed"] if fails else []
@@ -1303,6 +1312,8 @@ class DashboardStores:
             parts.append(f"{len(bad_tests)} bad-test")
         if mismatched:
             parts.append(f"{len(mismatched)} mismatched")
+        if redesign:
+            parts.append(f"{len(redesign)} redesign")
         lines = [f"E2E report {report.get('id')} for merge {merge} needs action.", ""]
         for entry in fails:
             lines.append(f"FAIL {entry.get('id')} ({entry.get('behavior') or ''}):")
@@ -1320,6 +1331,20 @@ class DashboardStores:
             lines.append(f"MISMATCH on {entry.get('id')} (owner passed, agent check failed):")
             lines.append(
                 "; ".join(str(action) for action in entry.get("agent_check_mismatches", []))[:2000]
+            )
+            lines.append("")
+        for entry in redesign:
+            actions = "; ".join(str(step.get("action", "")) for step in (entry.get("steps") or []))[
+                :2000
+            ]
+            lines.append(
+                f"REDESIGN {entry.get('id')} (all {len(entry.get('steps') or [])} steps "
+                "machine-runnable; rewrite as human-observable checks):"
+            )
+            lines.append(actions or "(no step text)")
+            lines.append(
+                "Adopt the automatable coverage into pytest where missing; "
+                "do not hand machine steps to the human tester again."
             )
             lines.append("")
         try:

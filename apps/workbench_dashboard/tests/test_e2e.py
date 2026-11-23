@@ -142,6 +142,63 @@ def test_submit_skips_followup_for_clean_pass(stores) -> None:
     assert inbox == []
 
 
+def _stepped_items() -> list[dict]:
+    items = _items()
+    items[0]["steps"] = [
+        {
+            "action": "Run `pytest tests/test_x.py` from the repo root.",
+            "expected": "Exit 0.",
+            "grounded": True,
+            "agent_runnable": True,
+        },
+        {
+            "action": "Run `ruff check .` from the repo root.",
+            "expected": "Exit 0.",
+            "grounded": True,
+            "agent_runnable": True,
+        },
+    ]
+    return items
+
+
+def test_submit_files_redesign_for_all_agent_steps(stores) -> None:
+    task = stores.create_e2e_task(merge_commit="abc", title="t", items=_stepped_items())
+    outcome = stores.submit_e2e_task(
+        task["id"],
+        [{"item_id": "behavior:dashboard", "steps": ["pass", "pass"], "notes": "  "}],
+    )
+    assert outcome["followup_id"]
+    inbox, _total = stores.inbox.list(limit=10)
+    (followup,) = [entry for entry in inbox if entry["id"] == outcome["followup_id"]]
+    assert "1 redesign" in followup["title"]
+    assert "REDESIGN behavior:dashboard" in followup["body"]
+    assert "human-observable" in followup["body"]
+    assert "pytest" in followup["body"]
+
+
+def test_submit_skips_redesign_for_mixed_steps(stores) -> None:
+    items = _stepped_items()
+    items[0]["steps"][1]["agent_runnable"] = False
+    task = stores.create_e2e_task(merge_commit="abc", title="t", items=items)
+    outcome = stores.submit_e2e_task(
+        task["id"],
+        [{"item_id": "behavior:dashboard", "steps": ["pass", "pass"], "notes": "  "}],
+    )
+    assert outcome["followup_id"] is None
+
+
+def test_submit_skips_redesign_for_bad_test_verdict(stores) -> None:
+    task = stores.create_e2e_task(merge_commit="abc", title="t", items=_stepped_items())
+    outcome = stores.submit_e2e_task(
+        task["id"],
+        [{"item_id": "behavior:dashboard", "verdict": "bad-test", "notes": "machine steps"}],
+    )
+    inbox, _total = stores.inbox.list(limit=10)
+    (followup,) = [entry for entry in inbox if entry["id"] == outcome["followup_id"]]
+    assert "redesign" not in followup["title"]
+    assert "BAD TEST DESIGN" in followup["body"]
+
+
 def test_attention_counts_mirror_default_filters(stores) -> None:
     stores.create_inbox_task(title="h", body="b", task_type="task", assignee="owner")
     stores.create_inbox_task(title="a", body="b", task_type="task", assignee="agent")
