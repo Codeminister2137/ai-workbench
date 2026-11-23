@@ -1,5 +1,10 @@
 """Run explicit component suites without replacing the final workspace check.
 
+Suites run serially by default to enforce full gate deterministic execution
+and avoid unverified worker/resource contention. Parallel pytest-xdist execution
+is opt-in for local developer runs via ``--parallel`` / ``-n [WORKERS]`` or the
+``WORKBENCH_TEST_WORKERS`` environment variable.
+
 Council and job-search use legacy top-level imports and run in separate pytest
 processes. Live suites retain their existing environment opt-ins.
 """
@@ -253,12 +258,55 @@ def suite_files(root: Path = ROOT) -> dict[str, tuple[str, ...]]:
     return groups
 
 
-def test_commands(names: list[str], extra: list[str], *, root: Path = ROOT) -> list[list[str]]:
+def _resolve_workers(workers: int | str | None = None) -> str | None:
+    """Resolve opt-in parallel workers from explicit argument or environment.
+
+    Returns a worker count string (e.g. '8', 'auto') when parallel execution
+    is requested, or None for serial execution (the default).
+    """
+    if workers is not None:
+        val = str(workers).strip()
+        if val in {"0", "false", "no", "off"}:
+            return None
+        if val in {"1", "true", "yes", "on"}:
+            return "8"
+        return val
+    env_workers = (
+        os.environ.get("WORKBENCH_TEST_WORKERS")
+        or os.environ.get("PYTEST_XDIST_WORKERS")
+        or os.environ.get("WORKBENCH_PARALLEL_TESTS")
+    )
+    if env_workers:
+        val = env_workers.strip()
+        if val in {"0", "false", "no", "off"}:
+            return None
+        if val in {"1", "true", "yes", "on"}:
+            return "8"
+        return val
+    return None
+
+
+def test_commands(
+    names: list[str],
+    extra: list[str],
+    workers: int | str | None = None,
+    *,
+    root: Path = ROOT,
+) -> list[list[str]]:
+    """Build pytest commands for the selected suites.
+
+    By default, commands run serially (no xdist workers). When `workers` is
+    provided or configured via environment, `-n <workers>` is included unless
+    the caller already specified `-n` in `extra`.
+    """
     groups = suite_files(root)
     selected = set(names)
     if "full" in selected:
         selected |= set(groups) - {"live"}
         selected.remove("full")
+    resolved_workers = _resolve_workers(workers)
+    has_extra_n = any(part == "-n" or part.startswith(("-n=", "-n")) for part in extra)
+    parallel = ["-n", resolved_workers] if resolved_workers and not has_extra_n else []
     commands = []
     labels = []
     for label in ("workspace", "council", "job-search"):
@@ -271,7 +319,6 @@ def test_commands(names: list[str], extra: list[str], *, root: Path = ROOT) -> l
             }
         )
         if paths:
-            parallel = [] if any(part == "-n" for part in extra) else ["-n", "8"]
             commands.append([sys.executable, "-m", "pytest", *parallel, *paths, *extra])
             labels.append(label)
     if len(commands) > 1:
@@ -323,6 +370,18 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="measure coverage across groups and enforce the ratchet",
     )
+    parser.add_argument(
+        "--parallel",
+        "-p",
+        "-n",
+        "--workers",
+        nargs="?",
+        const="8",
+        type=str,
+        default=None,
+        dest="workers",
+        help="opt-in: run tests in parallel with pytest-xdist (optional worker count, default: 8)",
+    )
     args = parser.parse_args(arguments[:separator])
     try:
         if args.list:
@@ -331,8 +390,15 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         status = 0
         rows: list[tuple[str, int, int, float]] = []
-        commands = test_commands(args.groups or ["full"], extra)
-        counts = [len(command) - 3 - len(extra) for command in commands]
+        commands = (
+            test_commands(args.groups or ["full"], extra, args.workers)
+            if args.workers is not None
+            else test_commands(args.groups or ["full"], extra)
+        )
+        counts = [
+            len(command) - (5 if len(command) > 4 and command[3] == "-n" else 3) - len(extra)
+            for command in commands
+        ]
         cov_data = ROOT / ".coverage"
         if args.cov:
             cov_data.unlink(missing_ok=True)
