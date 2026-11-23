@@ -350,3 +350,17 @@ def test_reopen_is_the_owner_override_for_reports(stores) -> None:
     stores.acknowledge_report(filed["id"])
     reopened = stores.reopen_inbox_task(filed["id"])
     assert reopened["status"] == "open"
+
+
+def test_failed_run_triage_states_terminal_rule(stores) -> None:
+    from dashboard_web_app import _file_failed_run_triage
+
+    run = {"id": "run-1", "title": "t", "status": "failed", "error": "boom"}
+    stores.runs.put("run-1", run)
+    _file_failed_run_triage(stores, run, "run-1", {"failure_class": "provider"})
+    items, _total = stores.inbox.list(limit=10)
+    (triage,) = [
+        entry for entry in items if (entry.get("metadata") or {}).get("triage_for") == "run-1"
+    ]
+    assert "never a conclusion" in (triage.get("body") or "")
+    assert "owner brief" in (triage.get("body") or "")

@@ -3637,7 +3637,10 @@ def _file_failed_run_triage(stores: DashboardStores, run: dict, run_id: str, sum
             f"Error: {error}\n"
             f"Failure class: {failure_class}\n"
             f"Run report: see run {run_id} (run:{run_id}).\n\n"
-            "Triage the failure and decide the follow-up."
+            "Triage the failure and decide the follow-up. Terminal rule: "
+            "'agent failed' alone is never a conclusion - end in a concrete "
+            "continuation (retry plan, fix-forward task) or an owner brief "
+            "asking a human to call it unattainable."
         )
         project_id: str | None = None
         candidate = run.get("project_id")
