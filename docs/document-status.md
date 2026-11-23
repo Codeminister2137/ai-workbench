@@ -103,6 +103,10 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/plans/job-search-execution-plan.md | PENDING | Refreshed 2026-11-13; S3/D2, M3/D3, M4/D4 open. |
 | docs/plans/interactive-mai-plan.md | PENDING | Draft 2026-11-14; owner decision on approval model open. |
 | docs/plans/investor-broker-selection-20261119.md | ACTED | Alpaca selected (d50c644d); broader research/autonomy accepted (2592e3e4, ADR-093). XTB/OANDA corrections in docs/research/investor-coverage-20261119.md supersede old comparison. |
+| docs/plans/investor-paper-design-20261123.md | PENDING | Paper-only design honoring d50c644d/2592e3e4/713fe10d; scaffold needs persistence/service brief. |
+| docs/plans/investor-alpaca-signup-20261123.md | PENDING | Owner signup guide; inbox b8306bc3 tracks the action. |
+| docs/plans/investor-coverage-note1-20261123.md | KNOWLEDGE | Universe + data-honesty research note (scope B sequencing). |
+| docs/plans/investor-strategy-note2-20261123.md | KNOWLEDGE | Strategy shortlist with disproof protocol. |
 | docs/plans/l3-eval-ladder-design.md | ACTED | Ladder shipped (route_eval.py + l3_ladder.py). |
 | docs/plans/local-model-queue.md | ACTED | Q1-Q4 all consumed into quality-policy v1. |
 | docs/plans/mai-supervision-design.md | PENDING | Placement/authority/paging accepted in ADR-090 (2026-11-18); broader fallback draft remains future work. |
