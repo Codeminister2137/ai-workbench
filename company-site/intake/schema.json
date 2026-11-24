@@ -72,7 +72,7 @@
       "type": "array", "maxItems": 5,
       "items": {"type": "string", "minLength": 1, "maxLength": 120}
     },
-    "budget_range": {"enum": ["<2k", "2-5k", "5-15k", "15k+", "undisclosed"]},
+    "budget_range": {"enum": ["<2k", "2-5k", "5-15k", "15k+", "<10k", "10–30k", "30–80k", "80k+", "undisclosed"]},
     "billing_model": {"enum": ["fixed", "time_materials", "retainer", "unsure"]},
     "marketing_goals": {
       "type": "array", "maxItems": 5,

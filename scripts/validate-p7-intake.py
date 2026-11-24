@@ -71,7 +71,19 @@ OPTIONAL = {
 ENUMS = {
     "capture_method": {"chatbot", "human", "import"},
     "deliverable_type": {"website", "web_app", "landing_page", "ecommerce", "other"},
-    "budget_range": {"<2k", "2-5k", "5-15k", "15k+", "undisclosed"},
+    # PLN buckets mirror p7_intake.BUDGET_RANGES (grounding §9); EUR uses
+    # hyphen ranges, PLN en-dash ranges. Keep the union in sync.
+    "budget_range": {
+        "<2k",
+        "2-5k",
+        "5-15k",
+        "15k+",
+        "<10k",
+        "10–30k",
+        "30–80k",
+        "80k+",
+        "undisclosed",
+    },
     "billing_model": {"fixed", "time_materials", "retainer", "unsure"},
     "preferred_language": {"pl", "en", "other"},
 }
@@ -207,9 +219,11 @@ def validate_file(path: Path, *, as_of: datetime | None = None) -> dict:
         if timeline["urgency"] not in {"flexible", "dated", "urgent"}:
             errors.append("timeline.urgency must be flexible/dated/urgent")
     contact = doc["client_contact"]
-    if set(contact) - {"name", "email", "company", "phone"}:
-        errors.append("client_contact allows only name/email/company/phone")
-    elif not all(
+    extra_contact = set(contact) - {"name", "email", "company", "phone"}
+    if extra_contact:
+        # Proposal rule 13: over-collection warns, never auto-rejects.
+        warnings.append("client_contact carries extra fields: " + ", ".join(sorted(extra_contact)))
+    if not all(
         isinstance(contact.get(key, ""), str) for key in ("name", "email", "company", "phone")
     ):
         errors.append("client_contact fields must be strings")
@@ -219,7 +233,7 @@ def validate_file(path: Path, *, as_of: datetime | None = None) -> dict:
         errors.append("client_contact.email is not an email address")
     elif len(contact.get("company", "")) > 80:
         errors.append("client_contact.company must be <= 80 chars")
-    elif not PHONE_RE.match(contact.get("phone", "")):
+    elif contact.get("phone", "") != "" and not PHONE_RE.match(contact.get("phone", "")):
         errors.append("client_contact.phone must be E.164 or empty")
     for text in _free_text_fields(doc):
         if text and not _clean_text(text):
