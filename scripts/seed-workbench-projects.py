@@ -24,61 +24,47 @@ from dashboard_projects import (  # noqa: E402
 )
 from dashboard_stores import DashboardStores  # noqa: E402
 
-PRODUCTS: tuple[tuple[str, str, str, str], ...] = (
-    (
-        "ai-workbench",
-        ".",
-        "Root: provider-agnostic AI infrastructure, orchestration, and products.",
-        "docs/projects/workbench.md",
-    ),
-    (
-        "Mai agent",
-        "packages/ai_agent",
-        "Personal AI execution surface: chat turns, Mai sessions, drain.",
-        "docs/projects/mai-agent.md",
-    ),
-    (
-        "job search",
-        "apps/job_search",
-        "CV variants, offer matching, application tracking.",
-        "docs/projects/job-search.md",
-    ),
-    (
-        "company site",
-        "company-site",
-        "P7 public front: offering, intake, chatbot.",
-        "docs/projects/company-site.md",
-    ),
-    (
-        "knowme-bank",
-        "packages/knowme_bank",
-        "Local-first personal knowledge bank with provenance.",
-        "docs/projects/knowme-bank.md",
-    ),
-    (
-        "dashboard",
-        "apps/workbench_dashboard",
-        "Single operator surface for the workbench.",
-        "docs/projects/dashboard.md",
-    ),
-    (
-        "AI council",
-        "apps/ai_council",
-        "Multi-model deliberation with a settled protocol.",
-        "docs/projects/ai-council.md",
-    ),
-)
+
+def _registry_dashboard() -> tuple[tuple[str, str, str, str], ...]:
+    """Product seed rows from the single registry (docs/goals/registry.json).
+
+    Only entries carrying a ``dashboard`` block seed dashboard projects;
+    code-only areas (provider, orchestrator, ...) and pre-scaffold tracks
+    (investor) stay out until they grow one. Order follows the registry.
+    """
+    import json
+
+    registry = json.loads((REPO / "docs" / "goals" / "registry.json").read_text())
+    rows = []
+    for entry in registry["projects"].values():
+        seed = entry.get("dashboard")
+        if not seed:
+            continue
+        rows.append((seed["name"], seed["root"], seed["description"], seed["explainer"]))
+    return tuple(rows)
+
+
+def _registry_area_products() -> dict[str, str]:
+    """E2E area -> product root, inverted from registry dashboard blocks."""
+    import json
+
+    registry = json.loads((REPO / "docs" / "goals" / "registry.json").read_text())
+    mapping = {}
+    for entry in registry["projects"].values():
+        seed = entry.get("dashboard")
+        if not seed:
+            continue
+        for area in seed.get("areas", []):
+            mapping[area] = seed["root"]
+    return mapping
+
+
+PRODUCTS: tuple[tuple[str, str, str, str], ...] = _registry_dashboard()
 
 LEGACY_ROOT_STAMP = "workbench"
 
 # E2E area -> product root (relative). Areas outside this map stay on root.
-AREA_PRODUCTS = {
-    "dashboard": "apps/workbench_dashboard",
-    "agent-cli": "packages/ai_agent",
-    "council": "apps/ai_council",
-    "job-search": "apps/job_search",
-    "company-site": "company-site",
-}
+AREA_PRODUCTS = _registry_area_products()
 
 
 def seed_projects(data_dir: Path, *, dry_run: bool) -> dict[str, str]:

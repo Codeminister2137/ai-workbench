@@ -2,6 +2,20 @@
   "_comment": "Single project registry. Plans, tasks and the dashboard reference projects by id; merges/splits edit this file plus the goal docs, never a grep over all files.",
   "version": 1,
   "projects": {
+    "workbench": {
+      "goal": "docs/goals/workbench.md",
+      "repo": "ai-workbench",
+      "owner": "Jakub",
+      "health": "on-track",
+      "relations": {},
+      "dashboard": {
+        "name": "ai-workbench",
+        "root": ".",
+        "description": "Root: provider-agnostic AI infrastructure, orchestration, and products.",
+        "explainer": "docs/projects/workbench.md",
+        "areas": []
+      }
+    },
     "provider": {
       "goal": "docs/goals/provider.md",
       "repo": "ai-workbench",
@@ -21,14 +35,28 @@
       "repo": "ai-workbench",
       "owner": "Jakub",
       "health": "on-track",
-      "relations": {"uses": ["provider", "orchestrator"]}
+      "relations": {"uses": ["provider", "orchestrator"]},
+      "dashboard": {
+        "name": "Mai agent",
+        "root": "packages/ai_agent",
+        "description": "Personal AI execution surface: chat turns, Mai sessions, drain.",
+        "explainer": "docs/projects/mai-agent.md",
+        "areas": ["agent-cli"]
+      }
     },
     "dashboard": {
       "goal": "docs/goals/dashboard.md",
       "repo": "ai-workbench",
       "owner": "Jakub",
       "health": "on-track",
-      "relations": {}
+      "relations": {},
+      "dashboard": {
+        "name": "dashboard",
+        "root": "apps/workbench_dashboard",
+        "description": "Single operator surface for the workbench.",
+        "explainer": "docs/projects/dashboard.md",
+        "areas": ["dashboard"]
+      }
     },
     "meetings-transcriber": {
       "goal": "docs/goals/meetings-transcriber.md",
@@ -42,28 +70,56 @@
       "repo": "ai-workbench",
       "owner": "Jakub",
       "health": "at-risk",
-      "relations": {"runs-on": ["dashboard"]}
+      "relations": {"runs-on": ["dashboard"]},
+      "dashboard": {
+        "name": "knowme-bank",
+        "root": "packages/knowme_bank",
+        "description": "Local-first personal knowledge bank with provenance.",
+        "explainer": "docs/projects/knowme-bank.md",
+        "areas": []
+      }
     },
     "job-search": {
       "goal": "docs/goals/job-search.md",
       "repo": "ai-workbench",
       "owner": "Jakub",
       "health": "on-track",
-      "relations": {"uses": ["provider"]}
+      "relations": {"uses": ["provider"]},
+      "dashboard": {
+        "name": "job search",
+        "root": "apps/job_search",
+        "description": "CV variants, offer matching, application tracking.",
+        "explainer": "docs/projects/job-search.md",
+        "areas": ["job-search"]
+      }
     },
     "council": {
       "goal": "docs/goals/council.md",
       "repo": "ai-workbench",
       "owner": "Jakub",
       "health": "on-track",
-      "relations": {"uses": ["provider"]}
+      "relations": {"uses": ["provider"]},
+      "dashboard": {
+        "name": "AI council",
+        "root": "apps/ai_council",
+        "description": "Multi-model deliberation with a settled protocol.",
+        "explainer": "docs/projects/ai-council.md",
+        "areas": ["council"]
+      }
     },
     "company-site": {
       "goal": "docs/goals/company-site.md",
       "repo": "ai-workbench",
       "owner": "Jakub",
       "health": "at-risk",
-      "relations": {}
+      "relations": {},
+      "dashboard": {
+        "name": "company site",
+        "root": "company-site",
+        "description": "P7 public front: offering, intake, chatbot.",
+        "explainer": "docs/projects/company-site.md",
+        "areas": ["company-site"]
+      }
     },
     "company-ops": {
       "goal": "docs/goals/company-ops.md",
@@ -79,6 +135,13 @@
       "health": "on-track",
       "relations": {},
       "_comment": "Repo operations itself: run plans, workflow, gates, sweeps."
+    },
+    "investor": {
+      "goal": "docs/goals/investor.md",
+      "repo": "ai-workbench",
+      "owner": "Jakub",
+      "health": "on-track",
+      "relations": {"uses": ["provider"], "runs-on": ["dashboard"]}
     }
   }
 }
