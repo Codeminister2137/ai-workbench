@@ -1637,7 +1637,8 @@ async function renderE2E(id) {
         const st = ((entry.steps || [])[si]) || {};
         let agent = "";
         if (st.evidence_exit !== undefined || st.evidence) {
-          agent = `<br><span class="muted">Agent check exit: ${esc(String(st.evidence_exit ?? "?"))}</span>`;
+          const verdict = st.evidence_summary ? `: ${esc(st.evidence_summary)}` : "";
+          agent = `<br><span class="muted">Agent check${verdict || ` exit: ${esc(String(st.evidence_exit ?? "?"))}`}</span>`;
           if (st.evidence) {
             agent += `<details><summary>Agent output</summary><pre>${esc(st.evidence)}</pre></details>`;
           }
@@ -1692,8 +1693,9 @@ async function renderE2E(id) {
       const dis = readOnly ? " disabled" : "";
       const rows = entry.steps.map((s, i) => {
         const runnable = s.agent_runnable && !readOnly;
+        const summary = s.evidence_summary ? `: ${esc(s.evidence_summary)}` : ` (exit ${esc(s.evidence_exit ?? "?")})`;
         const evidence = s.evidence
-          ? `<br><details><summary>Agent evidence (exit ${esc(s.evidence_exit ?? "?")})</summary><pre>${esc(s.evidence)}</pre></details>` : "";
+          ? `<br><span class="muted">Agent evidence${summary}</span><details><summary>Full output</summary><pre>${esc(s.evidence)}</pre></details>` : "";
         const runBtn = runnable
           ? ` <button type="button" data-agent-check="${esc(entry.id)}:${i}" title="Run this exact command agent-side and attach the output">Run check</button>` : "";
         return `<li><strong>${esc(s.action || "")}</strong><br>`
