@@ -51,9 +51,17 @@ def extract_command(action: str) -> str | None:
 def _default_runner(
     argv: Sequence[str], repo_root: Path, timeout_seconds: float = CHECK_TIMEOUT_SECONDS
 ) -> tuple[int, str]:
+    argv = list(argv)
+    if argv and not Path(argv[0]).is_absolute() and ("/" in argv[0] or "\\" in argv[0]):
+        # Windows resolves a relative program path against the CALLER's
+        # cwd, not the child's `cwd` param: the serve process lives
+        # elsewhere, so anchor relative paths at the repo root (observed:
+        # every serve-side check 127'd while shell runs passed). Bare
+        # command names keep PATH lookup.
+        argv[0] = str(Path(repo_root).resolve() / argv[0])
     try:
         proc = subprocess.run(
-            list(argv),
+            argv,
             cwd=repo_root,
             capture_output=True,
             text=True,
