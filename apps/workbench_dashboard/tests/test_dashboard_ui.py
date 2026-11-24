@@ -619,7 +619,8 @@ def test_e2e_tab_checks_and_submits() -> None:
     assert "Describe what is wrong with the test" in js
     assert 'data-agent-check="${esc(entry.id)}:' in js
     assert "Run this exact command agent-side and attach the output" in js
-    assert "Agent evidence attached — review it, then verdict" in js
+    assert "Agent evidence attached (exit" in js
+    assert "review it, then verdict" in js
     assert ".st-bad-test" in _read("app.css")
     assert "Draft — waiting on pointers" in js
     assert "Recent verdicts for this area (all merges)" in js
@@ -1359,6 +1360,7 @@ def test_e2e_report_shows_agent_evidence_and_mismatch() -> None:
     assert "agent mismatch" in js
     # Item ids contain colons: the click handler must split on the LAST one.
     assert "lastIndexOf" in js
+    assert "attached" in js
 
 
 def test_chat_agent_controls_present() -> None:

@@ -21,7 +21,7 @@ EVIDENCE_CHARS = 8000
 
 _BACKTICKED = re.compile(r"`([^`]+)`")
 _SHELL_CHARS = re.compile(r"[&|;$`()<>]")
-_PYTEST_RE = re.compile(r"^\.venv/Scripts/python\.exe -m pytest \S+ -q$")
+_PYTEST_RE = re.compile(r"^\.venv/Scripts/python\.exe -m pytest \S+ -(q|v)$")
 _HELP_RE = re.compile(r"^\S+ --help$")
 _DRYRUN_RE = re.compile(r"^\.venv/Scripts/python\.exe scripts/\S+\.py --dry-run$")
 _HTTP_GET_RE = re.compile(r"^\.venv/Scripts/python\.exe scripts/e2e-http-get\.py /\S* \d+$")
