@@ -1352,7 +1352,8 @@ def test_allowance_empty_states_are_honest() -> None:
 def test_e2e_report_shows_agent_evidence_and_mismatch() -> None:
     """Report view renders per-step agent evidence plus mismatch pills."""
     js = _read("app.js")
-    assert "Agent check exit:" in js
+    assert "Agent check" in js
+    assert "evidence_summary" in js
     assert "Agent output" in js
     assert "agent_check_mismatches" in js
     assert "agent mismatch" in js
