@@ -137,6 +137,21 @@ def test_skips_decisions_closed_and_foreign_items(tmp_path) -> None:
     assert bridge_agent_queue(stores) == []
 
 
+def test_hold_metadata_skips_bridging_until_released(tmp_path) -> None:
+    stores = DashboardStores(tmp_path)
+    held = _agent_task(stores, metadata={"hold": True})
+    _agent_task(stores, title="Free job")
+    (receipt,) = bridge_agent_queue(stores)
+    assert receipt["inbox_id"] != held["id"]
+    # Releasing the hold bridges on the next pass.
+    item = stores.inbox.get(held["id"])
+    assert item is not None
+    item["metadata"] = {key: value for key, value in item["metadata"].items() if key != "hold"}
+    stores.inbox.put(item["id"], item)
+    (released,) = bridge_agent_queue(stores)
+    assert released["inbox_id"] == held["id"]
+
+
 def test_endpoint_bridges_and_reports(server) -> None:
     base, _tmp = server
     result = post_json(base, "/api/inbox/bridge-runs", {})

@@ -134,6 +134,62 @@ def test_invalid_error_envelopes_preserve_status(body: bytes) -> None:
     assert str(err) == "X provider returned HTTP 400."
 
 
+def test_withheld_detail_keeps_safe_envelope_tokens() -> None:
+    body = json.dumps(
+        {
+            "error": {
+                "message": "Invalid messages[3]: private content here",
+                "type": "invalid_request_error",
+                "code": "invalid_messages",
+            }
+        }
+    ).encode()
+    err = http_error_to_provider_error(_body_error(body), provider="p", api_label="X")
+    text = str(err)
+    assert "withheld" in text
+    assert "type=invalid_request_error" in text
+    assert "code=invalid_messages" in text
+    assert "private content" not in text
+    assert "messages[3]" not in text
+    assert err.category is ProviderErrorCategory.NON_RETRYABLE
+
+
+def test_hostile_envelope_tokens_are_dropped() -> None:
+    body = json.dumps(
+        {
+            "error": {
+                "message": "bad request",
+                "type": "invalid_request_error with smuggled content payload",
+                "code": "sk-fixture-secret-token-value",
+            }
+        }
+    ).encode()
+    err = http_error_to_provider_error(_body_error(body), provider="p", api_label="X")
+    text = str(err)
+    assert "withheld" in text
+    assert "smuggled" not in text
+    assert "sk-fixture-secret-token-value" not in text
+
+
+def test_context_length_400_reroutes_to_longer_context_model() -> None:
+    body = json.dumps(
+        {
+            "error": {
+                "message": "Maximum prompt length exceeded with private input tokens",
+                "type": "invalid_request_error",
+                "code": "context_length_exceeded",
+            }
+        }
+    ).encode()
+    err = http_error_to_provider_error(_body_error(body), provider="p", api_label="X")
+    text = str(err)
+    assert err.category is ProviderErrorCategory.RETRYABLE
+    assert err.retryable is True
+    assert "route to a longer-context model" in text.lower()
+    assert "code=context_length_exceeded" in text
+    assert "private input" not in text
+
+
 def test_diagnostic_read_is_bounded() -> None:
     class CheckedBody(BytesIO):
         def read(self, size: int | None = -1):

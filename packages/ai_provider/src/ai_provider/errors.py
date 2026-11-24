@@ -49,11 +49,62 @@ class ProviderError(RuntimeError):
         self.tool_results: tuple[Any, ...] = ()
 
 
-def _http_error_detail(exc, *, credentials: Iterable[str | None]) -> str:
+_SAFE_TOKEN = re.compile(r"[A-Za-z0-9_.-]{1,64}")
+
+_SENSITIVE_TOKEN_PARTS = (
+    "sk-",
+    "api",
+    "key",
+    "secret",
+    "token",
+    "password",
+    "bearer",
+    "auth",
+    "private",
+    "credential",
+)
+"""Substrings that disqualify an otherwise well-shaped token.
+
+An identifier-shaped value can still be a credential echo (observed:
+provider-style secret in an error code field). Dropped tokens lose no
+classification the status code does not already carry (auth failures
+arrive as 401/403; this channel exists for 400-subclassification whose
+codes never contain these words).
+"""
+
+
+def _safe_envelope_tokens(payload: object) -> dict[str, str]:
+    """Validated error type/code tokens; safe even when the message is not.
+
+    Only short identifier-shaped provider tokens without sensitive
+    substrings pass; anything else is dropped so a hostile or echoing
+    envelope cannot smuggle content out through the classification
+    channel.
+    """
+    if not isinstance(payload, dict):
+        return {}
+    error = payload.get("error")
+    if not isinstance(error, dict):
+        return {}
+    tokens = {}
+    for key in ("type", "code"):
+        value = error.get(key)
+        if not isinstance(value, str) or not _SAFE_TOKEN.fullmatch(value):
+            continue
+        lowered = value.lower()
+        if any(part in lowered for part in _SENSITIVE_TOKEN_PARTS):
+            continue
+        tokens[key] = value
+    return tokens
+
+
+def _http_error_detail(exc, *, credentials: Iterable[str | None]) -> tuple[str, dict[str, str]]:
     """Expose bounded error diagnostics, failing closed on sensitive payloads.
 
     Never inspect request objects, headers or exception reprs. JSON response
     envelopes contribute only error message/type/code, not echoed request fields.
+    Returns (detail, safe_tokens): validated type/code tokens survive even a
+    withheld message so verdict classification keeps working on scrubbed errors.
     """
     from ai_provider.credential_guard import contains_credentials
 
@@ -66,34 +117,49 @@ def _http_error_detail(exc, *, credentials: Iterable[str | None]) -> str:
     try:
         body = exc.read(16_385)
         if not body:
-            return ""
+            return "", {}
         text = body.decode("utf-8", errors="replace")
-        if contains_credentials(text, extra=credentials) or sensitive.search(text):
-            return "[response detail withheld]"
-        # A partial JSON document cannot be safely filtered for echoed inputs.
+        tokens: dict[str, str] = {}
+        payload: object = None
         if text.lstrip().startswith(("{", "[")):
+            # A partial JSON document cannot be safely filtered for echoed inputs.
             if len(body) > 16_384:
-                return "[response detail withheld]"
-            payload = json.loads(text)
+                return "[response detail withheld]", {}
+            try:
+                payload = json.loads(text)
+            except ValueError:
+                return "", {}
+            tokens = _safe_envelope_tokens(payload)
+
+        def _withheld() -> tuple[str, dict[str, str]]:
+            if tokens:
+                tagged = " ".join(f"{key}={value}" for key, value in tokens.items())
+                return f"[response detail withheld: {tagged}]", tokens
+            return "[response detail withheld]", tokens
+
+        if contains_credentials(text, extra=credentials) or sensitive.search(text):
+            return _withheld()
+        if payload is not None:
             # JSON escapes can conceal credential values and sensitive field names.
             decoded = json.dumps(payload, ensure_ascii=False)
             if contains_credentials(payload, extra=credentials) or sensitive.search(decoded):
-                return "[response detail withheld]"
+                return _withheld()
             if not isinstance(payload, dict) or "error" not in payload:
-                return ""
+                return "", {}
             error = payload["error"]
             if isinstance(error, dict):
                 error = {key: error[key] for key in ("message", "type", "code") if key in error}
                 if any(not isinstance(value, (str, int, type(None))) for value in error.values()):
-                    return ""
+                    return "", {}
             elif not isinstance(error, str):
-                return ""
+                return "", {}
             text = json.dumps(error, ensure_ascii=False)
         text = " ".join(text.split())
-        return text if len(text) <= 500 else text[:497] + "..."
+        detail = text if len(text) <= 500 else text[:497] + "..."
+        return detail, tokens
     except Exception:
         # A diagnostic read/parse failure must not replace the original status.
-        return ""
+        return "", {}
 
 
 def http_error_to_provider_error(
@@ -112,10 +178,19 @@ def http_error_to_provider_error(
         category = ProviderErrorCategory.RETRYABLE
     else:
         category = ProviderErrorCategory.NON_RETRYABLE
-    detail = _http_error_detail(exc, credentials=credentials)
+    detail, tokens = _http_error_detail(exc, credentials=credentials)
     message = f"{api_label} provider returned HTTP {exc.code}."
     if detail:
         message += f" Response detail: {detail}"
+    if exc.code == 400 and (
+        tokens.get("code") == "context_length_exceeded"
+        or tokens.get("type") == "context_length_exceeded"
+    ):
+        # The request fits nowhere on this route, but a longer-context
+        # route may serve it: capability reroute, not terminal failure.
+        # The marker sentence is the FallbackSession capability signal.
+        category = ProviderErrorCategory.RETRYABLE
+        message += " Route to a longer-context model."
     return ProviderError(
         message,
         category=category,
