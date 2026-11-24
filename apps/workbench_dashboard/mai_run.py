@@ -28,7 +28,8 @@ MAI_INSTRUCTION_BUDGET_CHARS = 96_000
 
 _ALLOWANCE_RE = re.compile(r"allowance|denied|cost polic|budget|quota|exhaust", re.IGNORECASE)
 _CONFIG_RE = re.compile(
-    r"instruction.?budget|estimated context budget|invalid native (?:context|output) budget",
+    r"instruction.?budget|estimated context budget|invalid native (?:context|output) budget"
+    r"|loop context|after \d+ compactions",
     re.IGNORECASE,
 )
 _PROVIDER_RE = re.compile(

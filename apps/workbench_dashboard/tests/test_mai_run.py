@@ -342,6 +342,22 @@ def test_native_context_rejection_is_config_not_allowance() -> None:
     assert "context_tokens=65536" in outcome["stderr_tail"]
 
 
+def test_loop_compaction_thrash_is_config_not_allowance() -> None:
+    """Loop-context budget overflow must not pause the drain as allowance."""
+    outcome = mai_receipt(
+        MaiRunOutcome(
+            exit_code=1,
+            stdout_tail="",
+            stderr_tail=(
+                "failure_reason: loop context still exceeds its budget after 3 compactions; "
+                "one large output likely refills the window."
+            ),
+        ),
+        [],
+    )
+    assert outcome["failure_class"] == "config"
+
+
 def test_argv_carries_raised_instruction_budget(tmp_path) -> None:
     argv = build_mai_argv(_run(), repo_root=tmp_path, user_config=tmp_path / "user.toml")
     assert argv[argv.index("--instruction-budget-chars") + 1] == str(MAI_INSTRUCTION_BUDGET_CHARS)
