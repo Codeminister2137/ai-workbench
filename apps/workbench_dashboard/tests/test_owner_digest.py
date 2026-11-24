@@ -47,7 +47,7 @@ def test_hourly_quiet_flush_restart_and_blocker_priority(mail):
     assert not flush()["sent"]
     clock[0] += 1
     assert flush()["sent"]
-    assert sent[0]["body"].index("owner decision") < sent[0]["body"].index("\nprogress")
+    assert sent[0]["body"].index("owner decision") < sent[0]["body"].index("--- DONE ---")
     assert not flush()["sent"]
     assert queue()["deduped"]  # durable keys survive new connections
     queue("closeout")
@@ -153,3 +153,95 @@ def test_failed_urgent_delivery_can_retry_without_false_success(mail, monkeypatc
     monkeypatch.setattr(owner_mail, "_send_owner_mail_now", original)
     assert queue("urgent", blocker=True, all_work_blocked=True)["sent"]
     assert len(sent) == 1
+
+
+def test_verdict_tiers_blocker_soon_relax(mail):
+    """Digest v2: ASAP on blockers, soon on needs-you, relax on done-only."""
+    sent, clock, queue, flush, _ = mail
+    queue("nightly sweep done")
+    clock[0] += 3601
+    assert flush()["sent"]
+    assert sent[0]["body"].startswith("Verdict: relax — 0 need you, 1 done.")
+    assert "[relax]" in sent[0]["subject"]
+    queue("run failed", tier="needs-you")
+    clock[0] += 3601
+    assert flush()["sent"]
+    assert sent[1]["body"].startswith("Verdict: soon — 1 need you, 0 done.")
+    assert "[soon]" in sent[1]["subject"]
+    queue("owner decision needed", blocker=True)
+    clock[0] += 3601
+    assert flush()["sent"]
+    assert sent[2]["body"].startswith("Verdict: ASAP — 1 need you, 0 done.")
+    assert "[ASAP]" in sent[2]["subject"]
+    assert "BLOCKER: owner decision needed" in sent[2]["body"]
+
+
+def test_unknown_tier_fails_visible(mail):
+    sent, clock, queue, flush, _ = mail
+    queue("mystery event", tier="nonsense")
+    clock[0] += 3601
+    assert flush()["sent"]
+    assert "Verdict: soon" in sent[0]["body"]
+    assert "--- NEEDS YOU ---" in sent[0]["body"]
+
+
+def test_legacy_schema_migrates_with_done_backfill(mail, tmp_path):
+    """Pre-tier databases gain the column; old rows flush as done."""
+    sent, clock, _, flush, config = mail
+    db = sqlite3.connect(tmp_path / "owner-digest.sqlite3")
+    db.execute(
+        "CREATE TABLE events (key TEXT PRIMARY KEY, subject TEXT, body TEXT, blocker INTEGER, created REAL, delivered INTEGER DEFAULT 0)"
+    )
+    db.execute(
+        "INSERT INTO events(key,subject,body,blocker,created) VALUES(?,?,?,?,?)",
+        ("legacy", "old progress", "old progress", 0, 10000.0),
+    )
+    db.commit()
+    db.close()
+    clock[0] += 3601
+    assert flush()["sent"]
+    assert "Verdict: relax" in sent[0]["body"]
+    assert "- old progress — old progress" in sent[0]["body"]
+
+
+def test_golden_digest_rendering(mail, tmp_path):
+    """Golden v2 digest: verdict, tiered sections, compact done lines."""
+    sent, clock, _, flush, config = mail
+
+    def queue_body(subject, body, **kwargs):
+        return digest.queue_notification(
+            data_dir=tmp_path,
+            supervision="unattended",
+            subject=subject,
+            body=body,
+            config=config,
+            **kwargs,
+        )
+
+    queue_body(
+        "Blocked: approve deploy",
+        "Stopped for owner input: approve deploy.\nNext: inbox:abc123.",
+        blocker=True,
+    )
+    queue_body(
+        "Failed: night sweep",
+        "Failed\nTitle: night sweep\nOutcome: Could not complete: night sweep.\nNext: Triage queued; inbox:def456.",
+        tier="needs-you",
+    )
+    queue_body(
+        "Done: docs pass",
+        "Done\nTitle: docs pass\nOutcome: Completed: docs pass.\nNext: Merged as abc1234.",
+    )
+    clock[0] += 3601
+    assert flush()["sent"]
+    assert sent[0]["subject"] == "[workbench] [ASAP] Hourly digest"
+    assert sent[0]["body"] == (
+        "Verdict: ASAP — 2 need you, 1 done. Unattended session updates:\n"
+        "\n--- NEEDS YOU ---\n"
+        "\nBLOCKER: Blocked: approve deploy\n"
+        "Stopped for owner input: approve deploy.\nNext: inbox:abc123.\n"
+        "\nFailed: night sweep\n"
+        "Failed\nTitle: night sweep\nOutcome: Could not complete: night sweep.\nNext: Triage queued; inbox:def456.\n"
+        "\n--- DONE ---\n"
+        "\n- Done: docs pass — Outcome: Completed: docs pass.\n"
+    )
