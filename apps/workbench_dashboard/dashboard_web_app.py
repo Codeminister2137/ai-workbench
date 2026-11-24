@@ -2051,7 +2051,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         self, steps: list, index: int, timeout_seconds: float
     ) -> dict[str, object]:
         """Run one agent-runnable step and stamp its evidence; may raise ValueError."""
-        from e2e_agent_checks import execute_check
+        from e2e_agent_checks import execute_check, summarize_evidence
 
         result = execute_check(
             str(steps[index].get("action") or ""),
@@ -2059,6 +2059,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             timeout_seconds=timeout_seconds,
         )
         steps[index]["evidence"] = result["output"]
+        steps[index]["evidence_summary"] = summarize_evidence(result["output"], result["exit_code"])
         steps[index]["evidence_utc"] = datetime.now(UTC).isoformat()
         steps[index]["evidence_exit"] = result["exit_code"]
         return steps[index]

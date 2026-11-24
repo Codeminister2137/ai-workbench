@@ -145,6 +145,18 @@ def test_default_runner_anchors_relative_program_at_repo_root(tmp_path: Path, mo
     assert "hello-from-repo" in output
 
 
+def test_summarize_evidence_shows_exit_plus_last_meaningful_line() -> None:
+    assert (
+        e2e_agent_checks.summarize_evidence(".....\n22 passed in 0.57s\n", 0)
+        == "exit 0: 22 passed in 0.57s"
+    )
+    assert e2e_agent_checks.summarize_evidence(".....\n.....\n", 0) == "exit 0: no output captured"
+    assert e2e_agent_checks.summarize_evidence("", 127) == "exit 127: no output captured"
+    long = "x" * 300
+    assert e2e_agent_checks.summarize_evidence(long, 1).endswith("...")
+    assert e2e_agent_checks.summarize_evidence(None, None) == "exit ?: no output captured"
+
+
 def test_execute_check_refuses_unrunnable(tmp_path: Path) -> None:
     import pytest
 

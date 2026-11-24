@@ -76,6 +76,26 @@ def _default_runner(
     return proc.returncode, output or "(no output)"
 
 
+def summarize_evidence(output: object, exit_code: object) -> str:
+    """One glanceable line: exit plus the last meaningful output line.
+
+    Owners read the verdict without expanding kilobytes of pytest dots;
+    the full output stays one click away in the evidence detail.
+    """
+    code = exit_code if isinstance(exit_code, int) else "?"
+    text = output if isinstance(output, str) else ""
+    tail = ""
+    for line in text.splitlines():
+        stripped = " ".join(line.split())
+        if stripped and not set(stripped) <= {"."}:
+            tail = stripped
+    if not tail:
+        return f"exit {code}: no output captured"
+    if len(tail) > 200:
+        tail = tail[:197] + "..."
+    return f"exit {code}: {tail}"
+
+
 def execute_check(
     action: str,
     repo_root: Path,
