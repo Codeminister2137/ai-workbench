@@ -64,6 +64,18 @@ def mai_execution_completed(*texts: str) -> bool:
     return False
 
 
+def mai_reported_exhaustion(*texts: str) -> bool:
+    """True when Mai's closeout carries a fallback-exhaustion handoff.
+
+    ``fallback_handoff=`` renders in the closeout notes (tail-visible)
+    exactly when FallbackSession found no eligible continuation route;
+    ``continuation_stopped`` is the only handoff status it ever sets.
+    A parked run retries after backoff instead of failing forever.
+    """
+    blob = "\n".join(text or "" for text in texts)
+    return "fallback_handoff=" in blob and "continuation_stopped" in blob
+
+
 def capture_tail(text: str) -> str:
     """Keep the last TAIL_CHARS, marked and line-aligned when truncated.
 
@@ -248,6 +260,7 @@ def mai_receipt(outcome: MaiRunOutcome, argv: Sequence[str]) -> dict:
                 "status": "failed",
                 "error": error,
                 "failure_class": classify_failure(error, outcome.stdout_tail, outcome.stderr_tail),
+                "exhausted_tree": mai_reported_exhaustion(outcome.stdout_tail, outcome.stderr_tail),
                 "stdout_tail": outcome.stdout_tail,
                 "stderr_tail": outcome.stderr_tail,
                 "mai_argv": list(argv),
@@ -285,6 +298,7 @@ def mai_receipt(outcome: MaiRunOutcome, argv: Sequence[str]) -> dict:
         "status": "failed",
         "error": error,
         "failure_class": classify_failure(error, outcome.stdout_tail, outcome.stderr_tail),
+        "exhausted_tree": mai_reported_exhaustion(outcome.stdout_tail, outcome.stderr_tail),
         "stdout_tail": outcome.stdout_tail,
         "stderr_tail": outcome.stderr_tail,
         "mai_argv": list(argv),

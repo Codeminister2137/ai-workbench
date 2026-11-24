@@ -864,3 +864,95 @@ def test_claim_before_final_check_cancels_sleep_even_after_fast_completion(store
     assert stores.runs.get("race")["status"] == "paused"
     with interlock(stores.data_dir):
         assert final_check(stores.data_dir, config) != 0
+
+
+def _exhausting_drain(stores, calls):
+    def executor(run):
+        calls.append(run)
+        return {
+            "status": "failed",
+            "error": "Mai session exited with code 1",
+            "failure_class": "provider",
+            "exhausted_tree": True,
+        }
+
+    return RunDrain(
+        runs_dir=stores.data_dir / "runs",
+        get_inbox=stores.inbox.get,
+        executor=executor,
+    )
+
+
+def test_exhausted_tree_parks_with_backoff(stores, calls) -> None:
+    """Scheduler-A park-on-exhaustion: handoff failure requeues, never fails."""
+    from datetime import UTC, datetime
+
+    run_id, _inbox_id = _queue_chat_run(stores, answer="Approve")
+    worker = _exhausting_drain(stores, calls)
+    (outcome,) = worker.drain()
+    assert outcome["status"] == "queued"
+    assert outcome["action"] == "parked"
+    assert "ripe after" in outcome["reason"]
+    stored = stores.runs.get(run_id)
+    assert stored["status"] == "queued"
+    assert stored["park_count"] == 1
+    ripe_at = datetime.fromisoformat(stored["not_before_utc"])
+    assert ripe_at > datetime.now(UTC)
+    assert "finished_at_utc" not in stored
+    assert [entry["kind"] for entry in stored["events"]][-1] == "run_parked"
+    assert _claim_files(stores) == []
+
+
+def test_unripe_parked_run_skips_without_executing(stores, calls) -> None:
+    from datetime import UTC, datetime, timedelta
+
+    run_id, _inbox_id = _queue_chat_run(stores, answer="Approve")
+    worker = _exhausting_drain(stores, calls)
+    worker.drain()
+    assert len(calls) == 1
+    (outcome,) = worker.drain()
+    assert outcome["action"] == "parked"
+    assert "parked until" in outcome["reason"]
+    assert len(calls) == 1
+    # A ripe run executes again.
+    stored = stores.runs.get(run_id)
+    stored["not_before_utc"] = (datetime.now(UTC) - timedelta(minutes=1)).isoformat()
+    stores.runs.put(run_id, stored)
+    worker.drain()
+    assert len(calls) == 2
+    assert stores.runs.get(run_id)["park_count"] == 2
+
+
+def test_repeated_parks_fail_terminal(stores, calls) -> None:
+    """Nothing is immortal: past PARK_MAX the run fails with cause."""
+    from ai_agent.supervisor_drain import PARK_MAX
+
+    run_id, _inbox_id = _queue_chat_run(stores, answer="Approve")
+    worker = _exhausting_drain(stores, calls)
+    for _ in range(PARK_MAX + 1):
+        stored = stores.runs.get(run_id)
+        stored.pop("not_before_utc", None)
+        stores.runs.put(run_id, stored)
+        worker.drain()
+    stored = stores.runs.get(run_id)
+    assert stored["status"] == "failed"
+    assert "parked repeatedly" in stored["error"]
+    assert stored["park_count"] == PARK_MAX
+
+
+def test_plain_failure_never_parks(stores, calls) -> None:
+    def executor(run):
+        calls.append(run)
+        return {"status": "failed", "error": "genuine task failure"}
+
+    worker = RunDrain(
+        runs_dir=stores.data_dir / "runs",
+        get_inbox=stores.inbox.get,
+        executor=executor,
+    )
+    run_id, _inbox_id = _queue_chat_run(stores, answer="Approve")
+    (outcome,) = worker.drain()
+    assert outcome == {"run_id": run_id, "status": "failed"}
+    stored = stores.runs.get(run_id)
+    assert "park_count" not in stored
+    assert "not_before_utc" not in stored
