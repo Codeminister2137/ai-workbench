@@ -15,6 +15,17 @@ def test_extract_command_allows_pytest_and_help() -> None:
     assert e2e_agent_checks.extract_command("Try `ruff --help` first") == "ruff --help"
 
 
+def test_extract_command_allows_pytest_verbose_for_readable_evidence() -> None:
+    assert (
+        e2e_agent_checks.extract_command("Run `.venv/Scripts/python.exe -m pytest x -v` now")
+        == ".venv/Scripts/python.exe -m pytest x -v"
+    )
+    assert (
+        e2e_agent_checks.extract_command("Run `.venv/Scripts/python.exe -m pytest x -k foo`")
+        is None
+    )
+
+
 def test_extract_command_rejects_prose_and_shell() -> None:
     assert e2e_agent_checks.extract_command("Run the scoped pytest") is None
     assert e2e_agent_checks.extract_command("No backticks here") is None

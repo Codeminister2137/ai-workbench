@@ -1694,8 +1694,13 @@ async function renderE2E(id) {
       const rows = entry.steps.map((s, i) => {
         const runnable = s.agent_runnable && !readOnly;
         const summary = s.evidence_summary ? `: ${esc(s.evidence_summary)}` : ` (exit ${esc(s.evidence_exit ?? "?")})`;
+        let attached = "";
+        if (s.evidence_utc) {
+          const when = new Date(s.evidence_utc);
+          attached = ` · attached ${esc(isNaN(when) ? String(s.evidence_utc) : when.toLocaleString())}`;
+        }
         const evidence = s.evidence
-          ? `<br><span class="muted">Agent evidence${summary}</span><details><summary>Full output</summary><pre>${esc(s.evidence)}</pre></details>` : "";
+          ? `<br><span class="muted">Agent evidence${summary}${attached}</span><details><summary>Full output</summary><pre>${esc(s.evidence)}</pre></details>` : "";
         const runBtn = runnable
           ? ` <button type="button" data-agent-check="${esc(entry.id)}:${i}" title="Run this exact command agent-side and attach the output">Run check</button>` : "";
         return `<li><strong>${esc(s.action || "")}</strong><br>`
@@ -1752,12 +1757,14 @@ async function renderE2E(id) {
       const stepIndex = btn.dataset.agentCheck.slice(sep + 1);
       btn.disabled = true;
       try {
-        await api("/api/e2e/tasks/" + encodeURIComponent(id) + "/agent-check", {
+        const res = await api("/api/e2e/tasks/" + encodeURIComponent(id) + "/agent-check", {
           method: "POST",
           headers: {"Content-Type": "application/json"},
           body: JSON.stringify({item_id: itemId, step_index: Number(stepIndex)}),
         });
-        toast("Agent evidence attached — review it, then verdict", true);
+        const code = res && res.evidence ? res.evidence.evidence_exit : "?";
+        const stamp = res && res.evidence && res.evidence.evidence_utc ? ` at ${res.evidence.evidence_utc}` : "";
+        toast(`Agent evidence attached (exit ${code}${stamp}) — review it, then verdict`, true);
         render();
       } catch (err) {
         toast(err.message, false);
