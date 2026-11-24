@@ -371,3 +371,65 @@ def test_second_compaction_folds_prior_summary(tmp_path) -> None:
         and "Compacted summary of earlier turns" in message.content
     ]
     assert len(summaries) == 1
+
+
+def _tool_pair(call_id="c1"):
+    return (
+        AIMessage(
+            MessageRole.ASSISTANT,
+            "",
+            tool_calls=(AIToolCall(call_id, "read_file", {"path": "x"}),),
+        ),
+        AIMessage(MessageRole.TOOL, "content", tool_call_id=call_id),
+    )
+
+
+def test_paired_tail_shifts_past_orphaned_tool_result():
+    from ai_agent.loop import _paired_tail
+
+    call, result = _tool_pair()
+    assert _paired_tail([result, AIMessage(MessageRole.USER, "next")]) == [
+        AIMessage(MessageRole.USER, "next")
+    ]
+    assert _paired_tail([call, result]) == [call, result]
+
+
+def test_paired_tail_shifts_unanswered_assistant_calls():
+    from ai_agent.loop import _paired_tail
+
+    call, result = _tool_pair()
+    lonely = AIMessage(
+        MessageRole.ASSISTANT,
+        "",
+        tool_calls=(AIToolCall("cX", "read_file", {"path": "y"}),),
+    )
+    assert _paired_tail([lonely, call, result]) == [call, result]
+    assert _paired_tail([lonely]) == []
+    plain = AIMessage(MessageRole.ASSISTANT, "thinking aloud")
+    assert _paired_tail([plain, call, result]) == [plain, call, result]
+
+
+def test_compacted_request_never_starts_tail_with_orphan_tool(tmp_path):
+    """Post-compaction requests keep tool pairing strict-provider valid."""
+    client = CompactingClient()
+    loop = _loop(client, tmp_path, loop_context_budget_chars=1000)
+    ask, answer = _tool_pair()
+    orphan = AIMessage(MessageRole.TOOL, "orphaned", tool_call_id="c0")
+    user = AIMessage(MessageRole.USER, "go")
+    messages = [
+        AIMessage(MessageRole.SYSTEM, "SYS"),
+        AIMessage(MessageRole.USER, "old work " + "x" * 1200),
+        orphan,
+        ask,
+        answer,
+        user,
+    ]
+    count, _ = loop._maybe_compact(messages, 0, model="test", privacy_class=PrivacyClass.LOCAL_ONLY)
+    assert count == 1
+    tail_start = next(message for message in messages if message.role is not MessageRole.SYSTEM)
+    # Orphan folded away; tail starts with the complete tool pair.
+    assert tail_start is ask
+    assert orphan not in messages
+    assert messages[-1] is user
+    summary = next(message for message in messages if "Compacted summary" in message.content)
+    assert summary.content

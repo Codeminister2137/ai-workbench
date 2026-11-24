@@ -421,6 +421,7 @@ class AgentLoop:
                 category=ProviderErrorCategory.NON_RETRYABLE,
                 provider=self.client.backend.provider,
             )
+        tail = _paired_tail(tail)
         older = conversation[: len(conversation) - len(tail)] if tail else list(conversation)
         foldable: list[AIMessage] = [*prior_summaries, *older]
         if not foldable:
@@ -1032,6 +1033,35 @@ def _cap_tool_content(output: str) -> str:
 
 def _is_compaction_summary(message: AIMessage) -> bool:
     return message.content.startswith(COMPACTION_SUMMARY_PREFIX)
+
+
+def _paired_tail(tail: list[AIMessage]) -> list[AIMessage]:
+    """Shift the compaction tail start past unpaired tool messages.
+
+    A tail starting with a TOOL message (its assistant call folded
+    away) or an ASSISTANT whose tool calls lack in-tail results is
+    rejected by strict providers (observed: kimi 400
+    invalid_request_error on the first post-compaction request).
+    Shifted messages join the foldable turns, so their content
+    survives in the rolling summary instead of vanishing.
+    """
+    shift = 0
+    while shift < len(tail):
+        first = tail[shift]
+        if first.role is MessageRole.TOOL:
+            shift += 1
+            continue
+        if first.role is MessageRole.ASSISTANT and first.tool_calls:
+            answered = {
+                message.tool_call_id
+                for message in tail[shift + 1 :]
+                if message.role is MessageRole.TOOL and message.tool_call_id
+            }
+            if not all(call.id in answered for call in first.tool_calls):
+                shift += 1
+                continue
+        break
+    return tail[shift:]
 
 
 def _render_compaction_source(messages: list[AIMessage], cap_chars: int) -> str:
