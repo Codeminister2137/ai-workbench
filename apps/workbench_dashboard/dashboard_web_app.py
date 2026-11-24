@@ -3194,6 +3194,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 "modified_utc": entry.modified_utc,
                 "sensitivity": entry.sensitivity,
                 "renderable": entry.renderable,
+                "local_path": str(self._library().local_path(doc_id)),
             },
         }
         if parse_qs(query).get("content", ["0"])[0] == "1":
