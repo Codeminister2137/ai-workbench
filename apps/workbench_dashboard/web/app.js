@@ -1747,7 +1747,9 @@ async function renderE2E(id) {
            <p><button type="submit" title="Record verdicts and build the E2E report">Submit E2E results</button></p></form>`}</div>`;
     const form = document.getElementById("e2e-form");
     document.querySelectorAll("[data-agent-check]").forEach((btn) => btn.addEventListener("click", async () => {
-      const [itemId, stepIndex] = btn.dataset.agentCheck.split(":");
+      const sep = btn.dataset.agentCheck.lastIndexOf(":");
+      const itemId = btn.dataset.agentCheck.slice(0, sep);
+      const stepIndex = btn.dataset.agentCheck.slice(sep + 1);
       btn.disabled = true;
       try {
         await api("/api/e2e/tasks/" + encodeURIComponent(id) + "/agent-check", {

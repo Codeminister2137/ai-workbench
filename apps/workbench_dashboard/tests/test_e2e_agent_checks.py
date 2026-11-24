@@ -145,6 +145,12 @@ def test_default_runner_anchors_relative_program_at_repo_root(tmp_path: Path, mo
     assert "hello-from-repo" in output
 
 
+def test_format_evidence_leads_with_command_and_exit() -> None:
+    assert e2e_agent_checks.format_evidence("pytest x -q", 0, "dots") == (
+        "$ pytest x -q\n(exit 0)\n\ndots"
+    )
+
+
 def test_summarize_evidence_shows_exit_plus_last_meaningful_line() -> None:
     assert (
         e2e_agent_checks.summarize_evidence(".....\n22 passed in 0.57s\n", 0)

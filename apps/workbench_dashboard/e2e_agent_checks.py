@@ -76,6 +76,11 @@ def _default_runner(
     return proc.returncode, output or "(no output)"
 
 
+def format_evidence(command: str, exit_code: int, output: str) -> str:
+    """Self-describing evidence: what ran and how it ended, then raw output."""
+    return f"$ {command}\n(exit {exit_code})\n\n{output}"
+
+
 def summarize_evidence(output: object, exit_code: object) -> str:
     """One glanceable line: exit plus the last meaningful output line.
 

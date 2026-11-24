@@ -1357,6 +1357,8 @@ def test_e2e_report_shows_agent_evidence_and_mismatch() -> None:
     assert "Agent output" in js
     assert "agent_check_mismatches" in js
     assert "agent mismatch" in js
+    # Item ids contain colons: the click handler must split on the LAST one.
+    assert "lastIndexOf" in js
 
 
 def test_chat_agent_controls_present() -> None:
