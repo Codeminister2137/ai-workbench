@@ -123,6 +123,16 @@ class DocumentLibrary:
             raise KeyError(f"Unknown document: {doc_id}")
         return self._describe(root, self._roots[root][0], candidate)
 
+    def local_path(self, doc_id: str) -> Path:
+        """Absolute on-disk path for "open in an external editor" flows.
+
+        Reuses :meth:`get` so traversal escapes and misses fail the same
+        way as reads. The path is meaningful on the PC serving the
+        dashboard; remote clients just see text.
+        """
+        entry = self.get(doc_id)
+        return (self._roots[entry.root][0] / entry.relpath).resolve()
+
     def read_text(self, doc_id: str) -> tuple[str, bool]:
         """Return (body-without-front-matter, truncated) for markdown docs."""
         entry = self.get(doc_id)

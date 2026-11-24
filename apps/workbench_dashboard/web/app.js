@@ -2617,7 +2617,19 @@ async function renderDocuments(id) {
       ${(item.tags || []).length ? `<p>${item.tags.map((t) => `<span class="pill">${esc(t)}</span>`).join(" ")}</p>` : ""}
       ${item.project ? `<p><strong>Project:</strong> ${esc(item.project)}</p>` : ""}
       ${item.archived ? `<p><span class="pill" title="Archived document">archived</span></p>` : ""}
+      ${item.local_path ? `<p class="muted">Local file (this PC — open in Notepad++ or any editor): <code>${esc(item.local_path)}</code> <button type="button" id="copy-doc-path" title="Copy the local file path (open it in Notepad++ or any editor)">Copy path</button></p>` : ""}
       ${body}</div>`;
+    const copyBtn = document.getElementById("copy-doc-path");
+    if (copyBtn && item.local_path) {
+      copyBtn.addEventListener("click", () => {
+        navigator.clipboard.writeText(item.local_path).then(() => {
+          copyBtn.textContent = "Copied";
+        }).catch((err) => {
+          copyBtn.textContent = "Copy failed";
+          copyBtn.title = String(err && err.message ? err.message : err);
+        });
+      });
+    }
     return;
   }
   const picked = pickedTokens("f", "current");

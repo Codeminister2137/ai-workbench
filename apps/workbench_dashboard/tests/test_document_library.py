@@ -80,6 +80,19 @@ def test_get_refuses_traversal(library_roots) -> None:
         library.get("library/missing.md")
 
 
+def test_local_path_resolves_inside_root(library_roots) -> None:
+    """External-editor flows get a real on-disk path, still path-jailed."""
+    library = DocumentLibrary(library_roots)
+    resolved = library.local_path("library/hello.md")
+    assert resolved.is_file()
+    assert resolved.name == "hello.md"
+    assert library_roots.resolve() in resolved.parents
+    with pytest.raises(ValueError):
+        library.local_path("library/../secret.md")
+    with pytest.raises(KeyError):
+        library.local_path("library/missing.md")
+
+
 def test_read_text_strips_front_matter(library_roots) -> None:
     body, truncated = DocumentLibrary(library_roots).read_text("library/hello.md")
     assert body == "Body here.\n"
@@ -139,6 +152,7 @@ def test_documents_api_lists_and_serves(docs_server) -> None:
         detail = json.loads(response.read().decode("utf-8"))
     assert detail["ok"] is True
     assert detail["entry"]["title"] == "Hello"
+    assert detail["entry"]["local_path"].endswith("hello.md")
     with urlopen(f"{docs_server}/api/documents/library/hello.md?content=1", timeout=5) as response:
         content = json.loads(response.read().decode("utf-8"))
     assert content["content"] == "Body here.\n"
