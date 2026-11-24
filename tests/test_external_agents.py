@@ -333,8 +333,9 @@ def test_external_agent_command_discovers_antigravity_agy_alias(monkeypatch) -> 
     assert external_agent_command(AccessMethod.ANTIGRAVITY_CLI) == "C:/tools/agy.exe"
 
 
-def test_external_agent_command_discovers_kiro_cli_alias(monkeypatch) -> None:
+def test_external_agent_command_discovers_kiro_cli_alias(monkeypatch, tmp_path) -> None:
     monkeypatch.delenv("KIRO_COMMAND", raising=False)
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
 
     def fake_which(command: str) -> str | None:
         return "C:/tools/kiro-cli.exe" if command == "kiro-cli" else None
@@ -342,6 +343,28 @@ def test_external_agent_command_discovers_kiro_cli_alias(monkeypatch) -> None:
     monkeypatch.setattr("ai_provider.external_agents.shutil.which", fake_which)
 
     assert external_agent_command(AccessMethod.KIRO_CLI) == "C:/tools/kiro-cli.exe"
+
+
+def test_kiro_prefers_inspected_engine_over_drifting_launcher(monkeypatch, tmp_path) -> None:
+    """Launcher auto-updates (observed 3.5.0); only 2.24.0 is admitted."""
+    from ai_provider.external_agents import pinned_kiro_engine
+
+    monkeypatch.delenv("KIRO_COMMAND", raising=False)
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    monkeypatch.setattr(
+        "ai_provider.external_agents.shutil.which", lambda command: "C:/tools/kiro-cli.exe"
+    )
+    launcher = tmp_path / "Kiro-Cli" / "kiro-cli.exe"
+    launcher.parent.mkdir(parents=True)
+    launcher.touch()
+    assert external_agent_command(AccessMethod.KIRO_CLI) == "C:/tools/kiro-cli.exe"
+    engine = tmp_path / "Kiro-Cli" / "run" / "chat-cli-2.24.0.exe"
+    engine.parent.mkdir(parents=True, exist_ok=True)
+    engine.touch()
+    assert external_agent_command(AccessMethod.KIRO_CLI) == str(engine)
+    assert pinned_kiro_engine() == str(engine)
+    monkeypatch.setenv("KIRO_COMMAND", "C:/explicit/kiro.exe")
+    assert external_agent_command(AccessMethod.KIRO_CLI) == "C:/explicit/kiro.exe"
 
 
 def test_parse_external_agent_jsonl_counts_web_search_events() -> None:
