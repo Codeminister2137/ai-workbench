@@ -154,3 +154,18 @@ If a new component does not clearly fit:
 4. avoid speculative abstractions;
 5. ask the user if architectural placement is materially ambiguous;
 6. update this map after the decision.
+
+## Adding a project
+`docs/goals/registry.json` is the single source: plan headers, the
+dashboard seed, and E2E area mapping all read it; never hand-edit a
+second list. Procedure:
+1. Run `python scripts/add-project.py <id> --name <Name> [--root <rel>
+   --description <text> --areas <a,b>]` (`--dry-run` first). Code-only
+   and pre-scaffold tracks omit `--root` (no dashboard block).
+2. Fill the generated goal stub (and explainer stub, if any) with
+   real content; set relations to existing ids.
+3. Run `python scripts/add-project.py --validate-only` (must be clean).
+4. Tag new plans with the id; add ledger rows in
+   `docs/document-status.md`. The push gate enforces both.
+5. Re-run `seed-workbench-projects.py --dry-run` when a dashboard
+   block was added; seed for real only when provisioning a store.
