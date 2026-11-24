@@ -108,6 +108,7 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/plans/investor-coverage-note1-20261123.md | KNOWLEDGE | Universe + data-honesty research note (scope B sequencing). |
 | docs/plans/investor-strategy-note2-20261123.md | KNOWLEDGE | Strategy shortlist with disproof protocol. |
 | docs/plans/morning-loop-20261124.md | PENDING | Morning loop plan: B proof + 400 verdict, queue drain, project-org. |
+| docs/plans/provider-scouting-20261124.md | KNOWLEDGE | Ranked free/cheap provider shortlist (Groq>Z.AI>Cerebras>Gemini>Cloudflare); trial order + caveats. |
 | docs/plans/l3-eval-ladder-design.md | ACTED | Ladder shipped (route_eval.py + l3_ladder.py). |
 | docs/plans/local-model-queue.md | ACTED | Q1-Q4 all consumed into quality-policy v1. |
 | docs/plans/mai-supervision-design.md | PENDING | Placement/authority/paging accepted in ADR-090 (2026-11-18); broader fallback draft remains future work. |

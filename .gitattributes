@@ -1,0 +1,7 @@
+# Normalize line endings regardless of process-level git config.
+# Agent worktree sessions run under varied environments; without this,
+# LF-written files show as whole-file diffs against CRLF blobs and bury
+# real changes (observed 2026-11-24: a 25-iteration run produced only
+# line-ending churn). Text files normalize on commit; checkouts use the
+# platform default.
+* text=auto
