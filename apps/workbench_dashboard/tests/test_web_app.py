@@ -497,7 +497,9 @@ def test_agent_check_runs_exact_command_and_stores_evidence(
         {"item_id": "behavior:x", "step_index": 0},
     )
     assert out["ok"] is True
-    assert out["evidence"]["evidence"] == "proof output"
+    assert out["evidence"]["evidence"] == (
+        "$ .venv/Scripts/python.exe -m pytest x -q\n(exit 0)\n\nproof output"
+    )
     assert out["evidence"]["evidence_exit"] == 0
     assert seen["argv"] == [".venv/Scripts/python.exe", "-m", "pytest", "x", "-q"]
 
@@ -614,7 +616,7 @@ def test_submit_auto_runs_evidence_less_agent_steps(
     assert len(calls) == 1
     stored = json.loads((tmp_path / "data" / "e2e_tasks" / "t1.json").read_text(encoding="utf-8"))
     step = stored["items"][0]["steps"][0]
-    assert step["evidence"] == "auto proof"
+    assert step["evidence"] == "$ c\n(exit 0)\n\nauto proof"
     assert step["evidence_exit"] == 0
 
 
