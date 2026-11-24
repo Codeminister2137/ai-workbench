@@ -1036,6 +1036,40 @@ def test_external_sign_in_never_reads_input_or_launches_login(
         assert raised.value.category is ProviderErrorCategory.AUTHENTICATION
 
 
+def test_unready_initial_skips_to_first_ready_route(monkeypatch, routes):
+    """Readiness-gated initial (3d3a7656): unsigned CLI never stalls the run."""
+    messages = []
+    monkeypatch.setattr(
+        "ai_provider.execution_fallback.check_agent_readiness",
+        lambda method: AgentReadiness(method is not AccessMethod.CODEX_CLI, "synthetic readiness"),
+    )
+    run = FallbackSession(
+        profile(),
+        routes,
+        initial(routes),
+        compatible=lambda target: True,
+        interactive_login=False,
+        progress=messages.append,
+    )
+    assert run.primary_ready is False
+    assert set(run.ready) == {"copilot", "kiro"}
+    calls = []
+
+    def execute(target, prompt):
+        calls.append(target.route_id)
+        return "done"
+
+    assert run.run("Work", execute, lambda _: False, observe=str) == "done"
+    assert calls == ["copilot"]
+    assert run.attempts == [
+        {"route_id": "codex", "status": "initial_unready"},
+        {"route_id": "copilot", "status": "finished"},
+    ]
+    assert "codex" in run.failed_routes
+    assert run.current.route_id == "copilot"
+    assert any("fallback_initial_unready" in line for line in messages)
+
+
 def test_interactive_sign_in_happens_before_execution(monkeypatch, routes):
     checked = {}
     order = []

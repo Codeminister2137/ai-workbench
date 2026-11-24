@@ -424,10 +424,23 @@ class FallbackSession:
         self.continuation_messages = ()
         observed_history: list[str] = []
         if not self.primary_ready:
-            raise ProviderError(
-                "Primary account authentication was not verified before execution.",
-                category=ProviderErrorCategory.AUTHENTICATION,
+            first_ready = next(iter(self.ready.values()), None)
+            if first_ready is None:
+                raise ProviderError(
+                    "Primary account authentication was not verified before execution.",
+                    category=ProviderErrorCategory.AUTHENTICATION,
+                )
+            # Unready initial (unsigned CLI, missing binary): skip to the
+            # first ready route instead of dying fatal. The sign-in need
+            # was already reported at preflight; an unattended run must
+            # not stall on it when ready routes exist.
+            self._report_progress(
+                f"fallback_initial_unready: {self.current.route_id} -> "
+                f"{first_ready.route_id} (auth unverified)"
             )
+            self.attempts.append({"route_id": self.current.route_id, "status": "initial_unready"})
+            self.failed_routes.add(self.current.route_id)
+            self.current = first_ready
         if self.enabled and (
             self.current.billing_source.value in self.exhausted
             or self.current.route_id in self.overloaded
