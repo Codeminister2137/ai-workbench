@@ -229,6 +229,19 @@ def default_codex_command() -> str | None:
     return str(bundled) if bundled.exists() else None
 
 
+KIRO_PINNED_ENGINE = ("Kiro-Cli", "run", "chat-cli-2.24.0.exe")
+"""Inspected Kiro engine below LOCALAPPDATA; the only admitted client."""
+
+
+def pinned_kiro_engine() -> str | None:
+    """Return the inspected Kiro engine path when installed, else None."""
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    if not local_app_data:
+        return None
+    installed = Path(local_app_data).joinpath(*KIRO_PINNED_ENGINE)
+    return str(installed) if installed.is_file() else None
+
+
 def external_agent_command(access_method: AccessMethod) -> str | None:
     """Return the configured command for a supported external coding-agent route."""
 
@@ -247,7 +260,16 @@ def external_agent_command(access_method: AccessMethod) -> str | None:
     if access_method is AccessMethod.COPILOT_CLI:
         return os.environ.get("GITHUB_COPILOT_COMMAND") or shutil.which("copilot")
     if access_method is AccessMethod.KIRO_CLI:
-        command = os.environ.get("KIRO_COMMAND") or shutil.which("kiro-cli") or shutil.which("kiro")
+        override = os.environ.get("KIRO_COMMAND")
+        if override:
+            return override
+        # Prefer the inspected engine: the launcher auto-updates
+        # (observed 3.5.0) while only 2.24.0 has a verified isolation
+        # contract. PATH and the launcher file stay as fallback.
+        pinned = pinned_kiro_engine()
+        if pinned:
+            return pinned
+        command = shutil.which("kiro-cli") or shutil.which("kiro")
         if command:
             return command
         local_app_data = os.environ.get("LOCALAPPDATA")

@@ -96,11 +96,12 @@ def _read_output(process: subprocess.Popen[Any], deadline: float) -> str:
 def read_kiro_allowance(*, timeout_seconds: float = 15) -> dict[str, Any]:
     """Prove the admitted version/profile boundary before a single quota session."""
     command = external_agent_command(AccessMethod.KIRO_CLI)
-    if command is None and (local_app_data := os.environ.get("LOCALAPPDATA")):
-        # The Windows launcher may be absent while the inspected engine remains.
-        installed = Path(local_app_data) / "Kiro-Cli" / "run" / "chat-cli-2.24.0.exe"
-        if installed.is_file():
-            command = str(installed)
+    if command is None:
+        # Resolution already prefers the inspected engine; belt and
+        # braces if a future resolution drops it.
+        from ai_provider.external_agents import pinned_kiro_engine
+
+        command = pinned_kiro_engine()
     report = read_native_account_usage(
         None,
         source=SOURCE,
