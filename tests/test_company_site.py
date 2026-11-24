@@ -75,8 +75,10 @@ def test_offer_content_present() -> None:
     for needle in ["rozpoznanie", "stałej cenie", "Skoczów", "founding client"]:
         assert needle in index, needle
     services = (ROOT / "uslugi.html").read_text(encoding="utf-8")
-    for needle in ["Czego nie robimy", "SOW", "RODO", "30–50%"]:
+    for needle in ["Czego nie robimy", "SOW", "RODO", "30–50%", "najlżejszego pasującego"]:
         assert needle in services, needle
+    en_services = (ROOT / "en" / "services.html").read_text(encoding="utf-8")
+    assert "lightest fix that fits" in en_services
     en_index = (ROOT / "en" / "index.html").read_text(encoding="utf-8")
     for needle in ["fixed price", "founding-client", "Skoczów"]:
         assert needle in en_index, needle
