@@ -1,6 +1,8 @@
 /* Guided intake form (chatbot v1: form-first). No backend: validates in
- * the browser, then offers the brief as a JSON download + copyable text.
- * Field set mirrors the P7 intake validator; the server re-validates. */
+ * the browser, then offers the enquiry as a JSON lead download + copyable
+ * text. The lead carries P7 identity keys but is NOT a valid brief: the
+ * founder enriches it (target users, scope, timeline) before validation;
+ * see intake/README.md. */
 (function () {
   "use strict";
   var EN = document.documentElement.lang === "en";
@@ -35,10 +37,30 @@
   function el(id) { return document.getElementById(id); }
   function val(id) { var n = el(id); return n ? n.value.trim() : ""; }
 
+  /* Lead identity in P7 vocabulary: the founder keeps project_id and
+   * created_at when enriching the lead into a valid brief (see
+   * intake/README.md). Timestamp drops millis to satisfy the strict
+   * schema pattern (YYYY-MM-DDTHH:MM:SSZ). */
+  function utcStamp(now) {
+    return now.toISOString().replace(/\.\d{3}Z$/, "Z");
+  }
+  function projectId(title, now) {
+    var slug = (title || "lead").toLowerCase().replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "").slice(0, 40) || "lead";
+    var stamp = now.toISOString().slice(0, 10).replace(/-/g, "");
+    var rand = ("000" + Math.floor(Math.random() * 0xffff).toString(16)).slice(-4);
+    return (slug + "-" + stamp + "-" + rand).slice(0, 64);
+  }
+
   function brief() {
+    var now = new Date();
     return {
       format: "p7-project-file",
       version: "1.0.0",
+      format_version: "1.0.0",
+      project_id: projectId(val("f-title"), now),
+      created_at: utcStamp(now),
+      capture_method: "human",
       title: val("f-title"),
       client_contact: {
         name: val("f-name"),

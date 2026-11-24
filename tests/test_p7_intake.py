@@ -110,6 +110,35 @@ def test_expiry_and_weak_criteria(tmp_path: Path) -> None:
     assert any("untestable" in item for item in result["warnings"])
 
 
+def test_parity_with_dashboard_validator(tmp_path: Path) -> None:
+    """CLI accepts what the dashboard accepts: PLN buckets, empty phone.
+
+    Extra client_contact fields warn per proposal rule 13, never reject.
+    """
+    mod = _load()
+    as_of = datetime(2026, 11, 13, tzinfo=UTC)
+    for bucket in ("<10k", "10–30k", "30–80k", "80k+", "undisclosed"):
+        doc = _example()
+        doc["budget_range"] = bucket
+        doc["preferred_language"] = "pl"
+        result = mod.validate_file(_write(tmp_path, doc), as_of=as_of)
+        assert result["valid"] is True, (bucket, result["errors"])
+    bad_dash = _example()
+    bad_dash["budget_range"] = "10-30k"  # hyphen, not en-dash
+    assert mod.validate_file(_write(tmp_path, bad_dash), as_of=as_of)["valid"] is False
+
+    no_phone = _example()
+    no_phone["client_contact"] = dict(no_phone["client_contact"], phone="")
+    result = mod.validate_file(_write(tmp_path, no_phone), as_of=as_of)
+    assert result["valid"] is True, result["errors"]
+
+    extra = _example()
+    extra["client_contact"] = dict(extra["client_contact"], nickname="Jane")
+    result = mod.validate_file(_write(tmp_path, extra), as_of=as_of)
+    assert result["valid"] is True, result["errors"]
+    assert any("extra fields" in item for item in result["warnings"])
+
+
 def test_oversize_and_malformed_rejected(tmp_path: Path) -> None:
     mod = _load()
     big = tmp_path / "big.json"

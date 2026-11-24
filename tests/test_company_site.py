@@ -75,8 +75,10 @@ def test_offer_content_present() -> None:
     for needle in ["rozpoznanie", "stałej cenie", "Skoczów", "founding client"]:
         assert needle in index, needle
     services = (ROOT / "uslugi.html").read_text(encoding="utf-8")
-    for needle in ["Czego nie robimy", "SOW", "RODO", "30–50%"]:
+    for needle in ["Czego nie robimy", "SOW", "RODO", "30–50%", "najlżejszego pasującego"]:
         assert needle in services, needle
+    en_services = (ROOT / "en" / "services.html").read_text(encoding="utf-8")
+    assert "lightest fix that fits" in en_services
     en_index = (ROOT / "en" / "index.html").read_text(encoding="utf-8")
     for needle in ["fixed price", "founding-client", "Skoczów"]:
         assert needle in en_index, needle
@@ -94,6 +96,20 @@ def test_form_script_has_diacritics_and_budgets() -> None:
     assert "krótki tytuł" in script
     assert "Budżet i podsumowanie" in script
     assert "10–30k" in script  # grounding §9 PLN buckets
+
+
+def test_form_lead_uses_p7_vocabulary() -> None:
+    """form.js leads carry P7 identity keys for the enrichment step."""
+    script = (ROOT / "form.js").read_text(encoding="utf-8")
+    for needle in (
+        'format_version: "1.0.0"',
+        "project_id: projectId(",
+        "created_at: utcStamp(",
+        'capture_method: "human"',
+    ):
+        assert needle in script, needle
+    # Strict UTC shape (no millis) satisfies schema.json + both validators.
+    assert '.replace(/\\.\\d{3}Z$/, "Z")' in script
 
 
 def test_pricing_copy_matches_intake_buckets() -> None:

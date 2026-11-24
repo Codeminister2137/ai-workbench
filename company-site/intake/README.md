@@ -6,10 +6,22 @@ intake; the format never auto-creates tasks or spend.
 
 - `schema.json` — canonical draft 2020-12 schema (closed).
 - `example.json` — complete valid file (also the validator's golden case).
-- Producer: website chatbot (guided flow) or human contact form
-  (`capture_method: "human"`). Consumer: owner review, then Workbench.
+- Producer: website chatbot (guided flow, full brief) or the site contact
+  form (`form.js`), which emits a JSON **lead**: P7 identity keys
+  (`format_version`, `project_id`, `created_at`, `capture_method: "human"`)
+  plus contact/goal/budget only. A lead is not a valid brief.
+- Consumer: owner review, then Workbench.
 - Files live in `p7-projects/<slug>-<YYYYMMDD>-<short-id>.json`, UTF-8,
   max 32 kilobytes (KB), immutable after approval (edits create `v2` + `parent_id`).
+
+Lead → brief enrichment (founder, after the enquiry email arrives):
+
+1. Keep the lead's `project_id` and `created_at` (identity survives).
+2. Add the missing required fields from the client thread: `target_users`,
+   `success_criteria`, `deliverable_type`, `features_in`, `features_out`,
+   `timeline`; drop the lead-only `title`/`format`/`version` keys.
+3. Validate (below), then drop the file into `p7-projects/` for dashboard
+   review → approve → plan. Nothing auto-executes.
 
 Validate:
 

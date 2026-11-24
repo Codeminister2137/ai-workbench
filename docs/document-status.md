@@ -109,6 +109,10 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/plans/investor-strategy-note2-20261123.md | KNOWLEDGE | Strategy shortlist with disproof protocol. |
 | docs/plans/morning-loop-20261124.md | PENDING | Morning loop plan: B proof + 400 verdict, queue drain, project-org. |
 | docs/plans/provider-scouting-20261124.md | KNOWLEDGE | Ranked free/cheap provider shortlist (Groq>Z.AI>Cerebras>Gemini>Cloudflare); trial order + caveats. |
+| docs/plans/loop-20261124-4h.md | PENDING | Approved 4h loop plan (company site + naming + accountant); in progress. |
+| docs/plans/name-eligibility-20261124.md | PENDING | Slice-3 screen 2026-11-24: 3 NO-GO (IT/Soft/Code) + SmartTek conditional; owner choice pending. |
+| docs/plans/accountant-brief-infakt-20261124.md | PENDING | Slice-5 send-ready InFakt brief 2026-11-24 (JDG IT snapshot + 8 questions); awaiting owner send. |
+| docs/plans/loop-20261125.md | PENDING | Draft tomorrow loop plan (chatbot, P7 close-out, backlog). |
 | docs/plans/l3-eval-ladder-design.md | ACTED | Ladder shipped (route_eval.py + l3_ladder.py). |
 | docs/plans/local-model-queue.md | ACTED | Q1-Q4 all consumed into quality-policy v1. |
 | docs/plans/mai-supervision-design.md | PENDING | Placement/authority/paging accepted in ADR-090 (2026-11-18); broader fallback draft remains future work. |

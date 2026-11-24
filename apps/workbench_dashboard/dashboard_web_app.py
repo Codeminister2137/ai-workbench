@@ -3645,6 +3645,15 @@ def _file_failed_run_triage(stores: DashboardStores, run: dict, run_id: str, sum
             "continuation (retry plan, fix-forward task) or an owner brief "
             "asking a human to call it unattainable."
         )
+        try:
+            from run_forensics import render_forensics_block, summarize_failed_run
+
+            # Data lives at <repo>/apps/workbench_dashboard/data; the
+            # scratch worktrees sit at <repo>/.tmp/run-worktrees/<id8>.
+            repo_root = stores.data_dir.parent.parent.parent
+            body += "\n\n" + render_forensics_block(summarize_failed_run(repo_root, run_id))
+        except Exception:  # noqa: BLE001 - forensics enrich triage, never block it
+            pass
         project_id: str | None = None
         candidate = run.get("project_id")
         if isinstance(candidate, str) and candidate.strip():
