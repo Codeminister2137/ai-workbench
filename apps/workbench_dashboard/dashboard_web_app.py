@@ -2059,7 +2059,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             timeout_seconds=timeout_seconds,
         )
         steps[index]["evidence"] = format_evidence(
-            str(result["command"]), int(result["exit_code"]), str(result["output"])
+            result["command"], result["exit_code"], result["output"]
         )
         steps[index]["evidence_summary"] = summarize_evidence(result["output"], result["exit_code"])
         steps[index]["evidence_utc"] = datetime.now(UTC).isoformat()
