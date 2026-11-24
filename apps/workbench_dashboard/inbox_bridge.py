@@ -19,7 +19,6 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-
 MAX_BRIDGE_PER_CALL = 10
 
 
@@ -85,6 +84,10 @@ def bridge_agent_queue(stores, *, fanout_policy: str = "restricted") -> list[dic
         if not isinstance(metadata, dict):
             continue
         if metadata.get("bridge_run_id"):
+            continue
+        if metadata.get("hold") is True:
+            # Explicit sequencing hold (e.g. scope C waits for B's live
+            # proof). Held items stay visible but never become runs.
             continue
         title = str(item.get("title") or "").strip()
         body = str(item.get("body") or "").strip()
