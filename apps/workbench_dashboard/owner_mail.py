@@ -289,10 +289,13 @@ def notify_plan(
         notify_on = ATTENDED_NOTIFY_STATUSES
 
     def _send(summary: Mapping[str, object]) -> dict:
+        from owner_digest import TIER_DONE, TIER_NEEDS_YOU
+
         run_id = str(summary.get("run_id", "?"))
         key = f"{run_id}:{summary.get('status', '?')}"
         if _already_mailed(receipts_dir, key):
             return {"to": config["owner"], "sent": False, "deduped": True, "dedupe_key": key}
+        status = summary.get("status")
         return send_owner_mail(
             to=config["owner"],
             subject=format_run_subject(summary),
@@ -303,7 +306,8 @@ def notify_plan(
             dedupe_key=key,
             supervision=supervision,
             data_dir=receipts_dir.parent,
-            blocker=summary.get("status") in {"failed", "waiting_on_owner"},
+            blocker=status == "waiting_on_owner",
+            tier=TIER_NEEDS_YOU if status in {"failed", "waiting_on_owner"} else TIER_DONE,
         )
 
     return _send, notify_on
@@ -355,6 +359,7 @@ def send_owner_mail(
     blocker: bool = False,
     all_work_blocked: bool = False,
     data_dir: Path | None = None,
+    tier: str | None = None,
 ) -> dict:
     """Persist live notifications for the hourly unattended digest.
 
@@ -375,7 +380,7 @@ def send_owner_mail(
         raise ValueError("Refusing to send a notification off the owner address")
     if not subject.strip() or len(subject) > MAX_SUBJECT_CHARS or len(body) > MAX_BODY_CHARS:
         raise ValueError("Invalid notification subject or body length")
-    from owner_digest import queue_notification
+    from owner_digest import TIER_DONE, TIER_NEEDS_YOU, queue_notification
 
     root = shared_mail_root()
     if supervision is None:
@@ -391,4 +396,5 @@ def send_owner_mail(
         dedupe_key=dedupe_key,
         blocker=blocker,
         all_work_blocked=all_work_blocked,
+        tier=tier if tier is not None else (TIER_NEEDS_YOU if blocker else TIER_DONE),
     )

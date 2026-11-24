@@ -336,7 +336,12 @@ def test_digest_reaches_smtp_only_when_due(tmp_path, fake_smtp):
     )
     assert result["sent"]
     assert len(fake_smtp.instances) == 1
-    assert "BLOCKER" in fake_smtp.instances[0].sent[0].get_content()
+    content = fake_smtp.instances[0].sent[0].get_content()
+    # Digest v2: failed runs page as soon/needs-you, not BLOCKER; only
+    # waiting_on_owner (stopped for the owner) keeps the BLOCKER prefix.
+    assert "Verdict: soon" in content
+    assert "--- NEEDS YOU ---" in content
+    assert "BLOCKER" not in content
 
 
 @pytest.mark.parametrize(
