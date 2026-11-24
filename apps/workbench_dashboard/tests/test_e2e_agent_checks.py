@@ -122,6 +122,29 @@ def test_default_runner_honors_timeout_override(tmp_path) -> None:
     assert output.endswith("[TIMEOUT]")
 
 
+def test_default_runner_anchors_relative_program_at_repo_root(tmp_path: Path, monkeypatch) -> None:
+    """Windows resolves relative programs against the CALLER cwd, not the
+    child cwd param: serve lives elsewhere, so anchor at the repo root."""
+    import os
+
+    bindir = tmp_path / "repo" / "bin"
+    bindir.mkdir(parents=True)
+    if os.name == "nt":
+        prog = bindir / "hello.cmd"
+        prog.write_text("@echo hello-from-repo\r\n", encoding="utf-8")
+        argv = ["bin/hello.cmd"]
+    else:
+        prog = bindir / "hello.sh"
+        prog.write_text("#!/bin/sh\necho hello-from-repo\n", encoding="utf-8")
+        argv = ["bin/hello.sh"]
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+    code, output = e2e_agent_checks._default_runner(argv, tmp_path / "repo")
+    assert code == 0
+    assert "hello-from-repo" in output
+
+
 def test_execute_check_refuses_unrunnable(tmp_path: Path) -> None:
     import pytest
 
