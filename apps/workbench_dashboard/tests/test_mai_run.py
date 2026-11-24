@@ -264,6 +264,28 @@ def test_nonzero_exit_without_error_uses_exit_text() -> None:
     assert "exited with code 2" in receipt["error"]
 
 
+def test_exhaustion_handoff_sets_receipt_flag() -> None:
+    def runner(argv):
+        print("fallback_handoff=status:continuation_stopped, reason:deadline_or_no_route")
+        return 1
+
+    outcome = run_mai_session(["prompt"], runner=runner)
+    receipt = mai_receipt(outcome, ["prompt"])
+    assert receipt["status"] == "failed"
+    assert receipt["exhausted_tree"] is True
+
+
+def test_plain_failure_leaves_receipt_flag_clear() -> None:
+    def runner(argv):
+        print("execution_status: failed")
+        return 1
+
+    outcome = run_mai_session(["prompt"], runner=runner)
+    receipt = mai_receipt(outcome, ["prompt"])
+    assert receipt["status"] == "failed"
+    assert receipt["exhausted_tree"] is False
+
+
 def test_completed_receipt_carries_transcript_tails() -> None:
     def runner(argv):
         print("did the thing")

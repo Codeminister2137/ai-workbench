@@ -33,7 +33,7 @@ import json
 import logging
 import time
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from ai_agent.run_reports import (
@@ -54,6 +54,8 @@ APPROVAL_ANSWERS = frozenset({APPROVAL_ANSWER, "Schedule it"})
 CLAIM_SUFFIX = ".json.claim"
 PREAPPROVED_MODES = frozenset({"owner-filed", "e2e-followup", "agent-queue"})
 TMP_SUFFIX = ".json.tmp"
+PARK_BACKOFF_MINUTES = 30
+PARK_MAX = 5
 
 Executor = Callable[[dict], dict]
 InboxGet = Callable[[str], dict | None]
@@ -65,6 +67,20 @@ NEEDS_ATTENTION = "needs-attention"
 REPORT_NOTE_CHARS = 2000
 
 logger = logging.getLogger(__name__)
+
+
+def _not_before_utc(run: dict) -> datetime | None:
+    """Parse a parked run's not-before; malformed values count as ripe."""
+    raw = run.get("not_before_utc")
+    if not isinstance(raw, str) or not raw.strip():
+        return None
+    try:
+        moment = datetime.fromisoformat(raw.strip())
+    except ValueError:
+        return None
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=UTC)
+    return moment
 
 
 def _read_json(path: Path) -> dict | None:
@@ -252,6 +268,17 @@ class RunDrain:
         for _, path, run in pending:
             if started >= max_runs:
                 break
+            ripe_at = _not_before_utc(run)
+            if ripe_at is not None and ripe_at > datetime.now(UTC):
+                outcomes.append(
+                    {
+                        "run_id": run.get("id", path.stem),
+                        "status": "queued",
+                        "action": "parked",
+                        "reason": f"parked until {run['not_before_utc']}",
+                    }
+                )
+                continue
             # Cancelled runs bypass approval: they must reach terminal
             # state via the claim path instead of parking forever.
             if run.get("status") == "queued" and not run_cancelled(run):
@@ -482,9 +509,55 @@ class RunDrain:
             error = receipt.get("error") if outcome == "failed" else None
             if error is not None and not isinstance(error, str):
                 error = str(error)
+            if outcome == "failed" and receipt.get("exhausted_tree") is True:
+                parked = self._park_exhausted(path, claim, run, error, receipt)
+                if parked is not None:
+                    return parked
+                error = (
+                    f"fallback tree exhausted {PARK_MAX + 1}x; parked repeatedly, "
+                    f"giving up: {error or 'no route could execute'}"
+                )[:1000]
             return self._finish(path, claim, run, outcome, error=error or None, receipt=receipt)
         finally:
             self._release(path, claim)
+
+    def _park_exhausted(
+        self, path: Path, claim: Path, run: dict, error: str | None, receipt: dict
+    ) -> dict | None:
+        """Requeue a tree-exhausted run with backoff; None past the park cap.
+
+        The fallback tree already degrades (weak routes run before the
+        tree reports exhausted), so a handoff means even degraded work
+        is impossible right now: wait for resets, do not fail forever.
+        Past PARK_MAX parks the run fails terminal so nothing is immortal.
+        """
+        parks = int(run.get("park_count", 0) or 0) + 1
+        if parks > PARK_MAX:
+            return None
+        ripe_at = datetime.now(UTC) + timedelta(minutes=PARK_BACKOFF_MINUTES)
+        run["status"] = "queued"
+        run["park_count"] = parks
+        run["not_before_utc"] = ripe_at.isoformat()
+        run["note"] = (
+            f"Fallback tree exhausted (park {parks}/{PARK_MAX}); "
+            f"retrying after {ripe_at.isoformat()}"
+        )
+        run.pop("finished_at_utc", None)
+        run.pop("error", None)
+        run["updated_at_utc"] = self._iso_now()
+        _append_receipt(run, receipt)
+        append_run_event(
+            run,
+            "run_parked",
+            {"park": parks, "not_before_utc": run["not_before_utc"], "error": error},
+        )
+        self._publish(path, claim, run)
+        return {
+            "run_id": run.get("id", path.stem),
+            "status": "queued",
+            "action": "parked",
+            "reason": f"tree exhausted; ripe after {run['not_before_utc']}",
+        }
 
     def _finish(
         self,
