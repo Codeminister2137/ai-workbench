@@ -1,9 +1,14 @@
 # Fallback repair: verdict pipeline now (B), single executor later (C)
 
-Status: B accepted and implemented 2026-11-23; C accepted, pending.
-Owner decision, attended session 2026-11-23. No additional owner
-rationale was supplied beyond: fallback is a core feature and top
-priority; major restructuring is acceptable if needed.
+Status: B accepted and implemented 2026-11-23 (proven live: 45 verdict
+switches 23-24.11). C accepted 23.11, GO recorded 25.11, implemented
+25.11 (single `FallbackExecutor`; drain/relay/Mai migrated;
+`FallbackSession` deleted). Remaining acceptance: capped-primary live
+proofs per path (needs inference allowance) + C5 dynamic ordering
+(needs persistence decision). Owner decision, attended session
+2026-11-23. No additional owner rationale was supplied beyond:
+fallback is a core feature and top priority; major restructuring is
+acceptable if needed.
 
 ## Problem
 
