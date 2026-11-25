@@ -1,6 +1,6 @@
 """Fallback trigger truth table: trigger x error-category x overload admission.
 
-Pins the admission matrix implemented by ``FallbackSession.run`` together with
+Pins the admission matrix implemented by ``FallbackExecutor.run`` together with
 the ``explicit_usage_limit`` / ``explicit_model_overload`` marker tables in
 ``ai_provider.execution_fallback`` (composed with the ``ai_orchestrator``
 fallback candidate ranking). Covers Track B W1 gaps G1 (usage/overload marker
@@ -34,13 +34,13 @@ from ai_orchestrator import (
 from ai_provider.agent_readiness import AgentReadiness
 from ai_provider.errors import ProviderError, ProviderErrorCategory
 from ai_provider.execution_fallback import (
-    FallbackSession,
     explicit_model_overload,
     explicit_usage_limit,
     external_model_overload,
     external_usage_limit,
 )
 from ai_provider.external_agents import ExternalAgentEventSummary, ExternalAgentResult
+from ai_provider.fallback_executor import FallbackExecutor
 
 # Pinned copies of the production marker tables in execution_fallback.py.
 # Any production edit must update these lists deliberately, not silently.
@@ -134,7 +134,7 @@ def _result(returncode, stdout, stderr, failure=None):
     [
         (1, "", "failed: usage limit reached", None, True, False),
         (1, "", "failed: server_overloaded", None, False, True),
-        # Both predicates fire on combined text; FallbackSession.run prefers limited.
+        # Both predicates fire on combined text; FallbackExecutor.run prefers limited.
         (1, "", "usage limit reached; server_overloaded", None, True, True),
         (1, "", "clean", "usage limit reached", True, False),
         (1, "", "clean", "server_overloaded", False, True),
@@ -210,7 +210,7 @@ def _session(monkeypatch):
         lambda method: AgentReadiness(True, "authenticated"),
     )
     catalog = _catalog()
-    return FallbackSession(
+    return FallbackExecutor(
         _profile(),
         catalog,
         _initial(catalog),
@@ -290,7 +290,7 @@ PROVIDER_MATRIX = [
     ],
 )
 def test_provider_error_admission_matrix(monkeypatch, category, overload_text, expected):
-    """Category x overload-text admission through FallbackSession.run."""
+    """Category x overload-text admission through FallbackExecutor.run."""
     run = _session(monkeypatch)
     calls = []
     message = OVERLOAD_FAILURE_TEXT if overload_text else PLAIN_FAILURE_TEXT
@@ -363,7 +363,7 @@ EXTERNAL_MATRIX = [
     ids=[case[0] for case in EXTERNAL_MATRIX],
 )
 def test_external_result_admission_matrix(monkeypatch, failure, expected):
-    """External trigger x marker admission through FallbackSession.run."""
+    """External trigger x marker admission through FallbackExecutor.run."""
     run = _session(monkeypatch)
     calls = []
     first = _result(*failure)

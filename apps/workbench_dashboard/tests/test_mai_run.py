@@ -111,7 +111,10 @@ def test_subprocess_backend_captures_and_times_out(tmp_path) -> None:
     sleepy = [sys.executable, "-c", "import time; time.sleep(30)"]
     slow = run_mai_subprocess(["ignored"], cmd_prefix=sleepy, timeout_seconds=1)
     assert slow.exit_code == 3 and "timed out" in (slow.error or "")
+    assert slow.timed_out is True
     assert mai_receipt(slow, ["x"])["status"] == "failed"
+    assert mai_receipt(slow, ["x"])["timed_out"] is True
+    assert mai_receipt(ok, ["x"]).get("timed_out", False) is False
     missing = run_mai_subprocess(["ignored"], cmd_prefix=["definitely-not-a-binary-xyz"])
     assert missing.exit_code == 3 and "spawn failed" in (missing.error or "")
 
@@ -510,6 +513,51 @@ def test_retrying_executor_retries_provider_timeouts_once() -> None:
     assert receipt["status"] == "completed"
     assert receipt["attempt"] == 2
     assert "timed out" in receipt["retry_of"]["error"]
+
+
+def test_retrying_executor_prefers_structured_timeout_flag() -> None:
+    """Scope C: supervisor kills retry on the machine flag, no text needed."""
+    from mai_run import build_retrying_executor
+
+    calls: list = []
+
+    def killed(run: dict) -> dict:
+        calls.append(run)
+        if len(calls) == 1:
+            return {
+                "status": "failed",
+                "error": "Mai session killed",  # no timeout words at all
+                "failure_class": "provider",
+                "timed_out": True,
+            }
+        return {"status": "completed", "stdout_tail": "recovered"}
+
+    receipt = build_retrying_executor(killed)({"id": "r1"})
+    assert len(calls) == 2
+    assert receipt["status"] == "completed"
+
+
+def test_retrying_executor_ignores_prose_only_timeouts() -> None:
+    """Agent chatter mentioning timeouts must not trigger a retry."""
+    from mai_run import build_retrying_executor
+
+    seen: list = []
+
+    def inner(run: dict) -> dict:
+        seen.append(run)
+        return {
+            "status": "failed",
+            "error": "Mai session exited with code 1",
+            "failure_class": "provider",
+            "timed_out": False,
+            "stdout_tail": "I timed out waiting for the slow test suite",
+            "stderr_tail": "",
+        }
+
+    receipt = build_retrying_executor(inner)({"id": "r"})
+    assert len(seen) == 1
+    assert "attempt" not in receipt
+    assert receipt["status"] == "failed"
 
 
 def test_retrying_executor_passes_through_other_failures() -> None:

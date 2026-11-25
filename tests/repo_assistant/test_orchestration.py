@@ -27,7 +27,7 @@ def test_cli_expired_fallback_preflight_has_failed_summary_without_execution(
             category=ProviderErrorCategory.TIMEOUT,
         )
 
-    monkeypatch.setattr(_EXAMPLE, "FallbackSession", expired)
+    monkeypatch.setattr(_EXAMPLE, "FallbackExecutor", expired)
     monkeypatch.setattr(
         _EXAMPLE,
         "create_chat_client",

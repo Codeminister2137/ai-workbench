@@ -45,16 +45,14 @@ from ai_orchestrator.fallback import FallbackQualityPolicy, fallback_candidates
 from ai_provider import AIMessage, MessageRole, ProviderContinuation
 from ai_provider.agent_readiness import AgentReadiness
 from ai_provider.errors import ProviderError, ProviderErrorCategory
-from ai_provider.execution_fallback import (
-    FallbackSession,
-    external_usage_limit,
-)
+from ai_provider.execution_fallback import external_usage_limit
 from ai_provider.external_agents import ExternalAgentEventSummary, ExternalAgentResult
 from ai_provider.fallback_diagnostics import fallback_readiness_report
+from ai_provider.fallback_executor import FallbackExecutor
 from ai_provider.user_config import UserConfig
 
 # Pinned copy of the production preservation instruction prefix in
-# FallbackSession._preserve_work. Any production edit must update this
+# FallbackExecutor._preserve_work. Any production edit must update this
 # deliberately, not silently.
 PRESERVATION_PREFIX = (
     "Inspect existing work and report a handoff only. Implementation is stopped. "
@@ -146,7 +144,7 @@ def _session(monkeypatch, catalog, **kwargs):
     )
     kwargs.setdefault("compatible", lambda target: True)
     kwargs.setdefault("progress", lambda text: None)
-    return FallbackSession(_profile(), catalog, _initial(catalog), **kwargs)
+    return FallbackExecutor(_profile(), catalog, _initial(catalog), **kwargs)
 
 
 def _sensitive_limited_result():
@@ -356,7 +354,7 @@ def test_quality_policy_defaults_diverge_by_layer_deliberately():
     "fix" it by unifying defaults in a test-adjacent refactor.
     """
     assert (
-        signature(FallbackSession).parameters["quality_policy"].default
+        signature(FallbackExecutor).parameters["quality_policy"].default
         is FallbackQualityPolicy.EMERGENCY_PRESERVE
     )
     assert (

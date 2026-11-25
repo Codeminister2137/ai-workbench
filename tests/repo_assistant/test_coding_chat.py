@@ -689,7 +689,7 @@ def test_coding_chat_external_sign_in_and_retry_without_competing_terminal_input
     )
     monkeypatch.setattr("builtins.input", lambda *args: pytest.fail("Competing stdin reader"))
     monkeypatch.setattr(
-        "ai_provider.execution_fallback.subprocess.run",
+        "ai_provider.fallback_executor.subprocess.run",
         lambda *args, **kwargs: pytest.fail("Inline login launched"),
     )
     monkeypatch.setattr(

@@ -38,7 +38,6 @@ _PROVIDER_RE = re.compile(
 )
 _FAILURE_REASON_RE = re.compile(r"failure_reason\s*[=:]\s*([^;\n]+)")
 _EXECUTION_STATUS_RE = re.compile(r"execution_status\s*[=:]\s*([A-Za-z_]+)")
-_RETRYABLE_TIMEOUT_RE = re.compile(r"timed?\s*out", re.IGNORECASE)
 
 
 def mai_failure_reason(*texts: str) -> str | None:
@@ -69,7 +68,7 @@ def mai_reported_exhaustion(*texts: str) -> bool:
     """True when Mai's closeout carries a fallback-exhaustion handoff.
 
     ``fallback_handoff=`` renders in the closeout notes (tail-visible)
-    exactly when FallbackSession found no eligible continuation route;
+    exactly when the fallback executor found no eligible continuation route;
     ``continuation_stopped`` is the only handoff status it ever sets.
     A parked run retries after backoff instead of failing forever.
     """
@@ -101,6 +100,7 @@ class MaiRunOutcome:
     stderr_tail: str
     error: str | None = None
     facts: dict[str, str] | None = None  # parsed from full stdout (session id, route)
+    timed_out: bool = False  # True only when the supervisor killed Mai on timeout
 
 
 def build_mai_argv(
@@ -260,6 +260,7 @@ def mai_receipt(outcome: MaiRunOutcome, argv: Sequence[str]) -> dict:
             return {
                 "status": "failed",
                 "error": error,
+                "timed_out": bool(outcome.timed_out),
                 "failure_class": classify_failure(error, outcome.stdout_tail, outcome.stderr_tail),
                 "exhausted_tree": mai_reported_exhaustion(outcome.stdout_tail, outcome.stderr_tail),
                 "stdout_tail": outcome.stdout_tail,
@@ -273,6 +274,7 @@ def mai_receipt(outcome: MaiRunOutcome, argv: Sequence[str]) -> dict:
             return {
                 "status": "failed",
                 "error": "Mai session exited 0 with empty output (no usable content)",
+                "timed_out": bool(outcome.timed_out),
                 "failure_class": "provider",
                 "stdout_tail": outcome.stdout_tail,
                 "stderr_tail": outcome.stderr_tail,
@@ -298,6 +300,7 @@ def mai_receipt(outcome: MaiRunOutcome, argv: Sequence[str]) -> dict:
     return {
         "status": "failed",
         "error": error,
+        "timed_out": bool(outcome.timed_out),
         "failure_class": classify_failure(error, outcome.stdout_tail, outcome.stderr_tail),
         "exhausted_tree": mai_reported_exhaustion(outcome.stdout_tail, outcome.stderr_tail),
         "stdout_tail": outcome.stdout_tail,
@@ -396,6 +399,7 @@ def run_mai_subprocess(
             stderr_tail=capture_tail(stderr or ""),
             error=f"Mai session timed out after {timeout_seconds:.0f}s (killed)",
             facts=parse_mai_facts(stdout or ""),
+            timed_out=True,
         )
     return MaiRunOutcome(
         exit_code=int(proc.returncode or 0),
@@ -521,11 +525,22 @@ def build_retrying_executor(
     return execute
 
 
+_INACTIVITY_TIMEOUT_RE = re.compile(r"External agent timed out after \d+ seconds")
+
+
 def _retryable_timeout(receipt: dict) -> bool:
-    """True for failed provider receipts whose text names a timeout."""
+    """True for the two transient timeout kinds (scope C: machine-first).
+
+    Supervisor kills carry the structured ``timed_out`` flag from
+    run_mai_subprocess. Mai-internal inactivity timeouts have no machine
+    flag yet (C4 wires Mai onto the executor); they match only Mai's own
+    failure_reason marker inside the receipt error — never agent prose
+    in the tails, which used to cause false-positive retries.
+    """
     if receipt.get("status") != "failed":
         return False
     if receipt.get("failure_class") != "provider":
         return False
-    blob = "\n".join(str(receipt.get(key) or "") for key in ("error", "stdout_tail", "stderr_tail"))
-    return _RETRYABLE_TIMEOUT_RE.search(blob) is not None
+    if receipt.get("timed_out") is True:
+        return True
+    return _INACTIVITY_TIMEOUT_RE.search(str(receipt.get("error") or "")) is not None

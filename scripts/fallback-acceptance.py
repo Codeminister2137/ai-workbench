@@ -218,7 +218,7 @@ def main() -> int:
     process_handle = None
     owned_foreground = None
     recorded_sessions = []
-    real_session = cli.FallbackSession
+    real_session = cli.FallbackExecutor
 
     class RecordingSession(real_session):
         """Keep the finished session so its ready set and attempts can be asserted."""
@@ -227,7 +227,7 @@ def main() -> int:
             super().__init__(*session_args, **session_kwargs)
             recorded_sessions.append(self)
 
-    cli.FallbackSession = RecordingSession
+    cli.FallbackExecutor = RecordingSession
     simulated_limit_methods = {SIMULATABLE_LIMITS[name] for name in args.simulate_limit_on}
 
     def execute(prompt, config, **kwargs):
@@ -359,7 +359,7 @@ def main() -> int:
         )
     finally:
         cli._run_external_agent = real_execute
-        cli.FallbackSession = real_session
+        cli.FallbackExecutor = real_session
         execution_fallback.check_agent_readiness = real_auth
     # Validate the tiny assignment without executing model-authored Python.
     source_valid = valid_source(source.read_text(encoding="utf-8"))

@@ -22,11 +22,12 @@ from ai_orchestrator import (
     prepare_execution,
 )
 from ai_provider.agent_readiness import AgentReadiness
-from ai_provider.execution_fallback import FallbackSession, external_usage_limit
+from ai_provider.execution_fallback import external_usage_limit
 from ai_provider.external_agents import (
     ExternalAgentEventSummary,
     ExternalAgentResult,
 )
+from ai_provider.fallback_executor import FallbackExecutor
 
 
 def _w4_entry(route, method, billing, quality, tier):
@@ -136,7 +137,7 @@ def test_session_honors_allow_cost_escalation_at_session_scope(monkeypatch):
     initial = plan.target
     assert initial.route_id == "codex"
 
-    blocked = FallbackSession(
+    blocked = FallbackExecutor(
         profile,
         catalog,
         initial,
@@ -163,7 +164,7 @@ def test_session_honors_allow_cost_escalation_at_session_scope(monkeypatch):
     assert blocked.handoff is not None
     assert isinstance(blocked_result, ExternalAgentResult)
 
-    allowed = FallbackSession(
+    allowed = FallbackExecutor(
         profile,
         catalog,
         initial,
@@ -193,7 +194,7 @@ def test_session_honors_allow_cost_escalation_at_session_scope(monkeypatch):
     )
     assert allowed_calls == ["codex", "billed"]
 
-    unlisted = FallbackSession(
+    unlisted = FallbackExecutor(
         profile,
         catalog,
         initial,
@@ -235,7 +236,7 @@ def test_production_observe_sanitizes_preservation_payload_end_to_end(monkeypatc
     plan = prepare_execution("Fix source", profile, catalog, review_prompt=False).execution_plan
     assert plan is not None
     saved = []
-    run = FallbackSession(
+    run = FallbackExecutor(
         profile,
         catalog,
         plan.target,

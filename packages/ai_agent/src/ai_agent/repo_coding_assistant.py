@@ -75,7 +75,7 @@ from ai_provider.coding_assist import (
     run_coding_prompt,
 )
 from ai_provider.contracts import FinishReason
-from ai_provider.execution_fallback import FallbackSession, external_usage_limit
+from ai_provider.execution_fallback import external_usage_limit
 from ai_provider.external_agents import (
     ExternalAgentConfig as ExternalAgentConfig,  # noqa: F401 - compatibility export
 )
@@ -106,6 +106,7 @@ from ai_provider.external_agents import (
 from ai_provider.external_agents import (
     run_external_agent as _run_external_agent,
 )
+from ai_provider.fallback_executor import FallbackExecutor
 from ai_provider.native_admission import (
     NATIVE_TOOL_EVIDENCE,
     installed_native_identity,
@@ -2003,7 +2004,9 @@ def _execute_request(
         and external_orchestration.execution_plan is not None
     ):
         try:
-            args.fallback_session = FallbackSession(
+            # Scope C: the single fallback executor. The attribute keeps its
+            # historic name so every existing reader keeps working.
+            args.fallback_session = FallbackExecutor(
                 profile,
                 catalog,
                 external_orchestration.execution_plan.target,

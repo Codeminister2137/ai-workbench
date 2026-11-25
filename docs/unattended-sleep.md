@@ -37,6 +37,10 @@ or error receipts immediately; do not claim a timer exists just because launch
 returned. Save all paths, PID, due time and
 original deadline in the plan and `CURRENT_CONTEXT.md`. Tell the owner the due
 time in Europe/Warsaw and this fixed command at startup, not just at closeout.
+Rolling timers write `<receipt>.due-soon` while ≤10 min of lease remain
+(content: due timestamp; removed on renew/cancel). Before any command
+expected to exceed 5 min, Test-Path the marker: present means renew
+FIRST. The marker is advisory; the receipt due stays authoritative.
 From the repository root:
 
 ```powershell

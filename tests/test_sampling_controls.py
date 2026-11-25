@@ -75,7 +75,7 @@ def test_external_primary_refuses_before_client_or_fallback_start(tmp_path, monk
     def forbidden(*args, **kwargs):
         pytest.fail("external execution/readiness started with unsupported sampling")
 
-    monkeypatch.setattr(cli, "FallbackSession", forbidden)
+    monkeypatch.setattr(cli, "FallbackExecutor", forbidden)
     monkeypatch.setattr(cli, "_run_external_agent", forbidden)
     with pytest.raises(SystemExit) as error:
         cli.main(

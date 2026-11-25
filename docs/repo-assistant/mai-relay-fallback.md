@@ -8,7 +8,7 @@ the separate P1 allowance; this work does not consume or renew it.
 ## Design selected for supervisor review
 
 Resolve fallback host-side on every inference turn, retaining one host-owned
-`FallbackSession` for the run. It delegates ranking to the orchestrator and
+`FallbackExecutor` for the run. It delegates ranking to the orchestrator and
 remembers failed routes/billing buckets across turns. There is no extra model
 count limit. Existing quality, cost, privacy, capability, readiness, exclusion,
 deadline and fallback-trigger rules remain authoritative. Full fallback means
@@ -56,7 +56,7 @@ and supervisor must enforce cancellation and call deadlines.
 ## Synthetic proof and limits
 
 `apps/workbench_dashboard/tests/test_relay_inference.py` exercises real Mai
-`AgentLoop`, tool dispatch, mailbox files and host `FallbackSession` with
+`AgentLoop`, tool dispatch, mailbox files and host `FallbackExecutor` with
 synthetic responses. Three distinct billing buckets fail before the fourth route
 succeeds; the next turn carries the tool result and reuses that route. The test
 independently reads the file created by `CreateFileTool`. Other cases cover

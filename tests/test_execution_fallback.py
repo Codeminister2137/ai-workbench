@@ -31,8 +31,9 @@ from ai_orchestrator import (
 from ai_orchestrator.fallback import fallback_candidates
 from ai_provider.agent_readiness import AgentReadiness, _exchange_copilot_auth
 from ai_provider.errors import ProviderError, ProviderErrorCategory
-from ai_provider.execution_fallback import FallbackSession, external_usage_limit
+from ai_provider.execution_fallback import external_usage_limit
 from ai_provider.external_agents import ExternalAgentResult, parse_external_agent_jsonl
+from ai_provider.fallback_executor import FallbackExecutor
 from ai_provider.user_config import load_user_config
 
 
@@ -121,7 +122,7 @@ def session(monkeypatch, routes, **kwargs):
         "ai_provider.execution_fallback.check_agent_readiness",
         lambda method: AgentReadiness(True, "authenticated"),
     )
-    return FallbackSession(
+    return FallbackExecutor(
         profile(), routes, initial(routes), compatible=lambda target: True, **kwargs
     )
 
@@ -164,8 +165,8 @@ def test_openrouter_choice_errors_use_existing_fallback_eligibility(monkeypatch,
 def test_fallback_preflight_stops_at_deadline_without_login(monkeypatch, routes, expiry):
     now = 11.0 if expiry == "before_probe" else 0.0
     probes = []
-    monkeypatch.setattr("ai_provider.execution_fallback.time.perf_counter", lambda: now)
-    monkeypatch.setattr("ai_provider.execution_fallback.sys.stdin.isatty", lambda: True)
+    monkeypatch.setattr("ai_provider.fallback_executor.time.perf_counter", lambda: now)
+    monkeypatch.setattr("ai_provider.fallback_executor.sys.stdin.isatty", lambda: True)
 
     def readiness(method):
         nonlocal now
@@ -184,11 +185,11 @@ def test_fallback_preflight_stops_at_deadline_without_login(monkeypatch, routes,
     monkeypatch.setattr("ai_provider.execution_fallback.check_agent_readiness", readiness)
     monkeypatch.setattr("builtins.input", answer)
     monkeypatch.setattr(
-        "ai_provider.execution_fallback.subprocess.run",
+        "ai_provider.fallback_executor.subprocess.run",
         lambda *args, **kwargs: pytest.fail("Expired preflight launched login"),
     )
     with pytest.raises(ProviderError) as raised:
-        FallbackSession(
+        FallbackExecutor(
             profile(),
             routes,
             initial(routes),
@@ -208,7 +209,8 @@ def test_allowance_observation_is_once_per_source_and_never_routes(monkeypatch, 
         "status": status,
         "source": "codex_app_server",
         "observed_at_utc": "2026-10-10T09:00:00+00:00" if status == "available" else None,
-        "windows": [{"used_percent": 100}] if status == "available" else [],
+        # Non-exhausted windows: codex at 100% now skips (verified C2).
+        "windows": [{"used_percent": 20}] if status == "available" else [],
     }
 
     def collect(target):
@@ -232,6 +234,31 @@ def test_allowance_observation_is_once_per_source_and_never_routes(monkeypatch, 
     }
     assert sum(line.startswith("allowance_observation:") for line in progress) == 1
     assert run.handoff is None
+
+
+def test_verified_codex_exhaustion_skips_without_executing(monkeypatch, routes):
+    observation = {
+        "status": "available",
+        "source": "codex_app_server",
+        "windows": [{"used_percent": 100}],
+    }
+    executed = []
+    run = session(
+        monkeypatch,
+        routes,
+        observe_allowance=lambda target: observation,
+        progress=lambda text: None,
+    )
+
+    def execute(target, prompt):
+        executed.append(target.route_id)
+        return "done"
+
+    with pytest.raises(ProviderError) as raised:
+        run.run("Work", execute, lambda result: False, observe=str)
+    assert raised.value.category == ProviderErrorCategory.USAGE_LIMIT
+    assert executed == []
+    assert run.attempts[0] == {"route_id": "codex", "status": "allowance_exhausted"}
 
 
 @pytest.mark.parametrize("error", [OSError, ValueError, RuntimeError])
@@ -278,7 +305,7 @@ def test_allowance_collection_consumes_deadline_and_cannot_start_late_execution(
     monkeypatch, routes, collector_fails
 ):
     clock = [1.0]
-    monkeypatch.setattr("ai_provider.execution_fallback.time.perf_counter", lambda: clock[0])
+    monkeypatch.setattr("ai_provider.fallback_executor.time.perf_counter", lambda: clock[0])
 
     def collect(target):
         clock[0] = 11.0
@@ -501,7 +528,7 @@ def test_every_overloaded_route_is_tried_once(monkeypatch, routes):
 
 def test_expired_deadline_refuses_initial_and_later_stage(monkeypatch, routes):
     clock = [1.0]
-    monkeypatch.setattr("ai_provider.execution_fallback.time.perf_counter", lambda: clock[0])
+    monkeypatch.setattr("ai_provider.fallback_executor.time.perf_counter", lambda: clock[0])
     run = session(monkeypatch, routes, deadline=10.0)
     calls = []
 
@@ -523,7 +550,7 @@ def test_expired_deadline_refuses_initial_and_later_stage(monkeypatch, routes):
 
 def test_successful_response_after_deadline_is_still_timeout(monkeypatch, routes):
     now = 0.0
-    monkeypatch.setattr("ai_provider.execution_fallback.time.perf_counter", lambda: now)
+    monkeypatch.setattr("ai_provider.fallback_executor.time.perf_counter", lambda: now)
     run = session(monkeypatch, routes, deadline=10.0)
 
     def execute(target, prompt):
@@ -542,7 +569,7 @@ def test_deadline_after_partial_effect_preserves_handoff_without_fallback(
 ):
     clock = [1.0]
     saved = []
-    monkeypatch.setattr("ai_provider.execution_fallback.time.perf_counter", lambda: clock[0])
+    monkeypatch.setattr("ai_provider.fallback_executor.time.perf_counter", lambda: clock[0])
     run = session(monkeypatch, routes, deadline=10.0, save_handoff=saved.append)
     path = tmp_path / "effect.txt"
     calls = []
@@ -981,7 +1008,7 @@ def test_noninteractive_missing_auth_is_reported_before_execution(monkeypatch, r
     )
     monkeypatch.setattr("sys.stdin", io.StringIO())
     monkeypatch.setattr("builtins.input", lambda *args: pytest.fail("mid-run prompt"))
-    run = FallbackSession(
+    run = FallbackExecutor(
         profile(), routes, initial(routes), compatible=lambda target: True, progress=messages.append
     )
     assert not run.ready
@@ -1005,10 +1032,10 @@ def test_external_sign_in_never_reads_input_or_launches_login(
     )
     monkeypatch.setattr("builtins.input", lambda *args: pytest.fail("Inline sign-in read stdin"))
     monkeypatch.setattr(
-        "ai_provider.execution_fallback.subprocess.run",
+        "ai_provider.fallback_executor.subprocess.run",
         lambda *args, **kwargs: pytest.fail("Inline login launched"),
     )
-    run = FallbackSession(
+    run = FallbackExecutor(
         profile(),
         routes,
         initial(routes),
@@ -1043,7 +1070,7 @@ def test_unready_initial_skips_to_first_ready_route(monkeypatch, routes):
         "ai_provider.execution_fallback.check_agent_readiness",
         lambda method: AgentReadiness(method is not AccessMethod.CODEX_CLI, "synthetic readiness"),
     )
-    run = FallbackSession(
+    run = FallbackExecutor(
         profile(),
         routes,
         initial(routes),
@@ -1083,9 +1110,9 @@ def test_interactive_sign_in_happens_before_execution(monkeypatch, routes):
     monkeypatch.setattr("sys.stdin", SimpleNamespace(isatty=lambda: True))
     monkeypatch.setattr("builtins.input", lambda prompt: "yes")
     monkeypatch.setattr(
-        "ai_provider.execution_fallback.subprocess.run", lambda *a, **k: order.append("login")
+        "ai_provider.fallback_executor.subprocess.run", lambda *a, **k: order.append("login")
     )
-    run = FallbackSession(profile(), routes, initial(routes), compatible=lambda target: True)
+    run = FallbackExecutor(profile(), routes, initial(routes), compatible=lambda target: True)
     assert len(run.ready) == 2
     run.run("task", lambda *args: order.append("execute"), lambda result: False, observe=str)
     assert order == ["login", "login", "login", "execute"]
@@ -1098,7 +1125,7 @@ def test_unsupported_permissions_do_not_prompt_for_auth(monkeypatch, routes):
         if method is AccessMethod.CODEX_CLI
         else pytest.fail("ineligible candidate auth"),
     )
-    run = FallbackSession(profile(), routes, initial(routes), compatible=lambda target: False)
+    run = FallbackExecutor(profile(), routes, initial(routes), compatible=lambda target: False)
     assert not run.ready
 
 
@@ -1107,7 +1134,7 @@ def test_disabled_fallback_has_no_preflight(monkeypatch, routes, tmp_path):
         "ai_provider.execution_fallback.check_agent_readiness",
         lambda method: pytest.fail("disabled auth"),
     )
-    run = FallbackSession(
+    run = FallbackExecutor(
         profile(), routes, initial(routes), compatible=lambda target: True, enabled=False
     )
     assert run.run("task", lambda *args: "limited", lambda result: True, observe=str) == "limited"
@@ -1123,7 +1150,7 @@ def test_incompatibility_explanation_never_authorizes_or_authenticates_route(mon
         "ai_provider.execution_fallback.check_agent_readiness",
         lambda method: checked.append(method) or AgentReadiness(True, "authenticated"),
     )
-    run = FallbackSession(
+    run = FallbackExecutor(
         profile(),
         routes,
         initial(routes),
@@ -1512,7 +1539,9 @@ def test_provider_coding_wrappers_continue_on_normalized_limit(monkeypatch, rout
     task = replace(profile(), cost_policy_tier=CostPolicyTier.BILLING_ALLOWED)
     plan = prepare_execution("Fix", task, catalog, review_prompt=False).execution_plan
     assert plan is not None
-    run = FallbackSession(task, catalog, plan.target, compatible=lambda target: True)
+    from ai_provider.fallback_executor import FallbackExecutor
+
+    run = FallbackExecutor(task, catalog, plan.target, compatible=lambda target: True)
     args = argparse.Namespace(fallback_session=run, mode="implement" if native else "ask")
     config = cli.backend_config_from_execution_target(plan.target)
     calls = []
@@ -1805,12 +1834,32 @@ def test_allowance_interpreter_only_trusts_verified_sources():
         }
     )
     # Unknown sources, bad shapes and non-available probes never block.
-    assert not allowance_exhausted({**consumed, "source": "codex_app_server"})
+    assert not allowance_exhausted({**consumed, "source": "mystery_source"})
     assert not allowance_exhausted({**consumed, "status": "unknown"})
     assert not allowance_exhausted({**consumed, "windows": [{"used_percent": 100}]})
     assert not allowance_exhausted({**consumed, "windows": "nope"})
     assert not allowance_exhausted(None)
     assert not allowance_exhausted("nope")  # type: ignore[arg-type]
+
+
+def test_allowance_interpreter_trusts_settled_codex_windows():
+    from ai_provider.execution_fallback import allowance_exhausted
+
+    def codex(primary: float, weekly: float) -> dict:
+        return {
+            "status": "available",
+            "source": "codex_app_server",
+            "windows": [
+                {"bucket_id": "codex", "window": "primary", "used_percent": primary},
+                {"bucket_id": "codex", "window": "secondary", "used_percent": weekly},
+            ],
+        }
+
+    # Live shape 25.11: weekly 100% (0/47 finished 23-25.11) → exhausted.
+    assert allowance_exhausted(codex(0.0, 100.0))
+    assert allowance_exhausted(codex(100.0, 8.0))
+    assert not allowance_exhausted(codex(0.0, 8.0))
+    assert not allowance_exhausted(codex(99.9, 99.9))
 
 
 def test_verdict_classifier_covers_the_full_matrix():
