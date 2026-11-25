@@ -147,6 +147,8 @@ def update_draft(stores, invoice_id: str, payload: dict) -> dict[str, Any]:
     record = stores.invoices.get(invoice_id)
     if record is None:
         raise KeyError(invoice_id)
+    if isinstance(record.get("send"), dict) and record["send"].get("status") == "sent":
+        raise ValueError("sent invoices are immutable; issue a corrective invoice instead")
     if not isinstance(payload, dict):
         raise ValueError("draft input must be an object")
     draft = billing.draft_from_dict(payload)
@@ -161,6 +163,75 @@ def update_draft(stores, invoice_id: str, payload: dict) -> dict[str, Any]:
     record["number"] = draft.number
     record["draft"] = json.loads(billing.canonical_json(draft))
     record["approval"] = None
+    if isinstance(record.get("send"), dict) and record["send"].get("status") != "sent":
+        # Unsent send-state (requested/failed) belongs to the old content.
+        record["send"] = None
+    record["updated_at_utc"] = _utc_now()
+    stores.invoices.put(invoice_id, record)
+    return _present(record, billing)
+
+
+def request_send(stores, invoice_id: str) -> dict[str, Any]:
+    """Mark an approved draft as send-requested; returns record + idempotency key.
+
+    InFakt's create endpoint offers no idempotency key: a retried request
+    mints a second real invoice. So this state is the at-most-once guard —
+    the sender (a later network slice) must call it BEFORE the HTTP
+    request, and must reconcile via list/query before any resubmission
+    after a transport failure. Never blind-retry.
+    """
+    billing = _billing()
+    record = stores.invoices.get(invoice_id)
+    if record is None:
+        raise KeyError(invoice_id)
+    if not _approval_valid(record, billing):
+        raise ValueError("only an approved draft can be sent")
+    send = record.get("send")
+    if isinstance(send, dict) and send.get("status") in ("send_requested", "sent"):
+        raise ValueError(f"invoice already {send['status']}; record the outcome first")
+    attempt = (send.get("attempt", 0) + 1) if isinstance(send, dict) else 1
+    record["send"] = {
+        "status": "send_requested",
+        "idempotency_key": uuid.uuid4().hex,
+        "attempt": attempt,
+        "requested_at_utc": _utc_now(),
+        "remote_ref": None,
+        "errors": [],
+    }
+    record["updated_at_utc"] = _utc_now()
+    stores.invoices.put(invoice_id, record)
+    presented = _present(record, billing)
+    presented["idempotency_key"] = record["send"]["idempotency_key"]
+    return presented
+
+
+def record_send_result(
+    stores,
+    invoice_id: str,
+    *,
+    ok: bool,
+    idempotency_key: str,
+    remote_ref: str | None = None,
+    errors: list[str] | None = None,
+) -> dict[str, Any]:
+    """Record the sender's outcome; only the matching request can land."""
+    billing = _billing()
+    record = stores.invoices.get(invoice_id)
+    if record is None:
+        raise KeyError(invoice_id)
+    send = record.get("send")
+    if (
+        not isinstance(send, dict)
+        or send.get("status") != "send_requested"
+        or send.get("idempotency_key") != idempotency_key
+    ):
+        raise ValueError("no matching send request is open")
+    if ok and not remote_ref:
+        raise ValueError("a successful send must record its remote ref")
+    send["status"] = "sent" if ok else "send_failed"
+    send["remote_ref"] = remote_ref
+    send["errors"] = list(errors or [])
+    send["recorded_at_utc"] = _utc_now()
     record["updated_at_utc"] = _utc_now()
     stores.invoices.put(invoice_id, record)
     return _present(record, billing)
@@ -178,6 +249,7 @@ def _present(record: dict, billing) -> dict[str, Any]:
         "ksef": billing.ksef_ready_dict(draft),
         "approval": record.get("approval"),
         "approval_valid": _approval_valid(record, billing),
+        "send": record.get("send"),
         "created_at_utc": record.get("created_at_utc"),
         "updated_at_utc": record.get("updated_at_utc"),
     }

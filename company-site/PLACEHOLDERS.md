@@ -19,11 +19,13 @@ The intake form prepares JSON "to attach to an email" but no address
 is published. Sites: kontakt.html, en/contact.html (visible pending
 line). Unblocks: real enquiries. Mailto wiring follows the address.
 
-## PHONE
+## PHONE — RESOLVED 2026-11-24 (owner a1a7b4bf)
 
-Whether a phone number is published at all. Not referenced anywhere
-yet. Owner to decide (publish vs email-only). No site changes until
-decided.
+Email-only: no company number is published (owner's number stays
+private; surprise inbound calls unwanted). The intake form collects
+the CLIENT's optional phone (E.164) so the owner reaches out.
+Reversible if a company number is ever acquired — then add the
+published line to kontakt/contact pages.
 
 ## SERVICE_CITIES
 

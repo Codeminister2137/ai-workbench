@@ -5,7 +5,9 @@ from __future__ import annotations
 from urllib.error import HTTPError
 
 import pytest
+from dashboard_stores import DashboardStores
 from dashboard_test_http import get_json, post_json
+from invoices import create_draft, record_send_result, request_send, review_draft, update_draft
 
 
 def _party(name="Firma", nip="5270204778"):
@@ -87,6 +89,51 @@ def test_validation_errors_are_400(dashboard_server) -> None:
     with pytest.raises(HTTPError) as exc:
         get_json(dashboard_server, "/api/invoices/does-not-exist")
     assert exc.value.code == 404
+
+
+def _approved(stores, **overrides):
+    created = create_draft(stores, _draft(**overrides))
+    return review_draft(stores, created["id"], "Jakub")["id"]
+
+
+def test_send_state_machine_is_at_most_once(tmp_path) -> None:
+    """request->record pairing; no double request, no mismatched landing."""
+    stores = DashboardStores(tmp_path / "data")
+    item_id = _approved(stores)
+    with pytest.raises(ValueError, match="no matching send request"):
+        record_send_result(stores, item_id, ok=True, idempotency_key="x", remote_ref="r")
+    requested = request_send(stores, item_id)
+    key = requested["idempotency_key"]
+    assert requested["send"]["status"] == "send_requested"
+    with pytest.raises(ValueError, match="already send_requested"):
+        request_send(stores, item_id)
+    with pytest.raises(ValueError, match="no matching send request"):
+        record_send_result(stores, item_id, ok=True, idempotency_key="wrong", remote_ref="r")
+    with pytest.raises(ValueError, match="must record its remote ref"):
+        record_send_result(stores, item_id, ok=True, idempotency_key=key)
+    failed = record_send_result(stores, item_id, ok=False, idempotency_key=key, errors=["422"])
+    assert failed["send"]["status"] == "send_failed"
+    retry = request_send(stores, item_id)
+    assert retry["send"]["attempt"] == 2
+    sent = record_send_result(
+        stores, item_id, ok=True, idempotency_key=retry["idempotency_key"], remote_ref="uuid-1"
+    )
+    assert sent["send"]["status"] == "sent"
+    with pytest.raises(ValueError, match="already sent"):
+        request_send(stores, item_id)
+
+
+def test_unapproved_and_sent_guards(tmp_path) -> None:
+    """Unapproved drafts can't send; sent drafts can't be edited."""
+    stores = DashboardStores(tmp_path / "data")
+    created = create_draft(stores, _draft())
+    with pytest.raises(ValueError, match="only an approved draft"):
+        request_send(stores, created["id"])
+    item_id = _approved(stores, number="FV/2026/11/8")
+    key = request_send(stores, item_id)["idempotency_key"]
+    record_send_result(stores, item_id, ok=True, idempotency_key=key, remote_ref="uuid-2")
+    with pytest.raises(ValueError, match="immutable"):
+        update_draft(stores, item_id, _draft(number="FV/2026/11/8", notes="too late"))
 
 
 def test_invoices_tab_markers() -> None:

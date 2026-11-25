@@ -476,6 +476,18 @@ def test_run_detail_polls_receipts_contract() -> None:
     assert "<h3>Events and receipts</h3>" in js
 
 
+def test_run_detail_polls_progress_contract() -> None:
+    """Run detail fetches GET /api/runs/{id}/progress and degrades gracefully."""
+    js = _read("app.js")
+    assert '"/progress"' in js
+    assert "data.lines" in js
+    assert 'id="progress-list"' in js
+    assert "renderProgressInto" in js
+    assert "No transcript recorded for this run." in js
+    assert "Loading transcript..." in js
+    assert "<h3>Session transcript</h3>" in js
+
+
 def test_receipts_render_collapsed_turn_groups() -> None:
     """Receipts render as collapsed per-turn disclosures, never a raw dump."""
     js = _read("app.js")
@@ -1589,6 +1601,7 @@ const grab = (name) => eval('(' + source.slice(source.indexOf('function ' + name
 const esc = grab('esc');
 const gtext = grab('gtext');
 const truncate = grab('truncate');
+eval(source.slice(source.indexOf('const ID_ROUTES'), source.indexOf('function refLink(')));
 const renderer = source.slice(source.indexOf('async function renderChatThread('),
   source.indexOf('async function renderInbox('));
 eval(renderer);
@@ -1636,6 +1649,7 @@ const grab = (name) => eval('(' + source.slice(source.indexOf('function ' + name
   source.indexOf('\n}', source.indexOf('function ' + name + '(')) + 2) + ')');
 const esc = grab('esc');
 const gtext = grab('gtext');
+eval(source.slice(source.indexOf('const ID_ROUTES'), source.indexOf('function refLink(')));
 const renderer = source.slice(source.indexOf('async function renderChatThread('),
   source.indexOf('async function renderInbox('));
 eval(renderer);
@@ -1686,6 +1700,7 @@ const grab = (name) => eval('(' + source.slice(source.indexOf('function ' + name
 const esc = grab('esc');
 const gtext = grab('gtext');
 const truncate = grab('truncate');
+eval(source.slice(source.indexOf('const ID_ROUTES'), source.indexOf('function refLink(')));
 const renderer = source.slice(source.indexOf('async function renderChatThread('),
   source.indexOf('async function renderInbox('));
 eval(renderer);
@@ -1849,6 +1864,20 @@ const api = async (path) => path === '/api/sleep' ? {active: false} : {fleet};
 })().catch(error => {console.error(error); process.exitCode = 1;});
 """
     _run_node_driver(driver)
+
+
+def test_link_ids_cover_chat_and_backlog_bodies() -> None:
+    """ID-links Both: chat threads and backlog items enrich references too."""
+    js = _read("app.js")
+    chat = js[
+        js.index("async function renderChatThread(") : js.index("async function renderChatThread(")
+        + 4000
+    ]
+    assert chat.count("linkIds(esc(") >= 4, "chat bodies/reports/transcripts link IDs"
+    backlog = js[
+        js.index("async function renderBacklog(") : js.index("async function renderBacklog(") + 3000
+    ]
+    assert "linkIds(gtext(item.body" in backlog, "backlog body links IDs"
 
 
 def test_link_ids_links_refs_and_bare_ids_without_nesting() -> None:

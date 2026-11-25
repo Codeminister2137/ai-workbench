@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -92,6 +93,7 @@ STATIC_ROOT = ROOT / "web"
 REPO_ROOT = ROOT.parent.parent
 MAX_REQUEST_BYTES = 512_000
 REQUEST_TIMEOUT_SECONDS = 5.0
+MAX_PROGRESS_LINES = 2000
 DEFAULT_PORT = 8766
 SUBMIT_AUTOCHECK_BUDGET_SECONDS = 300.0
 
@@ -1069,6 +1071,9 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             if path.startswith("/api/runs/") and path.endswith("/staged"):
                 run_id = path[len("/api/runs/") : -len("/staged")]
                 return self._send_run_staged(config, run_id)
+            if path.startswith("/api/runs/") and path.endswith("/progress"):
+                run_id = path[len("/api/runs/") : -len("/progress")]
+                return self._send_run_progress(run_id)
             if path.startswith("/api/runs/"):
                 return self._send_item(
                     self._stores().runs,
@@ -2410,6 +2415,37 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             status = 404 if "not found" in str(exc).lower() else 400
             return self._send_json({"ok": False, "error": str(exc)}, status=status)
         self._send_json({"ok": True, "receipts": receipts})
+
+    def _send_run_progress(self, run_id: str) -> None:
+        """Serve a run's session transcript (mai stdout stream, jsonl)."""
+        safe_id = re.sub(r"[^A-Za-z0-9_-]", "", run_id)[:64]
+        if not safe_id:
+            return self._send_json({"ok": False, "error": "Invalid run id"}, status=400)
+        path = self.data_dir / "run-progress" / f"{safe_id}.jsonl"
+        if not path.is_file():
+            return self._send_json(
+                {"ok": False, "error": "No progress recorded for this run"}, status=404
+            )
+        lines: list[dict[str, str]] = []
+        truncated = False
+        try:
+            with path.open(encoding="utf-8", errors="replace") as handle:
+                for raw in handle:
+                    if len(lines) >= MAX_PROGRESS_LINES:
+                        truncated = True
+                        break
+                    try:
+                        entry = json.loads(raw)
+                    except ValueError:
+                        continue
+                    if not isinstance(entry, dict):
+                        continue
+                    lines.append(
+                        {"ts": str(entry.get("ts", "")), "line": str(entry.get("line", ""))}
+                    )
+        except OSError as exc:
+            return self._send_json({"ok": False, "error": str(exc)}, status=400)
+        self._send_json({"ok": True, "lines": lines, "truncated": truncated})
 
     def _send_work_roots(self, config: DashboardConfig) -> None:
         try:

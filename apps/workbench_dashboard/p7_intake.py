@@ -352,12 +352,21 @@ def list_intake(repo_root: Path) -> list[dict[str, Any]]:
 def render_brief(payload: dict) -> str:
     """Render an approved brief as plan-body markdown (read-only input)."""
     contact = payload.get("client_contact", {}) or {}
+    phone = contact.get("phone", "") or ""
+    contact_line = (
+        f"Contact: {contact.get('name', '')} <{contact.get('email', '')}>"
+        f" ({contact.get('company', '')})"
+    )
+    if phone:
+        # Email-only shop: the callback number is the reply path. Never
+        # drop it from the rendered brief (owner a1a7b4bf).
+        contact_line += f" | callback: {phone}"
     lines = [
         f"# Intake brief: {payload.get('project_id', '?')}",
         "",
         f"Goal: {payload.get('goal_summary', '')}",
         f"Deliverable: {payload.get('deliverable_type', '')} | Budget: {payload.get('budget_range', '')} | Urgency: {(payload.get('timeline') or {}).get('urgency', '')}",
-        f"Contact: {contact.get('name', '')} <{contact.get('email', '')}> ({contact.get('company', '')})",
+        contact_line,
         "",
         "## In scope",
         *[f"- {item}" for item in payload.get("features_in", [])],

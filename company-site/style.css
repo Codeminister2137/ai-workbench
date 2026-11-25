@@ -296,6 +296,7 @@ form.intake .hint { font-weight: 400; color: var(--muted); font-size: 0.9rem; }
 
 form.intake input[type="text"],
 form.intake input[type="email"],
+form.intake input[type="tel"],
 form.intake select,
 form.intake textarea {
   width: 100%;
@@ -327,3 +328,47 @@ form.intake fieldset {
 form.intake legend { font-weight: 700; padding: 0 0.4rem; }
 form.intake .checks label { font-weight: 400; margin: 0.35rem 0; }
 form.intake button { margin-top: 1.4rem; cursor: pointer; font-size: 1rem; }
+
+/* Chatbot widget (chatbot.js injects its own DOM) */
+
+.chat-fab {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 1.25rem;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 1.5rem;
+  font-weight: 700;
+  border: 1px solid var(--accent);
+  cursor: pointer;
+  z-index: 50;
+}
+
+.chat-fab:hover { background: var(--accent-ink); }
+
+.chat-panel {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 5rem;
+  width: min(22rem, calc(100vw - 2.5rem));
+  max-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  border-top: 4px solid var(--ink);
+  z-index: 50;
+}
+
+.chat-msgs { overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem; }
+
+.chat-msg p { margin-bottom: 0.3rem; font-size: 0.95rem; }
+.chat-msg.user { align-self: flex-end; color: var(--muted); font-size: 0.95rem; }
+.chat-msg.bot { align-self: flex-start; }
+
+.chat-form { display: flex; gap: 0.5rem; padding: 0.75rem; border-top: 1px solid var(--line); }
+.chat-form input { flex: 1; padding: 0.5rem 0.6rem; border: 1px solid var(--line); border-radius: var(--radius); font: inherit; color: var(--ink); background: var(--paper); }
+.chat-form button { cursor: pointer; font-size: 0.95rem; }

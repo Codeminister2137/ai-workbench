@@ -342,6 +342,7 @@ async function refreshRunDetail(id) {
     const statusEl = document.getElementById("run-status");
     if (statusEl) statusEl.textContent = [run.status, run.branch, run.commit].filter(Boolean).join(" · ");
     await renderReceiptsInto(id);
+    await renderProgressInto(id);
     await renderStagedInto(id);
   } catch (err) { /* next tick retries; never break the page */ }
 }
@@ -391,6 +392,28 @@ async function renderReceiptsInto(id) {
     const s = d.querySelector("summary");
     if (s && openKeys.has(s.textContent)) d.setAttribute("open", "");
   });
+}
+
+/* Session transcript: GET /api/runs/{id}/progress -> {ok, lines:[{ts,line}], truncated}.
+   Missing file (404) renders an honest placeholder; output is escaped. */
+async function renderProgressInto(id) {
+  const list = document.getElementById("progress-list");
+  if (!list) return;
+  let lines = null, truncated = false;
+  try {
+    const data = await api("/api/runs/" + encodeURIComponent(id) + "/progress");
+    lines = Array.isArray(data.lines) ? data.lines : [];
+    truncated = !!data.truncated;
+  } catch (err) { lines = null; }
+  if (!lines || !lines.length) {
+    list.innerHTML = '<p class="muted">No transcript recorded for this run.</p>';
+    return;
+  }
+  const sig = lines.length + ":" + (lines.length ? lines[lines.length - 1].ts : "");
+  if (list.dataset.sig === sig) return;
+  list.innerHTML = "<pre>" + lines.map((e) => esc((e.ts || "").slice(11, 19) + " " + (e.line || ""))).join("\n") + "</pre>"
+    + (truncated ? '<p class="muted">Transcript truncated at 2000 lines.</p>' : "");
+  list.dataset.sig = sig;
 }
 
 /* Project picker: GET /api/work-roots -> {ok, roots:[{id,path,display_name}]}.
@@ -762,17 +785,17 @@ async function renderChatThread(id, initial) {
       const cmdBlock = cmds
         ? `<p class="muted">Commands (${turn.commands.length})</p><ul class="plain agent-cmds">${cmds}</ul>`
         : `<p class="muted">No commands ran this turn.</p>`;
-      return `<div class="msg">${head}${cmdBlock}<div>${esc(turn.report || body)}</div>`
-        + `<details><summary>Full transcript (${body.length} chars)</summary><div>${esc(body)}</div></details></div>`;
+      return `<div class="msg">${head}${cmdBlock}<div>${linkIds(esc(turn.report || body))}</div>`
+        + `<details><summary>Full transcript (${body.length} chars)</summary><div>${linkIds(esc(body))}</div></details></div>`;
     }
     if (m.role !== "assistant" || body.length <= 600) {
-      return `<div class="msg">${head}<div>${esc(body)}</div></div>`;
+      return `<div class="msg">${head}<div>${linkIds(esc(body))}</div></div>`;
     }
     const cut = body.indexOf("\n\n");
     const lead = cut === -1 ? body.slice(0, 300) : body.slice(0, cut);
     const rest = cut === -1 ? body.slice(300) : body.slice(cut);
-    return `<div class="msg">${head}<div>${esc(lead)}</div>
-     <details><summary>Full turn (${body.length} chars)</summary><div>${esc(rest)}</div></details></div>`;
+    return `<div class="msg">${head}<div>${linkIds(esc(lead))}</div>
+     <details><summary>Full turn (${body.length} chars)</summary><div>${linkIds(esc(rest))}</div></details></div>`;
   };
   const msgs = payload.messages.map(renderMsg).join("");
   let planBanner = "";
@@ -1510,9 +1533,12 @@ async function renderRuns(id) {
       <div id="staged-list" data-applied="${run.staged_applied ? "1" : ""}"><p class="muted">Loading staged changes...</p></div>
       <h3>Events and receipts</h3>
       <div id="receipts-list"><p class="muted">Loading receipts...</p></div>
+      <h3>Session transcript</h3>
+      <div id="progress-list"><p class="muted">Loading transcript...</p></div>
       ${inboxLink}${planLink}
       ${report}</div>`;
     renderReceiptsInto(id);
+    renderProgressInto(id);
     renderStagedInto(id);
     startRunDetailPoll(id);
     const reportBtn = document.getElementById("report-btn");
@@ -2316,7 +2342,7 @@ async function renderBacklog(id) {
     view.innerHTML = `<h1>Backlog item</h1><p><a href="#/backlog">All backlog</a></p>
       <div class="card"><h2>${gtext(item.title)}</h2>
       <p class="muted">${esc(item.source)}${item.ref ? " · " + esc(item.ref) : ""} · ${esc(item.status)}</p>
-      <p class="inbox-body">${gtext(item.body || "")}</p>
+      <p class="inbox-body">${linkIds(gtext(item.body || ""))}</p>
       ${item.decision ? `<p><strong>Decision:</strong> ${esc(item.decision)}</p>` : ""}
       ${item.inbox_id ? `<p><a href="#/inbox/${esc(item.inbox_id)}" title="Open the inbox brief for this item">Inbox brief: ${esc(item.inbox_id)}</a></p>` : ""}
       ${item.gate ? `<p class="muted">Gate: ${esc(item.gate.kind)}${item.gate.condition ? " — " + esc(item.gate.condition) : ""}${item.gate.not_before ? " — opens " + esc(item.gate.not_before) : ""}${item.gate.item_id ? " — waits on " + esc(item.gate.item_id.slice(0, 8)) : ""}${item.task_spec ? "" : " (no prepared task)"}</p>` : ""}
