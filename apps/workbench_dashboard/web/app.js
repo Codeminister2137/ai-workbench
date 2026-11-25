@@ -3414,6 +3414,11 @@ document.getElementById("create-btn").addEventListener("click", () => {
     !document.getElementById("create-menu").hidden;
 });
 document.getElementById("bug-btn").addEventListener("click", openBugReport);
+document.getElementById("global-lookup").addEventListener("submit", (ev) => {
+  ev.preventDefault();
+  const token = document.getElementById("global-lookup-id").value.trim();
+  if (token) location.hash = "#/lookup/" + encodeURIComponent(token);
+});
 
 document.querySelectorAll("[data-create]").forEach((btn) => {
   btn.addEventListener("click", () => {

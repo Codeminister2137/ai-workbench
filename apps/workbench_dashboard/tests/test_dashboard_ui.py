@@ -476,6 +476,21 @@ def test_run_detail_polls_receipts_contract() -> None:
     assert "<h3>Events and receipts</h3>" in js
 
 
+def test_global_lookup_field_in_header() -> None:
+    """ID lookup is persistent: header form on every view, same resolver route."""
+    html = _read("index.html")
+    assert 'id="global-lookup"' in html
+    assert 'id="global-lookup-id"' in html
+    assert 'id="global-lookup-go"' in html
+    js = _read("app.js")
+    assert 'getElementById("global-lookup").addEventListener("submit"' in js
+    assert 'getElementById("global-lookup-id").value' in js
+    assert '#/lookup/" + encodeURIComponent(token)' in js
+    css = _read("app.css")
+    assert "#global-lookup" in css
+    assert "#global-lookup-id" in css
+
+
 def test_run_detail_polls_progress_contract() -> None:
     """Run detail fetches GET /api/runs/{id}/progress and degrades gracefully."""
     js = _read("app.js")
