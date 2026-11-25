@@ -208,7 +208,8 @@ def test_allowance_observation_is_once_per_source_and_never_routes(monkeypatch, 
         "status": status,
         "source": "codex_app_server",
         "observed_at_utc": "2026-10-10T09:00:00+00:00" if status == "available" else None,
-        "windows": [{"used_percent": 100}] if status == "available" else [],
+        # Non-exhausted windows: codex at 100% now skips (verified C2).
+        "windows": [{"used_percent": 20}] if status == "available" else [],
     }
 
     def collect(target):
@@ -232,6 +233,31 @@ def test_allowance_observation_is_once_per_source_and_never_routes(monkeypatch, 
     }
     assert sum(line.startswith("allowance_observation:") for line in progress) == 1
     assert run.handoff is None
+
+
+def test_verified_codex_exhaustion_skips_without_executing(monkeypatch, routes):
+    observation = {
+        "status": "available",
+        "source": "codex_app_server",
+        "windows": [{"used_percent": 100}],
+    }
+    executed = []
+    run = session(
+        monkeypatch,
+        routes,
+        observe_allowance=lambda target: observation,
+        progress=lambda text: None,
+    )
+
+    def execute(target, prompt):
+        executed.append(target.route_id)
+        return "done"
+
+    with pytest.raises(ProviderError) as raised:
+        run.run("Work", execute, lambda result: False, observe=str)
+    assert raised.value.category == ProviderErrorCategory.USAGE_LIMIT
+    assert executed == []
+    assert run.attempts[0] == {"route_id": "codex", "status": "allowance_exhausted"}
 
 
 @pytest.mark.parametrize("error", [OSError, ValueError, RuntimeError])
@@ -1805,12 +1831,32 @@ def test_allowance_interpreter_only_trusts_verified_sources():
         }
     )
     # Unknown sources, bad shapes and non-available probes never block.
-    assert not allowance_exhausted({**consumed, "source": "codex_app_server"})
+    assert not allowance_exhausted({**consumed, "source": "mystery_source"})
     assert not allowance_exhausted({**consumed, "status": "unknown"})
     assert not allowance_exhausted({**consumed, "windows": [{"used_percent": 100}]})
     assert not allowance_exhausted({**consumed, "windows": "nope"})
     assert not allowance_exhausted(None)
     assert not allowance_exhausted("nope")  # type: ignore[arg-type]
+
+
+def test_allowance_interpreter_trusts_settled_codex_windows():
+    from ai_provider.execution_fallback import allowance_exhausted
+
+    def codex(primary: float, weekly: float) -> dict:
+        return {
+            "status": "available",
+            "source": "codex_app_server",
+            "windows": [
+                {"bucket_id": "codex", "window": "primary", "used_percent": primary},
+                {"bucket_id": "codex", "window": "secondary", "used_percent": weekly},
+            ],
+        }
+
+    # Live shape 25.11: weekly 100% (0/47 finished 23-25.11) → exhausted.
+    assert allowance_exhausted(codex(0.0, 100.0))
+    assert allowance_exhausted(codex(100.0, 8.0))
+    assert not allowance_exhausted(codex(0.0, 8.0))
+    assert not allowance_exhausted(codex(99.9, 99.9))
 
 
 def test_verdict_classifier_covers_the_full_matrix():

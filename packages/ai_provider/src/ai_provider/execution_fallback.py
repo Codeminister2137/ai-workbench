@@ -180,8 +180,28 @@ def _kiro_windows_exhausted(windows: list[dict[str, Any]]) -> bool:
     return False
 
 
+def _codex_windows_exhausted(windows: list[dict[str, Any]]) -> bool:
+    """Codex quota semantics: any window at 100% used means refused.
+
+    Settled empirically 2026-11-25: weekly window at 100% 23-25.11
+    (primary 5h at 0%) while 0 of 47 codex executions finished (all
+    usage_limit verdicts). No counterexample observed.
+    """
+    for window in windows:
+        if not isinstance(window, dict):
+            continue
+        try:
+            used = float(window.get("used_percent", 0.0))
+        except (TypeError, ValueError):
+            continue
+        if used >= 100:
+            return True
+    return False
+
+
 ALLOWANCE_EXHAUSTION = {
     "kiro_isolated_v2_usage": _kiro_windows_exhausted,
+    "codex_app_server": _codex_windows_exhausted,
 }
 """Verified per-source exhaustion interpreters; unknown sources never block."""
 
