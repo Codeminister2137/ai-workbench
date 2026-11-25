@@ -1538,7 +1538,9 @@ def test_provider_coding_wrappers_continue_on_normalized_limit(monkeypatch, rout
     task = replace(profile(), cost_policy_tier=CostPolicyTier.BILLING_ALLOWED)
     plan = prepare_execution("Fix", task, catalog, review_prompt=False).execution_plan
     assert plan is not None
-    run = FallbackSession(task, catalog, plan.target, compatible=lambda target: True)
+    from ai_provider.fallback_executor import FallbackExecutor
+
+    run = FallbackExecutor(task, catalog, plan.target, compatible=lambda target: True)
     args = argparse.Namespace(fallback_session=run, mode="implement" if native else "ask")
     config = cli.backend_config_from_execution_target(plan.target)
     calls = []

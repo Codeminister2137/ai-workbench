@@ -265,6 +265,45 @@ def test_disabled_runs_initial_once_without_switching():
     assert outcome.attempts == [{"route_id": "codex", "status": "finished"}]
 
 
+def test_per_call_effects_override_injected_and_share_state():
+    first = ExternalAgentResult((), 1, "", "usage limit reached")
+    run = make_executor(catalog(), execute=lambda target, prompt: first)
+    outcome = run.run(
+        "Do it",
+        execute=lambda target, prompt: ExternalAgentResult((), 0, "overridden", ""),
+    )
+    assert outcome.status == "finished"
+    assert outcome.result.stdout == "overridden"
+    assert outcome.attempts == [{"route_id": "codex", "status": "finished"}]
+
+
+def test_unbound_run_raises_instead_of_failing_obscurely():
+    executor = FallbackExecutor(
+        profile(), catalog(), initial(catalog()), check_ready=lambda target: Readiness(True)
+    )
+    with pytest.raises(ValueError, match="no execute/observe/is_limited bound"):
+        executor.run("Do it")
+
+
+def test_compatible_filtering_marks_unavailable_with_reason():
+    run = make_executor(
+        catalog(),
+        compatible=lambda target: target.route_id != "copilot",
+        incompatibility_reason=lambda target: "no tools on copilot",
+    )
+    assert "copilot" not in run.ready
+    assert run.unavailable["copilot"] == "no tools on copilot"
+    assert run.primary_ready is True
+
+
+def test_primary_ready_false_when_initial_unready():
+    run = make_executor(
+        catalog(), check_ready=lambda target: Readiness(target.route_id != "codex", "signed out")
+    )
+    assert run.primary_ready is False
+    assert "codex" in run.unavailable
+
+
 def test_expired_deadline_refuses_execution():
     import time
 

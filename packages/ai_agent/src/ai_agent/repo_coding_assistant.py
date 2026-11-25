@@ -75,7 +75,7 @@ from ai_provider.coding_assist import (
     run_coding_prompt,
 )
 from ai_provider.contracts import FinishReason
-from ai_provider.execution_fallback import FallbackSession, external_usage_limit
+from ai_provider.execution_fallback import external_usage_limit
 from ai_provider.external_agents import (
     ExternalAgentConfig as ExternalAgentConfig,  # noqa: F401 - compatibility export
 )
@@ -106,6 +106,7 @@ from ai_provider.external_agents import (
 from ai_provider.external_agents import (
     run_external_agent as _run_external_agent,
 )
+from ai_provider.fallback_executor import FallbackExecutor
 from ai_provider.native_admission import (
     NATIVE_TOOL_EVIDENCE,
     installed_native_identity,
@@ -2003,7 +2004,9 @@ def _execute_request(
         and external_orchestration.execution_plan is not None
     ):
         try:
-            args.fallback_session = FallbackSession(
+            # Scope C: the single fallback executor. The attribute keeps its
+            # historic name so every existing reader keeps working.
+            args.fallback_session = FallbackExecutor(
                 profile,
                 catalog,
                 external_orchestration.execution_plan.target,
@@ -2824,7 +2827,7 @@ def _run_coding_prompt_with_fallback(
             progress_callback=_progress_reporter_factory(verbose=getattr(args, "verbose", False)),
         )
 
-    result = session.run(
+    outcome = session.run(
         prompt,
         execute,
         _fallback_limited,
@@ -2833,6 +2836,7 @@ def _run_coding_prompt_with_fallback(
             target, payload, args=args, profile=profile, repo_root=repo_root
         ),
     )
+    result = outcome.result
     print(f"effective_route_id: {session.current.route_id}")
     if hasattr(result, "orchestration"):
         return result
@@ -3398,7 +3402,7 @@ def _run_external_agent_with_fallback(
             progress_callback=progress_callback,
         )
 
-    result = session.run(
+    outcome = session.run(
         prompt,
         execute,
         _fallback_limited,
@@ -3407,6 +3411,7 @@ def _run_external_agent_with_fallback(
             target, payload, args=args, profile=profile, repo_root=repo_root
         ),
     )
+    result = outcome.result
     print(f"effective_route_id: {session.current.route_id}")
     if isinstance(result, ExternalAgentResult):
         return result
@@ -3448,7 +3453,7 @@ def _run_native_agent_with_fallback(
             progress_callback=progress_callback,
         )
 
-    result = session.run(
+    outcome = session.run(
         prompt,
         execute,
         _fallback_limited,
@@ -3457,6 +3462,7 @@ def _run_native_agent_with_fallback(
             target, payload, args=args, profile=profile, repo_root=repo_root
         ),
     )
+    result = outcome.result
     print(f"effective_route_id: {session.current.route_id}")
     if not isinstance(result, ExternalAgentResult):
         return result

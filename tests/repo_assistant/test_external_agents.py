@@ -214,7 +214,8 @@ def test_cli_executes_codex_external_agent_route(
             "status": "available",
             "source": "codex_app_server",
             "observed_at_utc": "2026-10-10T09:00:00+00:00",
-            "windows": [{"used_percent": 100}],
+            # Healthy windows: codex at 100% now skips (verified C2).
+            "windows": [{"bucket_id": "codex", "window": "primary", "used_percent": 20}],
             "cleanup_verified": True,
         }
 

@@ -317,7 +317,7 @@ def test_production_wrappers_supply_sanitizing_observe(tmp_path, monkeypatch, wr
     def run(prompt, execute, limited, *, observe, preserve):
         captured["observe"] = observe
         assert preserve(route, "preservation metadata") == "safe handoff"
-        return original
+        return SimpleNamespace(result=original)
 
     session = SimpleNamespace(initial=route, current=route, enabled=True, deadline=None)
     session.run = run
