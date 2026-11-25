@@ -299,4 +299,4 @@ def test_emergency_preservation_reports_without_implementing():
     assert len(payloads) == 1
     assert "Do not edit" in payloads[0]
     assert "PRIVATE ORIGINAL OBJECTIVE" not in payloads[0]
-    assert any(attempt.status == "preservation_only" for attempt in run.attempts)
+    assert any(attempt["status"] == "preservation_only" for attempt in run.attempts)
