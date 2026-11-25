@@ -122,18 +122,28 @@ if ($CancelAll) {
     [IO.Directory]::CreateDirectory($ControlDirectory) | Out-Null
     Write-AtomicText $cancelAllPath ([guid]::NewGuid().ToString())
     $pending = @()
+    $stale = @()
     foreach ($registration in Get-ChildItem -LiteralPath $ControlDirectory -Filter 'timer-*.json') {
         $record = Read-ControlText $registration.FullName | ConvertFrom-Json
-        $pending += $record.receipt_path
+        $pending += @{receipt = $record.receipt_path; registered = $registration.CreationTimeUtc}
     }
     $waitUntil = [datetimeoffset]::UtcNow.AddSeconds(5)
     do {
         $pending = @($pending | Where-Object {
-            if (-not (Test-Path -LiteralPath $_)) { return $true }
-            $state = Read-ControlText $_ | ConvertFrom-Json
+            if (-not (Test-Path -LiteralPath $_.receipt)) {
+                # A live timer always holds its receipt; only a registration
+                # created seconds ago (arm race) can still legitimately miss
+                # one. Ancient orphans resolve as stale, never pending.
+                if (([datetimeoffset]::UtcNow - $_.registered).TotalSeconds -lt 60) {
+                    return $true
+                }
+                $script:stale = @($script:stale) + $_.receipt
+                return $false
+            }
+            $state = Read-ControlText $_.receipt | ConvertFrom-Json
             if ($state.status -ne 'sleep_scheduled') { return $false }
             if (-not (Test-TimerProcessPending $state)) {
-                Write-Warning "Inactive timer receipt retained; no acknowledgement or sleep outcome established: $_"
+                Write-Warning "Inactive timer receipt retained; no acknowledgement or sleep outcome established: $($_.receipt)"
                 return $false
             }
             return $true
@@ -141,7 +151,18 @@ if ($CancelAll) {
         if ($pending.Count -eq 0) { break }
         Start-Sleep -Milliseconds 100
     } while ([datetimeoffset]::UtcNow -lt $waitUntil)
-    if ($pending.Count) { throw "Cancellation sent; acknowledgement missing for: $($pending -join ', ')" }
+    $stale = @($stale | Select-Object -Unique)
+    if ($stale.Count -gt 0) {
+        $shown = ($stale | Select-Object -First 3) -join ', '
+        $more = if ($stale.Count -gt 3) { " and $($stale.Count - 3) more" } else { '' }
+        Write-Warning "Ignored $($stale.Count) stale registration(s) with missing receipts: $shown$more"
+    }
+    if ($pending.Count) {
+        $names = @($pending | ForEach-Object { $_.receipt })
+        $shown = ($names | Select-Object -First 5) -join ', '
+        $more = if ($names.Count -gt 5) { " and $($names.Count - 5) more" } else { '' }
+        throw "Cancellation sent; acknowledgement missing for: $shown$more"
+    }
     Write-Output 'sleep_status: no active registered timer remains pending (inactive receipts are retained; submitted power requests cannot be undone)'
     return
 }
