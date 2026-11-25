@@ -113,6 +113,7 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/plans/name-eligibility-20261124.md | PENDING | Slice-3 screen 2026-11-24: 3 NO-GO (IT/Soft/Code) + SmartTek conditional; owner choice pending. |
 | docs/plans/accountant-brief-infakt-20261124.md | PENDING | Slice-5 send-ready InFakt brief 2026-11-24 (JDG IT snapshot + 8 questions); awaiting owner send. |
 | docs/plans/name-eligibility-fallback-20261124.md | PENDING | Fallback screen 24.11: Jaworski Software/IT conditional, JS Labs NO-GO, Pracownia weak; + namelix pack. |
+| docs/plans/invoice-sending-scope-20261125.md | PENDING | Slice-3 sending design 25.11 (InFakt sync + at-most-once machine); 3 owner gates filed, no live sends. |
 | docs/plans/loop-20261125.md | PENDING | Draft tomorrow loop plan (chatbot, P7 close-out, backlog). |
 | docs/plans/l3-eval-ladder-design.md | ACTED | Ladder shipped (route_eval.py + l3_ladder.py). |
 | docs/plans/local-model-queue.md | ACTED | Q1-Q4 all consumed into quality-policy v1. |

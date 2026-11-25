@@ -138,6 +138,16 @@ def test_warnings_not_rejections() -> None:
     assert any("email/phone" in warn for warn in verdict["warnings"])
 
 
+def test_rendered_brief_keeps_callback_phone() -> None:
+    """Email-only shop: a provided phone renders as the callback line."""
+    from p7_intake import render_brief
+
+    with_phone = _brief()
+    with_phone["client_contact"] = dict(with_phone["client_contact"], phone="+48601234567")
+    assert "callback: +48601234567" in render_brief(with_phone)
+    assert "callback:" not in render_brief(_brief())
+
+
 def test_list_and_approve_round_trip(tmp_path) -> None:
     intake = tmp_path / "p7-projects"
     intake.mkdir()
