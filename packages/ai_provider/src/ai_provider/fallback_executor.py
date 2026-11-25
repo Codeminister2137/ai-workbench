@@ -9,12 +9,10 @@ documented attempt ledger (``[{"route_id", "status"}]``) plus the
 established ``fallback_*`` progress protocol, so receipts, forensics
 and triage keep working across the migration.
 
-Migration status: C1 introduces the executor with NO callers. C3/C4
-rewire drain/chat/relay/direct-CLI onto it and then delete
-`FallbackSession` and the drain retry wrapper. Until then the two
-implementations coexist deliberately; this module must not import
-either of them. C2 adds machine-readable exhaustion readers; C5 adds
-dynamic ordering behind the ``reorder_candidates`` seam.
+Migration status: complete. Drain retry is verdict-driven, relay and
+Mai sessions run here, and `FallbackSession` is deleted. C2 added
+machine-readable exhaustion readers; C5 (dynamic ordering behind the
+``reorder_candidates`` seam) is queued with its persistence decision.
 
 No model calls, no network, no inference: the caller injects
 `execute`/`observe`/`is_limited`/`check_ready` and this module only
@@ -100,7 +98,7 @@ class FallbackExecutor:
         allow_cost_escalation: bool = False,
         cost_exemptions: frozenset[str] = frozenset(),
         enabled: bool = True,
-        interactive_login: bool = False,
+        interactive_login: bool = True,
         deadline: float | None = None,
         quality_policy: FallbackQualityPolicy = FallbackQualityPolicy.EMERGENCY_PRESERVE,
         progress: Callable[[str], None] | None = None,
@@ -154,19 +152,19 @@ class FallbackExecutor:
         self._check_deadline("during readiness preflight")
         if status.ready or not status.login_command:
             return status
-        self._report(
-            f"fallback_sign_in_needed: {target.provider}; run {list(status.login_command)!r}"
+        self.progress(
+            f"fallback_sign_in_needed: {target.product}; run {json.dumps(status.login_command)}"
         )
         if not self.interactive_login:
-            self._report(
-                "fallback_sign_in_scope: sign in outside coding-chat, then retry or "
-                "restart/resume to refresh readiness"
+            self.progress(
+                "fallback_sign_in_scope: sign in outside coding-chat, then retry or restart/resume "
+                "to refresh readiness"
             )
             return status
         if sys.stdin.isatty():
             try:
                 answer = (
-                    input(f"Sign into {target.provider} now before execution? [y/N] ")
+                    input(f"Sign into {target.product} now before execution? [y/N] ")
                     .strip()
                     .lower()
                 )
@@ -180,7 +178,7 @@ class FallbackExecutor:
                     status = self.check_ready(target)
                     self._check_deadline("during readiness preflight")
                 except OSError:
-                    self._report(f"fallback_login_failed: {target.provider}")
+                    self.progress(f"fallback_login_failed: {target.product}")
         return status
 
     # -- setup ----------------------------------------------------------
@@ -194,7 +192,7 @@ class FallbackExecutor:
     def _check_deadline(self, phase: str) -> None:
         if self.deadline is not None and time.perf_counter() >= self.deadline:
             raise ProviderError(
-                f"Continuation deadline expired {phase}; no execution attempted.",
+                f"Continuation deadline expired {phase}; no action admitted.",
                 category=ProviderErrorCategory.TIMEOUT,
             )
 
@@ -214,10 +212,17 @@ class FallbackExecutor:
         return reordered
 
     def _preflight(self) -> None:
-        if not self.enabled:
-            self.ready[self.initial.route_id] = self.initial
+        checked: dict[Any, Readiness] = {}
+        if not self.enabled and self.interactive_login:
             return
         self._check_deadline("during readiness preflight")
+        if is_external_agent_access_method(self.initial.access_method):
+            checked[self.initial.access_method] = self._authenticate(self.initial)
+            self.primary_ready = checked[self.initial.access_method].ready
+            if not self.primary_ready:
+                self.unavailable[self.initial.route_id] = checked[self.initial.access_method].reason
+        if not self.enabled:
+            return
         normal = fallback_candidates(
             self.profile,
             self.catalog,
@@ -267,18 +272,16 @@ class FallbackExecutor:
                         reason or "executor cannot preserve requested tools/permissions/options"
                     )
                 continue
-            status = self._authenticate(target)
-            if status.ready:
+            if not is_external_agent_access_method(target.access_method):
+                # Provider readiness is supplied by the composing caller, without inference.
+                (self.preservation_ready if preserving else self.ready)[target.route_id] = target
+                continue
+            if target.access_method not in checked:
+                checked[target.access_method] = self._authenticate(target)
+            if checked[target.access_method].ready:
                 (self.preservation_ready if preserving else self.ready)[target.route_id] = target
             else:
-                self.unavailable[target.route_id] = status.reason or "readiness unverified"
-        if self.initial.route_id not in self.ready:
-            status = self._authenticate(self.initial)
-            if status.ready:
-                self.ready[self.initial.route_id] = self.initial
-            else:
-                self.unavailable[self.initial.route_id] = status.reason or "readiness unverified"
-        self.primary_ready = self.initial.route_id in self.ready
+                self.unavailable[target.route_id] = checked[target.access_method].reason
         self._check_deadline("during readiness preflight")
         self._report("fallback_ready_routes: " + (", ".join(self.ready) or "none"))
         self._report(
@@ -373,7 +376,7 @@ class FallbackExecutor:
         current_prompt = prompt
         self.continuation_messages = ()
         observed_history: list[str] = []
-        if self.current.route_id not in self.ready:
+        if not self.primary_ready:
             first_ready = next(iter(self.ready.values()), None)
             if first_ready is None:
                 raise ProviderError(
@@ -393,6 +396,7 @@ class FallbackExecutor:
             or self.current.route_id in self.incapable
             or self.current.route_id in self.failed_routes
         ):
+            self._report("fallback_exhausted: no ready route remains; partial work preserved")
             raise ProviderError(
                 "No ready continuation route remains; no further execution attempted. "
                 "Partial work and handoff preserved.",
@@ -401,11 +405,25 @@ class FallbackExecutor:
                 else ProviderErrorCategory.USAGE_LIMIT,
             )
         while True:
-            self._check_deadline("before execution")
-            self.current = self._clamp_timeout(self.current)
+            if self.deadline is not None:
+                remaining = self.deadline - time.perf_counter()
+                if remaining <= 0:
+                    raise ProviderError(
+                        "Continuation deadline expired; no execution attempted. "
+                        "Inspect saved edits/receipts before restarting.",
+                        category=ProviderErrorCategory.TIMEOUT,
+                    )
+                self.current = self._clamp_timeout(self.current)
             self._observe_allowance()
-            self._check_deadline("during allowance observation")
-            self.current = self._clamp_timeout(self.current)
+            if self.deadline is not None:
+                remaining = self.deadline - time.perf_counter()
+                if remaining <= 0:
+                    raise ProviderError(
+                        "Continuation deadline expired during allowance observation; "
+                        "no execution attempted.",
+                        category=ProviderErrorCategory.TIMEOUT,
+                    )
+                self.current = self._clamp_timeout(self.current)
             allowance_skip = self.enabled and self._current_allowance_exhausted()
             result: Any = None
             error: ProviderError | None = None

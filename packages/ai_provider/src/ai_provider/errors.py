@@ -188,7 +188,7 @@ def http_error_to_provider_error(
     ):
         # The request fits nowhere on this route, but a longer-context
         # route may serve it: capability reroute, not terminal failure.
-        # The marker sentence is the FallbackSession capability signal.
+        # The marker sentence is the fallback-executor capability signal.
         category = ProviderErrorCategory.RETRYABLE
         message += " Route to a longer-context model."
     return ProviderError(

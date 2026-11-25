@@ -29,9 +29,10 @@ IMPORT_RE = re.compile(r"^from (ai_provider|ai_orchestrator|ai_agent)\b", re.M)
 # fallback_executor.py added 2026-11-25: scope C single fallback executor,
 # owner-accepted 2026-11-23 (ADR fallback-verdict-pipeline-B-then-C, inbox
 # b58f8502: "major restructuring is acceptable if needed"), GO recorded
-# 25.11. Same frozen vocabulary as execution_fallback.py (targets, catalog,
-# fallback candidates); no routing outcomes consumed. Temporary growth:
-# C4 deletes FallbackSession, net-shrinking the set.
+# 25.11. Same frozen vocabulary execution_fallback.py used (targets,
+# catalog, fallback candidates); no routing outcomes consumed.
+# execution_fallback.py left the set the same day: it now holds only the
+# verdict taxonomy (no up-imports), its walk deleted in C4.
 PROVIDER_UP_IMPORTERS = frozenset(
     {
         "acceptance_harness.py",
@@ -44,7 +45,6 @@ PROVIDER_UP_IMPORTERS = frozenset(
         "coding_assist.py",
         "coding_sessions.py",
         "copilot_usage.py",
-        "execution_fallback.py",
         "external_agents.py",
         "fallback_diagnostics.py",
         "fallback_executor.py",

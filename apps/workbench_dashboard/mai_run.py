@@ -68,7 +68,7 @@ def mai_reported_exhaustion(*texts: str) -> bool:
     """True when Mai's closeout carries a fallback-exhaustion handoff.
 
     ``fallback_handoff=`` renders in the closeout notes (tail-visible)
-    exactly when FallbackSession found no eligible continuation route;
+    exactly when the fallback executor found no eligible continuation route;
     ``continuation_stopped`` is the only handoff status it ever sets.
     A parked run retries after backoff instead of failing forever.
     """

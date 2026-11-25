@@ -85,7 +85,7 @@ status-propagation defect. Existing loop/closeout/coding-chat checks pass (74 te
 The resumption audit corrected the earlier composed-trace claim: the private
 `trace_errors.py` calls AgentLoop in a separate case, but does not invoke native
 execution wrappers in its named native/chat case. It connects synthetic
-FallbackSession callbacks to closeout/chat and does not reopen SQLite. Its edited
+FallbackExecutor callbacks to closeout/chat and does not reopen SQLite. Its edited
 version also contains a mismatched result key; its historical JSON receipt cannot
 validate later edits. Preserve that evidence without treating it as native
 integration acceptance.
@@ -107,7 +107,7 @@ ProviderError catch paths. It does not complete the wider error review.
 - No SQL schema migration is required for additive JSON keys. Existing records
   without new fields remain readable; provider categories/routing are unchanged.
 - `tests/repo_assistant/test_error_propagation.py` exercises the actual CLI,
-  native wrappers, AgentLoop, FallbackSession, terminal observer/return code and
+  native wrappers, AgentLoop, FallbackExecutor, terminal observer/return code and
   reopened SQLite. Transport/client admission/readiness are synthetic. Cases:
   direct failure, overload then secondary timeout, exhaustion, unknown attribution
   and successful recovery. Separate checks cover privacy sentinels, bounds and
