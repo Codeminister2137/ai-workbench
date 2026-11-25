@@ -28,7 +28,7 @@ import subprocess
 import sys
 import time
 from collections.abc import Callable
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, replace
 from typing import Any
 
 from ai_orchestrator import ExecutionTarget, ModelCatalogEntry, TaskProfile, prepare_execution
@@ -44,18 +44,6 @@ from ai_provider.execution_fallback import (
     explicit_model_overload,
 )
 from ai_provider.external_agents import ExternalAgentResult, is_external_agent_access_method
-
-
-@dataclass(slots=True)
-class ExecutorResult:
-    """Uniform outcome for every execution path."""
-
-    status: str  # "finished" | "exhausted"
-    route_id: str
-    result: Any = None
-    error: ProviderError | None = None
-    attempts: list[dict[str, str]] = field(default_factory=list)
-    handoff: dict[str, Any] | None = None
 
 
 @dataclass(slots=True)
@@ -368,9 +356,11 @@ class FallbackExecutor:
         *,
         observe: Callable[[Any], str] | None = None,
         preserve: Callable[[ExecutionTarget, str], str] | None = None,
-    ) -> ExecutorResult:
+    ) -> Any:
         """Execute with verdict-driven fallback; never replay completed effects.
 
+        Returns the raw execution result (legacy shape); the attempt
+        ledger, handoff and route state stay available as attributes.
         Per-call effects override the injected ones (Mai passes a fresh
         closure per mode); session state is shared across calls.
         """
@@ -502,13 +492,7 @@ class FallbackExecutor:
                 self._record(self.current.route_id, "finished")
                 if error is not None:
                     raise error
-                return ExecutorResult(
-                    status="finished",
-                    route_id=self.current.route_id,
-                    result=result,
-                    attempts=self._ledger(),
-                    handoff=self.handoff,
-                )
+                return result
             failed = self.current
             if allowance_skip:
                 reason = "allowance_exhausted"
@@ -604,7 +588,7 @@ class FallbackExecutor:
         result: Any,
         error: ProviderError | None,
         preserve: Callable[[ExecutionTarget, str], str] | None,
-    ) -> ExecutorResult:
+    ) -> Any:
         self.handoff = {
             "status": "continuation_stopped",
             "reason": "deadline_or_no_eligible_compatible_route",
@@ -631,13 +615,7 @@ class FallbackExecutor:
             self._preserve_work(observed_history, preserve)
         if error is not None:
             raise error
-        return ExecutorResult(
-            status="exhausted",
-            route_id=failed.route_id,
-            result=result,
-            attempts=self._ledger(),
-            handoff=self.handoff,
-        )
+        return result
 
     def _preserve_work(
         self, observed: list[str], preserve: Callable[[ExecutionTarget, str], str]

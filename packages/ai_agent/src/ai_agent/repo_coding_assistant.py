@@ -2827,7 +2827,7 @@ def _run_coding_prompt_with_fallback(
             progress_callback=_progress_reporter_factory(verbose=getattr(args, "verbose", False)),
         )
 
-    outcome = session.run(
+    result = session.run(
         prompt,
         execute,
         _fallback_limited,
@@ -2836,7 +2836,6 @@ def _run_coding_prompt_with_fallback(
             target, payload, args=args, profile=profile, repo_root=repo_root
         ),
     )
-    result = outcome.result
     print(f"effective_route_id: {session.current.route_id}")
     if hasattr(result, "orchestration"):
         return result
@@ -3402,7 +3401,7 @@ def _run_external_agent_with_fallback(
             progress_callback=progress_callback,
         )
 
-    outcome = session.run(
+    result = session.run(
         prompt,
         execute,
         _fallback_limited,
@@ -3411,7 +3410,6 @@ def _run_external_agent_with_fallback(
             target, payload, args=args, profile=profile, repo_root=repo_root
         ),
     )
-    result = outcome.result
     print(f"effective_route_id: {session.current.route_id}")
     if isinstance(result, ExternalAgentResult):
         return result
@@ -3453,7 +3451,7 @@ def _run_native_agent_with_fallback(
             progress_callback=progress_callback,
         )
 
-    outcome = session.run(
+    result = session.run(
         prompt,
         execute,
         _fallback_limited,
@@ -3462,7 +3460,6 @@ def _run_native_agent_with_fallback(
             target, payload, args=args, profile=profile, repo_root=repo_root
         ),
     )
-    result = outcome.result
     print(f"effective_route_id: {session.current.route_id}")
     if not isinstance(result, ExternalAgentResult):
         return result

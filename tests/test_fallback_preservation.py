@@ -141,7 +141,7 @@ def test_all_execution_wrappers_supply_preservation_callback(tmp_path, monkeypat
     def run(prompt, execute, limited, *, observe, preserve):
         assert prompt == "original objective"
         assert preserve(route, "preservation metadata") == "safe handoff"
-        return SimpleNamespace(result=original)
+        return original
 
     session.run = run
     namespace.fallback_session = session

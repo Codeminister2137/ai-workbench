@@ -96,12 +96,11 @@ def make_executor(routes, **kwargs):
 
 
 def test_finish_first_try_returns_result_with_finished_ledger():
-    result = ExternalAgentResult((), 0, "done", "")
-    outcome = make_executor(catalog(), execute=lambda target, prompt: result).run("Do it")
-    assert outcome.status == "finished"
-    assert outcome.route_id == "codex"
-    assert outcome.result is result
-    assert outcome.attempts == [{"route_id": "codex", "status": "finished"}]
+    expected = ExternalAgentResult((), 0, "done", "")
+    run = make_executor(catalog(), execute=lambda target, prompt: expected)
+    assert run.run("Do it") is expected
+    assert run.current.route_id == "codex"
+    assert run.attempts == [{"route_id": "codex", "status": "finished"}]
 
 
 def test_usage_limit_switches_and_retires_billing_bucket():
@@ -114,12 +113,12 @@ def test_usage_limit_switches_and_retires_billing_bucket():
         return ExternalAgentResult((), 0, "done", "")
 
     run = make_executor(catalog(), execute=execute)
-    outcome = run.run("Do it")
-    assert outcome.status == "finished"
-    assert outcome.route_id != "codex"
-    assert outcome.attempts == [
+    result = run.run("Do it")
+    assert isinstance(result, ExternalAgentResult) and result.returncode == 0
+    assert run.current.route_id != "codex"
+    assert run.attempts == [
         {"route_id": "codex", "status": "usage_limit"},
-        {"route_id": outcome.route_id, "status": "finished"},
+        {"route_id": run.current.route_id, "status": "finished"},
     ]
     assert BillingSource.CHATGPT_SUBSCRIPTION_ALLOWANCE.value in run.exhausted
     assert seen[0] == "codex"
@@ -135,9 +134,9 @@ def test_route_failure_retires_route_not_bucket():
         return ExternalAgentResult((), 0, "done", "")
 
     run = make_executor(catalog(), execute=execute)
-    outcome = run.run("Do it")
-    assert outcome.status == "finished"
-    assert outcome.attempts[0] == {"route_id": "codex", "status": "route_failure"}
+    result = run.run("Do it")
+    assert isinstance(result, ExternalAgentResult) and result.returncode == 0
+    assert run.attempts[0] == {"route_id": "codex", "status": "route_failure"}
     assert "codex" in run.failed_routes
     assert BillingSource.CHATGPT_SUBSCRIPTION_ALLOWANCE.value not in run.exhausted
 
@@ -174,9 +173,10 @@ def test_exhaustion_writes_handoff_and_saves():
         execute=lambda target, prompt: ExternalAgentResult((), 1, "", "usage limit reached"),
         save_handoff=saved.append,
     )
-    # Pure verdict failures (no exception, no allowance skip) return exhausted.
-    outcome = run.run("Do it")
-    assert outcome.status == "exhausted"
+    # Pure verdict failures (no exception, no allowance skip) return the
+    # last result with a full ledger and a saved handoff.
+    result = run.run("Do it")
+    assert isinstance(result, ExternalAgentResult) and result.returncode == 1
     assert run.handoff is not None
     assert run.handoff["status"] == "continuation_stopped"
     assert saved and saved[0]["status"] == "continuation_stopped"
@@ -191,9 +191,9 @@ def test_initial_unready_skips_to_first_ready():
         return Readiness(target.route_id != "codex", "signed out")
 
     run = make_executor(catalog(), check_ready=check_ready)
-    outcome = run.run("Do it")
-    assert outcome.status == "finished"
-    assert outcome.attempts[0] == {"route_id": "codex", "status": "initial_unready"}
+    result = run.run("Do it")
+    assert isinstance(result, ExternalAgentResult) and result.returncode == 0
+    assert run.attempts[0] == {"route_id": "codex", "status": "initial_unready"}
     assert "codex" in run.failed_routes
 
 
@@ -215,8 +215,8 @@ def test_reorder_seam_changes_order_and_guards_set():
         ),
         reorder_candidates=reorder,
     )
-    outcome = run.run("Do it")
-    assert outcome.status == "finished"
+    result = run.run("Do it")
+    assert isinstance(result, ExternalAgentResult) and result.returncode == 0
     # Initial still runs first; the reorder then jumps the queue to kiro.
     assert [attempt["route_id"] for attempt in run.attempts] == ["codex", "kiro"]
     # The seam sees the remaining candidates (failed codex already excluded).
@@ -245,9 +245,9 @@ def test_genuine_failure_returns_result_without_switching():
         seen.append(target.route_id)
         return result
 
-    outcome = make_executor(catalog(), execute=execute).run("Do it")
-    assert outcome.result is result
-    assert outcome.attempts == [{"route_id": "codex", "status": "finished"}]
+    run = make_executor(catalog(), execute=execute)
+    assert run.run("Do it") is result
+    assert run.attempts == [{"route_id": "codex", "status": "finished"}]
     assert seen == ["codex"]
 
 
@@ -259,22 +259,21 @@ def test_disabled_runs_initial_once_without_switching():
         seen.append(target.route_id)
         return result
 
-    outcome = make_executor(catalog(), execute=execute, enabled=False).run("Do it")
-    assert outcome.result is result
+    run = make_executor(catalog(), execute=execute, enabled=False)
+    assert run.run("Do it") is result
     assert seen == ["codex"]
-    assert outcome.attempts == [{"route_id": "codex", "status": "finished"}]
+    assert run.attempts == [{"route_id": "codex", "status": "finished"}]
 
 
 def test_per_call_effects_override_injected_and_share_state():
     first = ExternalAgentResult((), 1, "", "usage limit reached")
     run = make_executor(catalog(), execute=lambda target, prompt: first)
-    outcome = run.run(
+    result = run.run(
         "Do it",
         execute=lambda target, prompt: ExternalAgentResult((), 0, "overridden", ""),
     )
-    assert outcome.status == "finished"
-    assert outcome.result.stdout == "overridden"
-    assert outcome.attempts == [{"route_id": "codex", "status": "finished"}]
+    assert result.stdout == "overridden"
+    assert run.attempts == [{"route_id": "codex", "status": "finished"}]
 
 
 def test_unbound_run_raises_instead_of_failing_obscurely():
@@ -331,10 +330,10 @@ def test_emergency_preservation_reports_without_implementing():
         save_handoff=lambda receipt: saved.append(dict(receipt)),
         preserve=preserve,
     )
-    outcome = run.run("PRIVATE ORIGINAL OBJECTIVE")
-    assert outcome.status == "exhausted"
-    assert outcome.handoff is not None
-    assert outcome.handoff["preservation_route_id"] == "copilot"
+    result = run.run("PRIVATE ORIGINAL OBJECTIVE")
+    assert isinstance(result, ExternalAgentResult) and result.returncode == 1
+    assert run.handoff is not None
+    assert run.handoff["preservation_route_id"] == "copilot"
     assert len(payloads) == 1
     assert "Do not edit" in payloads[0]
     assert "PRIVATE ORIGINAL OBJECTIVE" not in payloads[0]

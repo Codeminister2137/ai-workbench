@@ -107,10 +107,9 @@ class HostRelayInference:
             )
 
         self._turn_request = request
-        outcome = self.executor.run("Relay inference turn")
-        response = outcome.result
+        response = self.executor.run("Relay inference turn")
         sent = self._turn_sent
         assert sent is not None
         self._history = (*sent.messages, response.message)
-        self._last_route = outcome.route_id
+        self._last_route = self.executor.current.route_id
         return response_payload(response)
