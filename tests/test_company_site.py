@@ -155,6 +155,17 @@ def test_dark_mode_follows_browser_setting() -> None:
     assert ".button {" in dark
 
 
+def test_intake_collects_optional_client_phone() -> None:
+    """Owner a1a7b4bf (email-only): the form collects the client's number."""
+    script = (ROOT / "form.js").read_text(encoding="utf-8")
+    assert 'phone: val("f-phone")' in script
+    assert "PHONE_RE" in script and "badPhone" in script
+    for page in (ROOT / "kontakt.html", ROOT / "en" / "contact.html"):
+        text = page.read_text(encoding="utf-8")
+        assert 'id="f-phone"' in text, page
+        assert 'type="tel"' in text, page
+
+
 def test_contact_pages_show_email_placeholder() -> None:
     pl = (ROOT / "kontakt.html").read_text(encoding="utf-8")
     assert "adres w przygotowaniu" in pl

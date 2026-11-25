@@ -12,6 +12,7 @@
     needEmail: "A valid email is required so we can reply.",
     needGoal: "Describe what you want to achieve.",
     needBudget: "Pick a budget range.",
+    badPhone: "Leave the phone empty or use international format (e.g. +48601234567).",
     secretWarn: "This looks like a secret — remove keys/passwords before sending.",
     ready: "Brief ready. Download the JSON and attach it to your email to us.",
     step1: "1. Contact",
@@ -23,6 +24,7 @@
     needEmail: "Prawidłowy e-mail jest wymagany, aby odpowiedzieć.",
     needGoal: "Opisz, co chcesz osiągnąć.",
     needBudget: "Wybierz przedział budżetu.",
+    badPhone: "Telefon zostaw pusty albo podaj w formacie międzynarodowym (np. +48601234567).",
     secretWarn: "To wygląda na sekret — usuń klucze/hasła przed wysłaniem.",
     ready: "Zapytanie gotowe. Pobierz JSON i załącz go do e-maila do nas.",
     step1: "1. Kontakt",
@@ -31,6 +33,7 @@
   };
   var SECRET_RE = /(api[_-]?key|password|secret|token)\s*[:=]|-----BEGIN.*PRIVATE KEY-----|(sk-|ghp_)[A-Za-z0-9]{8,}/i;
   var EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+  var PHONE_RE = /^\+[1-9]\d{7,14}$/;  /* E.164, mirrors intake schema; empty allowed */
   var BUDGETS_PL = ["<10k", "10–30k", "30–80k", "80k+", "undisclosed"];
   var BUDGETS_EN = ["<2k", "2-5k", "5-15k", "15k+", "undisclosed"];
 
@@ -66,7 +69,7 @@
         name: val("f-name"),
         email: val("f-email"),
         company: val("f-company"),
-        phone: ""
+        phone: val("f-phone")
       },
       goal_summary: val("f-goal"),
       problem_statement: val("f-problem"),
@@ -83,6 +86,7 @@
     if (!EMAIL_RE.test(val("f-email"))) errs.push(T.needEmail);
     if (!val("f-goal")) errs.push(T.needGoal);
     if (!val("f-budget")) errs.push(T.needBudget);
+    if (val("f-phone") && !PHONE_RE.test(val("f-phone"))) errs.push(T.badPhone);
     var blob = [val("f-goal"), val("f-problem"), val("f-goals")].join("\n");
     if (SECRET_RE.test(blob)) errs.push(T.secretWarn);
     return errs;
