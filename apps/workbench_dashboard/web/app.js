@@ -342,6 +342,7 @@ async function refreshRunDetail(id) {
     const statusEl = document.getElementById("run-status");
     if (statusEl) statusEl.textContent = [run.status, run.branch, run.commit].filter(Boolean).join(" · ");
     await renderReceiptsInto(id);
+    await renderProgressInto(id);
     await renderStagedInto(id);
   } catch (err) { /* next tick retries; never break the page */ }
 }
@@ -391,6 +392,28 @@ async function renderReceiptsInto(id) {
     const s = d.querySelector("summary");
     if (s && openKeys.has(s.textContent)) d.setAttribute("open", "");
   });
+}
+
+/* Session transcript: GET /api/runs/{id}/progress -> {ok, lines:[{ts,line}], truncated}.
+   Missing file (404) renders an honest placeholder; output is escaped. */
+async function renderProgressInto(id) {
+  const list = document.getElementById("progress-list");
+  if (!list) return;
+  let lines = null, truncated = false;
+  try {
+    const data = await api("/api/runs/" + encodeURIComponent(id) + "/progress");
+    lines = Array.isArray(data.lines) ? data.lines : [];
+    truncated = !!data.truncated;
+  } catch (err) { lines = null; }
+  if (!lines || !lines.length) {
+    list.innerHTML = '<p class="muted">No transcript recorded for this run.</p>';
+    return;
+  }
+  const sig = lines.length + ":" + (lines.length ? lines[lines.length - 1].ts : "");
+  if (list.dataset.sig === sig) return;
+  list.innerHTML = "<pre>" + lines.map((e) => esc((e.ts || "").slice(11, 19) + " " + (e.line || ""))).join("\n") + "</pre>"
+    + (truncated ? '<p class="muted">Transcript truncated at 2000 lines.</p>' : "");
+  list.dataset.sig = sig;
 }
 
 /* Project picker: GET /api/work-roots -> {ok, roots:[{id,path,display_name}]}.
@@ -1510,9 +1533,12 @@ async function renderRuns(id) {
       <div id="staged-list" data-applied="${run.staged_applied ? "1" : ""}"><p class="muted">Loading staged changes...</p></div>
       <h3>Events and receipts</h3>
       <div id="receipts-list"><p class="muted">Loading receipts...</p></div>
+      <h3>Session transcript</h3>
+      <div id="progress-list"><p class="muted">Loading transcript...</p></div>
       ${inboxLink}${planLink}
       ${report}</div>`;
     renderReceiptsInto(id);
+    renderProgressInto(id);
     renderStagedInto(id);
     startRunDetailPoll(id);
     const reportBtn = document.getElementById("report-btn");

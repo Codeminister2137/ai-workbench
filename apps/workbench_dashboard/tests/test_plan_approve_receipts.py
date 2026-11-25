@@ -162,6 +162,55 @@ def test_receipts_endpoint_rejects_malformed(dashboard_server, tmp_path) -> None
     raised.value.close()
 
 
+def _write_progress(tmp_path, run_id: str, entries: list) -> None:
+    progress_dir = tmp_path / "data" / "run-progress"
+    progress_dir.mkdir(parents=True, exist_ok=True)
+    (progress_dir / f"{run_id}.jsonl").write_text(
+        "".join(json.dumps(entry) + "\n" for entry in entries), encoding="utf-8"
+    )
+
+
+def test_progress_endpoint_serves_transcript_lines(dashboard_server, tmp_path) -> None:
+    _write_progress(
+        tmp_path,
+        "run1",
+        [
+            {"ts": "2026-11-25T09:00:00+00:00", "line": "mode: implement"},
+            {"ts": "2026-11-25T09:00:05+00:00", "line": "Turn 1: read_file on a.py"},
+            "not-an-entry",
+            {"ts": "2026-11-25T09:00:09+00:00", "line": "done"},
+        ],
+    )
+    payload = get_json(dashboard_server, "/api/runs/run1/progress")
+    assert payload["ok"] is True
+    assert payload["truncated"] is False
+    assert [entry["line"] for entry in payload["lines"]] == [
+        "mode: implement",
+        "Turn 1: read_file on a.py",
+        "done",
+    ]
+    with pytest.raises(HTTPError) as raised:
+        get_json(dashboard_server, "/api/runs/nope/progress")
+    assert raised.value.code == 404
+    raised.value.close()
+
+
+def test_progress_endpoint_jails_run_id(dashboard_server, tmp_path) -> None:
+    """Traversal resolves to a harmless safe id; only run-progress is served."""
+    _write_run(tmp_path, "w4", {"id": "w4", "title": "W4", "status": "completed"})
+    for hostile in ("%2E%2E", "..%2F..%2Fruns%2Fw4", "../runs/w4"):
+        with pytest.raises(HTTPError) as raised:
+            get_json(dashboard_server, f"/api/runs/{hostile}/progress")
+        assert raised.value.code == 404, hostile
+        raised.value.close()
+    with pytest.raises(HTTPError) as raised:
+        get_json(dashboard_server, "/api/runs/.../progress")
+    assert raised.value.code == 400
+    raised.value.close()
+    detail = get_json(dashboard_server, "/api/runs/w4")
+    assert detail["item"]["title"] == "W4"
+
+
 def test_run_detail_routing_unaffected_by_receipts(dashboard_server, tmp_path) -> None:
     _write_run(
         tmp_path,

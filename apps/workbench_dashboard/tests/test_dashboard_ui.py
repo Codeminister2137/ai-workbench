@@ -476,6 +476,18 @@ def test_run_detail_polls_receipts_contract() -> None:
     assert "<h3>Events and receipts</h3>" in js
 
 
+def test_run_detail_polls_progress_contract() -> None:
+    """Run detail fetches GET /api/runs/{id}/progress and degrades gracefully."""
+    js = _read("app.js")
+    assert '"/progress"' in js
+    assert "data.lines" in js
+    assert 'id="progress-list"' in js
+    assert "renderProgressInto" in js
+    assert "No transcript recorded for this run." in js
+    assert "Loading transcript..." in js
+    assert "<h3>Session transcript</h3>" in js
+
+
 def test_receipts_render_collapsed_turn_groups() -> None:
     """Receipts render as collapsed per-turn disclosures, never a raw dump."""
     js = _read("app.js")
