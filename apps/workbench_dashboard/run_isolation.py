@@ -4,7 +4,9 @@ Each isolated run gets ``run/<id8>`` branched from the integration branch
 (``develop``) in ``.tmp/run-worktrees/<id8>/``. ``user-config.toml`` is
 copied in (Mai requires it); ``.env`` is never copied (secrets stay out of
 scratch; Mai inherits the parent environment). Worktrees are retained after
-the run for owner review and manual pruning — never auto-merged or deleted.
+the run for owner review, then pruned by ``scripts/prune-worktrees.py``
+once the run has been terminal for 30+ days (owner answer A, inbox
+8d79ac88; run JSON + transcripts are kept forever) — never auto-merged.
 Fail-closed: anything unexpected raises instead of silently running elsewhere.
 """
 
