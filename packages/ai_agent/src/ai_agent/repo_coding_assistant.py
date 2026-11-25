@@ -266,6 +266,9 @@ from ai_agent.external_reporting import (
     print_external_agent_event_summary as _print_external_agent_event_summary,  # noqa: F401 - compatibility export
 )
 from ai_agent.external_reporting import (
+    print_session_usage_summary as _print_session_usage_summary,
+)
+from ai_agent.external_reporting import (
     timeout_output_to_text as _timeout_output_to_text,  # noqa: F401 - compatibility export
 )
 from ai_agent.external_reporting import (
@@ -1118,6 +1121,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         finally:
             if not finished:
                 session.status("interrupted")
+            _print_session_usage_summary()
             ACTIVE_SESSION.reset(token)
             ACTIVE_FOREGROUND.reset(foreground_token)
 
