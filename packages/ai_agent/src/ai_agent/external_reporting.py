@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 import subprocess
 from collections.abc import Sequence
+from contextvars import ContextVar
 from pathlib import Path
 from typing import Any
 
@@ -63,9 +65,99 @@ def usage_summary(usage: Any | None) -> str:
     return f"in={field('input_tokens')} out={field('output_tokens')} ({source})"
 
 
+_SESSION_USAGE: ContextVar[tuple[dict[str, Any] | None, ...]] = ContextVar(
+    "mai_session_usage", default=()
+)
+
+_TOKEN_ALIASES: dict[str, tuple[str, ...]] = {
+    "input_tokens": ("input_tokens", "inputTokens", "prompt_tokens", "promptTokens"),
+    "output_tokens": (
+        "output_tokens",
+        "outputTokens",
+        "completion_tokens",
+        "completionTokens",
+    ),
+    "total_tokens": ("total_tokens", "totalTokens"),
+    "reported_cost_usd": ("reported_cost_usd", "cost_usd", "costUsd"),
+}
+
+
+def note_external_usage(usage: dict[str, Any] | None) -> None:
+    """Accumulate one external call's usage dict for the session summary."""
+    _SESSION_USAGE.set(_SESSION_USAGE.get() + (usage,))
+
+
+def reset_session_usage() -> None:
+    """Clear the accumulator (tests; each process starts empty)."""
+    _SESSION_USAGE.set(())
+
+
+def _metric_values(records: Sequence[dict[str, Any] | None], metric: str) -> list[float]:
+    values: list[float] = []
+    for record in records:
+        if not isinstance(record, dict):
+            continue
+        for alias in _TOKEN_ALIASES[metric]:
+            value = record.get(alias)
+            if (
+                type(value) in (int, float)
+                and value >= 0
+                and (type(value) is int or math.isfinite(value))
+            ):
+                if metric != "reported_cost_usd" and type(value) is not int:
+                    continue
+                values.append(value)
+                break
+    return values
+
+
+def session_usage_summary() -> dict[str, Any]:
+    """Aggregate accumulated external-call usage with honest coverage.
+
+    Mirrors ``TurnUsage.summary`` honesty: ``known_sum``/``observed_calls``
+    plus ``complete``/``partial``/``unknown`` coverage per metric. Usage
+    dicts with no recognized token key count as ``unmapped`` (kept, not
+    zero-filled).
+    """
+    records = _SESSION_USAGE.get()
+    summary: dict[str, Any] = {
+        "calls": len(records),
+        "with_usage": sum(1 for record in records if isinstance(record, dict)),
+        "scope": "mai_session_external_calls",
+    }
+    unmapped = 0
+    for record in records:
+        if not isinstance(record, dict):
+            continue
+        keys = set(record)
+        if not any(alias in keys for aliases in _TOKEN_ALIASES.values() for alias in aliases):
+            unmapped += 1
+    summary["unmapped"] = unmapped
+    for metric in _TOKEN_ALIASES:
+        values = _metric_values(records, metric)
+        summary[metric] = {
+            "known_sum": (math.fsum(values) if metric == "reported_cost_usd" else sum(values))
+            if values
+            else None,
+            "observed_calls": len(values),
+            "coverage": "complete"
+            if values and len(values) == len(records)
+            else "partial"
+            if values
+            else "unknown",
+        }
+    return summary
+
+
+def print_session_usage_summary() -> None:
+    """Print the machine-readable session usage line for the dashboard."""
+    print("session_usage: " + json.dumps(session_usage_summary(), sort_keys=True))
+
+
 def print_external_agent_event_summary(events: ExternalAgentEventSummary) -> None:
     """Print structured external-agent execution metadata."""
 
+    note_external_usage(events.usage)
     print("external_agent_jsonl_events: parsed")
     print(f"external_agent_command_event_count: {len(events.command_events)}")
     print(f"external_agent_tool_event_count: {len(events.tool_events)}")

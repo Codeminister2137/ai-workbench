@@ -1,5 +1,6 @@
 """External diagnostics reflect structured failure evidence without unbounded output."""
 
+import json
 import subprocess
 
 import pytest
@@ -9,7 +10,11 @@ from ai_agent.external_reporting import (
     event_mentions_codex_collab_delegation,
     external_agent_exception_hint,
     format_external_agent_stderr,
+    note_external_usage,
     print_external_agent_event_summary,
+    print_session_usage_summary,
+    reset_session_usage,
+    session_usage_summary,
     write_external_agent_stderr,
 )
 from ai_provider.external_agents import ExternalAgentEventSummary
@@ -97,3 +102,71 @@ def test_zero_failure_limit_reports_count_without_failure_rows():
 def test_negative_failure_limit_is_rejected():
     with pytest.raises(ValueError, match="nonnegative"):
         format_external_agent_stderr("details", limit=-1)
+
+
+@pytest.fixture
+def clean_usage():
+    reset_session_usage()
+    yield
+    reset_session_usage()
+
+
+def test_session_usage_aggregates_aliases_with_complete_coverage(clean_usage):
+    note_external_usage({"input_tokens": 100, "output_tokens": 50})
+    note_external_usage({"inputTokens": 200, "completionTokens": 70, "cost_usd": 0.5})
+    summary = session_usage_summary()
+    assert summary["calls"] == 2
+    assert summary["with_usage"] == 2
+    assert summary["unmapped"] == 0
+    assert summary["input_tokens"] == {
+        "known_sum": 300,
+        "observed_calls": 2,
+        "coverage": "complete",
+    }
+    assert summary["output_tokens"]["known_sum"] == 120
+    assert summary["output_tokens"]["coverage"] == "complete"
+    assert summary["reported_cost_usd"]["known_sum"] == pytest.approx(0.5)
+    assert summary["reported_cost_usd"]["coverage"] == "partial"
+    assert summary["total_tokens"]["coverage"] == "unknown"
+
+
+def test_session_usage_counts_missing_and_unmapped_honestly(clean_usage):
+    note_external_usage(None)
+    note_external_usage({"metering_usage": {"x": 1}})
+    note_external_usage({"prompt_tokens": 10})
+    summary = session_usage_summary()
+    assert summary["calls"] == 3
+    assert summary["with_usage"] == 2
+    assert summary["unmapped"] == 1
+    assert summary["input_tokens"]["coverage"] == "partial"
+    assert summary["input_tokens"]["known_sum"] == 10
+    assert summary["output_tokens"] == {
+        "known_sum": None,
+        "observed_calls": 0,
+        "coverage": "unknown",
+    }
+
+
+def test_session_usage_ignores_invalid_values(clean_usage):
+    note_external_usage(
+        {"input_tokens": -5, "output_tokens": 1.5, "reported_cost_usd": float("nan")}
+    )
+    summary = session_usage_summary()
+    assert summary["input_tokens"]["coverage"] == "unknown"
+    assert summary["output_tokens"]["coverage"] == "unknown"
+    assert summary["reported_cost_usd"]["coverage"] == "unknown"
+
+
+def test_event_summary_feeds_session_accumulator(clean_usage, capsys):
+    summary = ExternalAgentEventSummary(
+        None, (), (), (), (), {"input_tokens": 7, "output_tokens": 3}, None, ()
+    )
+    print_external_agent_event_summary(summary)
+    capsys.readouterr()
+    print_session_usage_summary()
+    line = capsys.readouterr().out.strip()
+    assert line.startswith("session_usage: ")
+    payload = json.loads(line.partition(": ")[2])
+    assert payload["calls"] == 1
+    assert payload["input_tokens"]["known_sum"] == 7
+    assert payload["output_tokens"]["known_sum"] == 3
