@@ -25,8 +25,9 @@ supervisor review and hosted acceptance remain separate from these tests.
 
 - Worker: inject `ai_agent.relay_client.RelayChatClient(WorkerClient(mailbox,
   RelayGrant(run_id, policy_id)))` into Mai's existing `AgentLoop`.
-- Host: `relay_inference.build_mai_relay(mailbox, grant, fallback_session,
-  scoped_execute, privacy=...)` returns a `HostMediator`. Serve each turn while
+- Host: `relay_inference.build_mai_relay(mailbox, grant, profile, catalog,
+  initial, scoped_execute, privacy=...)` returns a `HostMediator` (scope C:
+  the host owns one `FallbackExecutor` per run). Serve each turn while
   supervising the worker. The factory refuses legacy fixed-model bypasses.
 - `scoped_execute(target, request)` must enforce live credentials, privacy,
   allowance, shared budget, timeout and cancellation on **every** attempt. It
