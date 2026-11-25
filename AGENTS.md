@@ -1035,7 +1035,11 @@ Use this loop:
    start, unless the owner specifies otherwise. Never reuse an expired deadline
    for a new run or silently reset it after compaction. Turn the monitors off
    at window start via `scripts/monitors-off.ps1` (power saving; any input
-   wakes them) and record the run in the plan.
+   wakes them) and record the run in the plan. Flip dashboard supervision
+   to unattended for the window via `python scripts/supervision.py set
+   unattended`, verify with `check --expect unattended`, and record the
+   pre-window mode for restoration. Without the flip, owner mail stays
+   silent (notify gates read the live mode; inbox fc87c472).
 2. Before implementation, write the active session plan to local
    `docs/plans/unattended-work-plan.md`, using
    `docs/unattended-work-plan-template.md`. Link it from `CURRENT_CONTEXT.md`.
@@ -1205,7 +1209,13 @@ pending unattended sleep that has not been requested: run `.\cancel-sleep.cmd`
 and verify the helpers' `sleep_cancelled` receipts before
 resuming work. Merely stating cancellation does not stop a scheduled helper.
 Do not issue a delayed sleep action to compensate for an earlier omission while
-the owner is using the computer.
+the owner is using the computer. At every window closeout (deadline, early
+stop, or owner return), restore supervision to its pre-window mode via
+`python scripts/supervision.py set attended` (or the recorded mode) and
+verify with `check`; a window must never leave the dashboard believing
+the owner is away. At each time checkpoint, run `check --expect
+unattended` alongside the clock check; on mismatch, re-flip
+immediately and record the drift.
 
 If the owner returns abruptly, including after a usage-limit interruption, switch
 to attended communication and verify actual queued task and process state. When
