@@ -196,6 +196,40 @@ function truncate(s, limit) {
   const text = String(s || "");
   return text.length <= limit ? text : text.slice(0, limit) + "…";
 }
+/* Progressive ID-title enrichment: after render, bare #/lookup/ links gain
+   "Title · kind · short-id" text via one cached resolve per unique ID.
+   Ambiguous/missing IDs keep bare text (the lookup view explains).
+   Never throws, never blocks render; polls re-render unenriched until
+   the next navigation. Capped at 50 links per pass. */
+const idTitleCache = new Map();
+async function enrichIdLinks(root) {
+  try {
+    const scope = root || document;
+    if (!scope.querySelectorAll) return;
+    const links = Array.from(scope.querySelectorAll('a[href^="#/lookup/"]')).slice(0, 50);
+    const ids = [...new Set(links.map((a) => {
+      const href = a.getAttribute("href") || "";
+      return href.slice("#/lookup/".length).split("?")[0].split("/")[0];
+    }).filter(Boolean))];
+    const pending = ids.filter((id) => !idTitleCache.has(id));
+    await Promise.all(pending.map(async (id) => {
+      try {
+        const data = await api("/api/resolve/" + encodeURIComponent(id));
+        const matches = Array.isArray(data.matches) ? data.matches : [];
+        idTitleCache.set(id, matches.length === 1 ? matches[0] : null);
+      } catch (err) { idTitleCache.set(id, null); }
+    }));
+    links.forEach((a) => {
+      if (a.dataset.enriched) return;
+      const id = (a.getAttribute("href") || "").slice("#/lookup/".length).split("?")[0].split("/")[0];
+      const match = idTitleCache.get(id);
+      if (match && match.title) {
+        a.textContent = `${match.title} · ${match.kind || match.type || "?"} · ${String(match.id || id).slice(0, 8)}`;
+        a.dataset.enriched = "1";
+      }
+    });
+  } catch (err) { /* enrichment never breaks the page */ }
+}
 /* One Mai activity line -> a readable status line, or null when it is
    machine noise (fact headers, usage blobs, diagnostics). */
 function humanizeActivity(line) {
@@ -3359,6 +3393,7 @@ async function render() {
     toast(err.message, false);
   }
   refreshBadge();
+  enrichIdLinks(view);
 }
 
 const E2E_REMINDER_VIEWS = ["home", "inbox", "chat", "runs", "fleet", "providers"];
