@@ -99,13 +99,13 @@ def _metric_values(records: Sequence[dict[str, Any] | None], metric: str) -> lis
             continue
         for alias in _TOKEN_ALIASES[metric]:
             value = record.get(alias)
-            if (
-                type(value) in (int, float)
-                and value >= 0
-                and (type(value) is int or math.isfinite(value))
-            ):
-                if metric != "reported_cost_usd" and type(value) is not int:
-                    continue
+            if isinstance(value, bool):
+                continue
+            if metric == "reported_cost_usd":
+                if isinstance(value, (int, float)) and value >= 0 and math.isfinite(float(value)):
+                    values.append(float(value))
+                    break
+            elif isinstance(value, int) and value >= 0:
                 values.append(value)
                 break
     return values
