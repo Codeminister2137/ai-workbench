@@ -86,6 +86,34 @@ function Write-AtomicText([string]$Path, [string]$Text) {
         if (Test-Path -LiteralPath $temporary) { Remove-Item -LiteralPath $temporary }
     }
 }
+function Update-DueSoonMarker(
+    [string]$MarkerPath,
+    [datetimeoffset]$DueUtc,
+    [datetimeoffset]$Now = [datetimeoffset]::UtcNow
+) {
+    # Pre-expiry warning for rolling timers (owner-approved 2026-11-25 after
+    # the unattended window slept on an unrenewed lease). Presence of the
+    # marker file means the lease expires within 10 minutes: renew before
+    # any long command. Additive only: firing, cancel and renew paths are
+    # untouched. Pure function of its inputs; unit-tested by dot-sourcing.
+    $remaining = $DueUtc - $Now
+    if ($remaining.TotalMinutes -le 10 -and $remaining.TotalSeconds -gt 0) {
+        $text = $DueUtc.ToUniversalTime().ToString("o")
+        if ((Test-Path -LiteralPath $MarkerPath) -and
+            ((Read-ControlText $MarkerPath) -eq $text)) {
+            return $true
+        }
+        Write-AtomicText $MarkerPath $text
+        return $true
+    }
+    if (Test-Path -LiteralPath $MarkerPath) { Remove-Item -LiteralPath $MarkerPath -Force }
+    return $false
+}
+function Remove-DueSoonMarker([string]$MarkerPath) {
+    if ($MarkerPath -and (Test-Path -LiteralPath $MarkerPath)) {
+        Remove-Item -LiteralPath $MarkerPath -Force
+    }
+}
 if (@($Sleep, $CancelAll, $Renew | Where-Object { $_ }).Count -gt 1) {
     throw 'Choose only one of Sleep, CancelAll or Renew.'
 }
@@ -215,6 +243,8 @@ if ($ReceiptPath -and (Test-Path -LiteralPath $ReceiptPath)) {
 $cancelGeneration = Read-CancelGeneration
 $leasePath = if ($Rolling) { "$([IO.Path]::GetFullPath($ReceiptPath)).lease" } else { '' }
 if ($leasePath -and (Test-Path -LiteralPath $leasePath)) { throw 'Lease path already exists.' }
+$dueSoonPath = if ($Rolling) { "$([IO.Path]::GetFullPath($ReceiptPath)).due-soon" } else { '' }
+Remove-DueSoonMarker $dueSoonPath
 [IO.Directory]::CreateDirectory($ControlDirectory) | Out-Null
 if ($leasePath) {
     [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($leasePath)) | Out-Null
@@ -275,6 +305,7 @@ while ($true) {
     if ((Read-CancelGeneration) -ne $cancelGeneration -or
         ($CancelPath -and (Test-Path -LiteralPath $CancelPath))) {
         Write-SleepReceipt "sleep_cancelled"
+        Remove-DueSoonMarker $dueSoonPath
         Write-Output "sleep_status: cancelled"
         return
     }
@@ -290,6 +321,7 @@ while ($true) {
             ).ToString('yyyy-MM-dd HH:mm:ss')
             Write-SleepReceipt 'sleep_scheduled'
         }
+        Update-DueSoonMarker $dueSoonPath $dueUtc | Out-Null
     }
     if ([datetimeoffset]::UtcNow -ge $dueUtc) { break }
     Start-Sleep -Seconds 1
@@ -297,6 +329,7 @@ while ($true) {
 if ((Read-CancelGeneration) -ne $cancelGeneration -or
     ($CancelPath -and (Test-Path -LiteralPath $CancelPath))) {
     Write-SleepReceipt "sleep_cancelled"
+    Remove-DueSoonMarker $dueSoonPath
     Write-Output "sleep_status: cancelled"
     return
 }
