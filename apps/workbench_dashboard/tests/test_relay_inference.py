@@ -46,7 +46,6 @@ from ai_provider.contracts import (
     PrivacyClass as ProviderPrivacy,
 )
 from ai_provider.errors import ProviderError, ProviderErrorCategory
-from ai_provider.execution_fallback import FallbackSession
 from relay_inference import HostRelayInference, build_mai_relay
 from relay_mailbox import HostMediator, RelayError, RelayGrant, WorkerClient
 
@@ -54,7 +53,7 @@ PRIVACY = ProviderPrivacy.PUBLIC_OR_LOW_RISK
 GRANT = RelayGrant("p2-synthetic", "host-policy")
 
 
-def session(*, excluded=frozenset(), deadline=None):
+def _parts():
     catalog = tuple(
         ModelCatalogEntry(
             backend=ModelBackend(
@@ -92,16 +91,20 @@ def session(*, excluded=frozenset(), deadline=None):
         "Synthetic relay", profile, catalog, review_prompt=False
     ).execution_plan
     assert plan is not None
-    return FallbackSession(
+    return profile, catalog, plan.target
+
+
+def make_host(execute, *, excluded=frozenset(), deadline=None):
+    profile, catalog, initial = _parts()
+    return HostRelayInference(
         profile,
         catalog,
-        plan.target,
-        compatible=lambda _: True,
-        interactive_login=False,
-        progress=lambda _: None,
-        priority=tuple(f"route-{i}" for i in range(4)),
+        initial,
+        execute,
+        privacy=PRIVACY,
         excluded_route_ids=excluded,
         deadline=deadline,
+        priority=tuple(f"route-{i}" for i in range(4)),
     )
 
 
@@ -138,7 +141,6 @@ def serve(tmp_path, host, turns, action):
 
 def test_synthetic_mai_tool_turn_walks_entire_tree_then_reuses_route(tmp_path):
     """Real AgentLoop, file exchange and orchestrator; only inference is synthetic."""
-    routes = session()
     attempts = []
     observed = []
 
@@ -165,7 +167,7 @@ def test_synthetic_mai_tool_turn_walks_entire_tree_then_reuses_route(tmp_path):
         assert "Error:" not in request.messages[-1].content
         return response()
 
-    host = HostRelayInference(routes, scoped, privacy=PRIVACY)
+    host = make_host(scoped)
     result = serve(
         tmp_path,
         host,
@@ -182,7 +184,7 @@ def test_synthetic_mai_tool_turn_walks_entire_tree_then_reuses_route(tmp_path):
     assert result.iterations == 2
     assert attempts == ["route-0", "route-1", "route-2", "route-3", "route-3"]
     assert all(request.messages == observed[0].messages for request in observed[:4])
-    assert [item["route_id"] for item in routes.attempts[:3]] == attempts[:3]
+    assert [item["route_id"] for item in host.executor.attempts[:3]] == attempts[:3]
     assert (tmp_path / "proof.txt").read_text() == "worker-tool-effect"
     assert sorted(path.name for path in tmp_path.iterdir()) == ["proof.txt"]
 
@@ -271,7 +273,7 @@ def test_native_container_mai_fallback_proof(tmp_path):
         assert "Error:" not in request.messages[-1].content
         return response()
 
-    host = HostRelayInference(session(), scoped, privacy=PRIVACY)
+    host = make_host(scoped)
     receipt: dict = {"synthetic": True, "passed": False}
 
     def run(_):
@@ -320,7 +322,7 @@ def test_refusals_do_not_fallback_or_leak_secrets(tmp_path, category):
     with pytest.raises(RelayError) as error:
         serve(
             tmp_path,
-            HostRelayInference(session(), deny, privacy=PRIVACY),
+            make_host(deny),
             1,
             lambda client: client.complete(
                 AIRequest((AIMessage(MessageRole.USER, "x"),), privacy_class=PRIVACY)
@@ -331,14 +333,13 @@ def test_refusals_do_not_fallback_or_leak_secrets(tmp_path, category):
 
 
 def test_exclusion_and_exhaustion_are_not_single_model_fallback():
-    routes = session(excluded=frozenset({"route-1"}))
     attempts = []
 
     def fail(target, request):
         attempts.append(target.route_id)
         raise ProviderError("limit", category=ProviderErrorCategory.USAGE_LIMIT)
 
-    host = HostRelayInference(routes, fail, privacy=PRIVACY)
+    host = make_host(fail, excluded=frozenset({"route-1"}))
     payload = request_payload(AIRequest((AIMessage(MessageRole.USER, "x"),), privacy_class=PRIVACY))
     with pytest.raises(ProviderError):
         host(payload)
@@ -349,15 +350,13 @@ def test_exclusion_and_exhaustion_are_not_single_model_fallback():
 
 
 def test_expired_deadline_prevents_admission():
-    routes = session()
-    routes.deadline = time.perf_counter() - 1
-    host = HostRelayInference(routes, lambda *_: pytest.fail("expired admission"), privacy=PRIVACY)
+    host = make_host(lambda *_: pytest.fail("expired admission"))
+    host.executor.deadline = time.perf_counter() - 1
     with pytest.raises(ProviderError, match="deadline"):
         host(request_payload(AIRequest((AIMessage(MessageRole.USER, "x"),), privacy_class=PRIVACY)))
 
 
 def test_overloaded_routes_walk_full_tree_without_exhausting_billing():
-    routes = session()
     attempts = []
 
     def scoped(target, request):
@@ -366,21 +365,19 @@ def test_overloaded_routes_walk_full_tree_without_exhausting_billing():
             raise ProviderError("server_overloaded", category=ProviderErrorCategory.RETRYABLE)
         return response()
 
-    host = HostRelayInference(routes, scoped, privacy=PRIVACY)
+    host = make_host(scoped)
     payload = request_payload(AIRequest((AIMessage(MessageRole.USER, "x"),), privacy_class=PRIVACY))
     assert host(payload)["message"]["content"] == "synthetic-ok"
     assert attempts == ["route-0", "route-1", "route-2", "route-3"]
-    assert routes.overloaded == {"route-0", "route-1", "route-2"}
-    assert not routes.exhausted
+    assert host.executor.overloaded == {"route-0", "route-1", "route-2"}
+    assert not host.executor.exhausted
 
 
 @pytest.mark.parametrize("parameters", [None, "invalid", [None], ["invalid"]])
 def test_malformed_tool_parameters_refused_before_admission(parameters):
     payload = request_payload(AIRequest((AIMessage(MessageRole.USER, "x"),), privacy_class=PRIVACY))
     payload["tools"] = [{"name": "tool", "description": "test", "parameters": parameters}]
-    host = HostRelayInference(
-        session(), lambda *_: pytest.fail("invalid admission"), privacy=PRIVACY
-    )
+    host = make_host(lambda *_: pytest.fail("invalid admission"))
     with pytest.raises(ValueError, match="invalid relay tool parameter"):
         host(payload)
 
@@ -423,8 +420,15 @@ def test_foreign_run_refused_before_scoped_callback(tmp_path):
 
 
 def test_mai_factory_refuses_legacy_bypass(tmp_path):
+    profile, catalog, initial = _parts()
     mediator = build_mai_relay(
-        str(tmp_path), GRANT, session(), lambda *_: pytest.fail("legacy bypass"), privacy=PRIVACY
+        str(tmp_path),
+        GRANT,
+        profile,
+        catalog,
+        initial,
+        lambda *_: pytest.fail("legacy bypass"),
+        privacy=PRIVACY,
     )
     (tmp_path / "request.json").write_text(
         json.dumps(
@@ -440,7 +444,6 @@ def test_mai_factory_refuses_legacy_bypass(tmp_path):
 
 
 def test_continuation_stays_host_side_and_is_removed_on_route_switch():
-    routes = session()
     requests = []
     continuation = ProviderContinuation(
         "synthetic", "model-0", "private-endpoint", {"opaque": "private-state"}
@@ -459,7 +462,7 @@ def test_continuation_stays_host_side_and_is_removed_on_route_switch():
         assert all(message.continuation is None for message in request.messages)
         return response()
 
-    host = HostRelayInference(routes, scoped, privacy=PRIVACY)
+    host = make_host(scoped)
     first = host(
         request_payload(AIRequest((AIMessage(MessageRole.USER, "x"),), privacy_class=PRIVACY))
     )
@@ -493,7 +496,7 @@ def test_all_prior_continuations_survive_three_turns_and_rewrites_invalidate_the
             ),
         )
 
-    host = HostRelayInference(session(), scoped, privacy=PRIVACY)
+    host = make_host(scoped)
     messages = [AIMessage(MessageRole.USER, "first")]
     for index in range(3):
         host(request_payload(AIRequest(tuple(messages), privacy_class=PRIVACY)))

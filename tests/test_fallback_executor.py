@@ -164,7 +164,7 @@ def test_allowance_observation_skips_without_executing():
         run.run("Do it")
     assert raised.value.category == ProviderErrorCategory.USAGE_LIMIT
     assert seen == []
-    assert run.attempts[0].as_dict()["status"] == "allowance_exhausted"
+    assert run.attempts[0]["status"] == "allowance_exhausted"
 
 
 def test_exhaustion_writes_handoff_and_saves():
@@ -180,7 +180,7 @@ def test_exhaustion_writes_handoff_and_saves():
     assert run.handoff is not None
     assert run.handoff["status"] == "continuation_stopped"
     assert saved and saved[0]["status"] == "continuation_stopped"
-    ledger = [attempt.as_dict() for attempt in run.attempts]
+    ledger = [attempt for attempt in run.attempts]
     assert ledger[0] == {"route_id": "codex", "status": "usage_limit"}
     assert {row["route_id"] for row in ledger} == {"codex", "copilot", "kiro"}
     assert {row["status"] for row in ledger} == {"usage_limit"}
@@ -218,7 +218,7 @@ def test_reorder_seam_changes_order_and_guards_set():
     outcome = run.run("Do it")
     assert outcome.status == "finished"
     # Initial still runs first; the reorder then jumps the queue to kiro.
-    assert [attempt.as_dict()["route_id"] for attempt in run.attempts] == ["codex", "kiro"]
+    assert [attempt["route_id"] for attempt in run.attempts] == ["codex", "kiro"]
     # The seam sees the remaining candidates (failed codex already excluded).
     assert observed_sets and observed_sets[0] == {"copilot", "kiro"}
 

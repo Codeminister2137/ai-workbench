@@ -45,17 +45,6 @@ from ai_provider.external_agents import ExternalAgentResult, is_external_agent_a
 
 
 @dataclass(slots=True)
-class ExecutorAttempt:
-    """One ledger row; serializes to the documented ``{"route_id", "status"}`` shape."""
-
-    route_id: str
-    status: str
-
-    def as_dict(self) -> dict[str, str]:
-        return {"route_id": self.route_id, "status": self.status}
-
-
-@dataclass(slots=True)
 class ExecutorResult:
     """Uniform outcome for every execution path."""
 
@@ -143,7 +132,7 @@ class FallbackExecutor:
         self.incapable: set[str] = set()
         self.failed_routes: set[str] = set()
         self.allowance_observations: dict[str, dict[str, Any]] = {}
-        self.attempts: list[ExecutorAttempt] = []
+        self.attempts: list[dict[str, str]] = []
         self.ready: dict[str, ExecutionTarget] = {}
         self.preservation_ready: dict[str, ExecutionTarget] = {}
         self.unavailable: dict[str, str] = {}
@@ -292,10 +281,10 @@ class FallbackExecutor:
     # -- main walk ------------------------------------------------------
 
     def _record(self, route_id: str, status: str) -> None:
-        self.attempts.append(ExecutorAttempt(route_id, status))
+        self.attempts.append({"route_id": route_id, "status": status})
 
     def _ledger(self) -> list[dict[str, str]]:
-        return [attempt.as_dict() for attempt in self.attempts]
+        return [dict(attempt) for attempt in self.attempts]
 
     def run(self, prompt: str) -> ExecutorResult:
         """Execute with verdict-driven fallback; never replay completed effects."""
@@ -607,7 +596,7 @@ class FallbackExecutor:
                     ProviderErrorCategory.RATE_LIMIT,
                 }:
                     self.exhausted.add(target.billing_source.value)
-                self.attempts[-1].status = "preservation_failed"
+                self.attempts[-1]["status"] = "preservation_failed"
                 self._report(
                     f"fallback_preservation_failed: {target.route_id}: {type(exc).__name__}"
                 )
