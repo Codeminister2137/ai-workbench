@@ -155,6 +155,50 @@ def test_dark_mode_follows_browser_setting() -> None:
     assert ".button {" in dark
 
 
+def test_chatbot_wired_on_all_pages() -> None:
+    """Every page loads the deterministic FAQ bot (chatbot.js)."""
+    assert (ROOT / "chatbot.js").is_file()
+    for rel in PL_PAGES:
+        assert '<script src="chatbot.js"></script>' in (ROOT / rel).read_text(encoding="utf-8"), rel
+    for rel in EN_PAGES:
+        assert '<script src="../chatbot.js"></script>' in (ROOT / rel).read_text(
+            encoding="utf-8"
+        ), rel
+
+
+def test_chatbot_knowledge_grounded_in_site_copy() -> None:
+    """Every KB entry cites a source page + exact quote found there.
+
+    This is the mechanical no-invention rule: answers may only restate
+    quoted site content (or the P7 knowledge bank for the fallback).
+    """
+    script = (ROOT / "chatbot.js").read_text(encoding="utf-8")
+    pairs = re.findall(r'source(_en)?: "([^"]+)", quote(_en)?: "((?:[^"\\]|\\.)*)"', script)
+    assert len(pairs) >= 16, f"expected 8 entries x PL/EN, got {len(pairs)}"
+    ids = re.findall(r'\n\s+id: "([a-z]+)",', script)
+    assert len(ids) == len(set(ids)) >= 8, ids
+    for _suffix, source, _qsuffix, quote in pairs:
+        page = (ROOT / source).read_text(encoding="utf-8")
+        assert quote in page, (source, quote)
+
+
+def test_chatbot_fallback_links_intake_form() -> None:
+    """Unknown input falls back to the form link, never an invented answer."""
+    script = (ROOT / "chatbot.js").read_text(encoding="utf-8")
+    assert "nie znam odpowiedzi" in script.lower() or "Nie znam odpowiedzi" in script
+    assert "rather than invent one" in script
+    assert '"kontakt.html"' in script and '"contact.html"' in script
+    # No network, no model, no eval: static matcher by construction.
+    for banned in ["fetch(", "XMLHttpRequest", "eval(", "WebSocket"]:
+        assert banned not in script, banned
+
+
+def test_chatbot_styles_defined() -> None:
+    css = (ROOT / "style.css").read_text(encoding="utf-8")
+    for needle in [".chat-fab", ".chat-panel", ".chat-msgs", ".chat-form", ".chat-msg"]:
+        assert needle in css, needle
+
+
 def test_intake_collects_optional_client_phone() -> None:
     """Owner a1a7b4bf (email-only): the form collects the client's number."""
     script = (ROOT / "form.js").read_text(encoding="utf-8")
