@@ -5,6 +5,8 @@ nav a { margin-right: var(--wb-space-5); text-decoration: none; white-space: now
 nav a.active { font-weight: bold; text-decoration: underline; }
 .badge { background: var(--wb-color-red); color: var(--wb-color-white); border-radius: var(--wb-radius-badge); padding: var(--wb-pad-badge); font-size: var(--wb-font-badge); }
 #create-wrap { position: relative; }
+#global-lookup { display: flex; gap: var(--wb-gap-flex); align-items: center; }
+#global-lookup-id { width: var(--wb-nav-menu-width); }
 #create-menu { position: absolute; right: 0; background: inherit; border: var(--wb-border-plain); padding: var(--wb-pad-menu); display: flex; flex-direction: column; gap: var(--wb-gap-menu); z-index: 10; }
 #create-menu[hidden] { display: none; }
 .columns { display: grid; grid-template-columns: 3fr 2fr; gap: var(--wb-gap-grid); }

@@ -476,6 +476,21 @@ def test_run_detail_polls_receipts_contract() -> None:
     assert "<h3>Events and receipts</h3>" in js
 
 
+def test_global_lookup_field_in_header() -> None:
+    """ID lookup is persistent: header form on every view, same resolver route."""
+    html = _read("index.html")
+    assert 'id="global-lookup"' in html
+    assert 'id="global-lookup-id"' in html
+    assert 'id="global-lookup-go"' in html
+    js = _read("app.js")
+    assert 'getElementById("global-lookup").addEventListener("submit"' in js
+    assert 'getElementById("global-lookup-id").value' in js
+    assert '#/lookup/" + encodeURIComponent(token)' in js
+    css = _read("app.css")
+    assert "#global-lookup" in css
+    assert "#global-lookup-id" in css
+
+
 def test_run_detail_polls_progress_contract() -> None:
     """Run detail fetches GET /api/runs/{id}/progress and degrades gracefully."""
     js = _read("app.js")
@@ -1122,6 +1137,8 @@ let replaced = null;
 const location = {hash: '', replace(url) { replaced = url; }};
 const stopRunsPoll = () => {}, stopRunDetailPoll = () => {}, loadModules = async () => {};
 const refreshBadge = () => {}, toast = () => {}, esc = String;
+let enriched = 0;
+const enrichIdLinks = async () => { enriched++; };
 let rendered = '';
 const renderRuns = async (id) => {rendered = 'runs:' + (id || '');};
 const renderChatList = async () => {rendered = 'chat';};
@@ -1140,6 +1157,7 @@ eval(router);
  location.hash = ''; rendered = ''; await render(); assert.equal(rendered, 'runs:');
  location.hash = '#/unknown'; view.innerHTML = ''; await render(); assert(view.innerHTML.includes('Not found'));
  location.hash = '#/spend'; await render(); assert.equal(replaced, '#/providers', 'alias replaces (no back-trap)');
+ assert(enriched > 0, 'render enriches ID links');
 })().catch(error => {console.error(error); process.exitCode = 1;});
 """
     assert "moduleSettings.landing_page" in router
@@ -1878,6 +1896,50 @@ def test_link_ids_cover_chat_and_backlog_bodies() -> None:
         js.index("async function renderBacklog(") : js.index("async function renderBacklog(") + 3000
     ]
     assert "linkIds(gtext(item.body" in backlog, "backlog body links IDs"
+
+
+def test_enrich_id_links_resolves_titles_caches_and_skips_ambiguous() -> None:
+    driver = r"""
+const assert = require('assert');
+const source = require('fs').readFileSync(process.argv[1], 'utf8');
+const cacheSrc = source.slice(source.indexOf('const idTitleCache'), source.indexOf('async function enrichIdLinks('));
+const fnSrc = source.slice(source.indexOf('async function enrichIdLinks('),
+  source.indexOf('\n}', source.indexOf('async function enrichIdLinks(')) + 2);
+eval(cacheSrc + '\n' + fnSrc);
+function link(href, text) {
+  return {href, textContent: text, dataset: {},
+    getAttribute(k) { return k === 'href' ? this.href : null; }};
+}
+const a1 = link('#/lookup/abc12345', 'abc12345');
+const a2 = link('#/lookup/abc12345', 'abc12345');
+const a3 = link('#/lookup/nope1234', 'nope1234');
+const a4 = link('#/lookup/multi999', 'multi999');
+const scope = {querySelectorAll: () => [a1, a2, a3, a4]};
+let calls = 0;
+const api = async (path) => {
+  calls++;
+  if (path.endsWith('/abc12345')) return {matches: [{id: 'abc12345ff', kind: 'inbox', title: 'Do the thing'}]};
+  if (path.endsWith('/multi999')) return {matches: [{id: 'x', kind: 'run', title: 'One'}, {id: 'y', kind: 'run', title: 'Two'}]};
+  return {matches: []};
+};
+(async () => {
+  await enrichIdLinks(scope);
+  assert.strictEqual(a1.textContent, 'Do the thing \u00b7 inbox \u00b7 abc12345');
+  assert.strictEqual(a1.dataset.enriched, '1');
+  assert.strictEqual(a2.textContent, 'Do the thing \u00b7 inbox \u00b7 abc12345');
+  assert.strictEqual(a3.textContent, 'nope1234');
+  assert.strictEqual(a4.textContent, 'multi999');
+  assert.strictEqual(calls, 3);
+  await enrichIdLinks(scope);
+  assert.strictEqual(calls, 3);
+})();
+"""
+    result = subprocess.run(
+        [_node_driver(), "-e", driver, str(WEB_DIR / "app.js")],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
 
 
 def test_link_ids_links_refs_and_bare_ids_without_nesting() -> None:
