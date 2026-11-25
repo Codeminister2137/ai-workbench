@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from mai_run import (
@@ -612,3 +613,105 @@ def test_explicit_progress_path_wins_over_dir(tmp_path) -> None:
     assert receipt["progress_path"] == str(direct)
     assert direct.is_file()
     assert not (tmp_path / "prog").exists()
+
+
+_USAGE_LINE = (
+    'session_usage: {"calls": 2, "input_tokens": {"known_sum": 300,'
+    ' "observed_calls": 2, "coverage": "complete"},'
+    ' "output_tokens": {"known_sum": 120, "observed_calls": 2,'
+    ' "coverage": "complete"}}'
+)
+
+
+def test_parse_mai_facts_pulls_session_usage_line() -> None:
+    from mai_run import parse_mai_facts
+
+    facts = parse_mai_facts(f"noise\n{_USAGE_LINE}\n")
+    assert json.loads(facts["session_usage"])["calls"] == 2
+
+
+def test_receipt_carries_parsed_session_usage() -> None:
+    outcome = MaiRunOutcome(
+        exit_code=0,
+        stdout_tail=f"did work\n{_USAGE_LINE}\n",
+        stderr_tail="",
+        facts={
+            "coding_session_id": "s1",
+            "effective_route_id": "requesty/gpt",
+            "session_usage": _USAGE_LINE.partition(": ")[2],
+        },
+    )
+    receipt = mai_receipt(outcome, ["x"])
+    assert receipt["status"] == "completed"
+    assert receipt["session_usage"]["input_tokens"]["known_sum"] == 300
+
+
+def test_receipt_without_usage_is_explicit_none() -> None:
+    ok = MaiRunOutcome(exit_code=0, stdout_tail="did work", stderr_tail="", facts={})
+    assert mai_receipt(ok, ["x"])["session_usage"] is None
+    bad = MaiRunOutcome(exit_code=1, stdout_tail="", stderr_tail="boom", facts={})
+    failed = mai_receipt(bad, ["x"])
+    assert failed["status"] == "failed"
+    assert failed["session_usage"] is None
+
+
+def test_malformed_usage_line_is_none_not_crash() -> None:
+    outcome = MaiRunOutcome(
+        exit_code=0,
+        stdout_tail="did work",
+        stderr_tail="",
+        facts={"session_usage": "{nope"},
+    )
+    assert mai_receipt(outcome, ["x"])["session_usage"] is None
+
+
+def _usage_runner(argv):
+    del argv
+    print("did work")
+    print("coding_session_id: s7")
+    print("effective_route_id: ollama/qwen3")
+    print(_USAGE_LINE)
+    return 0
+
+
+class _Ledger:
+    def __init__(self) -> None:
+        self.calls: list[dict] = []
+
+    def settle_local(self, **kwargs):
+        self.calls.append(kwargs)
+
+
+def test_executor_settles_measured_tokens(tmp_path) -> None:
+    ledger = _Ledger()
+    receipt = build_mai_executor(
+        tmp_path,
+        tmp_path / "u.toml",
+        backend="in-process",
+        runner=_usage_runner,
+        spend_ledger=ledger,
+    )(_run(id="r-7"))
+    assert receipt["status"] == "completed"
+    assert receipt["session_usage"]["calls"] == 2
+    (call,) = ledger.calls
+    assert call["task_id"] == "r-7"
+    assert call["task_class"] == "mai_run"
+    assert call["provider"] == "ollama" and call["model_id"] == "qwen3"
+    assert call["input_tokens"] == 300 and call["output_tokens"] == 120
+    assert call["usage_source"] == "mai-session"
+
+
+def test_settle_failure_never_breaks_run(tmp_path, capsys) -> None:
+    class _Boom:
+        def settle_local(self, **kwargs):
+            raise RuntimeError("ledger down")
+
+    receipt = build_mai_executor(
+        tmp_path,
+        tmp_path / "u.toml",
+        backend="in-process",
+        runner=_usage_runner,
+        spend_ledger=_Boom(),
+    )(_run())
+    assert receipt["status"] == "completed"
+    assert "mai spend settle failed" in capsys.readouterr().err
