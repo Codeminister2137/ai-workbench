@@ -785,17 +785,17 @@ async function renderChatThread(id, initial) {
       const cmdBlock = cmds
         ? `<p class="muted">Commands (${turn.commands.length})</p><ul class="plain agent-cmds">${cmds}</ul>`
         : `<p class="muted">No commands ran this turn.</p>`;
-      return `<div class="msg">${head}${cmdBlock}<div>${esc(turn.report || body)}</div>`
-        + `<details><summary>Full transcript (${body.length} chars)</summary><div>${esc(body)}</div></details></div>`;
+      return `<div class="msg">${head}${cmdBlock}<div>${linkIds(esc(turn.report || body))}</div>`
+        + `<details><summary>Full transcript (${body.length} chars)</summary><div>${linkIds(esc(body))}</div></details></div>`;
     }
     if (m.role !== "assistant" || body.length <= 600) {
-      return `<div class="msg">${head}<div>${esc(body)}</div></div>`;
+      return `<div class="msg">${head}<div>${linkIds(esc(body))}</div></div>`;
     }
     const cut = body.indexOf("\n\n");
     const lead = cut === -1 ? body.slice(0, 300) : body.slice(0, cut);
     const rest = cut === -1 ? body.slice(300) : body.slice(cut);
-    return `<div class="msg">${head}<div>${esc(lead)}</div>
-     <details><summary>Full turn (${body.length} chars)</summary><div>${esc(rest)}</div></details></div>`;
+    return `<div class="msg">${head}<div>${linkIds(esc(lead))}</div>
+     <details><summary>Full turn (${body.length} chars)</summary><div>${linkIds(esc(rest))}</div></details></div>`;
   };
   const msgs = payload.messages.map(renderMsg).join("");
   let planBanner = "";
@@ -2342,7 +2342,7 @@ async function renderBacklog(id) {
     view.innerHTML = `<h1>Backlog item</h1><p><a href="#/backlog">All backlog</a></p>
       <div class="card"><h2>${gtext(item.title)}</h2>
       <p class="muted">${esc(item.source)}${item.ref ? " · " + esc(item.ref) : ""} · ${esc(item.status)}</p>
-      <p class="inbox-body">${gtext(item.body || "")}</p>
+      <p class="inbox-body">${linkIds(gtext(item.body || ""))}</p>
       ${item.decision ? `<p><strong>Decision:</strong> ${esc(item.decision)}</p>` : ""}
       ${item.inbox_id ? `<p><a href="#/inbox/${esc(item.inbox_id)}" title="Open the inbox brief for this item">Inbox brief: ${esc(item.inbox_id)}</a></p>` : ""}
       ${item.gate ? `<p class="muted">Gate: ${esc(item.gate.kind)}${item.gate.condition ? " — " + esc(item.gate.condition) : ""}${item.gate.not_before ? " — opens " + esc(item.gate.not_before) : ""}${item.gate.item_id ? " — waits on " + esc(item.gate.item_id.slice(0, 8)) : ""}${item.task_spec ? "" : " (no prepared task)"}</p>` : ""}
