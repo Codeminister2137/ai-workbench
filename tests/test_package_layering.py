@@ -26,6 +26,12 @@ IMPORT_RE = re.compile(r"^from (ai_provider|ai_orchestrator|ai_agent)\b", re.M)
 # scheduling status) for the cycle-free storage boundary; no
 # orchestration behavior (routing, selection, judging). Growing the set
 # further still needs a new owner decision.
+# fallback_executor.py added 2026-11-25: scope C single fallback executor,
+# owner-accepted 2026-11-23 (ADR fallback-verdict-pipeline-B-then-C, inbox
+# b58f8502: "major restructuring is acceptable if needed"), GO recorded
+# 25.11. Same frozen vocabulary as execution_fallback.py (targets, catalog,
+# fallback candidates); no routing outcomes consumed. Temporary growth:
+# C4 deletes FallbackSession, net-shrinking the set.
 PROVIDER_UP_IMPORTERS = frozenset(
     {
         "acceptance_harness.py",
@@ -41,6 +47,7 @@ PROVIDER_UP_IMPORTERS = frozenset(
         "execution_fallback.py",
         "external_agents.py",
         "fallback_diagnostics.py",
+        "fallback_executor.py",
         "foreground_tools.py",
         "kiro_usage.py",
         "research_execution.py",
@@ -82,6 +89,27 @@ def test_provider_up_imports_do_not_grow() -> None:
     assert current <= PROVIDER_UP_IMPORTERS, (
         f"new up-importers: {sorted(current - PROVIDER_UP_IMPORTERS)}"
     )
+
+
+def test_fallback_executor_imports_only_frozen_vocabulary() -> None:
+    path = ROOT / "packages/ai_provider/src/ai_provider/fallback_executor.py"
+    approved = {
+        ("ai_orchestrator", "ExecutionTarget"),
+        ("ai_orchestrator", "ModelCatalogEntry"),
+        ("ai_orchestrator", "TaskProfile"),
+        ("ai_orchestrator", "prepare_execution"),
+        ("ai_orchestrator.fallback", "FallbackQualityPolicy"),
+        ("ai_orchestrator.fallback", "fallback_candidates"),
+        ("ai_orchestrator.fallback", "fallback_profile"),
+    }
+    for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+        if isinstance(node, ast.ImportFrom) and node.module:
+            if node.module.split(".")[0] in {"ai_orchestrator", "ai_agent"}:
+                assert {(node.module, name.name) for name in node.names} <= approved
+        elif isinstance(node, ast.Import):
+            assert not any(
+                name.name.split(".")[0] in {"ai_orchestrator", "ai_agent"} for name in node.names
+            ), "Use the approved explicit neutral-contract imports"
 
 
 def test_acceptance_storage_imports_only_approved_neutral_contracts() -> None:
