@@ -73,6 +73,7 @@ GROUPS = {
         "tests/test_copilot_usage.py",
         "tests/test_kiro_usage.py",
         "tests/test_turn_usage.py",
+        "tests/test_mai_eval_scoring.py",
         "tests/test_source_info.py",
         "tests/test_go_source_info.py",
         "tests/test_source_claims.py",
