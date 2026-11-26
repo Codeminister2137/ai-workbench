@@ -108,6 +108,21 @@ def test_warnings_flag_gaps_and_seniority() -> None:
     assert any("seniority" in warning for warning in report.warnings)
 
 
+def test_warnings_surface_offer_pay_and_seniority_verbatim() -> None:
+    """Q6/Q7: judge sees the offer's words; matcher filters on neither."""
+    report = build_match_report(
+        _vacancy(experience_requirement="5+ years", compensation="12000-16000 PLN net"),
+        _profile(),
+    )
+    assert "seniority: offer states '5+ years' — judge fit manually" in report.warnings
+    assert "pay: offer states '12000-16000 PLN net' — judge with the offer" in report.warnings
+
+
+def test_warnings_skip_missing_pay_and_seniority() -> None:
+    report = build_match_report(_vacancy(), _profile())
+    assert not [w for w in report.warnings if w.startswith(("pay:", "seniority:"))]
+
+
 def test_report_json_round_trip() -> None:
     report = build_match_report(_vacancy(), _profile())
     payload = json.loads(json.dumps(report.to_dict()))

@@ -97,8 +97,15 @@ def build_match_report(vacancy: JobVacancy, profile: CandidateProfile) -> MatchR
     warnings: list[str] = list(analysis.uncertainty_flags)
     if analysis.has_critical_gaps:
         warnings.append("critical_gaps: over half of required skills missing")
-    if (vacancy.experience_requirement or "").strip():
-        warnings.append("check seniority fit manually against the offer")
+    # Q6/Q7 (judgment-over-filtering): surface the offer's own words so the
+    # downstream judge sees pay + seniority without opening the offer. The
+    # matcher never filters on them; owner targets live in job-preferences.
+    experience = (vacancy.experience_requirement or "").strip()
+    if experience:
+        warnings.append(f"seniority: offer states {experience[:120]!r} — judge fit manually")
+    compensation = (vacancy.compensation or "").strip()
+    if compensation:
+        warnings.append(f"pay: offer states {compensation[:120]!r} — judge with the offer")
     return MatchReport(
         vacancy_id=vacancy.id,
         match_score=analysis.match_score,
