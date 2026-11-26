@@ -120,6 +120,7 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/plans/name-eligibility-fallback-20261124.md | PENDING | Fallback screen 24.11: Jaworski Software/IT conditional, JS Labs NO-GO, Pracownia weak; + namelix pack. |
 | docs/plans/invoice-sending-scope-20261125.md | PENDING | Slice-3 sending design 25.11 (InFakt sync + at-most-once machine); 3 owner gates filed, no live sends. |
 | docs/plans/mai-program-20261125.md | PENDING | Mai charter v0 25.11 (metrics + baselines + 20-task eval seed); retention brief filed separately. |
+| docs/plans/oc-rodo-pack-20261126.md | PENDING | OC shopping + register/DPA/visit rules draft 26.11 (orientation only); needs owner + accountant/counsel approval. |
 | docs/plans/loop-20261125.md | PENDING | Draft tomorrow loop plan (chatbot, P7 close-out, backlog). |
 | docs/plans/l3-eval-ladder-design.md | ACTED | Ladder shipped (route_eval.py + l3_ladder.py). |
 | docs/plans/local-model-queue.md | ACTED | Q1-Q4 all consumed into quality-policy v1. |
