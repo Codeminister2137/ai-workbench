@@ -152,6 +152,7 @@ def test_brand_and_seller_identity_final() -> None:
         assert "BeskidLogic" in text, page
         assert "5482782178" in text, page
         assert "546248869" in text, page
+        assert "Mickiewicza 25, 43-430 Skoczów" in text, page
         assert "Firma IT" not in text, page
         assert "IT studio" not in text, page
 
