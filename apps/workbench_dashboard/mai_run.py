@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import contextlib
 import io
+import json
 import math
 import os
 import re
@@ -181,13 +182,40 @@ def _run_timeout_seconds(run: dict) -> float | None:
 
 
 def parse_mai_facts(stdout: str) -> dict[str, str]:
-    """Pull Mai-printed facts (session id, effective route) from stdout."""
+    """Pull Mai-printed facts (session id, effective route, usage) from stdout."""
     facts: dict[str, str] = {}
     for line in stdout.splitlines():
-        for key in ("coding_session_id", "effective_route_id"):
+        for key in ("coding_session_id", "effective_route_id", "session_usage"):
             if line.startswith(f"{key}:"):
                 facts[key] = line.split(":", 1)[1].strip()
     return facts
+
+
+def parse_session_usage(facts: dict[str, str]) -> dict | None:
+    """Decode the ``session_usage`` fact; None when absent or malformed.
+
+    A missing line (older Mai, killed session) is explicit ``None`` on
+    the receipt — never zero-filled usage.
+    """
+    raw = facts.get("session_usage")
+    if not raw:
+        return None
+    try:
+        payload = json.loads(raw)
+    except ValueError:
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def _known_sum(usage: dict | None, metric: str) -> int | None:
+    """Measured token sum for one metric; None when unknown or malformed."""
+    if not isinstance(usage, dict):
+        return None
+    entry = usage.get(metric)
+    if not isinstance(entry, dict):
+        return None
+    value = entry.get("known_sum")
+    return value if isinstance(value, int) and value >= 0 else None
 
 
 def run_mai_session(
@@ -251,6 +279,7 @@ def classify_failure(*texts: str) -> str:
 def mai_receipt(outcome: MaiRunOutcome, argv: Sequence[str]) -> dict:
     """Drain receipt for a Mai outcome; transcripts stay in the tails."""
     facts = outcome.facts or parse_mai_facts(outcome.stdout_tail)
+    usage = parse_session_usage(facts)
     if outcome.error is None and outcome.exit_code == 0:
         reported = mai_failure_reason(outcome.stdout_tail, outcome.stderr_tail)
         if reported is not None and not mai_execution_completed(
@@ -268,6 +297,7 @@ def mai_receipt(outcome: MaiRunOutcome, argv: Sequence[str]) -> dict:
                 "mai_argv": list(argv),
                 "mai_session_id": facts.get("coding_session_id"),
                 "route_id": facts.get("effective_route_id"),
+                "session_usage": usage,
                 "source": "mai-session",
             }
         if not outcome.stdout_tail.strip() and not outcome.stderr_tail.strip():
@@ -281,6 +311,7 @@ def mai_receipt(outcome: MaiRunOutcome, argv: Sequence[str]) -> dict:
                 "mai_argv": list(argv),
                 "mai_session_id": facts.get("coding_session_id"),
                 "route_id": facts.get("effective_route_id"),
+                "session_usage": usage,
                 "source": "mai-session",
             }
         return {
@@ -290,6 +321,7 @@ def mai_receipt(outcome: MaiRunOutcome, argv: Sequence[str]) -> dict:
             "mai_argv": list(argv),
             "mai_session_id": facts.get("coding_session_id"),
             "route_id": facts.get("effective_route_id"),
+            "session_usage": usage,
             "source": "mai-session",
         }
     error = outcome.error or f"Mai session exited with code {outcome.exit_code}"
@@ -308,6 +340,7 @@ def mai_receipt(outcome: MaiRunOutcome, argv: Sequence[str]) -> dict:
         "mai_argv": list(argv),
         "mai_session_id": facts.get("coding_session_id"),
         "route_id": facts.get("effective_route_id"),
+        "session_usage": usage,
         "source": "mai-session",
     }
 
@@ -424,6 +457,7 @@ def build_mai_executor(
     model: str | None = None,
     progress_path: Path | str | None = None,
     progress_dir: Path | str | None = None,
+    spend_ledger: object | None = None,
 ) -> Callable[[dict], dict]:
     """Build a drain ``Executor`` handing runs to Mai sessions.
 
@@ -435,7 +469,9 @@ def build_mai_executor(
     ``coding_session`` resumes a bound Mai session (chat turns); runs
     always start fresh. ``progress_dir`` streams each run's stdout to
     ``<run-id>.jsonl`` there so a killed Mai still leaves evidence;
-    explicit ``progress_path`` wins when both are set.
+    explicit ``progress_path`` wins when both are set. ``spend_ledger``
+    settles per-run tokens from the ``session_usage`` receipt line
+    (``task_class="mai_run"``); metering never breaks runs.
     """
 
     def execute(run: dict) -> dict:
@@ -444,6 +480,7 @@ def build_mai_executor(
                 "status": "failed",
                 "error": "Mai run refused: empty task body (nothing to execute).",
                 "failure_class": "unknown",
+                "session_usage": None,
                 "source": "mai-session",
             }
         stream_path = progress_path
@@ -462,6 +499,7 @@ def build_mai_executor(
                     "status": "failed",
                     "error": f"run isolation failed: {exc}",
                     "failure_class": "unknown",
+                    "session_usage": None,
                     "source": "mai-session",
                 }
             root = isolated.path
@@ -491,6 +529,25 @@ def build_mai_executor(
             receipt["branch"] = isolated.branch
         if stream_path is not None and backend == "subprocess":
             receipt["progress_path"] = str(stream_path)
+        if spend_ledger is not None:
+            settle = getattr(spend_ledger, "settle_local", None)
+            if callable(settle):
+                route_id = str(receipt.get("route_id") or "")
+                route_provider, _, route_model = route_id.partition("/")
+                session_usage = receipt.get("session_usage")
+                session_usage = session_usage if isinstance(session_usage, dict) else None
+                try:
+                    settle(
+                        task_id=str(run.get("id", "?")),
+                        task_class="mai_run",
+                        model_id=route_model,
+                        provider=route_provider or "local",
+                        input_tokens=_known_sum(session_usage, "input_tokens"),
+                        output_tokens=_known_sum(session_usage, "output_tokens"),
+                        usage_source="mai-session",
+                    )
+                except Exception as exc:  # noqa: BLE001 - metering never breaks runs
+                    print(f"mai spend settle failed: {exc}", file=sys.stderr)
         return receipt
 
     return execute
