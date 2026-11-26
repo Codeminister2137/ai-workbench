@@ -487,6 +487,16 @@ def test_site_schema_only_needs_pointers() -> None:
     assert e2e_cases.needs_pointers(steps)
 
 
+def test_site_known_nonpage_files_get_suite_steps() -> None:
+    evidence = _site_evidence("company-site/PLACEHOLDERS.md", "company-site/billing.py")
+    steps = e2e_cases.draft_steps("company-site", evidence, ["placeholder index"])
+    assert len(steps) == 2
+    assert all(step["grounded"] and step["agent_runnable"] for step in steps)
+    assert "test_company_site.py" in steps[0]["action"]
+    assert "test_invoice_draft.py" in steps[1]["action"]
+    assert not e2e_cases.needs_pointers(steps)
+
+
 def test_orchestrator_splits_suite_from_trigger() -> None:
     evidence = {
         "packages/ai_orchestrator/src/ai_orchestrator/deliberation.py": {

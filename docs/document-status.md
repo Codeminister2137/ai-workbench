@@ -112,6 +112,10 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/plans/loop-20261124-4h.md | PENDING | Approved 4h loop plan (company site + naming + accountant); in progress. |
 | docs/plans/name-eligibility-20261124.md | PENDING | Slice-3 screen 2026-11-24: 3 NO-GO (IT/Soft/Code) + SmartTek conditional; owner choice pending. |
 | docs/plans/accountant-brief-infakt-20261124.md | PENDING | Slice-5 send-ready InFakt brief 2026-11-24 (JDG IT snapshot + 8 questions); awaiting owner send. |
+| docs/plans/beata-questions-20261126.md | PENDING | Send-ready 15-question pack for Beata 26.11 (G2/template/numbering/address/e-Doręczenia/auth/price + VAT/ZUS/scope/fee/friend/dotacje); awaiting owner send, answers tomorrow. |
+| docs/plans/site-deploy-runbooks.md | KNOWLEDGE | BeskidLogic deploy runbooks 26.11 (Pages+Zoho / PL all-in-one / Pages+Workspace); execute on hosting pick. |
+| docs/plans/site-publish-20261126.md | PENDING | EOD publish plan 26.11 (decision chain + agent prep + kill criteria); in progress. |
+| docs/plans/work-20261126.md | PENDING | Master 5-phase work plan 26.11 PM (publish → Beata → outreach → KnowMe → standard); in progress. |
 | docs/plans/name-eligibility-fallback-20261124.md | PENDING | Fallback screen 24.11: Jaworski Software/IT conditional, JS Labs NO-GO, Pracownia weak; + namelix pack. |
 | docs/plans/invoice-sending-scope-20261125.md | PENDING | Slice-3 sending design 25.11 (InFakt sync + at-most-once machine); 3 owner gates filed, no live sends. |
 | docs/plans/mai-program-20261125.md | PENDING | Mai charter v0 25.11 (metrics + baselines + 20-task eval seed); retention brief filed separately. |
