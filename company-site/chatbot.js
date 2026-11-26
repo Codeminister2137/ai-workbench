@@ -85,6 +85,15 @@
       keywords_en: ["pay off", "worth", "payback", "risk", "don't do"],
       answer: "Tak — rozpoznanie może zakończyć się uczciwym „nie róbcie tego”, z wyliczeniem zwrotu policzonym wspólnie. Decyzja „nie” to dostarczony wynik, nie porażka.",
       answer_en: "Yes — discovery may conclude with an honest “don't do this”, with payback math computed together. A “no” is a delivered outcome, not a failure."
+    },
+    {
+      id: "company",
+      source: "index.html", quote: "NIP 5482782178",
+      source_en: "en/index.html", quote_en: "NIP 5482782178",
+      keywords: ["nip", "regon", "beskidlogic", "nazwa firmy", "dane firmy", "jaworski", "firma it"],
+      keywords_en: ["nip", "regon", "beskidlogic", "company name", "company details", "jaworski", "tax id"],
+      answer: "BeskidLogic — Jakub Jaworski BeskidLogic, Skoczów. NIP 5482782178, REGON 546248869.",
+      answer_en: "BeskidLogic — Jakub Jaworski BeskidLogic, Skoczów. NIP 5482782178, REGON 546248869."
     }
   ];
 
