@@ -49,12 +49,10 @@ and one paid accountant hour before the first invoice (see
 billing.py docstring). Disclosed on uslugi.html terms section.
 Launch gate; not a copy change.
 
-## SELLER_IDENTITY — PARTIAL 2026-11-26 (inbox 82207bdd)
+## SELLER_IDENTITY — RESOLVED 2026-11-26 (owner A on 5f57ee73)
 
-NIP 5482782178 / REGON 546248869 live in footers + billing Party
-fields. Street address (Skoczów, Mickiewicza 25) HELD: publication
-needs the AI-investigation + owner deliberation the owner requested.
-Site shows city only until then.
+Full identity live in all 8 footers + privacy Controller sections:
+firma, Mickiewicza 25, 43-430 Skoczów, NIP 5482782178, REGON 546248869.
 
 ## BRANDING
 
