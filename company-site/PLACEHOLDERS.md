@@ -5,12 +5,12 @@ Every undecided item the draft needs before launch. HTML carries
 index. A launch is blocked until every ID below resolves or is
 explicitly waived by the owner.
 
-## COMPANY_NAME
+## COMPANY_NAME — RESOLVED 2026-11-26 (owner, inbox f85da96e)
 
-Legal + brand display name. P7 naming undecided.
-Stand-ins: "Firma IT · Skoczów" (PL), "IT studio · Skoczów" (EN),
-draft banners note the name is pending. Sites: brand links on all
-6 pages. Unblocks: brand links, titles, footer identity.
+Firma: "Jakub Jaworski BeskidLogic"; brand: "BeskidLogic". Brand
+links + footer identity live on all 6 pages. Domain/handle checks:
+beskidlogic.pl has no DNS (likely free — confirm at registrar);
+no web collisions for "BeskidLogic".
 
 ## CONTACT_EMAIL
 
@@ -49,11 +49,12 @@ and one paid accountant hour before the first invoice (see
 billing.py docstring). Disclosed on uslugi.html terms section.
 Launch gate; not a copy change.
 
-## SELLER_IDENTITY
+## SELLER_IDENTITY — PARTIAL 2026-11-26 (inbox 82207bdd)
 
-Tax identification number (NIP) / National Official Business Register number (REGON) / full registered address for footer identity and billing
-Party fields. P7 registration decision. Site shows only
-"Skoczów, Polska" until then.
+NIP 5482782178 / REGON 546248869 live in footers + billing Party
+fields. Street address (Skoczów, Mickiewicza 25) HELD: publication
+needs the AI-investigation + owner deliberation the owner requested.
+Site shows city only until then.
 
 ## BRANDING
 

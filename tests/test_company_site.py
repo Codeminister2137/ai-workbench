@@ -141,7 +141,19 @@ def test_placeholders_indexed() -> None:
         for marker in re.findall(r"PLACEHOLDER\(([A-Z_]+)\)", page.read_text(encoding="utf-8")):
             found.add(marker)
             assert f"## {marker}" in index, (page, marker)
-    assert found >= {"COMPANY_NAME", "CONTACT_EMAIL", "SERVICE_CITIES"}
+    # COMPANY_NAME resolved 26.11 (BeskidLogic); the rest still gate launch.
+    assert found >= {"CONTACT_EMAIL", "SERVICE_CITIES"}
+
+
+def test_brand_and_seller_identity_final() -> None:
+    """Brand BeskidLogic + NIP/REGON on every page (owner 26.11)."""
+    for page in sorted(ROOT.rglob("*.html")):
+        text = page.read_text(encoding="utf-8")
+        assert "BeskidLogic" in text, page
+        assert "5482782178" in text, page
+        assert "546248869" in text, page
+        assert "Firma IT" not in text, page
+        assert "IT studio" not in text, page
 
 
 def test_dark_mode_follows_browser_setting() -> None:
