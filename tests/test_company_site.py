@@ -162,7 +162,8 @@ def test_privacy_notice_covers_controller_rights_and_routes() -> None:
     pl = (ROOT / "prywatnosc.html").read_text(encoding="utf-8")
     for needle in [
         "Jakub Jaworski BeskidLogic",
-        "nie wysyła niczego na żaden serwer",
+        "wysyła je na nasz serwer",
+        "numer referencyjny",
         "w całości w Twojej przeglądarce",
         "art. 6 ust. 1 lit. b RODO",
         "24 miesiące",
@@ -173,7 +174,8 @@ def test_privacy_notice_covers_controller_rights_and_routes() -> None:
     en = (ROOT / "en" / "privacy.html").read_text(encoding="utf-8")
     for needle in [
         "Jakub Jaworski BeskidLogic",
-        "sends nothing to any server",
+        "sends it to our server",
+        "reference number",
         "entirely in your browser",
         "Art. 6(1)(b)",
         "24 months",
