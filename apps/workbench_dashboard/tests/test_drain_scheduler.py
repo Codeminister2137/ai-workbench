@@ -151,8 +151,9 @@ def _capture_tick(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, **kwargs):
         def start(self) -> bool:
             return True
 
-    def fake_build(config, data, root, stores):
+    def fake_build(config, data, root, stores, **kwargs):
         seen["repo_root"] = root
+        seen["spend_ledger"] = kwargs.get("spend_ledger")
 
         class FakeDrain:
             def drain(self, max_runs: int = 1):

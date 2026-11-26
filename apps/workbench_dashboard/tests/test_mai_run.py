@@ -715,3 +715,27 @@ def test_settle_failure_never_breaks_run(tmp_path, capsys) -> None:
     )(_run())
     assert receipt["status"] == "completed"
     assert "mai spend settle failed" in capsys.readouterr().err
+
+
+def test_settle_persists_measured_tokens_in_real_ledger(tmp_path) -> None:
+    from ai_orchestrator.spend_ledger import SpendLedger
+
+    ledger = SpendLedger(tmp_path / "spend_ledger.sqlite3")
+    receipt = build_mai_executor(
+        tmp_path,
+        tmp_path / "u.toml",
+        backend="in-process",
+        runner=_usage_runner,
+        spend_ledger=ledger,
+    )(_run(id="r-ledger"))
+    assert receipt["status"] == "completed"
+    records = [r for r in ledger.records() if r.task_id == "r-ledger"]
+    assert len(records) == 1
+    record = records[0]
+    assert record.task_class == "mai_run"
+    assert record.input_tokens == 300 and record.output_tokens == 120
+    assert record.usage_source == "mai-session"
+    assert record.provider == "ollama" and record.model_id == "qwen3"
+    # Durable across reopen (SQLite roundtrip, not just memory).
+    reopened = SpendLedger(tmp_path / "spend_ledger.sqlite3")
+    assert [r for r in reopened.records() if r.task_id == "r-ledger"]
