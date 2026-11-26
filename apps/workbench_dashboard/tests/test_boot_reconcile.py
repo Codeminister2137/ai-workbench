@@ -44,3 +44,26 @@ def test_build_run_drain_stamps_worker_epoch(tmp_path) -> None:
     assert drain._worker_epoch == "boot-9"
     defaulted = build_run_drain(config, data_dir, tmp_path, stores)
     assert defaulted._worker_epoch
+
+
+def test_build_run_drain_forwards_shared_ledger(tmp_path, monkeypatch) -> None:
+    import mai_run
+
+    seen: dict = {}
+
+    def fake_builder(*args, **kwargs):
+        seen.update(kwargs)
+        return lambda run: {"status": "completed"}
+
+    monkeypatch.setattr(mai_run, "build_mai_executor", fake_builder)
+    config_path = tmp_path / "dashboard.json"
+    config_path.write_text(json.dumps({"title": "Test Board"}), encoding="utf-8")
+    config = load_config(config_path)
+    data_dir = tmp_path / "data"
+    stores = DashboardStores(data_dir)
+    sentinel = object()
+    build_run_drain(config, data_dir, tmp_path, stores, spend_ledger=sentinel)
+    assert seen.get("spend_ledger") is sentinel
+    seen.clear()
+    build_run_drain(config, data_dir, tmp_path, stores)
+    assert seen.get("spend_ledger") is None

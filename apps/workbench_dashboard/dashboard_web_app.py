@@ -3068,6 +3068,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 self.repo_root,
                 stores,
                 executor_factory=factory,
+                spend_ledger=self.spend_ledger,
             )
         except StagedEditError as exc:
             return self._send_json({"ok": False, "error": str(exc)}, status=400)
@@ -3805,6 +3806,7 @@ def build_run_drain(
     stores: DashboardStores,
     executor_factory: Callable[[], Executor] | None = None,
     worker_epoch: str | None = None,
+    spend_ledger: Any | None = None,
 ) -> RunDrain:
     """Build the approved-runs drain shared by manual and scheduled drains.
 
@@ -3812,7 +3814,9 @@ def build_run_drain(
     model through the orchestrator by criteria) inside a per-run scratch
     worktree, so agent edits never touch shared checkouts; ``executor_factory``
     overrides it in tests. Runs are stamped with the worker epoch so boot
-    reconciliation can tell orphaned runs from live ones.
+    reconciliation can tell orphaned runs from live ones. ``spend_ledger``
+    (the app's shared instance) lets Mai runs settle measured tokens;
+    None keeps today's unsettled behavior.
     """
     if executor_factory is not None:
         executor = executor_factory()
@@ -3827,6 +3831,7 @@ def build_run_drain(
                 backend=getattr(config, "mai_backend", "subprocess"),
                 isolate=True,
                 progress_dir=data_dir / "run-progress",
+                spend_ledger=spend_ledger,
             )
         )
 
@@ -3900,6 +3905,7 @@ def reconcile_runs_at_startup(
     drain_root: Path,
     stores: DashboardStores,
     epoch: str,
+    spend_ledger: Any | None = None,
 ) -> list[dict]:
     """Requeue runs orphaned by a restart; drained runs resume unattended.
 
@@ -3908,7 +3914,7 @@ def reconcile_runs_at_startup(
     stays untouched. Never raises: reconcile must not block serving.
     """
     try:
-        drain = build_run_drain(config, data_dir, drain_root, stores)
+        drain = build_run_drain(config, data_dir, drain_root, stores, spend_ledger=spend_ledger)
     except (StagedEditError, ValueError, OSError) as exc:
         print(f"Workbench dashboard: startup reconcile skipped (drain: {exc})")
         return []
@@ -3991,7 +3997,13 @@ def maybe_start_drain_scheduler(
         if paused is not None:
             print(f"Workbench dashboard: scheduled drain paused: {paused['reason']}")
             return
-        drain = build_run_drain(config, data_dir, drain_root, stores)
+        drain = build_run_drain(
+            config,
+            data_dir,
+            drain_root,
+            stores,
+            spend_ledger=DashboardRequestHandler.spend_ledger,
+        )
         outcomes = drain.drain(max_runs=SCHEDULER_DRAIN_MAX_RUNS)
         print(f"Workbench dashboard: scheduled drain: {outcomes}")
         try:
@@ -4090,9 +4102,18 @@ def main() -> None:
         print(f"Workbench dashboard: pidfile unwritable, supervisor restarts unavailable: {exc}")
     boot_epoch = datetime.now(UTC).isoformat()
     try:
+        DashboardRequestHandler.spend_ledger = load_spend_ledger(args.data_dir)
+    except ValueError as exc:
+        print(f"Workbench dashboard: spend grants invalid, STT metering off: {exc}")
+    try:
         boot_config = load_config(args.config)
         reconcile_runs_at_startup(
-            boot_config, args.data_dir, state_root, DashboardStores(args.data_dir), boot_epoch
+            boot_config,
+            args.data_dir,
+            state_root,
+            DashboardStores(args.data_dir),
+            boot_epoch,
+            spend_ledger=DashboardRequestHandler.spend_ledger,
         )
     except Exception as exc:  # noqa: BLE001 - reconcile must never block serving
         print(f"Workbench dashboard: startup reconcile failed: {exc}")
@@ -4102,10 +4123,6 @@ def main() -> None:
         )
     except Exception as exc:  # noqa: BLE001 - scheduler must never block serving
         print(f"Workbench dashboard: drain scheduler failed to start: {exc}")
-    try:
-        DashboardRequestHandler.spend_ledger = load_spend_ledger(args.data_dir)
-    except ValueError as exc:
-        print(f"Workbench dashboard: spend grants invalid, STT metering off: {exc}")
     stt_key = meta_stt_key()
     if stt_key is not None and DashboardRequestHandler.spend_ledger is not None:
 
