@@ -121,6 +121,8 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/plans/invoice-sending-scope-20261125.md | PENDING | Slice-3 sending design 25.11 (InFakt sync + at-most-once machine); 3 owner gates filed, no live sends. |
 | docs/plans/mai-program-20261125.md | PENDING | Mai charter v0 25.11 (metrics + baselines + 20-task eval seed); retention brief filed separately. |
 | docs/plans/oc-rodo-pack-20261126.md | PENDING | OC shopping + register/DPA/visit rules draft 26.11 (orientation only); needs owner + accountant/counsel approval. |
+| docs/plans/intake-server-design-20261126.md | PENDING | Server-side intake design 26.11 (owner B on 6b3153f7); B1 copy + B2 core shipped, B3 waits hosting+mailbox. |
+| docs/plans/mai-resume-design-20261126.md | KNOWLEDGE | Resume design 26.11 (handoff-summary over message replay, privacy-safe); slices need plan approval. |
 | docs/plans/orch-queries-scope-20261126.md | KNOWLEDGE | Dynamic-query scope 26.11 (API shipped+tested, UI missing, S1-S3 need plan approval). |
 | docs/plans/loop-20261125.md | PENDING | Draft tomorrow loop plan (chatbot, P7 close-out, backlog). |
 | docs/plans/l3-eval-ladder-design.md | ACTED | Ladder shipped (route_eval.py + l3_ladder.py). |

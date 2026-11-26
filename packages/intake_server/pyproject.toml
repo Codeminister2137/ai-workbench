@@ -1,0 +1,13 @@
+[project]
+name = "intake-server"
+version = "0.1.0"
+description = "Transport-agnostic company-site intake core: validate, forward, log."
+requires-python = ">=3.13,<3.15"
+dependencies = []
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/intake_server"]
