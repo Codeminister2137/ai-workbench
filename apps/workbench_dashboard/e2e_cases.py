@@ -303,6 +303,18 @@ def _dashboard_steps(evidence: dict[str, dict[str, list[str]]]) -> list[dict]:
     return steps
 
 
+# Non-page site file -> exact contract command. Mapped files get
+# agent-runnable suite steps instead of owner pointer questions.
+SITE_FILE_CHECKS: dict[str, str] = {
+    "company-site/PLACEHOLDERS.md": (
+        ".venv/Scripts/python.exe -m pytest tests/test_company_site.py -q"
+    ),
+    "company-site/billing.py": (
+        ".venv/Scripts/python.exe -m pytest tests/test_invoice_draft.py -q"
+    ),
+}
+
+
 def _site_steps(evidence: dict[str, dict[str, list[str]]], subjects: Sequence[str]) -> list[dict]:
     subject = subjects[0] if subjects else "this change"
     steps: list[dict] = []
@@ -364,6 +376,21 @@ def _site_steps(evidence: dict[str, dict[str, list[str]]], subjects: Sequence[st
         for path in sorted(evidence)
         if not path.endswith(".html") and path.rsplit(".", 1)[-1] not in {"css", "js"}
     ]
+    unmapped_others = []
+    for path in others:
+        command = SITE_FILE_CHECKS.get(path)
+        if command is None:
+            unmapped_others.append(path)
+            continue
+        steps.append(
+            {
+                "action": f"Run `{command}` from the repo root ({path} changed).",
+                "expected": "Exit 0: the file's contract suite still passes.",
+                "grounded": True,
+                "agent_runnable": True,
+            }
+        )
+    others = unmapped_others
     if others:
         steps.append(
             {

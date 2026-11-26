@@ -10,7 +10,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1] / "company-site"
 
 def test_site_pages_carry_draft_banner_and_sound_links() -> None:
     pages = sorted(ROOT.rglob("*.html"))
-    assert len(pages) == 6
+    assert len(pages) == 8
     for page in pages:
         text = page.read_text(encoding="utf-8")
         lowered = text.lower()
@@ -33,8 +33,8 @@ def test_intake_form_wiring_matches_script() -> None:
             assert f'id="{element_id}"' in text, (page, element_id)
 
 
-PL_PAGES = ["index.html", "uslugi.html", "kontakt.html"]
-EN_PAGES = ["en/index.html", "en/services.html", "en/contact.html"]
+PL_PAGES = ["index.html", "uslugi.html", "kontakt.html", "prywatnosc.html"]
+EN_PAGES = ["en/index.html", "en/services.html", "en/contact.html", "en/privacy.html"]
 
 
 def test_pages_have_lang_structure_and_current_nav() -> None:
@@ -154,6 +154,40 @@ def test_brand_and_seller_identity_final() -> None:
         assert "546248869" in text, page
         assert "Firma IT" not in text, page
         assert "IT studio" not in text, page
+
+
+def test_privacy_notice_covers_controller_rights_and_routes() -> None:
+    """RODO notice: controller, local-only claims, rights, UODO path."""
+    pl = (ROOT / "prywatnosc.html").read_text(encoding="utf-8")
+    for needle in [
+        "Jakub Jaworski BeskidLogic",
+        "nie wysyła niczego na żaden serwer",
+        "w całości w Twojej przeglądarce",
+        "art. 6 ust. 1 lit. b RODO",
+        "24 miesiące",
+        "Prezesa Urzędu Ochrony Danych Osobowych",
+        "Nie profilujemy",
+    ]:
+        assert needle in pl, needle
+    en = (ROOT / "en" / "privacy.html").read_text(encoding="utf-8")
+    for needle in [
+        "Jakub Jaworski BeskidLogic",
+        "sends nothing to any server",
+        "entirely in your browser",
+        "Art. 6(1)(b)",
+        "24 months",
+        "UODO",
+        "do not profile",
+    ]:
+        assert needle in en, needle
+
+
+def test_every_page_links_privacy_notice() -> None:
+    """The notice is one click from anywhere (Art. 5 accessible place)."""
+    for rel in PL_PAGES:
+        assert 'href="prywatnosc.html"' in (ROOT / rel).read_text(encoding="utf-8"), rel
+    for rel in EN_PAGES:
+        assert 'href="privacy.html"' in (ROOT / rel).read_text(encoding="utf-8"), rel
 
 
 def test_dark_mode_follows_browser_setting() -> None:

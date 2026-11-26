@@ -65,3 +65,9 @@ The draft ships without them; a missing favicon 404s harmlessly.
 
 Domain + hosting target undecided (`deploy/` is empty). Launch
 decision; the site is static + a local JSON intake form.
+
+## HOSTING_PROVIDER
+
+Operator names for the privacy notice (site host + mailbox operator).
+Filed 26.11 with the privacy pages; resolves with the hosting pick
+(inbox 9a21853e).
