@@ -12,6 +12,7 @@ Metadata link keys (frozen contracts shared with battery arms T1/T5):
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from dashboard_stores import StoreError
@@ -201,7 +202,18 @@ def _report_body(source: dict, closeout: dict | None, runs: list) -> str:
     refs = list(source.get("context_refs") or [])
     if closeout is not None:
         refs += list(closeout.get("context_refs") or [])
+        refs.append(f"inbox:{closeout.get('id')}")
     refs.append(f"inbox:{source_id}")
+    # Quoted follow-ups stay findable: any inbox: id named in answers or
+    # resolutions becomes a link (bare hex is never linked — NIPs and run
+    # shorts would false-positive).
+    quoted = " ".join(
+        str(record.get(field) or "")
+        for record in (source, closeout)
+        if isinstance(record, dict)
+        for field in ("answer", "resolution", "note", "body")
+    )
+    refs += [f"inbox:{match}" for match in re.findall(r"inbox:([0-9a-f]{8,64})", quoted)]
     for ref in dict.fromkeys(refs):
         lines.append(f"- {ref}")
     return "\n".join(lines).strip()
