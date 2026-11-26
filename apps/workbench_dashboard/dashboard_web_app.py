@@ -3640,13 +3640,27 @@ def should_start_drain_scheduler(config: DashboardConfig) -> bool:
     return config.drain_interval_seconds >= DRAIN_SCHEDULER_MIN_INTERVAL_SECONDS
 
 
+STARVE_ERROR_RE = r"^Mai session exited with code 1: Agent loop exceeded max_iterations=\d+$"
+
+
+def _is_charter_starve(error: str) -> bool:
+    """Full-signature starve match (owner 492c9d13 A): anchored, exact.
+
+    Only the bare cap-hit message auto-links; any extra text (timeouts,
+    provider notes, tracebacks) keeps manual triage.
+    """
+    return re.fullmatch(STARVE_ERROR_RE, (error or "").strip()) is not None
+
+
 def _file_failed_run_triage(stores: DashboardStores, run: dict, run_id: str, summary: dict) -> None:
     """File one agent triage task for a failed run; never raises.
 
     Dedupes on open inbox tasks with ``metadata.triage_for == run_id``.
     A store cap-refusal flags ``triage_pending`` on the open source item
     (mirroring ``closeout_pending``) instead of raising; a successful
-    filing clears that stale flag.
+    filing clears that stale flag. Full-signature starves auto-resolve
+    with the charter link (owner 492c9d13 A); the item stays in the
+    audit trail as a closed record.
     """
     try:
         try:
@@ -3713,7 +3727,7 @@ def _file_failed_run_triage(stores: DashboardStores, run: dict, run_id: str, sum
             except Exception:  # noqa: BLE001 - create_inbox_task re-defaults on None
                 project_id = None
         try:
-            stores.create_inbox_task(
+            triage = stores.create_inbox_task(
                 title=f"Triage failed run {run_id[:8]}",
                 body=body,
                 task_type="task",
@@ -3740,6 +3754,19 @@ def _file_failed_run_triage(stores: DashboardStores, run: dict, run_id: str, sum
             except Exception:  # noqa: BLE001 - triage never breaks report-back
                 return
             return
+        if _is_charter_starve(error):
+            try:
+                stores.close_inbox_task(
+                    triage["id"],
+                    resolution=(
+                        "Auto-linked (owner 492c9d13 A): known starve class "
+                        "(max-iterations cap hit). Systemic fix owned by the "
+                        "Mai charter (docs/plans/mai-program-20261125.md); "
+                        "no per-run task."
+                    ),
+                )
+            except Exception:  # noqa: BLE001 - auto-resolve never breaks report-back
+                pass
         try:
             clear_ref = run.get("bridged_from") or run.get("inbox_id")
             if isinstance(clear_ref, str) and clear_ref:

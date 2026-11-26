@@ -409,3 +409,40 @@ def test_failed_run_triage_states_terminal_rule(stores) -> None:
     ]
     assert "never a conclusion" in (triage.get("body") or "")
     assert "owner brief" in (triage.get("body") or "")
+
+
+def test_charter_starve_triage_auto_resolves(stores) -> None:
+    from dashboard_web_app import _file_failed_run_triage
+
+    run = {
+        "id": "run-2",
+        "title": "t",
+        "status": "failed",
+        "error": "Mai session exited with code 1: Agent loop exceeded max_iterations=25",
+    }
+    stores.runs.put("run-2", run)
+    _file_failed_run_triage(stores, run, "run-2", {"failure_class": "provider"})
+    items, _total = stores.inbox.list(limit=10)
+    (triage,) = [
+        entry for entry in items if (entry.get("metadata") or {}).get("triage_for") == "run-2"
+    ]
+    assert triage["status"] == "closed"
+    assert "Mai charter" in (triage.get("resolution") or "")
+
+
+def test_near_miss_starve_keeps_manual_triage(stores) -> None:
+    from dashboard_web_app import _file_failed_run_triage
+
+    run = {
+        "id": "run-3",
+        "title": "t",
+        "status": "failed",
+        "error": "Mai session exited with code 1: Agent loop exceeded max_iterations=25 (retry 2)",
+    }
+    stores.runs.put("run-3", run)
+    _file_failed_run_triage(stores, run, "run-3", {"failure_class": "provider"})
+    items, _total = stores.inbox.list(limit=10)
+    (triage,) = [
+        entry for entry in items if (entry.get("metadata") or {}).get("triage_for") == "run-3"
+    ]
+    assert triage["status"] == "open"
