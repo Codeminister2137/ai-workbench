@@ -180,6 +180,51 @@ def test_finalize_files_chain_report_with_sections(stores) -> None:
     assert (reports[0].get("metadata") or {}).get("chain_report_for") == record["id"]
 
 
+def test_chain_report_links_closeout_and_quoted_followups(stores) -> None:
+    record = stores.create_inbox_task(
+        title="Pick?", body="b", task_type="decision", options=["A"], assignee="owner"
+    )
+    followup = stores.create_inbox_task(
+        title="Confirm?", body="b", task_type="decision", options=["A"], assignee="owner"
+    )
+    stores.answer_inbox_task(record["id"], answer="A")
+    stored = stores.inbox.get(record["id"])
+    assert stored is not None
+    closeout_id = (stored.get("metadata") or {}).get("closeout_id")
+    assert closeout_id
+    stores.close_inbox_task(closeout_id, resolution="did A")
+    stores.close_inbox_task(
+        record["id"], resolution=f"See follow-up inbox:{followup['id']} for confirm."
+    )
+    items, _ = stores.inbox.list(limit=100)
+    reports = [i for i in items if i.get("type") == "report"]
+    assert len(reports) == 1
+    where = reports[0]["body"].split("## Where to look")[1]
+    assert f"inbox:{closeout_id}" in where
+    assert f"inbox:{followup['id']}" in where
+
+
+def test_chain_report_ignores_bare_hex_and_nips(stores) -> None:
+    record = stores.create_inbox_task(
+        title="Pick?", body="b", task_type="decision", options=["A"], assignee="owner"
+    )
+    stores.answer_inbox_task(record["id"], answer="A")
+    stored = stores.inbox.get(record["id"])
+    assert stored is not None
+    closeout_id = (stored.get("metadata") or {}).get("closeout_id")
+    assert closeout_id
+    stores.close_inbox_task(closeout_id, resolution="did A")
+    stores.close_inbox_task(
+        record["id"], resolution="NIP 5482782178, see item abcdef12 for context."
+    )
+    items, _ = stores.inbox.list(limit=100)
+    reports = [i for i in items if i.get("type") == "report"]
+    assert len(reports) == 1
+    where = reports[0]["body"].split("## Where to look")[1]
+    assert "5482782178" not in where
+    assert "abcdef12" not in where
+
+
 @pytest.mark.parametrize("merge_key", ["merge_for_branch", "merge_for_run"])
 @pytest.mark.parametrize("source_first", [True, False])
 @pytest.mark.parametrize("answer", ["Merge now", "Hold"])
