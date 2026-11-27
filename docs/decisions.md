@@ -1383,3 +1383,11 @@ cost, with advisory attribution, not a separate client charge. C is preferred fo
 a future AI-enabled product, subject to client choice and discovery demand; no
 immediate product build is authorized. See the [decision record](decisions/p7-track23-ai-cost-handling.md)
 (source inbox `1ce80f7f35a74b09b60ea01a4fd9e7d4`). Client-specific terms remain gated.
+
+
+## P7 Track 2.5: price presentation confirmed (2026-11-27)
+
+Owner confirmed C: broad estimates on the offers overview; first-year totals,
+scoped examples and fuller disclaimers on project detail pages. Numeric bands
+and publication remain separately gated. See [decision record](decisions/p7-track25-price-presentation.md)
+(source inbox `73aaf0c8040342f7a738602778e51e9e`).

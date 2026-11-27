@@ -4,6 +4,16 @@ Run: `3f377ac0624947a1a58b24486085a4e0`. Research COMPLETE; owner pricing
 choices and professional tax/legal confirmation PENDING. This is internal
 research, not an approved price list, quote, contract or publication instruction.
 
+## Subsequent owner decision (2026-11-27)
+
+Inbox `73aaf0c8040342f7a738602778e51e9e` confirms C with progressive
+detail: broad estimates on the main offers page; first-year totals and fuller
+disclaimers on specific project detail pages. See
+[accepted presentation direction](decisions/p7-track25-price-presentation.md).
+This supersedes the preliminary presentation status and recommendation A below,
+not the pending approval of numeric prices, scopes, tax treatment or public copy.
+The remaining report preserves the original research and advice.
+
 ## Conclusion and authority
 
 Recommend keeping the existing PL discovery floor / EN number-silent posture
