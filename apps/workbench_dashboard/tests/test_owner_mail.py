@@ -226,15 +226,16 @@ def test_notify_plan_silent_without_smtp(tmp_path) -> None:
     assert list(tmp_path.iterdir()) == []
 
 
-def test_notify_plan_attended_mails_nothing(tmp_path, fake_smtp) -> None:
-    # Owner decision 2026-11-18: mail only during unattended sessions.
+def test_notify_plan_attended_mails_needs_you_only(tmp_path, fake_smtp) -> None:
+    # Tiered policy (owner C on 716e02b3): attended pages failed and
+    # waiting_on_owner; completed/cancelled summaries stay queued.
     sender, notify_on = notify_plan("attended", tmp_path, dict(SMTP_ENV))
     assert sender is not None
     assert notify_on == ATTENDED_NOTIFY_STATUSES
-    assert ATTENDED_NOTIFY_STATUSES == frozenset()
+    assert ATTENDED_NOTIFY_STATUSES == frozenset({"failed", "waiting_on_owner"})
     receipt = sender({"run_id": "run-12345678", "status": "failed", "title": "t"})
-    assert receipt["skipped"] == "attended"
-    assert not fake_smtp.instances
+    assert receipt.get("queued") is True
+    assert "skipped" not in receipt
 
 
 def test_notify_plan_unattended_mails_terminal(tmp_path) -> None:
