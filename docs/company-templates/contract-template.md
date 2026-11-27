@@ -26,12 +26,16 @@ Work starts after countersignature + first payment per SOW schedule.
 - Late payment: `[TO-VERIFY: statutory interest + recovery-cost wording]`
 - Work pauses if any invoice is `[OWNER: e.g. 21 days]` overdue (notice first).
 
-## 4. IP transfer
+## 4. Intellectual property (IP) licensing intent — terms pending review
 
-- Deliverables transfer to client on full payment of their SOW
-  `[TO-VERIFY: transfer vs licence wording; moral rights note]`.
-- Contractor background IP (libraries, templates, know-how) stays with
-  contractor, licensed perpetually to client as embedded in deliverables.
+- Accepted general intent: contractor retains ownership and reusable templates;
+  client receives a broad nonexclusive deliverable licence and remains free to
+  choose who maintains and expands the software. Preserve company-wide business
+  use and expansion/integration without mandatory ongoing services.
+- `[TO-VERIFY: per-project asset schedule, embedded rights, source/inspection/
+  modification and continuity package, duration/termination and legal wording.
+  See docs/p7-ip-decision-brief.md and p7-track24-source-continuity. This draft
+  settles no final rights package or access to all Workbench internals.]`
 - Third-party/open-source components pass through under their own licences
   (listed per SOW).
 
