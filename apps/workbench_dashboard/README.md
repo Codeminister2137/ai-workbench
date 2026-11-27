@@ -169,3 +169,6 @@ Approval requests (the legacy `order` record type) ask the owner to authorize a
 proposed action; tasks track work to perform. Approval requests remain excluded
 from automatic task-to-run bridging. Existing records and filter URLs retain
 the `order` token for compatibility. Show all includes every state, kind and assignee.
+
+The header Tools dropdown contains item ID lookup, Report bug, and the served
+branch/commit information. The + New control stays directly accessible.

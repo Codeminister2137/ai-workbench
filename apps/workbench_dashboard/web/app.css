@@ -4,7 +4,13 @@ header { display: flex; justify-content: space-between; align-items: center; pad
 nav a { margin-right: var(--wb-space-5); text-decoration: none; white-space: nowrap; }
 nav a.active { font-weight: bold; text-decoration: underline; }
 .badge { background: var(--wb-color-red); color: var(--wb-color-white); border-radius: var(--wb-radius-badge); padding: var(--wb-pad-badge); font-size: var(--wb-font-badge); }
-#create-wrap { position: relative; }
+#create-wrap { position: relative; flex-shrink: 0; }
+#header-tools { position: static; margin-left: auto; margin-right: var(--wb-space-3); flex-shrink: 0; }
+#header-tools > summary { cursor: pointer; padding: var(--wb-space-3); }
+#tools-panel { position: absolute; right: 0; top: 100%; z-index: 30; background: var(--wb-color-surface); border: var(--wb-border-plain); padding: var(--wb-pad-menu); width: min(22rem, calc(100vw - 3rem)); box-sizing: border-box; }
+#tools-panel > * { margin: var(--wb-space-3) 0; }
+#tools-panel #version-pill { display: block; overflow-wrap: anywhere; }
+#tools-panel #global-lookup-id { min-width: 0; width: 0; }
 #global-lookup { display: flex; gap: var(--wb-gap-flex); align-items: center; }
 #global-lookup-id { width: var(--wb-nav-menu-width); }
 #create-menu { position: absolute; right: 0; background: inherit; border: var(--wb-border-plain); padding: var(--wb-pad-menu); display: flex; flex-direction: column; gap: var(--wb-gap-menu); z-index: 10; }

@@ -2219,3 +2219,45 @@ eval(source.slice(source.indexOf('async function renderOrchestrator()')));
 })().catch(err => {console.error(err); process.exit(1);});
 """
     subprocess.run([node, "-e", driver, str(WEB_DIR / "app.js")], check=True)
+
+
+def test_tools_dropdown_contains_secondary_header_controls() -> None:
+    """Owner choice B groups secondary controls while keeping creation visible."""
+    from html.parser import HTMLParser
+
+    class Controls(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.in_tools = False
+            self.tools_ids = []
+            self.outside_ids = []
+            self.tools_open = None
+
+        def handle_starttag(self, tag, attrs):
+            attrs = dict(attrs)
+            if attrs.get("id") == "header-tools":
+                assert tag == "details"
+                self.in_tools = True
+                self.tools_open = "open" in attrs
+            if "id" in attrs:
+                (self.tools_ids if self.in_tools else self.outside_ids).append(attrs["id"])
+
+        def handle_endtag(self, tag):
+            if tag == "details":
+                self.in_tools = False
+
+    parser = Controls()
+    parser.feed(_read("index.html"))
+    assert parser.tools_open is False
+    for control in (
+        "version-pill",
+        "global-lookup",
+        "global-lookup-id",
+        "global-lookup-go",
+        "bug-btn",
+    ):
+        assert parser.tools_ids.count(control) == 1
+        assert control not in parser.outside_ids
+    assert "create-btn" in parser.outside_ids
+    assert "<summary title=" in _read("index.html")
+    assert "calc(100vw - 3rem)" in _read("app.css")
