@@ -727,9 +727,9 @@ def _mail_failure(config: SuperviseConfig, reason: str) -> None:
         from dashboard_config import load_config
         from owner_mail import load_smtp_config, send_owner_mail
 
-        # Owner decision 2026-11-18: mail only during unattended sessions.
-        if load_config(config.config_path).supervision != "unattended":
-            return
+        # Tiered policy (owner C on 716e02b3, supersedes the 2026-11-18
+        # unattended-only rule): a redeploy failure is a needs-you page.
+        supervision = load_config(config.config_path).supervision
         mail_config = load_smtp_config(root=config.main_root)
         send_owner_mail(
             to=mail_config["owner"],
@@ -739,7 +739,7 @@ def _mail_failure(config: SuperviseConfig, reason: str) -> None:
             dry_run=False,
             receipts_dir=config.data_dir / "mail-receipts",
             data_dir=config.data_dir,
-            supervision="unattended",
+            supervision=supervision,
             blocker=True,
             dedupe_key=f"redeploy:{reason}",
         )
@@ -812,12 +812,11 @@ def supervise_tick(config: SuperviseConfig, *, dry_run: bool = False, force: boo
         from owner_mail import load_smtp_config
 
         current = load_config(config.config_path)
-        if current.supervision == "unattended":
-            flush_digest(
-                data_dir=config.data_dir,
-                supervision=current.supervision,
-                config=load_smtp_config(root=config.main_root),
-            )
+        flush_digest(
+            data_dir=config.data_dir,
+            supervision=current.supervision,
+            config=load_smtp_config(root=config.main_root),
+        )
     except Exception:  # noqa: BLE001 - SMTP cannot prevent dashboard recovery
         pass
     for attempt in range(4):
