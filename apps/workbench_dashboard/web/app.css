@@ -26,6 +26,7 @@ nav a.active { font-weight: bold; text-decoration: underline; }
 form.inline { display: flex; gap: var(--wb-gap-flex); margin-top: var(--wb-space-3); }
 #chat-form { position: sticky; bottom: 0; background: var(--wb-color-surface); padding: var(--wb-space-3) 0; border-top: var(--wb-border-thin); z-index: 4; }
 input[type="text"], textarea { flex: 1; font: inherit; }
+textarea.free-text { width: 100%; min-height: 3.5em; resize: vertical; box-sizing: border-box; }
 button { font: inherit; cursor: pointer; }
 ul.plain { list-style: none; padding-left: 0; }
 .knowme-entries li { margin-bottom: var(--wb-space-4); }

@@ -84,7 +84,10 @@ def test_prepare_copies_tree(spec, src) -> None:
 def test_prepare_refuses_escaping_symlink(spec, src, tmp_path) -> None:
     outside = tmp_path / "secret.txt"
     outside.write_text("s3cret", encoding="utf-8")
-    (src / "leak").symlink_to(outside)
+    try:
+        (src / "leak").symlink_to(outside)
+    except OSError:
+        pytest.skip("symlinks require privileges on this host")
     with pytest.raises(RuntimeError, match="escapes source"):
         prepare_workspace(spec)
     assert not (spec.storage_root / "r1").exists()
