@@ -335,6 +335,7 @@ def capture_server_version(
         "started_utc": datetime.now(UTC).isoformat(),
         "tier": "tooling",
         "serve_branch": "develop",
+        "repo_url": _github_repo_url(repo_root),
     }
     if data_dir is not None:
         try:
@@ -383,6 +384,27 @@ def capture_server_version(
         if stamped.returncode == 0 and stamped.stdout.strip():
             info["commit_utc"] = stamped.stdout.strip()
     return _with_tier(info, config_path)
+
+
+def _github_repo_url(repo_root: Path) -> str | None:
+    """Best-effort https repo URL for commit links (None when unresolvable)."""
+    try:
+        proc = subprocess.run(
+            ["git", "remote", "get-url", "origin"],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if proc.returncode != 0:
+        return None
+    url = proc.stdout.strip()
+    match = re.match(r"(?:https?://github\.com/|git@github\.com:)([^/]+/[^/]+?)(?:\.git)?/?$", url)
+    if not match:
+        return None
+    return f"https://github.com/{match.group(1)}"
 
 
 def read_maintenance(data_dir: Path) -> dict[str, Any]:
