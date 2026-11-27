@@ -18,6 +18,7 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/codex-plugin-review.md | KNOWLEDGE | Point-in-time catalog note (not upstream truth). |
 | docs/codex-toolkit.md | KNOWLEDGE | Portable tooling notes. |
 | docs/company-run.md | KNOWLEDGE | Company-run reference (G12). |
+| docs/p7-pricing-research-20261127.md | PENDING | PL/EU offer and affordability research complete; Track 2.5/3 presentation, staged delivery, regional basis and discovery-credit mechanics await owner choices. |
 | docs/day-cycle.md | KNOWLEDGE | Day-cycle reference. |
 | docs/day-report-20261121.md | KNOWLEDGE | Day report 2026-11-21 (snapshot 21:47; closeout addendum pending). |
 | docs/decisions.md | KNOWLEDGE | Decision index (append-only log). |

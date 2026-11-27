@@ -190,6 +190,48 @@
         "D: Filtered direct host connection",
         "R: Host-initiated isolated-network relay (recommended)"
       ]
+    },
+    {
+      "id": "p7-track25-price-presentation",
+      "title": "P7 Track 2.5: choose price presentation",
+      "type": "decision",
+      "body": "Why: buyers need budget clarity without mistaking scope-dependent figures for\npromises. A: retain PL discovery floor / EN number-silent, quote builds and care.\nPro: respects prior decision, avoids premature bands. Con: more enquiries and\nuncertainty for buyers. B: scope-specific floors on both languages. Pro: quick\nqualification and transparency. Con: minimum anchors can mislead on total cost\nand require validated scope/cost floors. C: scoped bands/examples with first-year\ntotals on both languages. Pro: explains value and recurring obligations. Con:\nmore maintenance, wider anchoring and still weak transaction evidence.\nRecommendation: A now; prepare C as an internal validation aid, reconsider public\nuse only after costed examples and owner review. Question: A, B or C; if B/C,\nwhich service scopes and numeric amounts should receive a separate approval?\n\nResearch: C:\\Users\\Jakub\\PycharmProjects\\ai-workbench\\.tmp\\run-worktrees\\3f377ac06249\\docs\\p7-pricing-research-20261127.md\nSource: run 3f377ac0624947a1a58b24486085a4e0; inbox 3eb3bc3b286845fa8d147fdd2dfe2e4c. Recommendations only; no publication, price/contract change, outreach or paid inference authorized.",
+      "options": [
+        "A: Retain PL discovery floor; quote builds/care; EN number-silent",
+        "B: Scope-specific floors in PL and EN",
+        "C: Scoped bands/examples with first-year totals"
+      ]
+    },
+    {
+      "id": "p7-track3-affordability",
+      "title": "P7 Track 3: choose affordability and delivery approach",
+      "type": "decision",
+      "body": "Why: a smaller budget should not silently buy incomplete production work. A:\nretain working bands as unapproved references, cost each scope, and offer an\nindependently useful paid first slice with separate go/no-go before expansion.\nPro: evidence/value before full commitment, protects margin. Con: extra acceptance\nand possible later-stage integration cost. B: approve lower fixed packages with\nexplicitly reduced systems/features/support. Pro: accessible predictable entry.\nCon: needs a new scope/cost model, can anchor custom work too low. C: same full\nscope/fee with milestone instalments. Pro: cash-flow relief without scope loss.\nCon: unchanged total affordability and seller credit/collection exposure.\nRecommendation: A; optional C only under reviewed payment terms. No automatic\nmicrobusiness exclusion or blanket discount. Question: A, B or C, which buyer\nsegment/first outcome, and what cash/payback constraints should validation test?\n\nResearch: C:\\Users\\Jakub\\PycharmProjects\\ai-workbench\\.tmp\\run-worktrees\\3f377ac06249\\docs\\p7-pricing-research-20261127.md\nSource: run 3f377ac0624947a1a58b24486085a4e0; inbox 3eb3bc3b286845fa8d147fdd2dfe2e4c. Recommendations only; no publication, price/contract change, outreach or paid inference authorized.",
+      "options": [
+        "A: Cost each scope; independently useful first paid slice",
+        "B: Lower-priced packages with explicitly reduced scope",
+        "C: Full scope and total fee with milestone instalments"
+      ]
+    },
+    {
+      "id": "p7-track25-regional-pricing",
+      "title": "P7 Track 2.5: choose regional quote basis; confirm tax/legal questions",
+      "type": "decision",
+      "body": "Why: currency, customer value and tax treatment are separate. A: common scope/cost\nbasis across PL/EN, dated currency conversion and itemized demonstrable delivery\ndifferences; tax calculated separately. Pro: defensible, understandable parity.\nCon: captures less willingness-to-pay variation. B: segment/value-based bespoke\nquotes with explicit benefit/risk justification, legal review and no automatic\nlanguage/nationality multiplier. Pro: can capture high-value work. Con: more\njudgment, fairness/trust risk and legal review. Recommendation: A initially;\nevidence does not justify a flat EN premium. Question: A or B, and what actual\nincremental costs/value criteria may change a quote? Both retain accountant/legal\nconfirmation before affected real transactions.\n\nResearch: C:\\Users\\Jakub\\PycharmProjects\\ai-workbench\\.tmp\\run-worktrees\\3f377ac06249\\docs\\p7-pricing-research-20261127.md\nSource: run 3f377ac0624947a1a58b24486085a4e0; inbox 3eb3bc3b286845fa8d147fdd2dfe2e4c. Recommendations only; no publication, price/contract change, outreach or paid inference authorized.\n\nAccountant questions: actual VAT registration/exemption status; discovery vs\nadvisory classification; VAT-UE and foreign API imports; B2B status evidence;\nmixed custom work/hosting; B2C OSS/SME rules; EUR invoice conversion and PLN tax\namount; discovery-credit invoice/correction timing; KSeF dates and foreign\ndelivery; non-EU withholding and reporting. Lawyer questions: B2B versus protected\nsole traders/consumers; withdrawal and cancellation; credit expiry/refunds;\ngeo-pricing/equal access; data-processing/transfer duties; milestone acceptance,\ntermination and portable handoff. No professional engagement or payment is\nauthorized by this list.\n",
+      "options": [
+        "A: Common scope/cost basis; evidenced increments; tax separate",
+        "B: Value/segment quotes with justification and legal review"
+      ]
+    },
+    {
+      "id": "p7-track3-discovery-credit",
+      "title": "P7 Track 3: choose mechanics of approved discovery credit",
+      "type": "decision",
+      "body": "Why: unclear credit can create double charging, margin loss or disputed expiry.\nA: full discovery fee credited to the same scoped build, no short expiry; re-scope\nif assumptions materially change. Pro: straightforward, lower buyer pressure.\nCon: long-tail admin and repeat assessment risk. B: full credit within a stated\nwindow (e.g. 90 days), written expiry and revalidation policy. Pro: bounds reuse\nrisk; observed competitor precedent. Con: sales pressure and dispute risk; duration\nis not proven optimal. Recommendation: A for early projects with explicit quote\nvalidity; choose B only with a real cost/revalidation reason. Both retain a paid\nstandalone report; credit principle is accepted, neither changes refunds by\nimplication. Question: A or B; if B, what duration and changed-scope handling?\nAccountant/legal review precedes contractual wording.\n\nResearch: C:\\Users\\Jakub\\PycharmProjects\\ai-workbench\\.tmp\\run-worktrees\\3f377ac06249\\docs\\p7-pricing-research-20261127.md\nSource: run 3f377ac0624947a1a58b24486085a4e0; inbox 3eb3bc3b286845fa8d147fdd2dfe2e4c. Recommendations only; no publication, price/contract change, outreach or paid inference authorized.",
+      "options": [
+        "A: Full credit, no short expiry; re-scope changed assumptions",
+        "B: Full credit with explicit expiry/revalidation window"
+      ]
     }
   ]
 }
