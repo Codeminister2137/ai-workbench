@@ -23,6 +23,8 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/day-report-20261121.md | KNOWLEDGE | Day report 2026-11-21 (snapshot 21:47; closeout addendum pending). |
 | docs/day-report-20261127.md | KNOWLEDGE | Digest-level day report 2026-11-27 (work state + numbers + flags). |
 | docs/inbox-attribution.md | KNOWLEDGE | Inbox attribution contract (owner 10787032 A+B): author metadata, linked execution, effective model. |
+| docs/p7-hosting-mail-registration.md | KNOWLEDGE | Owner registration guide (CF Pages + Zoho EU); referenced by 74d4b57d. |
+| docs/p7-hosting-upgrade.md | KNOWLEDGE | Parked hosting/mail upgrade conditions + migration steps. |
 | docs/decisions.md | KNOWLEDGE | Decision index (append-only log). |
 | docs/definition-of-done.md | KNOWLEDGE | Done criteria. |
 | docs/documentation-conformance-plan.md | PENDING | In progress; bounded findings recorded, follow-ups open. |
