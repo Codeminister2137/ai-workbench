@@ -24,6 +24,8 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/day-report-20261127.md | KNOWLEDGE | Digest-level day report 2026-11-27 (work state + numbers + flags). |
 | docs/inbox-attribution.md | KNOWLEDGE | Inbox attribution contract (owner 10787032 A+B): author metadata, linked execution, effective model. |
 | docs/p7-hosting-mail-registration.md | KNOWLEDGE | Owner registration guide (CF Pages + Zoho EU); referenced by 74d4b57d. |
+| docs/p7-ai-cost-decision-brief.md | KNOWLEDGE | Track 2.3 reconciled alternatives (D accepted, C product preference); owner pick 40a1c633. |
+| docs/p7-ip-decision-brief.md | KNOWLEDGE | Track 2.4 reconciled alternatives (B accepted); owner pick 40a1c633. |
 | docs/p7-zus-tax-calendar.md | PENDING | First-year calendar draft 27.11; start date + statutory dates need owner/Beata confirmation. |
 | docs/p7-hosting-upgrade.md | KNOWLEDGE | Parked hosting/mail upgrade conditions + migration steps. |
 | docs/decisions.md | KNOWLEDGE | Decision index (append-only log). |
