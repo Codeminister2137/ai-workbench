@@ -67,8 +67,44 @@ def test_only_confirmed_whole_window_blocker_bypasses(mail):
     assert len(sent) == 1
 
 
-def test_attended_queue_and_flush_cannot_deliver(mail, tmp_path):
+def test_attended_pages_needs_you_and_holds_done(mail, tmp_path):
     sent, clock, queue, _, config = mail
+    queued = digest.queue_notification(
+        data_dir=tmp_path,
+        supervision="attended",
+        subject="done work",
+        body="Outcome: done",
+        config=config,
+    )
+    assert queued["queued"]
+    assert (tmp_path / "owner-digest.sqlite3").exists()
+    assert (
+        digest.flush_digest(data_dir=tmp_path, supervision="attended", config=config)["skipped"]
+        == "attended"
+    )
+    assert not sent
+    digest.queue_notification(
+        data_dir=tmp_path,
+        supervision="attended",
+        subject="need decision",
+        body="b",
+        config=config,
+        tier="needs-you",
+    )
+    page = digest.flush_digest(data_dir=tmp_path, supervision="attended", config=config)
+    assert page["sent"]
+    assert "need decision" in sent[0]["body"]
+    assert "done work" not in sent[0]["body"]
+    assert "Page" in sent[0]["subject"]
+    queue()
+    clock[0] += 3600
+    batch = digest.flush_digest(data_dir=tmp_path, supervision="unattended", config=config)
+    assert batch["sent"]
+    assert "done work" in sent[1]["body"]
+
+
+def test_attended_whole_window_blocker_pages_immediately(mail, tmp_path):
+    sent, _, _, _, config = mail
     result = digest.queue_notification(
         data_dir=tmp_path,
         supervision="attended",
@@ -78,12 +114,8 @@ def test_attended_queue_and_flush_cannot_deliver(mail, tmp_path):
         blocker=True,
         all_work_blocked=True,
     )
-    assert result["skipped"] == "attended"
-    assert not (tmp_path / "owner-digest.sqlite3").exists()
-    queue()
-    clock[0] += 3600
-    assert digest.flush_digest(data_dir=tmp_path, supervision="attended", config=config)["skipped"]
-    assert not sent
+    assert result["sent"]
+    assert len(sent) == 1
 
 
 def test_delivery_failure_preserves_pending(mail, monkeypatch):

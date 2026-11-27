@@ -60,10 +60,13 @@ def queue_notification(
     all_work_blocked: bool = False,
     tier: str = TIER_DONE,
 ) -> dict:
-    """Enqueue once, including blockers first; only whole-window blockers page."""
+    """Enqueue once, including blockers first; only whole-window blockers page.
+
+    Tiered policy (owner C on 716e02b3): needs-you pages send in any
+    supervision mode; done summaries wait for unattended. Enqueueing
+    always persists so attended pages have records to flush.
+    """
     result = {"sent": False, "error": None, "finished": time.time()}
-    if supervision != "unattended":
-        return dict(result, skipped="attended")
     key = dedupe_key or hashlib.sha256((subject + "\n" + body).encode()).hexdigest()
     db = _connect(data_dir)
     try:
@@ -96,10 +99,11 @@ def flush_digest(
 
     Failed delivery leaves records pending. SMTP cannot guarantee exactly-once
     delivery if the process dies after acceptance but before committing progress.
+    Attended mode pages needs-you/blocker rows immediately and leaves done
+    summaries queued; unattended mode flushes the hourly batch as before.
     """
     result = {"sent": False, "error": None, "finished": time.time()}
-    if supervision != "unattended":
-        return dict(result, skipped="attended")
+    attended = supervision != "unattended"
     from owner_mail import MAX_BODY_CHARS, _send_owner_mail_now
 
     clock = time.time() if now is None else now
@@ -110,13 +114,17 @@ def flush_digest(
         ).fetchall()
         if not rows:
             return dict(result, pending=0)
+        if attended:
+            rows = [row for row in rows if row[3] or row[5] == TIER_NEEDS_YOU]
+            if not rows:
+                return dict(result, skipped="attended")
         last = db.execute("SELECT last_sent FROM progress WHERE id=1").fetchone()
         due = max(min(row[4] for row in rows), last[0] if last else 0) + INTERVAL
         if urgent_key:
             rows = [row for row in rows if row[0] == urgent_key and row[3]]
             if not rows:
                 return dict(result, pending=0)
-        elif clock < due:
+        elif not attended and clock < due:
             return dict(result, queued=True, due=due)
         needs = [row for row in rows if row[3] or row[5] == TIER_NEEDS_YOU]
         done = [row for row in rows if row not in needs]
@@ -129,7 +137,7 @@ def flush_digest(
         selected = []
         body = (
             f"Verdict: {verdict} — {len(needs)} need you, {len(done)} done. "
-            "Unattended session updates:\n"
+            f"{'Attended page' if attended else 'Unattended session updates'}:\n"
         )
 
         def append_entry(entry: str, key: str) -> None:
@@ -162,7 +170,11 @@ def flush_digest(
         receipt = _send_owner_mail_now(
             to=config["owner"],
             subject="[workbench] "
-            + ("All work blocked" if urgent_key else f"[{verdict}] Hourly digest"),
+            + (
+                "All work blocked"
+                if urgent_key
+                else (f"[{verdict}] Page" if attended else f"[{verdict}] Hourly digest")
+            ),
             body=body,
             config=config,
             dry_run=False,
