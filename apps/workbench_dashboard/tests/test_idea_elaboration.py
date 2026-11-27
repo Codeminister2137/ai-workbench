@@ -30,7 +30,7 @@ def test_adopt_files_elaboration_task(tmp_path) -> None:
     assert task["assignee"] == "agent"
     assert task["status"] == "open"
     assert task["context_refs"] == [f"idea:{idea['id']}"]
-    assert task["metadata"] == {"elaboration_for": idea["id"]}
+    assert task["metadata"] == {"elaboration_for": idea["id"], "author_source": "rule"}
     assert "An app that waters plants." in task["body"]
     assert "Prototype it" in task["body"]
     assert "plan-1" in task["body"]

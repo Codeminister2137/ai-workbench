@@ -2841,7 +2841,7 @@ def _run_coding_prompt_with_fallback(
         ),
     )
     print(f"effective_route_id: {session.current.route_id}")
-    print(f"effective_model_id: {session.current.model}")
+    print(f"effective_model_id: {getattr(session.current, 'model', None)}")
     if hasattr(result, "orchestration"):
         return result
     from ai_orchestrator import ExecutionPlan
@@ -3416,7 +3416,7 @@ def _run_external_agent_with_fallback(
         ),
     )
     print(f"effective_route_id: {session.current.route_id}")
-    print(f"effective_model_id: {session.current.model}")
+    print(f"effective_model_id: {getattr(session.current, 'model', None)}")
     if isinstance(result, ExternalAgentResult):
         return result
     return ExternalAgentResult(
@@ -3467,7 +3467,7 @@ def _run_native_agent_with_fallback(
         ),
     )
     print(f"effective_route_id: {session.current.route_id}")
-    print(f"effective_model_id: {session.current.model}")
+    print(f"effective_model_id: {getattr(session.current, 'model', None)}")
     if not isinstance(result, ExternalAgentResult):
         return result
     from ai_agent.loop import AgentResult
