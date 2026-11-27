@@ -178,6 +178,10 @@ function linkIds(html) {
         kind = kind?.toLowerCase();
         if (!kind && id.length < 12) return m;
         const low = id.toLowerCase();
+        if (!kind && id.length === 40) {
+          if (typeof repoUrl === "undefined" || !repoUrl) return m;
+          return `<a href="${repoUrl}/commit/${low}" target="_blank" rel="noopener" title="Open commit ${id} on remote">${m}</a>`;
+        }
         const href = kind ? ID_ROUTES[kind] + low : "#/lookup/" + low;
         const title = kind ? `Open ${kind} ${id}` : "Look up this ID";
         return `<a href="${href}" title="${title}">${m}</a>`;
@@ -189,6 +193,10 @@ function refLink(ref) {
   const text = String(ref || "");
   const known = text.match(/^(inbox|run|idea|plan|chat):([0-9a-fA-F]{8,64})$/);
   if (known) return `<a href="${ID_ROUTES[known[1]]}${known[2].toLowerCase()}" title="Open ${known[1]} ${known[2]}">${esc(text)}</a>`;
+  if (/^[0-9a-fA-F]{40}$/.test(text)) {
+    if (typeof repoUrl !== "undefined" && repoUrl) return `<a href="${repoUrl}/commit/${text.toLowerCase()}" target="_blank" rel="noopener" title="Open commit ${text} on remote">${esc(text)}</a>`;
+    return esc(text);
+  }
   if (/^[0-9a-fA-F]{8,64}$/.test(text)) return `<a href="#/lookup/${text.toLowerCase()}" title="Look up this ID">${esc(text)}</a>`;
   return linkIds(esc(text));
 }
@@ -353,9 +361,11 @@ function startMaintPoll() {
 }
 
 /* Served-version pill: branch@commit once at boot, so a stale page is obvious. */
+let repoUrl = null;
 async function loadVersionPill() {
   try {
     const v = await api("/api/version");
+    if (v.repo_url) repoUrl = v.repo_url;
     const el = document.getElementById("version-pill");
     if (!el) return;
     el.textContent = `${v.branch || "?"}@${v.commit || "?"}`;

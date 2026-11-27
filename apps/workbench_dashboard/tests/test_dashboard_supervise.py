@@ -91,6 +91,34 @@ def test_capture_version_reads_commit_date_from_git(tmp_path) -> None:
     assert info["commit_utc"] == expect
 
 
+def test_github_repo_url_normalizes_remotes(tmp_path) -> None:
+    import subprocess
+
+    from dashboard_web_app import _github_repo_url, capture_server_version
+
+    subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
+    assert _github_repo_url(tmp_path) is None
+    subprocess.run(
+        ["git", "remote", "add", "origin", "git@github.com:org/repo.git"],
+        cwd=tmp_path,
+        check=True,
+    )
+    assert _github_repo_url(tmp_path) == "https://github.com/org/repo"
+    assert capture_server_version(tmp_path)["repo_url"] == "https://github.com/org/repo"
+    subprocess.run(
+        ["git", "remote", "set-url", "origin", "https://github.com/org/repo"],
+        cwd=tmp_path,
+        check=True,
+    )
+    assert _github_repo_url(tmp_path) == "https://github.com/org/repo"
+    subprocess.run(
+        ["git", "remote", "set-url", "origin", "https://gitlab.com/org/repo.git"],
+        cwd=tmp_path,
+        check=True,
+    )
+    assert _github_repo_url(tmp_path) is None
+
+
 def test_version_endpoint_serves_snapshot(dashboard_server, monkeypatch) -> None:
     from dashboard_test_http import get_json
     from dashboard_web_app import DashboardRequestHandler

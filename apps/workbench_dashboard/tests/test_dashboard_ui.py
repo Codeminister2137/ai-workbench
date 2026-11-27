@@ -2329,3 +2329,25 @@ assert(html.includes('<a href="#/runs/d">Waiting</a>'));
 assert(html.includes('Open inbox kinds'));
 """
     _run_node_driver(driver)
+
+
+def test_commit_shas_link_to_remote_or_stay_plain() -> None:
+    """40-hex SHAs link to the remote commit; plain text without a remote."""
+    driver = r"""
+const assert = require('assert');
+const source = require('fs').readFileSync(process.argv[1], 'utf8');
+const grab = (name) => eval('(' + source.slice(source.indexOf('function ' + name + '('),
+  source.indexOf('\n}', source.indexOf('function ' + name + '(')) + 2) + ')');
+const sha = 'd5385d4ad0a41bbc881e55a824c2933044cc6109';
+global.repoUrl = 'https://github.com/org/repo';
+const linkIds = grab('linkIds');
+const linked = linkIds('see ' + sha + ' here');
+assert(linked.includes('https://github.com/org/repo/commit/' + sha), 'commit links remote');
+assert(linked.includes('target="_blank"'));
+const uuid = 'f05e3226dd8440fc816e03cd89c6c431';
+assert(linkIds(uuid).includes('#/lookup/' + uuid), '32-hex still resolves internally');
+global.repoUrl = null;
+assert.strictEqual(linkIds(sha), sha, 'no remote means no link');
+assert.strictEqual(linkIds('feature/report-digest'), 'feature/report-digest', 'branches stay plain');
+"""
+    _run_node_driver(driver)
