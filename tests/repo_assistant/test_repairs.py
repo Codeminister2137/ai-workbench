@@ -159,6 +159,7 @@ def test_cli_orchestrated_repair_reruns_validation_until_passed(
             "progress": "failure_changed",
             "changed_paths": [],
             "effective_route_id": "ollama/gpt-oss:20b",
+            "effective_model_id": "gpt-oss:20b",
             "fallback_attempts": [
                 {"route_id": "ollama/gpt-oss:20b", "status": "finished"},
                 {"route_id": "ollama/gpt-oss:20b", "status": "finished"},
