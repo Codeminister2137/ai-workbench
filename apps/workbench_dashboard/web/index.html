@@ -54,14 +54,19 @@
     <a href="#/modules" data-view="modules" title="Available modules and activation preferences">Modules</a>
     <a href="#/help" data-view="help" title="Help: runbook and troubleshooting">Help</a>
   </nav>
-  <span id="version-pill" class="muted" title="Served branch and commit"></span>
-  <form id="global-lookup" title="Find any item by ID from anywhere">
-    <input type="text" id="global-lookup-id" placeholder="Find item by ID..." title="Look up any inbox, run, idea, or plan ID (full or unique prefix)">
-    <button type="submit" id="global-lookup-go" title="Open the item with this ID">Go</button>
-  </form>
+  <details id="header-tools">
+    <summary title="Find items, report bugs, and inspect the served version">Tools</summary>
+    <div id="tools-panel">
+      <span id="version-pill" class="muted" title="Served branch and commit"></span>
+      <form id="global-lookup" title="Find any item by ID from anywhere">
+        <input type="text" aria-label="Find item by ID" id="global-lookup-id" placeholder="Find item by ID..." title="Look up any inbox, run, idea, or plan ID (full or unique prefix)">
+        <button type="submit" id="global-lookup-go" title="Open the item with this ID">Go</button>
+      </form>
+      <button id="bug-btn" title="Report a bug with automatic context capture">Report bug</button>
+    </div>
+  </details>
   <div id="create-wrap">
     <button id="create-btn" title="New chat, plan note, inbox item, idea, or backlog item">+ New</button>
-    <button id="bug-btn" title="Report a bug with automatic context capture">Report bug</button>
     <div id="create-menu" hidden>
       <button data-create="chat" title="Start a supervisor chat">New chat</button>
       <button data-create="inbox" title="Add an inbox task">New inbox item</button>

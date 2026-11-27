@@ -2255,3 +2255,47 @@ def test_chat_keeps_enter_to_send() -> None:
     assert 'freeText({name: "text", rows: 2' in js
     assert 'ev.key === "Enter" && !ev.shiftKey' in js
     assert "form.requestSubmit()" in js
+
+
+def test_tools_dropdown_contains_secondary_header_controls() -> None:
+    """Owner choice B groups secondary controls while keeping creation visible."""
+    from html.parser import HTMLParser
+
+    class Controls(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.in_tools = False
+            self.tools_ids = []
+            self.outside_ids = []
+            self.tools_open = None
+
+        def handle_starttag(self, tag, attrs):
+            attrs = dict(attrs)
+            if attrs.get("id") == "header-tools":
+                assert tag == "details"
+                self.in_tools = True
+                self.tools_open = "open" in attrs
+            if "id" in attrs:
+                (self.tools_ids if self.in_tools else self.outside_ids).append(attrs["id"])
+
+        def handle_endtag(self, tag):
+            if tag == "details":
+                self.in_tools = False
+
+    parser = Controls()
+    parser.feed(_read("index.html"))
+    assert parser.tools_open is False
+    for control in (
+        "version-pill",
+        "global-lookup",
+        "global-lookup-id",
+        "global-lookup-go",
+        "bug-btn",
+    ):
+        assert parser.tools_ids.count(control) == 1
+        assert control not in parser.outside_ids
+    assert "create-btn" in parser.outside_ids
+    assert "<summary title=" in _read("index.html")
+    assert "calc(100vw - 3rem)" in _read("app.css")
+    css = _read("app.css")
+    assert re.search(r"#tools-panel #global-lookup-id\s*\{[^}]*flex\s*:", css)
