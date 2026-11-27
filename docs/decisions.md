@@ -1387,3 +1387,10 @@ immediate product build is authorized. See the [decision record](decisions/p7-tr
 ## P7 Track 2.5: regional quote basis (2026-11-27)
 
 Owner selected A on inbox `06ca3ea5962d4c5185ef131c266e0a19`: common scope/cost basis, evidenced increments within existing ranges, tax separate. Remote work rationale and pending professional checks: [decision](decisions/p7-track25-regional-quote-basis.md). No new public prices authorized.
+
+## P7 Track 2.5: price presentation confirmed (2026-11-27)
+
+Owner confirmed C: broad estimates on the offers overview; first-year totals,
+scoped examples and fuller disclaimers on project detail pages. Numeric bands
+and publication remain separately gated. See [decision record](decisions/p7-track25-price-presentation.md)
+(source inbox `73aaf0c8040342f7a738602778e51e9e`).
