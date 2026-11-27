@@ -361,3 +361,24 @@ def test_summarize_with_proposals_includes_manual_and_section():
     assert "Ad | look at this" in user
     with pytest.raises(digest.DigestError, match="empty-digest"):
         digest.summarize_with_proposals([], [], client=_FakeClient())
+
+
+def test_extract_defaults_to_snippet_and_full_opt_in_includes_body():
+    message = digest.extract_message(_plain_raw())
+    assert "body" not in message
+    assert "Hi there" in message["snippet"]
+    full = digest.extract_message(_plain_raw(), full=True)
+    assert full["body"].strip().startswith("Hi there")
+    assert full["snippet"] == message["snippet"]
+
+
+def test_fetch_full_flag_reaches_cli_output(fake_imap, tmp_path):
+    fake_imap.mailbox = [_plain_raw()]
+    out = tmp_path / "digest.json"
+    assert digest.main(["--fetch", "1", "--out", str(out)]) == 0
+    saved = json.loads(out.read_text(encoding="utf-8"))
+    assert "body" not in saved[0]
+    out_full = tmp_path / "full.json"
+    assert digest.main(["--fetch", "1", "--full", "--out", str(out_full)]) == 0
+    saved_full = json.loads(out_full.read_text(encoding="utf-8"))
+    assert "Hi there" in saved_full[0]["body"]
