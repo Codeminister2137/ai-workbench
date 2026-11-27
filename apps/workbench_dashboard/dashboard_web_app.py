@@ -1129,6 +1129,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 return self._send_e2e_tasks(parsed.query)
             if path == "/api/e2e/reports":
                 return self._send_e2e_reports()
+            if path == "/api/e2e/digest":
+                return self._send_e2e_digest()
             if path == "/api/e2e/by-view":
                 return self._send_e2e_by_view(parsed.query)
             if path.startswith("/api/e2e/tasks/"):
@@ -2172,6 +2174,62 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
     def _send_e2e_reports(self) -> None:
         items, total = self._stores().e2e_reports.list(limit=100)
         self._send_json({"ok": True, "items": items, "total": total})
+
+    def _send_e2e_digest(self) -> None:
+        """On-demand digest over reports + runs + inbox (inbox:0170c0da).
+
+        Read-only rollup for when volume exceeds realistic reading: counts
+        by verdict/status, top failing run titles, stuck/queued items and
+        open inbox kinds, with ids linking to full records. Freshness: live
+        read at request time, no cache. Claim double-check hooks are future
+        scope (backlog:671945f5).
+        """
+        from collections import Counter
+
+        stores = self._stores()
+        reports, _ = stores.e2e_reports.list(limit=100000)
+        runs, _ = stores.runs.list(limit=100000)
+        inbox_items, _ = stores.inbox.list(limit=100000)
+        verdicts: Counter = Counter()
+        for report in reports:
+            overall = report.get("overall")
+            if isinstance(overall, dict):
+                overall = overall.get("verdict", "?")
+            verdicts[str(overall)] += 1
+        run_status: Counter = Counter()
+        failing_titles: Counter = Counter()
+        stuck = []
+        for run in runs:
+            status = str(run.get("status"))
+            run_status[status] += 1
+            if status == "failed":
+                failing_titles[str(run.get("title", "?"))[:80]] += 1
+            if status in ("needs-attention", "queued"):
+                stuck.append({"id": run.get("id"), "status": status, "title": run.get("title")})
+        inbox_status: Counter = Counter()
+        open_kinds: Counter = Counter()
+        for item in inbox_items:
+            status = str(item.get("status"))
+            inbox_status[status] += 1
+            if status in ("open", "answered"):
+                open_kinds[str(item.get("title", "?")).split(":")[0][:40]] += 1
+        self._send_json(
+            {
+                "ok": True,
+                "reports": {"total": len(reports), "by_verdict": dict(verdicts)},
+                "runs": {"total": len(runs), "by_status": dict(run_status)},
+                "top_failing_runs": [
+                    {"title": title, "count": count}
+                    for title, count in failing_titles.most_common(5)
+                ],
+                "stuck_runs": stuck[:20],
+                "inbox": {
+                    "total": len(inbox_items),
+                    "by_status": dict(inbox_status),
+                    "open_kinds": dict(open_kinds.most_common(10)),
+                },
+            }
+        )
 
     def _send_e2e_by_view(self, query: str) -> None:
         from e2e_promotion import views_for_area

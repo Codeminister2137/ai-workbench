@@ -325,3 +325,31 @@ def test_by_view_matches_area_and_saves_drafts(dashboard_server) -> None:
     assert saved["ok"] is True
     again = get_json(dashboard_server, "/api/e2e/by-view?view=home")
     assert again["items"][0]["draft_notes"] == "looks good"
+
+
+def test_digest_rolls_up_reports_runs_and_inbox(dashboard_server, tmp_path) -> None:
+    """On-demand digest counts verdicts, clusters failures, links stuck items."""
+    import json
+
+    def seed(subdir, name, payload):
+        target = tmp_path / "data" / subdir
+        target.mkdir(parents=True, exist_ok=True)
+        (target / name).write_text(json.dumps(payload), encoding="utf-8")
+
+    seed("e2e_reports", "r1.json", {"id": "r1", "overall": "pass", "title": "t"})
+    seed("e2e_reports", "r2.json", {"id": "r2", "overall": "fail", "title": "t"})
+    seed("runs", "a.json", {"id": "a", "status": "failed", "title": "Flaky widget"})
+    seed("runs", "b.json", {"id": "b", "status": "failed", "title": "Flaky widget"})
+    seed("runs", "c.json", {"id": "c", "status": "completed", "title": "Done"})
+    seed("runs", "d.json", {"id": "d", "status": "queued", "title": "Waiting"})
+    seed("inbox", "i1.json", {"id": "i1", "status": "open", "title": "P7: something"})
+    seed("inbox", "i2.json", {"id": "i2", "status": "closed", "title": "Old"})
+    digest = get_json(dashboard_server, "/api/e2e/digest")
+    assert digest["ok"] is True
+    assert digest["reports"] == {"total": 2, "by_verdict": {"pass": 1, "fail": 1}}
+    assert digest["runs"]["total"] == 4
+    assert digest["runs"]["by_status"] == {"failed": 2, "completed": 1, "queued": 1}
+    assert digest["top_failing_runs"] == [{"title": "Flaky widget", "count": 2}]
+    assert digest["stuck_runs"] == [{"id": "d", "status": "queued", "title": "Waiting"}]
+    assert digest["inbox"]["by_status"] == {"open": 1, "closed": 1}
+    assert digest["inbox"]["open_kinds"] == {"P7": 1}
