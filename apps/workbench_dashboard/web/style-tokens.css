@@ -65,6 +65,7 @@
 
   --wb-size-page: 960px;
   --wb-size-toast: 24rem;
+  --wb-size-tools-panel: min(22rem, calc(100vw - 3rem));
   --wb-gap-grid: 1rem;
   --wb-gap-flex: .5rem;
   --wb-gap-menu: .25rem;

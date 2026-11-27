@@ -1917,14 +1917,6 @@ async function renderE2E(id) {
   bindFilterBoxes("e2e-filters", "e2e", "s");
 }
 
-function inboxAttribution(item) {
-  if (item.created_by === "owner") return "owner";
-  const meta = item.metadata || {};
-  const source = meta.author_source || (item.created_by === "agent" ? "CLI" : "supervisor / unknown");
-  const identity = `route ${meta.author_route || "unknown"} | model ${meta.author_model || "unknown"}`;
-  return `${source} | ${identity}${meta.attribution_run_id ? " (linked execution)" : ""}`;
-}
-
 async function renderInbox(id) {
   if (id) {
     const payload = await api("/api/inbox/" + encodeURIComponent(id));
@@ -2136,6 +2128,14 @@ async function renderInbox(id) {
     location.hash = "#/inbox" + (query ? "?" + query : "");
   });
   bindFilterBoxes("inbox-filters", "inbox", "f");
+}
+
+function inboxAttribution(item) {
+  if (item.created_by === "owner") return "owner";
+  const meta = item.metadata || {};
+  const source = meta.author_source || (item.created_by === "agent" ? "CLI" : "supervisor / unknown");
+  const identity = `route ${meta.author_route || "unknown"} | model ${meta.author_model || "unknown"}`;
+  return `${source} | ${identity}${meta.attribution_run_id ? " (linked execution)" : ""}`;
 }
 
 async function renderLookup(id) {

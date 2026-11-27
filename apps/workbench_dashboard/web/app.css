@@ -7,7 +7,7 @@ nav a.active { font-weight: bold; text-decoration: underline; }
 #create-wrap { position: relative; flex-shrink: 0; }
 #header-tools { position: static; margin-left: auto; margin-right: var(--wb-space-3); flex-shrink: 0; }
 #header-tools > summary { cursor: pointer; padding: var(--wb-space-3); }
-#tools-panel { position: absolute; right: 0; top: 100%; z-index: 30; background: var(--wb-color-surface); border: var(--wb-border-plain); padding: var(--wb-pad-menu); width: min(22rem, calc(100vw - 3rem)); box-sizing: border-box; }
+#tools-panel { position: absolute; right: 0; top: 100%; z-index: 30; background: var(--wb-color-surface); border: var(--wb-border-plain); padding: var(--wb-pad-menu); width: var(--wb-size-tools-panel); box-sizing: border-box; }
 #tools-panel > * { margin: var(--wb-space-3) 0; }
 #tools-panel #version-pill { display: block; overflow-wrap: anywhere; }
 #tools-panel #global-lookup-id { min-width: 0; flex: 1 1 0; }
