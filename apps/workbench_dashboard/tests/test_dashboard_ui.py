@@ -2296,6 +2296,7 @@ def test_tools_dropdown_contains_secondary_header_controls() -> None:
         assert control not in parser.outside_ids
     assert "create-btn" in parser.outside_ids
     assert "<summary title=" in _read("index.html")
-    assert "calc(100vw - 3rem)" in _read("app.css")
+    assert "var(--wb-size-tools-panel)" in _read("app.css")
+    assert "calc(100vw - 3rem)" in _read("style-tokens.css")
     css = _read("app.css")
     assert re.search(r"#tools-panel #global-lookup-id\s*\{[^}]*flex\s*:", css)

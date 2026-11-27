@@ -186,7 +186,9 @@ def test_inbox_attribution_uses_observed_receipt_not_route_spelling(tmp_path):
     assert item["metadata"]["author_route"] == "opaque-route"
     assert item["metadata"]["author_model"] == "actual-model"
     assert item["metadata"]["attribution_run_id"] == "r1"
-    assert stores.inbox.get(item["id"])["metadata"] == item["metadata"]
+    stored = stores.inbox.get(item["id"])
+    assert stored is not None
+    assert stored["metadata"] == item["metadata"]
     explicit = {**item, "metadata": {"author_model": "explicit"}}
     assert stores.with_inbox_attribution(explicit)["metadata"]["author_model"] == "explicit"
 
