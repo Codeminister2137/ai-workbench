@@ -151,9 +151,9 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/plans/p6-dashboard-scouting.md | ACTED | Dashboard built; scouting consumed. |
 | docs/plans/p7-capability-analysis.md | KNOWLEDGE | P7 working reference. |
 | docs/plans/p7-company-scouting.md | ACTED | Scouting consumed; residue in P7 deliberation. |
-| docs/plans/p7-deliberation-pack-20261118.md | PENDING | Owner deliberation brief; answers recorded on 52ccc91a. |
+| docs/plans/p7-deliberation-pack-20261118.md | PENDING | 52ccc91a disposition recorded 2026-11-27: naming complete; Track 2.1/2.2 approved; explanations and PL/EU pricing research pending in agent follow-ups. |
 | docs/plans/p7-discovery-checklist.md | KNOWLEDGE | On-site discovery tool v1. |
-| docs/plans/p7-grounding-20261109.md | KNOWLEDGE | Pricing/positioning ground truth §§1-9. |
+| docs/plans/p7-grounding-20261109.md | PENDING | Historical pricing hypotheses; owner 52ccc91a requests current PL/EU affordability and regional-pricing research. |
 | docs/plans/p7-knowledge-bank.md | KNOWLEDGE | Chatbot can/cannot bank. |
 | docs/plans/p7-paperwork-checklist.md | ACTED | Dropped 2026-11-18: phases absorbed by starting-company-checklist.md. |
 | docs/plans/p7-project-file-format-proposal.md | ACTED | Approved D9e-A; schema+validator shipped (029c874). |
