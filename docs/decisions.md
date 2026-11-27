@@ -1383,3 +1383,7 @@ cost, with advisory attribution, not a separate client charge. C is preferred fo
 a future AI-enabled product, subject to client choice and discovery demand; no
 immediate product build is authorized. See the [decision record](decisions/p7-track23-ai-cost-handling.md)
 (source inbox `1ce80f7f35a74b09b60ea01a4fd9e7d4`). Client-specific terms remain gated.
+
+## P7 Track 2.5: regional quote basis (2026-11-27)
+
+Owner selected A on inbox `06ca3ea5962d4c5185ef131c266e0a19`: common scope/cost basis, evidenced increments within existing ranges, tax separate. Remote work rationale and pending professional checks: [decision](decisions/p7-track25-regional-quote-basis.md). No new public prices authorized.
