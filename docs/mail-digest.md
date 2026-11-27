@@ -47,6 +47,13 @@ and refuses digests over 60,000 characters with `digest-too-large`.
 
 ## Status and privacy
 
+The accepted [Gmail authorization design](decisions/ADR-099-gmail-class-based-approval.md)
+permits task-relevant reading and defines standing sending to verified owned
+mailboxes with an audit trail. External automatic-send classes need separate
+owner-approved rules. The general sender, audit enforcement and explicit `--full`
+read option are pending implementation; the commands here retain snippet output.
+Mailbox read permission alone does not authorize hosted summarization.
+
 - `--probe` prints `PROBE_OK`, or `PROBE_FAIL <reason>` with exit code 1.
 - `--fetch` prints `FETCH_OK <count>`, or `FETCH_FAIL <reason>` with exit
   code 1 (no file written).

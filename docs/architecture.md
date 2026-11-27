@@ -582,3 +582,11 @@ Owner notification delivery uses the dashboard's shared local hourly digest
 blockers before routine updates, immediate mail only for a confirmed blocker of
 all work. Existing dashboard scheduler/supervisor ticks flush durable pending
 notifications; individual failed tasks do not imply whole-window blockage.
+
+General Gmail access has an accepted class-based authorization design
+([ADR-099](decisions/ADR-099-gmail-class-based-approval.md)): task-relevant reads
+and sends only to verified owned mailboxes have standing permission; external
+automatic-send classes require separately approved rules. Recipient enforcement
+and a private audit trail are required before activating the general sender.
+This design does not replace the notification cadence above or grant permission
+to send mailbox content to AI providers. Runtime implementation remains pending.
