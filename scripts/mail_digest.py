@@ -141,13 +141,17 @@ def _extract_urls(text: str) -> list[str]:
     return urls
 
 
-def extract_message(raw: bytes) -> dict:
-    """Local-only extraction: from/date/subject/message-id/snippet/urls."""
+def extract_message(raw: bytes, *, full: bool = False) -> dict:
+    """Local-only extraction: from/date/subject/message-id/snippet/urls.
+
+    ``full`` adds the complete plain-text body; the snippet default is
+    unchanged. Reading never marks, moves or deletes mail.
+    """
     msg = email.message_from_bytes(raw, policy=email.policy.default)
     text = _message_text(msg)
     snippet = re.sub(r"\s+", " ", text).strip()[:SNIPPET_LEN]
     date = msg["Date"]
-    return {
+    result = {
         "from": _decode_header(msg["From"]),
         "date": str(date) if date else "",
         "subject": _decode_header(msg["Subject"]),
@@ -155,12 +159,16 @@ def extract_message(raw: bytes) -> dict:
         "snippet": snippet,
         "urls": _extract_urls(text),
     }
+    if full:
+        result["body"] = text
+    return result
 
 
-def fetch_latest(count: int, query: str = "ALL") -> list[dict]:
+def fetch_latest(count: int, query: str = "ALL", *, full: bool = False) -> list[dict]:
     """Fetch the latest ``count`` INBOX mails matching ``query``, newest first.
 
     ``query`` is a raw IMAP SEARCH criteria string, e.g. ``'(FROM "news@example.com")'``.
+    ``full`` includes complete bodies (explicit opt-in). Read-only mailbox use.
     Raises :class:`DigestError` with a coarse reason on any failure.
     """
     config = read_gmail_config()
@@ -186,7 +194,7 @@ def fetch_latest(count: int, query: str = "ALL") -> list[dict]:
             typ, fetched = client.fetch(num, "(RFC822)")
             if typ != "OK" or not fetched or not isinstance(fetched[0], tuple):
                 continue
-            messages.append(extract_message(fetched[0][1]))
+            messages.append(extract_message(fetched[0][1], full=full))
         return messages
     except DigestError:
         raise
@@ -349,6 +357,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--out", type=Path, default=None, help="JSON output path for --fetch/--summarize"
     )
+    parser.add_argument(
+        "--full",
+        action="store_true",
+        help="include complete message bodies with --fetch (default is snippets)",
+    )
     args = parser.parse_args(argv)
     if args.probe:
         ok, reason = probe()
@@ -371,7 +384,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.out is None:
         parser.error("--fetch requires --out <json>")
     try:
-        messages = fetch_latest(args.fetch, args.query)
+        messages = fetch_latest(args.fetch, args.query, full=args.full)
     except DigestError as error:
         print(f"FETCH_FAIL {error.reason}")
         return 1

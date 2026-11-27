@@ -1,6 +1,9 @@
 # ADR-099: Gmail reading and class-based send approval
 
-Status: Accepted design, 2026-11-27. Runtime implementation pending.
+Status: Accepted design, 2026-11-27. Runtime slice 1 implemented
+27.11 (`scripts/gmail_auth.py`: owned-class authorization, exact-message
+approvals, content-free audit, `--full` reads; fake-transport matrix green).
+Live SMTP activation remains a linked follow-up.
 Source inbox: `1ce1d465084943ed9d2fb30c93689997`.
 Closeout run: `d06daaf679294e0892686e4019cd75d9`.
 
