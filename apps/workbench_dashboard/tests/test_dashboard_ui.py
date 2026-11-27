@@ -212,8 +212,8 @@ def test_dynamic_inputs_and_selects_have_titles() -> None:
     js = _read("app.js")
     inputs = [tag for tag in re.findall(r"<input\b[^>]*>", js) if 'type="radio"' not in tag]
     assert (
-        len(inputs) == 69
-    )  # +bad-test checkbox; +agent-enable checkbox; +spend-policy prepaid/cap (scope is a select); +spend-adjust remaining; step radios excluded; +jobs form (6); +id lookup; +bug report view/consent (2)
+        len(inputs) == 61
+    )  # +bad-test checkbox; +agent-enable checkbox; +spend-policy prepaid/cap (scope is a select); +spend-adjust remaining; step radios excluded; +jobs form (6); +id lookup; +bug report view/consent (2); -8 free-text inputs unified into freeText textareas (U1: answer, chat, project desc, 2 decision notes, node question, wf-desc, propose)
     for tag in inputs:
         assert "title=" in tag, f"input without title: {tag}"
     selects = re.findall(r"<select\b[^>]*>", js)
@@ -883,7 +883,7 @@ def test_inbox_close_form_and_reopen_markers() -> None:
     """Detail page records outcomes on close and offers reopen when closed."""
     js = _read("app.js")
     assert 'id="close-form"' in js
-    assert 'name="resolution"' in js
+    assert 'freeText({name: "resolution"' in js
     assert "/close" in js and "resolution:" in js
     assert 'id="reopen-btn"' in js
     assert "/reopen" in js
@@ -1227,6 +1227,7 @@ def test_reminder_entries_separated_execute():
     driver = r"""
 const assert = require('assert');
 const source = require('fs').readFileSync(process.argv[1], 'utf8');
+const freeText = eval('(' + source.slice(source.indexOf('function freeText('), source.indexOf('\n}', source.indexOf('function freeText(')) + 2) + ')');
 const E2E_REMINDER_VIEWS = ['inbox'];
 let html = '';
 const card = {className: '', id: '',
@@ -1539,6 +1540,7 @@ const gtext = grab('gtext');
 const filterBoxes = grab('filterBoxes');
 const pickedTokens = grab('pickedTokens');
 const bindFilterBoxes = grab('bindFilterBoxes');
+const freeText = grab('freeText');
 const projectOptions = async () => '<option value="">All projects</option>';
 eval(source.slice(source.indexOf('const ID_ROUTES'), source.indexOf('function truncate(')));
 const renderer = source.slice(source.indexOf('async function renderInbox('),
@@ -1619,6 +1621,7 @@ const grab = (name) => eval('(' + source.slice(source.indexOf('function ' + name
 const esc = grab('esc');
 const gtext = grab('gtext');
 const truncate = grab('truncate');
+const freeText = grab('freeText');
 eval(source.slice(source.indexOf('const ID_ROUTES'), source.indexOf('function refLink(')));
 const renderer = source.slice(source.indexOf('async function renderChatThread('),
   source.indexOf('async function renderInbox('));
@@ -1667,6 +1670,7 @@ const grab = (name) => eval('(' + source.slice(source.indexOf('function ' + name
   source.indexOf('\n}', source.indexOf('function ' + name + '(')) + 2) + ')');
 const esc = grab('esc');
 const gtext = grab('gtext');
+const freeText = grab('freeText');
 eval(source.slice(source.indexOf('const ID_ROUTES'), source.indexOf('function refLink(')));
 const renderer = source.slice(source.indexOf('async function renderChatThread('),
   source.indexOf('async function renderInbox('));
@@ -1718,6 +1722,7 @@ const grab = (name) => eval('(' + source.slice(source.indexOf('function ' + name
 const esc = grab('esc');
 const gtext = grab('gtext');
 const truncate = grab('truncate');
+const freeText = grab('freeText');
 eval(source.slice(source.indexOf('const ID_ROUTES'), source.indexOf('function refLink(')));
 const renderer = source.slice(source.indexOf('async function renderChatThread('),
   source.indexOf('async function renderInbox('));
@@ -1806,6 +1811,7 @@ const grab = (name) => eval('(' + source.slice(source.indexOf('function ' + name
 const esc = grab('esc');
 const fmtTime = grab('fmtTime');
 const serviceRowsHtml = grab('serviceRowsHtml');
+const freeText = grab('freeText');
 const view = {innerHTML: '', querySelectorAll: () => []};
 const document = {getElementById: () => ({addEventListener() {}})};
 const moduleActive = () => false;
@@ -1859,6 +1865,7 @@ const grab = (name) => eval('(' + source.slice(source.indexOf('function ' + name
 const esc = grab('esc');
 const fmtTime = grab('fmtTime');
 const serviceRowsHtml = grab('serviceRowsHtml');
+const freeText = grab('freeText');
 const renderer = source.slice(source.indexOf('async function renderFleet('),
   source.indexOf('async function flipToggle('));
 eval(renderer);
@@ -1992,6 +1999,7 @@ const gtext = grab('gtext');
 const filterBoxes = grab('filterBoxes');
 const pickedTokens = grab('pickedTokens');
 const bindFilterBoxes = grab('bindFilterBoxes');
+const freeText = grab('freeText');
 const projectOptions = async () => '<option value="">All projects</option>';
 eval(source.slice(source.indexOf('const ID_ROUTES'), source.indexOf('function truncate(')));
 const renderer = source.slice(source.indexOf('async function renderInbox('),
@@ -2097,6 +2105,8 @@ const trigger = {isConnected: true, focused: false, focus() {this.focused = true
 const recentApiPaths = [{method: 'GET', path: '/api/runs'}];
 const navigator = {userAgent: 'test'};
 const fieldRow = (label, field) => field;
+const esc = (s) => String(s ?? '');
+const freeText = eval('(' + source.slice(source.indexOf('function freeText('), source.indexOf('\n}', source.indexOf('function freeText(')) + 2) + ')');
 const toast = () => {};
 const api = async (path, options) => {
   posts.push({path, payload: JSON.parse(options.body)});
@@ -2219,3 +2229,29 @@ eval(source.slice(source.indexOf('async function renderOrchestrator()')));
 })().catch(err => {console.error(err); process.exit(1);});
 """
     subprocess.run([node, "-e", driver, str(WEB_DIR / "app.js")], check=True)
+
+
+def test_free_text_partial_is_the_only_textarea_source() -> None:
+    """All free-text areas render through freeText (U1 unification)."""
+    js = _read("app.js")
+    assert js.count("<textarea") == 1
+    assert "function freeText(" in js
+    assert 'class="free-text"' in js
+    assert "esc(value ||" in js
+    css = _read("app.css")
+    assert re.search(r"textarea\.free-text\s*\{[^}]*resize\s*:\s*vertical", css)
+
+
+def test_answer_box_is_resizable_textarea() -> None:
+    """The inbox answer box is a multi-row freeText, not a one-line input."""
+    js = _read("app.js")
+    assert 'freeText({name: "answer", rows: 4' in js
+    assert 'input type="text" name="answer"' not in js
+
+
+def test_chat_keeps_enter_to_send() -> None:
+    """Chat textarea sends on Enter, newline on Shift+Enter (no regression)."""
+    js = _read("app.js")
+    assert 'freeText({name: "text", rows: 2' in js
+    assert 'ev.key === "Enter" && !ev.shiftKey' in js
+    assert "form.requestSubmit()" in js

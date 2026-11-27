@@ -891,7 +891,7 @@ async function renderChatThread(id, initial) {
     ${planBanner}
     ${modeBar}${stagedBar}${pendingBar}
     <div id="thread">${msgs || '<p class="muted">No messages yet.</p>'}</div>
-    <form class="inline" id="chat-form"><input type="text" name="text" placeholder="Message..." title="Message the supervisor" required>
+    <form class="inline" id="chat-form">${freeText({name: "text", rows: 2, placeholder: "Message...", title: "Message the supervisor (Enter sends, Shift+Enter adds a line)", required: true})}
     <button type="submit" title="Send message">Send</button>
     <button type="button" id="run-request-btn" title="Queue this message as an agent run (owner pre-approved)">Request run</button>
     <button type="button" id="dictate-btn" title="Dictate with the microphone (Meta server first, browser fallback)">Dictate</button></form>
@@ -1102,6 +1102,14 @@ async function renderChatThread(id, initial) {
     const text = ev.target.text.value.trim();
     if (text) send(text);
   });
+  if (form.text && form.text.addEventListener) {
+    form.text.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter" && !ev.shiftKey && !ev.isComposing) {
+        ev.preventDefault();
+        form.requestSubmit();
+      }
+    });
+  }
   document.getElementById("run-request-btn").addEventListener("click", async () => {
     const text = form.text.value.trim();
     if (!text) { toast("Message text is required", false); return; }
@@ -1394,7 +1402,7 @@ async function renderProjects(id) {
     <form id="project-form" class="inline">
       <input type="text" name="name" placeholder="Name..." title="Project name (required)" value="">
       <input type="text" name="root" placeholder="Root directory..." title="Project root directory (must exist)" value="">
-      <input type="text" name="description" placeholder="Description (optional)..." title="Project description (optional)" value="">
+      ${freeText({name: "description", rows: 2, placeholder: "Description (optional)...", title: "Project description (optional)"})}
       <select name="ptype" title="Project type: general work root or book manuscript">
         <option value="general">general</option>
         ${moduleActive("books") ? '<option value="book">book</option>' : ""}
@@ -1790,7 +1798,7 @@ async function renderE2E(id) {
       const controls = readOnly ? "" : `
         ${verdictRow}
         <div><label><input type="checkbox" name="badtest-${esc(entry.id)}" title="Flag bad test design"> Flag bad test design (steps untestable or unclear)</label></div>
-        <div><textarea name="notes-${esc(entry.id)}" rows="2" placeholder="Notes (what you tried, what you saw)..." title="Test notes for this behavior">${esc(entry.draft_notes || "")}</textarea></div>`;
+        <div>${freeText({name: `notes-${entry.id}`, rows: 2, placeholder: "Notes (what you tried, what you saw)...", title: "Test notes for this behavior", value: entry.draft_notes || ""})}</div>`;
       return `<li><strong>${esc(entry.behavior || entry.id)}</strong>
         <span class="pill st-pending">${esc(entry.kind || "")} · needs testing</span>
         ${entry.needs_pointers ? `<p class="muted">Draft steps — pointers requested; final checks land before testing opens.</p>` : ""}
@@ -1955,13 +1963,13 @@ async function renderInbox(id) {
       <form id="answer-form">
         ${options}
         ${options ? '<p class="muted">Pick one, add a note, or both — the note expands your choice.</p>' : ""}
-        <div><input type="text" name="answer" placeholder="${options ? "Add a note (optional)..." : "Your answer..."}" title="${options ? "Optional note expanding your choice" : "Type your answer"}"></div>
+        <div>${freeText({name: "answer", rows: 4, placeholder: options ? "Add a note (optional)..." : "Your answer...", title: options ? "Optional note expanding your choice" : "Type your answer"})}</div>
         <p><button type="submit" title="Record your choice and note">Submit answer</button></p>
       </form>
       <h3>Actions</h3>
       <form id="close-form">
         <div><select name="resolution_kind" title="Final outcome, or closed pending follow-up"><option value="final">Final outcome \u2014 archive</option><option value="followup">No final answer \u2014 needs follow-up</option></select></div>
-        <div><textarea name="resolution" rows="3" placeholder="Outcome note (required) — what was implemented, with technical details..." title="Implementation outcome, stored with the archived task"></textarea></div>
+        <div>${freeText({name: "resolution", rows: 3, placeholder: "Outcome note (required) — what was implemented, with technical details...", title: "Implementation outcome, stored with the archived task"})}</div>
         <p><button type="submit" title="Record the outcome and archive this task">Close with outcome</button></p>
       </form>
       <p><button type="button" id="delete-inbox-btn" title="Permanently delete this inbox item (linked runs keep their history)">Delete item</button></p>`}</div>`;
@@ -2316,7 +2324,7 @@ async function renderIdeas(id) {
       ${item.status === "new" ? `<p><button id="mark-seen-btn" title="Mark this idea seen (moves it out of new)">Mark seen</button></p>` : ""}
       <form id="review-form" class="inline">
         <select name="status" title="Triage status">${opts}</select>
-        <input type="text" name="decision" placeholder="Decision note..." title="Decision note (optional)" value="${esc(item.decision || "")}">
+        ${freeText({name: "decision", rows: 2, placeholder: "Decision note...", title: "Decision note (optional)", value: item.decision || ""})}
         <input type="text" name="plan" placeholder="Plan id (optional)..." title="Link a backlog plan id (optional)" value="${esc(item.plan_id || "")}">
         <button type="submit" title="Save triage status and note">Save triage</button>
       </form></div>`;
@@ -2382,7 +2390,7 @@ async function renderBacklog(id) {
       ${item.gate ? `<p class="muted">Gate: ${esc(item.gate.kind)}${item.gate.condition ? " — " + esc(item.gate.condition) : ""}${item.gate.not_before ? " — opens " + esc(item.gate.not_before) : ""}${item.gate.item_id ? " — waits on " + esc(item.gate.item_id.slice(0, 8)) : ""}${item.task_spec ? "" : " (no prepared task)"}</p>` : ""}
       <form id="review-form" class="inline">
         <select name="status" title="Grooming status">${opts}</select>
-        <input type="text" name="decision" placeholder="Decision note..." title="Decision note (optional)" value="${esc(item.decision || "")}">
+        ${freeText({name: "decision", rows: 2, placeholder: "Decision note...", title: "Decision note (optional)", value: item.decision || ""})}
         <button type="submit" title="Save grooming status and note">Save grooming</button>
       </form>
       <p><button id="promote-btn" title="File this item as an inbox decision (take into run, or hold)">Propose inbox brief</button>
@@ -2467,7 +2475,7 @@ function wfNodeRow(node, index, options) {
   } else if (node.type === "scrutiny") {
     config = `<input type="text" name="node-text" placeholder="Focus (optional)..." title="Scrutiny focus (optional)" value="${esc(node.config.focus || "")}">`;
   } else {
-    config = `<input type="text" name="node-text" placeholder="Question..." title="Owner question (required)" value="${esc(node.config.question || "")}">`;
+    config = `${freeText({name: "node-text", rows: 2, placeholder: "Question...", title: "Owner question (required)", value: node.config.question || ""})}`;
   }
   return `<div class="card" data-node="${index}">
     <div class="inline">
@@ -2551,7 +2559,7 @@ async function renderWorkflows(id) {
   view.innerHTML = `<h1>Workflow composer</h1><p><a href="#/workflows">All workflows</a></p>
     <div class="card">
       <p><input type="text" id="wf-name" placeholder="Name..." title="Workflow name (required)" value="${esc(graph.name)}"></p>
-      <p><input type="text" id="wf-desc" placeholder="Description (optional)..." title="Workflow description (optional)" value="${esc(graph.description || "")}"></p>
+      <p>${freeText({id: "wf-desc", rows: 2, placeholder: "Description (optional)...", title: "Workflow description (optional)", value: graph.description || ""})}</p>
       <p><select id="wf-load" title="Load a saved graph into the composer (saving stores a new copy)">
         <option value="">Reuse a saved graph...</option>${loadOpts}</select></p>
       <div id="wf-nodes"></div>
@@ -2761,6 +2769,21 @@ async function renderIntake() {
 function fieldRow(label, inner, hint) {
   return `<p><label><strong>${label}</strong><br>${inner}</label><br><span class="muted">${hint}</span></p>`;
 }
+
+function freeText({id, name, rows, placeholder, title, required, autofocus, value, extra}) {
+  const attrs = [
+    id ? `id="${esc(id)}"` : "",
+    name ? `name="${esc(name)}"` : "",
+    `rows="${rows || 3}"`,
+    placeholder ? `placeholder="${placeholder}"` : "",
+    title ? `title="${title}"` : "",
+    required ? "required" : "",
+    autofocus ? "autofocus" : "",
+    extra || "",
+  ].filter(Boolean).join(" ");
+  return `<textarea class="free-text" ${attrs}>${esc(value || "")}</textarea>`;
+}
+
 function renderHelp() {
   view.innerHTML = `<h1>Help</h1>
     <div class="card"><h2>Run a client project</h2>
@@ -2823,7 +2846,7 @@ function openBugReport() {
   dialog.setAttribute("aria-labelledby", "bug-heading");
   dialog.innerHTML = `<h2 id="bug-heading">Report a bug</h2><form id="bug-form">
       ${fieldRow("View", '<input type="text" id="bug-view" readonly title="View where Report bug was clicked (automatic)">', "automatic")}
-      ${fieldRow("What happened *", '<textarea id="bug-description" rows="4" required autofocus title="Describe what went wrong (required)"></textarea>', "required")}
+      ${fieldRow("What happened *", `${freeText({id: "bug-description", rows: 4, required: true, autofocus: true, title: "Describe what went wrong (required)"})}`, "required")}
       ${fieldRow("Details", '<label><input type="checkbox" id="bug-consent" title="Attach recent in-app activity (API paths only, no form contents)"> attach recent in-app activity (API paths only, never form contents)</label>', "optional")}
     <p><button type="submit" title="File this bug for agent triage">Report bug</button>
     <button type="button" id="bug-cancel" title="Cancel without filing a report">Cancel</button></p>
@@ -2873,17 +2896,17 @@ function renderCreate(kind) {
       ${fieldRow("Title *", '<input type="text" id="f-title" value="Dashboard chat" title="Chat title (required)">', "required")}`},
     inbox: {heading: "New inbox item", fields: `
       ${fieldRow("Title *", '<input type="text" id="f-title" title="Inbox item title (required)">', "required")}
-      ${fieldRow("Details", '<textarea id="f-body" rows="3" title="Details (optional)"></textarea>', "optional")}
+      ${fieldRow("Details", `${freeText({id: "f-body", rows: 3, title: "Details (optional)"})}`, "optional")}
       ${fieldRow("Type *", `<select id="f-type" title="Item type (required)"><option value="clarification">clarification</option><option value="decision">decision</option><option value="task">task</option></select>`, "required")}
       ${fieldRow("For *", `<select id="f-for" title="Who should do this (required)"><option value="owner">me</option><option value="agent">AI agent</option></select>`, "required")}`},
     idea: {heading: "New idea", fields: `
       ${fieldRow("Title *", '<input type="text" id="f-title" title="Idea title (required)">', "required")}
-      ${fieldRow("Description", '<textarea id="f-body" rows="3" title="Description (optional)"></textarea>', "optional")}
+      ${fieldRow("Description", `${freeText({id: "f-body", rows: 3, title: "Description (optional)"})}`, "optional")}
       ${fieldRow("Origin *", `<select id="f-source" title="Whose idea (required)"><option value="owner">mine</option><option value="third-party">someone else's</option></select>`, "required")}
       ${fieldRow("Contact", '<input type="text" id="f-contact" title="Name or contact (only for third-party ideas)">', "only for third-party ideas")}`},
     backlog: {heading: "New backlog item", fields: `
       ${fieldRow("Title *", '<input type="text" id="f-title" title="Backlog item title (required)">', "required")}
-      ${fieldRow("Description", '<textarea id="f-body" rows="3" title="Description (optional)"></textarea>', "optional")}
+      ${fieldRow("Description", `${freeText({id: "f-body", rows: 3, title: "Description (optional)"})}`, "optional")}
       ${fieldRow("Origin *", `<select id="f-source" title="Who filed it (required)"><option value="owner">me</option><option value="agent">AI agent</option></select>`, "required")}
       ${fieldRow("Ref", '<input type="text" id="f-ref" title="Origin reference: ledger doc, idea id (optional)">', "optional")}`},
   };
@@ -2981,7 +3004,7 @@ async function renderSchedule() {
   view.innerHTML = `<h1>Schedule</h1>
     <div class="card"><h2>Queue a one-shot run</h2>
     <p class="muted">Type what you want done — a proposal (model + budget) lands in the inbox for approval. Nothing runs until you approve it. One-shot runs live in the Runs view afterwards; this page's Upcoming and Recurring lists are recurring Windows tasks, a separate thing.</p>
-    <form class="inline" id="propose-form"><input type="text" name="text" placeholder="Review the auth module, about 30 min..." title="Describe the task in free text"><button type="submit" title="File as an approval-gated proposal">Propose</button></form></div>
+    <form class="inline" id="propose-form">${freeText({name: "text", rows: 2, placeholder: "Review the auth module, about 30 min...", title: "Describe the task in free text"})}<button type="submit" title="File as an approval-gated proposal">Propose</button></form></div>
     <p class="muted">Live from the fleet probe: recurring Windows tasks and the sleep guard.</p>${body}`;
   document.getElementById("propose-form").addEventListener("submit", async (ev) => {
     ev.preventDefault();
@@ -3422,7 +3445,7 @@ async function renderE2EReminders(name) {
     return `${rule}<div><p><strong>${esc(entry.behavior || entry.item_id)}</strong>
       <a href="#/e2e/${esc(entry.task_id)}" title="Open the full E2E checklist">open checklist</a></p>
       ${guide}
-      <div><textarea data-notes-task="${esc(entry.task_id)}" data-notes-item="${esc(entry.item_id)}" rows="2" placeholder="Jot down what you observe..." title="Draft notes for this behavior">${esc(entry.draft_notes || "")}</textarea></div>
+      <div>${freeText({rows: 2, placeholder: "Jot down what you observe...", title: "Draft notes for this behavior", value: entry.draft_notes || "", extra: `data-notes-task="${esc(entry.task_id)}" data-notes-item="${esc(entry.item_id)}"`})}</div>
       <p><button type="button" data-save-notes="${esc(entry.task_id)}:${esc(entry.item_id)}" title="Save these notes as a draft">Save notes</button></p></div>`;
   }).join("");
   view.append(card);
