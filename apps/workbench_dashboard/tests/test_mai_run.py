@@ -739,3 +739,14 @@ def test_settle_persists_measured_tokens_in_real_ledger(tmp_path) -> None:
     # Durable across reopen (SQLite roundtrip, not just memory).
     reopened = SpendLedger(tmp_path / "spend_ledger.sqlite3")
     assert [r for r in reopened.records() if r.task_id == "r-ledger"]
+
+
+def test_receipt_captures_model_independent_of_route_alias():
+    outcome = MaiRunOutcome(
+        0, "effective_route_id: opaque-alias\neffective_model_id: actual-v2\n", ""
+    )
+    receipt = mai_receipt(outcome, ["prompt"])
+    assert receipt["route_id"] == "opaque-alias"
+    assert receipt["model_id"] == "actual-v2"
+    legacy = mai_receipt(MaiRunOutcome(0, "effective_route_id: provider/alias\n", ""), [])
+    assert legacy["model_id"] is None

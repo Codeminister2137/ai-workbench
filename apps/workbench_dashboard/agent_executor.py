@@ -363,6 +363,7 @@ def build_executor(
             "status": "completed",
             "summary": summary[:MAX_SUMMARY_CHARS],
             "route_id": route_id,
+            "model_id": backend.model,
             "iterations": iterations,
             "tool_calls": tool_calls,
             "staged": staged,

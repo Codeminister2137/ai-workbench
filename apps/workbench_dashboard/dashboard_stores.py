@@ -286,6 +286,38 @@ class DashboardStores:
             filled[key] = count
         return filled
 
+    def with_inbox_attribution(self, item: dict) -> dict:
+        """Project observed identity without guessing models from route names.
+
+        Legacy records are enriched on read; no historical rewrite is needed.
+        Linked execution identity is separate from the filing source.
+        """
+        metadata = dict(item.get("metadata") or {})
+        if item.get("created_by") == "owner":
+            return item
+        refs = item.get("context_refs") or []
+        for ref in refs:
+            if not isinstance(ref, str) or not ref.startswith("run:"):
+                continue
+            run_id = ref[4:]
+            if not run_id or "/" in run_id or "\\" in run_id or run_id.startswith("."):
+                continue
+            run = self.runs.get(run_id)
+            if not run:
+                continue
+            receipts = run.get("receipts") or []
+            for receipt in reversed(receipts):
+                if not isinstance(receipt, dict):
+                    continue
+                if receipt.get("route_id") or receipt.get("model_id"):
+                    metadata.setdefault("author_route", receipt.get("route_id"))
+                    metadata.setdefault("author_model", receipt.get("model_id"))
+                    metadata.setdefault("attribution_run_id", ref[4:])
+                    break
+            if metadata.get("attribution_run_id"):
+                break
+        return {**item, "metadata": metadata}
+
     def create_inbox_task(
         self,
         *,
@@ -340,6 +372,7 @@ class DashboardStores:
             "answered_at": None,
             "answer": None,
         }
+        record = self.with_inbox_attribution(record)
         self.inbox.put(record["id"], record)
         return record
 
@@ -420,7 +453,7 @@ class DashboardStores:
                 created_by="supervisor",
                 assignee="agent",
                 project_id=str(record.get("project_id") or self.default_project_id()),
-                metadata={"closeout_for": record.get("id")},
+                metadata={"author_source": "rule", "closeout_for": record.get("id")},
                 context_refs=[f"inbox:{record.get('id')}"],
             )
         except StoreError:
@@ -853,7 +886,7 @@ class DashboardStores:
                 created_by="supervisor",
                 assignee="agent",
                 context_refs=[f"idea:{idea_id}"],
-                metadata={"elaboration_for": idea_id},
+                metadata={"author_source": "rule", "elaboration_for": idea_id},
             )
         except StoreError:
             record["elaboration_pending"] = True
@@ -1053,7 +1086,7 @@ class DashboardStores:
             task_type="task",
             created_by="supervisor",
             assignee="agent",
-            metadata={"backlog_id": item_id},
+            metadata={"author_source": "rule", "backlog_id": item_id},
         )
         record["inbox_id"] = task["id"]
         record["status"] = "doing"
@@ -1355,6 +1388,7 @@ class DashboardStores:
                 created_by="supervisor",
                 assignee="agent",
                 metadata={
+                    "author_source": "rule",
                     "kind": "e2e-followup",
                     "merge_commit": merge,
                     "report_id": report.get("id"),

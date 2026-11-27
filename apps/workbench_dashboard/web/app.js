@@ -1909,6 +1909,14 @@ async function renderE2E(id) {
   bindFilterBoxes("e2e-filters", "e2e", "s");
 }
 
+function inboxAttribution(item) {
+  if (item.created_by === "owner") return "owner";
+  const meta = item.metadata || {};
+  const source = meta.author_source || (item.created_by === "agent" ? "CLI" : "supervisor / unknown");
+  const identity = `route ${meta.author_route || "unknown"} | model ${meta.author_model || "unknown"}`;
+  return `${source} | ${identity}${meta.attribution_run_id ? " (linked execution)" : ""}`;
+}
+
 async function renderInbox(id) {
   if (id) {
     const payload = await api("/api/inbox/" + encodeURIComponent(id));
@@ -1933,7 +1941,8 @@ async function renderInbox(id) {
       : "";
     view.innerHTML = `<h1>Inbox task</h1><p><a href="#/inbox">All tasks</a></p>
       <div class="card"><h2>${gtext(item.title)}</h2>
-      <p class="muted">${esc(item.type === "order" ? "Approval request" : item.type)} · ${esc(item.status)}${(item.resolution_kind || "final") !== "final" ? " · needs follow-up" : ""} · from ${esc(item.created_by || "")} · opened ${stamp(item.created_at)}</p>
+      <p class="muted">${esc(item.type === "order" ? "Approval request" : item.type)} · ${esc(item.status)}${(item.resolution_kind || "final") !== "final" ? " · needs follow-up" : ""} · from ${esc(inboxAttribution(item))} · opened ${stamp(item.created_at)}</p>
+      <p class="muted">ID: <code>${esc(item.id)}</code></p>
       <h3>Request</h3>
       <p class="inbox-body">${linkIds(gtext(item.body || ""))}</p>
       ${item.type === "task" ? '<p class="muted">Do the steps above, then answer Done with a note. Never paste secrets here — put keys in .env / User env.</p>' : ""}
@@ -2089,7 +2098,7 @@ async function renderInbox(id) {
   const items = shown.length
     ? shown.map((t) =>
         `<li><a href="#/inbox/${esc(t.id)}">${gtext(t.title)}</a>
-         <span class="pill st-${esc((t.status || "none").replace(/\s+/g, "-"))}">${esc(t.type === "order" ? "Approval request" : t.type)} · ${esc(t.status)}${t.assignee === "agent" ? " · for AI" : ""}${isFollowup(t) ? " · needs follow-up" : ""}${t.run_status ? " · run " + esc(t.run_status) : ""}</span></li>`).join("")
+         <span class="pill st-${esc((t.status || "none").replace(/\s+/g, "-"))}">${esc(t.type === "order" ? "Approval request" : t.type)} · ${esc(t.status)}${t.assignee === "agent" ? " · for AI" : ""}${isFollowup(t) ? " · needs follow-up" : ""}${t.run_status ? " · run " + esc(t.run_status) : ""}</span><br><small class="muted">${esc(inboxAttribution(t))}</small></li>`).join("")
     : '<li class="muted">Nothing matches these filters. Tick more boxes, or tick Closed to see the archive.</li>';
   const groups = [
     ["Who", [["human", "Human", "Tasks assigned to you"], ["ai", "AI", "Tasks assigned to the agent"]]],
