@@ -1375,3 +1375,11 @@ read option remain implementation work; this is an accepted design.
 
 Inbox `3e4544cf23a244878105c04ebb0bf031`: owner chose inFakt with Beata Witek as personal accountant for the registered JDG, with a standing option to revisit DIY later on cost grounds. Scope/price/OC/questions live in `docs/plans/accountant-brief-infakt-20261124.md` (owner-appended Q&A included); G1 sandbox key verified live in .env, G2 template check and G3 go-live pending (inbox 4abc2d81, G2 how-to 279b0777).
 
+
+## P7 Track 2.3: AI-cost handling (2026-11-27)
+
+Owner selected D for scoped software delivery: our AI use is an internal operating
+cost, with advisory attribution, not a separate client charge. C is preferred for
+a future AI-enabled product, subject to client choice and discovery demand; no
+immediate product build is authorized. See the [decision record](decisions/p7-track23-ai-cost-handling.md)
+(source inbox `1ce80f7f35a74b09b60ea01a4fd9e7d4`). Client-specific terms remain gated.
