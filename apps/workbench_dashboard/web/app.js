@@ -1911,10 +1911,39 @@ async function renderE2E(id) {
   ];
   view.innerHTML = `<h1>E2E promotion</h1>
     <p class="muted">Test each behavior, note what you saw, submit once. Report assembly and promotion state are automated.</p>
+    <p><button id="e2e-digest-btn" title="Roll up all reports, runs and inbox items into one readable digest">Digest reports</button></p>
+    <div id="e2e-digest" hidden></div>
     ${filterBoxes("e2e-filters", groups, picked)}
     <h2>Checklists</h2><ul class="plain">${rows}</ul>
     <h2>Recent reports</h2><ul class="plain">${reportRows || '<li class="muted">No reports match these filters.</li>'}</ul>`;
   bindFilterBoxes("e2e-filters", "e2e", "s");
+  const digestBtn = document.getElementById("e2e-digest-btn");
+  if (digestBtn) digestBtn.addEventListener("click", async () => {
+    const box = document.getElementById("e2e-digest");
+    try {
+      const digest = await api("/api/e2e/digest");
+      box.innerHTML = renderE2EDigest(digest);
+      box.hidden = false;
+    } catch (err) {
+      toast(err.message, false);
+    }
+  });
+}
+
+function renderE2EDigest(digest) {
+  const counts = (obj) => Object.entries(obj || {})
+    .map(([key, val]) => `<li>${esc(key)}: ${esc(String(val))}</li>`).join("");
+  const failing = (digest.top_failing_runs || [])
+    .map((r) => `<li>${esc(r.title)} (x${esc(String(r.count))})</li>`).join("");
+  const stuck = (digest.stuck_runs || [])
+    .map((r) => `<li><a href="#/runs/${esc(r.id)}">${esc(r.title || r.id)}</a> (${esc(r.status)})</li>`).join("");
+  return `<div class="card"><h2>Digest</h2>
+    <h3>Reports (${esc(String(digest.reports.total))})</h3><ul>${counts(digest.reports.by_verdict)}</ul>
+    <h3>Runs (${esc(String(digest.runs.total))})</h3><ul>${counts(digest.runs.by_status)}</ul>
+    <h3>Top failing runs</h3><ul>${failing || '<li class="muted">None</li>'}</ul>
+    <h3>Stuck runs</h3><ul>${stuck || '<li class="muted">None</li>'}</ul>
+    <h3>Inbox (${esc(String(digest.inbox.total))})</h3><ul>${counts(digest.inbox.by_status)}</ul>
+    <h3>Open inbox kinds</h3><ul>${counts(digest.inbox.open_kinds)}</ul></div>`;
 }
 
 async function renderInbox(id) {

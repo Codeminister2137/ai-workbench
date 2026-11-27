@@ -201,8 +201,8 @@ def test_dynamic_buttons_have_titles() -> None:
     js = _read("app.js")
     buttons = re.findall(r"<button\b[^>]*>", js)
     assert (
-        len(buttons) == 65
-    )  # +doc pin; +fanout apply; +delete-inbox-btn +e2e submit +chat mode/apply/approve +notes save +agent-check run +agent-config save +spend-policy add/save/remove +spend-adjust record +backlog to-task +jobs submit +report acknowledge +id lookup +bug dialog (2) +orchestrator query +doc local-path copy
+        len(buttons) == 66
+    )  # +doc pin; +fanout apply; +delete-inbox-btn +e2e submit +chat mode/apply/approve +notes save +agent-check run +agent-config save +spend-policy add/save/remove +spend-adjust record +backlog to-task +jobs submit +report acknowledge +id lookup +bug dialog (2) +orchestrator query +doc local-path copy +e2e digest
     for tag in buttons:
         assert "title=" in tag, f"button without title: {tag}"
 
@@ -2300,3 +2300,32 @@ def test_tools_dropdown_contains_secondary_header_controls() -> None:
     assert "calc(100vw - 3rem)" in _read("style-tokens.css")
     css = _read("app.css")
     assert re.search(r"#tools-panel #global-lookup-id\s*\{[^}]*flex\s*:", css)
+
+
+def test_e2e_digest_button_renders_rollup() -> None:
+    """Digest button fetches the rollup endpoint and renders sections (0170c0da)."""
+    js = _read("app.js")
+    assert 'id="e2e-digest-btn"' in js
+    assert '"/api/e2e/digest"' in js
+    assert "function renderE2EDigest(" in js
+    driver = r"""
+const assert = require('assert');
+const source = require('fs').readFileSync(process.argv[1], 'utf8');
+const grab = (name) => eval('(' + source.slice(source.indexOf('function ' + name + '('),
+  source.indexOf('\n}', source.indexOf('function ' + name + '(')) + 2) + ')');
+const esc = grab('esc');
+const renderE2EDigest = grab('renderE2EDigest');
+const html = renderE2EDigest({
+  reports: {total: 2, by_verdict: {pass: 1, fail: 1}},
+  runs: {total: 1, by_status: {queued: 1}},
+  top_failing_runs: [],
+  stuck_runs: [{id: 'd', status: 'queued', title: 'Waiting'}],
+  inbox: {total: 1, by_status: {open: 1}, open_kinds: {P7: 1}},
+});
+assert(html.includes('<h2>Digest</h2>'));
+assert(html.includes('Reports (2)'));
+assert(html.includes('<li>pass: 1</li>'));
+assert(html.includes('<a href="#/runs/d">Waiting</a>'));
+assert(html.includes('Open inbox kinds'));
+"""
+    _run_node_driver(driver)
