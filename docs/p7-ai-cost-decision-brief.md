@@ -1,4 +1,4 @@
-# P7 Track 2.3: AI-cost handling ? reconciled alternatives
+# P7 Track 2.3: AI-cost handling - reconciled alternatives
 
 Reconciled 2026-11-27 under inbox `52b91c6139f646608224b185a775fbcf` A.
 Original proposal: commit `78019a48b70a13d8847374aa6dc0eadd8bdb7fab`.
@@ -37,7 +37,7 @@ a separate visible management fee initially. Local inference can reduce external
 metering, but hardware, electricity, maintenance and capacity remain real costs;
 it is a deployment choice under any option, not free consumption.
 
-## Historical production-only mechanics ? conditional, not approved
+## Historical production-only mechanics - conditional, not approved
 
 The following describes B only if separately negotiated for a client product.
 It is not the selected delivery policy or an implementation requirement.

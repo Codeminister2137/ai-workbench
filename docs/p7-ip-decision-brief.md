@@ -1,4 +1,4 @@
-# P7 Track 2.4: IP licensing ? reconciled alternatives
+# P7 Track 2.4: IP licensing - reconciled alternatives
 
 Reconciled 2026-11-27 under inbox `52b91c6139f646608224b185a775fbcf` A.
 Original proposal: commit `78019a48b70a13d8847374aa6dc0eadd8bdb7fab`.
