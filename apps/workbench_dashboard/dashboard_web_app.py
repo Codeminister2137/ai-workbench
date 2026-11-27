@@ -1109,7 +1109,11 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             if path.startswith("/api/projects/"):
                 return self._send_project(path[len("/api/projects/") :])
             if path.startswith("/api/inbox/"):
-                return self._send_item(self._stores().inbox, path[len("/api/inbox/") :])
+                return self._send_item(
+                    self._stores().inbox,
+                    path[len("/api/inbox/") :],
+                    enrich=self._stores().with_inbox_attribution,
+                )
             if path.startswith("/api/resolve/"):
                 token = unquote(path[len("/api/resolve/") :])
                 return self._send_json({"ok": True, "matches": self._stores().resolve_id(token)})
@@ -1940,7 +1944,12 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             if isinstance(item, dict) and item.get("id")
         ]
         self._send_json(
-            {"ok": True, "items": items, "total": len(items), "attention_ids": attention_ids}
+            {
+                "ok": True,
+                "items": [self._stores().with_inbox_attribution(item) for item in items],
+                "total": len(items),
+                "attention_ids": attention_ids,
+            }
         )
 
     @staticmethod

@@ -255,7 +255,7 @@ def finalize_chain_report(stores: Any, source_id: str) -> dict[str, Any]:
             created_by="supervisor",
             assignee="owner",
             project_id=str(source.get("project_id") or stores.default_project_id()),
-            metadata={CHAIN_REPORT_KEY: source_id},
+            metadata={"author_source": "rule", CHAIN_REPORT_KEY: source_id},
             context_refs=[f"inbox:{source_id}"],
         )
         source.pop("report_pending", None)

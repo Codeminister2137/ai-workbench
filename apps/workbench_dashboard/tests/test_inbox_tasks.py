@@ -169,3 +169,66 @@ def test_collection_delete_rejects_bad_ids(tmp_path) -> None:
     assert stores.inbox.delete("no-such-id") is False
     with pytest.raises(StoreError):
         stores.inbox.delete("../escape")
+
+
+def test_inbox_attribution_uses_observed_receipt_not_route_spelling(tmp_path):
+    stores = DashboardStores(tmp_path)
+    stores.runs.put(
+        "r1", {"id": "r1", "receipts": [{"route_id": "opaque-route", "model_id": "actual-model"}]}
+    )
+    item = stores.create_inbox_task(
+        title="AI finding",
+        body="Details",
+        task_type="task",
+        created_by="agent",
+        context_refs=["run:r1"],
+    )
+    assert item["metadata"]["author_route"] == "opaque-route"
+    assert item["metadata"]["author_model"] == "actual-model"
+    assert item["metadata"]["attribution_run_id"] == "r1"
+    assert stores.inbox.get(item["id"])["metadata"] == item["metadata"]
+    explicit = {**item, "metadata": {"author_model": "explicit"}}
+    assert stores.with_inbox_attribution(explicit)["metadata"]["author_model"] == "explicit"
+
+
+def test_legacy_attribution_is_read_only_and_unknown_stays_unknown(tmp_path):
+    stores = DashboardStores(tmp_path)
+    stores.runs.put("old", {"id": "old", "receipts": [{"route_id": "provider/not-a-model"}]})
+    item = {"id": "legacy", "created_by": "supervisor", "context_refs": ["run:old"]}
+    enriched = stores.with_inbox_attribution(item)
+    assert enriched["metadata"]["author_model"] is None
+    assert "metadata" not in item
+    owner = {**item, "created_by": "owner"}
+    assert stores.with_inbox_attribution(owner) == owner
+    rule = {"created_by": "supervisor", "metadata": {"author_source": "rule"}}
+    assert stores.with_inbox_attribution(rule) == rule
+
+
+def test_inbox_detail_exposes_execution_identity(tasks_server):
+    base, root = tasks_server
+    stores = DashboardStores(root / "data")
+    stores.runs.put(
+        "observed",
+        {"id": "observed", "receipts": [{"route_id": "route-alias", "model_id": "model-v2"}]},
+    )
+    item = stores.create_inbox_task(
+        title="Finding", body="", task_type="task", context_refs=["run:observed"]
+    )
+    detail = get_json(base, f"/api/inbox/{item['id']}")["item"]
+    assert detail["metadata"]["author_model"] == "model-v2"
+    listing = get_json(base, "/api/inbox")["items"]
+    assert (
+        next(i for i in listing if i["id"] == item["id"])["metadata"]["author_route"]
+        == "route-alias"
+    )
+
+
+def test_attribution_ignores_invalid_run_references(tmp_path):
+    stores = DashboardStores(tmp_path)
+    item = stores.create_inbox_task(
+        title="Finding",
+        body="",
+        task_type="task",
+        context_refs=["run:", "run:../bad", "run:missing"],
+    )
+    assert item["metadata"] == {}

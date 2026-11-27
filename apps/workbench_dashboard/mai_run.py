@@ -185,7 +185,12 @@ def parse_mai_facts(stdout: str) -> dict[str, str]:
     """Pull Mai-printed facts (session id, effective route, usage) from stdout."""
     facts: dict[str, str] = {}
     for line in stdout.splitlines():
-        for key in ("coding_session_id", "effective_route_id", "session_usage"):
+        for key in (
+            "coding_session_id",
+            "effective_route_id",
+            "effective_model_id",
+            "session_usage",
+        ):
             if line.startswith(f"{key}:"):
                 facts[key] = line.split(":", 1)[1].strip()
     return facts
@@ -297,6 +302,7 @@ def mai_receipt(outcome: MaiRunOutcome, argv: Sequence[str]) -> dict:
                 "mai_argv": list(argv),
                 "mai_session_id": facts.get("coding_session_id"),
                 "route_id": facts.get("effective_route_id"),
+                "model_id": facts.get("effective_model_id"),
                 "session_usage": usage,
                 "source": "mai-session",
             }
@@ -311,6 +317,7 @@ def mai_receipt(outcome: MaiRunOutcome, argv: Sequence[str]) -> dict:
                 "mai_argv": list(argv),
                 "mai_session_id": facts.get("coding_session_id"),
                 "route_id": facts.get("effective_route_id"),
+                "model_id": facts.get("effective_model_id"),
                 "session_usage": usage,
                 "source": "mai-session",
             }
@@ -321,6 +328,7 @@ def mai_receipt(outcome: MaiRunOutcome, argv: Sequence[str]) -> dict:
             "mai_argv": list(argv),
             "mai_session_id": facts.get("coding_session_id"),
             "route_id": facts.get("effective_route_id"),
+            "model_id": facts.get("effective_model_id"),
             "session_usage": usage,
             "source": "mai-session",
         }
@@ -340,6 +348,7 @@ def mai_receipt(outcome: MaiRunOutcome, argv: Sequence[str]) -> dict:
         "mai_argv": list(argv),
         "mai_session_id": facts.get("coding_session_id"),
         "route_id": facts.get("effective_route_id"),
+        "model_id": facts.get("effective_model_id"),
         "session_usage": usage,
         "source": "mai-session",
     }

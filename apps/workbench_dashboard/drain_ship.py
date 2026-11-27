@@ -157,6 +157,7 @@ def ship_completed_run(run: dict, *, repo_root: Path, stores: Any) -> dict[str, 
             assignee="agent",
             project_id=str(stores.default_project_id()),
             metadata={
+                "author_source": "rule",
                 "merge_for_branch": branch,
                 "merge_for_run": run_id,
             },

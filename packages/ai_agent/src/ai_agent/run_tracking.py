@@ -557,6 +557,7 @@ def fallback_details(args: argparse.Namespace) -> dict[str, Any]:
         return {}
     return {
         "effective_route_id": session.current.route_id,
+        "effective_model_id": getattr(session.current, "model", None),
         "fallback_attempts": list(session.attempts),
         **({"fallback_handoff": session.handoff} if session.handoff is not None else {}),
     }
