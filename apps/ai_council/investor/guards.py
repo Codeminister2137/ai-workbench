@@ -11,7 +11,6 @@ Guard messages name hosts and sources, never secret values.
 from __future__ import annotations
 
 import math
-from urllib.parse import urlsplit
 
 PAPER_TRADING_HOSTS = ("paper-api.alpaca.markets",)
 LIVE_TRADING_HOSTS = ("api.alpaca.markets",)
@@ -23,21 +22,40 @@ class PaperGuardError(ValueError):
     """A paper-only guard refused; the message names the violated rule."""
 
 
+def _split_host(url: str) -> str:
+    """Take the host from an https URL without network imports.
+
+    The investor-offline test bans urllib/requests-style imports in this
+    package, so authority parsing is manual and fail-closed: https only,
+    no userinfo, no IP literals, 443 is the only accepted explicit port.
+    """
+    text = url.strip()
+    scheme, sep, rest = text.partition("://")
+    if not sep or scheme.lower() != "https":
+        raise PaperGuardError(f"endpoint must use https: {url!r}")
+    authority = rest.split("/", 1)[0].split("?", 1)[0].split("#", 1)[0]
+    if not authority:
+        raise PaperGuardError(f"endpoint host missing: {url!r}")
+    if "@" in authority:
+        raise PaperGuardError("endpoint must not embed credentials")
+    if authority.startswith("["):
+        raise PaperGuardError(f"endpoint host not on the paper allowlist: {authority!r}")
+    host, colon, port = authority.partition(":")
+    if colon and port != "443":
+        raise PaperGuardError(f"endpoint port refused (443 only): {port!r}")
+    host = host.lower()
+    if not host:
+        raise PaperGuardError(f"endpoint host missing: {url!r}")
+    return host
+
+
 def check_endpoint(url: str) -> str:
     """Allow only https URLs on the paper trading host; return the host."""
-    try:
-        parts = urlsplit(url.strip())
-    except ValueError as exc:
-        raise PaperGuardError(f"endpoint unparsable: {url!r}") from exc
-    host = (parts.hostname or "").lower()
-    if parts.username or parts.password:
-        raise PaperGuardError("endpoint must not embed credentials")
-    if parts.scheme != "https":
-        raise PaperGuardError(f"endpoint must use https: {url!r}")
+    host = _split_host(url)
     if host in LIVE_TRADING_HOSTS:
         raise PaperGuardError(f"live trading host refused: {host}")
     if host not in PAPER_TRADING_HOSTS:
-        raise PaperGuardError(f"endpoint host not on the paper allowlist: {host or url!r}")
+        raise PaperGuardError(f"endpoint host not on the paper allowlist: {host}")
     return host
 
 
