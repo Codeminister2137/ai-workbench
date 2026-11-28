@@ -43,8 +43,9 @@ reasons to decline. Intentions are not confirmed repeat purchases.
 
 Identify what remains unknown about independent expansion, maintenance and
 recurring needs. Keep internal margin estimates in seller notes, separate from
-this portable report. See the [commercial-durability evaluation](../p7-commercial-durability-20261128.md)
-for evidence prompts; it changes no client rights or service commitments.
+this portable report. See the commercial-durability evaluation (find it via the
+[document-status ledger](../document-status.md)) for evidence prompts; it
+changes no client rights or service commitments.
 
 ## 6. Suggested milestones (feeds SOW §5)
 
