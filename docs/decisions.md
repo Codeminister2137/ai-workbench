@@ -1406,3 +1406,12 @@ and publication remain separately gated. See [decision record](decisions/p7-trac
 Owner C on inbox `c124e9a4` (2026-11-28) amends [ADR-098](decisions/ADR-098-hourly-unattended-mail-digest.md): dashboard work alerts, retained weekly digest and hourly unattended phone-visible status, immediate mail only for confirmed whole-window blockers in either mode. No mailbox migration or new push service.
 
 Owner A on inbox `472cea09` (2026-11-28) approves Investor slice-2 bounds: max 5 paper orders/day, $1,000 max notional per order, $5,000 max open exposure, fixed SPY/QQQ universe, 5 trading days max, journal proof per the slice-1 contract. Implemented as `investor.loop.run_day` + single Alpaca-paper transport; trial firing starts on a trading day (weekend orders cannot fill).
+
+## P7 Track 2.4: reconciled prerequisite (2026-11-28)
+
+Owner `ba6281ff` A retains selected `f21f9f5` briefs and retires historical
+`3c9f7bc` / `5bc3d1a` integration. [Reconciled IP decision](decisions/p7-track24-ip-licensing.md)
+preserves B, later project-source/independent-maintenance and company-wide
+business-use choices (`6dea3d6d`, `900205c0`). Redistribution is separately
+negotiated; niche validation and final legal terms remain pending. Exact-scope
+Tier 3 approval is required before merge; this records preparation authority only.

@@ -32,10 +32,16 @@ Work starts after countersignature + first payment per SOW schedule.
   client receives a broad nonexclusive deliverable licence and remains free to
   choose who maintains and expands the software. Preserve company-wide business
   use and expansion/integration without mandatory ongoing services.
-- `[TO-VERIFY: per-project asset schedule, embedded rights, source/inspection/
-  modification and continuity package, duration/termination and legal wording.
-  See docs/p7-ip-decision-brief.md and p7-track24-source-continuity. This draft
-  settles no final rights package or access to all Workbench internals.]`
+- Accepted scope includes relevant project source, build/deploy instructions and
+  runbook sufficient for independent operation and appointed maintenance under
+  confidentiality; company-wide business use, scaling, modification, expansion
+  and integrations are intended. Software resale/redistribution/sublicensing
+  requires separate negotiation and legal review, not a blanket enforceability
+  claim or access to all private Workbench internals.
+- `[TO-VERIFY: per-project asset/dependency schedule, embedded permissions,
+  handover acceptance, duration/termination, transfer and final legal wording.
+  See docs/decisions/p7-track24-ip-licensing.md. Accepted commercial scope does
+  not make this draft approved client terms.]`
 - Third-party/open-source components pass through under their own licences
   (listed per SOW).
 

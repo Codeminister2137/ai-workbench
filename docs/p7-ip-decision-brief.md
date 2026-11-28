@@ -9,12 +9,17 @@ Source `2c9efe65437b493792497d4f807570e0` selected B as general intent:
 a broad nonexclusive deliverable licence, retaining reusable templates, with
 clients free to choose who maintains and expands their software. The owner wants
 both sides to benefit from existing work and to avoid forced dependency.
-A/C/D remain negotiable for particular clients. The source/inspection/modification
-package, niche comparison and final legal wording remain pending under existing
-follow-up `6dea3d6d42ef463aaac822135748a8ed`, gate
-`p7-track24-source-continuity`. B does not itself settle source access or grant
-rights to all Workbench internals. No assignment, contract, price or publication
-is authorized. The accepted source answer controls over this historical proposal.
+A/C/D remain negotiable for particular clients. Later owner answers
+`6dea3d6d42ef463aaac822135748a8ed` and `900205c04ef94c379ec369164ce0cf0a`
+confirm project-source/build/deploy/runbook handover, company-wide business use,
+scaling, modification, expansion, integrations and independent appointed
+maintenance under confidentiality. Software redistribution/resale/sublicensing
+requires separate negotiation and legal review; no blanket enforceability claim
+is made. Niche validation and final legal wording remain pending. See the
+[reconciled decision](decisions/p7-track24-ip-licensing.md), prepared under
+`ba6281ff` A for Tier 3 review. No access to all Workbench internals, assignment,
+contract, price or publication is authorized. Accepted answers control over this
+historical proposal.
 
 ## Viable alternatives
 
@@ -34,7 +39,7 @@ decision if a client actually wants hosted access rather than a delivered system
 ## Required boundary and client-rights schedule
 
 For the selected B intent, prepare a per-project rights schedule for review;
-the following are candidate terms, not approved rights:
+the following require per-project drafting consistent with the accepted scope:
 
 - Bespoke deliverables: named source code, configurations, designs, documentation
   and client-specific workflows. Define the proposed licence scope and effective event; any assignment
@@ -68,7 +73,8 @@ Do not reopen the default question. A may suit a buyer requiring bespoke ownersh
 but reduces founder reuse; C trades targeted exclusivity for additional price and
 negotiation; D requires separately valuing lost reuse and checking owned rights.
 B supports reuse and client choice but still needs a credible continuity package.
-The existing source-continuity follow-up owns that unresolved decision.
+The source-continuity and business-use choices are resolved as recorded above;
+per-project implementation, niche validation and legal wording remain pending.
 
 Asset boundaries, confidentiality, third-party rights and legal review remain
 required before client use. Counsel must review actual licence scope, form,

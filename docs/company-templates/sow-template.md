@@ -61,10 +61,16 @@ until written.
   client receives a broad nonexclusive deliverable licence and remains free to
   choose who maintains and expands the software. Company-wide business use and
   expansion/integration remain intended uses, not mandatory ongoing services.
-- `[TO-VERIFY: per-project asset schedule, source/inspection/modification and
-  continuity package, licence scope and legal wording before use. See
-  docs/p7-ip-decision-brief.md and existing p7-track24-source-continuity follow-up.
-  This draft does not settle those terms or grant access to all Workbench internals.]`
+- Accepted scope includes relevant project source, build/deploy instructions and
+  runbook sufficient for independent operation and appointed maintenance under
+  confidentiality; company-wide business use, scaling, modification, expansion
+  and integrations are intended. Software resale/redistribution/sublicensing
+  requires separate negotiation and legal review, not a blanket enforceability
+  claim or access to all private Workbench internals.
+- `[TO-VERIFY: per-project asset/dependency schedule, embedded permissions,
+  handover acceptance, duration/termination, transfer and final legal wording.
+  See docs/decisions/p7-track24-ip-licensing.md. Accepted commercial scope does
+  not make this draft approved client terms.]`
 - Mutual confidentiality per the non-disclosure agreement (NDA) template (or §-level clause here).
 
 ## 9. Liability cap & warranty
