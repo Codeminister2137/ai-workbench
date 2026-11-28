@@ -14,7 +14,7 @@ document, including headings; use the acronym alone afterward.
 |---|---|---|
 | Statement of Work (SOW) | `sow-template.md` | scope, fixed quote, acceptance, payment |
 | Non-disclosure agreement (NDA; mutual, Polish law) | `nda-template.md` | confidentiality both directions |
-| Business-to-business (B2B) services contract | `contract-template.md` | services, intellectual property (IP) transfer, liability cap |
+| Business-to-business (B2B) services contract | `contract-template.md` | services, intellectual property (IP) licensing intent (terms pending review), liability cap |
 | Discovery report | `discovery-report-template.md` | paid-discovery deliverable |
 | Invoice + reminders | `invoice-template.md` | Polish invoice fields, National e-Invoicing System (Krajowy System e-Faktur, KSeF) notes |
 

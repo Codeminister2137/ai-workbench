@@ -28,7 +28,7 @@
 
 - Total: `[OWNER: amount + currency]` `[TO-VERIFY: net vs gross presentation]`
 - Valid until: `[OWNER: date]`
-- What changes the price: scope changes per §8 only. No hourly drift.
+- What changes the price: scope changes per §7 only. No hourly drift.
 
 ## 5. Milestones & acceptance
 
@@ -57,10 +57,14 @@ until written.
 
 ## 8. Intellectual property (IP) & confidentiality
 
-- IP transfers to client on full payment `[TO-VERIFY: transfer wording +
-  moral-rights note under Polish copyright law]`.
-- Pre-existing contractor tooling stays contractor property, licensed to
-  client as needed to run the deliverables.
+- Accepted general intent: contractor retains ownership and reusable templates;
+  client receives a broad nonexclusive deliverable licence and remains free to
+  choose who maintains and expands the software. Company-wide business use and
+  expansion/integration remain intended uses, not mandatory ongoing services.
+- `[TO-VERIFY: per-project asset schedule, source/inspection/modification and
+  continuity package, licence scope and legal wording before use. See
+  docs/p7-ip-decision-brief.md and existing p7-track24-source-continuity follow-up.
+  This draft does not settle those terms or grant access to all Workbench internals.]`
 - Mutual confidentiality per the non-disclosure agreement (NDA) template (or §-level clause here).
 
 ## 9. Liability cap & warranty
