@@ -9,6 +9,7 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 
 | Document | Status | Result / next |
 | docs/api-docs.md | KNOWLEDGE | API reference. |
+| docs/p7-commercial-durability-20261128.md | KNOWLEDGE | Durability evaluation 28.11 (run c62be486): recommendation + template alignment, not accepted policy; legal/niche validation separate. |
 | docs/architecture.md | KNOWLEDGE | System architecture (update when architecture changes). |
 | docs/audit-20261103-triage.md | ACTED | Triage complete 2026-11-06 (0 UNREVIEWED, 0 REAL). |
 | docs/e2e-corpus-audit-73249b26.md | KNOWLEDGE | E2E corpus lifecycle audit (run 73249b26); behavior triage outstanding. |
