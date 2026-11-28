@@ -1,5 +1,9 @@
 # Development Workflow
 
+Follow the [working-language policy](working-language-policy.md): English internal
+work, verbatim Polish evidence and original references, first-use English glosses
+for Polish terms, explicit translation uncertainty, and a maintained glossary.
+
 ## 1. Before starting
 High-priority cross-repository work follows the
 [official-documentation conformance plan](documentation-conformance-plan.md).
