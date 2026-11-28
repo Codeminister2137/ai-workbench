@@ -516,6 +516,33 @@ def test_retrying_executor_retries_provider_timeouts_once() -> None:
     assert "timed out" in receipt["retry_of"]["error"]
 
 
+def test_retrying_executor_preserves_first_leg_identity() -> None:
+    from mai_run import build_retrying_executor
+
+    calls: list = []
+
+    def flaky(run: dict) -> dict:
+        calls.append(run)
+        if len(calls) == 1:
+            return {
+                "status": "failed",
+                "error": "Mai session exited with code 1: External agent timed out after 180 seconds",
+                "failure_class": "provider",
+                "route_id": "first/route",
+                "model_id": "first-model",
+                "mai_session_id": "s1",
+                "session_usage": {"calls": 1},
+            }
+        return {"status": "completed", "stdout_tail": "recovered", "route_id": "second/route"}
+
+    receipt = build_retrying_executor(flaky)({"id": "r1"})
+    assert receipt["route_id"] == "second/route"
+    assert receipt["retry_of"]["route_id"] == "first/route"
+    assert receipt["retry_of"]["model_id"] == "first-model"
+    assert receipt["retry_of"]["mai_session_id"] == "s1"
+    assert receipt["retry_of"]["session_usage"] == {"calls": 1}
+
+
 def test_retrying_executor_prefers_structured_timeout_flag() -> None:
     """Scope C: supervisor kills retry on the machine flag, no text needed."""
     from mai_run import build_retrying_executor

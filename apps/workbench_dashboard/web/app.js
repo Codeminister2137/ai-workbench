@@ -2174,7 +2174,11 @@ function inboxAttribution(item) {
   const meta = item.metadata || {};
   const source = meta.author_source || (item.created_by === "agent" ? "CLI" : "supervisor / unknown");
   const identity = `route ${meta.author_route || "unknown"} | model ${meta.author_model || "unknown"}`;
-  return `${source} | ${identity}${meta.attribution_run_id ? " (linked execution)" : ""}`;
+  const assigned = (meta.assigned_route || meta.assigned_model)
+    && (meta.assigned_route !== meta.author_route || meta.assigned_model !== meta.author_model)
+    ? ` (assigned route ${meta.assigned_route || "unknown"} | model ${meta.assigned_model || "unknown"})`
+    : "";
+  return `${source} | ${identity}${meta.attribution_run_id ? " (linked execution)" : ""}${assigned}`;
 }
 
 async function renderLookup(id) {

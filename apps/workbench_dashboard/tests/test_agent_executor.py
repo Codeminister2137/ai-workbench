@@ -251,6 +251,9 @@ def test_owner_tasks_filed_to_inbox(tmp_path) -> None:
     assert filed[0]["task_type"] == "task"
     assert filed[0]["task_id"] == "r1"
     assert filed[0]["context_refs"] == ["run:r1"]
+    assert filed[0]["metadata"]["author_source"] == "drain-run"
+    assert filed[0]["metadata"]["assigned_route"] == "ollama/fake"
+    assert filed[0]["metadata"]["assigned_model"] == "fake"
 
 
 def test_owner_tasks_without_inbox_fail_closed(tmp_path) -> None:
