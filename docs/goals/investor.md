@@ -30,8 +30,10 @@ Alpaca signup pending with owner.
 
 Qualify ETF time-series momentum offline first (owner A on `426eb4f2`).
 Prepare and freeze the qualification manifest, audit historical data and run
-the disproof protocol before a connected trial. Exact symbols, cadence and
-launch window remain pending; scaffold defaults are not owner approval.
+the disproof protocol before a connected trial. Owner A on `86ee6792` approves SPY/QQQ, one decision per regular trading
+session, for the first small trial; B is deferred for later review. An explicit
+future launch window remains required after qualification and runtime safety
+pass; gate `investor-momentum-launch-window` retains that action.
 See [accepted direction and qualification gates](../decisions/investor-momentum-qualification.md).
 The Council SQLite journal and bounded loop already exist; runtime safety
 and connected-trial readiness remain separate acceptance work.
