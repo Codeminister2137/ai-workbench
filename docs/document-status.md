@@ -188,6 +188,7 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/api-reference/ | TRIAGE | Aggregate; per-file rows future scope. |
 | docs/artifacts/ | TRIAGE | Aggregate; per-file rows future scope. |
 | docs/decisions/ | KNOWLEDGE | ADRs are decision results by construction. |
+| docs/inbox-templates/ | KNOWLEDGE | Filing templates (decision/closeout/task); referenced by AGENTS.md. |
 | docs/library/ | TRIAGE | Aggregate; per-file rows future scope. |
 | docs/library-private/ | TRIAGE | Aggregate; per-file rows future scope. |
 | docs/repo-assistant/ | TRIAGE | Aggregate; per-file rows future scope. |
