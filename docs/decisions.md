@@ -1404,3 +1404,12 @@ and publication remain separately gated. See [decision record](decisions/p7-trac
 (source inbox `73aaf0c8040342f7a738602778e51e9e`).
 
 Owner C on inbox `c124e9a4` (2026-11-28) amends [ADR-098](decisions/ADR-098-hourly-unattended-mail-digest.md): dashboard work alerts, retained weekly digest and hourly unattended phone-visible status, immediate mail only for confirmed whole-window blockers in either mode. No mailbox migration or new push service.
+
+## P7 Track 2.4: reconciled prerequisite (2026-11-28)
+
+Owner `ba6281ff` A retains selected `f21f9f5` briefs and retires historical
+`3c9f7bc` / `5bc3d1a` integration. [Reconciled IP decision](decisions/p7-track24-ip-licensing.md)
+preserves B, later project-source/independent-maintenance and company-wide
+business-use choices (`6dea3d6d`, `900205c0`). Redistribution is separately
+negotiated; niche validation and final legal terms remain pending. Exact-scope
+Tier 3 approval is required before merge; this records preparation authority only.

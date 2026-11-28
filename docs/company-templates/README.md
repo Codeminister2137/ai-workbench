@@ -21,3 +21,7 @@ document, including headings; use the acronym alone afterward.
 Related: P7 paperwork checklist (`docs/plans/p7-paperwork-checklist.md`),
 offering draft (`docs/plans/company-offering-draft.md`), accountant
 investigation (`docs/plans/accountant-investigation.md`).
+
+Track 2.4 accepted source and business-use scope is reconciled in
+`docs/decisions/p7-track24-ip-licensing.md`; templates remain drafts pending
+per-project schedules and legal review, not approved client terms.
