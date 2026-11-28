@@ -38,9 +38,8 @@ MAX_SUBJECT_CHARS = 300
 MAX_BODY_CHARS = 50_000
 SUPERVISION_MODES = ("attended", "unattended")
 
-# Tiered policy (owner C on 716e02b3, supersedes the 2026-11-18
-# unattended-only rule): attended pages needs-you run outcomes (failed,
-# waiting_on_owner); completed/cancelled summaries wait for unattended.
+# Owner C on c124e9a4 supersedes attended routine pages: these statuses
+# enqueue for periodic status mail, while the dashboard owns work alerts.
 # ``paused`` is never terminal and never mailed.
 ATTENDED_NOTIFY_STATUSES = frozenset({"failed", "waiting_on_owner"})
 UNATTENDED_NOTIFY_STATUSES = frozenset({"completed", "failed", "cancelled", "waiting_on_owner"})

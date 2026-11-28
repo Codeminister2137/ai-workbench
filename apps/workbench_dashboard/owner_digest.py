@@ -62,9 +62,9 @@ def queue_notification(
 ) -> dict:
     """Enqueue once, including blockers first; only whole-window blockers page.
 
-    Tiered policy (owner C on 716e02b3): needs-you pages send in any
-    supervision mode; done summaries wait for unattended. Enqueueing
-    always persists so attended pages have records to flush.
+    Owner C on c124e9a4: routine work notifications stay on the dashboard.
+    Persist updates for periodic unattended status mail; only a confirmed
+    whole-window blocker may page in either supervision mode.
     """
     result = {"sent": False, "error": None, "finished": time.time()}
     key = dedupe_key or hashlib.sha256((subject + "\n" + body).encode()).hexdigest()
@@ -99,8 +99,9 @@ def flush_digest(
 
     Failed delivery leaves records pending. SMTP cannot guarantee exactly-once
     delivery if the process dies after acceptance but before committing progress.
-    Attended mode pages needs-you/blocker rows immediately and leaves done
-    summaries queued; unattended mode flushes the hourly batch as before.
+    Attended mode holds routine updates, including needs-you/blocker rows.
+    A confirmed urgent key may page in either mode; unattended status batches
+    retain the hourly cadence.
     """
     result = {"sent": False, "error": None, "finished": time.time()}
     attended = supervision != "unattended"
@@ -114,10 +115,8 @@ def flush_digest(
         ).fetchall()
         if not rows:
             return dict(result, pending=0)
-        if attended:
-            rows = [row for row in rows if row[3] or row[5] == TIER_NEEDS_YOU]
-            if not rows:
-                return dict(result, skipped="attended")
+        if attended and not urgent_key:
+            return dict(result, skipped="attended")
         last = db.execute("SELECT last_sent FROM progress WHERE id=1").fetchone()
         due = max(min(row[4] for row in rows), last[0] if last else 0) + INTERVAL
         if urgent_key:

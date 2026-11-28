@@ -577,11 +577,16 @@ Codex must ask before making material decisions involving new services, persiste
 
 ## Owner notification delivery
 
-Owner notification delivery uses the dashboard's shared local hourly digest
-([ADR-098](decisions/ADR-098-hourly-unattended-mail-digest.md)): unattended only,
-blockers before routine updates, immediate mail only for a confirmed blocker of
-all work. Existing dashboard scheduler/supervisor ticks flush durable pending
-notifications; individual failed tasks do not imply whole-window blockage.
+Owner work alerts use the existing dashboard inbox/run surfaces. Owner C on
+`c124e9a4` supersedes routine attended mail pages (see the
+[ADR-098 amendment](decisions/ADR-098-hourly-unattended-mail-digest.md)).
+The weekly mail digest remains, alongside the existing hourly unattended status
+batches for phone-visible progress. Attended ticks hold routine queued updates,
+including needs-you events. Immediate mail in either mode requires a confirmed
+whole-window blocker; individual task failures do not establish that condition.
+Existing scheduler/supervisor ticks flush durable status updates. Delivery needs
+a running PC and SMTP; browser/mobile push and general outage detection are not
+implemented. Recipients and mailbox configuration are unchanged.
 
 General Gmail access has an accepted class-based authorization design
 ([ADR-099](decisions/ADR-099-gmail-class-based-approval.md)): task-relevant reads
