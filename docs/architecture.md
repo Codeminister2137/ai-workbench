@@ -1,5 +1,10 @@
 # Architecture
 
+Cross-project working records follow the
+[English-first, Polish-source policy](working-language-policy.md). Preserve
+original evidence alongside interpretations; this convention authorizes no new
+translation service, storage, or external data route.
+
 For package responsibilities, start with the [project map](project-map.md).
 The repo assistant's [workflow guides](repo-coding-assistant.md) describe current
 execution surfaces; [publication](publication.md) covers source/history privacy.

@@ -1,3 +1,11 @@
+## Working language: English work with Polish sources (2026-11-28)
+
+Owner selected A on inbox `db097eef712c4a8586bc78acbbae86aa`: English internal
+analysis/records/decisions, verbatim Polish evidence and original references,
+first-use English glosses and a maintained glossary. See the
+[policy and trade-offs](working-language-policy.md). Translation uncertainty
+remains explicit; Polish audience-facing material may remain Polish.
+
 ## Fallback repair: verdict pipeline now (B), single executor later (C) (2026-11-23)
 
 Owner selected **B then C** (attended): fallback is a core feature and

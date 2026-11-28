@@ -989,6 +989,15 @@ Closing a gate item records its resolution; that closes the gate.
 
 ## Communication
 
+### Working language
+
+Use English for analysis, internal records, decisions, and instructions. Preserve
+Polish sources verbatim with original references alongside English interpretations.
+Keep key Polish terms with an English gloss on first use; follow the
+[working-language policy and maintained glossary](docs/working-language-policy.md).
+Flag translation uncertainty, especially for legal/tax/accounting material.
+Polish correspondence, forms, and audience-facing copy may remain Polish.
+
 Be concise and technically precise.
 
 Every final response must give a concise, informative account of the verified
