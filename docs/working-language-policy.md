@@ -41,6 +41,7 @@ meaning against the particular source and date.
 | KSeF — Krajowy System e-Faktur | National e-Invoicing System | Keep source-specific applicability and dates. |
 | CEIDG — Centralna Ewidencja i Informacja o Działalności Gospodarczej | Central Register and Information on Economic Activity | Preserve official names and identifiers verbatim. |
 | ZUS — Zakład Ubezpieczeń Społecznych | Social Insurance Institution | Distinguish the institution from contributions and benefits. |
+| JDG — jednoosobowa działalność gospodarcza | one-person business activity (sole proprietorship) | Preserve the exact legal-form wording from the source; not a company. |
 
 ## Alternatives and trade-offs
 
