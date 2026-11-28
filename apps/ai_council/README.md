@@ -51,6 +51,12 @@ Injected callbacks own their privacy and inference authorization; the built-in
 fixture tests use deterministic callbacks. Do not put secrets/private transcripts
 in proposals or assessments.
 
+`investor.guards` proves the paper-only contract a future connected trial must
+pass first: https endpoints on the paper trading host only (live hosts fail
+with their own message, data hosts stay rejected), credentials from the
+paper-named sources only, and simulated orders within a positive notional cap.
+Pure checks, no network; slice 2 wires them in front of any broker call.
+
 ## Requirements
 
 - Python dependencies from the workspace
