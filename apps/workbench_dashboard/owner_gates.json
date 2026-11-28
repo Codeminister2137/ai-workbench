@@ -267,6 +267,16 @@
         "A: Proposed SPY/QQQ daily; specify eligible window",
         "B: Supply alternate symbols, cadence and window"
       ]
+    },
+    {
+      "id": "investor-momentum-offline-freeze",
+      "title": "Investor: freeze offline momentum protocol and identify local historical inputs",
+      "type": "decision",
+      "body": "Decision needed: accept the proposed offline qualification package or specify an alternative before freezing.\n\nWhy it matters: variant, dates, execution costs and concentration definition change whether momentum survives disproof. No historical inputs were found in the bounded local inventory; acquisition/transmission is not authorized.\n\nOptions:\nA: Accept the research design in docs/research/investor-momentum-manifest-proposal.md, conditional on a provenance-complete local dataset and audit; identify its local path.\nB: Specify an alternate local dataset and/or research package before any results are consumed.\n\nPros and cons:\nA: Explicit SPY/QQQ 12-1 monthly research, 2004-2025 inputs, fixed haircuts and windows prevents result-driven tuning and keeps scope small. Correlated ETFs limit generality; costs are assumptions and required local history is unavailable in searched locations.\nB: Can match available historical coverage and owner research intent, including 6-1 instead. Requires another reviewed freeze and delays evidence; comparing variants after seeing results would invalidate this protocol.\n\nTechnical recommendation: A as a proposed protocol only, conditional on authentic audited local inputs. Do not freeze missing source/hash fields, fetch data, substitute fixtures or run qualification yet. If no suitable local dataset exists, keep qualification blocked; external acquisition needs separate authorization.\n\nQuestion: Accept A or specify B, and where is the existing local historical dataset? This does not change connected-trial parameters on 86ee6792 or runtime work on 8f1ccefb.",
+      "options": [
+        "A: Accept proposed protocol; identify local data (Recommended)",
+        "B: Specify alternative offline protocol/data"
+      ]
     }
   ]
 }
