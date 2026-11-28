@@ -12,6 +12,8 @@ def test_paper_endpoint_passes_and_returns_host():
         "paper-api.alpaca.markets"
     )
     assert check_endpoint("https://PAPER-API.ALPACA.MARKETS/v2") == "paper-api.alpaca.markets"
+    assert check_endpoint("HTTPS://paper-api.alpaca.markets/v2") == "paper-api.alpaca.markets"
+    assert check_endpoint("https://paper-api.alpaca.markets:443/v2") == "paper-api.alpaca.markets"
 
 
 @pytest.mark.parametrize(
@@ -22,6 +24,10 @@ def test_paper_endpoint_passes_and_returns_host():
         ("https://data.alpaca.markets/v2/stocks", "allowlist"),
         ("https://evil.example.com/v2", "allowlist"),
         ("https://user:pass@paper-api.alpaca.markets/v2", "credentials"),
+        ("https://paper-api.alpaca.markets:8443/v2", "port"),
+        ("https://127.0.0.1/v2", "allowlist"),
+        ("https://[::1]/v2", "allowlist"),
+        ("https:///v2", "host missing"),
         ("not a url", "https"),
         ("", "https"),
     ],
