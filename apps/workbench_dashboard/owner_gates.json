@@ -262,11 +262,8 @@
       "id": "investor-momentum-trial-parameters",
       "type": "decision",
       "title": "Investor momentum: confirm exact paper-trial parameters after offline qualification",
-      "body": "Owner A on 426eb4f248614154a8c929743ffd20cd selects offline ETF momentum qualification first. Qualification and runtime safety are not yet proven; no connected launch is admitted. Decision needed: exact symbols, cadence and launch window, omitted from that answer. A: use SPY/QQQ with one decision per regular trading session, only after passing offline qualification and runtime safety; supply an explicit future launch window before admission. Pro: small fixed liquid ETF set and low operational load. Con: correlated exposures and delayed broker evidence; these are proposed parameters, not approved ones. B: supply an alternate fixed 2-3 liquid US ETF set, cadence and future launch window. Pro: better owner fit and potentially broader exposures. Con: requires matching data audits and may increase evaluation and operational effort. Technical recommendation: A for a small first trial, with window chosen only after prerequisites pass. Question: A or B, which exact symbols/cadence/window? Existing five-day, five-orders/day, $1,000/order and $5,000 exposure caps remain. No mechanics-only trial, paid data/inference or live trading authorized. Offline manifest preparation proceeds independently; its material data/parameter choices must be frozen before qualification.",
-      "options": [
-        "A: Proposed SPY/QQQ daily; specify eligible window",
-        "B: Supply alternate symbols, cadence and window"
-      ]
+      "body": "Resolved by owner A on 86ee6792eb5c45babdcb0514d8a2452d: SPY/QQQ, one decision per regular trading session, for the first small paper trial. Owner: A for first small trial, B later. Alternate parameters require later review. Explicit future launch dates remain deferred until offline qualification and runtime safety pass, tracked by investor-momentum-launch-window. Existing five-trading-day, five-orders/day, $1,000/order and $5,000 exposure caps remain. This answer authorizes no connected launch, live trading, paid data or paid inference.",
+      "options": []
     },
     {
       "id": "investor-momentum-offline-freeze",
@@ -276,6 +273,16 @@
       "options": [
         "A: Accept proposed protocol; identify local data (Recommended)",
         "B: Specify alternative offline protocol/data"
+      ]
+    },
+    {
+      "id": "investor-momentum-launch-window",
+      "title": "Investor: confirm future paper-trial window after qualification and runtime safety",
+      "type": "decision",
+      "body": "Decision needed: after offline qualification and runtime safety pass, confirm the explicit future launch window for the first SPY/QQQ daily paper trial.\n\nWhy it matters: source 86ee6792 approves symbols and cadence but supplies no dates. A date-free approval must not admit connected execution.\n\nOptions:\nA: Once prerequisites pass, supply exact future start/end dates within the existing five-trading-day cap.\nB: Defer the connected trial until a later owner review.\n\nPros and cons:\nA: Enables bounded broker evidence with approved symbols/cadence; requires passing evidence and owner availability for the chosen dates.\nB: Avoids committing dates before readiness; delays broker evidence.\n\nTechnical recommendation: A only after passing offline qualification and independently evidenced runtime safety; until then retain this gate pending and do not choose dates automatically. Keep five orders/day, $1,000/order and $5,000 exposure caps. No live trading, paid data/inference or automatic launch.\n\nQuestion: When prerequisites pass, which exact future start/end dates do you approve, or should the trial remain deferred?",
+      "options": [
+        "A: Supply future window after prerequisites pass (Recommended)",
+        "B: Defer connected trial"
       ]
     }
   ]

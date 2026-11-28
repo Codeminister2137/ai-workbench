@@ -11,9 +11,19 @@ Owner source `426eb4f248614154a8c929743ffd20cd`, answer A:
 This selects research sequencing, not a successful backtest or trial launch.
 
 The source explicitly asks for exact symbols, cadence and launch window;
-the answer supplies none. SPY/QQQ were examples in bounds source
+that earlier answer supplied none. SPY/QQQ were examples in bounds source
 `472cea09ec2048fc89a2f94e6908c3c6`, not owner-selected symbols.
 Existing runtime defaults do not supply missing owner approval.
+
+Owner source `86ee6792eb5c45babdcb0514d8a2452d`, answer A, now approves
+SPY/QQQ and one decision per regular trading session for the first small
+paper trial. Owner note: "I agree with recommendation, A for first small
+trial, B later". B remains a future alternative requiring its own reviewed
+parameters; it is not an approved second trial. A keeps the universe and
+operational load small, at the cost of correlated exposures and delayed
+broker evidence. B could broaden exposures but requires matching audits
+and more evaluation work. No explicit launch dates were supplied; the
+accepted recommendation defers the window until prerequisites pass.
 
 ## Alternatives and consequences
 
@@ -53,7 +63,8 @@ they do not authorize another store or service.
   momentum quality, valid historical coverage or profitability.
 
 No historical qualification was run in this closeout. No dataset, winning
-variant, exact symbols, cadence or launch date is claimed frozen. Offline
+variant or launch date is claimed frozen. Connected-trial symbols and
+cadence are approved above; offline manifest choices remain separate. Offline
 qualification preparation may proceed without launching a connected trial.
 
 ## Connected trial admission
@@ -61,7 +72,8 @@ qualification preparation may proceed without launching a connected trial.
 Retain caps from `472cea09`: five orders/day, $1,000/order, $5,000 open
 exposure, two or three fixed liquid US ETFs, at most five trading days,
 paper only and journal proof. Before admission require passing qualification,
-owner-confirmed exact symbols/cadence/window and independently evidenced
+the approved SPY/QQQ daily decision cadence and an owner-confirmed
+explicit future launch window and independently evidenced
 runtime safety including restart/ambiguous-order recovery. Runtime work is
 tracked separately on `8f1ccefb6bc64cf9b94b2514640f2c15`; this decision
 does not declare it complete. No broker calls, paid data, paid inference,
@@ -71,3 +83,14 @@ Next action: prepare the complete offline qualification manifest and freeze
 its material choices through the dashboard before the first historical run.
 Completion requires a frozen manifest, audited data and a preserved disproof
 report; a failed hypothesis is a valid research outcome, not launch readiness.
+
+## Parameter closeout, 2026-11-28
+
+Run `3adddd5f368f4b0ea486403098877dab` implements source `86ee6792`: symbols
+and cadence COMPLETE; launch-window selection DEFERRED until passing offline
+qualification and independently evidenced runtime safety. Gate
+`investor-momentum-launch-window` retains that owner action. Before admission,
+record exact future start/end dates within the existing five-trading-day cap,
+with the trial bounds and stop conditions. Do not infer a rolling window,
+start automatically, change runtime defaults or launch a connected trial
+from this answer. All existing caps and prohibitions remain in force.
