@@ -67,7 +67,7 @@ def test_only_confirmed_whole_window_blocker_bypasses(mail):
     assert len(sent) == 1
 
 
-def test_attended_pages_needs_you_and_holds_done(mail, tmp_path):
+def test_attended_holds_routine_alerts_for_periodic_status(mail, tmp_path):
     sent, clock, queue, _, config = mail
     queued = digest.queue_notification(
         data_dir=tmp_path,
@@ -91,16 +91,19 @@ def test_attended_pages_needs_you_and_holds_done(mail, tmp_path):
         config=config,
         tier="needs-you",
     )
+    queue("one failed task", blocker=True)
+    clock[0] += 3600
     page = digest.flush_digest(data_dir=tmp_path, supervision="attended", config=config)
-    assert page["sent"]
-    assert "need decision" in sent[0]["body"]
-    assert "done work" not in sent[0]["body"]
-    assert "Page" in sent[0]["subject"]
+    assert page["skipped"] == "attended"
+    assert not sent
     queue()
     clock[0] += 3600
     batch = digest.flush_digest(data_dir=tmp_path, supervision="unattended", config=config)
     assert batch["sent"]
-    assert "done work" in sent[1]["body"]
+    assert "done work" in sent[0]["body"]
+    assert "need decision" in sent[0]["body"]
+    assert "one failed task" in sent[0]["body"]
+    assert "Hourly digest" in sent[0]["subject"]
 
 
 def test_attended_whole_window_blocker_pages_immediately(mail, tmp_path):

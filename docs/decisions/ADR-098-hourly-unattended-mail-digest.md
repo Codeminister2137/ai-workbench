@@ -2,7 +2,36 @@
 
 Status: Accepted, 2026-11-20. Source inbox `fa9590e797b3468ca56a8409f3e394d5`, closeout run `43af703038b3443bbfe379d14248f20f`.
 
-## Decision and owner intent
+## Amendment: dashboard work alerts and retained status mail (2026-11-28)
+
+Owner selected C on inbox `c124e9a497ec4102aa0f53d3837db9c7`:
+weekly digest mail and dashboard work notifications. The owner's note retains
+phone-visible periodic work status without opening Tailscale/apps, and requests
+an emergency path where feasible. This supersedes routine attended pages from
+`716e02b3505345e09fd2a29718bc63f8` (runtime `cd75b60` / `59290c0`).
+The original unattended-only decision below is preserved as history.
+
+Routine needs-you events remain visible in the existing dashboard inbox/run
+surfaces. They no longer generate attended mail pages, including individual
+failed tasks and owner decisions. Existing hourly unattended status batches
+remain available for phone-visible progress; the separate weekly mail digest
+and its schedule are retained. Queued rows survive restart and wait while
+attended. No new browser/mobile push delivery is introduced.
+
+The existing confirmed whole-window-blocker path still sends immediately in
+either supervision mode. A failed task alone does not establish an emergency.
+This is a bounded emergency path, not detection of every critical failure:
+SMTP, an active producer/scheduler and a running PC remain prerequisites.
+No guarantee of phone push, delivery during sleep, or outage detection is made.
+
+A (retain tiered mail) gives more immediate visibility but adds work-mail noise.
+B (private mailbox) separates client mail but requires another verified recipient
+and inbox. Accepted C reduces routine mail noise but requires dashboard monitoring
+for individual work alerts; retained periodic status and the existing emergency
+exception address the owner's stated phone-visibility uses. No mailbox migration,
+recipient change, new external service, dependency or storage is introduced.
+
+## Original decision and owner intent
 
 The owner chose A, an hourly digest rather than a send-time throttle. Mail is only for unattended sessions. Blockers are the primary purpose and appear before routine progress. A real blocker may bypass cadence only when all work is blocked. Routine completions, sleep and final closeout have no independent immediate-mail exception.
 

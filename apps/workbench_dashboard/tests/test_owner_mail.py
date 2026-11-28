@@ -226,9 +226,9 @@ def test_notify_plan_silent_without_smtp(tmp_path) -> None:
     assert list(tmp_path.iterdir()) == []
 
 
-def test_notify_plan_attended_mails_needs_you_only(tmp_path, fake_smtp) -> None:
-    # Tiered policy (owner C on 716e02b3): attended pages failed and
-    # waiting_on_owner; completed/cancelled summaries stay queued.
+def test_notify_plan_attended_queues_needs_you_only(tmp_path, fake_smtp) -> None:
+    # Owner C on c124e9a4: retain these outcomes for periodic status;
+    # the shared flusher prevents routine attended mail pages.
     sender, notify_on = notify_plan("attended", tmp_path, dict(SMTP_ENV))
     assert sender is not None
     assert notify_on == ATTENDED_NOTIFY_STATUSES

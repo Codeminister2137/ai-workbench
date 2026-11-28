@@ -1402,3 +1402,5 @@ Owner confirmed C: broad estimates on the offers overview; first-year totals,
 scoped examples and fuller disclaimers on project detail pages. Numeric bands
 and publication remain separately gated. See [decision record](decisions/p7-track25-price-presentation.md)
 (source inbox `73aaf0c8040342f7a738602778e51e9e`).
+
+Owner C on inbox `c124e9a4` (2026-11-28) amends [ADR-098](decisions/ADR-098-hourly-unattended-mail-digest.md): dashboard work alerts, retained weekly digest and hourly unattended phone-visible status, immediate mail only for confirmed whole-window blockers in either mode. No mailbox migration or new push service.

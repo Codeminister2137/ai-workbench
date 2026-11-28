@@ -1,6 +1,17 @@
 {
   "gates": [
     {
+      "id": "mail-channel-retention",
+      "title": "Mail follow-up: retain AI notifications and separate company/private mail?",
+      "type": "decision",
+      "body": "Accepted owner C on c124e9a497ec4102aa0f53d3837db9c7: dashboard work alerts; retain weekly mail digest and existing hourly unattended status for phone visibility. Routine attended pages are superseded. Confirmed whole-window blockers retain immediate mail in either mode. No recipient migration or new push service. See ADR-098 amendment for scope and delivery limits.",
+      "options": [
+        "A: Keep current tiered mail",
+        "B: Separate private owner mailbox",
+        "C: Weekly digest mail; dashboard work notifications"
+      ]
+    },
+    {
       "id": "sleep-20261121-owner-facts",
       "title": "Sleep follow-up: power-button actor, Mai channel and report",
       "type": "clarification",
@@ -11,7 +22,7 @@
       "id": "mail-notification-cadence",
       "title": "Mail: choose hourly digest or simpler throttle",
       "type": "decision",
-      "body": "Accepted A from inbox fa9590e797b3468ca56a8409f3e394d5: hourly durable digest, unattended sessions only, blockers first. Immediate mail is allowed only for a real blocker when all work is blocked; sleep/closeout and routine completions remain batched. See ADR-098-hourly-unattended-mail-digest.md for delivery progress, coordination, recovery and scheduler requirements.",
+      "body": "Hourly unattended status digest retained. Owner C on c124e9a4 supersedes routine attended pages: dashboard owns work alerts, weekly digest stays, confirmed whole-window blockers may mail immediately in either mode. See ADR-098 amendment.",
       "options": [
         "A: Hourly digest; confirm exception policy",
         "B: Hourly throttle; confirm exception policy"
