@@ -1405,7 +1405,12 @@ and publication remain separately gated. See [decision record](decisions/p7-trac
 
 Owner C on inbox `c124e9a4` (2026-11-28) amends [ADR-098](decisions/ADR-098-hourly-unattended-mail-digest.md): dashboard work alerts, retained weekly digest and hourly unattended phone-visible status, immediate mail only for confirmed whole-window blockers in either mode. No mailbox migration or new push service.
 
-Owner A on inbox `472cea09` (2026-11-28) approves Investor slice-2 bounds: max 5 paper orders/day, $1,000 max notional per order, $5,000 max open exposure, fixed SPY/QQQ universe, 5 trading days max, journal proof per the slice-1 contract. Implemented as `investor.loop.run_day` + single Alpaca-paper transport; trial firing starts on a trading day (weekend orders cannot fill).
+Owner A on inbox `472cea09` (2026-11-28) approves Investor slice-2 bounds: max 5 paper orders/day, $1,000 max notional per order, $5,000 max open exposure, two or three fixed liquid US ETFs, 5 trading days max, journal proof per the slice-1 contract. SPY/QQQ were examples, not a selected universe. Existing `investor.loop.run_day` and Alpaca-paper transport are scaffolding, not proof of trial readiness.
+
+Owner A on inbox `426eb4f248614154a8c929743ffd20cd` selects
+[offline ETF momentum qualification first](decisions/investor-momentum-qualification.md).
+Selection is complete; qualification, exact input/strategy freeze and connected
+trial readiness remain incomplete. No mechanics-only trial substituted.
 
 ## P7 Track 2.4: reconciled prerequisite (2026-11-28)
 

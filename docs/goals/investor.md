@@ -28,5 +28,10 @@ Alpaca signup pending with owner.
 
 ## Next action
 
-Coverage research notes, then the scaffold brief
-(persistence/service decision) before any engine code.
+Qualify ETF time-series momentum offline first (owner A on `426eb4f2`).
+Prepare and freeze the qualification manifest, audit historical data and run
+the disproof protocol before a connected trial. Exact symbols, cadence and
+launch window remain pending; scaffold defaults are not owner approval.
+See [accepted direction and qualification gates](../decisions/investor-momentum-qualification.md).
+The Council SQLite journal and bounded loop already exist; runtime safety
+and connected-trial readiness remain separate acceptance work.
