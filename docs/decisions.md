@@ -1404,3 +1404,5 @@ and publication remain separately gated. See [decision record](decisions/p7-trac
 (source inbox `73aaf0c8040342f7a738602778e51e9e`).
 
 Owner C on inbox `c124e9a4` (2026-11-28) amends [ADR-098](decisions/ADR-098-hourly-unattended-mail-digest.md): dashboard work alerts, retained weekly digest and hourly unattended phone-visible status, immediate mail only for confirmed whole-window blockers in either mode. No mailbox migration or new push service.
+
+Owner A on inbox `472cea09` (2026-11-28) approves Investor slice-2 bounds: max 5 paper orders/day, $1,000 max notional per order, $5,000 max open exposure, fixed SPY/QQQ universe, 5 trading days max, journal proof per the slice-1 contract. Implemented as `investor.loop.run_day` + single Alpaca-paper transport; trial firing starts on a trading day (weekend orders cannot fill).
