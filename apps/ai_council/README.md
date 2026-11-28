@@ -45,17 +45,34 @@ symbol universe. `assess` appends later outcomes/lessons linked to immutable
 original decisions. Both tables prohibit updates/deletes; this is application
 integrity, not protection from someone who can modify the SQLite file.
 
-This slice has no live adapter, council-backed judge or broker execution loop.
-Tests establish software correctness, not model quality or paper profitability.
-Injected callbacks own their privacy and inference authorization; the built-in
-fixture tests use deterministic callbacks. Do not put secrets/private transcripts
-in proposals or assessments.
+This slice has no council-backed judge. Tests establish software correctness,
+not model quality or paper profitability. Injected callbacks own their privacy
+and inference authorization; the built-in fixture tests use deterministic
+callbacks. Do not put secrets/private transcripts in proposals or assessments.
 
 `investor.guards` proves the paper-only contract a future connected trial must
 pass first: https endpoints on the paper trading host only (live hosts fail
 with their own message, data hosts stay rejected), credentials from the
 paper-named sources only, and simulated orders within a positive notional cap.
 Pure checks, no network; slice 2 wires them in front of any broker call.
+
+### Slice 2: bounded loop (owner A, inbox `472cea09`)
+
+`investor.loop.run_day` runs one bounded decision round per call against an
+injected `BrokerTransport`: max 5 orders/day, $1,000 max notional per order,
+$5,000 max open exposure, fixed SPY/QQQ universe, 5 trading days max, no
+shorts. Every round journals exactly one decision; submits, rejects, errors
+and halt markers attach as outcome assessments via `replay.assess`, and
+`replay.outcomes` reads them back. Any guard trip, broker refusal or journal
+failure halts the run with a journaled marker; later calls stay halted.
+
+`investor/` stays offline-pure (`test_investor_stays_offline` bans network
+imports there). `OfflineBroker` fills deterministically at configured prices
+for tests and the harness. The single Alpaca-paper HTTPS transport
+(`alpaca_paper.HttpsTransport`, outside `investor/`) submits market-notional
+orders, so no price feed and no market-data exception is needed. Trial state
+derives from the journal, so daily invocations need no daemon: run once per
+trading day and the loop enforces day caps, the day limit and halts itself.
 
 ## Requirements
 

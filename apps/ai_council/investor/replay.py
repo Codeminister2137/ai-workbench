@@ -138,6 +138,17 @@ def record_decision(
     return record["id"]
 
 
+def outcomes(store: ConversationStore, decision_id: str) -> list[dict]:
+    """Read outcome assessments linked to one decision, in recording order."""
+    return [
+        json.loads(row[0])
+        for row in store.connection.execute(
+            "SELECT record FROM investor_outcomes WHERE decision_id = ? ORDER BY rowid",
+            (decision_id,),
+        )
+    ]
+
+
 def assess(
     store: ConversationStore, decision_id: str, assessed_at: datetime, outcome: str, lessons: str
 ) -> None:
