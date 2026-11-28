@@ -572,8 +572,9 @@ def build_retrying_executor(
     The 180s external-agent inactivity timeout is transient often enough
     to deserve one fresh session; every other failure passes through
     untouched so retries never multiply real spend or mask real errors.
-    The final receipt carries ``attempt`` plus the first failure under
-    ``retry_of`` when a retry happened.
+    The final receipt carries ``attempt`` plus the first leg's identity
+    and failure under ``retry_of`` when a retry happened, so fallback
+    legs stay visible instead of being overwritten.
     """
 
     def execute(run: dict) -> dict:
@@ -585,6 +586,10 @@ def build_retrying_executor(
         second["retry_of"] = {
             "error": first.get("error"),
             "failure_class": first.get("failure_class"),
+            "route_id": first.get("route_id"),
+            "model_id": first.get("model_id"),
+            "mai_session_id": first.get("mai_session_id"),
+            "session_usage": first.get("session_usage"),
         }
         return second
 

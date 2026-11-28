@@ -325,6 +325,11 @@ def build_executor(
                         task_type="task",
                         task_id=run_id,
                         context_refs=[f"run:{run_id}"],
+                        metadata={
+                            "author_source": "drain-run",
+                            "assigned_route": route_id,
+                            "assigned_model": backend.model,
+                        },
                     )
                 except Exception as exc:
                     return {"status": "failed", "error": f"Owner-task filing failed: {exc}"}

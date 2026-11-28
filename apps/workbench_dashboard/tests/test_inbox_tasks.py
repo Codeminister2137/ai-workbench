@@ -234,3 +234,47 @@ def test_attribution_ignores_invalid_run_references(tmp_path):
         context_refs=["run:", "run:../bad", "run:missing"],
     )
     assert item["metadata"] == {}
+
+
+def test_attribution_follows_metadata_run_id(tmp_path):
+    stores = DashboardStores(tmp_path)
+    stores.runs.put(
+        "r9", {"id": "r9", "receipts": [{"route_id": "run-route", "model_id": "run-model"}]}
+    )
+    item = stores.create_inbox_task(
+        title="Rule finding",
+        body="Details",
+        task_type="task",
+        metadata={"author_source": "rule", "run_id": "r9"},
+    )
+    assert item["metadata"]["author_route"] == "run-route"
+    assert item["metadata"]["author_model"] == "run-model"
+    assert item["metadata"]["attribution_run_id"] == "r9"
+    assert item["metadata"]["author_source"] == "rule"
+
+
+def test_attribution_defaults_source_to_supervisor(tmp_path):
+    stores = DashboardStores(tmp_path)
+    stores.runs.put(
+        "r9", {"id": "r9", "receipts": [{"route_id": "run-route", "model_id": "run-model"}]}
+    )
+    item = stores.create_inbox_task(
+        title="Supervisor finding",
+        body="Details",
+        task_type="task",
+        metadata={"run_id": "r9"},
+    )
+    assert item["metadata"]["author_source"] == "supervisor"
+    assert item["metadata"]["attribution_run_id"] == "r9"
+
+
+def test_attribution_ignores_invalid_metadata_run_id(tmp_path):
+    stores = DashboardStores(tmp_path)
+    item = stores.create_inbox_task(
+        title="Rule finding",
+        body="Details",
+        task_type="task",
+        metadata={"run_id": "../escape"},
+    )
+    assert "author_route" not in item["metadata"]
+    assert "attribution_run_id" not in item["metadata"]

@@ -290,16 +290,21 @@ class DashboardStores:
         """Project observed identity without guessing models from route names.
 
         Legacy records are enriched on read; no historical rewrite is needed.
-        Linked execution identity is separate from the filing source.
+        Linked execution identity is separate from the filing source. Runs
+        linked via ``metadata.run_id`` enrich like ``context_refs`` run:
+        links, so rule-filed items without refs still resolve.
         """
         metadata = dict(item.get("metadata") or {})
         if item.get("created_by") == "owner":
             return item
-        refs = item.get("context_refs") or []
-        for ref in refs:
-            if not isinstance(ref, str) or not ref.startswith("run:"):
-                continue
-            run_id = ref[4:]
+        candidates: list[str] = []
+        for ref in item.get("context_refs") or []:
+            if isinstance(ref, str) and ref.startswith("run:"):
+                candidates.append(ref[4:])
+        filed_run = metadata.get("run_id")
+        if isinstance(filed_run, str) and filed_run:
+            candidates.append(filed_run)
+        for run_id in candidates:
             if not run_id or "/" in run_id or "\\" in run_id or run_id.startswith("."):
                 continue
             run = self.runs.get(run_id)
@@ -312,7 +317,9 @@ class DashboardStores:
                 if receipt.get("route_id") or receipt.get("model_id"):
                     metadata.setdefault("author_route", receipt.get("route_id"))
                     metadata.setdefault("author_model", receipt.get("model_id"))
-                    metadata.setdefault("attribution_run_id", ref[4:])
+                    metadata.setdefault("attribution_run_id", run_id)
+                    if item.get("created_by") == "supervisor":
+                        metadata.setdefault("author_source", "supervisor")
                     break
             if metadata.get("attribution_run_id"):
                 break

@@ -125,6 +125,11 @@ recommendations without alternatives, or questions
 that make the owner reconstruct the consequences. Small reversible
 implementation details are not material decisions and need no formal brief.
 
+When filing the brief as an inbox `decision` item, copy
+`docs/inbox-templates/decision.md` and keep every section separated by a
+blank line — a one-paragraph blob is unreadable. Closeouts and generic tasks
+use `docs/inbox-templates/closeout.md` and `docs/inbox-templates/task.md`.
+
 Codex may recommend an option, but must distinguish its recommendation
 from the user's decision.
 
