@@ -73,6 +73,7 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/wake-runbook.md | KNOWLEDGE | Wake runbook. |
 | docs/workflow-builder-note.md | KNOWLEDGE | Decomposition note for idea 9b22ac09 (open). |
 | docs/workflow.md | KNOWLEDGE | Workflow rules. |
+| docs/working-language-policy.md | KNOWLEDGE | Owner A db097eef 28.11: EN-first work, verbatim PL sources, maintained glossary. |
 | docs/xiaomi-health-connect-runbook.md | PENDING | Owner chose path B (inbox 173cb000); backfill + sync + first export pending. |
 | docs/plans/00_MASTER_CHECKLIST_AI_Job_Search_IT_Business.txt | KNOWLEDGE | Founder source plan (constraints input). |
 | docs/plans/01_AI_Provider_Agnostic_Infrastructure_Plan.txt | KNOWLEDGE | Founder source plan (capability evidence). |
@@ -125,7 +126,8 @@ Subdirectories are covered by aggregate rows; per-file rows are future scope.
 | docs/plans/site-dns-template.md | KNOWLEDGE | Paste-ready DNS records 26.11 (site CNAME/A + Zoho/Workspace MX/SPF/DKIM/DMARC); fill after hosting pick. |
 | docs/plans/site-publish-20261126.md | PENDING | EOD publish plan 26.11 (decision chain + agent prep + kill criteria); in progress. |
 | docs/plans/work-20261126.md | ACTED | Master 5-phase work plan 26.11 PM; superseded by work-20261127.md. |
-| docs/plans/work-20261127.md | PENDING | 27.11 plan: Beata round 2, publish chain, outreach, leftover queue. |
+| docs/plans/work-20261127.md | ACTED | 27.11 plan consumed; superseded by work-20261128.md. |
+| docs/plans/work-20261128.md | PENDING | 28.11 morning queue: G2 verify, language merge, P7 merges, archival. |
 | docs/plans/surface-parity-sweep-20261127.md | PENDING | Human/AI parity sweep 27.11 (H1-H4 + A1-A4 findings); owner reviews, then execute. |
 | docs/plans/name-eligibility-fallback-20261124.md | PENDING | Fallback screen 24.11: Jaworski Software/IT conditional, JS Labs NO-GO, Pracownia weak; + namelix pack. |
 | docs/plans/invoice-sending-scope-20261125.md | PENDING | Slice-3 sending design 25.11 (InFakt sync + at-most-once machine); 3 owner gates filed, no live sends. |
